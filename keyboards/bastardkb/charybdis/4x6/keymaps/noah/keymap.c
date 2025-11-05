@@ -121,12 +121,21 @@ void pointing_device_init_user(void) {
 #endif // POINTING_DEVICE_ENABLE
 
 #ifdef RGB_MATRIX_ENABLE
+// Treat both OS Caps Lock and QMK Caps Word as "caps active"
+static inline bool caps_is_active(void) {
+#    ifdef CAPS_WORD_ENABLE
+    extern bool is_caps_word_on(void);
+    if (is_caps_word_on()) return true;
+#    endif
+    return host_keyboard_led_state().caps_lock;
+}
+
 // --- Caps Lock indicator: support multiple LED indices ---
 #    define CAPS_LED_COUNT 3
 static const uint8_t CAPS_LED_INDICES[CAPS_LED_COUNT] = {1, 5, 7}; // edit this list to your desired LEDs
 
 static inline void paint_caps_yellow_if_on(uint8_t led_min, uint8_t led_max) {
-    if (!host_keyboard_led_state().caps_lock) return;
+    if (!caps_is_active()) return;
     hsv_t caps_hsv = {.h = 43, .s = 255, .v = rgb_matrix_get_val()}; // yellow at current brightness
     rgb_t caps_rgb = hsv_to_rgb(caps_hsv);
     for (uint8_t i = 0; i < CAPS_LED_COUNT; i++) {
