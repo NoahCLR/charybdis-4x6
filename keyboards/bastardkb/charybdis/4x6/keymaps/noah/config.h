@@ -83,4 +83,4 @@
 #ifdef AUTO_MOUSE_TIME
 #    undef AUTO_MOUSE_TIME
 #endif
-#define AUTO_MOUSE_TIME 1500
+#define AUTO_MOUSE_TIME 1200 // milliseconds
