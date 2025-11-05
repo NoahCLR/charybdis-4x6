@@ -137,6 +137,17 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         // Return true to fully override the active RGB effect with solid white.
         // If you'd rather let the running effect keep animating, return false.
         return true;
+    } else if (top == LAYER_LOWER) {
+        // Deep purple = hue 200°, full saturation, keep current brightness
+        hsv_t hsv = {.h = 200, .s = 255, .v = rgb_matrix_get_val()};
+        rgb_t rgb = hsv_to_rgb(hsv);
+
+        for (uint8_t i = led_min; i < led_max; i++) {
+            rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
+        }
+
+        // Override active RGB effect with solid green
+        return true;
     }
 
     // Not on the pointer layer → don’t interfere with effects/other indicators
