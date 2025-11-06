@@ -22,7 +22,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest -y || true
+          gh release delete latest -y --repo "$GITHUB_REPOSITORY" || true
 
   update-tag:
     name: 'Update tag for release'
@@ -46,7 +46,7 @@ jobs:
     needs: update-tag
 
   retitle-release:
-    name: 'Set release title'
+    name: 'Set release title & notes'
     runs-on: ubuntu-latest
     needs: publish
     steps:
@@ -55,4 +55,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release edit latest \
+            --repo "$GITHUB_REPOSITORY" \
             --title "Noah’s Charybdis 4x6 Layout"
