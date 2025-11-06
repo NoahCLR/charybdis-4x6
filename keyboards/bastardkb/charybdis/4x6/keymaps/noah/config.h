@@ -16,7 +16,17 @@
  */
 #pragma once
 
-// --- Brightness cap ---
+#ifdef VIA_ENABLE
+/* VIA configuration. */
+#    define DYNAMIC_KEYMAP_LAYER_COUNT 4
+#endif // VIA_ENABLE
+
+#ifndef __arm__
+/* Disable unused features. */
+#    define NO_ACTION_ONESHOT
+#endif // __arm__
+
+// --- RGB Brightness cap ---
 #ifdef RGBLIGHT_LIMIT_VAL
 #    undef RGBLIGHT_LIMIT_VAL
 #endif
@@ -27,15 +37,20 @@
 #endif
 #define LED_MATRIX_MAXIMUM_BRIGHTNESS 150
 
-#ifdef LED_MATRIX_DEFAULT_VAL
-#    undef LED_MATRIX_DEFAULT_VAL
-#endif
-#define LED_MATRIX_DEFAULT_VAL LED_MATRIX_MAXIMUM_BRIGHTNESS
-
 #ifdef RGB_MATRIX_MAXIMUM_BRIGHTNESS
 #    undef RGB_MATRIX_MAXIMUM_BRIGHTNESS
 #endif
 #define RGB_MATRIX_MAXIMUM_BRIGHTNESS 150
+
+#ifdef RGB_MATRIX_DEFAULT_VAL
+#    undef RGB_MATRIX_DEFAULT_VAL
+#endif
+#define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
+
+#ifdef LED_MATRIX_DEFAULT_VAL
+#    undef LED_MATRIX_DEFAULT_VAL
+#endif
+#define LED_MATRIX_DEFAULT_VAL LED_MATRIX_MAXIMUM_BRIGHTNESS
 
 // --- Default mode/color (solid red) ---
 #ifdef RGB_MATRIX_DEFAULT_MODE
@@ -53,27 +68,13 @@
 #endif
 #define RGB_MATRIX_DEFAULT_SAT 255
 
-#ifdef RGB_MATRIX_DEFAULT_VAL
-#    undef RGB_MATRIX_DEFAULT_VAL
-#endif
-#define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
-
+// --- Split layer state for syncing RGB Per Layer between both sides ---
 #ifdef SPLIT_LAYER_STATE_ENABLE
 #    undef SPLIT_LAYER_STATE_ENABLE
 #endif
 #define SPLIT_LAYER_STATE_ENABLE
 
-#ifdef VIA_ENABLE
-/* VIA configuration. */
-#    define DYNAMIC_KEYMAP_LAYER_COUNT 4
-#endif // VIA_ENABLE
-
-#ifndef __arm__
-/* Disable unused features. */
-#    define NO_ACTION_ONESHOT
-#endif // __arm__
-
-/* Charybdis-specific features. */
+/* Auto Mouse Settings */
 
 #ifdef POINTING_DEVICE_ENABLE
 // Enable automatic mouse movement when on the pointer layer.

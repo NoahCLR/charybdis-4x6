@@ -138,8 +138,8 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         // Return true to fully override the active RGB effect with solid white.
         return true;
     } else if (top == LAYER_LOWER) {
-        // Green = hue 85°, full saturation, keep current brightness
-        hsv_t hsv = {.h = 85, .s = 255, .v = rgb_matrix_get_val()};
+        // Blue = hue 169°, full saturation, keep current brightness
+        hsv_t hsv = {.h = 169, .s = 255, .v = rgb_matrix_get_val()};
         rgb_t rgb = hsv_to_rgb(hsv);
 
         for (uint8_t i = led_min; i < led_max; i++) {
