@@ -126,7 +126,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 
     if (top == LAYER_POINTER) {
         // White = saturation 0; keep current brightness
-        hsv_t hsv = {.h = 0, .s = 0, .v = rgb_matrix_get_val()};
+        hsv_t hsv = {.h = 0, .s = 0, .v = 75};
         rgb_t rgb = hsv_to_rgb(hsv);
 
         for (uint8_t i = led_min; i < led_max; i++) {
