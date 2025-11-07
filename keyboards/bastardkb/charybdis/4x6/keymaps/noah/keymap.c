@@ -121,6 +121,49 @@ void pointing_device_init_user(void) {
 #endif // POINTING_DEVICE_ENABLE
 
 #ifdef RGB_MATRIX_ENABLE
+// ------------------------------------------------------------
+// RGB Matrix idle timeout (from scratch, QMK API only)
+// Turns off RGB Matrix after inactivity and restores it on key press.
+// ------------------------------------------------------------
+
+#    ifndef RGB_MATRIX_IDLE_TIMEOUT_MIN
+#        define RGB_MATRIX_IDLE_TIMEOUT_MIN 1 // minutes
+#    endif
+
+static uint32_t rgb_idle_timer         = 0;
+static bool     rgb_matrix_was_enabled = true;
+
+void matrix_scan_user(void) {
+    // Initialize timer once
+    if (rgb_idle_timer == 0) {
+        rgb_idle_timer = timer_read32();
+    }
+
+    const uint32_t timeout_ms = (uint32_t)RGB_MATRIX_IDLE_TIMEOUT_MIN * 60000u; // minutes -> ms
+    if (timer_elapsed32(rgb_idle_timer) >= timeout_ms) {
+        if (rgb_matrix_was_enabled) {
+            rgb_matrix_disable_noeeprom();
+            rgb_matrix_was_enabled = false;
+        }
+        // Reset timer so we don't repeatedly call disable
+        rgb_idle_timer = timer_read32();
+    }
+}
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (record->event.pressed) {
+        // Reset idle timer and re-enable RGB Matrix if it was disabled
+        rgb_idle_timer = timer_read32();
+        if (!rgb_matrix_was_enabled) {
+            rgb_matrix_enable_noeeprom();
+            rgb_matrix_was_enabled = true;
+        }
+    }
+    return true;
+}
+#endif // RGB_MATRIX_ENABLE
+
+#ifdef RGB_MATRIX_ENABLE
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
 
@@ -162,38 +205,4 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     // If no layer matched, reset to default RGB effect (Set in config.h)
     return false;
 }
-
-static uint32_t key_timer;               // timer for last keyboard activity, use 32bit value and function to make longer idle time possible
-static void     refresh_rgb(void);       // refreshes the activity timer and RGB, invoke whenever any activity happens
-static void     check_rgb_timeout(void); // checks if enough time has passed for RGB to timeout
-bool            is_rgb_timeout = false;  // store if RGB has timed out or not in a boolean
-
-void refresh_rgb(void) {
-    key_timer = timer_read32(); // store time of last refresh
-    if (is_rgb_timeout) {
-        is_rgb_timeout = false;
-        rgblight_wakeup();
-    }
-}
-void check_rgb_timeout(void) {
-    if (!is_rgb_timeout && timer_elapsed32(key_timer) > RGBLIGHT_TIMEOUT) // check if RGB has already timeout and if enough time has passed
-    {
-        rgblight_suspend();
-        is_rgb_timeout = true;
-    }
-}
-/* Then, call the above functions from QMK's built in post processing functions like so */
-/* Runs at the end of each scan loop, check if RGB timeout has occurred or not */
-void housekeeping_task_user(void) {
-#    ifdef RGBLIGHT_TIMEOUT
-    check_rgb_timeout();
-#    endif
-}
-/* Runs after each key press, check if activity occurred */
-void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
-#    ifdef RGBLIGHT_TIMEOUT
-    if (record->event.pressed) refresh_rgb();
-#    endif
-}
-
 #endif // RGB_MATRIX_ENABLE

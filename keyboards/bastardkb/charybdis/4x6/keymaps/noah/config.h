@@ -84,6 +84,3 @@
 #    undef AUTO_MOUSE_TIME
 #endif
 #define AUTO_MOUSE_TIME 1200 // milliseconds
-
-#define RGBLIGHT_SLEEP        // enable rgblight_suspend() and rgblight_wakeup() in keymap.c
-#define RGBLIGHT_TIMEOUT 9000 // ms to wait until rgblight time out, 900K ms is 15min.
