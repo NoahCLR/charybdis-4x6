@@ -122,13 +122,9 @@ void pointing_device_init_user(void) {
 
 #ifdef RGB_MATRIX_ENABLE
 // ------------------------------------------------------------
-// RGB Matrix idle timeout (from scratch, QMK API only)
-// Turns off RGB Matrix after inactivity and restores it on key press.
+// RGB Matrix idle timeout
+// Turns off RGB Matrix after inactivity and restores it on key press or mouse movement.
 // ------------------------------------------------------------
-
-#    ifndef RGB_MATRIX_IDLE_TIMEOUT_MIN
-#        define RGB_MATRIX_IDLE_TIMEOUT_MIN 1 // minutes
-#    endif
 
 static uint32_t rgb_idle_timer         = 0;
 static bool     rgb_matrix_was_enabled = true;
@@ -162,7 +158,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 
-#    ifdef POINTING_DEVICE_ENABLE
 // Reset idle timer on any pointing-device activity and wake RGB if needed
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     if (mouse_report.x || mouse_report.y || mouse_report.h || mouse_report.v || mouse_report.buttons) {
@@ -174,10 +169,10 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     }
     return mouse_report;
 }
-#    endif // POINTING_DEVICE_ENABLE
-#endif     // RGB_MATRIX_ENABLE
 
-#ifdef RGB_MATRIX_ENABLE
+// ------------------------------------------------------------
+// RGB Matrix per-layer indicators
+// ------------------------------------------------------------
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
 

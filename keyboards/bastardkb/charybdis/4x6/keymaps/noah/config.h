@@ -84,3 +84,6 @@
 #    undef AUTO_MOUSE_TIME
 #endif
 #define AUTO_MOUSE_TIME 1200 // milliseconds
+
+// --- RGB Matrix Idle Timeout ---
+#define RGB_MATRIX_IDLE_TIMEOUT_MIN 1 // minutes
