@@ -122,6 +122,12 @@ void pointing_device_init_user(void) {
 
 #ifdef RGB_MATRIX_ENABLE
 
+report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    if (mouse_report.x || mouse_report.y || mouse_report.h || mouse_report.v || mouse_report.buttons) {
+        rgb_matrix_enable_noeeprom();
+    }
+    return mouse_report;
+}
 // ------------------------------------------------------------
 // RGB Matrix per-layer indicators
 // ------------------------------------------------------------
@@ -136,7 +142,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         for (uint8_t i = led_min; i < led_max; i++) {
             rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
         }
-        rgb_matrix_enable_noeeprom();
+
         // Override active RGB effect with solid White.
         return true;
     } else if (top == LAYER_LOWER) {
