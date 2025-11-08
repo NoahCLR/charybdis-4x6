@@ -91,3 +91,4 @@
 #define RGB_MATRIX_TIMEOUT 10000 // number of milliseconds to wait until rgb automatically turns off
 
 #define SPLIT_POINTING_ENABLE
+#define POINTING_DEVICE_COMBINED
