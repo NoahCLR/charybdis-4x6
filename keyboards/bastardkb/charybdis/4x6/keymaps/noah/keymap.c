@@ -136,7 +136,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         for (uint8_t i = led_min; i < led_max; i++) {
             rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
         }
-
+        rgb_matrix_enable_noeeprom();
         // Override active RGB effect with solid White.
         return true;
     } else if (top == LAYER_LOWER) {
