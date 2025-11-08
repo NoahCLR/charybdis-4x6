@@ -88,4 +88,5 @@
 // --- RGB Matrix Idle Timeout ---
 // #define RGB_MATRIX_IDLE_TIMEOUT_MIN 20 // minutes
 
-#define RGB_MATRIX_TIMEOUT 30000 // number of milliseconds to wait until rgb automatically turns off
+#define RGB_MATRIX_TIMEOUT 10000 // number of milliseconds to wait until rgb automatically turns off
+#define RGB_MATRIX_SPLIT {29, 27}
