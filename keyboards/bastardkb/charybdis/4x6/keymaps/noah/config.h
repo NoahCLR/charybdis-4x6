@@ -88,3 +88,13 @@
 // --- RGB Matrix Idle Timeout ---
 #define RGB_MATRIX_TIMEOUT 900000 // number of milliseconds to wait until rgb automatically turns off
 #define SPLIT_ACTIVITY_ENABLE
+
+#ifdef RGB_MATRIX_LED_COUNT
+#    undef RGB_MATRIX_LED_COUNT
+#endif
+#define RGB_MATRIX_LED_COUNT 58 // total number (example)
+
+#ifdef RGB_MATRIX_SPLIT
+#    undef RGB_MATRIX_SPLIT
+#endif
+#define RGB_MATRIX_SPLIT {29, 29} // left, right
