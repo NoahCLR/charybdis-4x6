@@ -88,3 +88,7 @@
 // --- RGB Matrix Idle Timeout ---
 #define RGB_MATRIX_TIMEOUT 900000 // number of milliseconds to wait until rgb automatically turns off
 #define SPLIT_ACTIVITY_ENABLE
+
+#ifdef SPLIT_TRANSPORT_MIRROR
+#    undef SPLIT_TRANSPORT_MIRROR
+#endif
