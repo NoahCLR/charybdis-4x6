@@ -271,9 +271,9 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         rgb_matrix_set_color(26, 0, 255, 0);
         rgb_matrix_set_color(27, 0, 255, 0);
         rgb_matrix_set_color(28, 0, 255, 0);
-    } else if (is_keyboard_right()) {
-        rgb_matrix_set_color(3, 255, 0, 0);
     } else if (is_keyboard_left()) {
+        rgb_matrix_set_color(3, 255, 0, 0);
+    } else if (!is_keyboard_left()) {
         rgb_matrix_set_color(23, 0, 0, 255);
     }
 
