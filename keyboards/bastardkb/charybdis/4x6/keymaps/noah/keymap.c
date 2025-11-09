@@ -275,8 +275,8 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     //    }
 
     rgb_matrix_set_color(58, 0, 0, 255);
-    rgb_matrix_set_color(57, 0, 0, 255);
-    rgb_matrix_set_color(56, 0, 0, 255);
+    rgb_matrix_set_color(57, 255, 0, 0);
+    rgb_matrix_set_color(56, 0, 255, 0);
 
     return true;
 }
