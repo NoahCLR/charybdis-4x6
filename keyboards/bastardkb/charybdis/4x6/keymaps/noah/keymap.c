@@ -240,42 +240,45 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
 
-    if (top == LAYER_POINTER) {
-        // White = saturation 0; keep current brightness
-        hsv_t hsv = {.h = 0, .s = 0, .v = 75};
-        rgb_t rgb = hsv_to_rgb(hsv);
-
-        for (uint8_t i = led_min; i < led_max; i++) {
-            rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
-        }
-
-        // Override active RGB effect with solid White.
-        return true;
-    } else if (top == LAYER_LOWER) {
-        // Blue = hue 169°, full saturation, keep current brightness
-        hsv_t hsv = {.h = 169, .s = 255, .v = rgb_matrix_get_val()};
-        rgb_t rgb = hsv_to_rgb(hsv);
-
-        for (uint8_t i = led_min; i < led_max; i++) {
-            rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
-        }
-
-        // Override active RGB effect with solid Blue
-        return true;
-    } else if (top == LAYER_RAISE) {
-        // Purple = hue 180°, full saturation, keep current brightness
-        hsv_t hsv = {.h = 180, .s = 255, .v = rgb_matrix_get_val()};
-        rgb_t rgb = hsv_to_rgb(hsv);
-
-        for (uint8_t i = led_min; i < led_max; i++) {
-            rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
-        }
-
-        // Override active RGB effect with solid Purple
-        return true;
+    // Only override on specific layers
+    if (top != LAYER_POINTER && top != LAYER_LOWER && top != LAYER_RAISE) {
+        return false;
     }
 
-    // If no layer matched, reset to default RGB effect (Set in config.h)
-    return false;
+    uint8_t val = rgb_matrix_get_val();
+    hsv_t   hsv;
+
+    switch (top) {
+        case LAYER_POINTER: // white
+            hsv = (hsv_t){.h = 0, .s = 0, .v = 75};
+            break;
+        case LAYER_LOWER: // blue
+            hsv = (hsv_t){.h = 169, .s = 255, .v = val};
+            break;
+        case LAYER_RAISE: // purple
+            hsv = (hsv_t){.h = 180, .s = 255, .v = val};
+            break;
+    }
+
+    rgb_t base_rgb = hsv_to_rgb(hsv);
+
+    // 1) First: set all LEDs to the layer color
+    for (uint8_t i = led_min; i < led_max; i++) {
+        rgb_matrix_set_color(i, base_rgb.r, base_rgb.g, base_rgb.b);
+    }
+
+    // 2) Then: special color for Caps key LED (override)
+    const uint8_t CAPS_LED = 3;
+
+    led_t led_state = host_keyboard_led_state();
+    if (led_state.caps_lock) {
+        // Caps ON → make it e.g. bright green
+        rgb_matrix_set_color(CAPS_LED, 0, 255, 0);
+    } else {
+        // Caps OFF → keep the layer color
+        rgb_matrix_set_color(CAPS_LED, base_rgb.r, base_rgb.g, base_rgb.b);
+    }
+
+    return true;
 }
 #endif // RGB_MATRIX_ENABLE
