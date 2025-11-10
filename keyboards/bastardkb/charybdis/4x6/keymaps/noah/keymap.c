@@ -278,4 +278,30 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 
     return true;
 }
+
+void rgb_matrix_set_color_all_debug(void) {
+    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
+        uint8_t color_index = i / 5;
+        switch (color_index % 6) {
+            case 0:
+                rgb_matrix_set_color(i, 255, 0, 0);
+                break; // red
+            case 1:
+                rgb_matrix_set_color(i, 0, 255, 0);
+                break; // green
+            case 2:
+                rgb_matrix_set_color(i, 0, 0, 255);
+                break; // blue
+            case 3:
+                rgb_matrix_set_color(i, 255, 255, 0);
+                break; // yellow
+            case 4:
+                rgb_matrix_set_color(i, 255, 0, 255);
+                break; // magenta
+            case 5:
+                rgb_matrix_set_color(i, 0, 255, 255);
+                break; // cyan
+        }
+    }
+}
 #endif // RGB_MATRIX_ENABLE
