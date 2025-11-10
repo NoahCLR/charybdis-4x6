@@ -225,14 +225,74 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
  * ├────────────────────────┤                 ├────────────────────────┤
  *    3   4  11  12  19  23                     52  48  41  40  33  32
  * ╰────────────────────────╯                 ╰────────────────────────╯
- *                       26  27  28     53  54  XX
- *                           25  24     55  XX
+ *                       26  27  28     53  54
+ *                           25  24     55
  *                     ╰────────────╯ ╰────────────╯
  *
- * Note: the LED config simulates 58 LEDs instead of the actual 56 to prevent
- * confusion when testing LEDs during assembly when handedness is not set
- * correctly.  Those fake LEDs are bound to the physical bottom-left corner.
+ * 0–28  → left half
+ * 29–55 → right half
  */
+
+// ------------------------------------------------------------
+// Side awareness helpers
+// ------------------------------------------------------------
+static inline bool led_is_left(uint8_t index) {
+    return index < 29;
+}
+static inline bool led_is_right(uint8_t index) {
+    return (index >= 29 && index <= 55);
+}
+
+// This tells us which physical half we are running on at runtime.
+static inline bool this_is_left_half(void) {
+    return is_keyboard_left();
+}
+
+// ------------------------------------------------------------
+// Core LED helpers
+// ------------------------------------------------------------
+
+static inline void set_led_rgb(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
+    if (index >= RGB_MATRIX_LED_COUNT) return;
+
+    // 🔸 Filter: only act on LEDs belonging to this half
+    if (this_is_left_half()) {
+        if (!led_is_left(index)) return;
+    } else {
+        if (!led_is_right(index)) return;
+    }
+
+    rgb_matrix_set_color(index, r, g, b);
+}
+
+static inline void set_led_color(uint8_t index, rgb_t color) {
+    set_led_rgb(index, color.r, color.g, color.b);
+}
+
+static inline void fill_led_range(uint8_t from, uint8_t to, rgb_t color) {
+    if (from >= RGB_MATRIX_LED_COUNT) return;
+    if (to > RGB_MATRIX_LED_COUNT) to = RGB_MATRIX_LED_COUNT;
+
+    for (uint8_t i = from; i < to; i++) {
+        set_led_color(i, color);
+    }
+}
+
+// Convenience wrappers for whole halves
+static inline void set_left_side(rgb_t color) {
+    for (uint8_t i = 0; i < 29; i++)
+        set_led_color(i, color);
+}
+
+static inline void set_right_side(rgb_t color) {
+    for (uint8_t i = 29; i <= 55; i++)
+        set_led_color(i, color);
+}
+
+static inline void set_both_sides(rgb_t color) {
+    set_left_side(color);
+    set_right_side(color);
+}
 
 // ------------------------------------------------------------
 // RGB Matrix per-layer indicators
@@ -240,40 +300,33 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
 
-    // Only override on specific layers
     if (top != LAYER_POINTER && top != LAYER_LOWER && top != LAYER_RAISE) {
         return false;
     }
 
-    uint8_t val = rgb_matrix_get_val();
-    hsv_t   hsv;
+    uint8_t current_brightness = rgb_matrix_get_val();
 
     switch (top) {
-        case LAYER_POINTER: // white
-            hsv = (hsv_t){.h = 0, .s = 0, .v = 75};
-            break;
-        case LAYER_LOWER: // blue
-            hsv = (hsv_t){.h = 169, .s = 255, .v = val};
-            break;
-        case LAYER_RAISE: // purple
-            hsv = (hsv_t){.h = 180, .s = 255, .v = val};
-            break;
+        case LAYER_POINTER: {
+            hsv_t hsv = {.h = 0, .s = 0, .v = 75};
+            set_both_sides(hsv_to_rgb(hsv));
+        } break;
+
+        case LAYER_LOWER: {
+            hsv_t hsv_left  = {.h = 169, .s = 255, .v = current_brightness};
+            hsv_t hsv_right = {.h = 190, .s = 200, .v = current_brightness};
+            set_left_side(hsv_to_rgb(hsv_left));
+            set_right_side(hsv_to_rgb(hsv_right));
+        } break;
+
+        case LAYER_RAISE: {
+            hsv_t hsv_left  = {.h = 180, .s = 255, .v = current_brightness};
+            hsv_t hsv_right = {.h = 195, .s = 255, .v = current_brightness};
+            set_left_side(hsv_to_rgb(hsv_left));
+            set_right_side(hsv_to_rgb(hsv_right));
+        } break;
     }
 
-    rgb_t base_rgb = hsv_to_rgb(hsv);
-
-    // set all LEDs to the layer color
-    for (uint8_t i = led_min; i < led_max; i++) {
-        rgb_matrix_set_color(i, base_rgb.r, base_rgb.g, base_rgb.b);
-    }
-
-    // Example: Different color on LED 3 depending on left/right half
-    //    if (is_keyboard_left()) {
-    //        rgb_matrix_set_color(3, 255, 0, 0);
-    //    } else {
-    //        rgb_matrix_set_color(3, 0, 0, 255);
-    //    }
     return true;
 }
-
 #endif // RGB_MATRIX_ENABLE
