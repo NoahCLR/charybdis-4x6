@@ -23,6 +23,7 @@ enum custom_keycodes {
     MACRO_14,
     MACRO_15,
     VOLMODE,
+    CARET_MODE,
 };
 
 enum charybdis_keymap_layers {
@@ -107,7 +108,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             vol_acc      = 0;
             vol_last_dir = 0;
         }
-        return false; // consume the key (pure hold)
+        return false;
+    }
+
+    if (keycode == CARET_MODE) {
+        caret_active = record->event.pressed;
+        if (!caret_active) {
+            dominant_axis = '\0';
+        }
+        return false;
     }
 
     // 2) Everything else: act only on key press
@@ -202,9 +211,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     // Volume mode (held custom key) has top priority
     if (volmode_active) return handle_volume_mode(mouse_report);
 
-    // Caret mode when Alt (Option) is held
-    uint8_t mods = get_mods();
-    caret_active = (mods & (MOD_BIT(KC_LALT) | MOD_BIT(KC_RALT))) != 0;
+    // Caret mode (held custom key) has second priority
     if (caret_active) return handle_caret_mode(mouse_report);
 
     // Default: pass through unchanged
