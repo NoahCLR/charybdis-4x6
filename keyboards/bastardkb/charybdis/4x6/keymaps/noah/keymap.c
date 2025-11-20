@@ -100,8 +100,89 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // ------------------------------------------------------------
 // Macros
 // ------------------------------------------------------------
+
+// How long you have to hold before it becomes the "shifted" symbol (ms)
+
+// Simple timer for our tap/hold keys
+static uint16_t tap_hold_timer;
+
+static void send_shifted_symbol(uint16_t keycode) {
+    switch (keycode) {
+        // Number row
+        case KC_1:
+            tap_code16(KC_EXLM);
+            break; // !
+        case KC_2:
+            tap_code16(KC_AT);
+            break; // @
+        case KC_3:
+            tap_code16(KC_HASH);
+            break; // #
+        case KC_4:
+            tap_code16(KC_DLR);
+            break; // $
+        case KC_5:
+            tap_code16(KC_PERC);
+            break; // %
+        case KC_6:
+            tap_code16(KC_CIRC);
+            break; // ^
+        case KC_7:
+            tap_code16(KC_AMPR);
+            break; // &
+        case KC_8:
+            tap_code16(KC_ASTR);
+            break; // *
+        case KC_9:
+            tap_code16(KC_LPRN);
+            break; // (
+        case KC_0:
+            tap_code16(KC_RPRN);
+            break; // )
+
+        // Punctuation row
+        case KC_MINS:
+            tap_code16(KC_UNDS);
+            break; // _
+        case KC_EQL:
+            tap_code16(KC_PLUS);
+            break; // +
+        case KC_LBRC:
+            tap_code16(KC_LCBR);
+            break; // {
+        case KC_RBRC:
+            tap_code16(KC_RCBR);
+            break; // }
+        case KC_BSLS:
+            tap_code16(KC_PIPE);
+            break; // |
+        case KC_GRV:
+            tap_code16(KC_TILD);
+            break; // ~
+
+        // Right-hand punctuation
+        case KC_SCLN:
+            tap_code16(KC_COLN);
+            break; // :
+        case KC_QUOT:
+            tap_code16(KC_DQUO);
+            break; // "
+        case KC_COMM:
+            tap_code16(KC_LABK);
+            break; // <
+        case KC_DOT:
+            tap_code16(KC_RABK);
+            break; // >
+
+        // Fallback: just send the original unshifted key if we forgot a mapping
+        default:
+            tap_code(keycode);
+            break;
+    }
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // --- 1) Hold-type keys (react on press + release) ---
+    // --- 1) Hold-type keys (react on press + release), unchanged ---
     switch (keycode) {
         case VOLMODE:
             volmode_active = record->event.pressed;
@@ -119,12 +200,50 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 
-    // --- 2) Ignore releases for everything else ---
+    // --- 2) Tap/Hold symbol & number keys (like custom Auto Shift) ---
+    switch (keycode) {
+        case KC_1:
+        case KC_2:
+        case KC_3:
+        case KC_4:
+        case KC_5:
+        case KC_6:
+        case KC_7:
+        case KC_8:
+        case KC_9:
+        case KC_0:
+        case KC_MINS:
+        case KC_EQL:
+        case KC_LBRC:
+        case KC_RBRC:
+        case KC_BSLS:
+        case KC_GRV:
+        case KC_SCLN:
+        case KC_QUOT:
+        case KC_COMM:
+        case KC_DOT:
+            if (record->event.pressed) {
+                // key down: start timer, don't send anything yet
+                tap_hold_timer = timer_read();
+            } else {
+                // key up: decide tap vs hold
+                if (timer_elapsed(tap_hold_timer) < CUSTOM_TAP_HOLD_TERM) {
+                    // TAP: send normal version (1, 2, -, =, etc.)
+                    tap_code(keycode);
+                } else {
+                    // HOLD: send shifted symbol (!, @, _, +, etc.)
+                    send_shifted_symbol(keycode);
+                }
+            }
+            return false; // fully handled
+    }
+
+    // --- 3) Ignore releases for everything else (your existing behavior) ---
     if (!record->event.pressed) {
         return true;
     }
 
-    // --- 3) Macros (press-only) ---
+    // --- 4) Macros (press-only), unchanged ---
     switch (keycode) {
         case MACRO_0: // Spotlight: GUI + Space
             SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
