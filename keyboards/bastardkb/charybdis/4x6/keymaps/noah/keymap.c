@@ -102,7 +102,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // ------------------------------------------------------------
 static uint16_t tap_hold_timer;
 
-static void send_shifted_symbol(uint16_t keycode) {
+static void send_hold_variant(uint16_t keycode) {
     switch (keycode) {
         // Number row
         case KC_1:
@@ -170,6 +170,14 @@ static void send_shifted_symbol(uint16_t keycode) {
             tap_code16(KC_RABK);
             break; // >
 
+        // Arrow keys with Alt modifier
+        case KC_LEFT:
+            tap_code16(A(KC_LEFT));
+            break; // Alt + Left Arrow
+        case KC_RIGHT:
+            tap_code16(A(KC_RIGHT));
+            break; // Alt + Right Arrow
+
         // Fallback: just send the original unshifted key if we forgot a mapping
         default:
             tap_code(keycode);
@@ -218,6 +226,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case KC_QUOT:
         case KC_COMM:
         case KC_DOT:
+        case KC_LEFT:
+        case KC_RIGHT:
             if (record->event.pressed) {
                 // key down: start timer, don't send anything yet
                 tap_hold_timer = timer_read();
@@ -227,11 +237,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     // TAP: send normal version (1, 2, -, =, etc.)
                     tap_code(keycode);
                 } else {
-                    // HOLD: send shifted symbol (!, @, _, +, etc.)
-                    send_shifted_symbol(keycode);
+                    // HOLD: send hold variant (Shifted symbol, Alt + Arrow, etc.)
+                    send_hold_variant(keycode);
                 }
             }
-            return false; // fully handled
+            return false;
     }
 
     // --- 3) Ignore releases for everything else ---
