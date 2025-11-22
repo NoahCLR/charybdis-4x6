@@ -346,6 +346,16 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
             // Treat DRAGSCROLL as a mouse key so it WON'T deactivate the auto mouse layer
             automouse_rgb_track_mousekey(record->event.pressed);
             return true;
+
+        case CARET_MODE:
+            // Treat CARET_MODE as a mouse key so it WON'T deactivate the auto mouse layer
+            automouse_rgb_track_mousekey(record->event.pressed);
+            return true;
+
+        case VOLMODE:
+            // Treat VOLMODE as a mouse key so it WON'T deactivate the auto mouse layer
+            automouse_rgb_track_mousekey(record->event.pressed);
+            return true;
     }
     return false;
 }
