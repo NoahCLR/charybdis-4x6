@@ -5,6 +5,13 @@
 #    include "pointing_device_auto_mouse.h"
 #    include "rgb_helpers.h"
 
+// Utility to paint every LED regardless of half (master computes the whole frame).
+static inline void automouse_rgb_set_all(rgb_t color) {
+    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
+        rgb_matrix_set_color(i, color.r, color.g, color.b);
+    }
+}
+
 // Tunables for the countdown gradient and minimum visibility.
 #    ifndef AUTOMOUSE_RGB_HUE_FULL
 #        define AUTOMOUSE_RGB_HUE_FULL 85 // green-ish when plenty of time remains
@@ -66,6 +73,11 @@ static inline void automouse_rgb_track_layer_state(layer_state_t state) {
 
 // Called from pointing_device_task_user so we mirror the auto-mouse timer resets.
 static inline void automouse_rgb_track_pointing(report_mouse_t mouse_report) {
+    if (this_is_left_half()) {
+        // No sensor on the non-pointer side.
+        return;
+    }
+
     if (!automouse_rgb_is_enabled()) {
         return;
     }
@@ -125,7 +137,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer) {
     // When auto-mouse is locked (e.g. dragscroll toggle), pin to the lock color.
     if (get_auto_mouse_toggle()) {
         hsv_t hsv = {.h = AUTOMOUSE_RGB_HUE_LOCKED, .s = 255, .v = base_value};
-        set_both_sides(hsv_to_rgb(hsv));
+        automouse_rgb_set_all(hsv_to_rgb(hsv));
         return true;
     }
 
@@ -135,7 +147,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer) {
     uint8_t  hue      = (uint8_t)((int16_t)AUTOMOUSE_RGB_HUE_EMPTY + (hue_span * (int16_t)remaining) / (int16_t)timeout);
     hsv_t    hsv      = {.h = hue, .s = 255, .v = value < AUTOMOUSE_RGB_MIN_VALUE ? AUTOMOUSE_RGB_MIN_VALUE : value};
 
-    set_both_sides(hsv_to_rgb(hsv));
+    automouse_rgb_set_all(hsv_to_rgb(hsv));
     return true;
 }
 
