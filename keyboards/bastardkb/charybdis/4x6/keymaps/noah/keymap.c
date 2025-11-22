@@ -328,34 +328,17 @@ void pointing_device_init_user(void) {
 bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
         case SNIPING_MODE:
-            // Treat SNIPING as a mouse key so it WON'T deactivate the auto mouse layer
-            automouse_rgb_track_mousekey(record->event.pressed);
-            return true;
-
         case SNIPING_MODE_TOGGLE:
-            // Treat SNIPING as a mouse key so it WON'T deactivate the auto mouse layer
-            automouse_rgb_track_mousekey(record->event.pressed);
-            return true;
-
         case DRAGSCROLL_MODE:
-            // Treat DRAGSCROLL as a mouse key so it WON'T deactivate the auto mouse layer
-            automouse_rgb_track_mousekey(record->event.pressed);
-            return true;
-
         case DRAGSCROLL_MODE_TOGGLE:
-            // Treat DRAGSCROLL as a mouse key so it WON'T deactivate the auto mouse layer
-            automouse_rgb_track_mousekey(record->event.pressed);
-            return true;
-
         case CARET_MODE:
-            // Treat CARET_MODE as a mouse key so it WON'T deactivate the auto mouse layer
-            automouse_rgb_track_mousekey(record->event.pressed);
-            return true;
-
         case VOLMODE:
-            // Treat VOLMODE as a mouse key so it WON'T deactivate the auto mouse layer
+        case DPI_MOD:
+        case DPI_RMOD:
+        case S_D_MOD:
+        case S_D_RMOD:
+            // Treat as mouse keys so they WON'T deactivate the auto mouse layer
             automouse_rgb_track_mousekey(record->event.pressed);
-            return true;
     }
     return false;
 }
