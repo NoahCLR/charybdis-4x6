@@ -42,13 +42,13 @@ static inline void automouse_rgb_set_all(rgb_t color) {
 #        define AUTOMOUSE_RGB_END_V 255
 #    endif
 #    ifndef AUTOMOUSE_RGB_LOCKED_H
-#        define AUTOMOUSE_RGB_LOCKED_H 180 // purple when auto-mouse is locked on
+#        define AUTOMOUSE_RGB_LOCKED_H 21
 #    endif
 #    ifndef AUTOMOUSE_RGB_LOCKED_S
-#        define AUTOMOUSE_RGB_LOCKED_S 255 // full saturation when auto-mouse is locked on
+#        define AUTOMOUSE_RGB_LOCKED_S 255
 #    endif
 #    ifndef AUTOMOUSE_RGB_LOCKED_V
-#        define AUTOMOUSE_RGB_LOCKED_V 255 // moderate brightness when auto-mouse is locked on
+#        define AUTOMOUSE_RGB_LOCKED_V 255
 #    endif
 #    ifndef AUTOMOUSE_RGB_MIN_VALUE
 #        define AUTOMOUSE_RGB_MIN_VALUE 12 // keep LEDs visible even near timeout
