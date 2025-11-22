@@ -243,6 +243,10 @@ static inline bool automouse_rgb_render(uint8_t top_layer) {
 
     // When auto-mouse is locked (e.g. dragscroll toggle), pin to the lock color.
     if (pkt.flags & AUTOMOUSE_RGB_FLAG_LOCKED) {
+        // Broadcast the locked state so the slave mirrors the solid color.
+        if (is_master) {
+            automouse_rgb_broadcast(&pkt);
+        }
         automouse_rgb_set_all(hsv_to_rgb(locked));
         return true;
     }
