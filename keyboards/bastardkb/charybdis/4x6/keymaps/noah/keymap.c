@@ -287,6 +287,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 // ------------------------------------------------------------
 // Pointing Device Stuff
 // ------------------------------------------------------------
+#ifdef SPLIT_TRANSACTION_IDS_USER
+void keyboard_post_init_user(void) {
+    automouse_rgb_post_init();
+}
+#endif
+
 #ifdef POINTING_DEVICE_ENABLE
 
 // Automatically enable sniping-mode on the chosen layer.

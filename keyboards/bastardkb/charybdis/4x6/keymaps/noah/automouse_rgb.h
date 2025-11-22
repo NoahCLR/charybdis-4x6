@@ -2,8 +2,24 @@
 
 #if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 
+#    include <string.h>
 #    include "pointing_device_auto_mouse.h"
 #    include "rgb_helpers.h"
+#    ifdef SPLIT_TRANSACTION_IDS_USER
+#        include "transactions.h"
+#        include "transactions_user.h"
+#    endif
+
+typedef struct __attribute__((packed)) {
+    uint16_t remaining;
+    uint16_t timeout;
+    uint8_t  flags;
+} automouse_rgb_packet_t;
+
+#    define AUTOMOUSE_RGB_FLAG_LOCKED 0x01
+#    define AUTOMOUSE_RGB_FLAG_ARMED 0x02
+
+static automouse_rgb_packet_t automouse_rgb_remote = {0};
 
 // Utility to paint every LED regardless of half (master computes the whole frame).
 static inline void automouse_rgb_set_all(rgb_t color) {
@@ -73,11 +89,6 @@ static inline void automouse_rgb_track_layer_state(layer_state_t state) {
 
 // Called from pointing_device_task_user so we mirror the auto-mouse timer resets.
 static inline void automouse_rgb_track_pointing(report_mouse_t mouse_report) {
-    if (!is_keyboard_master()) {
-        // Only master sees the live pointing data.
-        return;
-    }
-
     if (!automouse_rgb_is_enabled()) {
         return;
     }
@@ -115,32 +126,82 @@ static inline uint16_t automouse_rgb_time_remaining(void) {
     return timeout - elapsed;
 }
 
+static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
+    automouse_rgb_packet_t p = {
+        .remaining = automouse_rgb_time_remaining(),
+        .timeout   = automouse_rgb_timeout(),
+        .flags     = 0,
+    };
+    if (get_auto_mouse_toggle()) p.flags |= AUTOMOUSE_RGB_FLAG_LOCKED;
+    if (automouse_rgb_armed) p.flags |= AUTOMOUSE_RGB_FLAG_ARMED;
+    return p;
+}
+
+#    ifdef SPLIT_TRANSACTION_IDS_USER
+static inline void automouse_rgb_sync_from_slave(void) {
+    if (!is_keyboard_master()) {
+        return;
+    }
+    automouse_rgb_packet_t pkt = {0};
+    if (transaction_rpc_recv(PUT_AUTOMOUSE_RGB, sizeof(pkt), &pkt)) {
+        automouse_rgb_remote = pkt;
+    }
+}
+
+static inline void automouse_rgb_slave_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
+    (void)initiator2target_buffer_size;
+    (void)initiator2target_buffer;
+    if (target2initiator_buffer_size < sizeof(automouse_rgb_packet_t)) {
+        return;
+    }
+    automouse_rgb_packet_t pkt = automouse_rgb_local_packet();
+    memcpy(target2initiator_buffer, &pkt, sizeof(pkt));
+}
+
+static inline void automouse_rgb_post_init(void) {
+    transaction_register_rpc(PUT_AUTOMOUSE_RGB, automouse_rgb_slave_rpc);
+}
+#    else
+static inline void automouse_rgb_sync_from_slave(void) {
+}
+static inline void automouse_rgb_post_init(void) {
+}
+#    endif
+
 // Render a simple gradient countdown on the entire board. Returns true when it handled the layer.
 static inline bool automouse_rgb_render(uint8_t top_layer) {
-    if (!is_keyboard_master()) {
-        // Only the master should paint to avoid stale timers overriding the fresh frame.
-        return false;
-    }
-
     if (top_layer != get_auto_mouse_layer() || !automouse_rgb_is_enabled()) {
         return false;
     }
 
+    automouse_rgb_sync_from_slave();
+
+    automouse_rgb_packet_t pkt = automouse_rgb_local_packet();
+
+    // If the master has stale data but the slave has a fresh timer, use the remote copy.
+    if (is_keyboard_master()) {
+        bool remote_fresher = (automouse_rgb_remote.flags & AUTOMOUSE_RGB_FLAG_ARMED) && (!automouse_rgb_armed || automouse_rgb_remote.remaining > pkt.remaining);
+        if (remote_fresher) {
+            pkt = automouse_rgb_remote;
+        }
+    }
+
+    uint16_t remaining  = pkt.remaining;
+    uint16_t timeout    = pkt.timeout ? pkt.timeout : automouse_rgb_timeout();
     uint16_t timeout    = automouse_rgb_timeout();
-    uint16_t remaining  = automouse_rgb_time_remaining();
     uint8_t  base_value = rgb_matrix_get_val();
 
     // Avoid divide-by-zero and keep a minimal pulse even if we never saw activity.
     if (!timeout) {
         timeout = 1;
     }
-    if (!automouse_rgb_armed) {
+    if (!(pkt.flags & AUTOMOUSE_RGB_FLAG_ARMED)) {
         automouse_rgb_arm_timer();
         remaining = timeout;
     }
 
     // When auto-mouse is locked (e.g. dragscroll toggle), pin to the lock color.
-    if (get_auto_mouse_toggle()) {
+    if (pkt.flags & AUTOMOUSE_RGB_FLAG_LOCKED) {
         hsv_t hsv = {.h = AUTOMOUSE_RGB_HUE_LOCKED, .s = 255, .v = base_value};
         automouse_rgb_set_all(hsv_to_rgb(hsv));
         return true;
@@ -162,6 +223,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer) {
 static inline void automouse_rgb_track_layer_state(layer_state_t state) { (void)state; }
 static inline void automouse_rgb_track_pointing(report_mouse_t mouse_report) { (void)mouse_report; }
 static inline void automouse_rgb_track_mousekey(bool pressed) { (void)pressed; }
+static inline void automouse_rgb_post_init(void) {}
 static inline bool automouse_rgb_render(uint8_t top_layer) {
     (void)top_layer;
     return false;
