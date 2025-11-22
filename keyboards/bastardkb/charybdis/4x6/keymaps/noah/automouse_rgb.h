@@ -146,7 +146,7 @@ static inline automouse_rgb_packet_t automouse_rgb_seed_packet(void) {
     return (automouse_rgb_packet_t){
         .remaining = timeout,
         .timeout   = timeout,
-        .flags     = AUTOMOUSE_RGB_FLAG_ARMED,
+        .flags     = AUTOMOUSE_RGB_FLAG_ARMED | (get_auto_mouse_toggle() ? AUTOMOUSE_RGB_FLAG_LOCKED : 0),
     };
 }
 
@@ -175,11 +175,22 @@ static inline void automouse_rgb_post_init(void) {
     }
     transaction_register_rpc(PUT_AUTOMOUSE_RGB, automouse_rgb_slave_rpc);
 }
+
+static inline void automouse_rgb_sync_from_master(void) {
+    if (is_keyboard_master()) {
+        return;
+    }
+    automouse_rgb_packet_t incoming = {0};
+    if (transaction_rpc_recv(PUT_AUTOMOUSE_RGB, sizeof(incoming), &incoming)) {
+        automouse_rgb_remote = incoming;
+    }
+}
 #    else
 static inline void automouse_rgb_broadcast(const automouse_rgb_packet_t *pkt) {
     (void)pkt;
 }
 static inline void automouse_rgb_post_init(void) {}
+static inline void automouse_rgb_sync_from_master(void) {}
 #    endif
 
 // Render a simple gradient countdown on the entire board. Returns true when it handled the layer.
@@ -189,6 +200,11 @@ static inline bool automouse_rgb_render(uint8_t top_layer) {
     }
 
     bool is_master = is_keyboard_master();
+#    ifdef SPLIT_TRANSACTION_IDS_USER
+    if (!is_master) {
+        automouse_rgb_sync_from_master();
+    }
+#    endif
     automouse_rgb_packet_t pkt =
 #    ifdef SPLIT_TRANSACTION_IDS_USER
         is_master ? automouse_rgb_local_packet() : automouse_rgb_remote;
