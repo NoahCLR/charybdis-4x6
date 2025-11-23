@@ -416,22 +416,46 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 
     switch (top) {
         case LAYER_POINTER: {
-            if (automouse_rgb_render(top)) {
+            if (automouse_rgb_render(top, led_min, led_max)) {
                 break;
             }
         } break;
 
         case LAYER_LOWER: {
-            hsv_t hsv = (hsv_t){.h = 169, .s = 255, .v = current_brightness};
-            set_both_sides(hsv_to_rgb(hsv));
+            hsv_t hsv  = (hsv_t){.h = 169, .s = 255, .v = current_brightness};
+            rgb_t base = hsv_to_rgb(hsv);
+
+            set_both_sides(base, led_min, led_max);
+
+            // If you want to highlight the LOWER mods differently:
+            // set_led_group(layer_lower_mods,
+            //               sizeof(layer_lower_mods),
+            //               led_min, led_max,
+            //               base);
+
+            hsv_t hsv2  = (hsv_t){.h = 20, .s = 255, .v = current_brightness};
+            rgb_t base2 = hsv_to_rgb(hsv2);
+
+            set_led_color(1, led_min, led_max, base2);  // LED 1
+            set_led_color(40, led_min, led_max, base2); // LED 29
+
         } break;
 
         case LAYER_RAISE: {
-            hsv_t hsv = (hsv_t){.h = 180, .s = 255, .v = current_brightness};
-            set_both_sides(hsv_to_rgb(hsv));
+            hsv_t hsv  = (hsv_t){.h = 180, .s = 255, .v = current_brightness};
+            rgb_t base = hsv_to_rgb(hsv);
+
+            set_both_sides(base, led_min, led_max);
+
+            // If you want to highlight the RAISE mods differently:
+            // set_led_group(layer_raise_mods,
+            //               sizeof(layer_raise_mods),
+            //               led_min, led_max,
+            //               base);
         } break;
     }
 
     return true;
 }
+
 #endif // RGB_MATRIX_ENABLE

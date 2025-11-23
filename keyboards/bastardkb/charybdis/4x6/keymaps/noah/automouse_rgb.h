@@ -18,8 +18,8 @@ typedef struct __attribute__((packed)) {
 } automouse_rgb_packet_t;
 
 // Utility to paint every LED regardless of half (master computes the whole frame).
-static inline void automouse_rgb_set_all(rgb_t color) {
-    set_both_sides(color);
+static inline void automouse_rgb_set_all(rgb_t color, uint8_t led_min, uint8_t led_max) {
+    set_both_sides(color, led_min, led_max);
 }
 
 // Tunables for the countdown gradient and minimum visibility.
@@ -205,7 +205,7 @@ static inline void automouse_rgb_post_init(void) {}
 #    endif
 
 // Render a simple gradient countdown on the entire board. Returns true when it handled the layer.
-static inline bool automouse_rgb_render(uint8_t top_layer) {
+static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max) {
     if (top_layer != get_auto_mouse_layer() || !automouse_rgb_is_enabled()) {
         return false;
     }
@@ -247,7 +247,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer) {
         if (is_master) {
             automouse_rgb_broadcast(&pkt);
         }
-        automouse_rgb_set_all(hsv_to_rgb(locked));
+        automouse_rgb_set_all(hsv_to_rgb(locked), led_min, led_max);
         return true;
     }
 
@@ -276,7 +276,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer) {
 
     hsv_t hsv = {.h = hue, .s = sat, .v = value < AUTOMOUSE_RGB_MIN_VALUE ? AUTOMOUSE_RGB_MIN_VALUE : value};
 
-    automouse_rgb_set_all(hsv_to_rgb(hsv));
+    automouse_rgb_set_all(hsv_to_rgb(hsv), led_min, led_max);
 
     if (is_master) {
         automouse_rgb_broadcast(&pkt);
@@ -298,8 +298,10 @@ static inline void automouse_rgb_track_mousekey(bool pressed) {
     (void)pressed;
 }
 static inline void automouse_rgb_post_init(void) {}
-static inline bool automouse_rgb_render(uint8_t top_layer) {
+static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max) {
     (void)top_layer;
+    (void)led_min;
+    (void)led_max;
     return false;
 }
 
