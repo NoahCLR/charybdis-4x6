@@ -38,7 +38,7 @@ static inline void fill_led_range(uint8_t from, uint8_t to, uint8_t led_min, uin
 }
 
 // ------------------------------------------------------------
-// Convenience halves – using led_min/led_max only
+// Convenience halves helpers
 // ------------------------------------------------------------
 
 // "Left side" = entire physical left half
