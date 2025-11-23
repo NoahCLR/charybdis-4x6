@@ -389,15 +389,41 @@ static const uint8_t layer_raise_mods[] = {33, 18};
 static const uint8_t layer_lower_mods[] = {4, 47};
 
 // ─── RGB HELPER SUMMARY ─────────────────────────────────────────────
-// set_led_color(i, color)        → set single LED by index (side-aware)
-// set_led_group(list, n, color)  → set non-contiguous LEDs
-// fill_led_range(from, to, color)  → fill continuous LED range
-// set_left_side(color)           → color all left-side LEDs
-// set_right_side(color)          → color all right-side LEDs
-// set_both_sides(color)          → color all LEDs on both halves
+// All helpers below must be called *inside*
+// rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max)
+// because they use led_min/led_max for split-safe operation.
 //
-// Use this for color: hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = current_brightness})
-// Use this for setting a group: set_led_group(layer_raise_mods, sizeof(layer_raise_mods), hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = current_brightness}));
+// set_led_color(i, led_min, led_max, color)
+//     → Color a single LED by global index.
+//       Only affects this half’s LED range.
+//
+// set_led_group(list, count, led_min, led_max, color)
+//     → Color a list of non-contiguous LED indices.
+//
+// fill_led_range(from, to, led_min, led_max, color)
+//     → Color a continuous range [from, to), clamped to this half.
+//
+// set_left_side(color, led_min, led_max)
+//     → Color the entire left half.
+//       Only does work when running on the left half (led_min == 0).
+//
+// set_right_side(color, led_min, led_max)
+//     → Color the entire right half.
+//       Only does work when running on the right half (led_min > 0).
+//
+// set_both_sides(color, led_min, led_max)
+//     → Color all LEDs on *this* half only.
+//
+// Typical color usage:
+//
+//     rgb_t c = hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = current_brightness});
+//
+// Example group usage:
+//
+//     set_led_group(layer_raise_mods,
+//                   sizeof(layer_raise_mods),
+//                   led_min, led_max,
+//                   hsv_to_rgb((hsv_t){ .h = 180, .s = 255, .v = current_brightness }));
 // ───────────────────────────────────────────────────────────────────
 
 // ------------------------------------------------------------
@@ -426,19 +452,6 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
             rgb_t base = hsv_to_rgb(hsv);
 
             set_both_sides(base, led_min, led_max);
-
-            // If you want to highlight the LOWER mods differently:
-            // set_led_group(layer_lower_mods,
-            //               sizeof(layer_lower_mods),
-            //               led_min, led_max,
-            //               base);
-
-            hsv_t hsv2  = (hsv_t){.h = 20, .s = 255, .v = current_brightness};
-            rgb_t base2 = hsv_to_rgb(hsv2);
-
-            set_led_color(1, led_min, led_max, base2);  // LED 1
-            set_led_color(40, led_min, led_max, base2); // LED 29
-
         } break;
 
         case LAYER_RAISE: {
@@ -446,12 +459,6 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
             rgb_t base = hsv_to_rgb(hsv);
 
             set_both_sides(base, led_min, led_max);
-
-            // If you want to highlight the RAISE mods differently:
-            // set_led_group(layer_raise_mods,
-            //               sizeof(layer_raise_mods),
-            //               led_min, led_max,
-            //               base);
         } break;
     }
 
