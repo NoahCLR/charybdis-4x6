@@ -5,7 +5,6 @@
 #    include <string.h>
 #    include "pointing_device_auto_mouse.h"
 #    include "rgb_helpers.h"
-#    include "timer.h"
 #    ifdef SPLIT_TRANSACTION_IDS_USER
 #        include "transactions.h"
 #    endif
@@ -61,17 +60,13 @@ static inline void automouse_rgb_set_all(rgb_t color, uint8_t led_min, uint8_t l
 #    ifndef AUTOMOUSE_RGB_DEAD_TIME_DEN
 #        define AUTOMOUSE_RGB_DEAD_TIME_DEN 3 // denominator of dead-time fraction
 #    endif
-#    ifndef AUTOMOUSE_RGB_BROADCAST_INTERVAL
-#        define AUTOMOUSE_RGB_BROADCAST_INTERVAL 50 // minimum ms between RPC packets
-#    endif
 
 // We only track "armed" locally now; the timer itself lives in auto-mouse core.
 static bool automouse_rgb_armed = false;
 
 #    ifdef SPLIT_TRANSACTION_IDS_USER
-static automouse_rgb_packet_t automouse_rgb_remote            = {0};
-static automouse_rgb_packet_t automouse_rgb_last_sent         = {0};
-static uint16_t               automouse_rgb_last_broadcast_ts = 0;
+static automouse_rgb_packet_t automouse_rgb_remote    = {0};
+static automouse_rgb_packet_t automouse_rgb_last_sent = {0};
 #    endif
 
 static inline bool automouse_rgb_is_enabled(void) {
@@ -105,12 +100,6 @@ static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
     uint16_t timeout   = automouse_rgb_timeout();
     uint16_t remaining = automouse_rgb_time_remaining();
 
-    // Quantize remaining to reduce packet churn; align with broadcast interval.
-    const uint16_t step = AUTOMOUSE_RGB_BROADCAST_INTERVAL;
-    if (step > 1) {
-        remaining = (remaining / step) * step;
-    }
-
     // Update our local "armed" flag based on real timer state.
     if (remaining > 0) {
         automouse_rgb_armed = true;
@@ -137,21 +126,11 @@ static inline automouse_rgb_packet_t automouse_rgb_seed_packet(void) {
 }
 
 static inline void automouse_rgb_broadcast(const automouse_rgb_packet_t *pkt) {
-    uint16_t now = timer_read();
-
-    // Rate-limit how often we send packets.
-    if (timer_elapsed(automouse_rgb_last_broadcast_ts) < AUTOMOUSE_RGB_BROADCAST_INTERVAL) {
-        return;
-    }
-
-    // Skip if nothing meaningful changed.
     if (memcmp(&automouse_rgb_last_sent, pkt, sizeof(automouse_rgb_packet_t)) == 0) {
         return;
     }
-
     transaction_rpc_send(PUT_AUTOMOUSE_RGB, sizeof(*pkt), pkt);
-    automouse_rgb_last_sent         = *pkt;
-    automouse_rgb_last_broadcast_ts = now;
+    automouse_rgb_last_sent = *pkt;
 }
 
 static inline void automouse_rgb_slave_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
@@ -201,13 +180,11 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
     }
 
     // If we haven't armed yet (first time on the layer, no activity),
-    // fake a full remaining time so we show the "start" color and make sure
-    // the packet we broadcast carries the same remaining value.
+    // fake a full remaining time so we show the "start" color.
     if (!(pkt.flags & AUTOMOUSE_RGB_FLAG_ARMED)) {
         remaining           = timeout;
         automouse_rgb_armed = true;
         pkt.flags |= AUTOMOUSE_RGB_FLAG_ARMED;
-        pkt.remaining = remaining;
     }
 
     // Define start, end, and locked colors in HSV space.
