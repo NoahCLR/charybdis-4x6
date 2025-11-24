@@ -423,8 +423,6 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 // RGB Matrix per-layer indicators
 // ------------------------------------------------------------
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    automouse_rgb_track_layer_state(layer_state | default_layer_state);
-
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
 
     if (top != LAYER_POINTER && top != LAYER_LOWER && top != LAYER_RAISE) {
