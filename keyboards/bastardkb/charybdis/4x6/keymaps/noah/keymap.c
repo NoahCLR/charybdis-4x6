@@ -422,6 +422,16 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 // ------------------------------------------------------------
 // RGB Matrix per-layer indicators
 // ------------------------------------------------------------
+
+// Auto-mouse gradient colors (start -> end) and locked indicator.
+static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 75};
+static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = 255};
+static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = 255};
+
+// Layer colors that will be clamped to current brightness at render time.
+static const hsv_t layer_lower_color = {.h = 169, .s = 255, .v = 255};
+static const hsv_t layer_raise_color = {.h = 180, .s = 255, .v = 255};
+
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
 
@@ -429,27 +439,25 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         return false;
     }
 
-    uint8_t current_brightness = rgb_matrix_get_val();
-
     switch (top) {
         case LAYER_POINTER: {
-            if (automouse_rgb_render(top, led_min, led_max)) {
+            hsv_t start  = clamp_hsv_to_matrix_brightness(automouse_color_start);
+            hsv_t end    = clamp_hsv_to_matrix_brightness(automouse_color_end);
+            hsv_t locked = clamp_hsv_to_matrix_brightness(automouse_color_locked);
+
+            if (automouse_rgb_render(top, led_min, led_max, start, end, locked)) {
                 break;
             }
         } break;
 
         case LAYER_LOWER: {
-            hsv_t hsv  = (hsv_t){.h = 169, .s = 255, .v = current_brightness};
-            rgb_t base = hsv_to_rgb(hsv);
-
-            set_both_sides(base, led_min, led_max);
+            hsv_t hsv = clamp_hsv_to_matrix_brightness(layer_lower_color);
+            set_both_sides(hsv_to_rgb(hsv), led_min, led_max);
         } break;
 
         case LAYER_RAISE: {
-            hsv_t hsv  = (hsv_t){.h = 180, .s = 255, .v = current_brightness};
-            rgb_t base = hsv_to_rgb(hsv);
-
-            set_both_sides(base, led_min, led_max);
+            hsv_t hsv = clamp_hsv_to_matrix_brightness(layer_raise_color);
+            set_both_sides(hsv_to_rgb(hsv), led_min, led_max);
         } break;
     }
 

@@ -22,34 +22,7 @@ static inline void automouse_rgb_set_all(rgb_t color, uint8_t led_min, uint8_t l
     set_both_sides(color, led_min, led_max);
 }
 
-// Tunables for the countdown gradient and minimum visibility.
-#    ifndef AUTOMOUSE_RGB_START_H
-#        define AUTOMOUSE_RGB_START_H 0
-#    endif
-#    ifndef AUTOMOUSE_RGB_START_S
-#        define AUTOMOUSE_RGB_START_S 0
-#    endif
-#    ifndef AUTOMOUSE_RGB_START_V
-#        define AUTOMOUSE_RGB_START_V 75
-#    endif
-#    ifndef AUTOMOUSE_RGB_END_H
-#        define AUTOMOUSE_RGB_END_H 0
-#    endif
-#    ifndef AUTOMOUSE_RGB_END_S
-#        define AUTOMOUSE_RGB_END_S 255
-#    endif
-#    ifndef AUTOMOUSE_RGB_END_V
-#        define AUTOMOUSE_RGB_END_V 255
-#    endif
-#    ifndef AUTOMOUSE_RGB_LOCKED_H
-#        define AUTOMOUSE_RGB_LOCKED_H 21
-#    endif
-#    ifndef AUTOMOUSE_RGB_LOCKED_S
-#        define AUTOMOUSE_RGB_LOCKED_S 255
-#    endif
-#    ifndef AUTOMOUSE_RGB_LOCKED_V
-#        define AUTOMOUSE_RGB_LOCKED_V 255
-#    endif
+// Tunables for minimum visibility and dead-time on the countdown pulse.
 #    ifndef AUTOMOUSE_RGB_MIN_VALUE
 #        define AUTOMOUSE_RGB_MIN_VALUE 12 // keep LEDs visible even near timeout
 #    endif
@@ -135,7 +108,7 @@ static inline void automouse_rgb_post_init(void) {}
 #    endif
 
 // Render a simple gradient countdown on the entire board. Returns true when it handled the layer.
-static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max) {
+static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end, hsv_t locked) {
     if (top_layer != get_auto_mouse_layer() || !automouse_rgb_is_enabled()) {
         return false;
     }
@@ -155,17 +128,6 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
     if (!timeout) {
         timeout = 1;
     }
-
-    // Define start, end, and locked colors in HSV space.
-    hsv_t start  = {.h = AUTOMOUSE_RGB_START_H, .s = AUTOMOUSE_RGB_START_S, .v = AUTOMOUSE_RGB_START_V};
-    hsv_t end    = {.h = AUTOMOUSE_RGB_END_H, .s = AUTOMOUSE_RGB_END_S, .v = AUTOMOUSE_RGB_END_V};
-    hsv_t locked = {.h = AUTOMOUSE_RGB_LOCKED_H, .s = AUTOMOUSE_RGB_LOCKED_S, .v = AUTOMOUSE_RGB_LOCKED_V};
-
-    // Clamp to current brightness setting.
-    uint8_t base_value = rgb_matrix_get_val();
-    if (start.v > base_value) start.v = base_value;
-    if (end.v > base_value) end.v = base_value;
-    if (locked.v > base_value) locked.v = base_value;
 
     // When auto-mouse is locked (e.g. dragscroll toggle), pin to the lock color.
     if (pkt.flags & AUTOMOUSE_RGB_FLAG_LOCKED) {
@@ -217,10 +179,13 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
 #else // defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 
 static inline void automouse_rgb_post_init(void) {}
-static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max) {
+static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end, hsv_t locked) {
     (void)top_layer;
     (void)led_min;
     (void)led_max;
+    (void)start;
+    (void)end;
+    (void)locked;
     return false;
 }
 

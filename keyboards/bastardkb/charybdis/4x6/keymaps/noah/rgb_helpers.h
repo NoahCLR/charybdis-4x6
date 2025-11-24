@@ -64,4 +64,13 @@ static inline void set_both_sides(rgb_t color, uint8_t led_min, uint8_t led_max)
     fill_led_range(led_min, led_max, led_min, led_max, color);
 }
 
+// Clamp HSV value to the current RGB matrix brightness setting.
+static inline hsv_t clamp_hsv_to_matrix_brightness(hsv_t hsv) {
+    uint8_t base_value = rgb_matrix_get_val();
+    if (hsv.v > base_value) {
+        hsv.v = base_value;
+    }
+    return hsv;
+}
+
 #endif // RGB_MATRIX_ENABLE
