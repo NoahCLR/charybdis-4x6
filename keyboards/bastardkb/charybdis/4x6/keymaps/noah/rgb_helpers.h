@@ -72,9 +72,4 @@ static inline hsv_t clamp_hsv_value(hsv_t hsv, uint8_t max_value) {
     return hsv;
 }
 
-// Clamp HSV value to the current RGB matrix brightness setting.
-static inline hsv_t clamp_hsv_to_matrix_brightness(hsv_t hsv) {
-    return clamp_hsv_value(hsv, rgb_matrix_get_val());
-}
-
 #endif // RGB_MATRIX_ENABLE
