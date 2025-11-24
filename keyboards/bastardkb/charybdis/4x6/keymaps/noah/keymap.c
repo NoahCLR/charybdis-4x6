@@ -424,13 +424,13 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 // ------------------------------------------------------------
 
 // Auto-mouse gradient colors (start -> end) and locked indicator.
-static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 75};     //  white
-static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = 255};  //  red
-static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = 255}; //  orange
+static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 75};                               // white
+static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // red
+static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // orange
 
 // Layer colors that will be clamped to current brightness at render time.
-static const hsv_t layer_lower_color = {.h = 169, .s = 255, .v = 255}; // purple
-static const hsv_t layer_raise_color = {.h = 180, .s = 255, .v = 255}; // blue
+static const hsv_t layer_lower_color = {.h = 169, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // purple
+static const hsv_t layer_raise_color = {.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // blue
 
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
@@ -439,27 +439,19 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         return false;
     }
 
-    uint8_t current_brightness = rgb_matrix_get_val();
-
     switch (top) {
         case LAYER_POINTER: {
-            hsv_t start  = clamp_hsv_value(automouse_color_start, current_brightness);
-            hsv_t end    = clamp_hsv_value(automouse_color_end, current_brightness);
-            hsv_t locked = clamp_hsv_value(automouse_color_locked, current_brightness);
-
-            if (automouse_rgb_render(top, led_min, led_max, start, end, locked)) {
+            if (automouse_rgb_render(top, led_min, led_max, automouse_color_start, automouse_color_end, automouse_color_locked)) {
                 break;
             }
         } break;
 
         case LAYER_LOWER: {
-            hsv_t hsv = clamp_hsv_value(layer_lower_color, current_brightness);
-            set_both_sides(hsv_to_rgb(hsv), led_min, led_max);
+            set_both_sides(hsv_to_rgb(layer_lower_color), led_min, led_max);
         } break;
 
         case LAYER_RAISE: {
-            hsv_t hsv = clamp_hsv_value(layer_raise_color, current_brightness);
-            set_both_sides(hsv_to_rgb(hsv), led_min, led_max);
+            set_both_sides(hsv_to_rgb(layer_raise_color), led_min, led_max);
         } break;
     }
 
