@@ -10,7 +10,6 @@
 #    endif
 
 #    define AUTOMOUSE_RGB_FLAG_LOCKED 0x01
-#    define AUTOMOUSE_RGB_FLAG_ARMED 0x02
 
 typedef struct __attribute__((packed)) {
     uint16_t remaining;
@@ -61,9 +60,6 @@ static inline void automouse_rgb_set_all(rgb_t color, uint8_t led_min, uint8_t l
 #        define AUTOMOUSE_RGB_DEAD_TIME_DEN 3 // denominator of dead-time fraction
 #    endif
 
-// We only track "armed" locally now; the timer itself lives in auto-mouse core.
-static bool automouse_rgb_armed = false;
-
 #    ifdef SPLIT_TRANSACTION_IDS_USER
 static automouse_rgb_packet_t automouse_rgb_remote    = {0};
 static automouse_rgb_packet_t automouse_rgb_last_sent = {0};
@@ -78,19 +74,6 @@ static inline uint16_t automouse_rgb_timeout(void) {
     return timeout ? timeout : AUTO_MOUSE_TIME;
 }
 
-// Optional hook if you want to reset "armed" when leaving the layer.
-static inline void automouse_rgb_track_layer_state(layer_state_t state) {
-    static layer_state_t previous_state = 0;
-    bool                 now_on         = layer_state_cmp(state, get_auto_mouse_layer());
-    bool                 was_on         = layer_state_cmp(previous_state, get_auto_mouse_layer());
-
-    if (!now_on && was_on) {
-        automouse_rgb_armed = false;
-    }
-
-    previous_state = state;
-}
-
 // Time remaining comes directly from auto-mouse core now.
 static inline uint16_t automouse_rgb_time_remaining(void) {
     return auto_mouse_get_time_remaining();
@@ -100,18 +83,12 @@ static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
     uint16_t timeout   = automouse_rgb_timeout();
     uint16_t remaining = automouse_rgb_time_remaining();
 
-    // Update our local "armed" flag based on real timer state.
-    if (remaining > 0) {
-        automouse_rgb_armed = true;
-    }
-
     automouse_rgb_packet_t p = {
         .remaining = remaining,
         .timeout   = timeout,
         .flags     = 0,
     };
     if (get_auto_mouse_toggle()) p.flags |= AUTOMOUSE_RGB_FLAG_LOCKED;
-    if (automouse_rgb_armed) p.flags |= AUTOMOUSE_RGB_FLAG_ARMED;
     return p;
 }
 
@@ -121,7 +98,7 @@ static inline automouse_rgb_packet_t automouse_rgb_seed_packet(void) {
     return (automouse_rgb_packet_t){
         .remaining = timeout,
         .timeout   = timeout,
-        .flags     = AUTOMOUSE_RGB_FLAG_ARMED,
+        .flags     = 0,
     };
 }
 
@@ -177,14 +154,6 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
     // Avoid divide-by-zero and keep a minimal pulse even if we never saw activity.
     if (!timeout) {
         timeout = 1;
-    }
-
-    // If we haven't armed yet (first time on the layer, no activity),
-    // fake a full remaining time so we show the "start" color.
-    if (!(pkt.flags & AUTOMOUSE_RGB_FLAG_ARMED)) {
-        remaining           = timeout;
-        automouse_rgb_armed = true;
-        pkt.flags |= AUTOMOUSE_RGB_FLAG_ARMED;
     }
 
     // Define start, end, and locked colors in HSV space.
@@ -247,16 +216,6 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
 
 #else // defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 
-// No-op shims so callers can remain clean.
-static inline void automouse_rgb_track_layer_state(layer_state_t state) {
-    (void)state;
-}
-static inline void automouse_rgb_track_pointing(report_mouse_t mouse_report) {
-    (void)mouse_report;
-}
-static inline void automouse_rgb_track_mousekey(bool pressed) {
-    (void)pressed;
-}
 static inline void automouse_rgb_post_init(void) {}
 static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max) {
     (void)top_layer;
