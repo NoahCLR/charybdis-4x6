@@ -439,11 +439,13 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         return false;
     }
 
+    uint8_t current_brightness = rgb_matrix_get_val();
+
     switch (top) {
         case LAYER_POINTER: {
-            hsv_t start  = clamp_hsv_to_matrix_brightness(automouse_color_start);
-            hsv_t end    = clamp_hsv_to_matrix_brightness(automouse_color_end);
-            hsv_t locked = clamp_hsv_to_matrix_brightness(automouse_color_locked);
+            hsv_t start  = clamp_hsv_value(automouse_color_start, current_brightness);
+            hsv_t end    = clamp_hsv_value(automouse_color_end, current_brightness);
+            hsv_t locked = clamp_hsv_value(automouse_color_locked, current_brightness);
 
             if (automouse_rgb_render(top, led_min, led_max, start, end, locked)) {
                 break;
@@ -451,13 +453,15 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         } break;
 
         case LAYER_LOWER: {
-            hsv_t hsv = clamp_hsv_to_matrix_brightness(layer_lower_color);
-            set_both_sides(hsv_to_rgb(hsv), led_min, led_max);
+            hsv_t hsv  = clamp_hsv_value(layer_lower_color, current_brightness);
+            rgb_t base = hsv_to_rgb(hsv);
+            set_both_sides(base, led_min, led_max);
         } break;
 
         case LAYER_RAISE: {
-            hsv_t hsv = clamp_hsv_to_matrix_brightness(layer_raise_color);
-            set_both_sides(hsv_to_rgb(hsv), led_min, led_max);
+            hsv_t hsv  = clamp_hsv_value(layer_raise_color, current_brightness);
+            rgb_t base = hsv_to_rgb(hsv);
+            set_both_sides(base, led_min, led_max);
         } break;
     }
 
