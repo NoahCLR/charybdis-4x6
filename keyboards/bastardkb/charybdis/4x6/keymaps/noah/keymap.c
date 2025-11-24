@@ -187,6 +187,10 @@ static void send_hold_variant(uint16_t keycode) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (IS_MOUSEKEY(keycode)) {
+        automouse_rgb_track_mousekey(record->event.pressed);
+    }
+
     // --- 1) Hold-type keys (react on press + release) ---
     switch (keycode) {
         case VOLMODE:
@@ -309,6 +313,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
             set_auto_mouse_enable(true); // enable it again
             break;
     }
+    automouse_rgb_track_layer_state(state);
     return state;
 }
 #    endif // CHARYBDIS_AUTO_SNIPING_ON_LAYER
@@ -338,6 +343,8 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    automouse_rgb_track_pointing(mouse_report);
+
     // Volume mode (held custom key)
     if (volmode_active) {
         return handle_volume_mode(mouse_report);
