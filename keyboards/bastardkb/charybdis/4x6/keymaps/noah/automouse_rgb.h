@@ -52,11 +52,11 @@ static inline uint16_t automouse_rgb_time_remaining(void) {
 }
 
 static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
-    uint16_t remaining = automouse_rgb_time_remaining();
-    automouse_rgb_packet_t p = {
-        .remaining = remaining,
-        .timeout   = automouse_rgb_timeout(),
-        .flags     = 0,
+    uint16_t               remaining = automouse_rgb_time_remaining();
+    automouse_rgb_packet_t p         = {
+                .remaining = remaining,
+                .timeout   = automouse_rgb_timeout(),
+                .flags     = 0,
     };
     if (get_auto_mouse_toggle()) p.flags |= AUTOMOUSE_RGB_FLAG_LOCKED;
     return p;
@@ -126,12 +126,13 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
         timeout = 1;
     }
 
+    // Broadcast ASAP once we've validated we're on the right layer and auto-mouse is enabled.
+    if (is_master) {
+        automouse_rgb_broadcast(&pkt);
+    }
+
     // When auto-mouse is locked (e.g. dragscroll toggle), pin to the lock color.
     if (pkt.flags & AUTOMOUSE_RGB_FLAG_LOCKED) {
-        // Broadcast the locked state so the slave mirrors the solid color.
-        if (is_master) {
-            automouse_rgb_broadcast(&pkt);
-        }
         automouse_rgb_set_all(hsv_to_rgb(locked), led_min, led_max);
         return true;
     }
@@ -162,10 +163,6 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
     hsv_t hsv = {.h = hue, .s = sat, .v = value < AUTOMOUSE_RGB_MIN_VALUE ? AUTOMOUSE_RGB_MIN_VALUE : value};
 
     automouse_rgb_set_all(hsv_to_rgb(hsv), led_min, led_max);
-
-    if (is_master) {
-        automouse_rgb_broadcast(&pkt);
-    }
 
     return true;
 }
