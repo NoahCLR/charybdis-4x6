@@ -11,7 +11,7 @@
 #    define AUTOMOUSE_RGB_FLAG_LOCKED 0x01
 
 typedef struct __attribute__((packed)) {
-    uint16_t remaining;
+    uint16_t elapsed;
     uint8_t  flags;
 } automouse_rgb_packet_t;
 
@@ -31,6 +31,10 @@ static inline void automouse_rgb_set_all(rgb_t color, uint8_t led_min, uint8_t l
 #        define AUTOMOUSE_RGB_DEAD_TIME_DEN 3 // denominator of dead-time fraction
 #    endif
 
+static const uint16_t AUTOMOUSE_RGB_DEAD_TIME = (AUTO_MOUSE_TIME * AUTOMOUSE_RGB_DEAD_TIME_NUM) / AUTOMOUSE_RGB_DEAD_TIME_DEN;
+
+static const uint16_t AUTOMOUSE_RGB_TIMEOUT = AUTO_MOUSE_TIME;
+
 // Split packet tracking.
 #    ifdef SPLIT_TRANSACTION_IDS_USER
 static automouse_rgb_packet_t automouse_rgb_remote    = {0};
@@ -42,19 +46,18 @@ static inline bool automouse_rgb_is_enabled(void) {
 }
 
 static inline uint16_t automouse_rgb_timeout(void) {
-    uint16_t timeout = get_auto_mouse_timeout();
-    return timeout ? timeout : AUTO_MOUSE_TIME;
+    return AUTOMOUSE_RGB_TIMEOUT;
 }
 
-static inline uint16_t automouse_rgb_time_remaining(void) {
-    return auto_mouse_get_time_remaining();
+static inline uint16_t automouse_rgb_time_elapsed(void) {
+    return auto_mouse_get_time_elapsed();
 }
 
 static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
-    uint16_t               remaining = automouse_rgb_time_remaining();
-    automouse_rgb_packet_t p         = {
-                .remaining = remaining,
-                .flags     = 0,
+    uint16_t               elapsed = automouse_rgb_time_elapsed();
+    automouse_rgb_packet_t p       = {
+              .elapsed = elapsed,
+              .flags   = 0,
     };
     if (get_auto_mouse_toggle()) p.flags |= AUTOMOUSE_RGB_FLAG_LOCKED;
     return p;
@@ -63,8 +66,8 @@ static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
 #    ifdef SPLIT_TRANSACTION_IDS_USER
 static inline automouse_rgb_packet_t automouse_rgb_seed_packet(void) {
     return (automouse_rgb_packet_t){
-        .remaining = automouse_rgb_timeout(),
-        .flags     = 0,
+        .elapsed = 0,
+        .flags   = 0,
     };
 }
 
@@ -114,13 +117,8 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
         automouse_rgb_local_packet();
 #    endif
 
-    uint16_t remaining = pkt.remaining;
-    uint16_t timeout   = automouse_rgb_timeout();
-
-    // Avoid divide-by-zero and keep a minimal pulse even if we never saw activity.
-    if (!timeout) {
-        timeout = 1;
-    }
+    uint16_t elapsed = pkt.elapsed;
+    uint16_t timeout = AUTOMOUSE_RGB_TIMEOUT;
 
     // Broadcast ASAP once we've validated we're on the right layer and auto-mouse is enabled.
     if (is_master) {
@@ -133,12 +131,16 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
         return true;
     }
 
-    // Map remaining time to hue/value for a quick visual countdown with a dead-time window.
-    uint16_t dead_time   = (timeout * AUTOMOUSE_RGB_DEAD_TIME_NUM) / AUTOMOUSE_RGB_DEAD_TIME_DEN;
+    // Map elapsed time to hue/value for a quick visual countdown with a dead-time window.
+    uint16_t dead_time   = AUTOMOUSE_RGB_DEAD_TIME;
     uint16_t active_span = (timeout > dead_time) ? (timeout - dead_time) : 1;
 
-    uint16_t elapsed = timeout > remaining ? (timeout - remaining) : 0;
-    uint16_t prog    = (elapsed <= dead_time) ? 0 : (elapsed - dead_time);
+    // Clamp elapsed so it does not exceed timeout.
+    if (elapsed > timeout) {
+        elapsed = timeout;
+    }
+
+    uint16_t prog = (elapsed <= dead_time) ? 0 : (elapsed - dead_time);
 
     uint8_t value = end.v;
     uint8_t hue   = end.h;
