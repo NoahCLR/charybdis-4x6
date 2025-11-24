@@ -12,7 +12,6 @@
 
 typedef struct __attribute__((packed)) {
     uint16_t remaining;
-    uint16_t timeout;
     uint8_t  flags;
 } automouse_rgb_packet_t;
 
@@ -55,7 +54,6 @@ static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
     uint16_t               remaining = automouse_rgb_time_remaining();
     automouse_rgb_packet_t p         = {
                 .remaining = remaining,
-                .timeout   = automouse_rgb_timeout(),
                 .flags     = 0,
     };
     if (get_auto_mouse_toggle()) p.flags |= AUTOMOUSE_RGB_FLAG_LOCKED;
@@ -64,10 +62,8 @@ static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
 
 #    ifdef SPLIT_TRANSACTION_IDS_USER
 static inline automouse_rgb_packet_t automouse_rgb_seed_packet(void) {
-    uint16_t timeout = automouse_rgb_timeout();
     return (automouse_rgb_packet_t){
-        .remaining = timeout,
-        .timeout   = timeout,
+        .remaining = automouse_rgb_timeout(),
         .flags     = 0,
     };
 }
@@ -119,7 +115,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
 #    endif
 
     uint16_t remaining = pkt.remaining;
-    uint16_t timeout   = pkt.timeout ? pkt.timeout : automouse_rgb_timeout();
+    uint16_t timeout   = automouse_rgb_timeout();
 
     // Avoid divide-by-zero and keep a minimal pulse even if we never saw activity.
     if (!timeout) {
