@@ -5,6 +5,7 @@
 #    include <string.h>
 #    include "pointing_device_auto_mouse.h"
 #    include "rgb_helpers.h"
+#    include "timer.h"
 #    ifdef SPLIT_TRANSACTION_IDS_USER
 #        include "transactions.h"
 #    endif
@@ -200,11 +201,13 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
     }
 
     // If we haven't armed yet (first time on the layer, no activity),
-    // fake a full remaining time so we show the "start" color.
+    // fake a full remaining time so we show the "start" color and make sure
+    // the packet we broadcast carries the same remaining value.
     if (!(pkt.flags & AUTOMOUSE_RGB_FLAG_ARMED)) {
         remaining           = timeout;
         automouse_rgb_armed = true;
         pkt.flags |= AUTOMOUSE_RGB_FLAG_ARMED;
+        pkt.remaining = remaining;
     }
 
     // Define start, end, and locked colors in HSV space.
