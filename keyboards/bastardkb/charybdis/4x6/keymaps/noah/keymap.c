@@ -431,13 +431,13 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 // ------------------------------------------------------------
 
 // Auto-mouse gradient colors (start -> end) and locked indicator.
-static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 75};
-static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = 255};
-static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = 255};
+static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 75};     //  white
+static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = 255};  //  red
+static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = 255}; //  orange
 
 // Layer colors that will be clamped to current brightness at render time.
-static const hsv_t layer_lower_color = {.h = 169, .s = 255, .v = 255};
-static const hsv_t layer_raise_color = {.h = 180, .s = 255, .v = 255};
+static const hsv_t layer_lower_color = {.h = 169, .s = 255, .v = 255}; // purple
+static const hsv_t layer_raise_color = {.h = 180, .s = 255, .v = 255}; // blue
 
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
@@ -460,15 +460,13 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         } break;
 
         case LAYER_LOWER: {
-            hsv_t hsv  = clamp_hsv_value(layer_lower_color, current_brightness);
-            rgb_t base = hsv_to_rgb(hsv);
-            set_both_sides(base, led_min, led_max);
+            hsv_t hsv = clamp_hsv_value(layer_lower_color, current_brightness);
+            set_both_sides(hsv_to_rgb(hsv), led_min, led_max);
         } break;
 
         case LAYER_RAISE: {
-            hsv_t hsv  = clamp_hsv_value(layer_raise_color, current_brightness);
-            rgb_t base = hsv_to_rgb(hsv);
-            set_both_sides(base, led_min, led_max);
+            hsv_t hsv = clamp_hsv_value(layer_raise_color, current_brightness);
+            set_both_sides(hsv_to_rgb(hsv), led_min, led_max);
         } break;
     }
 
