@@ -41,16 +41,8 @@ static automouse_rgb_packet_t automouse_rgb_remote    = {0};
 static automouse_rgb_packet_t automouse_rgb_last_sent = {0};
 #    endif
 
-static inline bool automouse_rgb_is_enabled(void) {
-    return get_auto_mouse_enable();
-}
-
-static inline uint16_t automouse_rgb_time_elapsed(void) {
-    return auto_mouse_get_time_elapsed();
-}
-
 static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
-    uint16_t               elapsed = automouse_rgb_time_elapsed();
+    uint16_t               elapsed = auto_mouse_get_time_elapsed();
     automouse_rgb_packet_t p       = {
               .elapsed = elapsed,
               .flags   = 0,
@@ -101,7 +93,7 @@ static inline void automouse_rgb_post_init(void) {}
 
 // Render a simple gradient countdown on the entire board. Returns true when it handled the layer.
 static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end, hsv_t locked) {
-    if (top_layer != get_auto_mouse_layer() || !automouse_rgb_is_enabled()) {
+    if (!get_auto_mouse_enable()) {
         return false;
     }
 
@@ -126,16 +118,12 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
         return true;
     }
 
-    // Map elapsed time to hue/value for a quick visual countdown with a dead-time window.
-    uint16_t dead_time   = AUTOMOUSE_RGB_DEAD_TIME;
-    uint16_t active_span = AUTOMOUSE_RGB_ACTIVE_SPAN;
-
     // Clamp elapsed so it does not exceed timeout.
     if (elapsed > AUTO_MOUSE_TIME) {
         elapsed = AUTO_MOUSE_TIME;
     }
 
-    uint16_t prog = (elapsed <= dead_time) ? 0 : (elapsed - dead_time);
+    uint16_t prog = (elapsed <= AUTOMOUSE_RGB_DEAD_TIME) ? 0 : (elapsed - AUTOMOUSE_RGB_DEAD_TIME);
 
     uint8_t value = end.v;
     uint8_t hue   = end.h;
@@ -146,7 +134,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
         hue   = start.h;
         sat   = start.s;
     } else {
-        uint32_t t = (uint32_t)prog * 255 / active_span; // 0-255 lerp factor
+        uint32_t t = (uint32_t)prog * 255 / AUTOMOUSE_RGB_ACTIVE_SPAN; // 0-255 lerp factor
         // linear interpolation per channel
         hue   = start.h + (uint8_t)(((int16_t)end.h - (int16_t)start.h) * t / 255);
         sat   = start.s + (uint8_t)(((int16_t)end.s - (int16_t)start.s) * t / 255);
