@@ -1,15 +1,17 @@
-// --- Tunables ---
-#ifndef CARET_THRESHOLD_X
-#    define CARET_THRESHOLD_X 40
-#endif
-#ifndef CARET_THRESHOLD_Y
-#    define CARET_THRESHOLD_Y 50
-#endif
-#ifndef VOLUME_THRESHOLD
-#    define VOLUME_THRESHOLD 60
-#endif
 
-// --- Internal state (ensure these exist once in your file) ---
+#if defined POINTING_DEVICE_ENABLE
+// ─── Tunables ───────────────────────────────────────────────────────────────
+#    ifndef CARET_THRESHOLD_X
+#        define CARET_THRESHOLD_X 40
+#    endif
+#    ifndef CARET_THRESHOLD_Y
+#        define CARET_THRESHOLD_Y 50
+#    endif
+#    ifndef VOLUME_THRESHOLD
+#        define VOLUME_THRESHOLD 60
+#    endif
+
+// ─── Internal state ─────────────────────────────────────────────────────────
 static bool    caret_active  = false;
 static int32_t acc_x         = 0;
 static int32_t acc_y         = 0;
@@ -21,7 +23,7 @@ static bool    volmode_active = false; // set in process_record_user for VOLMODE
 static int32_t vol_acc        = 0;
 static int8_t  vol_last_dir   = 0;
 
-// --- Small helpers ---
+// ─── Helpers ────────────────────────────────────────────────────────────────
 static inline report_mouse_t freeze_mouse(report_mouse_t r) {
     return (report_mouse_t){0};
 }
@@ -54,7 +56,7 @@ static inline void caret_update_dominant_axis(int16_t dx, int16_t dy) {
         dominant_axis = 'y';
 }
 
-// --- Mode handlers ---
+// ─── Mode handlers ──────────────────────────────────────────────────────────
 static inline report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     int16_t dy = mouse_report.y;
 
@@ -113,3 +115,12 @@ static inline report_mouse_t handle_caret_mode(report_mouse_t mouse_report) {
 
     return freeze_mouse(mouse_report);
 }
+#else  // POINTING_DEVICE_ENABLE not defined: define empty stubs to avoid compiler errors.
+static inline report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+
+static inline report_mouse_t handle_caret_mode(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+#endif // POINTING_DEVICE_ENABLE

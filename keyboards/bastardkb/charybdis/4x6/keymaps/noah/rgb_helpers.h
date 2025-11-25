@@ -4,10 +4,10 @@
 
 #    include "rgb_matrix.h"
 
-// ------------------------------------------------------------
-// Core helpers: always pass led_min / led_max from
-// rgb_matrix_indicators_advanced_user()
-// ------------------------------------------------------------
+// ─── Core helpers ───────────────────────────────────────────────────────────
+// Always pass led_min / led_max from rgb_matrix_indicators_advanced_user()
+// to ensure proper half-keyboard behavior.
+// ────────────────────────────────────────────────────────────────────────────
 
 static inline void set_led_rgb(uint8_t index, uint8_t led_min, uint8_t led_max, uint8_t r, uint8_t g, uint8_t b) {
     if (index < led_min || index >= led_max) {
@@ -37,9 +37,7 @@ static inline void fill_led_range(uint8_t from, uint8_t to, uint8_t led_min, uin
     }
 }
 
-// ------------------------------------------------------------
-// Convenience halves helpers
-// ------------------------------------------------------------
+// ─── Convenience helpers ────────────────────────────────────────────────────
 
 // "Left side" = entire physical left half
 // -> only the half with led_min == 0 does any work
@@ -69,6 +67,19 @@ static inline hsv_t clamp_hsv_value(hsv_t hsv, uint8_t max_value) {
     if (hsv.v > max_value) {
         hsv.v = max_value;
     }
+    return hsv;
+}
+
+#else // RGB_MATRIX_ENABLE not defined: define empty stubs to avoid compiler errors.
+
+static inline void  set_led_rgb(uint8_t index, uint8_t led_min, uint8_t led_max, uint8_t r, uint8_t g, uint8_t b) {}
+static inline void  set_led_color(uint8_t index, uint8_t led_min, uint8_t led_max, rgb_t color) {}
+static inline void  set_led_group(const uint8_t *indices, uint8_t count, uint8_t led_min, uint8_t led_max, rgb_t color) {}
+static inline void  fill_led_range(uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max, rgb_t color) {}
+static inline void  set_left_side(rgb_t color, uint8_t led_min, uint8_t led_max) {}
+static inline void  set_right_side(rgb_t color, uint8_t led_min, uint8_t led_max) {}
+static inline void  set_both_sides(rgb_t color, uint8_t led_min, uint8_t led_max) {}
+static inline hsv_t clamp_hsv_value(hsv_t hsv, uint8_t max_value) {
     return hsv;
 }
 
