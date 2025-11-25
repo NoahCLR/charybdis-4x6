@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(SPLIT_TRANSACTION_IDS_USER) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
+#ifdef(SPLIT_TRANSACTION_IDS_USER) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 
 #    include <string.h>
 #    include "pointing_device_auto_mouse.h"
