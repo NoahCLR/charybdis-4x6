@@ -291,11 +291,9 @@ void keyboard_post_init_user(void) {
 }
 #    endif // SPLIT_TRANSACTION_IDS_USER
 
-// Automatically enable sniping-mode on the chosen layer.
-#    define CHARYBDIS_AUTO_SNIPING_ON_LAYER LAYER_RAISE
-#    ifdef CHARYBDIS_AUTO_SNIPING_ON_LAYER
 layer_state_t layer_state_set_user(layer_state_t state) {
-    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_ON_LAYER));
+    // Automatically enable sniping-mode on the chosen layer.
+    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
 
     // Manage Auto Mouse enabling/disabling based on layer to avoid conflicts with sniping
     uint8_t layer = get_highest_layer(state);
@@ -311,7 +309,6 @@ layer_state_t layer_state_set_user(layer_state_t state) {
     }
     return state;
 }
-#    endif // CHARYBDIS_AUTO_SNIPING_ON_LAYER
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 void pointing_device_init_user(void) {

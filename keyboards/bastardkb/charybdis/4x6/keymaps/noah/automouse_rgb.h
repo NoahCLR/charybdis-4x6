@@ -33,7 +33,7 @@ static inline void automouse_rgb_set_all(rgb_t color, uint8_t led_min, uint8_t l
 
 static const uint16_t AUTOMOUSE_RGB_DEAD_TIME = (AUTO_MOUSE_TIME * AUTOMOUSE_RGB_DEAD_TIME_NUM) / AUTOMOUSE_RGB_DEAD_TIME_DEN;
 
-static const uint16_t AUTOMOUSE_RGB_ACTIVE_SPAN = (AUTO_MOUSE_TIME > AUTOMOUSE_RGB_DEAD_TIME) ? (AUTO_MOUSE_TIME - AUTOMOUSE_RGB_DEAD_TIME) : 1;
+static const uint16_t AUTOMOUSE_RGB_ACTIVE_SPAN = AUTO_MOUSE_TIME - AUTOMOUSE_RGB_DEAD_TIME;
 
 // Split packet tracking.
 #    ifdef SPLIT_TRANSACTION_IDS_USER
