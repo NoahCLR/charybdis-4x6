@@ -290,11 +290,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 // ------------------------------------------------------------
 #ifdef POINTING_DEVICE_ENABLE
 
-// #    ifdef SPLIT_TRANSACTION_IDS_USER // Auto Mouse RGB timer sync
-// void keyboard_post_init_user(void) {
-//     automouse_rgb_post_init();
-// }
-// #    endif // SPLIT_TRANSACTION_IDS_USER
+#    ifdef SPLIT_TRANSACTION_IDS_USER // Auto Mouse RGB timer sync
+void keyboard_post_init_user(void) {
+    automouse_rgb_post_init();
+}
+#    endif // SPLIT_TRANSACTION_IDS_USER
 
 layer_state_t layer_state_set_user(layer_state_t state) {
     // Automatically enable sniping-mode on the chosen layer.
