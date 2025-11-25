@@ -114,3 +114,4 @@
  * Tap/Hold timing
  * ──────────────────────────────── */
 #define CUSTOM_TAP_HOLD_TERM 180
+#define CUSTOM_LONGER_HOLD_TERM 500

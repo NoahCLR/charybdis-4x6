@@ -102,8 +102,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // Macros
 // ------------------------------------------------------------
 static uint16_t tap_hold_timer;
+static uint16_t tap_hold_elapsed_time;
 
-static void send_hold_variant(uint16_t keycode) {
+static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
     switch (keycode) {
         // Number row
         case KC_1:
@@ -190,6 +191,23 @@ static void send_hold_variant(uint16_t keycode) {
     }
 }
 
+static void send_longer_hold_variant(uint16_t keycode) { // CUSTOM_LONGER_HOLD_TERM
+    switch (keycode) {
+        case KC_LEFT:
+            tap_code16(G(KC_LEFT));
+            break; //  GUI + Left Arrow
+        case KC_RIGHT:
+            tap_code16(G(KC_RIGHT));
+            break; //  GUI + Right Arrow
+
+        default:
+            send_hold_variant(keycode);
+            break;
+    }
+
+    // Currently unused, but could be implemented for more complex behaviors.
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 1) Hold-type keys (react on press + release) ---
     switch (keycode) {
@@ -239,9 +257,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 tap_hold_timer = timer_read();
             } else {
                 // key up: decide tap vs hold
-                if (timer_elapsed(tap_hold_timer) < CUSTOM_TAP_HOLD_TERM) {
+                tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
+
+                if (tap_hold_elapsed_time < CUSTOM_TAP_HOLD_TERM) {
                     // TAP: send normal version (1, 2, -, =, etc.)
                     tap_code(keycode);
+                } else if (tap_hold_elapsed_time > CUSTOM_LONGER_HOLD_TERM) {
+                    // LONGER HOLD: send longer-hold variant (GUI + Arrow, etc.)
+                    send_longer_hold_variant(keycode);
                 } else {
                     // HOLD: send hold variant (Shifted symbol, Alt + Arrow, etc.)
                     send_hold_variant(keycode);
