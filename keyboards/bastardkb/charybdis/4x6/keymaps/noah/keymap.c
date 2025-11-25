@@ -290,12 +290,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 // ------------------------------------------------------------
 #ifdef POINTING_DEVICE_ENABLE
 
-// #    ifdef SPLIT_TRANSACTION_IDS_USER // Auto Mouse RGB timer sync
-// void keyboard_post_init_user(void) {
-//     automouse_rgb_post_init();
-// }
-// #    endif // SPLIT_TRANSACTION_IDS_USER
-
 layer_state_t layer_state_set_user(layer_state_t state) {
     // Automatically enable sniping-mode on the chosen layer.
     charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
@@ -319,7 +313,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 void pointing_device_init_user(void) {
     set_auto_mouse_layer(LAYER_POINTER); // set default pointer layer
     set_auto_mouse_enable(true);         // enable Auto Mouse by default
-    automouse_rgb_post_init();
+    automouse_rgb_post_init();           // initialize Auto Mouse RGB for slave side
 }
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
