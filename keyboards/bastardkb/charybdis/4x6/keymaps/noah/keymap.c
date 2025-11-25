@@ -1,6 +1,7 @@
 #include QMK_KEYBOARD_H
 #include "rgb_helpers.h"
 #include "trackerball_helpers.h"
+#include "automouse_rgb.h"
 
 // ------------------------------------------------------------
 // Custom Keycodes & Keymap Layers
@@ -101,8 +102,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // Macros
 // ------------------------------------------------------------
 static uint16_t tap_hold_timer;
+static uint16_t tap_hold_elapsed_time;
 
-static void send_hold_variant(uint16_t keycode) {
+static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
     switch (keycode) {
         // Number row
         case KC_1:
@@ -178,11 +180,32 @@ static void send_hold_variant(uint16_t keycode) {
             tap_code16(A(KC_RIGHT));
             break; // Alt + Right Arrow
 
+        case KC_ENT:
+            tap_code16(S(KC_ENT));
+            break; // Shift + Enter
+
         // Fallback: just send the original unshifted key if we forgot a mapping
         default:
             tap_code(keycode);
             break;
     }
+}
+
+static void send_longer_hold_variant(uint16_t keycode) { // CUSTOM_LONGER_HOLD_TERM
+    switch (keycode) {
+        case KC_LEFT:
+            tap_code16(G(KC_LEFT));
+            break; //  GUI + Left Arrow
+        case KC_RIGHT:
+            tap_code16(G(KC_RIGHT));
+            break; //  GUI + Right Arrow
+
+        default:
+            send_hold_variant(keycode);
+            break;
+    }
+
+    // Currently unused, but could be implemented for more complex behaviors.
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -228,14 +251,20 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case KC_DOT:
         case KC_LEFT:
         case KC_RIGHT:
+        case KC_ENT:
             if (record->event.pressed) {
                 // key down: start timer, don't send anything yet
                 tap_hold_timer = timer_read();
             } else {
                 // key up: decide tap vs hold
-                if (timer_elapsed(tap_hold_timer) < CUSTOM_TAP_HOLD_TERM) {
+                tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
+
+                if (tap_hold_elapsed_time < CUSTOM_TAP_HOLD_TERM) {
                     // TAP: send normal version (1, 2, -, =, etc.)
                     tap_code(keycode);
+                } else if (tap_hold_elapsed_time > CUSTOM_LONGER_HOLD_TERM) {
+                    // LONGER HOLD: send longer-hold variant (GUI + Arrow, etc.)
+                    send_longer_hold_variant(keycode);
                 } else {
                     // HOLD: send hold variant (Shifted symbol, Alt + Arrow, etc.)
                     send_hold_variant(keycode);
@@ -284,51 +313,26 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 // ------------------------------------------------------------
 #ifdef POINTING_DEVICE_ENABLE
 
-// Automatically enable sniping-mode on the chosen layer.
-#    define CHARYBDIS_AUTO_SNIPING_ON_LAYER LAYER_RAISE
-#    ifdef CHARYBDIS_AUTO_SNIPING_ON_LAYER
-layer_state_t layer_state_set_user(layer_state_t state) {
-    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_ON_LAYER));
-
-    // Manage Auto Mouse enabling/disabling based on layer to avoid conflicts with sniping
-    uint8_t layer = get_highest_layer(state);
-
-    switch (layer) {
-        case LAYER_RAISE:
-            set_auto_mouse_enable(false); // disable Auto Mouse when in sniping layer
-            break;
-
-        default:
-            set_auto_mouse_enable(true); // enable it again
-            break;
-    }
-    return state;
-}
-#    endif // CHARYBDIS_AUTO_SNIPING_ON_LAYER
-
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 void pointing_device_init_user(void) {
     set_auto_mouse_layer(LAYER_POINTER); // set default pointer layer
     set_auto_mouse_enable(true);         // enable Auto Mouse by default
+    automouse_rgb_post_init();           // initialize Auto Mouse RGB for slave side
 }
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
 bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
         case SNIPING_MODE:
-            // Treat SNIPING as a mouse key so it WON'T deactivate the auto mouse layer
-            return true;
-
         case SNIPING_MODE_TOGGLE:
-            // Treat SNIPING as a mouse key so it WON'T deactivate the auto mouse layer
-            return true;
-
         case DRAGSCROLL_MODE:
-            // Treat DRAGSCROLL as a mouse key so it WON'T deactivate the auto mouse layer
-            return true;
-
         case DRAGSCROLL_MODE_TOGGLE:
-            // Treat DRAGSCROLL as a mouse key so it WON'T deactivate the auto mouse layer
+        case CARET_MODE:
+        case VOLMODE:
+        case DPI_MOD:
+        case DPI_RMOD:
+        case S_D_MOD:
+        case S_D_RMOD:
             return true;
     }
     return false;
@@ -348,6 +352,26 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         return mouse_report;
     }
 }
+
+layer_state_t layer_state_set_user(layer_state_t state) {
+    // Automatically enable sniping-mode on the chosen layer.
+    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
+
+    // Manage Auto Mouse enabling/disabling based on layer to avoid conflicts with sniping
+    uint8_t layer = get_highest_layer(state);
+
+    switch (layer) {
+        case LAYER_RAISE:
+            set_auto_mouse_enable(false); // disable Auto Mouse when in sniping layer
+            break;
+
+        default:
+            set_auto_mouse_enable(true); // enable it again
+            break;
+    }
+    return state;
+}
+
 #endif // POINTING_DEVICE_ENABLE
 
 // ------------------------------------------------------------
@@ -379,19 +403,56 @@ static const uint8_t layer_raise_mods[] = {33, 18};
 static const uint8_t layer_lower_mods[] = {4, 47};
 
 // ─── RGB HELPER SUMMARY ─────────────────────────────────────────────
-// set_led_color(i, color)        → set single LED by index (side-aware)
-// set_led_group(list, n, color)  → set non-contiguous LEDs
-// fill_led_range(from, to, col)  → fill continuous LED range
-// set_left_side(color)           → color all left-side LEDs
-// set_right_side(color)          → color all right-side LEDs
-// set_both_sides(color)          → color all LEDs on both halves
+// All helpers below must be called *inside*
+// rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max)
+// because they use led_min/led_max for split-safe operation.
 //
-// Use this for color: hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = current_brightness})
+// set_led_color(i, led_min, led_max, color)
+//     → Color a single LED by global index.
+//       Only affects this half’s LED range.
+//
+// set_led_group(list, count, led_min, led_max, color)
+//     → Color a list of non-contiguous LED indices.
+//
+// fill_led_range(from, to, led_min, led_max, color)
+//     → Color a continuous range [from, to), clamped to this half.
+//
+// set_left_side(color, led_min, led_max)
+//     → Color the entire left half.
+//       Only does work when running on the left half (led_min == 0).
+//
+// set_right_side(color, led_min, led_max)
+//     → Color the entire right half.
+//       Only does work when running on the right half (led_min > 0).
+//
+// set_both_sides(color, led_min, led_max)
+//     → Color all LEDs on *this* half only.
+//
+// Typical color usage:
+//
+//     rgb_t c = hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = current_brightness});
+//
+// Example group usage:
+//
+//     set_led_group(layer_raise_mods,
+//                   sizeof(layer_raise_mods),
+//                   led_min, led_max,
+//                   hsv_to_rgb((hsv_t){ .h = 180, .s = 255, .v = current_brightness }));
 // ───────────────────────────────────────────────────────────────────
 
 // ------------------------------------------------------------
 // RGB Matrix per-layer indicators
 // ------------------------------------------------------------
+
+// Auto-mouse gradient colors (start -> end) and locked indicator.
+static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 75};                               // white
+static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // red
+static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // orange
+
+// Layer colors that will be clamped to current brightness at render time.
+static const hsv_t layer_lower_color = {.h = 169, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // purple
+static const hsv_t layer_raise_color = {.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // blue
+
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
 
@@ -399,27 +460,23 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         return false;
     }
 
-    uint8_t current_brightness = rgb_matrix_get_val();
-
     switch (top) {
         case LAYER_POINTER: {
-            hsv_t hsv = (hsv_t){.h = 0, .s = 0, .v = 75};
-            set_both_sides(hsv_to_rgb(hsv));
-            //            set_led_group(layer_raise_mods, sizeof(layer_raise_mods), hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = current_brightness}));
-            //            set_led_group(layer_lower_mods, sizeof(layer_lower_mods), hsv_to_rgb((hsv_t){.h = 169, .s = 255, .v = current_brightness}));
+            if (automouse_rgb_render(top, led_min, led_max, automouse_color_start, automouse_color_end, automouse_color_locked)) {
+                break;
+            }
         } break;
 
         case LAYER_LOWER: {
-            hsv_t hsv = (hsv_t){.h = 169, .s = 255, .v = current_brightness};
-            set_both_sides(hsv_to_rgb(hsv));
+            set_both_sides(hsv_to_rgb(layer_lower_color), led_min, led_max);
         } break;
 
         case LAYER_RAISE: {
-            hsv_t hsv = (hsv_t){.h = 180, .s = 255, .v = current_brightness};
-            set_both_sides(hsv_to_rgb(hsv));
+            set_both_sides(hsv_to_rgb(layer_raise_color), led_min, led_max);
         } break;
     }
 
     return true;
 }
+
 #endif // RGB_MATRIX_ENABLE

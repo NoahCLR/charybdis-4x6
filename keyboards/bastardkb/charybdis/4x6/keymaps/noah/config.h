@@ -72,6 +72,11 @@
 #endif
 #define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
 
+#ifdef RGB_MATRIX_LED_FLUSH_LIMIT
+#    undef RGB_MATRIX_LED_FLUSH_LIMIT
+#endif
+#define RGB_MATRIX_LED_FLUSH_LIMIT 33 // Limit to  LEDs per matrix flush to
+
 /* RGB Matrix timeout/sleep */
 #ifdef RGB_MATRIX_TIMEOUT
 #    undef RGB_MATRIX_TIMEOUT
@@ -84,13 +89,10 @@
 #ifdef POINTING_DEVICE_ENABLE
 /* Auto pointer layer on movement + 16-bit motion reports. */
 #    define POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#    define AUTO_MOUSE_TIME 1200 // ms to switch back after movement or mouse key activity
 #    define MOUSE_EXTENDED_REPORT
+#    define SPLIT_TRANSACTION_IDS_USER PUT_AUTOMOUSE_RGB // Enable split transactions for Auto Mouse RGB countdown
 #endif
-
-#ifdef AUTO_MOUSE_TIME
-#    undef AUTO_MOUSE_TIME
-#endif
-#define AUTO_MOUSE_TIME 1200 // ms to switch back after movement or mouse key activity
 
 /* ────────────────────────────────
  * Scroll configuration
@@ -111,4 +113,5 @@
 /* ────────────────────────────────
  * Tap/Hold timing
  * ──────────────────────────────── */
-#define CUSTOM_TAP_HOLD_TERM 180
+#define CUSTOM_TAP_HOLD_TERM 150
+#define CUSTOM_LONGER_HOLD_TERM 400
