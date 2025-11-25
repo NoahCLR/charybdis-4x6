@@ -1,13 +1,11 @@
 #pragma once
 
-#if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
+#if defined(SPLIT_TRANSACTION_IDS_USER) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 
 #    include <string.h>
 #    include "pointing_device_auto_mouse.h"
 #    include "rgb_helpers.h"
-#    ifdef SPLIT_TRANSACTION_IDS_USER
-#        include "transactions.h"
-#    endif
+#    include "transactions.h"
 #    define AUTOMOUSE_RGB_FLAG_LOCKED 0x01
 
 typedef struct __attribute__((packed)) {
@@ -36,10 +34,8 @@ static const uint16_t AUTOMOUSE_RGB_DEAD_TIME = (AUTO_MOUSE_TIME * AUTOMOUSE_RGB
 static const uint16_t AUTOMOUSE_RGB_ACTIVE_SPAN = AUTO_MOUSE_TIME - AUTOMOUSE_RGB_DEAD_TIME;
 
 // Split packet tracking.
-#    ifdef SPLIT_TRANSACTION_IDS_USER
 static automouse_rgb_packet_t automouse_rgb_remote    = {0};
 static automouse_rgb_packet_t automouse_rgb_last_sent = {0};
-#    endif
 
 static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
     uint16_t               elapsed = auto_mouse_get_time_elapsed();
@@ -51,7 +47,6 @@ static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
     return p;
 }
 
-#    ifdef SPLIT_TRANSACTION_IDS_USER
 static inline automouse_rgb_packet_t automouse_rgb_seed_packet(void) {
     return (automouse_rgb_packet_t){
         .elapsed = 0,
@@ -84,26 +79,11 @@ static inline void automouse_rgb_post_init(void) {
     }
     transaction_register_rpc(PUT_AUTOMOUSE_RGB, automouse_rgb_slave_rpc);
 }
-#    else
-static inline void automouse_rgb_broadcast(const automouse_rgb_packet_t *pkt) {
-    (void)pkt;
-}
-static inline void automouse_rgb_post_init(void) {}
-#    endif
 
 // Render a simple gradient countdown on the entire board. Returns true when it handled the layer.
 static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end, hsv_t locked) {
-    if (!get_auto_mouse_enable()) {
-        return false;
-    }
-
     bool                   is_master = is_keyboard_master();
-    automouse_rgb_packet_t pkt =
-#    ifdef SPLIT_TRANSACTION_IDS_USER
-        is_master ? automouse_rgb_local_packet() : automouse_rgb_remote;
-#    else
-        automouse_rgb_local_packet();
-#    endif
+    automouse_rgb_packet_t pkt       = is_master ? automouse_rgb_local_packet() : automouse_rgb_remote;
 
     uint16_t elapsed = pkt.elapsed;
 
@@ -148,7 +128,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
     return true;
 }
 
-#else // defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
+#else // defined(SPLIT_TRANSACTION_IDS_USER) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 
 static inline void automouse_rgb_post_init(void) {}
 static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end, hsv_t locked) {
