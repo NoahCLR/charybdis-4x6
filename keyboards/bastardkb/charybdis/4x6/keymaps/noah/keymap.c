@@ -3,9 +3,7 @@
 #include "trackerball_helpers.h"
 #include "automouse_rgb.h"
 
-// ------------------------------------------------------------
-// Custom Keycodes & Keymap Layers
-// ------------------------------------------------------------
+// ─── Custom Keycodes & Keymap Layers ────────────────────────────────
 enum custom_keycodes {
     MACRO_0 = SAFE_RANGE,
     MACRO_1,
@@ -98,9 +96,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format on
 };
 
-// ------------------------------------------------------------
-// Macros
-// ------------------------------------------------------------
+// ─── Macros ─────────────────────────────────────────────────────────
 static uint16_t tap_hold_timer;
 static uint16_t tap_hold_elapsed_time;
 
@@ -308,9 +304,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 
-// ------------------------------------------------------------
-// Pointing Device Stuff
-// ------------------------------------------------------------
+// ─── Pointing Device Stuff ──────────────────────────────────────────
 #ifdef POINTING_DEVICE_ENABLE
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
@@ -374,31 +368,29 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 
 #endif // POINTING_DEVICE_ENABLE
 
-// ------------------------------------------------------------
-// RGB Stuff
-// ------------------------------------------------------------
+// ─── RGB Stuff ──────────────────────────────────────────────────────
 #ifdef RGB_MATRIX_ENABLE
-/**
- * LEDs index.
- *
- * ╭────────────────────────╮                 ╭────────────────────────╮
- *    0   7   8  15  16  20                     49  45  44  37  36  29
- * ├────────────────────────┤                 ├────────────────────────┤
- *    1   6   9  14  17  21                     50  46  43  38  35  30
- * ├────────────────────────┤                 ├────────────────────────┤
- *    2   5  10  13  18  22                     51  47  42  39  34  31
- * ├────────────────────────┤                 ├────────────────────────┤
- *    3   4  11  12  19  23                     52  48  41  40  33  32
- * ╰────────────────────────╯                 ╰────────────────────────╯
- *                       26  27  28     53  54  XX
- *                           25  24     55  XX
- *                     ╰────────────╯ ╰────────────╯
- *
- * 0–28  → left half
- * 29–55 → right half
- */
 
-// LED Groups
+// ─── LEDs index ─────────────────────────────────────────────────────
+//
+// ╭────────────────────────╮                 ╭────────────────────────╮
+//    0   7   8  15  16  20                     49  45  44  37  36  29
+// ├────────────────────────┤                 ├────────────────────────┤
+//    1   6   9  14  17  21                     50  46  43  38  35  30
+// ├────────────────────────┤                 ├────────────────────────┤
+//    2   5  10  13  18  22                     51  47  42  39  34  31
+// ├────────────────────────┤                 ├────────────────────────┤
+//    3   4  11  12  19  23                     52  48  41  40  33  32
+// ╰────────────────────────╯                 ╰────────────────────────╯
+//                       26  27  28     53  54  XX
+//                           25  24     55  XX
+//                     ╰────────────╯ ╰────────────╯
+//
+// 0–28  → left half
+// 29–55 → right half
+//
+// ────────────────────────────────────────────────────────────────────
+
 static const uint8_t layer_raise_mods[] = {33, 18};
 static const uint8_t layer_lower_mods[] = {4, 47};
 
@@ -438,18 +430,16 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 //                   sizeof(layer_raise_mods),
 //                   led_min, led_max,
 //                   hsv_to_rgb((hsv_t){ .h = 180, .s = 255, .v = current_brightness }));
-// ───────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────
 
-// ------------------------------------------------------------
-// RGB Matrix per-layer indicators
-// ------------------------------------------------------------
+// ─── RGB Matrix per-layer indicators ────────────────────────────────
 
 // Auto-mouse gradient colors (start -> end) and locked indicator.
 static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 75};                               // white
 static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // red
 static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // orange
 
-// Layer colors that will be clamped to current brightness at render time.
+// Layer colors that will be clamped to maximum brightness at render time.
 static const hsv_t layer_lower_color = {.h = 169, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // purple
 static const hsv_t layer_raise_color = {.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // blue
 
