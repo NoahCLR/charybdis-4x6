@@ -8,7 +8,7 @@ permissions:
 jobs:
   build:
     name: 'QMK Userspace Build'
-    uses: NoahCLR/QMK.github/.github/workflows/qmk_userspace_build.yml@main
+    uses: ./.github/workflows/qmk_userspace_build.yml
     with:
       qmk_repo: NoahCLR/bastardkb-qmk
       qmk_ref: bkb-master
@@ -59,7 +59,7 @@ jobs:
 
   publish:
     name: 'QMK Userspace Publish'
-    uses: NoahCLR/QMK.github/.github/workflows/qmk_userspace_publish.yml@main
+    uses: ./.github/workflows/qmk_userspace_publish.yml
     if: github.ref_name == 'main'
     needs: update-tag
 
