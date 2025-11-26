@@ -13,8 +13,132 @@ jobs:
       qmk_repo: NoahCLR/bastardkb-qmk
       qmk_ref: bkb-master
 
+  reset-release:
+    name: 'Delete existing release so timestamp updates'
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Delete branch-specific release if it exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Determine a branch-safe tag name
+          SAFE_BRANCH="${GITHUB_REF_NAME//\//-}"
+          if [ "$SAFE_BRANCH" = "main" ]; then
+            TAG="latest"
+          else
+            TAG="latest-$SAFE_BRANCH"
+          fi
+
+          echo "Deleting release/tag: $TAG if it exists..."
+          gh release delete "$TAG" -y --repo "$GITHUB_REPOSITORY" || true
+
+  update-tag:
+    name: 'Update tag for release'
+    runs-on: ubuntu-latest
+    needs: reset-release
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Move or recreate branch-specific tag
+        run: |
+          # Determine a branch-safe tag name
+          SAFE_BRANCH="${GITHUB_REF_NAME//\//-}"
+          if [ "$SAFE_BRANCH" = "main" ]; then
+            TAG="latest"
+          else
+            TAG="latest-$SAFE_BRANCH"
+          fi
+
+          echo "Tagging commit $GITHUB_SHA as $TAG"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -fa "$TAG" -m "Auto release for $GITHUB_SHA ($GITHUB_REF_NAME)" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$TAG"
+
   publish:
     name: 'QMK Userspace Publish'
     uses: qmk/.github/.github/workflows/qmk_userspace_publish.yml@main
-    if: always() && !cancelled()
-    needs: build
+    if: github.ref_name == 'main'
+    needs: update-tag
+
+  publish-branch:
+    name: 'Publish branch artifacts to branch-specific release'
+    runs-on: ubuntu-latest
+    needs: update-tag
+    if: github.ref_name != 'main'
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create or update branch release and upload UF2s
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          SAFE_BRANCH="${GITHUB_REF_NAME//\//-}"
+          TAG="latest-$SAFE_BRANCH"
+          TITLE="Charybdis 4x6 (${GITHUB_REF_NAME})"
+
+          echo "Ensuring release $TAG exists"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release exists"
+          else
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" \
+              --prerelease \
+              --latest=false \
+              --notes "Auto release for $GITHUB_SHA ($GITHUB_REF_NAME)" || true
+          fi
+
+          echo "Uploading UF2 assets to $TAG if any are present"
+          shopt -s nullglob
+          UF2_FILES=(artifacts/**/*.uf2 artifacts/*.uf2)
+          if [ ${#UF2_FILES[@]} -eq 0 ]; then
+            echo "No UF2 files found in artifacts/. Listing contents for debugging:";
+            ls -R artifacts || true
+          else
+            gh release upload "$TAG" "${UF2_FILES[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+          fi
+
+  retitle-release:
+    name: 'Set release title & notes'
+    runs-on: ubuntu-latest
+    needs: publish
+    steps:
+      - name: Update release metadata (stable on main, prerelease on branches)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Determine a branch-safe tag name
+          SAFE_BRANCH="${GITHUB_REF_NAME//\//-}"
+          if [ "$SAFE_BRANCH" = "main" ]; then
+            TAG="latest"
+            TITLE="Noah’s Charybdis 4x6 Layout"
+            PRE_FLAG=""
+            LATEST_FLAG="--latest"
+          else
+            TAG="latest-$SAFE_BRANCH"
+            TITLE="Charybdis 4x6 (${GITHUB_REF_NAME})"
+            PRE_FLAG="--prerelease"
+            LATEST_FLAG="--latest=false"
+          fi
+
+          echo "Editing or creating release $TAG with title: $TITLE"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Release exists: update it
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" $PRE_FLAG $LATEST_FLAG
+          else
+            # Release does not exist yet: create it
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" $PRE_FLAG $LATEST_FLAG \
+              --generate-notes
+          fi
