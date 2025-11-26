@@ -8,7 +8,7 @@ permissions:
 jobs:
   build:
     name: 'QMK Userspace Build'
-    uses: qmk/.github/.github/workflows/qmk_userspace_build.yml@main
+    uses: NoahCLR/QMK.github/.github/workflows/qmk_userspace_build.yml@main
     with:
       qmk_repo: NoahCLR/bastardkb-qmk
       qmk_ref: bkb-master
