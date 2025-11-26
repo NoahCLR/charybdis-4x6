@@ -1,5 +1,6 @@
+#pragma once
 
-#if defined POINTING_DEVICE_ENABLE
+#if defined(POINTING_DEVICE_ENABLE)
 // ─── Tunables ───────────────────────────────────────────────────────────────
 #    ifndef CARET_THRESHOLD_X
 #        define CARET_THRESHOLD_X 40

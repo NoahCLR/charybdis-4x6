@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef RGB_MATRIX_ENABLE
+#if defined(RGB_MATRIX_ENABLE)
 
 #    include "rgb_matrix.h"
 
