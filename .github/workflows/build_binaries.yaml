@@ -59,7 +59,7 @@ jobs:
 
   publish:
     name: 'QMK Userspace Publish'
-    uses: qmk/.github/.github/workflows/qmk_userspace_publish.yml@main
+    uses: NoahCLR/QMK.github/.github/workflows/qmk_userspace_publish.yml@main
     if: github.ref_name == 'main'
     needs: update-tag
 
