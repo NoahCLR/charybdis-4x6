@@ -26,7 +26,8 @@ jobs:
   build:
     name: Build Userspace Firmware
     runs-on: ubuntu-latest
-    container: qmkfm/base_container
+    container:
+      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8
 
     steps:
       - name: Checkout Userspace
@@ -50,20 +51,6 @@ jobs:
           repository: ${{ inputs.qmk_repo || 'qmk/qmk_firmware' }}
           ref: ${{ inputs.qmk_ref || 'master' }}
           submodules: recursive
-
-      # ---- PEP 668-safe install of QMK CLI ----
-      - name: Install QMK CLI (override PEP 668)
-        shell: bash
-        env:
-          PIP_BREAK_SYSTEM_PACKAGES: "1"
-        run: |
-          python3 -m pip install --upgrade qmk
-          python3 -m pip install -r qmk_firmware/requirements.txt
-
-      - name: Install ARM toolchain
-        run: |
-          apt-get update
-          apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi
 
       - name: Configure QMK CLI
         run: |
