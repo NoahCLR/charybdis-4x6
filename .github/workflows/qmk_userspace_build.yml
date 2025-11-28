@@ -26,7 +26,7 @@ jobs:
   build:
     name: Build Userspace Firmware
     runs-on: ubuntu-latest
-    container: ghcr.io/noahclr/qmk_cli::latest
+    container: ghcr.io/noahclr/qmk_cli:latest
 
     steps:
       - name: Checkout Userspace
