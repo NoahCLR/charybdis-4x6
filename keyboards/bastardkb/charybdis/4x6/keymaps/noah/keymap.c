@@ -389,7 +389,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 // 0–28  → left half
 // 29–55 → right half
 //
-// ────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 
 static const uint8_t layer_raise_mods[] = {33, 18};
 static const uint8_t layer_lower_mods[] = {4, 47};
