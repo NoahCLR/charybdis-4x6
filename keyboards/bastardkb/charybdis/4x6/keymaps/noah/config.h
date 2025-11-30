@@ -76,7 +76,7 @@
 #    ifdef RGB_MATRIX_LED_FLUSH_LIMIT
 #        undef RGB_MATRIX_LED_FLUSH_LIMIT
 #    endif
-#    define RGB_MATRIX_LED_FLUSH_LIMIT 33 // in ms (~30 FPS)
+#    define RGB_MATRIX_LED_FLUSH_LIMIT 50
 
 // RGB Matrix timeout/sleep
 #    ifdef RGB_MATRIX_TIMEOUT
