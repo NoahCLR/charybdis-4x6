@@ -26,7 +26,8 @@ jobs:
   build:
     name: Build Userspace Firmware
     runs-on: ubuntu-latest
-    container: ghcr.io/noahclr/qmk_cli:latest
+    container:
+      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8
 
     steps:
       - name: Checkout Userspace
@@ -50,12 +51,6 @@ jobs:
           repository: ${{ inputs.qmk_repo || 'qmk/qmk_firmware' }}
           ref: ${{ inputs.qmk_ref || 'master' }}
           submodules: recursive
-
-      - name: Install QMK CLI dependencies
-        run: |
-          echo '$PATH'
-          echo $PATH | tr ':' '\n' | sed -e 's/^/ - /g'
-          pip install -r qmk_firmware/requirements.txt
 
       - name: Configure QMK CLI
         run: |
