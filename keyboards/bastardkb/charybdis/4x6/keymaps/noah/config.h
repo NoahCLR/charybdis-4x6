@@ -76,7 +76,7 @@
 #    ifdef RGB_MATRIX_LED_FLUSH_LIMIT
 #        undef RGB_MATRIX_LED_FLUSH_LIMIT
 #    endif
-#    define RGB_MATRIX_LED_FLUSH_LIMIT 50
+#    define RGB_MATRIX_LED_FLUSH_LIMIT 16
 
 // RGB Matrix timeout/sleep
 #    ifdef RGB_MATRIX_TIMEOUT
