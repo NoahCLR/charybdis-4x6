@@ -225,21 +225,17 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
         case DRG_TOG_HOLD:
             if (record->event.pressed) {
+                // key down: start timer, don't send anything yet
                 tap_hold_timer = timer_read();
             } else {
+                // key up: decide tap vs hold
                 tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
 
-                if (tap_hold_elapsed_time >= CUSTOM_TAP_HOLD_TERM) {
-                    bool enable_dragscroll      = !charybdis_get_pointer_dragscroll_enabled();
-                    bool automouse_is_locked    = get_auto_mouse_toggle();
-                    bool needs_automouse_toggle = (enable_dragscroll && !automouse_is_locked) || (!enable_dragscroll && automouse_is_locked);
-
-                    charybdis_set_pointer_dragscroll_enabled(enable_dragscroll);
-
-                    if (needs_automouse_toggle) {
-                        auto_mouse_toggle();
-                    }
+                if (tap_hold_elapsed_time > CUSTOM_TAP_HOLD_TERM) {
+                    // HOLD: behave as if DRAGSCROLL_MODE_TOGGLE was pressed
+                    tap_code16(DRAGSCROLL_MODE_TOGGLE);
                 } else {
+                    // TAP: send whatever is on BASE at this position
                     uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
                     tap_code16(fallback_key);
                 }
@@ -247,7 +243,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 
-    // --- 2) Tap/Hold symbol & number keys (Custom Auto Shift) ---
+    // --- 2) Tap/Hold/Longer Hold symbol & number keys (react on press + release) ---
     switch (keycode) {
         case KC_1:
         case KC_2:
