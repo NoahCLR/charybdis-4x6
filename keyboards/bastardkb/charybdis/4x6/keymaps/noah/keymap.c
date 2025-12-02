@@ -227,9 +227,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 tap_hold_timer = timer_read();
             } else {
-                uint16_t elapsed = timer_elapsed(tap_hold_timer);
+                tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
 
-                if (elapsed >= CUSTOM_TAP_HOLD_TERM) {
+                if (tap_hold_elapsed_time >= CUSTOM_TAP_HOLD_TERM) {
                     bool enable_dragscroll      = !charybdis_get_pointer_dragscroll_enabled();
                     bool automouse_is_locked    = get_auto_mouse_toggle();
                     bool needs_automouse_toggle = (enable_dragscroll && !automouse_is_locked) || (!enable_dragscroll && automouse_is_locked);
@@ -240,8 +240,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         auto_mouse_toggle();
                     }
                 } else {
-                    uint8_t  active_layer = get_highest_layer(default_layer_state);
-                    uint16_t fallback_key = keymap_key_to_keycode(active_layer, record->event.key);
+                    uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
                     tap_code16(fallback_key);
                 }
             }
