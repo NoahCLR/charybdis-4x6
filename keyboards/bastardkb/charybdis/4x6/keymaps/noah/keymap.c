@@ -67,7 +67,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
   [LAYER_RAISE] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
+                  XXXXXXX,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   XXXXXXX,           G(KC_Q),           XXXXXXX,           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -82,7 +82,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
   [LAYER_POINTER] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  _______,           _______,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              _______,           _______,           _______,           _______,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -100,7 +100,6 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // ─── Macros ─────────────────────────────────────────────────────────────────
 static uint16_t tap_hold_timer;
 static uint16_t tap_hold_elapsed_time;
-static uint16_t drg_tog_timer;
 
 static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
     switch (keycode) {
@@ -274,11 +273,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 3) Drag-scroll toggle: hold to toggle, tap to send base-layer key ---
     if (keycode == DRG_TOG_HOLD) {
         if (record->event.pressed) {
-            drg_tog_timer = timer_read();
+            tap_hold_timer = timer_read();
         } else {
-            uint16_t elapsed = timer_elapsed(drg_tog_timer);
+            tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
 
-            if (elapsed >= CUSTOM_TAP_HOLD_TERM) {
+            if (tap_hold_elapsed_time >= CUSTOM_TAP_HOLD_TERM) {
                 bool new_state        = !charybdis_get_pointer_dragscroll_enabled();
                 bool automouse_locked = get_auto_mouse_toggle();
 
