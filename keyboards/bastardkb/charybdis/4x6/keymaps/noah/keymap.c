@@ -183,7 +183,7 @@ static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
 
         // Fallback: just send the original unshifted key if we forgot a mapping
         default:
-            tap_code(keycode);
+            tap_code16(keycode);
             break;
     }
 }
@@ -206,7 +206,7 @@ static void send_longer_hold_variant(uint16_t keycode) { // CUSTOM_LONGER_HOLD_T
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // --- 1) Hold-type keys (react on press + release) ---
+    // --- 1) Hold / Toggle type keys (react on press + release) ---
     switch (keycode) {
         case VOLMODE:
             volmode_active = record->event.pressed;
@@ -220,6 +220,30 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             caret_active = record->event.pressed;
             if (!caret_active) {
                 dominant_axis = '\0';
+            }
+            return false;
+
+        case DRG_TOG_HOLD:
+            if (record->event.pressed) {
+                tap_hold_timer = timer_read();
+            } else {
+                uint16_t elapsed = timer_elapsed(tap_hold_timer);
+
+                if (elapsed >= CUSTOM_TAP_HOLD_TERM) {
+                    bool enable_dragscroll      = !charybdis_get_pointer_dragscroll_enabled();
+                    bool automouse_is_locked    = get_auto_mouse_toggle();
+                    bool needs_automouse_toggle = (enable_dragscroll && !automouse_is_locked) || (!enable_dragscroll && automouse_is_locked);
+
+                    charybdis_set_pointer_dragscroll_enabled(enable_dragscroll);
+
+                    if (needs_automouse_toggle) {
+                        auto_mouse_toggle();
+                    }
+                } else {
+                    uint8_t  active_layer = get_highest_layer(default_layer_state);
+                    uint16_t fallback_key = keymap_key_to_keycode(active_layer, record->event.key);
+                    tap_code16(fallback_key);
+                }
             }
             return false;
     }
@@ -258,7 +282,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
                 if (tap_hold_elapsed_time < CUSTOM_TAP_HOLD_TERM) {
                     // TAP: send normal version (1, 2, -, =, etc.)
-                    tap_code(keycode);
+                    tap_code16(keycode);
                 } else if (tap_hold_elapsed_time > CUSTOM_LONGER_HOLD_TERM) {
                     // LONGER HOLD: send longer-hold variant (GUI + Arrow, etc.)
                     send_longer_hold_variant(keycode);
@@ -270,40 +294,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 
-    // --- 3) Drag-scroll toggle: hold to toggle, tap to send base-layer key ---
-    if (keycode == DRG_TOG_HOLD) {
-        if (record->event.pressed) {
-            tap_hold_timer = timer_read();
-        } else {
-            tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
-
-            if (tap_hold_elapsed_time >= CUSTOM_TAP_HOLD_TERM) {
-                bool new_state        = !charybdis_get_pointer_dragscroll_enabled();
-                bool automouse_locked = get_auto_mouse_toggle();
-
-                charybdis_set_pointer_dragscroll_enabled(new_state);
-
-                if (new_state && !automouse_locked) {
-                    auto_mouse_toggle();
-                } else if (!new_state && automouse_locked) {
-                    auto_mouse_toggle();
-                }
-
-            } else {
-                uint8_t  base_layer       = get_highest_layer(default_layer_state);
-                uint16_t fallback_keycode = keymap_key_to_keycode(base_layer, record->event.key);
-                tap_code16(fallback_keycode);
-            }
-        }
-        return false;
-    }
-
-    // --- 4) Ignore releases for everything else ---
+    // --- 3) Ignore releases for everything else ---
     if (!record->event.pressed) {
         return true;
     }
 
-    // --- 5) Macros (press-only) ---
+    // --- 4) Macros (press-only) ---
     switch (keycode) {
         case MACRO_0: // Spotlight: GUI + Space
             SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
