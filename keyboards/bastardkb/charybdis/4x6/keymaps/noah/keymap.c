@@ -2,6 +2,9 @@
 #include "rgb_helpers.h"
 #include "trackerball_helpers.h"
 #include "automouse_rgb.h"
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#    include "pointing_device_auto_mouse.h"
+#endif
 
 // ─── Custom Keycodes & Keymap Layers ────────────────────────────────────────
 enum custom_keycodes {
@@ -23,6 +26,7 @@ enum custom_keycodes {
     MACRO_15,
     VOLMODE,
     CARET_MODE,
+    DRG_TOG_HOLD,
 };
 
 enum charybdis_keymap_layers {
@@ -85,7 +89,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,        KC_MS_BTN3,           DRG_TOG,           SNP_TOG,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,        KC_MS_BTN3,      DRG_TOG_HOLD,           SNP_TOG,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              VOLMODE,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           _______,        CARET_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -99,6 +103,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // ─── Macros ─────────────────────────────────────────────────────────────────
 static uint16_t tap_hold_timer;
 static uint16_t tap_hold_elapsed_time;
+static uint16_t drg_tog_timer;
 
 static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
     switch (keycode) {
@@ -269,12 +274,40 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 
-    // --- 3) Ignore releases for everything else ---
+    // --- 3) Drag-scroll toggle: hold to toggle, tap to send base-layer key ---
+    if (keycode == DRG_TOG_HOLD) {
+        if (record->event.pressed) {
+            drg_tog_timer = timer_read();
+        } else {
+            uint16_t elapsed = timer_elapsed(drg_tog_timer);
+
+            if (elapsed >= CUSTOM_TAP_HOLD_TERM) {
+                bool new_state = !charybdis_get_pointer_dragscroll_enabled();
+                charybdis_set_pointer_dragscroll_enabled(new_state);
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+                bool automouse_locked = get_auto_mouse_toggle();
+
+                if (new_state && !automouse_locked) {
+                    auto_mouse_toggle();
+                } else if (!new_state && automouse_locked) {
+                    auto_mouse_toggle();
+                }
+#endif
+            } else {
+                uint8_t  base_layer       = get_highest_layer(default_layer_state);
+                uint16_t fallback_keycode = keymap_key_to_keycode(base_layer, record->event.key);
+                tap_code16(fallback_keycode);
+            }
+        }
+        return false;
+    }
+
+    // --- 4) Ignore releases for everything else ---
     if (!record->event.pressed) {
         return true;
     }
 
-    // --- 4) Macros (press-only) ---
+    // --- 5) Macros (press-only) ---
     switch (keycode) {
         case MACRO_0: // Spotlight: GUI + Space
             SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
@@ -321,6 +354,7 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
         case SNIPING_MODE_TOGGLE:
         case DRAGSCROLL_MODE:
         case DRAGSCROLL_MODE_TOGGLE:
+        case DRG_TOG_HOLD:
         case CARET_MODE:
         case VOLMODE:
         case DPI_MOD:
