@@ -2,9 +2,6 @@
 #include "rgb_helpers.h"
 #include "trackerball_helpers.h"
 #include "automouse_rgb.h"
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-#    include "pointing_device_auto_mouse.h"
-#endif
 
 // ─── Custom Keycodes & Keymap Layers ────────────────────────────────────────
 enum custom_keycodes {
@@ -284,15 +281,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (elapsed >= CUSTOM_TAP_HOLD_TERM) {
                 bool new_state = !charybdis_get_pointer_dragscroll_enabled();
                 charybdis_set_pointer_dragscroll_enabled(new_state);
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-                bool automouse_locked = get_auto_mouse_toggle();
-
-                if (new_state && !automouse_locked) {
-                    auto_mouse_toggle();
-                } else if (!new_state && automouse_locked) {
-                    auto_mouse_toggle();
-                }
-#endif
             } else {
                 uint8_t  base_layer       = get_highest_layer(default_layer_state);
                 uint16_t fallback_keycode = keymap_key_to_keycode(base_layer, record->event.key);
