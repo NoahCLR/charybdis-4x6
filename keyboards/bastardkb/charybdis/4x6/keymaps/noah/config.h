@@ -90,7 +90,7 @@
 // ─── Pointing device ────────────────────────────────────────────────────────
 #ifdef POINTING_DEVICE_ENABLE
 
-// Auto pointer layer on movement
+// Auto pointer layer on mouse activity
 #    define POINTING_DEVICE_AUTO_MOUSE_ENABLE            // Enable Auto Mouse feature because it's awesome
 #    define AUTO_MOUSE_TIME 1200                         // Inactivity timeout (ms) before auto-mouse mode disengages
 #    define SPLIT_TRANSACTION_IDS_USER PUT_AUTOMOUSE_RGB // Enable split transactions for Auto Mouse RGB countdown
