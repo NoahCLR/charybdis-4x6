@@ -80,7 +80,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
 
     uint16_t elapsed = pkt.elapsed;
 
-    // Broadcast ASAP once we've validated we're on the right layer and auto-mouse is enabled.
+    // Master broadcasts its latest state to the slave.
     if (is_master) {
         automouse_rgb_broadcast(&pkt);
     }
