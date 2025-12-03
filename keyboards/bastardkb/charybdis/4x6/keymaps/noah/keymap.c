@@ -206,7 +206,7 @@ static void send_longer_hold_variant(uint16_t keycode) { // CUSTOM_LONGER_HOLD_T
     // Currently unused, but could be implemented for more complex behaviors.
 }
 
-static void tap_custom_key(uint16_t kc) {
+static void tap_custom_bk_key(uint16_t kc) {
     keyrecord_t rec = {0};
 
     rec.event.pressed = true;
@@ -244,7 +244,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
                 if (tap_hold_elapsed_time > CUSTOM_TAP_HOLD_TERM) {
                     // HOLD: behave as if DRAGSCROLL_MODE_TOGGLE was pressed
-                    tap_custom_key(DRAGSCROLL_MODE_TOGGLE);
+                    tap_custom_bk_key(DRAGSCROLL_MODE_TOGGLE);
 
                 } else {
                     // TAP: send whatever is on BASE at this position
@@ -392,12 +392,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
             set_auto_mouse_enable(false); // disable Auto Mouse when in sniping layer
             break;
 
-        case LAYER_POINTER:
-            // Keep Auto Mouse enabled in pointer layer
-            break;
-
         default:
-            charybdis_set_pointer_dragscroll_enabled(false);
             set_auto_mouse_enable(true); // enable it again
             break;
     }
