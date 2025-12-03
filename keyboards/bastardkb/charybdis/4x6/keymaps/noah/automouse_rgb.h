@@ -15,7 +15,7 @@ typedef struct __attribute__((packed)) {
 
 // Utility to paint every LED regardless of half (master computes the whole frame).
 static inline void automouse_rgb_set_all(rgb_t color, uint8_t led_min, uint8_t led_max) {
-    set_both_sides(color, led_min, led_max);
+    rgb_set_both_halves(color, led_min, led_max);
 }
 
 // Tunables for the countdown gradient and minimum visibility.

@@ -420,25 +420,25 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 // rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max)
 // because they use led_min/led_max for split-safe operation.
 //
-// set_led_color(i, led_min, led_max, color)
+// rgb_set_led_color(i, led_min, led_max, color)
 //     → Color a single LED by global index.
 //       Only affects this half’s LED range.
 //
-// set_led_group(list, count, led_min, led_max, color)
+// rgb_set_led_group(list, count, led_min, led_max, color)
 //     → Color a list of non-contiguous LED indices.
 //
-// fill_led_range(from, to, led_min, led_max, color)
+// rgb_fill_led_range(from, to, led_min, led_max, color)
 //     → Color a continuous range [from, to), clamped to this half.
 //
-// set_left_side(color, led_min, led_max)
+// rgb_set_left_half(color, led_min, led_max)
 //     → Color the entire left half.
 //       Only does work when running on the left half (led_min == 0).
 //
-// set_right_side(color, led_min, led_max)
+// rgb_set_right_half(color, led_min, led_max)
 //     → Color the entire right half.
 //       Only does work when running on the right half (led_min > 0).
 //
-// set_both_sides(color, led_min, led_max)
+// rgb_set_both_halves(color, led_min, led_max)
 //     → Color all LEDs on *this* half only.
 //
 // Typical color usage:
@@ -447,7 +447,7 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 //
 // Example group usage:
 //
-//     set_led_group(layer_raise_mods,
+//     rgb_set_led_group(layer_raise_mods,
 //                   sizeof(layer_raise_mods),
 //                   led_min, led_max,
 //                   hsv_to_rgb((hsv_t){ .h = 180, .s = 255, .v = current_brightness }));
@@ -479,11 +479,11 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         } break;
 
         case LAYER_LOWER: {
-            set_both_sides(hsv_to_rgb(layer_lower_color), led_min, led_max);
+            rgb_set_both_halves(hsv_to_rgb(layer_lower_color), led_min, led_max);
         } break;
 
         case LAYER_RAISE: {
-            set_both_sides(hsv_to_rgb(layer_raise_color), led_min, led_max);
+            rgb_set_both_halves(hsv_to_rgb(layer_raise_color), led_min, led_max);
         } break;
     }
 
