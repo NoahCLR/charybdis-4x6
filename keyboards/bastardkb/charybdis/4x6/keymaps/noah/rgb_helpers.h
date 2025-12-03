@@ -70,8 +70,7 @@ static inline hsv_t clamp_hsv_value(hsv_t hsv, uint8_t max_value) {
     return hsv;
 }
 
-#else // RGB_MATRIX_ENABLE not defined: define empty stubs to avoid compiler errors.
-
+#else  // RGB_MATRIX_ENABLE not defined: define empty stubs to avoid compiler errors.
 static inline void  rgb_set_led(uint8_t index, uint8_t led_min, uint8_t led_max, uint8_t r, uint8_t g, uint8_t b) {}
 static inline void  rgb_set_led_color(uint8_t index, uint8_t led_min, uint8_t led_max, rgb_t color) {}
 static inline void  rgb_set_led_group(const uint8_t *indices, uint8_t count, uint8_t led_min, uint8_t led_max, rgb_t color) {}
@@ -85,5 +84,4 @@ static inline hsv_t clamp_hsv_value(hsv_t hsv, uint8_t max_value) {
     }
     return hsv;
 }
-
 #endif // RGB_MATRIX_ENABLE

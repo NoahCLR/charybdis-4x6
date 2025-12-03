@@ -121,8 +121,7 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
     return true;
 }
 
-#else // SPLIT_TRANSACTION_IDS_USER && POINTING_DEVICE_AUTO_MOUSE_ENABLE && RGB_MATRIX_ENABLE not all defined: define empty stubs to avoid compiler errors.
-
+#else  // SPLIT_TRANSACTION_IDS_USER && POINTING_DEVICE_AUTO_MOUSE_ENABLE && RGB_MATRIX_ENABLE not all defined: define empty stubs to avoid compiler errors.
 static inline void automouse_rgb_post_init(void) {}
 static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end, hsv_t locked) {
     (void)top_layer;
@@ -133,5 +132,4 @@ static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint
     (void)locked;
     return false;
 }
-
 #endif // defined(SPLIT_TRANSACTION_IDS_USER) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)

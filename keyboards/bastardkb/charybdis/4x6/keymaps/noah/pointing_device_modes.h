@@ -116,11 +116,11 @@ static inline report_mouse_t handle_caret_mode(report_mouse_t mouse_report) {
 
     return freeze_mouse(mouse_report);
 }
+
 #else  // POINTING_DEVICE_ENABLE not defined: define empty stubs to avoid compiler errors.
 static inline report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
-
 static inline report_mouse_t handle_caret_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
