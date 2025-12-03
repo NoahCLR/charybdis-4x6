@@ -1,7 +1,7 @@
 #include QMK_KEYBOARD_H
 #include "rgb_helpers.h"
-#include "trackerball_helpers.h"
-#include "automouse_rgb.h"
+#include "pointing_device_modes.h"
+#include "rgb_automouse.h"
 
 // ─── Custom Keycodes & Keymap Layers ────────────────────────────────────────
 enum custom_keycodes {
