@@ -24,7 +24,7 @@ enum custom_keycodes {
     MACRO_15,
     VOLMODE,
     CARET_MODE,
-    DRG_TOG_HOLD,
+    DRG_TOG_ON_HOLD,
 };
 
 enum charybdis_keymap_layers {
