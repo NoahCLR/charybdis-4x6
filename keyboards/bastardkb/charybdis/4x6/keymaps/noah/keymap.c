@@ -379,8 +379,9 @@ layer_state_t layer_state_set_user(layer_state_t state) {
             break;
 
         default:
-            // All other layers: disable sniping, enable Auto Mouse
+            // All other layers: disable sniping, dragscroll mode and enable Auto Mouse
             charybdis_set_pointer_sniping_enabled(false);
+            charybdis_set_pointer_dragscroll_enabled(false);
             set_auto_mouse_enable(true);
             break;
     }
