@@ -210,10 +210,10 @@ static void tap_custom_key(uint16_t kc) {
     keyrecord_t rec = {0};
 
     rec.event.pressed = true;
-    process_record_user(kc, &rec);
+    process_record_kb(kc, &rec);
 
     rec.event.pressed = false;
-    process_record_user(kc, &rec);
+    process_record_kb(kc, &rec);
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
