@@ -369,24 +369,24 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
 }
 
 layer_state_t layer_state_set_user(layer_state_t state) {
-    // Automatically enable sniping-mode on the chosen layer.
-    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
-
-    // Manage Auto Mouse enabling/disabling based on layer to avoid conflicts with sniping
     uint8_t layer = get_highest_layer(state);
 
     switch (layer) {
         case LAYER_RAISE:
-            set_auto_mouse_enable(false); // disable Auto Mouse when in sniping layer
+            // RAISE layer: enable sniping, disable Auto Mouse
+            charybdis_set_pointer_sniping_enabled(true);
+            set_auto_mouse_enable(false);
             break;
 
         default:
-            set_auto_mouse_enable(true); // enable it again
+            // All other layers: disable sniping, enable Auto Mouse
+            charybdis_set_pointer_sniping_enabled(false);
+            set_auto_mouse_enable(true);
             break;
     }
+
     return state;
 }
-
 #endif // POINTING_DEVICE_ENABLE
 
 // ─── RGB Stuff ──────────────────────────────────────────────────────────────
