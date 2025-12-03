@@ -206,6 +206,16 @@ static void send_longer_hold_variant(uint16_t keycode) { // CUSTOM_LONGER_HOLD_T
     // Currently unused, but could be implemented for more complex behaviors.
 }
 
+static void tap_custom_key(uint16_t kc) {
+    keyrecord_t rec = {0};
+
+    rec.event.pressed = true;
+    process_record_user(kc, &rec);
+
+    rec.event.pressed = false;
+    process_record_user(kc, &rec);
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 1) Hold / Toggle type keys (react on press + release) ---
     switch (keycode) {
@@ -234,7 +244,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
                 if (tap_hold_elapsed_time > CUSTOM_TAP_HOLD_TERM) {
                     // HOLD: behave as if DRAGSCROLL_MODE_TOGGLE was pressed
-                    tap_code16(DRAGSCROLL_MODE_TOGGLE);
+                    tap_custom_key(DRAGSCROLL_MODE_TOGGLE);
+
                 } else {
                     // TAP: send whatever is on BASE at this position
                     uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
@@ -370,23 +381,26 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
 }
 
 layer_state_t layer_state_set_user(layer_state_t state) {
+    // Automatically enable sniping-mode on the chosen layer.
+    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
+
+    // Manage Auto Mouse enabling/disabling based on layer to avoid conflicts with sniping
     uint8_t layer = get_highest_layer(state);
 
     switch (layer) {
         case LAYER_RAISE:
-            // RAISE layer: enable sniping, disable Auto Mouse
-            charybdis_set_pointer_sniping_enabled(true);
-            set_auto_mouse_enable(false);
+            set_auto_mouse_enable(false); // disable Auto Mouse when in sniping layer
+            break;
+
+        case LAYER_POINTER:
+            // Keep Auto Mouse enabled in pointer layer
             break;
 
         default:
-            // All other layers: disable sniping, dragscroll mode and enable Auto Mouse
-            charybdis_set_pointer_sniping_enabled(false);
             charybdis_set_pointer_dragscroll_enabled(false);
-            set_auto_mouse_enable(true);
+            set_auto_mouse_enable(true); // enable it again
             break;
     }
-
     return state;
 }
 #endif // POINTING_DEVICE_ENABLE
