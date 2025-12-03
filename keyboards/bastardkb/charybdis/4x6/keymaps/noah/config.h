@@ -92,7 +92,7 @@
 
 // Auto pointer layer on movement
 #    define POINTING_DEVICE_AUTO_MOUSE_ENABLE            // Enable Auto Mouse feature because it's awesome
-#    define AUTO_MOUSE_TIME 1200                         // ms to switch back after movement or mouse key activity
+#    define AUTO_MOUSE_TIME 1200                         // Inactivity timeout (ms) before auto-mouse mode disengages
 #    define SPLIT_TRANSACTION_IDS_USER PUT_AUTOMOUSE_RGB // Enable split transactions for Auto Mouse RGB countdown
 
 // 16-bit motion reports
@@ -103,7 +103,7 @@
 #    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
 
-// ─── Scroll Behavior ────────────────────────────────────────────────────────
+// ─── Scroll Behavior ─────────────────────────────────────────────────────────
 #    define CHARYBDIS_DRAGSCROLL_REVERSE_Y // Invert scroll direction
 // #define POINTING_DEVICE_HIRES_SCROLL_EXPONENT 1
 #    define CHARYBDIS_DRAGSCROLL_DPI 100
