@@ -80,6 +80,9 @@ static inline void  rgb_set_left_half(rgb_t color, uint8_t led_min, uint8_t led_
 static inline void  rgb_set_right_half(rgb_t color, uint8_t led_min, uint8_t led_max) {}
 static inline void  rgb_set_both_halves(rgb_t color, uint8_t led_min, uint8_t led_max) {}
 static inline hsv_t clamp_hsv_value(hsv_t hsv, uint8_t max_value) {
+    if (hsv.v > max_value) {
+        hsv.v = max_value;
+    }
     return hsv;
 }
 

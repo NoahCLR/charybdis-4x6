@@ -443,14 +443,14 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 //
 // Typical color usage:
 //
-//     rgb_t c = hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = current_brightness});
+//     rgb_t color = hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS});
 //
 // Example group usage:
 //
 //     rgb_set_led_group(layer_raise_mods,
 //                   sizeof(layer_raise_mods),
 //                   led_min, led_max,
-//                   hsv_to_rgb((hsv_t){ .h = 180, .s = 255, .v = current_brightness }));
+//                   hsv_to_rgb((hsv_t){ .h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS }));
 // ────────────────────────────────────────────────────────────────────────────
 
 // ─── RGB Matrix per-layer indicators ────────────────────────────────────────
