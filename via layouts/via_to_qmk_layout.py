@@ -101,6 +101,7 @@ REPLACEMENTS = {
     
     "CUSTOM(80)": "VOLMODE",
     "CUSTOM(81)": "CARET_MODE",
+    "CUSTOM(82)": "DRG_TOG_ON_HOLD",
 }
 
 def apply_replacements(token: str) -> str:

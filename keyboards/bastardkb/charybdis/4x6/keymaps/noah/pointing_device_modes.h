@@ -13,7 +13,7 @@
 #    endif
 
 // ─── Internal state ─────────────────────────────────────────────────────────
-static bool    caret_active  = false;
+static bool    caret_active  = false; // set in process_record_user for CARET_MODE key
 static int32_t acc_x         = 0;
 static int32_t acc_y         = 0;
 static int8_t  last_x_dir    = 0;
