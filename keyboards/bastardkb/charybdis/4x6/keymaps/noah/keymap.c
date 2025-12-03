@@ -70,7 +70,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
                   XXXXXXX,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           G(KC_Q),           XXXXXXX,           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
+                  XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
          MT(MOD_LSFT,KC_CAPS),          KC_LGUI,          KC_LALT,          G(KC_C),            MO(2),           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,           XXXXXXX,           XXXXXXX,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -87,7 +87,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,        KC_MS_BTN3,      DRG_TOG_HOLD,           SNP_TOG,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,        KC_MS_BTN3,      DRG_TOG_ON_HOLD,        SNP_TOG,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              VOLMODE,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           _______,        CARET_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -98,7 +98,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format on
 };
 
-// ─── Macros ─────────────────────────────────────────────────────────────────
+// ─── Key Interaction Stuff ──────────────────────────────────────────────────
 static uint16_t tap_hold_timer;
 static uint16_t tap_hold_elapsed_time;
 
@@ -206,7 +206,17 @@ static void send_longer_hold_variant(uint16_t keycode) { // CUSTOM_LONGER_HOLD_T
     // Currently unused, but could be implemented for more complex behaviors.
 }
 
-static void tap_custom_bk_key(uint16_t kc) {
+static void tap_custom_keycode(uint16_t kc) {
+    keyrecord_t rec = {0};
+
+    rec.event.pressed = true;
+    process_record_user(kc, &rec);
+
+    rec.event.pressed = false;
+    process_record_user(kc, &rec);
+}
+
+static void tap_custom_bk_keycode(uint16_t kc) {
     keyrecord_t rec = {0};
 
     rec.event.pressed = true;
@@ -217,7 +227,7 @@ static void tap_custom_bk_key(uint16_t kc) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // --- 1) Hold / Toggle type keys (react on press + release) ---
+    // --- 1) Hold / Toggle Modes (react on press + release) ---
     switch (keycode) {
         case VOLMODE:
             volmode_active = record->event.pressed;
@@ -234,7 +244,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
 
-        case DRG_TOG_HOLD:
+        case DRG_TOG_ON_HOLD:
             if (record->event.pressed) {
                 // key down: start timer, don't send anything yet
                 tap_hold_timer = timer_read();
@@ -244,7 +254,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
                 if (tap_hold_elapsed_time > CUSTOM_TAP_HOLD_TERM) {
                     // HOLD: behave as if DRAGSCROLL_MODE_TOGGLE was pressed
-                    tap_custom_bk_key(DRAGSCROLL_MODE_TOGGLE);
+                    tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
 
                 } else {
                     // TAP: send whatever is on BASE at this position
@@ -255,7 +265,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 
-    // --- 2) Tap/Hold/Longer Hold symbol & number keys (react on press + release) ---
+    // --- 2) Tap/Hold/Longer Hold Keys (react on press + release) ---
     switch (keycode) {
         case KC_1:
         case KC_2:
@@ -353,7 +363,7 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
         case SNIPING_MODE_TOGGLE:
         case DRAGSCROLL_MODE:
         case DRAGSCROLL_MODE_TOGGLE:
-        case DRG_TOG_HOLD:
+        case DRG_TOG_ON_HOLD:
         case CARET_MODE:
         case VOLMODE:
         case DPI_MOD:
@@ -398,6 +408,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
     }
     return state;
 }
+
 #endif // POINTING_DEVICE_ENABLE
 
 // ─── RGB Stuff ──────────────────────────────────────────────────────────────
