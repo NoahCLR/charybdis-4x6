@@ -206,15 +206,15 @@ static void send_longer_hold_variant(uint16_t keycode) { // CUSTOM_LONGER_HOLD_T
     // Currently unused, but could be implemented for more complex behaviors.
 }
 
-static void tap_custom_keycode(uint16_t kc) {
-    keyrecord_t rec = {0};
-
-    rec.event.pressed = true;
-    process_record_user(kc, &rec);
-
-    rec.event.pressed = false;
-    process_record_user(kc, &rec);
-}
+// static void tap_custom_keycode(uint16_t kc) {
+//    keyrecord_t rec = {0};
+//
+//    rec.event.pressed = true;
+//    process_record_user(kc, &rec);
+//
+//    rec.event.pressed = false;
+//    process_record_user(kc, &rec);
+// }
 
 static void tap_custom_bk_keycode(uint16_t kc) {
     keyrecord_t rec = {0};
