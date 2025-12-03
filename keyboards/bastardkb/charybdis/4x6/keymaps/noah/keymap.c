@@ -231,17 +231,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
         case VOLMODE:
             volmode_active = record->event.pressed;
-            // if (!volmode_active) {
-            //     vol_acc      = 0;
-            //     vol_last_dir = 0;
-            // }
             return false;
 
         case CARET_MODE:
             caret_active = record->event.pressed;
-            // if (!caret_active) {
-            //     dominant_axis = '\0';
-            // }
             return false;
 
         case DRG_TOG_ON_HOLD:
