@@ -13,6 +13,7 @@
 
 // ─── Sync-specific features ─────────────────────────────────────────────────
 #ifdef SPLIT_KEYBOARD
+
 // Keep layer state in sync across halves for rgb matrix layer indicators
 #    ifdef SPLIT_LAYER_STATE_ENABLE
 #        undef SPLIT_LAYER_STATE_ENABLE
@@ -70,13 +71,13 @@
 #    ifdef RGB_MATRIX_DEFAULT_VAL
 #        undef RGB_MATRIX_DEFAULT_VAL
 #    endif
-#    define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS // Max brightness
+#    define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS // Set to max defined above
 
 // LED flush limit to reduce load
 #    ifdef RGB_MATRIX_LED_FLUSH_LIMIT
 #        undef RGB_MATRIX_LED_FLUSH_LIMIT
 #    endif
-#    define RGB_MATRIX_LED_FLUSH_LIMIT 16
+#    define RGB_MATRIX_LED_FLUSH_LIMIT 16 // ms between rgbmatrix updates
 
 // RGB Matrix timeout/sleep
 #    ifdef RGB_MATRIX_TIMEOUT
@@ -88,27 +89,32 @@
 
 // ─── Pointing device ────────────────────────────────────────────────────────
 #ifdef POINTING_DEVICE_ENABLE
-// Auto pointer layer on movement + 16-bit motion reports.
-#    define POINTING_DEVICE_AUTO_MOUSE_ENABLE
-#    define AUTO_MOUSE_TIME 1200 // ms to switch back after movement or mouse key activity
-#    define MOUSE_EXTENDED_REPORT
+
+// Auto pointer layer on mouse activity
+#    define POINTING_DEVICE_AUTO_MOUSE_ENABLE            // Enable Auto Mouse feature because it's awesome
+#    define AUTO_MOUSE_TIME 1200                         // Inactivity timeout (ms) before auto-mouse mode disengages
 #    define SPLIT_TRANSACTION_IDS_USER PUT_AUTOMOUSE_RGB // Enable split transactions for Auto Mouse RGB countdown
 
-// ─── Scroll configuration ───────────────────────────────────────────────────
-#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y
+// 16-bit motion reports
+#    define MOUSE_EXTENDED_REPORT
+#    define WHEEL_EXTENDED_REPORT
+
+// High-resolution scroll
 #    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
-// #define POINTING_DEVICE_HIRES_SCROLL_EXPONENT 1
-#    define WHEEL_EXTENDED_REPORT true
 
+// ─── Scroll Behavior ─────────────────────────────────────────────────────────
+#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y // Invert scroll direction
+// #define POINTING_DEVICE_HIRES_SCROLL_EXPONENT 1
 #    define CHARYBDIS_DRAGSCROLL_DPI 100
 #    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0
 #    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8 // 125 Hz-ish
 #    define CHARYBDIS_SCROLL_SNAP_RATIO 3
 #    define CHARYBDIS_SCROLL_STEP_DIVISOR 10
 #    define CHARYBDIS_SCROLL_MAX_STEP 1
+
 #endif // POINTING_DEVICE_ENABLE
 
 // ─── Tap/Hold timing ────────────────────────────────────────────────────────
-#define CUSTOM_TAP_HOLD_TERM 150
-#define CUSTOM_LONGER_HOLD_TERM 400
+#define CUSTOM_TAP_HOLD_TERM 150    // ms to differentiate tap vs hold
+#define CUSTOM_LONGER_HOLD_TERM 400 // ms to differentiate normal hold vs longer hold

@@ -13,7 +13,7 @@
 #    endif
 
 // ─── Internal state ─────────────────────────────────────────────────────────
-static bool    caret_active  = false;
+static bool    caret_active  = false; // set in process_record_user for CARET_MODE key
 static int32_t acc_x         = 0;
 static int32_t acc_y         = 0;
 static int8_t  last_x_dir    = 0;
@@ -116,11 +116,11 @@ static inline report_mouse_t handle_caret_mode(report_mouse_t mouse_report) {
 
     return freeze_mouse(mouse_report);
 }
+
 #else  // POINTING_DEVICE_ENABLE not defined: define empty stubs to avoid compiler errors.
 static inline report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
-
 static inline report_mouse_t handle_caret_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }

@@ -1,7 +1,8 @@
 #include QMK_KEYBOARD_H
+
+#include "pointing_device_modes.h"
+#include "rgb_automouse.h"
 #include "rgb_helpers.h"
-#include "trackerball_helpers.h"
-#include "automouse_rgb.h"
 
 // ─── Custom Keycodes & Keymap Layers ────────────────────────────────────────
 enum custom_keycodes {
@@ -23,6 +24,7 @@ enum custom_keycodes {
     MACRO_15,
     VOLMODE,
     CARET_MODE,
+    DRG_TOG_ON_HOLD,
 };
 
 enum charybdis_keymap_layers {
@@ -66,9 +68,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
   [LAYER_RAISE] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
+                  XXXXXXX,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           G(KC_Q),           XXXXXXX,           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
+                  XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
          MT(MOD_LSFT,KC_CAPS),          KC_LGUI,          KC_LALT,          G(KC_C),            MO(2),           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,           XXXXXXX,           XXXXXXX,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -81,11 +83,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
   [LAYER_POINTER] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  _______,           _______,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              _______,           _______,           _______,           _______,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,        KC_MS_BTN3,           DRG_TOG,           SNP_TOG,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,        KC_MS_BTN3,      DRG_TOG_ON_HOLD,        SNP_TOG,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              VOLMODE,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           _______,        CARET_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -96,7 +98,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format on
 };
 
-// ─── Macros ─────────────────────────────────────────────────────────────────
+// ─── Key Interaction Stuff ──────────────────────────────────────────────────
 static uint16_t tap_hold_timer;
 static uint16_t tap_hold_elapsed_time;
 
@@ -182,7 +184,7 @@ static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
 
         // Fallback: just send the original unshifted key if we forgot a mapping
         default:
-            tap_code(keycode);
+            tap_code16(keycode);
             break;
     }
 }
@@ -204,26 +206,59 @@ static void send_longer_hold_variant(uint16_t keycode) { // CUSTOM_LONGER_HOLD_T
     // Currently unused, but could be implemented for more complex behaviors.
 }
 
+// static void tap_custom_keycode(uint16_t kc) {
+//    keyrecord_t rec = {0};
+//
+//    rec.event.pressed = true;
+//    process_record_user(kc, &rec);
+//
+//    rec.event.pressed = false;
+//    process_record_user(kc, &rec);
+// }
+
+static void tap_custom_bk_keycode(uint16_t kc) {
+    keyrecord_t rec = {0};
+
+    rec.event.pressed = true;
+    process_record_kb(kc, &rec);
+
+    rec.event.pressed = false;
+    process_record_kb(kc, &rec);
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // --- 1) Hold-type keys (react on press + release) ---
+    // --- 1) Hold / Toggle Modes (react on press + release) ---
     switch (keycode) {
         case VOLMODE:
             volmode_active = record->event.pressed;
-            if (!volmode_active) {
-                vol_acc      = 0;
-                vol_last_dir = 0;
-            }
             return false;
 
         case CARET_MODE:
             caret_active = record->event.pressed;
-            if (!caret_active) {
-                dominant_axis = '\0';
+            return false;
+
+        case DRG_TOG_ON_HOLD:
+            if (record->event.pressed) {
+                // key down: start timer, don't send anything yet
+                tap_hold_timer = timer_read();
+            } else {
+                // key up: decide tap vs hold
+                tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
+
+                if (tap_hold_elapsed_time > CUSTOM_TAP_HOLD_TERM) {
+                    // HOLD: behave as if DRAGSCROLL_MODE_TOGGLE was pressed
+                    tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
+
+                } else {
+                    // TAP: send whatever is on BASE at this position
+                    uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
+                    tap_code16(fallback_key);
+                }
             }
             return false;
     }
 
-    // --- 2) Tap/Hold symbol & number keys (Custom Auto Shift) ---
+    // --- 2) Tap/Hold/Longer Hold Keys (react on press + release) ---
     switch (keycode) {
         case KC_1:
         case KC_2:
@@ -257,7 +292,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
                 if (tap_hold_elapsed_time < CUSTOM_TAP_HOLD_TERM) {
                     // TAP: send normal version (1, 2, -, =, etc.)
-                    tap_code(keycode);
+                    tap_code16(keycode);
                 } else if (tap_hold_elapsed_time > CUSTOM_LONGER_HOLD_TERM) {
                     // LONGER HOLD: send longer-hold variant (GUI + Arrow, etc.)
                     send_longer_hold_variant(keycode);
@@ -321,6 +356,7 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
         case SNIPING_MODE_TOGGLE:
         case DRAGSCROLL_MODE:
         case DRAGSCROLL_MODE_TOGGLE:
+        case DRG_TOG_ON_HOLD:
         case CARET_MODE:
         case VOLMODE:
         case DPI_MOD:
@@ -399,37 +435,37 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 // rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max)
 // because they use led_min/led_max for split-safe operation.
 //
-// set_led_color(i, led_min, led_max, color)
+// rgb_set_led_color(i, led_min, led_max, color)
 //     → Color a single LED by global index.
 //       Only affects this half’s LED range.
 //
-// set_led_group(list, count, led_min, led_max, color)
+// rgb_set_led_group(list, count, led_min, led_max, color)
 //     → Color a list of non-contiguous LED indices.
 //
-// fill_led_range(from, to, led_min, led_max, color)
+// rgb_fill_led_range(from, to, led_min, led_max, color)
 //     → Color a continuous range [from, to), clamped to this half.
 //
-// set_left_side(color, led_min, led_max)
+// rgb_set_left_half(color, led_min, led_max)
 //     → Color the entire left half.
 //       Only does work when running on the left half (led_min == 0).
 //
-// set_right_side(color, led_min, led_max)
+// rgb_set_right_half(color, led_min, led_max)
 //     → Color the entire right half.
 //       Only does work when running on the right half (led_min > 0).
 //
-// set_both_sides(color, led_min, led_max)
+// rgb_set_both_halves(color, led_min, led_max)
 //     → Color all LEDs on *this* half only.
 //
 // Typical color usage:
 //
-//     rgb_t c = hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = current_brightness});
+//     rgb_t color = hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS});
 //
 // Example group usage:
 //
-//     set_led_group(layer_raise_mods,
+//     rgb_set_led_group(layer_raise_mods,
 //                   sizeof(layer_raise_mods),
 //                   led_min, led_max,
-//                   hsv_to_rgb((hsv_t){ .h = 180, .s = 255, .v = current_brightness }));
+//                   hsv_to_rgb((hsv_t){ .h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS }));
 // ────────────────────────────────────────────────────────────────────────────
 
 // ─── RGB Matrix per-layer indicators ────────────────────────────────────────
@@ -458,11 +494,11 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         } break;
 
         case LAYER_LOWER: {
-            set_both_sides(hsv_to_rgb(layer_lower_color), led_min, led_max);
+            rgb_set_both_halves(hsv_to_rgb(layer_lower_color), led_min, led_max);
         } break;
 
         case LAYER_RAISE: {
-            set_both_sides(hsv_to_rgb(layer_raise_color), led_min, led_max);
+            rgb_set_both_halves(hsv_to_rgb(layer_raise_color), led_min, led_max);
         } break;
     }
 
