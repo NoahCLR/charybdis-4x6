@@ -244,14 +244,6 @@ static bool get_non_pointer_momentary_layer_target(uint16_t keycode, uint8_t *ta
         case QK_LAYER_MOD ... QK_LAYER_MOD_MAX:
             *target_layer = QK_LAYER_MOD_GET_LAYER(keycode);
             break;
-#        ifndef NO_ACTION_TAPPING
-        case QK_LAYER_TAP ... QK_LAYER_TAP_MAX:
-            *target_layer = QK_LAYER_TAP_GET_LAYER(keycode);
-            break;
-        case QK_LAYER_TAP_TOGGLE ... QK_LAYER_TAP_TOGGLE_MAX:
-            *target_layer = QK_LAYER_TAP_TOGGLE_GET_LAYER(keycode);
-            break;
-#        endif
         default:
             return false;
     }
@@ -264,14 +256,10 @@ static void maybe_swap_auto_mouse_momentary_layer(uint16_t keycode, keyrecord_t 
         return;
     }
 
-    // QMK auto-mouse skips non-target momentary layer keys (MO/LM/LT/TT).
-    // Swap pointer->target in one state update so there is no transient base layer.
+    // Handle only pure hold layer keys (MO/LM). LT/TT can become sticky if
+    // we force immediate swaps before their tap/hold resolution completes.
     uint8_t target_layer = 0;
     if (layer_state_is(LAYER_POINTER) && !get_auto_mouse_toggle() && get_non_pointer_momentary_layer_target(keycode, &target_layer)) {
-        layer_state_t next_state = layer_state;
-        next_state &= ~((layer_state_t)1 << LAYER_POINTER);
-        next_state |= ((layer_state_t)1 << target_layer);
-        layer_state_set(next_state);
         auto_mouse_reset_trigger(true);
     }
 }
