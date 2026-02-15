@@ -333,12 +333,6 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 #endif // POINTING_DEVICE_ENABLE
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-#ifdef POINTING_DEVICE_ENABLE
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    maybe_swap_auto_mouse_momentary_layer(keycode, record);
-#    endif
-#endif
-
     // --- 1) Hold / Toggle Modes (react on press + release) ---
     switch (keycode) {
         case VOLMODE:
@@ -449,6 +443,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     return true;
+}
+
+void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
+#ifdef POINTING_DEVICE_ENABLE
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    maybe_swap_auto_mouse_momentary_layer(keycode, record);
+#    endif
+#endif
 }
 
 // ─── RGB Stuff ──────────────────────────────────────────────────────────────
