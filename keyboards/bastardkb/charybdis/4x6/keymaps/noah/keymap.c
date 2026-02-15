@@ -235,35 +235,6 @@ void pointing_device_init_user(void) {
     set_auto_mouse_enable(true);         // enable Auto Mouse by default
     automouse_rgb_post_init();           // initialize Auto Mouse RGB for slave side
 }
-
-static bool get_non_pointer_momentary_layer_target(uint16_t keycode, uint8_t *target_layer) {
-    switch (keycode) {
-        case QK_MOMENTARY ... QK_MOMENTARY_MAX:
-            *target_layer = QK_MOMENTARY_GET_LAYER(keycode);
-            break;
-        case QK_LAYER_MOD ... QK_LAYER_MOD_MAX:
-            *target_layer = QK_LAYER_MOD_GET_LAYER(keycode);
-            break;
-        default:
-            return false;
-    }
-
-    return *target_layer != LAYER_POINTER;
-}
-
-static void maybe_swap_auto_mouse_momentary_layer(uint16_t keycode, keyrecord_t *record) {
-    if (!record->event.pressed) {
-        return;
-    }
-
-    // Handle only pure hold layer keys (MO/LM). LT/TT can become sticky if
-    // we force immediate swaps before their tap/hold resolution completes.
-    uint8_t target_layer = 0;
-    if (layer_state_is(LAYER_POINTER) && !get_auto_mouse_toggle() && get_non_pointer_momentary_layer_target(keycode, &target_layer)) {
-        auto_mouse_reset_trigger(true);
-    }
-}
-
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
 bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -300,6 +271,14 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
 }
 
 layer_state_t layer_state_set_user(layer_state_t state) {
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    // If auto-mouse pointer layer overlaps with another active layer, drop
+    // pointer in the same update to avoid transient base hops and sticky states.
+    if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0) {
+        state &= ~((layer_state_t)1 << LAYER_POINTER);
+    }
+#    endif
+
     // Automatically enable sniping-mode on the chosen layer.
     charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
 
@@ -431,14 +410,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     return true;
-}
-
-void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
-#ifdef POINTING_DEVICE_ENABLE
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    maybe_swap_auto_mouse_momentary_layer(keycode, record);
-#    endif
-#endif
 }
 
 // ─── RGB Stuff ──────────────────────────────────────────────────────────────
