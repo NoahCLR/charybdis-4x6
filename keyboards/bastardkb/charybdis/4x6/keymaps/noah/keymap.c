@@ -227,6 +227,12 @@ static void tap_custom_bk_keycode(uint16_t kc) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+#ifdef POINTING_DEVICE_ENABLE
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    maybe_swap_auto_mouse_momentary_layer(keycode, record);
+#    endif
+#endif
+
     // --- 1) Hold / Toggle Modes (react on press + release) ---
     switch (keycode) {
         case VOLMODE:
@@ -349,43 +355,44 @@ void pointing_device_init_user(void) {
     automouse_rgb_post_init();           // initialize Auto Mouse RGB for slave side
 }
 
-static bool is_non_pointer_momentary_layer_key(uint16_t keycode) {
-    uint8_t target_layer = 0;
-
+static bool get_non_pointer_momentary_layer_target(uint16_t keycode, uint8_t *target_layer) {
     switch (keycode) {
         case QK_MOMENTARY ... QK_MOMENTARY_MAX:
-            target_layer = QK_MOMENTARY_GET_LAYER(keycode);
+            *target_layer = QK_MOMENTARY_GET_LAYER(keycode);
             break;
         case QK_LAYER_MOD ... QK_LAYER_MOD_MAX:
-            target_layer = QK_LAYER_MOD_GET_LAYER(keycode);
+            *target_layer = QK_LAYER_MOD_GET_LAYER(keycode);
             break;
 #        ifndef NO_ACTION_TAPPING
         case QK_LAYER_TAP ... QK_LAYER_TAP_MAX:
-            target_layer = QK_LAYER_TAP_GET_LAYER(keycode);
+            *target_layer = QK_LAYER_TAP_GET_LAYER(keycode);
             break;
         case QK_LAYER_TAP_TOGGLE ... QK_LAYER_TAP_TOGGLE_MAX:
-            target_layer = QK_LAYER_TAP_TOGGLE_GET_LAYER(keycode);
+            *target_layer = QK_LAYER_TAP_TOGGLE_GET_LAYER(keycode);
             break;
 #        endif
         default:
             return false;
     }
 
-    return target_layer != LAYER_POINTER;
+    return *target_layer != LAYER_POINTER;
 }
 
-bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+static void maybe_swap_auto_mouse_momentary_layer(uint16_t keycode, keyrecord_t *record) {
     if (!record->event.pressed) {
-        return true;
+        return;
     }
 
-    // QMK auto-mouse skips non-target momentary layer keys (MO/LM/LT/TT),
-    // so force-reset when pointer layer is only active via auto-mouse.
-    if (layer_state_is(LAYER_POINTER) && !get_auto_mouse_toggle() && is_non_pointer_momentary_layer_key(keycode)) {
+    // QMK auto-mouse skips non-target momentary layer keys (MO/LM/LT/TT).
+    // Swap pointer->target in one state update so there is no transient base layer.
+    uint8_t target_layer = 0;
+    if (layer_state_is(LAYER_POINTER) && !get_auto_mouse_toggle() && get_non_pointer_momentary_layer_target(keycode, &target_layer)) {
+        layer_state_t next_state = layer_state;
+        next_state &= ~((layer_state_t)1 << LAYER_POINTER);
+        next_state |= ((layer_state_t)1 << target_layer);
+        layer_state_set(next_state);
         auto_mouse_reset_trigger(true);
     }
-
-    return true;
 }
 
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
