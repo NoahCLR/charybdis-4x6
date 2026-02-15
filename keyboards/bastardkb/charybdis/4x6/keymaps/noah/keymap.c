@@ -226,79 +226,6 @@ static void tap_custom_bk_keycode(uint16_t kc) {
     process_record_kb(kc, &rec);
 }
 
-// ─── Pointing Device Stuff ──────────────────────────────────────────────────
-#ifdef POINTING_DEVICE_ENABLE
-
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-void pointing_device_init_user(void) {
-    set_auto_mouse_layer(LAYER_POINTER); // set default pointer layer
-    set_auto_mouse_enable(true);         // enable Auto Mouse by default
-    automouse_rgb_post_init();           // initialize Auto Mouse RGB for slave side
-}
-#    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
-
-bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
-    switch (keycode) {
-        case SNIPING_MODE:
-        case SNIPING_MODE_TOGGLE:
-        case DRAGSCROLL_MODE:
-        case DRAGSCROLL_MODE_TOGGLE:
-        case DRG_TOG_ON_HOLD:
-        case CARET_MODE:
-        case VOLMODE:
-        case DPI_MOD:
-        case DPI_RMOD:
-        case S_D_MOD:
-        case S_D_RMOD:
-            return true;
-    }
-    return false;
-}
-
-report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
-    // Volume mode (held custom key)
-    if (volmode_active) {
-        return handle_volume_mode(mouse_report);
-    }
-    // Caret mode (held custom key)
-    else if (caret_active) {
-        return handle_caret_mode(mouse_report);
-    }
-    // Default: pass through unchanged
-    else {
-        return mouse_report;
-    }
-}
-
-layer_state_t layer_state_set_user(layer_state_t state) {
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    // If auto-mouse pointer layer overlaps with another active layer, drop
-    // pointer in the same update to avoid transient base hops and sticky states.
-    if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0) {
-        state &= ~((layer_state_t)1 << LAYER_POINTER);
-    }
-#    endif
-
-    // Automatically enable sniping-mode on the chosen layer.
-    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
-
-    // Manage Auto Mouse enabling/disabling based on layer to avoid conflicts with sniping
-    uint8_t layer = get_highest_layer(state);
-
-    switch (layer) {
-        case LAYER_RAISE:
-            set_auto_mouse_enable(false); // disable Auto Mouse when in sniping layer
-            break;
-
-        default:
-            set_auto_mouse_enable(true); // enable it again
-            break;
-    }
-    return state;
-}
-
-#endif // POINTING_DEVICE_ENABLE
-
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 1) Hold / Toggle Modes (react on press + release) ---
     switch (keycode) {
@@ -411,6 +338,79 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
     return true;
 }
+
+// ─── Pointing Device Stuff ──────────────────────────────────────────────────
+#ifdef POINTING_DEVICE_ENABLE
+
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+void pointing_device_init_user(void) {
+    set_auto_mouse_layer(LAYER_POINTER); // set default pointer layer
+    set_auto_mouse_enable(true);         // enable Auto Mouse by default
+    automouse_rgb_post_init();           // initialize Auto Mouse RGB for slave side
+}
+#    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
+
+bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
+    switch (keycode) {
+        case SNIPING_MODE:
+        case SNIPING_MODE_TOGGLE:
+        case DRAGSCROLL_MODE:
+        case DRAGSCROLL_MODE_TOGGLE:
+        case DRG_TOG_ON_HOLD:
+        case CARET_MODE:
+        case VOLMODE:
+        case DPI_MOD:
+        case DPI_RMOD:
+        case S_D_MOD:
+        case S_D_RMOD:
+            return true;
+    }
+    return false;
+}
+
+report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    // Volume mode (held custom key)
+    if (volmode_active) {
+        return handle_volume_mode(mouse_report);
+    }
+    // Caret mode (held custom key)
+    else if (caret_active) {
+        return handle_caret_mode(mouse_report);
+    }
+    // Default: pass through unchanged
+    else {
+        return mouse_report;
+    }
+}
+
+layer_state_t layer_state_set_user(layer_state_t state) {
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    // If auto-mouse pointer layer overlaps with another active layer, drop
+    // pointer in the same update to avoid transient base hops and sticky states.
+    if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0) {
+        state &= ~((layer_state_t)1 << LAYER_POINTER);
+    }
+#    endif
+
+    // Automatically enable sniping-mode on the chosen layer.
+    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
+
+    // Manage Auto Mouse enabling/disabling based on layer to avoid conflicts with sniping
+    uint8_t layer = get_highest_layer(state);
+
+    switch (layer) {
+        case LAYER_RAISE:
+            set_auto_mouse_enable(false); // disable Auto Mouse when in sniping layer
+            break;
+
+        default:
+            set_auto_mouse_enable(true); // enable it again
+            break;
+    }
+    return state;
+}
+
+#endif // POINTING_DEVICE_ENABLE
 
 // ─── RGB Stuff ──────────────────────────────────────────────────────────────
 #ifdef RGB_MATRIX_ENABLE
