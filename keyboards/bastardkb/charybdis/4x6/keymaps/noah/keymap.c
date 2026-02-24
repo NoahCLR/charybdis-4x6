@@ -384,6 +384,14 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
 }
 
 layer_state_t layer_state_set_user(layer_state_t state) {
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    // If auto-mouse pointer layer overlaps with another active layer, drop
+    // pointer in the same update to avoid transient base hops and sticky states.
+    if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0) {
+        state &= ~((layer_state_t)1 << LAYER_POINTER);
+    }
+#    endif
+
     // Automatically enable sniping-mode on the chosen layer.
     charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
 
