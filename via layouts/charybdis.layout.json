@@ -141,7 +141,7 @@
       "KC_NO",
       "KC_NO",
       "MT(MOD_LSFT,KC_CAPS)",
-      "KC_NO",
+      "LSG(KC_Z)",
       "KC_NO",
       "G(KC_C)",
       "MO(2)",
