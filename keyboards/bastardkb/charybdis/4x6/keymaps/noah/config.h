@@ -47,7 +47,7 @@
 #    ifdef RGB_MATRIX_MAXIMUM_BRIGHTNESS
 #        undef RGB_MATRIX_MAXIMUM_BRIGHTNESS
 #    endif
-#    define RGB_MATRIX_MAXIMUM_BRIGHTNESS 150
+#    define RGB_MATRIX_MAXIMUM_BRIGHTNESS 200
 
 // Default solid color mode.
 #    ifdef RGB_MATRIX_DEFAULT_MODE
