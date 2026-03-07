@@ -30,9 +30,9 @@ enum custom_keycodes {
 enum charybdis_keymap_layers {
     LAYER_BASE = 0,
     LAYER_LOWER,
+    LAYER_NUM,
     LAYER_RAISE,
     LAYER_POINTER,
-    LAYER_NUM,
 };
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {

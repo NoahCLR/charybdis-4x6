@@ -201,9 +201,10 @@ def main():
     layer_names = [
         "LAYER_BASE",
         "LAYER_LOWER",
+        "LAYER_NUM",
         "LAYER_RAISE",
         "LAYER_POINTER",
-        "LAYER_NUM"
+
     ]
 
     for idx, tokens in enumerate(all_tokens):
