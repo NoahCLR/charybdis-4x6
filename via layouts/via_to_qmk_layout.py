@@ -203,6 +203,7 @@ def main():
         "LAYER_LOWER",
         "LAYER_RAISE",
         "LAYER_POINTER",
+        "LAYER_NUM"
     ]
 
     for idx, tokens in enumerate(all_tokens):
