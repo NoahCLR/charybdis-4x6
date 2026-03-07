@@ -479,7 +479,7 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 // ─── RGB Matrix per-layer indicators ────────────────────────────────────────
 
 // Auto-mouse gradient colors (start -> end) and locked indicator.
-static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};    // white
+static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 150};                              // white
 static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // red
 static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // orange
 
