@@ -3,7 +3,7 @@
 // ─── Core / feature toggles ─────────────────────────────────────────────────
 #ifdef VIA_ENABLE
 #    undef DYNAMIC_KEYMAP_LAYER_COUNT
-#    define DYNAMIC_KEYMAP_LAYER_COUNT 4
+#    define DYNAMIC_KEYMAP_LAYER_COUNT 5
 #endif
 
 #ifndef __arm__
