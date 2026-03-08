@@ -3,7 +3,7 @@
 // ─── Core / feature toggles ─────────────────────────────────────────────────
 #ifdef VIA_ENABLE
 #    undef DYNAMIC_KEYMAP_LAYER_COUNT
-#    define DYNAMIC_KEYMAP_LAYER_COUNT 4
+#    define DYNAMIC_KEYMAP_LAYER_COUNT 5
 #endif
 
 #ifndef __arm__
@@ -47,7 +47,7 @@
 #    ifdef RGB_MATRIX_MAXIMUM_BRIGHTNESS
 #        undef RGB_MATRIX_MAXIMUM_BRIGHTNESS
 #    endif
-#    define RGB_MATRIX_MAXIMUM_BRIGHTNESS 150
+#    define RGB_MATRIX_MAXIMUM_BRIGHTNESS 200
 
 // Default solid color mode.
 #    ifdef RGB_MATRIX_DEFAULT_MODE

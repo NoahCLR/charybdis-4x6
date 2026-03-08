@@ -30,6 +30,7 @@ enum custom_keycodes {
 enum charybdis_keymap_layers {
     LAYER_BASE = 0,
     LAYER_LOWER,
+    LAYER_NUM,
     LAYER_RAISE,
     LAYER_POINTER,
 };
@@ -42,39 +43,54 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                          KC_TAB,              KC_Q,              KC_W,              KC_E,              KC_R,              KC_T,                 KC_Y,              KC_U,              KC_I,              KC_O,              KC_P,           KC_BSLS,
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-               MT(MOD_LSFT,KC_CAPS),             KC_A,             KC_S,             KC_D,       LT(2,KC_F),              KC_G,                 KC_H,        LT(1,KC_J),              KC_K,              KC_L,           KC_SCLN,           KC_QUOT,
+               MT(MOD_LSFT,KC_CAPS),             KC_A,             KC_S,             KC_D,       LT(3,KC_F),              KC_G,                 KC_H,        LT(1,KC_J),              KC_K,              KC_L,           KC_SCLN,           KC_QUOT,
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        KC_LCTL,        LT(1,KC_Z),              KC_X,              KC_C,              KC_V,              KC_B,                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(2,KC_SLSH),           KC_LALT,
+                        KC_LCTL,        LT(2,KC_Z),              KC_X,              KC_C,              KC_V,              KC_B,                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(3,KC_SLSH),           KC_RALT,
         // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                 KC_LGUI,            KC_SPC,             MO(1),             MO(2),            KC_ENT,
+                                                                                 KC_LGUI,            KC_SPC,             MO(1),             MO(3),            KC_ENT,
                                                                                                      KC_DEL,           KC_BSPC,           KC_BSPC
         //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
         ),
       
         [LAYER_LOWER] = LAYOUT(
         // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                        XXXXXXX,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
+                         KC_ESC,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                         XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LPRN,           KC_RPRN,           KC_QUOT,           KC_PPLS,
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-               MT(MOD_LSFT,KC_CAPS),          XXXXXXX,          XXXXXXX,          XXXXXXX,          XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,        S(KC_QUOT),           KC_PEQL,
+                        KC_LSFT,           XXXXXXX,           XXXXXXX,           XXXXXXX,            KC_ESC,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,        S(KC_QUOT),           KC_PEQL,
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        MACRO_5,           XXXXXXX,        LCAG(KC_X),        LCAG(KC_C),           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,        S(KC_LBRC),        S(KC_RBRC),           XXXXXXX,           XXXXXXX,
+                        KC_LCTL,           XXXXXXX,        LCAG(KC_X),        LCAG(KC_C),         LSG(KC_V),           XXXXXXX,              XXXXXXX,           XXXXXXX,        S(KC_LBRC),        S(KC_RBRC),           XXXXXXX,           KC_RALT,
         // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                  KC_LGUI,            KC_SPC,           XXXXXXX,           XXXXXXX,           XXXXXXX,
                                                                                                      KC_DEL,           KC_BSPC,           KC_BSPC
         //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
         ),
       
+        [LAYER_NUM] = LAYOUT(
+        // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+                        XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
+        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                        XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P7,             KC_P8,             KC_P9,           XXXXXXX,           KC_PPLS,
+        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                        XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,             MO(3),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
+        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                        XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
+        // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                 KC_LGUI,            KC_SPC,           XXXXXXX,           XXXXXXX,             KC_P0,
+                                                                                                     KC_DEL,           KC_BSPC,           KC_BSPC
+        //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
+        ),
+      
         [LAYER_RAISE] = LAYOUT(
         // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                        XXXXXXX,           XXXXXXX,           XXXXXXX,        LCAG(KC_V),           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
+                    LAG(KC_ESC),           XXXXXXX,           XXXXXXX,        LCAG(KC_V),           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                         XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-               MT(MOD_LSFT,KC_CAPS),          XXXXXXX,          XXXXXXX,          G(KC_C),            MO(2),           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,           XXXXXXX,           XXXXXXX,
+               MT(MOD_LSFT,KC_CAPS),        LSG(KC_Z),          XXXXXXX,          G(KC_C),            MO(2),           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        KC_LCTL,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           XXXXXXX,           KC_RALT,
+                        MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           XXXXXXX,        CARET_MODE,
         // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                  KC_LGUI,            KC_SPC,             MO(1),           KC_LALT,            KC_ENT,
                                                                                                      KC_DEL,           KC_BSPC,           KC_BSPC
@@ -91,7 +107,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                         _______,           _______,           _______,           _______,           _______,           _______,              VOLMODE,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           _______,        CARET_MODE,
         // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                 KC_LGUI,            KC_SPC,             MO(1),             MO(2),            KC_ENT,
+                                                                                 KC_LGUI,            KC_SPC,             MO(1),             MO(3),            KC_ENT,
                                                                                                      KC_DEL,           KC_BSPC,           KC_BSPC
         //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
         ),
@@ -479,18 +495,19 @@ static const uint8_t layer_lower_mods[] = {4, 47};
 // ─── RGB Matrix per-layer indicators ────────────────────────────────────────
 
 // Auto-mouse gradient colors (start -> end) and locked indicator.
-static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 75};                               // white
+static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 150};                              // white
 static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // red
 static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // orange
 
 // Layer colors that will be clamped to maximum brightness at render time.
 static const hsv_t layer_lower_color = {.h = 169, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // purple
 static const hsv_t layer_raise_color = {.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // blue
+static const hsv_t layer_num_color   = {.h = 85, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // green
 
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t top = get_highest_layer(layer_state | default_layer_state);
 
-    if (top != LAYER_POINTER && top != LAYER_LOWER && top != LAYER_RAISE) {
+    if (top != LAYER_POINTER && top != LAYER_LOWER && top != LAYER_RAISE && top != LAYER_NUM) {
         return false;
     }
 
@@ -507,6 +524,10 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 
         case LAYER_RAISE: {
             rgb_set_both_halves(hsv_to_rgb(layer_raise_color), led_min, led_max);
+        } break;
+
+        case LAYER_NUM: {
+            rgb_set_both_halves(hsv_to_rgb(layer_num_color), led_min, led_max);
         } break;
     }
 
