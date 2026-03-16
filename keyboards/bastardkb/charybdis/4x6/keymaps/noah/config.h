@@ -140,14 +140,19 @@
 
 // ─── Drag-scroll tuning ────────────────────────────────────────────────────
 // Drag-scroll converts trackball motion into scroll events.
+// With hi-res scrolling, each scroll unit = 1/120th of a notch.
+//
+//   Speed     = DPI / STEP_DIVISOR   (lower = slower, more precise)
+//   Smoothness = RATE_LIMIT_MS       (lower = more frequent updates)
+//   Snap feel  = SNAP_RATIO          (higher = stricter axis lock)
 
-#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y     // Invert Y so "push forward = scroll up" (natural scroll)
-#    define CHARYBDIS_DRAGSCROLL_DPI 100       // Very low DPI for smooth, precise scrolling
-#    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0 // No motion buffering (immediate response)
-#    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8   // Min ms between scroll events (≈125 Hz)
-#    define CHARYBDIS_SCROLL_SNAP_RATIO 3      // Axis lock: dominant axis must be 3x the other to snap
-#    define CHARYBDIS_SCROLL_STEP_DIVISOR 10   // Divide raw motion by 10 for scroll step size
-#    define CHARYBDIS_SCROLL_MAX_STEP 1        // Cap at 1 scroll step per event for precision
+#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y       // "push forward = scroll up"
+#    define CHARYBDIS_DRAGSCROLL_DPI 100         // Sensor CPI while scrolling (lower = finer control)
+#    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0   // Dead zone in sensor counts (0 = immediate response)
+#    define CHARYBDIS_SCROLL_STEP_DIVISOR 8      // Sensor counts per hi-res scroll unit (higher = slower)
+#    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8     // Min ms between scroll events (8 ≈ 125 Hz)
+#    define CHARYBDIS_SCROLL_SNAP_RATIO 3        // Axis lock: dominant axis must be Nx the other to snap
+#    define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 80 // Discard buffered motion after this many ms idle
 
 #endif // POINTING_DEVICE_ENABLE
 
