@@ -8,7 +8,7 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 - **Trackball modes** — Hold a key to turn the trackball into a volume knob, arrow-key emitter, or scroll wheel
 - **Auto-mouse layer with countdown gradient** — The pointer layer activates automatically when you move the trackball. LEDs fade from white to red over 1.2 seconds to show remaining time before the layer deactivates, giving you a visual countdown. The gradient is synced to the slave half over RPC so both sides animate together.
 - **Custom tap/hold system** — Number row and punctuation keys do different things based on hold duration: tap for the plain key, hold for the shifted symbol, longer hold for a third action
-- **Per-layer RGB indicators** — Each layer has a distinct color; trackball modes overlay a color on the right half
+- **Per-layer RGB indicators** — Each layer has a distinct color; trackball modes overlay a color on the right half. Colors are defined as HSV values in `keymap.c` — see [hsv colors.jpg](hsv%20colors.jpg) for a quick reference of hue values. Split-safe RGB helpers in `rgb_helpers.h` handle LED chunk boundaries so you can target individual LEDs, specific halves, or both without worrying about the split addressing.
 - **Hi-res scroll** — 120x scroll multiplier for smooth, precise scrolling
 - **Split state sync** — Auto-mouse countdown and mode flags are synced from master to slave over RPC so both halves show correct LEDs
 
