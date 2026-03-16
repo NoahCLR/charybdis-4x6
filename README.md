@@ -9,6 +9,7 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 - **Auto-mouse layer** — The pointer layer activates automatically when you move the trackball and fades out after 1.2 seconds of inactivity
 - **Custom tap/hold system** — Number row and punctuation keys do different things based on hold duration: tap for the plain key, hold for the shifted symbol, longer hold for a third action
 - **Per-layer RGB indicators** — Each layer has a distinct color; trackball modes overlay a color on the right half
+- **Hi-res scroll** — 120x scroll multiplier for smooth, precise scrolling
 - **Split state sync** — Auto-mouse countdown and mode flags are synced from master to slave over RPC so both halves show correct LEDs
 
 ## Layers
@@ -18,8 +19,10 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 | Base | Default | RGB effect | QWERTY typing |
 | Num | Hold `Z` / Hold `B`| Green | Numpad on the right half |
 | Lower | `MO(2)` / Hold `J` | Blue | Symbols, DPI controls, brackets |
-| Raise | `MO(3)` / Hold `F` / Hold `/` | Purple | Navigation, media, mouse buttons, macOS shortcuts |
-| Pointer | Auto (trackball movement) | White-to-red gradient | Mouse buttons, scroll, trackball mode toggles |
+| Raise | `MO(3)` / Hold `F` / Hold `/` | Purple | Navigation, media, mouse buttons, macOS shortcuts. Sniping (lower DPI) auto-enables; auto-mouse is disabled to avoid conflicts. |
+| Pointer | Auto (trackball movement) | White-to-red gradient | Mouse buttons, scroll, trackball mode toggles. Automatically stripped when another layer is explicitly active to prevent flickering. |
+
+The Caps Lock position is a dual-purpose key: hold for Shift, tap for Caps Lock.
 
 ## Trackball Modes
 
@@ -33,6 +36,8 @@ Modes are activated by holding a key. The right-half LEDs change color to show t
 | Arrow | `ARROW_MODE` | Cyan | Trackball motion sends arrow keys (dominant axis wins) |
 
 `DRG_TOG_ON_HOLD` is a dual-purpose key on the Pointer layer: tap sends the base-layer key at that position, hold toggles drag-scroll lock on/off.
+
+If drag-scroll is already toggled on (locked), pressing and releasing the momentary `DRGSCRL` key will unlock it — so you don't have to reach for the toggle key to turn it off.
 
 ## Macros (macOS)
 
