@@ -6,7 +6,7 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 
 - **5 layers** — Base (QWERTY), Numpad, Lower (symbols), Raise (navigation/media), and Pointer (auto-mouse)
 - **Trackball modes** — Hold a key to turn the trackball into a volume knob, arrow-key emitter, or scroll wheel
-- **Auto-mouse layer** — The pointer layer activates automatically when you move the trackball and fades out after 1.2 seconds of inactivity
+- **Auto-mouse layer with countdown gradient** — The pointer layer activates automatically when you move the trackball. LEDs fade from white to red over 1.2 seconds to show remaining time before the layer deactivates, giving you a visual countdown. The gradient is synced to the slave half over RPC so both sides animate together.
 - **Custom tap/hold system** — Number row and punctuation keys do different things based on hold duration: tap for the plain key, hold for the shifted symbol, longer hold for a third action
 - **Per-layer RGB indicators** — Each layer has a distinct color; trackball modes overlay a color on the right half
 - **Hi-res scroll** — 120x scroll multiplier for smooth, precise scrolling
