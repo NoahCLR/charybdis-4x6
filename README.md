@@ -5,7 +5,7 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 ## Features
 
 - **5 layers** — Base (QWERTY), Numpad, Lower (symbols), Raise (navigation/media), and Pointer (auto-mouse)
-- **Trackball modes** — Hold a key to turn the trackball into a volume knob, arrow-key emitter, or scroll wheel
+- **Trackball modes** — Hold a key to turn the trackball into a volume knob, arrow-key emitter, scroll wheel, or zoom control
 - **Auto-mouse layer with countdown gradient** — The pointer layer activates automatically when you move the trackball. LEDs fade from white to red over 1.2 seconds to show remaining time before the layer deactivates, giving you a visual countdown. The gradient is synced to the slave half over RPC so both sides animate together.
 - **Custom tap/hold system** — Number row and punctuation keys do different things based on hold duration: tap for the plain key, hold for the shifted symbol, longer hold for a third action
 - **Per-layer RGB indicators** — Each layer has a distinct color; trackball modes overlay a color on the right half. Colors are defined as HSV values in `keymap.c` — see [hsv colors.jpg](hsv%20colors.jpg) for a quick reference of hue values. Split-safe RGB helpers in `rgb_helpers.h` handle LED chunk boundaries so you can target individual LEDs, specific halves, or both without worrying about the split addressing.
@@ -26,18 +26,21 @@ The Caps Lock position is a dual-purpose key: hold for Shift, tap for Caps Lock.
 
 ## Trackball Modes
 
-Modes are activated by holding a key. The right-half LEDs change color to show the active mode.
+Mode keys are dual-purpose: tap sends the base-layer key at that position, hold activates the trackball mode. The right-half LEDs change color to show the active mode.
 
 | Mode | Key | Color | Behavior |
 |------|-----|-------|----------|
 | Drag Scroll | `DRGSCRL` | Orange | Trackball motion becomes scrolling |
 | Volume | `VOLUME_MODE` | Yellow | Trackball Y-axis controls system volume |
 | Brightness | `BRIGHTNESS_MODE` | Magenta | Trackball Y-axis controls screen brightness |
+| Zoom | `ZOOM_MODE` | Chartreuse | Trackball Y-axis zooms in (GUI+Plus) / out (GUI+Minus) |
 | Arrow | `ARROW_MODE` | Cyan | Trackball motion sends arrow keys (dominant axis wins) |
 
 `DRG_TOG_ON_HOLD` is a dual-purpose key on the Pointer layer: tap sends the base-layer key at that position, hold toggles drag-scroll lock on/off.
 
 If drag-scroll is already toggled on (locked), pressing and releasing the momentary `DRGSCRL` key will unlock it — so you don't have to reach for the toggle key to turn it off.
+
+Sniping (lower DPI) works during trackball modes — it slows down the trackball input, so arrow keys emit less frequently and volume, brightness, and zoom adjustments become finer-grained.
 
 ## Macros (macOS)
 
@@ -91,7 +94,7 @@ The top of the script has a configuration section with the things you'd need to 
 keyboards/bastardkb/charybdis/4x6/keymaps/noah/
   keymap.c                  Main keymap: layers, key processing, RGB indicators
   config.h                  QMK/Charybdis configuration overrides
-  pointing_device_modes.h   Trackball mode system (volume, arrow, dragscroll)
+  pointing_device_modes.h   Trackball mode system (volume, brightness, zoom, arrow, dragscroll)
   split_sync.h              Master → slave state sync via RPC (mode flags + elapsed time)
   rgb_automouse.h           Auto-mouse countdown gradient (white → red)
   rgb_helpers.h             Split-safe RGB matrix helper functions
