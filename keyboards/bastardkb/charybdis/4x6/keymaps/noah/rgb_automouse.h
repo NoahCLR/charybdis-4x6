@@ -1,135 +1,111 @@
+// ────────────────────────────────────────────────────────────────────────────
+// Auto-Mouse RGB Gradient
+// ────────────────────────────────────────────────────────────────────────────
+//
+// When LAYER_POINTER is active (auto-mouse triggered by trackball
+// movement), all LEDs show an animated gradient that represents the
+// remaining time before the layer deactivates:
+//
+//   Start (just triggered): white
+//   End   (about to expire): red
+//
+// The first third of the timeout is "dead time" — the color stays
+// white so you don't get distracting flicker during active use.
+// The gradient only animates during the final two-thirds.
+//
+// HSV → RGB conversion is cached to avoid expensive math every frame.
+//
+// The elapsed time used for the gradient comes from two sources:
+//   - Master half: reads auto_mouse_get_time_elapsed() directly
+//   - Slave half:  reads pd_sync_remote.elapsed (synced via split_sync.h)
+//
+// ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#if defined(SPLIT_TRANSACTION_IDS_USER) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
+#if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 
-#    include <string.h>
 #    include "pointing_device_auto_mouse.h"
 #    include "rgb_helpers.h"
-#    include "transactions.h"
+#    include "split_sync.h"
 
+// How long the color stays at the start value before the gradient begins.
+// Default: first 1/3 of AUTO_MOUSE_TIME (400ms of 1200ms).
 #    ifndef AUTOMOUSE_RGB_DEAD_TIME
-#        define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3) // time at start where color is static
+#        define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3)
 #    endif
 
+// The remaining time over which the gradient animates.
 #    define AUTOMOUSE_RGB_ACTIVE_SPAN (AUTO_MOUSE_TIME - AUTOMOUSE_RGB_DEAD_TIME)
-#    define AUTOMOUSE_RGB_FLAG_LOCKED 0x01
 
-typedef struct __attribute__((packed)) {
+// ─── Auto-mouse gradient rendering ─────────────────────────────────────────
+
+// Cache the last computed HSV → RGB conversion to avoid redundant math.
+// Only recomputed when the interpolated HSV actually changes.
+// Persists across layer activations intentionally — the gradient always
+// restarts from prog=0 (start color), so stale cache values are harmless.
+static rgb_t automouse_cached_rgb  = {0};
+static hsv_t automouse_cached_hsv  = {0};
+static bool  automouse_cache_valid = false;
+
+// Render the auto-mouse countdown gradient across all LEDs.
+//
+// Parameters:
+//   led_min/max: the LED chunk being rendered (split-safe)
+//   start/end:  the HSV colors for the gradient endpoints
+//
+// The gradient interpolates linearly from `start` to `end` based on how
+// much of the auto-mouse timeout has elapsed.
+__attribute__((noinline)) static bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end) {
+    // Read elapsed once and reuse for both sync and rendering.
+    // Master reads the timer directly; slave uses the synced value.
     uint16_t elapsed;
-    uint8_t  flags;
-} automouse_rgb_packet_t;
-
-// Split packet tracking.
-static automouse_rgb_packet_t automouse_rgb_remote    = {0};
-static automouse_rgb_packet_t automouse_rgb_last_sent = {0};
-
-// Create a local Auto Mouse RGB packet with current elapsed time and lock status.
-static inline automouse_rgb_packet_t automouse_rgb_local_packet(void) {
-    uint16_t               elapsed = auto_mouse_get_time_elapsed();
-    automouse_rgb_packet_t p       = {
-              .elapsed = elapsed,
-              .flags   = 0,
-    };
-    if (get_auto_mouse_toggle()) p.flags |= AUTOMOUSE_RGB_FLAG_LOCKED;
-    return p;
-}
-
-// Create a default seed packet with zeroed fields.
-static inline automouse_rgb_packet_t automouse_rgb_seed_packet(void) {
-    return (automouse_rgb_packet_t){
-        .elapsed = 0,
-        .flags   = 0,
-    };
-}
-
-// Broadcast the given Auto Mouse RGB packet to the slave side if it has changed.
-static inline void automouse_rgb_broadcast(const automouse_rgb_packet_t *pkt) {
-    if (memcmp(&automouse_rgb_last_sent, pkt, sizeof(automouse_rgb_packet_t)) == 0) {
-        return;
-    }
-    transaction_rpc_send(PUT_AUTOMOUSE_RGB, sizeof(*pkt), pkt);
-    automouse_rgb_last_sent = *pkt;
-}
-
-// RPC handler for slave side to receive Auto Mouse RGB packets.
-static inline void automouse_rgb_slave_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
-    (void)target2initiator_buffer_size;
-    (void)target2initiator_buffer;
-    if (initiator2target_buffer_size < sizeof(automouse_rgb_packet_t)) {
-        return;
-    }
-    memcpy(&automouse_rgb_remote, initiator2target_buffer, sizeof(automouse_rgb_packet_t));
-}
-
-// Initialize Auto Mouse RGB tracking and broadcast initial state.
-static inline void automouse_rgb_post_init(void) {
-    transaction_register_rpc(PUT_AUTOMOUSE_RGB, automouse_rgb_slave_rpc);
-
-    automouse_rgb_remote    = automouse_rgb_seed_packet();
-    automouse_rgb_last_sent = automouse_rgb_seed_packet();
-
     if (is_keyboard_master()) {
-        automouse_rgb_broadcast(&automouse_rgb_remote);
-    }
-}
-
-// Render a simple gradient countdown on the entire board. Returns true when it handled the layer.
-static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end, hsv_t locked) {
-    bool                   is_master = is_keyboard_master();
-    automouse_rgb_packet_t pkt       = is_master ? automouse_rgb_local_packet() : automouse_rgb_remote;
-
-    uint16_t elapsed = pkt.elapsed;
-
-    // Master broadcasts its latest state to the slave.
-    if (is_master) {
-        automouse_rgb_broadcast(&pkt);
+        elapsed = auto_mouse_get_time_elapsed();
+        pd_state_sync_elapsed(elapsed); // broadcast to slave using same value
+    } else {
+        elapsed = pd_sync_remote.elapsed;
     }
 
-    // When auto-mouse is locked (e.g. dragscroll toggle), pin to the lock color.
-    if (pkt.flags & AUTOMOUSE_RGB_FLAG_LOCKED) {
-        rgb_set_both_halves(hsv_to_rgb(locked), led_min, led_max);
-        return true;
-    }
-
-    // Clamp elapsed so it does not exceed timeout.
     if (elapsed > AUTO_MOUSE_TIME) {
         elapsed = AUTO_MOUSE_TIME;
     }
 
+    // During dead time (first 1/3), progress stays at 0 → color stays at `start`.
     uint16_t prog = (elapsed <= AUTOMOUSE_RGB_DEAD_TIME) ? 0 : (elapsed - AUTOMOUSE_RGB_DEAD_TIME);
 
-    uint8_t value = end.v;
-    uint8_t hue   = end.h;
-    uint8_t sat   = end.s;
+    // Interpolate HSV channels linearly from start → end.
+    hsv_t hsv;
 
     if (prog == 0) {
-        value = start.v;
-        hue   = start.h;
-        sat   = start.s;
+        hsv = start;
     } else {
-        uint32_t t = (uint32_t)prog * 255 / AUTOMOUSE_RGB_ACTIVE_SPAN; // 0-255 lerp factor
-        // linear interpolation per channel
-        hue   = start.h + (uint8_t)(((int16_t)end.h - (int16_t)start.h) * t / 255);
-        sat   = start.s + (uint8_t)(((int16_t)end.s - (int16_t)start.s) * t / 255);
-        value = start.v + (uint8_t)(((int16_t)end.v - (int16_t)start.v) * t / 255);
+        // t ranges from 0 to 255 as prog goes from 0 to ACTIVE_SPAN.
+        uint32_t t = (uint32_t)prog * 255 / AUTOMOUSE_RGB_ACTIVE_SPAN;
+        // int32_t cast prevents overflow: diff can be up to 255, t up to 255,
+        // so the product can reach 65025 which exceeds int16_t range.
+        hsv.h = start.h + (uint8_t)((int32_t)((int16_t)end.h - (int16_t)start.h) * t / 255);
+        hsv.s = start.s + (uint8_t)((int32_t)((int16_t)end.s - (int16_t)start.s) * t / 255);
+        hsv.v = start.v + (uint8_t)((int32_t)((int16_t)end.v - (int16_t)start.v) * t / 255);
     }
 
-    hsv_t hsv = (hsv_t){.h = hue, .s = sat, .v = value};
+    // Only call hsv_to_rgb() when the color actually changed.
+    if (!automouse_cache_valid || hsv.h != automouse_cached_hsv.h || hsv.s != automouse_cached_hsv.s || hsv.v != automouse_cached_hsv.v) {
+        automouse_cached_hsv  = hsv;
+        automouse_cached_rgb  = hsv_to_rgb(hsv);
+        automouse_cache_valid = true;
+    }
 
-    rgb_set_both_halves(hsv_to_rgb(hsv), led_min, led_max);
+    rgb_set_both_halves(automouse_cached_rgb, led_min, led_max);
 
     return true;
 }
 
-#else  // SPLIT_TRANSACTION_IDS_USER && POINTING_DEVICE_AUTO_MOUSE_ENABLE && RGB_MATRIX_ENABLE not all defined: define empty stubs to avoid compiler errors.
-static inline void automouse_rgb_post_init(void) {}
-static inline bool automouse_rgb_render(uint8_t top_layer, uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end, hsv_t locked) {
-    (void)top_layer;
+#else  // Required features not all enabled — provide empty stubs.
+static inline bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end) {
     (void)led_min;
     (void)led_max;
     (void)start;
     (void)end;
-    (void)locked;
     return false;
 }
-#endif // defined(SPLIT_TRANSACTION_IDS_USER) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
+#endif // defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)

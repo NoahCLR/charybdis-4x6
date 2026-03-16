@@ -1,26 +1,43 @@
+// ────────────────────────────────────────────────────────────────────────────
+// Noah's Charybdis 4x6 — Configuration Overrides
+// ────────────────────────────────────────────────────────────────────────────
+//
+// This file overrides default QMK and Charybdis firmware settings.
+// Values here take precedence over the keyboard-level config.h.
+//
+// The #undef-before-#define pattern is used throughout because QMK may
+// have already defined these values in parent config files.  Without
+// the #undef, redefining a macro would cause a compiler warning.
+//
+// ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 // ─── Core / feature toggles ─────────────────────────────────────────────────
+
+// VIA is a GUI tool for remapping keys without recompiling firmware.
+// We need 5 dynamic layers to match our layer count (Base, Num, Lower, Raise, Pointer).
 #ifdef VIA_ENABLE
 #    undef DYNAMIC_KEYMAP_LAYER_COUNT
 #    define DYNAMIC_KEYMAP_LAYER_COUNT 5
 #endif
 
-#ifndef __arm__
-// Save space on non-ARM builds.
-#    define NO_ACTION_ONESHOT
-#endif
+// ─── Split keyboard sync ───────────────────────────────────────────────────
+//
+// The Charybdis 4x6 is a split keyboard — each half has its own MCU.
+// By default, only keystrokes are sent between halves.  These options
+// enable syncing additional state so both halves stay consistent.
 
-// ─── Sync-specific features ─────────────────────────────────────────────────
 #ifdef SPLIT_KEYBOARD
 
-// Keep layer state in sync across halves for rgb matrix layer indicators
+// Sync the active layer set to the slave half so it can show the correct
+// RGB layer indicator colors.
 #    ifdef SPLIT_LAYER_STATE_ENABLE
 #        undef SPLIT_LAYER_STATE_ENABLE
 #    endif
 #    define SPLIT_LAYER_STATE_ENABLE
 
-// Keep activity state in sync for rgb matrix timeout
+// Sync user activity timestamps so the RGB timeout (sleep) triggers at
+// the same time on both halves.
 #    ifdef SPLIT_ACTIVITY_ENABLE
 #        undef SPLIT_ACTIVITY_ENABLE
 #    endif
@@ -29,92 +46,115 @@
 #endif // SPLIT_KEYBOARD
 
 // ─── RGB Matrix configuration ───────────────────────────────────────────────
+//
+// The Charybdis 4x6 has per-key RGB LEDs driven by QMK's RGB Matrix system.
+// These settings control LED count, brightness, default effect, and timing.
+
 #ifdef RGB_MATRIX_ENABLE
 
-// Total number of LEDs
+// Total LED count across both halves.
+// The right (pointer) half has 2 dummy LED positions, but they still count.
 #    ifdef RGB_MATRIX_LED_COUNT
 #        undef RGB_MATRIX_LED_COUNT
 #    endif
-#    define RGB_MATRIX_LED_COUNT 58 // Total LEDs (2 dummy LEDs on pointer side)
+#    define RGB_MATRIX_LED_COUNT 58
 
-// RGB Split configuration
+// How the LEDs are split between halves: 29 left, 29 right.
 #    ifdef RGB_MATRIX_SPLIT
 #        undef RGB_MATRIX_SPLIT
 #    endif
-#    define RGB_MATRIX_SPLIT {29, 29} // Left, Right
+#    define RGB_MATRIX_SPLIT {29, 29}
 
-// Brightness Cap to protect the LEDS from drawing too much power.
+// Cap brightness to protect LEDs from drawing too much current.
+// 200/255 ≈ 78% brightness.
 #    ifdef RGB_MATRIX_MAXIMUM_BRIGHTNESS
 #        undef RGB_MATRIX_MAXIMUM_BRIGHTNESS
 #    endif
 #    define RGB_MATRIX_MAXIMUM_BRIGHTNESS 200
 
-// Default solid color mode.
+// Start with a solid color effect (no animation) — layer indicators
+// override this when a non-base layer is active.
 #    ifdef RGB_MATRIX_DEFAULT_MODE
 #        undef RGB_MATRIX_DEFAULT_MODE
 #    endif
 #    define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_SOLID_COLOR
 
-// Default hue value
 #    ifdef RGB_MATRIX_DEFAULT_HUE
 #        undef RGB_MATRIX_DEFAULT_HUE
 #    endif
-#    define RGB_MATRIX_DEFAULT_HUE 0 // Red
+#    define RGB_MATRIX_DEFAULT_HUE 0 // Red hue
 
-// Default saturation value
 #    ifdef RGB_MATRIX_DEFAULT_SAT
 #        undef RGB_MATRIX_DEFAULT_SAT
 #    endif
-#    define RGB_MATRIX_DEFAULT_SAT 255
+#    define RGB_MATRIX_DEFAULT_SAT 255 // Full saturation
 
-// Default brightness value
 #    ifdef RGB_MATRIX_DEFAULT_VAL
 #        undef RGB_MATRIX_DEFAULT_VAL
 #    endif
-#    define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS // Set to max defined above
+#    define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
 
-// LED flush limit to reduce load
+// Minimum ms between RGB matrix updates.  Higher = less CPU load but
+// choppier animations.  32ms ≈ 30 FPS.
 #    ifdef RGB_MATRIX_LED_FLUSH_LIMIT
 #        undef RGB_MATRIX_LED_FLUSH_LIMIT
 #    endif
-#    define RGB_MATRIX_LED_FLUSH_LIMIT 16 // ms between rgbmatrix updates
+#    define RGB_MATRIX_LED_FLUSH_LIMIT 32
 
-// RGB Matrix timeout/sleep
+// Turn off LEDs after 15 minutes (900,000ms) of inactivity.
+// Requires SPLIT_ACTIVITY_ENABLE to keep both halves in sync.
 #    ifdef RGB_MATRIX_TIMEOUT
 #        undef RGB_MATRIX_TIMEOUT
 #    endif
-#    define RGB_MATRIX_TIMEOUT 900000 // ms before auto-off, requires SPLIT_ACTIVITY_ENABLE to stay in sync across halves
+#    define RGB_MATRIX_TIMEOUT 900000
 
 #endif // RGB_MATRIX_ENABLE
 
-// ─── Pointing device ────────────────────────────────────────────────────────
+// ─── Pointing device (trackball) ────────────────────────────────────────────
+//
+// The Charybdis has a trackball on the right half.
+// These settings configure auto-mouse behavior, DPI, and scroll tuning.
+
 #ifdef POINTING_DEVICE_ENABLE
 
-// Auto pointer layer on mouse activity
-#    define POINTING_DEVICE_AUTO_MOUSE_ENABLE            // Enable Auto Mouse feature because it's awesome
-#    define AUTO_MOUSE_TIME 1200                         // Inactivity timeout (ms) before auto-mouse mode disengages
-#    define SPLIT_TRANSACTION_IDS_USER PUT_AUTOMOUSE_RGB // Enable split transactions for Auto Mouse RGB countdown
+// Auto-mouse: automatically activates LAYER_POINTER when the trackball
+// moves, and deactivates it after the timeout expires.
+#    define POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#    define AUTO_MOUSE_TIME 1200 // ms of no trackball movement before the pointer layer deactivates
 
-// 16-bit motion reports
+// Register a custom split RPC transaction for syncing pointing device
+// state (auto-mouse elapsed time + mode flags) from master to slave.
+#    ifdef SPLIT_KEYBOARD
+#        define SPLIT_TRANSACTION_IDS_USER PUT_PD_SYNC
+#    endif
+
+// Enable 16-bit motion reports for higher precision at high DPI.
 #    define MOUSE_EXTENDED_REPORT
 #    define WHEEL_EXTENDED_REPORT
 
-// High-resolution scroll
+// High-resolution scrolling: multiplier controls how many hi-res scroll
+// units are sent per trackball tick.  120x matches most OS expectations
+// for smooth scrolling.
 #    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
 
-// ─── Scroll Behavior ─────────────────────────────────────────────────────────
-#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y // Invert scroll direction
-// #define POINTING_DEVICE_HIRES_SCROLL_EXPONENT 1
-#    define CHARYBDIS_DRAGSCROLL_DPI 100
-#    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0
-#    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8 // 125 Hz-ish
-#    define CHARYBDIS_SCROLL_SNAP_RATIO 3
-#    define CHARYBDIS_SCROLL_STEP_DIVISOR 10
-#    define CHARYBDIS_SCROLL_MAX_STEP 1
+// ─── Drag-scroll tuning ────────────────────────────────────────────────────
+// Drag-scroll converts trackball motion into scroll events.
+
+#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y     // Invert Y so "push forward = scroll up" (natural scroll)
+#    define CHARYBDIS_DRAGSCROLL_DPI 100       // Very low DPI for smooth, precise scrolling
+#    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0 // No motion buffering (immediate response)
+#    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8   // Min ms between scroll events (≈125 Hz)
+#    define CHARYBDIS_SCROLL_SNAP_RATIO 3      // Axis lock: dominant axis must be 3x the other to snap
+#    define CHARYBDIS_SCROLL_STEP_DIVISOR 10   // Divide raw motion by 10 for scroll step size
+#    define CHARYBDIS_SCROLL_MAX_STEP 1        // Cap at 1 scroll step per event for precision
 
 #endif // POINTING_DEVICE_ENABLE
 
-// ─── Tap/Hold timing ────────────────────────────────────────────────────────
-#define CUSTOM_TAP_HOLD_TERM 150    // ms to differentiate tap vs hold
-#define CUSTOM_LONGER_HOLD_TERM 400 // ms to differentiate normal hold vs longer hold
+// ─── Custom tap/hold timing ────────────────────────────────────────────────
+// Used by the custom three-tier tap/hold system in keymap.c.
+// These are NOT QMK's built-in TAPPING_TERM — they're checked manually
+// in process_record_user().
+#define CUSTOM_TAP_HOLD_TERM 150 // < 150ms = tap (send plain key)
+// 150–400ms = hold (shifted variant)
+#define CUSTOM_LONGER_HOLD_TERM 400 // > 400ms = longer hold (third action)

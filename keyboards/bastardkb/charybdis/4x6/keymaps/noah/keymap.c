@@ -1,10 +1,70 @@
+// ────────────────────────────────────────────────────────────────────────────
+// Noah's Charybdis 4x6 keymap
+// ────────────────────────────────────────────────────────────────────────────
+//
+// This is a QMK firmware keymap for the Bastard Keyboards Charybdis 4x6,
+// a split ergonomic keyboard with a built-in trackball on the right half.
+//
+// Architecture overview:
+//
+//   keymap.c (this file)
+//     Main keymap file.  Defines layers, key behavior, macros, pointing
+//     device integration, and RGB layer indicators.  Ties together the
+//     four helper headers below.
+//
+//   pointing_device_modes.h
+//     Bitfield-based mode system that changes what the trackball does.
+//     Modes: Volume (Y-axis → volume), Brightness (Y-axis → brightness),
+//     Arrow (motion → arrow keys), Dragscroll (firmware-native scroll mode).
+//
+//   split_sync.h
+//     Syncs pointing-device state (mode flags + auto-mouse elapsed time)
+//     from the master half to the slave half over QMK's split RPC
+//     transport.  Both values travel in a single 3-byte packet.
+//
+//   rgb_automouse.h
+//     Renders the auto-mouse countdown gradient (white → red) based on
+//     how much of the timeout has elapsed.
+//
+//   rgb_helpers.h
+//     Thin wrappers around rgb_matrix_set_color() that are safe to call
+//     on a split keyboard (they clamp to the current half's LED range).
+//
+// Key concepts for newcomers:
+//
+//   - "Split keyboard":  Each physical half has its own MCU.  The left
+//     half (master) runs the keymap logic and sends state to the right
+//     half (slave) so it can update its own LEDs.
+//
+//   - "Auto-mouse layer":  QMK can automatically activate a layer when
+//     it detects trackball movement, and deactivate it after a timeout.
+//     We use this for LAYER_POINTER.
+//
+//   - "Tap vs Hold":  A key can do different things depending on how
+//     long you press it.  This keymap implements a custom three-tier
+//     system: tap (<150ms), hold (150–400ms), and longer hold (>400ms).
+//
+//   - XXXXXXX = key does nothing on this layer.
+//     _______ = transparent, falls through to the layer below.
+//
+// ────────────────────────────────────────────────────────────────────────────
+
 #include QMK_KEYBOARD_H
 
 #include "pointing_device_modes.h"
+#include "split_sync.h"
 #include "rgb_automouse.h"
 #include "rgb_helpers.h"
 
 // ─── Custom Keycodes & Keymap Layers ────────────────────────────────────────
+
+// Custom keycodes are assigned values starting from SAFE_RANGE so they don't
+// collide with any built-in QMK or Charybdis keycodes.
+//
+// MACRO_0–15 are generic macro slots (some used, rest reserved for VIA).
+// VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE activate pointing device modes while held.
+// DRG_TOG_ON_HOLD is a dual-purpose key: tap sends the base-layer key at
+// that position, hold toggles drag-scroll lock.
 enum custom_keycodes {
     MACRO_0 = SAFE_RANGE,
     MACRO_1,
@@ -12,115 +72,147 @@ enum custom_keycodes {
     MACRO_3,
     MACRO_4,
     MACRO_5,
-    MACRO_6,
-    MACRO_7,
-    MACRO_8,
-    MACRO_9,
-    MACRO_10,
-    MACRO_11,
-    MACRO_12,
-    MACRO_13,
-    MACRO_14,
-    MACRO_15,
-    VOLMODE,
-    CARET_MODE,
+    MACRO_6,  // reserved for VIA
+    MACRO_7,  // reserved for VIA
+    MACRO_8,  // reserved for VIA
+    MACRO_9,  // reserved for VIA
+    MACRO_10, // reserved for VIA
+    MACRO_11, // reserved for VIA
+    MACRO_12, // reserved for VIA
+    MACRO_13, // reserved for VIA
+    MACRO_14, // reserved for VIA
+    MACRO_15, // reserved for VIA
+    VOLUME_MODE,
+    BRIGHTNESS_MODE,
+    ARROW_MODE,
     DRG_TOG_ON_HOLD,
 };
 
+// Layers are stacked: higher layers override lower ones.
+// Keys marked _______ let the layer below show through.
 enum charybdis_keymap_layers {
-    LAYER_BASE = 0,
-    LAYER_NUM,
-    LAYER_LOWER,
-    LAYER_RAISE,
-    LAYER_POINTER,
+    LAYER_BASE = 0, // Default QWERTY typing layer
+    LAYER_NUM,      // Numpad on the right half (activated by holding Z or B)
+    LAYER_LOWER,    // Symbols and DPI controls (blue RGB)
+    LAYER_RAISE,    // Navigation, media, and mouse buttons (purple RGB, sniping enabled)
+    LAYER_POINTER,  // Auto-mouse layer: activates on trackball movement, deactivates after timeout
 };
+
+// ─── Keymap Layouts ─────────────────────────────────────────────────────────
+//
+// QMK key prefixes quick reference:
+//   KC_     = plain keycode              MT() = mod on hold, key on tap
+//   LT(l,k) = layer l on hold, k on tap  MO() = momentary layer while held
+//   G()     = GUI + key                   A()  = Alt + key
+//   S()     = Shift + key                 LCAG() = Ctrl+Alt+GUI + key
+//   LSG()   = Left Shift+GUI + key        LAG()  = Left Alt+GUI + key
+//
+// The number row (KC_1–KC_0) and punctuation keys use a custom tap/hold
+// system defined below — they are NOT using QMK's built-in mod-tap.
+// See process_record_user() for details.
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
     [LAYER_BASE] = LAYOUT(
-        // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                        QK_GESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,                 KC_6,              KC_7,              KC_8,              KC_9,              KC_0,           KC_MINS,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                         KC_TAB,              KC_Q,              KC_W,              KC_E,              KC_R,              KC_T,                 KC_Y,              KC_U,              KC_I,              KC_O,              KC_P,           KC_BSLS,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-               MT(MOD_LSFT,KC_CAPS),             KC_A,             KC_S,             KC_D,       LT(3,KC_F),              KC_G,                 KC_H,        LT(2,KC_J),              KC_K,              KC_L,           KC_SCLN,           KC_QUOT,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        KC_LCTL,        LT(1,KC_Z),              KC_X,              KC_C,              KC_V,              KC_B,                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(3,KC_SLSH),           KC_RALT,
-        // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                 KC_LGUI,            KC_SPC,             MO(2),             MO(3),            KC_ENT,
-                                                                                                     KC_DEL,           KC_BSPC,           KC_BSPC
-        //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-        ),
-      
-        [LAYER_NUM] = LAYOUT(
-        // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                        XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P7,             KC_P8,             KC_P9,           XXXXXXX,           KC_PPLS,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,             MO(3),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
-        // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                 KC_LGUI,            KC_SPC,             MO(2),             MO(3),             KC_P0,
-                                                                                                     KC_DEL,           KC_BSPC,           KC_BSPC
-        //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-        ),
-      
-        [LAYER_LOWER] = LAYOUT(
-        // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                         KC_ESC,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LPRN,           KC_RPRN,           KC_QUOT,           KC_PPLS,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        KC_LSFT,           XXXXXXX,           XXXXXXX,           XXXXXXX,            KC_ESC,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,        S(KC_QUOT),           KC_PEQL,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        KC_LCTL,           XXXXXXX,        LCAG(KC_X),        LCAG(KC_C),         LSG(KC_V),           XXXXXXX,              XXXXXXX,           XXXXXXX,        S(KC_LBRC),        S(KC_RBRC),           XXXXXXX,           KC_RALT,
-        // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                 KC_LGUI,            KC_SPC,           XXXXXXX,             MO(3),           XXXXXXX,
-                                                                                                     KC_DEL,           KC_BSPC,           KC_BSPC
-        //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-        ),
-      
-        [LAYER_RAISE] = LAYOUT(
-        // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                    LAG(KC_ESC),           XXXXXXX,           XXXXXXX,        LCAG(KC_V),           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-               MT(MOD_LSFT,KC_CAPS),        LSG(KC_Z),          XXXXXXX,          G(KC_C),          XXXXXXX,           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           XXXXXXX,        CARET_MODE,
-        // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                 KC_LGUI,            KC_SPC,           XXXXXXX,           KC_LALT,            KC_ENT,
-                                                                                                     KC_DEL,           KC_BSPC,           KC_BSPC
-        //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-        ),
-      
-        [LAYER_POINTER] = LAYOUT(
-        // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                        _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,        KC_MS_BTN3,   DRG_TOG_ON_HOLD,           SNP_TOG,           _______,
-        // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                        _______,           _______,           _______,           _______,           _______,           _______,              VOLMODE,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           _______,        CARET_MODE,
-        // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                 KC_LGUI,            KC_SPC,             MO(2),             MO(3),            KC_ENT,
-                                                                                                     KC_DEL,           KC_BSPC,           KC_BSPC
-        //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-        ),
+  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+                  QK_GESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,                 KC_6,              KC_7,              KC_8,              KC_9,              KC_0,           KC_MINS,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                   KC_TAB,              KC_Q,              KC_W,              KC_E,              KC_R,              KC_T,                 KC_Y,              KC_U,              KC_I,              KC_O,              KC_P,           KC_BSLS,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+         MT(MOD_LSFT,KC_CAPS),             KC_A,             KC_S,             KC_D,       LT(3,KC_F),              KC_G,                 KC_H,        LT(2,KC_J),              KC_K,              KC_L,           KC_SCLN,           KC_QUOT,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  KC_LCTL,        LT(1,KC_Z),              KC_X,              KC_C,              KC_V,        LT(1,KC_B),                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(3,KC_SLSH),           KC_RALT,
+  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                           KC_LGUI,            KC_SPC,             MO(2),             MO(3),            KC_ENT,
+                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
+  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
+    ),
+
+    [LAYER_NUM] = LAYOUT(
+  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P7,             KC_P8,             KC_P9,           XXXXXXX,           KC_PPLS,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,             MO(3),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
+  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                           KC_LGUI,            KC_SPC,             MO(2),             MO(3),             KC_P0,
+                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
+  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
+    ),
+
+    [LAYER_LOWER] = LAYOUT(
+  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+                   KC_ESC,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LPRN,           KC_RPRN,           KC_QUOT,           KC_PPLS,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  KC_LSFT,           XXXXXXX,           XXXXXXX,           XXXXXXX,            KC_ESC,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,        S(KC_QUOT),           KC_PEQL,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  KC_LCTL,           XXXXXXX,        LCAG(KC_X),        LCAG(KC_C),         LSG(KC_V),           XXXXXXX,              XXXXXXX,           XXXXXXX,        S(KC_LBRC),        S(KC_RBRC),           XXXXXXX,           KC_RALT,
+  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                           KC_LGUI,            KC_SPC,           XXXXXXX,             MO(3),           XXXXXXX,
+                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
+  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
+    ),
+
+    [LAYER_RAISE] = LAYOUT(
+  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+              LAG(KC_ESC),           XXXXXXX,           XXXXXXX,        LCAG(KC_V),           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+         MT(MOD_LSFT,KC_CAPS),        LSG(KC_Z),          XXXXXXX,          G(KC_C),          XXXXXXX,           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           XXXXXXX,        ARROW_MODE,
+  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                           KC_LGUI,            KC_SPC,           XXXXXXX,           KC_LALT,            KC_ENT,
+                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
+  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
+    ),
+
+    [LAYER_POINTER] = LAYOUT(
+  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  _______,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,           _______,        KC_MS_BTN3,   DRG_TOG_ON_HOLD,           SNP_TOG,           _______,
+  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+                  _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           _______,        ARROW_MODE,
+  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                           KC_LGUI,            KC_SPC,             MO(2),             MO(3),            KC_ENT,
+                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
+  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
+    ),
     // clang-format on
 };
 
-// ─── Key Interaction Stuff ──────────────────────────────────────────────────
-static uint16_t tap_hold_timer;
-static uint16_t tap_hold_elapsed_time;
+// ─── Custom Tap / Hold / Longer-Hold System ─────────────────────────────────
+//
+// This keymap does NOT use QMK's built-in mod-tap for the number row and
+// punctuation.  Instead, it implements its own three-tier timing system:
+//
+//   Tap   (< 150ms):  Send the plain key.          e.g. "1"
+//   Hold  (150–400ms): Send the shifted variant.    e.g. "!" (Shift+1)
+//   Longer hold (> 400ms): Send a third action.     e.g. GUI+Arrow
+//
+// This means key-down does NOT immediately register — the character is only
+// sent on key-up, after measuring how long the key was held.
+//
+// The thresholds are defined in config.h:
+//   CUSTOM_TAP_HOLD_TERM      = 150ms
+//   CUSTOM_LONGER_HOLD_TERM   = 400ms
 
-static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
+static uint16_t tap_hold_timer;
+
+// Send the hold variant (triggered at 150–400ms hold).
+// Maps each key to its shifted symbol.
+static void send_hold_variant(uint16_t keycode) {
     switch (keycode) {
-        // Number row
+        // Number row → shifted symbols
         case KC_1:
             tap_code16(KC_EXLM);
             break; // !
@@ -152,7 +244,7 @@ static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
             tap_code16(KC_RPRN);
             break; // )
 
-        // Punctuation row
+        // Punctuation → shifted variants
         case KC_MINS:
             tap_code16(KC_UNDS);
             break; // _
@@ -171,8 +263,6 @@ static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
         case KC_GRV:
             tap_code16(KC_TILD);
             break; // ~
-
-        // Right-hand punctuation
         case KC_SCLN:
             tap_code16(KC_COLN);
             break; // :
@@ -186,52 +276,47 @@ static void send_hold_variant(uint16_t keycode) { // CUSTOM_TAP_HOLD_TERM
             tap_code16(KC_RABK);
             break; // >
 
-        // Arrow keys with Alt modifier
+        // Arrows → Alt+Arrow (word-jump on macOS)
         case KC_LEFT:
             tap_code16(A(KC_LEFT));
-            break; // Alt + Left Arrow
+            break;
         case KC_RIGHT:
             tap_code16(A(KC_RIGHT));
-            break; // Alt + Right Arrow
+            break;
 
+        // Enter → Shift+Enter (e.g. new line without send in chat apps)
         case KC_ENT:
             tap_code16(S(KC_ENT));
-            break; // Shift + Enter
+            break;
 
-        // Fallback: just send the original unshifted key if we forgot a mapping
         default:
             tap_code16(keycode);
             break;
     }
 }
 
-static void send_longer_hold_variant(uint16_t keycode) { // CUSTOM_LONGER_HOLD_TERM
+// Send the longer-hold variant (triggered at >400ms hold).
+// Only a few keys have a third tier; everything else falls back to hold variant.
+static void send_longer_hold_variant(uint16_t keycode) {
     switch (keycode) {
+        // Arrows → GUI+Arrow (line-jump on macOS: Home/End equivalent)
         case KC_LEFT:
             tap_code16(G(KC_LEFT));
-            break; //  GUI + Left Arrow
+            break;
         case KC_RIGHT:
             tap_code16(G(KC_RIGHT));
-            break; //  GUI + Right Arrow
+            break;
 
+        // All other keys: fall back to the normal hold variant.
         default:
             send_hold_variant(keycode);
             break;
     }
-
-    // Currently unused, but could be implemented for more complex behaviors.
 }
 
-// static void tap_custom_keycode(uint16_t kc) {
-//    keyrecord_t rec = {0};
-//
-//    rec.event.pressed = true;
-//    process_record_user(kc, &rec);
-//
-//    rec.event.pressed = false;
-//    process_record_user(kc, &rec);
-// }
-
+// Simulate a full press+release of a Charybdis firmware keycode (e.g.
+// DRAGSCROLL_MODE_TOGGLE).  Uses process_record_kb (not _user) to avoid
+// infinite recursion back into our own handler.
 static void tap_custom_bk_keycode(uint16_t kc) {
     keyrecord_t rec = {0};
 
@@ -242,31 +327,87 @@ static void tap_custom_bk_keycode(uint16_t kc) {
     process_record_kb(kc, &rec);
 }
 
+// ─── Key Event Processing ───────────────────────────────────────────────────
+//
+// QMK calls this function for every key press and release.  Returning false
+// tells QMK "I handled it, don't process further."  Returning true means
+// "pass it along to the next handler."
+//
+// The logic is organized in stages:
+//   1) Pointing device mode keys (press + release)
+//   2) Tap/hold/longer-hold keys (press + release)
+//   3) Early return for releases (everything below is press-only)
+//   4) Macros (press-only)
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // --- 1) Hold / Toggle Modes (react on press + release) ---
+    // --- 1) Pointing device mode keys (react on both press and release) ---
     switch (keycode) {
-        case VOLMODE:
-            volmode_active = record->event.pressed;
+        // VOLUME_MODE: Hold to activate volume mode (trackball Y → volume).
+        case VOLUME_MODE:
+            pd_mode_update(PD_MODE_VOLUME, record->event.pressed);
+
+            pd_state_sync();
             return false;
 
-        case CARET_MODE:
-            caret_active = record->event.pressed;
+        // BRIGHTNESS_MODE: Hold to activate brightness mode (trackball Y → screen brightness).
+        case BRIGHTNESS_MODE:
+            pd_mode_update(PD_MODE_BRIGHTNESS, record->event.pressed);
+
+            pd_state_sync();
             return false;
 
+        // ARROW_MODE: Hold to activate arrow mode (trackball → arrow keys).
+        case ARROW_MODE:
+            pd_mode_update(PD_MODE_ARROW, record->event.pressed);
+
+            pd_state_sync();
+            return false;
+
+        // DRAGSCROLL_MODE (Charybdis firmware keycode, not in our enum):
+        // Hold to scroll with trackball.  We intercept it here to add
+        // unlock behavior: if drag-scroll was already *toggled on* (locked),
+        // pressing and releasing the momentary key will unlock it instead.
+        case DRAGSCROLL_MODE: {
+            static bool dragscroll_was_locked = false;
+            if (record->event.pressed) {
+                // Remember if drag-scroll was already locked before this press.
+                dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
+                pd_mode_update(PD_MODE_DRAGSCROLL, true);
+                pd_state_sync();
+                return true; // let firmware also handle it (enables scroll)
+            } else {
+                if (dragscroll_was_locked) {
+                    // It was locked — turn off the toggle and clear mode flag.
+                    tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
+                    pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
+
+                    pd_state_sync();
+                    return false;
+                }
+                pd_mode_update(PD_MODE_DRAGSCROLL, false);
+
+                pd_state_sync();
+                return true; // let firmware handle release (disables scroll)
+            }
+        }
+
+        // DRG_TOG_ON_HOLD: Dual-purpose key for the auto-mouse layer.
+        //   Tap  → sends whatever key is at this position on LAYER_BASE.
+        //   Hold → toggles drag-scroll lock on/off.
         case DRG_TOG_ON_HOLD:
             if (record->event.pressed) {
-                // key down: start timer, don't send anything yet
                 tap_hold_timer = timer_read();
             } else {
-                // key up: decide tap vs hold
-                tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
+                uint16_t tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
 
                 if (tap_hold_elapsed_time > CUSTOM_TAP_HOLD_TERM) {
-                    // HOLD: behave as if DRAGSCROLL_MODE_TOGGLE was pressed
+                    // HOLD: toggle drag-scroll lock
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
+                    pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
 
+                    pd_state_sync();
                 } else {
-                    // TAP: send whatever is on BASE at this position
+                    // TAP: look up and send the base-layer key at this matrix position
                     uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
                     tap_code16(fallback_key);
                 }
@@ -274,7 +415,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 
-    // --- 2) Tap/Hold/Longer Hold Keys (react on press + release) ---
+    // --- 2) Custom tap/hold/longer-hold keys (react on both press and release) ---
+    // These keys don't register on key-down.  Instead we start a timer, and
+    // on key-up we decide what to send based on how long the key was held.
     switch (keycode) {
         case KC_1:
         case KC_2:
@@ -300,38 +443,36 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case KC_RIGHT:
         case KC_ENT:
             if (record->event.pressed) {
-                // key down: start timer, don't send anything yet
                 tap_hold_timer = timer_read();
             } else {
-                // key up: decide tap vs hold
-                tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
+                uint16_t tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
 
                 if (tap_hold_elapsed_time < CUSTOM_TAP_HOLD_TERM) {
-                    // TAP: send normal version (1, 2, -, =, etc.)
+                    // TAP: send the plain key (1, 2, -, etc.)
                     tap_code16(keycode);
                 } else if (tap_hold_elapsed_time > CUSTOM_LONGER_HOLD_TERM) {
-                    // LONGER HOLD: send longer-hold variant (GUI + Arrow, etc.)
+                    // LONGER HOLD: third-tier action (GUI+Arrow for navigation)
                     send_longer_hold_variant(keycode);
                 } else {
-                    // HOLD: send hold variant (Shifted symbol, Alt + Arrow, etc.)
+                    // HOLD: shifted variant (!, @, _, etc.)
                     send_hold_variant(keycode);
                 }
             }
             return false;
     }
 
-    // --- 3) Ignore releases for everything else ---
+    // --- 3) Everything below is press-only — let releases pass through. ---
     if (!record->event.pressed) {
         return true;
     }
 
-    // --- 4) Macros (press-only) ---
+    // --- 4) Macros (fire once on key-down, using SEND_STRING for combos) ---
     switch (keycode) {
-        case MACRO_0: // Spotlight: GUI + Space
+        case MACRO_0: // Spotlight search (macOS): GUI + Space
             SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
             return false;
 
-        case MACRO_1: // ChatGPT: Alt + Space
+        case MACRO_1: // Claude: Alt + Space
             SEND_STRING(SS_LALT(SS_TAP(X_SPACE)));
             return false;
 
@@ -339,15 +480,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_SPACE))));
             return false;
 
-        case MACRO_3: // OCR copy on macOS: Ctrl + Alt + GUI + C
+        case MACRO_3: // OCR text copy (macOS): Ctrl + Alt + GUI + C
             SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("c"))));
             return false;
 
-        case MACRO_4: // Screenshot on macOS: Ctrl + Alt + GUI + X
+        case MACRO_4: // Screenshot (macOS): Ctrl + Alt + GUI + X
             SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("x"))));
             return false;
 
-        case MACRO_5: // Emoji picker: Ctrl + GUI + Space
+        case MACRO_5: // Emoji picker (macOS): Ctrl + GUI + Space
             SEND_STRING(SS_LCTL(SS_LGUI(SS_TAP(X_SPACE))));
             return false;
     }
@@ -355,83 +496,132 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 
-// ─── Pointing Device Stuff ──────────────────────────────────────────────────
+// ─── Pointing Device Integration ────────────────────────────────────────────
+//
+// The Charybdis has a trackball on the right half.  QMK's pointing
+// device subsystem calls these hooks to let us customize behavior.
+//
+// Key features:
+//   - Auto-mouse: LAYER_POINTER activates when the trackball moves and
+//     deactivates after AUTO_MOUSE_TIME (1200ms) of no movement.
+//   - Sniping: Automatically enabled on LAYER_RAISE for precision work
+//     (lower DPI while that layer is active).
+//   - Mode interception: Volume, Brightness, and Arrow modes intercept
+//     trackball reports before they reach the OS (see pointing_device_modes.h).
 #ifdef POINTING_DEVICE_ENABLE
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 void pointing_device_init_user(void) {
-    set_auto_mouse_layer(LAYER_POINTER); // set default pointer layer
-    set_auto_mouse_enable(true);         // enable Auto Mouse by default
-    automouse_rgb_post_init();           // initialize Auto Mouse RGB for slave side
+    set_auto_mouse_layer(LAYER_POINTER);
+    set_auto_mouse_enable(true);
+    split_sync_init(); // register split RPC handler for state sync
 }
-#    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
-
+// Tell QMK which custom keycodes count as "mouse activity" so that pressing
+// them keeps the auto-mouse layer alive (prevents it from timing out while
+// you're actively using trackball features).
 bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
+        // Charybdis firmware keycodes
         case SNIPING_MODE:
         case SNIPING_MODE_TOGGLE:
         case DRAGSCROLL_MODE:
         case DRAGSCROLL_MODE_TOGGLE:
-        case DRG_TOG_ON_HOLD:
-        case CARET_MODE:
-        case VOLMODE:
         case DPI_MOD:
         case DPI_RMOD:
         case S_D_MOD:
         case S_D_RMOD:
+        // Custom keycodes (from our enum)
+        case DRG_TOG_ON_HOLD:
+        case ARROW_MODE:
+        case BRIGHTNESS_MODE:
+        case VOLUME_MODE:
             return true;
     }
     return false;
 }
+#    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
-report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
-    // Volume mode (held custom key)
-    if (volmode_active) {
-        return handle_volume_mode(mouse_report);
+// Called every scan cycle with the trackball's motion report.
+// If a pointing device mode is active, we intercept the report and convert
+// it to keypresses (volume/brightness/arrow); otherwise we pass it through unchanged.
+// .time_critical places this in RAM, bypassing the RP2040's 16KB XIP flash
+// cache.  Without this, cache aliasing from the rest of the binary causes
+// stalls that produce cursor jumps.  See rules.mk for full explanation.
+__attribute__((section(".time_critical.pointing_device_task_user"))) report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (!pd_mode_active(pd_mode_priority[i])) continue;
+        switch (pd_mode_priority[i]) {
+            case PD_MODE_VOLUME:
+                return handle_volume_mode(mouse_report);
+            case PD_MODE_BRIGHTNESS:
+                return handle_brightness_mode(mouse_report);
+            case PD_MODE_ARROW:
+                return handle_arrow_mode(mouse_report);
+            default:
+                break; // PD_MODE_DRAGSCROLL: handled by charybdis firmware
+        }
     }
-    // Caret mode (held custom key)
-    else if (caret_active) {
-        return handle_caret_mode(mouse_report);
-    }
-    // Default: pass through unchanged
-    else {
-        return mouse_report;
-    }
+    return mouse_report;
 }
 
+// Called whenever the active layer set changes.
+// We use this to:
+//   1. Prevent the auto-mouse pointer layer from stacking on top of other
+//      active layers (which would cause flickering / stuck states).
+//   2. Enable sniping (lower DPI) automatically on LAYER_RAISE.
+//   3. Disable auto-mouse while LAYER_RAISE is active, because sniping
+//      and auto-mouse fight over pointer behavior.
 layer_state_t layer_state_set_user(layer_state_t state) {
+    // Enable sniping (lower DPI) automatically on LAYER_RAISE.
+    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
+
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    // If auto-mouse pointer layer overlaps with another active layer, drop
-    // pointer in the same update to avoid transient base hops and sticky states.
+    // If the pointer layer is on AND any other layer is explicitly active,
+    // strip the pointer layer to avoid conflicts.  Only do this if
+    // the user hasn't manually toggled auto-mouse, and no mouse key is held.
     if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0) {
         state &= ~((layer_state_t)1 << LAYER_POINTER);
     }
-#    endif
 
-    // Automatically enable sniping-mode on the chosen layer.
-    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
+    // Disable auto-mouse while LAYER_RAISE is active, because sniping
+    // and auto-mouse fight over pointer behavior.
+    set_auto_mouse_enable(!layer_state_cmp(state, LAYER_RAISE));
+#    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
-    // Manage Auto Mouse enabling/disabling based on layer to avoid conflicts with sniping
-    uint8_t layer = get_highest_layer(state);
-
-    switch (layer) {
-        case LAYER_RAISE:
-            set_auto_mouse_enable(false); // disable Auto Mouse when in sniping layer
-            break;
-
-        default:
-            set_auto_mouse_enable(true); // enable it again
-            break;
-    }
     return state;
 }
 
 #endif // POINTING_DEVICE_ENABLE
 
-// ─── RGB Stuff ──────────────────────────────────────────────────────────────
 #ifdef RGB_MATRIX_ENABLE
 
-// ─── LEDs index ─────────────────────────────────────────────────────────────
+// ─── RGB Matrix Layer Indicators ────────────────────────────────────────────
+//
+// Each layer gets a distinct LED color so you always know which layer is
+// active at a glance.  Pointing device modes overlay a color on the right
+// half (the trackball side) so you can tell which mode the trackball is in.
+//
+// Color scheme:
+//   LAYER_POINTER → animated white-to-red gradient (auto-mouse countdown)
+//   LAYER_NUM     → green
+//   LAYER_LOWER   → blue
+//   LAYER_RAISE   → purple
+//
+// Mode overlays (right half only, highest priority first):
+//   Drag scroll   → orange
+//   Volume        → yellow
+//   Brightness    → magenta
+//   Arrow         → cyan
+//
+// LAYER_BASE has no custom indicator — it uses the default RGB matrix effect.
+//
+// See rgb_helpers.h for the full split-safe helper API (rgb_set_both_halves,
+// rgb_set_right_half, rgb_set_led_group, etc.).
+
+// ─── LED Index Map ──────────────────────────────────────────────────────────
+//
+// Physical LED positions for reference when targeting specific LEDs.
+// Numbers are the LED index passed to rgb_matrix_set_color().
 //
 // ╭────────────────────────╮                 ╭────────────────────────╮
 //    0   7   8  15  16  20                     49  45  44  37  36  29
@@ -446,89 +636,92 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 //                           25  24     55  XX
 //                     ╰────────────╯ ╰────────────╯
 //
-// 0–28  → left half
-// 29–55 → right half
-//
-// ────────────────────────────────────────────────────────────────────────────
+// 0–28  → left half (29 LEDs)
+// 29–57 → right half (29 LEDs, 2 are dummy/unused on pointer side)
 
+// LED groups for future per-key highlights (e.g. lighting up modifier keys on specific layers).
 static const uint8_t layer_raise_mods[] = {33, 18};
 static const uint8_t layer_lower_mods[] = {4, 47};
 
-// ─── RGB HELPER SUMMARY ─────────────────────────────────────────────────────
-// All helpers below must be called *inside*
-// rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max)
-// because they use led_min/led_max for split-safe operation.
-//
-// rgb_set_led_color(i, led_min, led_max, color)
-//     → Color a single LED by global index.
-//       Only affects this half’s LED range.
-//
-// rgb_set_led_group(list, count, led_min, led_max, color)
-//     → Color a list of non-contiguous LED indices.
-//
-// rgb_fill_led_range(from, to, led_min, led_max, color)
-//     → Color a continuous range [from, to), clamped to this half.
-//
-// rgb_set_left_half(color, led_min, led_max)
-//     → Color the entire left half.
-//       Only does work when running on the left half (led_min == 0).
-//
-// rgb_set_right_half(color, led_min, led_max)
-//     → Color the entire right half.
-//       Only does work when running on the right half (led_min > 0).
-//
-// rgb_set_both_halves(color, led_min, led_max)
-//     → Color all LEDs on *this* half only.
-//
-// Typical color usage:
-//
-//     rgb_t color = hsv_to_rgb((hsv_t){.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS});
-//
-// Example group usage:
-//
-//     rgb_set_led_group(layer_raise_mods,
-//                   sizeof(layer_raise_mods),
-//                   led_min, led_max,
-//                   hsv_to_rgb((hsv_t){ .h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS }));
-// ────────────────────────────────────────────────────────────────────────────
+// Auto-mouse gradient: starts white, fades to red as the timeout approaches.
+// White is capped at v=150 (not MAX_BRIGHTNESS) to limit current draw — all LEDs
+// lit white at full brightness exceeds the USB power budget.
+static const hsv_t automouse_color_start = {.h = 0, .s = 0, .v = 150};                             // white
+static const hsv_t automouse_color_end   = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // red
 
-// ─── RGB Matrix per-layer indicators ────────────────────────────────────────
+// Layer indicator colors (defined as HSV, converted to RGB once on first render).
+static const hsv_t layer_lower_hsv = {.h = 169, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // blue
+static const hsv_t layer_raise_hsv = {.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // purple
+static const hsv_t layer_num_hsv   = {.h = 85, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // green
 
-// Auto-mouse gradient colors (start -> end) and locked indicator.
-static const hsv_t automouse_color_start  = {.h = 0, .s = 0, .v = 150};                              // white
-static const hsv_t automouse_color_end    = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // red
-static const hsv_t automouse_color_locked = {.h = 21, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // orange
+// Pointing device mode overlay colors.
+static const hsv_t mode_dragscroll_hsv = {.h = 21, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // orange
+static const hsv_t mode_volume_hsv     = {.h = 43, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // yellow
+static const hsv_t mode_brightness_hsv = {.h = 213, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // magenta
+static const hsv_t mode_arrow_hsv      = {.h = 127, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // cyan
 
-// Layer colors that will be clamped to maximum brightness at render time.
-static const hsv_t layer_lower_color = {.h = 169, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // purple
-static const hsv_t layer_raise_color = {.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // blue
-static const hsv_t layer_num_color   = {.h = 85, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // green
+// Pre-computed RGB cache.  hsv_to_rgb() is called once at init instead of
+// every frame (~30fps × 2 chunks = ~60 calls/sec saved).
+static rgb_t layer_lower_rgb, layer_raise_rgb, layer_num_rgb;
+// Mode overlay colors, indexed to match pd_mode_priority[].
+static rgb_t pd_mode_rgb[PD_MODE_COUNT];
+static bool  rgb_colors_init = false;
 
-bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    uint8_t top = get_highest_layer(layer_state | default_layer_state);
-
-    if (top != LAYER_POINTER && top != LAYER_LOWER && top != LAYER_RAISE && top != LAYER_NUM) {
-        return false;
+// QMK calls this in batches (led_min to led_max) — potentially multiple
+// times per frame, once per "chunk" of LEDs.  On a split keyboard, each
+// half only processes its own LEDs.
+// .time_critical places this in RAM to avoid XIP cache evictions that
+// disrupt the pointing device hot path.  See rules.mk for full explanation.
+__attribute__((section(".time_critical.rgb_matrix_indicators"))) bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+    // One-time initialization: convert all HSV colors to RGB.
+    if (!rgb_colors_init) {
+        layer_lower_rgb = hsv_to_rgb(layer_lower_hsv);
+        layer_raise_rgb = hsv_to_rgb(layer_raise_hsv);
+        layer_num_rgb   = hsv_to_rgb(layer_num_hsv);
+        // Mode overlay colors, indexed to match pd_mode_priority[]:
+        // [0] dragscroll, [1] volume, [2] brightness, [3] arrow
+        pd_mode_rgb[0]  = hsv_to_rgb(mode_dragscroll_hsv);
+        pd_mode_rgb[1]  = hsv_to_rgb(mode_volume_hsv);
+        pd_mode_rgb[2]  = hsv_to_rgb(mode_brightness_hsv);
+        pd_mode_rgb[3]  = hsv_to_rgb(mode_arrow_hsv);
+        rgb_colors_init = true;
     }
 
-    switch (top) {
-        case LAYER_POINTER: {
-            if (automouse_rgb_render(top, led_min, led_max, automouse_color_start, automouse_color_end, automouse_color_locked)) {
-                break;
-            }
-        } break;
+    uint8_t active_layer = get_highest_layer(layer_state | default_layer_state);
 
-        case LAYER_NUM: {
-            rgb_set_both_halves(hsv_to_rgb(layer_num_color), led_min, led_max);
-        } break;
+    // Paint all LEDs with the active layer's color.
+    // On LAYER_BASE (default), don't override — let the default RGB effect play.
+    switch (active_layer) {
+        case LAYER_POINTER:
+            // Animated gradient: white → red over the auto-mouse countdown.
+            // Also syncs elapsed time + mode flags to slave (single timer read).
+            automouse_rgb_render(led_min, led_max, automouse_color_start, automouse_color_end);
+            break;
 
-        case LAYER_LOWER: {
-            rgb_set_both_halves(hsv_to_rgb(layer_lower_color), led_min, led_max);
-        } break;
+        case LAYER_NUM:
+            rgb_set_both_halves(layer_num_rgb, led_min, led_max);
+            break;
 
-        case LAYER_RAISE: {
-            rgb_set_both_halves(hsv_to_rgb(layer_raise_color), led_min, led_max);
-        } break;
+        case LAYER_LOWER:
+            rgb_set_both_halves(layer_lower_rgb, led_min, led_max);
+            break;
+
+        case LAYER_RAISE:
+            rgb_set_both_halves(layer_raise_rgb, led_min, led_max);
+            break;
+
+        default:
+            return false;
+    }
+
+    // If a pointing device mode is active, override the right half with the
+    // mode's color.  This provides instant visual feedback for which mode
+    // the trackball is in.  Priority order comes from pd_mode_priority[].
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_mode_active(pd_mode_priority[i])) {
+            rgb_set_right_half(pd_mode_rgb[i], led_min, led_max);
+            break;
+        }
     }
 
     return true;
