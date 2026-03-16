@@ -132,22 +132,17 @@
 #    define MOUSE_EXTENDED_REPORT
 #    define WHEEL_EXTENDED_REPORT
 
-// High-resolution scrolling: multiplier controls how many hi-res scroll
-// units are sent per trackball tick.  120x matches most OS expectations
-// for smooth scrolling.
 #    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
 
 // ─── Drag-scroll tuning ────────────────────────────────────────────────────
-// Drag-scroll converts trackball motion into scroll events.
 
-#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y     // Invert Y so "push forward = scroll up" (natural scroll)
-#    define CHARYBDIS_DRAGSCROLL_DPI 100       // Very low DPI for smooth, precise scrolling
-#    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0 // No motion buffering (immediate response)
-#    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8   // Min ms between scroll events (≈125 Hz)
-#    define CHARYBDIS_SCROLL_SNAP_RATIO 3      // Axis lock: dominant axis must be 3x the other to snap
-#    define CHARYBDIS_SCROLL_STEP_DIVISOR 10   // Divide raw motion by 10 for scroll step size
-#    define CHARYBDIS_SCROLL_MAX_STEP 1        // Cap at 1 scroll step per event for precision
+#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y       // "push forward = scroll up"
+#    define CHARYBDIS_DRAGSCROLL_DPI 100         // Raw sensitivity (1 inch ≈ 1.7 notches at 120x)
+#    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0   // No dead zone
+#    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8     // ≈125 Hz emit rate
+#    define CHARYBDIS_SCROLL_SNAP_RATIO 3        // Axis lock ratio
+#    define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 80 // Kill ghost scroll after 80ms idle
 
 #endif // POINTING_DEVICE_ENABLE
 
