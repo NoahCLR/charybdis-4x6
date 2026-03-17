@@ -72,8 +72,14 @@ QMK calls `process_record_user()` for every key press and release. The function 
 ```mermaid
 flowchart TD
     A[Key press/release event] --> B{Stage 1: Mode key?}
-    B -- "VOLUME / BRIGHTNESS / ARROW" --> C[Update pd_mode_flags]
-    C --> D[Sync state to slave]
+    B -- "VOLUME / BRIGHTNESS / ZOOM / ARROW" --> C{Press or release?}
+    C -- Press --> C1[Start timer + activate mode]
+    C -- Release --> C2{Held < 150ms?}
+    C2 -- Yes --> C3[Deactivate mode + send base-layer key]
+    C2 -- No --> C4[Deactivate mode]
+    C1 --> D[Sync state to slave]
+    C3 --> D
+    C4 --> D
     D --> STOP([return false])
 
     B -- "DRAGSCROLL" --> E{Already toggled on?}
@@ -116,6 +122,8 @@ flowchart TD
     (Y-axis → volume up/down)"]
     C -- "Brightness active" --> F["handle_brightness_mode
     (Y-axis → brightness up/down)"]
+    C -- "Zoom active" --> Z["handle_zoom_mode
+    (Y-axis → GUI+Plus/Minus)"]
     C -- "Arrow active" --> G["handle_arrow_mode
     (dominant axis → arrow key)"]
     C -- "No mode active" --> H["Pass through unchanged
@@ -124,10 +132,11 @@ flowchart TD
     style D fill:#f90,color:#000
     style E fill:#ff0,color:#000
     style F fill:#f0f,color:#000
+    style Z fill:#7f0,color:#000
     style G fill:#0ff,color:#000
 ```
 
-> **Priority:** If multiple modes are held simultaneously, only the highest-priority one runs. The priority order is defined once in `pd_mode_priority[]`: dragscroll > volume > brightness > arrow.
+> **Priority:** If multiple modes are held simultaneously, only the highest-priority one runs. The priority order is defined once in `pd_mode_priority[]`: dragscroll > volume > brightness > zoom > arrow.
 
 ## RGB Rendering
 

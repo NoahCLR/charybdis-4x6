@@ -26,8 +26,16 @@
 // The Charybdis 4x6 is a split keyboard — each half has its own MCU.
 // By default, only keystrokes are sent between halves.  These options
 // enable syncing additional state so both halves stay consistent.
-
+//
 #ifdef SPLIT_KEYBOARD
+
+// The default split serial timeout (20ms) is far too long for a keyboard
+// with a trackball — a single failed transaction blocks the main loop for
+// 20ms, causing the sensor to accumulate motion into a huge cursor jump.
+// At 230400 baud a full transaction completes in <1ms; 5ms is generous
+// headroom while keeping worst-case stalls well below perceptible.
+#    undef SERIAL_USART_TIMEOUT
+#    define SERIAL_USART_TIMEOUT 5
 
 // Sync the active layer set to the slave half so it can show the correct
 // RGB layer indicator colors.
@@ -132,9 +140,6 @@
 #    define MOUSE_EXTENDED_REPORT
 #    define WHEEL_EXTENDED_REPORT
 
-// High-resolution scrolling: multiplier controls how many hi-res scroll
-// units are sent per trackball tick.  120x matches most OS expectations
-// for smooth scrolling.
 #    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
 

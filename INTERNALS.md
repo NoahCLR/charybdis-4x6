@@ -16,23 +16,24 @@ This keymap depends on [NoahCLR/bastardkb-qmk](https://github.com/NoahCLR/bastar
 - Added `auto_mouse_get_time_elapsed()` — exposes how long ago the auto-mouse layer was activated, used by the keymap to render the countdown gradient on the LEDs
 - Not available in stock QMK
 
-## RP2040 XIP Cache Aliasing
+## Split Serial Timeout (`SERIAL_USART_TIMEOUT`)
 
-The RP2040 has a 16KB direct-mapped XIP (execute-in-place) flash cache. Each physical flash address maps to exactly one cache line with no associativity. When the firmware binary is large enough, two frequently-called functions can alias to the same cache line, causing pipeline stalls.
+QMK's split serial transport defaults to a 20ms receive timeout (`SERIAL_USART_TIMEOUT`). Each scan cycle runs ~15+ transactions (matrix, timer sync, layer state, activity, RGB, pointing, mods, custom RPC, etc.). When any single transaction fails — due to noise, half-duplex collisions, or timing — the master blocks for the full 20ms timeout.
 
-This matters because the pointing device pipeline runs at ~1000Hz. Cache misses in this path produce visible cursor jumps during fast trackball movement.
+This is imperceptible for keypresses, but devastating for a trackball. The PMW33xx sensor accumulates motion during the stall, and when the next successful read finally happens, the firmware receives a huge delta, producing a visible cursor jump.
 
-### The three-part fix (all three are required)
+The fix is one line in `config.h`:
 
-1. **LTO (`LTO_ENABLE = yes` in `rules.mk`)** — Link-time optimization reduces the binary by ~19KB and reshuffles code layout, reducing the chance of cache aliasing.
+```c
+#define SERIAL_USART_TIMEOUT 5
+```
 
-2. **`__attribute__((noinline))`** — Applied to mode handler functions in `pointing_device_modes.h` and sync functions in `split_sync.h`. Prevents the compiler from inlining small functions into the hot path, which would change code layout and reintroduce aliasing.
+At 230400 baud, a successful transaction completes in <1ms. A 5ms timeout gives generous headroom while limiting worst-case stalls to well below the cursor-jump threshold. The default 20ms is only needed for unreliable connections (long cables, noisy environments).
 
-3. **`.time_critical` sections** — Places the two hottest callbacks in RAM, bypassing the XIP cache entirely:
-   - `pointing_device_task_user()` in `keymap.c`
-   - `rgb_matrix_indicators_advanced_user()` in `keymap.c`
 
-Removing any one of these three can reintroduce cursor jumps.
+### LTO
+
+`LTO_ENABLE = yes` in `rules.mk` — Link-time optimization reduces the binary size.
 
 ## Split Sync Protocol
 

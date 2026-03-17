@@ -55,7 +55,7 @@ static bool  automouse_cache_valid = false;
 //
 // The gradient interpolates linearly from `start` to `end` based on how
 // much of the auto-mouse timeout has elapsed.
-__attribute__((noinline)) static bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end) {
+static bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end) {
     // Read elapsed once and reuse for both sync and rendering.
     // Master reads the timer directly; slave uses the synced value.
     uint16_t elapsed;

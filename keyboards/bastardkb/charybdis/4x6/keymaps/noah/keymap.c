@@ -15,7 +15,8 @@
 //   pointing_device_modes.h
 //     Bitfield-based mode system that changes what the trackball does.
 //     Modes: Volume (Y-axis → volume), Brightness (Y-axis → brightness),
-//     Arrow (motion → arrow keys), Dragscroll (firmware-native scroll mode).
+//     Zoom (Y-axis → GUI+Plus/Minus), Arrow (motion → arrow keys),
+//     Dragscroll (firmware-native scroll mode).
 //
 //   split_sync.h
 //     Syncs pointing-device state (mode flags + auto-mouse elapsed time)
@@ -62,7 +63,7 @@
 // collide with any built-in QMK or Charybdis keycodes.
 //
 // MACRO_0–15 are generic macro slots (some used, rest reserved for VIA).
-// VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE activate pointing device modes while held.
+// VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE activate pointing device modes while held.
 // DRG_TOG_ON_HOLD is a dual-purpose key: tap sends the base-layer key at
 // that position, hold toggles drag-scroll lock.
 enum custom_keycodes {
@@ -85,6 +86,7 @@ enum custom_keycodes {
     VOLUME_MODE,
     BRIGHTNESS_MODE,
     ARROW_MODE,
+    ZOOM_MODE,
     DRG_TOG_ON_HOLD,
 };
 
@@ -179,7 +181,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,           _______,        KC_MS_BTN3,   DRG_TOG_ON_HOLD,           SNP_TOG,           _______,
+                  KC_LSFT,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,         ZOOM_MODE,        KC_MS_BTN3,   DRG_TOG_ON_HOLD,           SNP_TOG,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,        KC_MS_BTN1,        KC_MS_BTN2,           DRGSCRL,           _______,        ARROW_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -342,26 +344,30 @@ static void tap_custom_bk_keycode(uint16_t kc) {
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 1) Pointing device mode keys (react on both press and release) ---
     switch (keycode) {
-        // VOLUME_MODE: Hold to activate volume mode (trackball Y → volume).
+        // VOLUME_MODE / BRIGHTNESS_MODE / ZOOM_MODE / ARROW_MODE:
+        // Dual-purpose keys: tap sends the base-layer key at this position,
+        // hold activates the trackball mode.  The mode activates immediately
+        // on press so it's ready if you move the trackball; if released
+        // quickly (< CUSTOM_TAP_HOLD_TERM), the mode is cancelled and the
+        // base-layer key is sent instead.
         case VOLUME_MODE:
-            pd_mode_update(PD_MODE_VOLUME, record->event.pressed);
-
-            pd_state_sync();
-            return false;
-
-        // BRIGHTNESS_MODE: Hold to activate brightness mode (trackball Y → screen brightness).
         case BRIGHTNESS_MODE:
-            pd_mode_update(PD_MODE_BRIGHTNESS, record->event.pressed);
-
+        case ZOOM_MODE:
+        case ARROW_MODE: {
+            uint8_t mode = (keycode == VOLUME_MODE) ? PD_MODE_VOLUME : (keycode == BRIGHTNESS_MODE) ? PD_MODE_BRIGHTNESS : (keycode == ZOOM_MODE) ? PD_MODE_ZOOM : PD_MODE_ARROW;
+            if (record->event.pressed) {
+                tap_hold_timer = timer_read();
+                pd_mode_update(mode, true);
+            } else {
+                pd_mode_update(mode, false);
+                if (timer_elapsed(tap_hold_timer) < CUSTOM_TAP_HOLD_TERM) {
+                    uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
+                    tap_code16(fallback_key);
+                }
+            }
             pd_state_sync();
             return false;
-
-        // ARROW_MODE: Hold to activate arrow mode (trackball → arrow keys).
-        case ARROW_MODE:
-            pd_mode_update(PD_MODE_ARROW, record->event.pressed);
-
-            pd_state_sync();
-            return false;
+        }
 
         // DRAGSCROLL_MODE (Charybdis firmware keycode, not in our enum):
         // Hold to scroll with trackball.  We intercept it here to add
@@ -506,7 +512,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 //     deactivates after AUTO_MOUSE_TIME (1200ms) of no movement.
 //   - Sniping: Automatically enabled on LAYER_RAISE for precision work
 //     (lower DPI while that layer is active).
-//   - Mode interception: Volume, Brightness, and Arrow modes intercept
+//   - Mode interception: Volume, Brightness, Zoom, and Arrow modes intercept
 //     trackball reports before they reach the OS (see pointing_device_modes.h).
 #ifdef POINTING_DEVICE_ENABLE
 
@@ -533,6 +539,7 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
         // Custom keycodes (from our enum)
         case DRG_TOG_ON_HOLD:
         case ARROW_MODE:
+        case ZOOM_MODE:
         case BRIGHTNESS_MODE:
         case VOLUME_MODE:
             return true;
@@ -542,12 +549,7 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
 // Called every scan cycle with the trackball's motion report.
-// If a pointing device mode is active, we intercept the report and convert
-// it to keypresses (volume/brightness/arrow); otherwise we pass it through unchanged.
-// .time_critical places this in RAM, bypassing the RP2040's 16KB XIP flash
-// cache.  Without this, cache aliasing from the rest of the binary causes
-// stalls that produce cursor jumps.  See rules.mk for full explanation.
-__attribute__((section(".time_critical.pointing_device_task_user"))) report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (!pd_mode_active(pd_mode_priority[i])) continue;
         switch (pd_mode_priority[i]) {
@@ -555,6 +557,8 @@ __attribute__((section(".time_critical.pointing_device_task_user"))) report_mous
                 return handle_volume_mode(mouse_report);
             case PD_MODE_BRIGHTNESS:
                 return handle_brightness_mode(mouse_report);
+            case PD_MODE_ZOOM:
+                return handle_zoom_mode(mouse_report);
             case PD_MODE_ARROW:
                 return handle_arrow_mode(mouse_report);
             default:
@@ -611,6 +615,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 //   Drag scroll   → orange
 //   Volume        → yellow
 //   Brightness    → magenta
+//   Zoom          → chartreuse/lime
 //   Arrow         → cyan
 //
 // LAYER_BASE has no custom indicator — it uses the default RGB matrix effect.
@@ -659,6 +664,7 @@ static const hsv_t mode_dragscroll_hsv = {.h = 21, .s = 255, .v = RGB_MATRIX_MAX
 static const hsv_t mode_volume_hsv     = {.h = 43, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // yellow
 static const hsv_t mode_brightness_hsv = {.h = 213, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // magenta
 static const hsv_t mode_arrow_hsv      = {.h = 127, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // cyan
+static const hsv_t mode_zoom_hsv       = {.h = 64, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // chartreuse/lime
 
 // Pre-computed RGB cache.  hsv_to_rgb() is called once at init instead of
 // every frame (~30fps × 2 chunks = ~60 calls/sec saved).
@@ -670,20 +676,19 @@ static bool  rgb_colors_init = false;
 // QMK calls this in batches (led_min to led_max) — potentially multiple
 // times per frame, once per "chunk" of LEDs.  On a split keyboard, each
 // half only processes its own LEDs.
-// .time_critical places this in RAM to avoid XIP cache evictions that
-// disrupt the pointing device hot path.  See rules.mk for full explanation.
-__attribute__((section(".time_critical.rgb_matrix_indicators"))) bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     // One-time initialization: convert all HSV colors to RGB.
     if (!rgb_colors_init) {
         layer_lower_rgb = hsv_to_rgb(layer_lower_hsv);
         layer_raise_rgb = hsv_to_rgb(layer_raise_hsv);
         layer_num_rgb   = hsv_to_rgb(layer_num_hsv);
         // Mode overlay colors, indexed to match pd_mode_priority[]:
-        // [0] dragscroll, [1] volume, [2] brightness, [3] arrow
+        // [0] dragscroll, [1] volume, [2] brightness, [3] zoom, [4] arrow
         pd_mode_rgb[0]  = hsv_to_rgb(mode_dragscroll_hsv);
         pd_mode_rgb[1]  = hsv_to_rgb(mode_volume_hsv);
         pd_mode_rgb[2]  = hsv_to_rgb(mode_brightness_hsv);
-        pd_mode_rgb[3]  = hsv_to_rgb(mode_arrow_hsv);
+        pd_mode_rgb[3]  = hsv_to_rgb(mode_zoom_hsv);
+        pd_mode_rgb[4]  = hsv_to_rgb(mode_arrow_hsv);
         rgb_colors_init = true;
     }
 

@@ -61,7 +61,7 @@ static inline uint16_t pd_sync_quantize(uint16_t raw) {
 }
 
 // Send the packet to the slave, but only if it changed since last send.
-__attribute__((noinline)) static void pd_sync_broadcast(const pd_sync_packet_t *pkt) {
+static void pd_sync_broadcast(const pd_sync_packet_t *pkt) {
     if (memcmp(&pd_sync_last_sent, pkt, sizeof(pd_sync_packet_t)) == 0) {
         return; // identical to last send — skip
     }
@@ -99,7 +99,7 @@ static inline void split_sync_init(void) {
 // Broadcast current state to the slave using a pre-read elapsed time.
 // Called by automouse_rgb_render() which already reads the timer for
 // rendering, avoiding a redundant auto_mouse_get_time_elapsed() call.
-__attribute__((noinline)) static void pd_state_sync_elapsed(uint16_t raw_elapsed) {
+static void pd_state_sync_elapsed(uint16_t raw_elapsed) {
     if (!is_keyboard_master()) return;
     pd_sync_packet_t pkt = {
         .elapsed       = pd_sync_quantize(raw_elapsed),
@@ -111,7 +111,7 @@ __attribute__((noinline)) static void pd_state_sync_elapsed(uint16_t raw_elapsed
 // Convenience: read elapsed from the timer and broadcast.
 // Used by process_record_user on mode flag changes (where no timer
 // value is available yet).
-__attribute__((noinline)) static void pd_state_sync(void) {
+static void pd_state_sync(void) {
     pd_state_sync_elapsed(auto_mouse_get_time_elapsed());
 }
 

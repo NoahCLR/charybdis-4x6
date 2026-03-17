@@ -3,7 +3,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // This module lets the trackball do different things depending on which
-// "mode" is active.  Modes are activated by holding keys on the keyboard.
+// "mode" is active.  Mode keys are dual-purpose: tap sends the base-layer
+// key at that position, hold activates the trackball mode.
 //
 // Available modes:
 //
@@ -18,6 +19,9 @@
 //   BRIGHTNESS mode — Trackball Y-axis controls screen brightness.
 //                    Roll up = brighter, roll down = dimmer.
 //
+//   ZOOM mode    — Trackball Y-axis controls zoom level.
+//                  Roll up = zoom in (GUI+Plus), roll down = zoom out (GUI+Minus).
+//
 //   DRAGSCROLL   — Not handled here; this flag just tracks whether the
 //                  Charybdis firmware's native drag-scroll is active,
 //                  so RGB can reflect the state.
@@ -26,7 +30,7 @@
 //   1. Add a PD_MODE_xxx define here (next free bit)
 //   2. Add it to pd_mode_priority[] at the desired position, update PD_MODE_COUNT
 //   3. Add a custom keycode in keymap.c's enum
-//   4. Handle press/release with pd_mode_update() in process_record_user
+//   4. Add the keycode to the tap/hold mode key handler in process_record_user
 //   5. Add a handler case in pointing_device_task_user's switch
 //   6. Add an RGB color and pd_mode_rgb[] entry in rgb_matrix_indicators (optional)
 //   7. Add the keycode to is_mouse_record_user (keeps auto-mouse alive)
@@ -42,19 +46,17 @@
 #define PD_MODE_ARROW (1 << 1)      // Trackball → arrow keys
 #define PD_MODE_DRAGSCROLL (1 << 2) // Mirrors charybdis_get_pointer_dragscroll_enabled()
 #define PD_MODE_BRIGHTNESS (1 << 3) // Trackball Y → screen brightness up/down
-// #define PD_MODE_xxx       (1 << 4)  // next free slot
+#define PD_MODE_ZOOM (1 << 4)       // Trackball Y → GUI+Plus / GUI+Minus
+// #define PD_MODE_xxx       (1 << 5)  // next free slot
 // ... up to (1 << 7) for 8 modes in a uint8_t
 
 // Priority order for mode resolution — first active mode wins.
 // Both pointing_device_task_user (handler dispatch) and
 // rgb_matrix_indicators_advanced_user (right-half color overlay) iterate this
 // array, so reordering here changes behavior in both places.
-#define PD_MODE_COUNT 4
+#define PD_MODE_COUNT 5
 static const uint8_t pd_mode_priority[PD_MODE_COUNT] = {
-    PD_MODE_DRAGSCROLL,
-    PD_MODE_VOLUME,
-    PD_MODE_BRIGHTNESS,
-    PD_MODE_ARROW,
+    PD_MODE_DRAGSCROLL, PD_MODE_VOLUME, PD_MODE_BRIGHTNESS, PD_MODE_ZOOM, PD_MODE_ARROW,
 };
 
 // ─── Global mode state ─────────────────────────────────────────────────────
@@ -104,7 +106,7 @@ static inline report_mouse_t freeze_mouse(void) {
 static int32_t vol_acc_y    = 0; // accumulated Y motion
 static int8_t  vol_last_dir = 0; // last direction
 
-__attribute__((noinline)) static report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
+static report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     int16_t dy = mouse_report.y;
 
     if (dy != 0) {
@@ -138,7 +140,7 @@ __attribute__((noinline)) static report_mouse_t handle_volume_mode(report_mouse_
 static int32_t bright_acc_y    = 0; // accumulated Y motion
 static int8_t  bright_last_dir = 0; // last direction
 
-__attribute__((noinline)) static report_mouse_t handle_brightness_mode(report_mouse_t mouse_report) {
+static report_mouse_t handle_brightness_mode(report_mouse_t mouse_report) {
     int16_t dy = mouse_report.y;
 
     if (dy != 0) {
@@ -155,6 +157,40 @@ __attribute__((noinline)) static report_mouse_t handle_brightness_mode(report_mo
         while (bright_acc_y <= -BRIGHTNESS_THRESHOLD) {
             tap_code(KC_BRIU);
             bright_acc_y += BRIGHTNESS_THRESHOLD;
+        }
+    }
+
+    return freeze_mouse();
+}
+
+// ─── Zoom mode ──────────────────────────────────────────────────────────────
+// Accumulates trackball Y-axis motion and sends GUI+Plus / GUI+Minus
+// when the threshold is crossed.  Works in browsers, editors, Figma, etc.
+
+#    ifndef ZOOM_THRESHOLD
+#        define ZOOM_THRESHOLD 80 // sensor counts of Y motion per zoom step
+#    endif
+
+static int32_t zoom_acc_y    = 0; // accumulated Y motion
+static int8_t  zoom_last_dir = 0; // last direction
+
+static report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
+    int16_t dy = mouse_report.y;
+
+    if (dy != 0) {
+        int8_t dir = (dy > 0) ? 1 : -1;
+        // Reset accumulator on direction change to prevent "zoom bounce"
+        if (zoom_last_dir != 0 && dir != zoom_last_dir) zoom_acc_y = 0;
+        zoom_last_dir = dir;
+
+        zoom_acc_y += dy;
+        while (zoom_acc_y >= ZOOM_THRESHOLD) {
+            tap_code16(G(KC_MINS));
+            zoom_acc_y -= ZOOM_THRESHOLD;
+        }
+        while (zoom_acc_y <= -ZOOM_THRESHOLD) {
+            tap_code16(G(KC_EQL));
+            zoom_acc_y += ZOOM_THRESHOLD;
         }
     }
 
@@ -216,7 +252,7 @@ static inline void arrow_update_dominant_axis(int16_t dx, int16_t dy) {
         arrow_axis_is_x = false;
 }
 
-__attribute__((noinline)) static report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
+static report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
     int16_t dx = mouse_report.x;
     int16_t dy = mouse_report.y;
 
@@ -260,6 +296,9 @@ static inline report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
 static inline report_mouse_t handle_brightness_mode(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+static inline report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
 static inline report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
