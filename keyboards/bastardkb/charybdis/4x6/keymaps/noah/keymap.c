@@ -692,31 +692,21 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         rgb_colors_init = true;
     }
 
-    uint8_t active_layer = get_highest_layer(layer_state | default_layer_state);
-
     // Paint all LEDs with the active layer's color.
     // On LAYER_BASE (default), don't override — let the default RGB effect play.
-    switch (active_layer) {
-        case LAYER_POINTER:
-            // Animated gradient: white → red over the auto-mouse countdown.
-            // Also syncs elapsed time + mode flags to slave (single timer read).
-            automouse_rgb_render(led_min, led_max, automouse_color_start, automouse_color_end);
-            break;
-
-        case LAYER_NUM:
-            rgb_set_both_halves(layer_num_rgb, led_min, led_max);
-            break;
-
-        case LAYER_LOWER:
-            rgb_set_both_halves(layer_lower_rgb, led_min, led_max);
-            break;
-
-        case LAYER_RAISE:
-            rgb_set_both_halves(layer_raise_rgb, led_min, led_max);
-            break;
-
-        default:
-            return false;
+    // Check explicitly-activated layers before auto-activated LAYER_POINTER,
+    // so that e.g. sniping (LAYER_RAISE) shows purple even when LAYER_POINTER
+    // is also active due to a held mode key.
+    if (layer_state_cmp(layer_state, LAYER_RAISE)) {
+        rgb_set_both_halves(layer_raise_rgb, led_min, led_max);
+    } else if (layer_state_cmp(layer_state, LAYER_LOWER)) {
+        rgb_set_both_halves(layer_lower_rgb, led_min, led_max);
+    } else if (layer_state_cmp(layer_state, LAYER_NUM)) {
+        rgb_set_both_halves(layer_num_rgb, led_min, led_max);
+    } else if (layer_state_cmp(layer_state, LAYER_POINTER)) {
+        automouse_rgb_render(led_min, led_max, automouse_color_start, automouse_color_end);
+    } else {
+        return false;
     }
 
     // If a pointing device mode is active, override the right half with the
