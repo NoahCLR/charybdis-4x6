@@ -576,22 +576,52 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
 //   3. Disable auto-mouse while LAYER_RAISE is active, because sniping
 //      and auto-mouse fight over pointer behavior.
 layer_state_t layer_state_set_user(layer_state_t state) {
+    // Guard against re-entrancy.  set_auto_mouse_enable(false) calls
+    // layer_off(LAYER_POINTER) internally, which re-enters this function
+    // with stale global layer_state (missing LAYER_RAISE).  That recursive
+    // call would undo sniping and re-enable auto-mouse.  Block it.
+    static bool reentry_guard = false;
+    if (reentry_guard) return state;
+    reentry_guard = true;
+
     // Enable sniping (lower DPI) automatically on LAYER_RAISE.
     charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     // If the pointer layer is on AND any other layer is explicitly active,
     // strip the pointer layer to avoid conflicts.  Only do this if
-    // the user hasn't manually toggled auto-mouse, and no mouse key is held.
-    if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0) {
+    // the user hasn't manually toggled auto-mouse, no mouse key is held,
+    // and drag scroll isn't locked (locked drag scroll needs the pointer
+    // layer to stay active for mode overlay and pointer-layer keys).
+    if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0 && !charybdis_get_pointer_dragscroll_enabled()) {
         state &= ~((layer_state_t)1 << LAYER_POINTER);
     }
 
     // Disable auto-mouse while LAYER_RAISE is active, because sniping
     // and auto-mouse fight over pointer behavior.
+    // set_auto_mouse_enable() calls auto_mouse_reset() which wipes all
+    // auto-mouse state (key tracker, toggle, timers).  Save and restore
+    // so that held mouse keys (e.g. DRGSCRL) and drag-scroll lock
+    // survive the transition.
+    int8_t saved_key_tracker = get_auto_mouse_key_tracker();
+    bool   saved_toggle      = get_auto_mouse_toggle();
+
     set_auto_mouse_enable(!layer_state_cmp(state, LAYER_RAISE));
+
+    set_auto_mouse_key_tracker(saved_key_tracker);
+    if (saved_toggle != get_auto_mouse_toggle()) {
+        auto_mouse_toggle();
+    }
+
+    // If drag scroll is locked, force LAYER_POINTER on so the mode overlay
+    // and pointer-layer keys remain available (even if auto-mouse was
+    // just disabled or the layer was deactivated by QMK internals).
+    if (charybdis_get_pointer_dragscroll_enabled()) {
+        state |= ((layer_state_t)1 << LAYER_POINTER);
+    }
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
+    reentry_guard = false;
     return state;
 }
 
@@ -693,10 +723,13 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     }
 
     // Paint all LEDs with the active layer's color.
-    // On LAYER_BASE (default), don't override — let the default RGB effect play.
     // Check explicitly-activated layers before auto-activated LAYER_POINTER,
     // so that e.g. sniping (LAYER_RAISE) shows purple even when LAYER_POINTER
     // is also active due to a held mode key.
+    // On LAYER_BASE, skip layer painting — the default RGB effect has already
+    // rendered — but still fall through to the mode overlay below so that
+    // e.g. drag-scroll lock shows orange on the right half.
+    bool layer_painted = true;
     if (layer_state_cmp(layer_state, LAYER_RAISE)) {
         rgb_set_both_halves(layer_raise_rgb, led_min, led_max);
     } else if (layer_state_cmp(layer_state, LAYER_LOWER)) {
@@ -706,7 +739,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     } else if (layer_state_cmp(layer_state, LAYER_POINTER)) {
         automouse_rgb_render(led_min, led_max, automouse_color_start, automouse_color_end);
     } else {
-        return false;
+        layer_painted = false;
     }
 
     // If a pointing device mode is active, override the right half with the
@@ -719,7 +752,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         }
     }
 
-    return true;
+    return layer_painted;
 }
 
 #endif // RGB_MATRIX_ENABLE
