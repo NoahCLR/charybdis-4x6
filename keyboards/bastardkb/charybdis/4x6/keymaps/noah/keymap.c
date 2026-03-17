@@ -112,7 +112,6 @@ enum charybdis_keymap_layers {
 // The number row (KC_1–KC_0) and punctuation keys use a custom tap/hold
 // system defined below — they are NOT using QMK's built-in mod-tap.
 // See process_record_user() for details.
-
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
     [LAYER_BASE] = LAYOUT(
@@ -207,7 +206,6 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // The thresholds are defined in config.h:
 //   CUSTOM_TAP_HOLD_TERM      = 150ms
 //   CUSTOM_LONGER_HOLD_TERM   = 400ms
-
 static uint16_t tap_hold_timer;
 
 // Send the hold variant (triggered at 150–400ms hold).
