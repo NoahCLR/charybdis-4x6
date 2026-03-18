@@ -87,6 +87,10 @@ By default, QMK determines master/slave by USB detection (`usb_bus_detected()`).
 - **`config.h`** — uncomment `#define FORCE_MASTER` or `#define FORCE_SLAVE` (under `#ifdef SPLIT_KEYBOARD`)
 - **Command line** — `qmk compile ... -e FORCE_MASTER=yes` or `-e FORCE_SLAVE=yes` (handled by `rules.mk` via `OPT_DEFS`)
 
+The `qmk-build` shell alias builds both firmwares in one go, outputting `charybdis_right.uf2` (master) and `charybdis_left.uf2` (slave).
+
+`MASTER_RIGHT` is defined at the keyboard level (`4x6/config.h`) in the qmk repo — the right half (with the trackball) is always the master side. The `FORCE_*` flags only override role detection; handedness remains determined by `MASTER_RIGHT`.
+
 If neither flag is set, the firmware falls through to QMK's default USB detection — no behavior change.
 
 ## LTO

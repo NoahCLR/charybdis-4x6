@@ -32,7 +32,8 @@
 // ─── Split role override ────────────────────────────────────────────────────
 // Uncomment ONE of these to force this firmware to always be master or slave.
 // Useful when both halves have USB connected.  Leave both commented for
-// default USB-detect behavior.
+// default USB-detect behavior.  Not to be confused with handedness
+// (left/right), which is set by MASTER_RIGHT in the keyboard-level config in the qmk repo.
 // #define FORCE_MASTER
 // #define FORCE_SLAVE
 
