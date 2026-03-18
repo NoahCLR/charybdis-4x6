@@ -29,6 +29,13 @@
 //
 #ifdef SPLIT_KEYBOARD
 
+// ─── Split role override ────────────────────────────────────────────────────
+// Uncomment ONE of these to force this firmware to always be master or slave.
+// Useful when both halves have USB connected.  Leave both commented for
+// default USB-detect behavior.
+// #define FORCE_MASTER
+// #define FORCE_SLAVE
+
 // The default split serial timeout (20ms) is far too long for a keyboard
 // with a trackball — a single failed transaction blocks the main loop for
 // 20ms, causing the sensor to accumulate motion into a huge cursor jump.

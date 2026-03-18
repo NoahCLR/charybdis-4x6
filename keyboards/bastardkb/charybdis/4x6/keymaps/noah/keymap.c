@@ -57,6 +57,20 @@
 #include "rgb_automouse.h"
 #include "rgb_helpers.h"
 
+// Force master/slave role at compile time.  Needed when both halves have
+// their own USB connection (e.g. for full LED brightness on each side
+// when using a long cable) so they don't both detect USB and fight over
+// who is master.  Build with: -e FORCE_MASTER=yes or -e FORCE_SLAVE=yes
+#if defined(FORCE_MASTER)
+bool is_keyboard_master_impl(void) { return true; }
+#elif defined(FORCE_SLAVE)
+#    include "usb_util.h"
+bool is_keyboard_master_impl(void) {
+    usb_disconnect();
+    return false;
+}
+#endif
+
 // ─── Custom Keycodes & Keymap Layers ────────────────────────────────────────
 
 // Custom keycodes are assigned values starting from SAFE_RANGE so they don't

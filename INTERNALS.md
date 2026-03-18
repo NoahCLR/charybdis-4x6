@@ -77,6 +77,18 @@ This is imperceptible for keypresses, but devastating for a trackball. The PMW33
 
 At 230400 baud, a successful transaction completes in <1ms. A 5ms timeout gives generous headroom while limiting worst-case stalls to well below the cursor-jump threshold. The default 20ms is only needed for unreliable connections (long cables, noisy environments).
 
+## Split Role Override (`FORCE_MASTER` / `FORCE_SLAVE`)
+
+By default, QMK determines master/slave by USB detection (`usb_bus_detected()`). When both halves have their own USB connection (e.g. for full LED brightness on each side when using a long cable), both detect USB and both claim master.
+
+`FORCE_MASTER` and `FORCE_SLAVE` override `is_keyboard_master_impl()` (a weak function in `split_util.c`) to hardcode the role at compile time. The slave override also calls `usb_disconnect()` to prevent the slave's USB stack from staying active.
+
+**Two ways to set the flag:**
+- **`config.h`** — uncomment `#define FORCE_MASTER` or `#define FORCE_SLAVE` (under `#ifdef SPLIT_KEYBOARD`)
+- **Command line** — `qmk compile ... -e FORCE_MASTER=yes` or `-e FORCE_SLAVE=yes` (handled by `rules.mk` via `OPT_DEFS`)
+
+If neither flag is set, the firmware falls through to QMK's default USB detection — no behavior change.
+
 ## LTO
 
 `LTO_ENABLE = yes` in `rules.mk` — Link-time optimization reduces the binary size.
