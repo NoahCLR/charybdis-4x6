@@ -389,13 +389,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
 
         // DRAGSCROLL_MODE (Charybdis firmware keycode, not in our enum):
-        // Hold to scroll with trackball.  We intercept it here to add
-        // unlock behavior: if drag-scroll was already *toggled on* (locked),
-        // pressing and releasing the momentary key will unlock it instead.
+        // Dual-purpose like the other mode keys: tap sends the base-layer
+        // key, hold activates drag-scroll.  Also adds unlock behavior:
+        // if drag-scroll was already *toggled on* (locked), pressing and
+        // releasing the momentary key will unlock it instead.
         case DRAGSCROLL_MODE: {
             static bool dragscroll_was_locked = false;
             if (record->event.pressed) {
-                // Remember if drag-scroll was already locked before this press.
+                tap_hold_timer = timer_read();
                 dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
                 pd_mode_update(PD_MODE_DRAGSCROLL, true);
                 pd_state_sync();
@@ -405,13 +406,19 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     // It was locked — turn off the toggle and clear mode flag.
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
-
                     pd_state_sync();
                     return false;
                 }
                 pd_mode_update(PD_MODE_DRAGSCROLL, false);
-
                 pd_state_sync();
+                if (timer_elapsed(tap_hold_timer) < CUSTOM_TAP_HOLD_TERM) {
+                    // Tap: disable dragscroll ourselves since we return false
+                    // (preventing the firmware from seeing the release).
+                    charybdis_set_pointer_dragscroll_enabled(false);
+                    uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
+                    tap_code16(fallback_key);
+                    return false;
+                }
                 return true; // let firmware handle release (disables scroll)
             }
         }

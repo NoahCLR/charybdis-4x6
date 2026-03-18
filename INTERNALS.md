@@ -131,7 +131,7 @@ All mode keys are registered in `is_mouse_record_user()` so that holding them ke
 
 ### Dragscroll special cases
 
-**Momentary (`DRGSCRL`):** Intercepted in `process_record_user` to add unlock behavior — if dragscroll was already toggled on (locked), pressing and releasing the momentary key unlocks it instead of doing a normal momentary hold.
+**Momentary (`DRGSCRL`):** Dual-purpose like the other mode keys: tap sends the base-layer key, hold activates drag-scroll. If dragscroll was already toggled on (locked), pressing and releasing the momentary key unlocks it instead.
 
 **Toggle-on-hold (`DRG_TOG_ON_HOLD`):** A dual-purpose key on the Pointer layer. Tap sends the base-layer key at that position; hold (> 150ms) toggles dragscroll lock on/off via `tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE)`.
 
