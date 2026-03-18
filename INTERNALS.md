@@ -133,7 +133,7 @@ All mode keys are registered in `is_mouse_record_user()` so that holding them ke
 
 **Momentary (`DRGSCRL`):** Dual-purpose like the other mode keys: tap sends the base-layer key, hold activates drag-scroll. If dragscroll was already toggled on (locked), pressing and releasing the momentary key unlocks it instead.
 
-**Toggle-on-hold (`DRG_TOG_ON_HOLD`):** A dual-purpose key on the Pointer layer. Tap sends the base-layer key at that position; hold (> 150ms) toggles dragscroll lock on/off via `tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE)`.
+**Toggle-on-hold (`DRG_TOG_ON_HOLD`):** A dual-purpose key on the Pointer layer. Tap sends the base-layer key at that position; hold (> 150ms) enables dragscroll lock. When already locked, any press (tap or hold) unlocks it.
 
 `tap_custom_bk_keycode()` simulates a full press+release of a Charybdis firmware keycode by calling `process_record_kb()` directly (not `_user`, to avoid infinite recursion).
 

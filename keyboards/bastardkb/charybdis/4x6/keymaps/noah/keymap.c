@@ -400,7 +400,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
                 pd_mode_update(PD_MODE_DRAGSCROLL, true);
                 pd_state_sync();
-                return true; // let firmware also handle it (enables scroll)
+                return true;
             } else {
                 if (dragscroll_was_locked) {
                     // It was locked — turn off the toggle and clear mode flag.
@@ -412,31 +412,35 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 pd_mode_update(PD_MODE_DRAGSCROLL, false);
                 pd_state_sync();
                 if (timer_elapsed(tap_hold_timer) < CUSTOM_TAP_HOLD_TERM) {
-                    // Tap: disable dragscroll ourselves since we return false
-                    // (preventing the firmware from seeing the release).
+                    // Tap: disable dragscroll if it was enabled, then send the base-layer key.
                     charybdis_set_pointer_dragscroll_enabled(false);
                     uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
                     tap_code16(fallback_key);
                     return false;
                 }
-                return true; // let firmware handle release (disables scroll)
+                return true;
             }
         }
 
         // DRG_TOG_ON_HOLD: Dual-purpose key for the auto-mouse layer.
         //   Tap  → sends whatever key is at this position on LAYER_BASE.
-        //   Hold → toggles drag-scroll lock on/off.
+        //   Hold → enables drag-scroll lock.
+        //   When already locked, any press (tap or hold) unlocks.
         case DRG_TOG_ON_HOLD:
             if (record->event.pressed) {
                 tap_hold_timer = timer_read();
             } else {
-                uint16_t tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
+                bool is_locked = charybdis_get_pointer_dragscroll_enabled();
 
-                if (tap_hold_elapsed_time > CUSTOM_TAP_HOLD_TERM) {
-                    // HOLD: toggle drag-scroll lock
+                if (is_locked) {
+                    // Already locked — any release (tap or hold) unlocks.
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
-
+                    pd_state_sync();
+                } else if (timer_elapsed(tap_hold_timer) > CUSTOM_TAP_HOLD_TERM) {
+                    // HOLD: toggle drag-scroll lock on
+                    tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
+                    pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
                     pd_state_sync();
                 } else {
                     // TAP: look up and send the base-layer key at this matrix position
