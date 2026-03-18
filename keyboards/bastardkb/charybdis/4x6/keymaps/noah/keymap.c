@@ -430,9 +430,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 tap_hold_timer = timer_read();
             } else {
-                bool is_locked = charybdis_get_pointer_dragscroll_enabled();
+                bool dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
 
-                if (is_locked) {
+                if (dragscroll_was_locked) {
                     // Already locked — any release (tap or hold) unlocks.
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
