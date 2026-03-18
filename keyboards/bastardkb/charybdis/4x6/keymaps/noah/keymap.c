@@ -33,21 +33,23 @@
 //
 // Key concepts for newcomers:
 //
-//   - "Split keyboard":  Each physical half has its own MCU.  The left
-//     half (master) runs the keymap logic and sends state to the right
+//   - "Split keyboard":  Each physical half has its own MCU.  The right
+//     half (master) runs the keymap logic and sends state to the left
 //     half (slave) so it can update its own LEDs.
 //
 //   - "Auto-mouse layer":  QMK can automatically activate a layer when
 //     it detects trackball movement, and deactivate it after a timeout.
 //     We use this for LAYER_POINTER.
 //
+//   - "Pointing device modes":  We define custom modes that change the behavior of the
+//     pointing device (e.g. volume control, scroll, mouse movement) and tie
+//     them to keys in the keymap.  These modes are implemented by intercepting
+//     the relevant keycodes in process_record_user() and setting flags that
+//     the pointing device code checks to decide what to do with pointing device movement.
+//
 //   - "Tap vs Hold":  A key can do different things depending on how
 //     long you press it.  This keymap implements a custom three-tier
 //     system: tap (<150ms), hold (150–400ms), and longer hold (>400ms).
-//
-//   - XXXXXXX = key does nothing on this layer.
-//     _______ = transparent, falls through to the layer below.
-//
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H
@@ -124,6 +126,9 @@ enum charybdis_keymap_layers {
 //   G()     = GUI + key                   A()  = Alt + key
 //   S()     = Shift + key                 LCAG() = Ctrl+Alt+GUI + key
 //   LSG()   = Left Shift+GUI + key        LAG()  = Left Alt+GUI + key
+//
+//   - XXXXXXX = key does nothing on this layer.
+//     _______ = transparent, falls through to the layer below.
 //
 // The number row (KC_1–KC_0) and punctuation keys use a custom tap/hold
 // system defined below — they are NOT using QMK's built-in mod-tap.
