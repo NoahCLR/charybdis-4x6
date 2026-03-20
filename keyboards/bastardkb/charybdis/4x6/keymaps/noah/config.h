@@ -144,6 +144,9 @@
 #        define SPLIT_TRANSACTION_IDS_USER PUT_PD_SYNC
 #    endif
 
+// Default pointer DPI (base value before DPI_MOD/DPI_RMOD adjustments).
+#    define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
+
 // Enable 16-bit motion reports for higher precision at high DPI.
 #    define MOUSE_EXTENDED_REPORT
 #    define WHEEL_EXTENDED_REPORT
