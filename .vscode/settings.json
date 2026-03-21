@@ -1,5 +1,23 @@
 {
     "editor.defaultFormatter": "xaver.clang-format",
     "C_Cpp.dimInactiveRegions": false,
-    "C_Cpp.intelliSenseEngine": "disabled"
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "files.exclude": {
+        "**/.DS_Store": true,
+        ".clang-format": true,
+        ".clangd": true,
+        ".claude/": true,
+        ".devcontainer/": true,
+        ".editorconfig": true,
+        ".github/": true,
+        "LICENSE": true,
+        "Makefile": true,
+        "qmk.json": true,
+        ".gitignore": true,
+        "layouts/": true,
+        "users/": true,
+        "memory/": true,
+        "keyboards/.keep": true,
+        "keyboards/bastardkb/charybdis/4x6/keymaps/vendor/": true,
+    }
 }
