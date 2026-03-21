@@ -145,11 +145,11 @@
 #    endif
 
 // Default pointer DPI (base value before DPI_MOD/DPI_RMOD adjustments).
-#    define CHARYBDIS_MINIMUM_DEFAULT_DPI 400
+#    define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
 
 // Liftoff distance — how high the ball can be lifted before tracking stops.
 // Default is 0x02; higher = tracks further from the surface.
-#    define PMW33XX_LIFTOFF_DISTANCE 0x04
+#    define PMW33XX_LIFTOFF_DISTANCE 0x03
 
 // Enable 16-bit motion reports for higher precision at high DPI.
 #    define MOUSE_EXTENDED_REPORT
