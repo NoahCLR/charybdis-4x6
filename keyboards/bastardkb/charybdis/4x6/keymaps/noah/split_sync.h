@@ -20,7 +20,7 @@
 //
 // NOTE: The elapsed time comes from auto_mouse_get_time_elapsed(), a
 // custom function added to QMK's auto-mouse subsystem in the firmware
-// fork at https://github.com/NoahCLR/bastardkb-qmk (branch bkb-master).
+// fork at https://github.com/NoahCLR/bastardkb-qmk (branch qmk-latest).
 // It is not available in stock QMK.
 //
 // ────────────────────────────────────────────────────────────────────────────
