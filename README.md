@@ -1,4 +1,4 @@
-# Noah's Charybdis 4x6 Keymap
+# Noah's Charybdis 4x6 Keymap - QMK 0.32.5 - 03-2026
 
 A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/charybdis/), a split ergonomic keyboard with a built-in trackball on the right half.
 
