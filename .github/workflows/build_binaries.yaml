@@ -11,7 +11,7 @@ jobs:
     uses: ./.github/workflows/qmk_userspace_build.yml
     with:
       qmk_repo: NoahCLR/bastardkb-qmk
-      qmk_ref: bkb-master
+      qmk_ref: qmk-latest
 
   reset-release:
     name: 'Delete existing release so timestamp updates'

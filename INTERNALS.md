@@ -4,7 +4,7 @@ Technical notes for developers working on this keymap. For feature overview, see
 
 ## Custom Firmware Fork
 
-This keymap depends on [NoahCLR/bastardkb-qmk](https://github.com/NoahCLR/bastardkb-qmk) (branch `bkb-master`), which modifies two areas of the firmware:
+This keymap depends on [NoahCLR/bastardkb-qmk](https://github.com/NoahCLR/bastardkb-qmk) (branch `qmk-latest`), which modifies two areas of the firmware:
 
 ### Charybdis dragscroll (`keyboards/bastardkb/charybdis/charybdis.c`)
 
