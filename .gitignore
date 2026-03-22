@@ -9,3 +9,6 @@
 *.hex
 *.bin
 *.uf2
+
+# Claude Code
+.claude/
