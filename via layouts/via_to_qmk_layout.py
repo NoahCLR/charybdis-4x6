@@ -56,10 +56,32 @@ REPLACEMENTS = {
     "S(KC_0)":    "KC_RPRN",
     "S(KC_MINS)": "KC_UNDS",
 
-    # Deprecated / renamed keycodes
+    # Deprecated / renamed keycodes (QMK 0.32+)
     "KC_GESC": "QK_GESC",
     "RESET": "QK_BOOT",
     "QK_CLEAR_EEPROM": "EE_CLR",
+
+    # Deprecated short modifier keycodes → full names (QMK 0.32+)
+    "KC_LCTL":  "KC_LEFT_CTRL",
+    "KC_RCTL":  "KC_RIGHT_CTRL",
+    "KC_LSFT":  "KC_LEFT_SHIFT",
+    "KC_RSFT":  "KC_RIGHT_SHIFT",
+    "KC_LALT":  "KC_LEFT_ALT",
+    "KC_RALT":  "KC_RIGHT_ALT",
+    "KC_LGUI":  "KC_LEFT_GUI",
+    "KC_RGUI":  "KC_RIGHT_GUI",
+
+    # Deprecated mouse button keycodes → QMK 0.32+ names
+    "KC_MS_BTN1": "MS_BTN1",
+    "KC_MS_BTN2": "MS_BTN2",
+    "KC_MS_BTN3": "MS_BTN3",
+    "KC_MS_BTN4": "MS_BTN4",
+    "KC_MS_BTN5": "MS_BTN5",
+
+    # Shifted symbols with named equivalents
+    "S(KC_QUOT)": "KC_DQUO",
+    "S(KC_RBRC)": "KC_RCBR",
+    "S(KC_LBRC)": "KC_LCBR",
 
     # Charybdis firmware keycodes (VIA CUSTOM 0–7)
     "CUSTOM(0)": "DPI_MOD",
