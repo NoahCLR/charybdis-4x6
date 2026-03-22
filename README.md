@@ -19,7 +19,7 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 | Layer | Activation | Color | Purpose |
 |-------|-----------|-------|---------|
 | Base | Default | RGB effect | QWERTY typing |
-| Num | Hold `Z` / Hold `B`| Green | Numpad on the right half |
+| Num | Hold `B`| Green | Numpad on the right half |
 | Lower | `MO(2)` / Hold `J` | Blue | Symbols, DPI controls, brackets |
 | Raise | `MO(3)` / Hold `F` / Hold `/` | Purple | Navigation, media, mouse buttons, macOS shortcuts. Sniping (lower DPI) auto-enables; auto-mouse is disabled to avoid conflicts. |
 | Pointer | Auto (trackball movement) | White-to-red gradient | Mouse buttons, scroll, trackball mode toggles. Automatically stripped when another layer is explicitly active to prevent flickering. |
