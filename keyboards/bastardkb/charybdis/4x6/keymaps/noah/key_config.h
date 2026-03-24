@@ -108,39 +108,39 @@ typedef struct {
 // keycode    tap        hold           longer_hold    double_tap  hold_layer   immediate
 static const key_behavior_t key_behaviors[] = {
     // Number row → shifted symbols (6/7/8 also have double-tap for media)
-    {KC_1,     KC_1,      KC_EXLM,       KC_NO,         KC_NO,      0,           true},  // 1 → !
-    {KC_2,     KC_2,      KC_AT,         KC_NO,         KC_NO,      0,           true},  // 2 → @
-    {KC_3,     KC_3,      KC_HASH,       KC_NO,         KC_NO,      0,           true},  // 3 → #
-    {KC_4,     KC_4,      KC_DLR,        KC_NO,         KC_NO,      0,           true},  // 4 → $
-    {KC_5,     KC_5,      KC_PERC,       KC_NO,         KC_NO,      0,           true},  // 5 → %
-    {KC_6,     KC_6,      KC_CIRC,       KC_NO,         KC_MPLY,    0,           true},  // 6 → ^ / play
-    {KC_7,     KC_7,      KC_AMPR,       KC_NO,         KC_MNXT,    0,           true},  // 7 → & / next
-    {KC_8,     KC_8,      KC_ASTR,       KC_NO,         KC_MPRV,    0,           true},  // 8 → * / prev
-    {KC_9,     KC_9,      KC_LPRN,       KC_NO,         KC_NO,      0,           true},  // 9 → (
-    {KC_0,     KC_0,      KC_RPRN,       KC_NO,         KC_NO,      0,           true},  // 0 → )
+    {KC_1, KC_1, KC_EXLM, KC_NO, KC_NO, 0, true},   // 1 → !
+    {KC_2, KC_2, KC_AT, KC_NO, KC_NO, 0, true},     // 2 → @
+    {KC_3, KC_3, KC_HASH, KC_NO, KC_NO, 0, true},   // 3 → #
+    {KC_4, KC_4, KC_DLR, KC_NO, KC_NO, 0, true},    // 4 → $
+    {KC_5, KC_5, KC_PERC, KC_NO, KC_NO, 0, true},   // 5 → %
+    {KC_6, KC_6, KC_CIRC, KC_NO, KC_MPLY, 0, true}, // 6 → ^ / play
+    {KC_7, KC_7, KC_AMPR, KC_NO, KC_MNXT, 0, true}, // 7 → & / next
+    {KC_8, KC_8, KC_ASTR, KC_NO, KC_MPRV, 0, true}, // 8 → * / prev
+    {KC_9, KC_9, KC_LPRN, KC_NO, KC_NO, 0, true},   // 9 → (
+    {KC_0, KC_0, KC_RPRN, KC_NO, KC_NO, 0, true},   // 0 → )
 
     // Punctuation → shifted variants
-    {KC_MINS,  KC_MINS,   KC_UNDS,       KC_NO,         KC_NO,      0,           true},  // - → _
-    {KC_EQL,   KC_EQL,    KC_PLUS,       KC_NO,         KC_NO,      0,           true},  // = → +
-    {KC_LBRC,  KC_LBRC,   KC_LCBR,       KC_NO,         KC_NO,      0,           true},  // [ → {
-    {KC_RBRC,  KC_RBRC,   KC_RCBR,       KC_NO,         KC_NO,      0,           true},  // ] → }
-    {KC_BSLS,  KC_BSLS,   KC_PIPE,       KC_NO,         KC_NO,      0,           true},  // \ → |
-    {KC_GRV,   KC_GRV,    KC_TILD,       KC_NO,         KC_NO,      0,           true},  // ` → ~
-    {KC_SCLN,  KC_SCLN,   KC_COLN,       KC_NO,         KC_NO,      0,           true},  // ; → :
-    {KC_QUOT,  KC_QUOT,   KC_DQUO,       KC_NO,         KC_NO,      0,           true},  // ' → "
-    {KC_COMM,  KC_COMM,   KC_LABK,       KC_NO,         KC_NO,      0,           true},  // , → <
-    {KC_DOT,   KC_DOT,    KC_RABK,       KC_NO,         KC_NO,      0,           true},  // . → >
+    {KC_MINS, KC_MINS, KC_UNDS, KC_NO, KC_NO, 0, true}, // - → _
+    {KC_EQL, KC_EQL, KC_PLUS, KC_NO, KC_NO, 0, true},   // = → +
+    {KC_LBRC, KC_LBRC, KC_LCBR, KC_NO, KC_NO, 0, true}, // [ → {
+    {KC_RBRC, KC_RBRC, KC_RCBR, KC_NO, KC_NO, 0, true}, // ] → }
+    {KC_BSLS, KC_BSLS, KC_PIPE, KC_NO, KC_NO, 0, true}, // \ → |
+    {KC_GRV, KC_GRV, KC_TILD, KC_NO, KC_NO, 0, true},   // ` → ~
+    {KC_SCLN, KC_SCLN, KC_COLN, KC_NO, KC_NO, 0, true}, // ; → :
+    {KC_QUOT, KC_QUOT, KC_DQUO, KC_NO, KC_NO, 0, true}, // ' → "
+    {KC_COMM, KC_COMM, KC_LABK, KC_NO, KC_NO, 0, true}, // , → <
+    {KC_DOT, KC_DOT, KC_RABK, KC_NO, KC_NO, 0, true},   // . → >
 
     // Enter → Shift+Enter (new line without send in chat apps)
-    {KC_ENT,   KC_ENT,    S(KC_ENT),     KC_NO,         KC_NO,      0,           true},
+    {KC_ENT, KC_ENT, S(KC_ENT), KC_NO, KC_NO, 0, true},
 
     // Arrows — release-based (immediate=false) for three-tier support
-    {KC_LEFT,  KC_LEFT,   A(KC_LEFT),    G(KC_LEFT),    KC_NO,      0,           false}, // ← / word / line
-    {KC_RIGHT, KC_RIGHT,  A(KC_RIGHT),   G(KC_RIGHT),   KC_NO,      0,           false}, // → / word / line
+    {KC_LEFT, KC_LEFT, A(KC_LEFT), G(KC_LEFT), KC_NO, 0, false},     // ← / word / line
+    {KC_RIGHT, KC_RIGHT, A(KC_RIGHT), G(KC_RIGHT), KC_NO, 0, false}, // → / word / line
 
     // Layer activation keys (hold → layer, double-tap → media)
-    {LOWER,    KC_NO,     KC_NO,         KC_NO,         KC_MPLY,    LAYER_LOWER, false},
-    {RAISE,    KC_NO,     KC_NO,         KC_NO,         KC_MPLY,    LAYER_RAISE, false},
+    {LOWER, KC_NO, KC_NO, KC_NO, KC_MPLY, LAYER_LOWER, false},
+    {RAISE, KC_NO, KC_NO, KC_NO, KC_MPLY, LAYER_RAISE, false},
 };
 
 #define KEY_BEHAVIOR_COUNT (sizeof(key_behaviors) / sizeof(key_behaviors[0]))
@@ -265,7 +265,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,           DRGSCRL,           _______,        ARROW_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,      LT(1,KC_SPC),             MO(2),             MO(3),            KC_ENT,
+                                                                       KC_LEFT_GUI,      LT(1,KC_SPC),             MO(2),             RAISE,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,           KC_BSPC
   //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
     ),
