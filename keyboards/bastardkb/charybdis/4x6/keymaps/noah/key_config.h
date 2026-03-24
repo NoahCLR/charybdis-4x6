@@ -168,6 +168,7 @@ static const double_tap_key_t double_tap_keys[] = {
     {MO(LAYER_LOWER), KC_MPLY}, // play/pause
     {MO(LAYER_RAISE), KC_MPLY}, // play/pause
     {VOLUME_MODE, KC_MUTE},     // mute
+    {KC_N, KC_MUTE},            // mute
 };
 
 #define DOUBLE_TAP_KEY_COUNT (sizeof(double_tap_keys) / sizeof(double_tap_keys[0]))
@@ -203,7 +204,7 @@ typedef struct {
 
 // keycode            tap
 static const mode_tap_override_t mode_tap_overrides[] = {
-    // {VOLUME_MODE,     KC_MUTE},   // example: tap volume mode → mute
+    {VOLUME_MODE, KC_N}, // example: tap volume mode → mute
 };
 
 #define MODE_TAP_OVERRIDE_COUNT (sizeof(mode_tap_overrides) / sizeof(mode_tap_overrides[0]))
