@@ -471,6 +471,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 // HSV source arrays live in rgb_config.h (layer_colors[], pd_mode_colors[]).
 static rgb_t layer_rgb[LAYER_COUNT];
 static rgb_t pd_mode_rgb[PD_MODE_COUNT];
+static rgb_t led_group_rgb[LAYER_LED_GROUP_COUNT];
 static bool  rgb_colors_init = false;
 
 // QMK calls this in batches (led_min to led_max) — potentially multiple
@@ -483,6 +484,8 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
             layer_rgb[i] = hsv_to_rgb(layer_colors[i]);
         for (uint8_t i = 0; i < PD_MODE_COUNT; i++)
             pd_mode_rgb[i] = hsv_to_rgb(pd_mode_colors[i]);
+        for (uint8_t i = 0; i < LAYER_LED_GROUP_COUNT; i++)
+            led_group_rgb[i] = hsv_to_rgb(layer_led_groups[i].color);
         rgb_colors_init = true;
     }
 
@@ -505,6 +508,14 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         layer_painted = true;
     }
 #    endif
+
+    // Paint per-layer LED group highlights (e.g. modifier keys on specific layers).
+    for (uint8_t g = 0; g < LAYER_LED_GROUP_COUNT; g++) {
+        if (layer_state_cmp(layer_state, layer_led_groups[g].layer)) {
+            rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count,
+                              led_min, led_max, led_group_rgb[g]);
+        }
+    }
 
     // If a pointing device mode is active, override the right half with the
     // mode's color.  This provides instant visual feedback for which mode

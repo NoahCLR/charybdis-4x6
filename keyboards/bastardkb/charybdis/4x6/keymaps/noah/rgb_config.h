@@ -117,6 +117,27 @@ static const hsv_t pd_mode_colors[PD_MODE_COUNT] = {
     {127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},  // [4] arrow      → cyan
 };
 
+// Per-layer LED group highlights.
+// Paint specific LEDs a different color when a layer is active (e.g. to mark
+// modifier keys).  Each entry references an LED index array defined above it.
+// Adding a highlight: define the LED array, add one line to layer_led_groups[].
+static const uint8_t raise_highlight_leds[] = {33, 18};
+static const uint8_t lower_highlight_leds[] = {4, 47};
+
+typedef struct {
+    uint8_t        layer;
+    hsv_t          color;
+    const uint8_t *leds;
+    uint8_t        count;
+} layer_led_group_t;
+
+static const layer_led_group_t layer_led_groups[] = {
+    {LAYER_RAISE, {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, raise_highlight_leds, 2},  // red
+    {LAYER_LOWER, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, lower_highlight_leds, 2},  // yellow
+};
+
+#    define LAYER_LED_GROUP_COUNT (sizeof(layer_led_groups) / sizeof(layer_led_groups[0]))
+
 // Auto-mouse gradient endpoints (white → red countdown).
 // White is capped at v=150 (not MAX_BRIGHTNESS) to limit current draw — all LEDs
 // lit white at full brightness exceeds the USB power budget.
