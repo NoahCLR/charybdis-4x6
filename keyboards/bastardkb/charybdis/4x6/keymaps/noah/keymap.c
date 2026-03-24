@@ -19,9 +19,11 @@
 //
 //   pointing_device_modes.h
 //     Bitfield-based mode system that changes what the trackball does.
-//     Modes: Volume (Y-axis → volume), Brightness (Y-axis → brightness),
-//     Zoom (Y-axis → GUI+Plus/Minus), Arrow (motion → arrow keys),
-//     Dragscroll (firmware-native scroll mode).
+//     Mode flags, structs, state helpers, and the pd_modes[] config table.
+//
+//   pointing_device_mode_handlers.h
+//     Handler implementations for each trackball mode (volume, brightness,
+//     zoom, arrow).  Included by pointing_device_modes.h.
 //
 //   split_sync.h
 //     Syncs pointing-device state (mode flags + auto-mouse elapsed time)
@@ -130,6 +132,11 @@ static void td_reset(tap_dance_state_t *state, void *user_data) {
 // key_config.h — no changes needed here.
 tap_dance_action_t tap_dance_actions[TD_COUNT];
 
+// ─── Pointing Device Mode Timer ──────────────────────────────────────────────
+// Separate from tap_hold_timer so PD mode keys and tap/hold keys don't
+// stomp each other's timers if pressed in quick succession.
+static uint16_t pd_mode_timer;
+
 // ─── Custom Tap / Hold / Longer-Hold System ─────────────────────────────────
 //
 // The mapping table lives in key_config.h (tap_hold_config[]).
@@ -142,6 +149,15 @@ static uint16_t tap_hold_timer;
 static uint16_t tap_hold_keycode = KC_NO;
 static bool     tap_hold_fired   = false;
 static const tap_hold_config_t *tap_hold_active_cfg = NULL;
+
+// ─── RGB Color Cache ─────────────────────────────────────────────────────────
+// Pre-computed HSV → RGB conversions, populated once in keyboard_post_init_user.
+// Declared here (before init) so both init and the render callback can see them.
+#ifdef RGB_MATRIX_ENABLE
+static rgb_t layer_rgb[LAYER_COUNT];
+static rgb_t pd_mode_rgb[PD_MODE_COUNT];
+static rgb_t led_group_rgb[LAYER_LED_GROUP_COUNT];
+#endif
 
 // Look up a keycode in the tap_hold_config table.  Returns NULL if not found.
 static const tap_hold_config_t *tap_hold_lookup(uint16_t keycode) {
@@ -185,11 +201,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         uint8_t mode = pd_mode_for_keycode(keycode);
         if (mode) {
             if (record->event.pressed) {
-                tap_hold_timer = timer_read();
+                pd_mode_timer = timer_read();
                 pd_mode_update(mode, true);
             } else {
                 pd_mode_update(mode, false);
-                if (timer_elapsed(tap_hold_timer) < CUSTOM_TAP_HOLD_TERM) {
+                if (timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
                     uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
                     tap_code16(fallback_key);
                 }
@@ -209,7 +225,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case DRAGSCROLL_MODE: {
             static bool dragscroll_was_locked = false;
             if (record->event.pressed) {
-                tap_hold_timer        = timer_read();
+                pd_mode_timer         = timer_read();
                 dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
                 pd_mode_update(PD_MODE_DRAGSCROLL, true);
                 pd_state_sync();
@@ -224,7 +240,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 }
                 pd_mode_update(PD_MODE_DRAGSCROLL, false);
                 pd_state_sync();
-                if (timer_elapsed(tap_hold_timer) < CUSTOM_TAP_HOLD_TERM) {
+                if (timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
                     // Tap: disable dragscroll if it was enabled, then send the base-layer key.
                     charybdis_set_pointer_dragscroll_enabled(false);
                     uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
@@ -241,7 +257,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         //   When already locked, any press (tap or hold) unlocks.
         case DRG_TOG_ON_HOLD:
             if (record->event.pressed) {
-                tap_hold_timer = timer_read();
+                pd_mode_timer = timer_read();
             } else {
                 bool dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
 
@@ -250,7 +266,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
                     pd_state_sync();
-                } else if (timer_elapsed(tap_hold_timer) > CUSTOM_TAP_HOLD_TERM) {
+                } else if (timer_elapsed(pd_mode_timer) > CUSTOM_TAP_HOLD_TERM) {
                     // HOLD: toggle drag-scroll lock on
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
@@ -302,8 +318,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     // --- 4) Macros (fire once on key-down, defined in key_config.h) ---
-    MACRO_DISPATCH(keycode);
-    return false;
+    if (macro_dispatch(keycode)) return false;
+    return true;
 }
 
 // ─── Immediate Hold Detection ────────────────────────────────────────────────
@@ -334,6 +350,24 @@ void keyboard_post_init_user(void) {
         tap_dance_actions[i].fn.on_each_release   = NULL;
         tap_dance_actions[i].user_data            = (void *)&td_config[i];
     }
+
+#ifdef RGB_MATRIX_ENABLE
+    // Pre-compute HSV → RGB conversions for all color tables so the
+    // per-frame render callback doesn't need to do it.
+    for (uint8_t i = 0; i < LAYER_COUNT; i++)
+        layer_rgb[i] = hsv_to_rgb(layer_colors[i]);
+    // Map each mode's color by matching mode_flag from pd_modes[] to pd_mode_colors[].
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        for (uint8_t c = 0; c < PD_MODE_COLOR_COUNT; c++) {
+            if (pd_mode_colors[c].mode_flag == pd_modes[i].mode_flag) {
+                pd_mode_rgb[i] = hsv_to_rgb(pd_mode_colors[c].color);
+                break;
+            }
+        }
+    }
+    for (uint8_t i = 0; i < LAYER_LED_GROUP_COUNT; i++)
+        led_group_rgb[i] = hsv_to_rgb(layer_led_groups[i].color);
+#endif
 }
 
 // ─── Pointing Device Integration ────────────────────────────────────────────
@@ -461,36 +495,10 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 // 0–28  → left half (29 LEDs)
 // 29–57 → right half (29 LEDs, 2 are dummy/unused on pointer side)
 
-// Pre-computed RGB cache.  hsv_to_rgb() is called once at init instead of
-// every frame (~30fps × 2 chunks = ~60 calls/sec saved).
-// HSV source arrays live in rgb_config.h (layer_colors[], pd_mode_colors[]).
-static rgb_t layer_rgb[LAYER_COUNT];
-static rgb_t pd_mode_rgb[PD_MODE_COUNT];
-static rgb_t led_group_rgb[LAYER_LED_GROUP_COUNT];
-static bool  rgb_colors_init = false;
-
 // QMK calls this in batches (led_min to led_max) — potentially multiple
 // times per frame, once per "chunk" of LEDs.  On a split keyboard, each
 // half only processes its own LEDs.
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    // One-time initialization: convert all HSV colors to RGB.
-    if (!rgb_colors_init) {
-        for (uint8_t i = 0; i < LAYER_COUNT; i++)
-            layer_rgb[i] = hsv_to_rgb(layer_colors[i]);
-        // Map each mode's color by matching mode_flag from pd_modes[] to pd_mode_colors[].
-        for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-            for (uint8_t c = 0; c < PD_MODE_COLOR_COUNT; c++) {
-                if (pd_mode_colors[c].mode_flag == pd_modes[i].mode_flag) {
-                    pd_mode_rgb[i] = hsv_to_rgb(pd_mode_colors[c].color);
-                    break;
-                }
-            }
-        }
-        for (uint8_t i = 0; i < LAYER_LED_GROUP_COUNT; i++)
-            led_group_rgb[i] = hsv_to_rgb(layer_led_groups[i].color);
-        rgb_colors_init = true;
-    }
-
     // Paint all LEDs with the highest active layer's color.
     // Layers with {0,0,0} in layer_colors[] are skipped (BASE uses the
     // default RGB effect, POINTER uses the auto-mouse gradient below).

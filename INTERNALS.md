@@ -12,10 +12,10 @@ A mode intercepts trackball motion and converts it to keypresses (volume, arrows
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `pointing_device_modes.h` | Add a `#define PD_MODE_xxx (1 << N)` (next free bit) |
+| 1 | `lib/pointing_device_modes.h` | Add a `#define PD_MODE_xxx (1 << N)` (next free bit) |
 | 2 | `key_config.h` | Add a keycode to the `custom_keycodes` enum (e.g. `XXX_MODE`) |
-| 3 | `pointing_device_modes.h` | Write a `handle_xxx_mode()` function (see existing handlers for the pattern) |
-| 4 | `pointing_device_modes.h` | Add an entry to `pd_modes[]`: `{PD_MODE_xxx, XXX_MODE, handle_xxx_mode}` — array position = priority |
+| 3 | `lib/pointing_device_modes.h` | Write a `handle_xxx_mode()` function (see existing handlers for the pattern) |
+| 4 | `lib/pointing_device_modes.h` | Add an entry to `pd_modes[]`: `{PD_MODE_xxx, XXX_MODE, handle_xxx_mode}` — array position = priority |
 | 5 | `rgb_config.h` | Add a tagged color entry to `pd_mode_colors[]`: `{PD_MODE_xxx, {hue, sat, val}}` |
 | 6 | `via_to_qmk_layout.py` | Add a `CUSTOM(N)` → `XXX_MODE` mapping to `REPLACEMENTS` |
 
@@ -27,7 +27,7 @@ A tap dance gives a key different actions for single tap, hold, and double tap.
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `key_config.h` | Add one line to `TD_LIST`: `X(TD_xx, tap_kc, hold_kc, double_tap_kc, hold_layer)` |
+| 1 | `key_config.h` | Add one line to `TD_LIST`: `TDE(TD_xx, tap_kc, hold_kc, double_tap_kc, hold_layer)` |
 | 2 | `via_to_qmk_layout.py` | Add the name to `TAP_DANCE_NAMES` (must match enum order) |
 
 The enum, config array, `TD_COUNT`, and runtime action wiring are all auto-generated from `TD_LIST`. Use `hold_layer` (e.g. `LAYER_LOWER`) for layer-hold tap dances; use `0` for keycode-hold.
@@ -69,7 +69,7 @@ Highlight specific LEDs with a different color when a layer is active (e.g. mark
 | Step | File | What to do |
 |------|------|------------|
 | 1 | `rgb_config.h` | Define an LED index array: `static const uint8_t xxx_leds[] = {led1, led2, ...};` |
-| 2 | `rgb_config.h` | Add one line to `layer_led_groups[]`: `{LAYER_xxx, {hue, sat, val}, xxx_leds, count}` |
+| 2 | `rgb_config.h` | Add one line to `layer_led_groups[]`: `{LAYER_xxx, {hue, sat, val}, xxx_leds, sizeof(xxx_leds)}` |
 
 Use the LED Index Map in `keymap.c` to find the LED indices for each physical key position.
 
@@ -181,7 +181,7 @@ If neither flag is set, the firmware falls through to QMK's default USB detectio
 Keys `6`, `7`, `8` and the layer keys (Lower, Raise) use QMK's tap dance (`TAP_DANCE_ENABLE = yes` in `rules.mk`). The implementation is data-driven:
 
 - **`td_config_t`** struct defines tap, hold, double-tap keycodes, and an optional `hold_layer` for layer-hold tap dances.
-- **`TD_LIST` X-macro** is the single source of truth: each line defines the enum name, tap keycode, hold keycode, double-tap keycode, and optional hold-layer. The macro expands twice — once to generate the `tap_dances` enum and `TD_COUNT`, once to populate the `td_config[]` array.
+- **`TD_LIST` TDE-macro** is the single source of truth: each line defines the enum name, tap keycode, hold keycode, double-tap keycode, and optional hold-layer. The macro expands twice — once to generate the `tap_dances` enum and `TD_COUNT`, once to populate the `td_config[]` array.
 - **`tap_dance_actions[]`** is declared as an empty array of size `TD_COUNT` and populated at runtime in `keyboard_post_init_user()`, which wires every entry to the shared `td_finished`/`td_reset` callbacks with the corresponding `td_config` pointer as `user_data`.
 - **`td_finished()`** and **`td_reset()`** are shared callbacks that read the config via `user_data`. No per-key callback duplication.
 - Layer-hold tap dances (TD_28, TD_53) use `layer_on()`/`layer_off()` instead of `tap_code16()`. A static `td_hold_layer_active` variable tracks which layer to deactivate on reset.
@@ -209,7 +209,7 @@ State tracking uses three statics: `tap_hold_timer` (when the key was pressed), 
 
 ## Pointing Device Modes
 
-The trackball mode system is a bitfield-based design in `pointing_device_modes.h`. Each mode is a single bit in `pd_mode_flags`. When a mode is active, `pointing_device_task_user()` intercepts the trackball motion report and dispatches to the mode's handler function pointer (stored in `pd_modes[]`), which converts it to keypresses (volume, brightness, zoom, arrow) instead of cursor movement.
+The trackball mode system is a bitfield-based design in `lib/pointing_device_modes.h`. Each mode is a single bit in `pd_mode_flags`. When a mode is active, `pointing_device_task_user()` intercepts the trackball motion report and dispatches to the mode's handler function pointer (stored in `pd_modes[]`), which converts it to keypresses (volume, brightness, zoom, arrow) instead of cursor movement.
 
 ### Mode resolution
 
@@ -259,7 +259,7 @@ This top-down iteration means higher layers always take priority. For example, L
 
 ### Auto-mouse countdown gradient
 
-Defined in `rgb_automouse.h`. Interpolates linearly from white (HSV 0,0,150) to red (HSV 0,255,max) based on `auto_mouse_get_time_elapsed()`. The first 1/3 of the timeout (400ms) is "dead time" — color stays white to prevent distracting flicker during active trackball use.
+Defined in `lib/rgb_automouse.h`. Interpolates linearly from white (HSV 0,0,150) to red (HSV 0,255,max) based on `auto_mouse_get_time_elapsed()`. The first 1/3 of the timeout (400ms) is "dead time" — color stays white to prevent distracting flicker during active trackball use.
 
 The gradient also drives split sync: the master reads the timer once, uses it for both rendering and broadcasting to the slave via `pd_state_sync_elapsed()`.
 
@@ -288,7 +288,7 @@ typedef struct __attribute__((packed)) {
 
 **Slave-side handler:** `pd_sync_slave_rpc()` updates both `pd_sync_remote` (for RGB rendering) and `pd_mode_flags` (for mode overlay colors).
 
-## RGB Helpers (`rgb_helpers.h`)
+## RGB Helpers (`lib/rgb_helpers.h`)
 
 Split-safe wrappers around `rgb_matrix_set_color()`. On a split keyboard, `rgb_matrix_indicators_advanced_user()` is called in chunks — each half only processes its own LEDs. The helpers clamp to the current chunk so callers can use global LED indices (0–57) without worrying about which half they're on.
 
@@ -318,6 +318,6 @@ Tap dance keycodes are handled separately: VIA exports them as raw hex (`0x5700`
 
 ## Adding a New Trackball Mode
 
-See the [quick reference](#add-a-new-trackball-mode) at the top for the step-by-step checklist. The full config lives in `pointing_device_modes.h` — the handler function, `pd_modes[]` entry, and mode flag define are all in the same file.
+See the [quick reference](#add-a-new-trackball-mode) at the top for the step-by-step checklist. The full config lives in `lib/pointing_device_modes.h` — the handler function, `pd_modes[]` entry, and mode flag define are all in the same file.
 
 `process_record_user`, `is_mouse_record_user`, `pointing_device_task_user`, and RGB rendering all iterate `pd_modes[]` automatically — no manual keycode lists or switch cases to update in `keymap.c`.

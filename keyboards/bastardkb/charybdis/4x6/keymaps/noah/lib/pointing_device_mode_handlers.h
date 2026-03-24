@@ -1,0 +1,233 @@
+// ────────────────────────────────────────────────────────────────────────────
+// Pointing Device Mode Handlers
+// ────────────────────────────────────────────────────────────────────────────
+//
+// Handler implementations for each trackball mode.  Each handler converts
+// trackball motion into keypresses (volume, brightness, zoom, arrows).
+//
+// These are separated from pointing_device_modes.h (which owns the mode
+// flags, structs, and config table) so that tuning a handler's algorithm
+// doesn't require touching the mode system's config/plumbing.
+//
+// ────────────────────────────────────────────────────────────────────────────
+#pragma once
+#include "key_config.h" // for custom keycodes and layer enums
+
+#if defined(POINTING_DEVICE_ENABLE)
+
+// Return a zeroed mouse report — effectively "eats" the trackball motion
+// so the OS doesn't also see mouse movement while a mode is active.
+static inline report_mouse_t freeze_mouse(void) {
+    return (report_mouse_t){0};
+}
+
+// ─── Volume mode ────────────────────────────────────────────────────────────
+// Accumulates trackball Y-axis motion and sends volume up/down keypresses
+// when the threshold is crossed.  X-axis motion is ignored.
+
+#    ifndef VOLUME_THRESHOLD
+#        define VOLUME_THRESHOLD 60 // sensor counts of Y motion per volume step
+#    endif
+
+static int32_t vol_acc_y    = 0; // accumulated Y motion
+static int8_t  vol_last_dir = 0; // last direction
+
+static report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
+    int16_t dy = mouse_report.y;
+
+    if (dy != 0) {
+        int8_t dir = (dy > 0) ? 1 : -1;
+        // Reset accumulator on direction change to prevent "volume bounce"
+        if (vol_last_dir != 0 && dir != vol_last_dir) vol_acc_y = 0;
+        vol_last_dir = dir;
+
+        vol_acc_y += dy;
+        while (vol_acc_y >= VOLUME_THRESHOLD) {
+            tap_code(KC_AUDIO_VOL_DOWN);
+            vol_acc_y -= VOLUME_THRESHOLD;
+        }
+        while (vol_acc_y <= -VOLUME_THRESHOLD) {
+            tap_code(KC_AUDIO_VOL_UP);
+            vol_acc_y += VOLUME_THRESHOLD;
+        }
+    }
+
+    return freeze_mouse();
+}
+
+// ─── Brightness mode ─────────────────────────────────────────────────────────
+// Accumulates trackball Y-axis motion and sends brightness up/down keypresses
+// when the threshold is crossed.  X-axis motion is ignored.
+
+#    ifndef BRIGHTNESS_THRESHOLD
+#        define BRIGHTNESS_THRESHOLD 60 // sensor counts of Y motion per brightness step
+#    endif
+
+static int32_t bright_acc_y    = 0; // accumulated Y motion
+static int8_t  bright_last_dir = 0; // last direction
+
+static report_mouse_t handle_brightness_mode(report_mouse_t mouse_report) {
+    int16_t dy = mouse_report.y;
+
+    if (dy != 0) {
+        int8_t dir = (dy > 0) ? 1 : -1;
+        // Reset accumulator on direction change to prevent "brightness bounce"
+        if (bright_last_dir != 0 && dir != bright_last_dir) bright_acc_y = 0;
+        bright_last_dir = dir;
+
+        bright_acc_y += dy;
+        while (bright_acc_y >= BRIGHTNESS_THRESHOLD) {
+            tap_code(KC_BRID);
+            bright_acc_y -= BRIGHTNESS_THRESHOLD;
+        }
+        while (bright_acc_y <= -BRIGHTNESS_THRESHOLD) {
+            tap_code(KC_BRIU);
+            bright_acc_y += BRIGHTNESS_THRESHOLD;
+        }
+    }
+
+    return freeze_mouse();
+}
+
+// ─── Zoom mode ──────────────────────────────────────────────────────────────
+// Accumulates trackball Y-axis motion and sends GUI+Plus / GUI+Minus
+// when the threshold is crossed.  Works in browsers, editors, Figma, etc.
+
+#    ifndef ZOOM_THRESHOLD
+#        define ZOOM_THRESHOLD 80 // sensor counts of Y motion per zoom step
+#    endif
+
+static int32_t zoom_acc_y    = 0; // accumulated Y motion
+static int8_t  zoom_last_dir = 0; // last direction
+
+static report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
+    int16_t dy = mouse_report.y;
+
+    if (dy != 0) {
+        int8_t dir = (dy > 0) ? 1 : -1;
+        // Reset accumulator on direction change to prevent "zoom bounce"
+        if (zoom_last_dir != 0 && dir != zoom_last_dir) zoom_acc_y = 0;
+        zoom_last_dir = dir;
+
+        zoom_acc_y += dy;
+        while (zoom_acc_y >= ZOOM_THRESHOLD) {
+            tap_code16(G(KC_MINS));
+            zoom_acc_y -= ZOOM_THRESHOLD;
+        }
+        while (zoom_acc_y <= -ZOOM_THRESHOLD) {
+            tap_code16(G(KC_EQL));
+            zoom_acc_y += ZOOM_THRESHOLD;
+        }
+    }
+
+    return freeze_mouse();
+}
+
+// ─── Arrow mode ─────────────────────────────────────────────────────────────
+// Converts trackball motion into arrow key presses.  Only the dominant axis
+// (whichever has more motion) emits keys — the other axis is suppressed and
+// its accumulator is reset.  This makes navigation feel intentional rather
+// than jittery.
+
+#    ifndef ARROW_THRESHOLD_X
+#        define ARROW_THRESHOLD_X 40 // sensor counts of X motion per Left/Right arrow press
+#    endif
+#    ifndef ARROW_THRESHOLD_Y
+#        define ARROW_THRESHOLD_Y 50 // sensor counts of Y motion per Up/Down arrow press
+#    endif
+
+static int32_t arrow_acc_x      = 0;    // accumulated X motion
+static int32_t arrow_acc_y      = 0;    // accumulated Y motion
+static int8_t  arrow_last_x_dir = 0;    // last X direction (+1 or -1)
+static int8_t  arrow_last_y_dir = 0;    // last Y direction (+1 or -1)
+static bool    arrow_axis_is_x  = true; // true = X dominant, false = Y dominant
+
+// Send an arrow key, adding Shift if it's currently held.
+// This enables text selection in arrow mode by holding Shift.
+static inline void arrow_send_key(uint16_t keycode) {
+    if (get_mods() & MOD_MASK_SHIFT)
+        tap_code16(S(keycode));
+    else
+        tap_code(keycode);
+}
+
+// Emit as many arrow presses as the accumulated delta allows.
+// Returns the leftover delta (less than one threshold).
+static inline int32_t arrow_emit_many(int32_t delta, uint16_t positive, uint16_t negative, uint16_t threshold) {
+    while (delta >= threshold) {
+        arrow_send_key(positive);
+        delta -= threshold;
+    }
+    while (delta <= -(int32_t)threshold) {
+        arrow_send_key(negative);
+        delta += threshold;
+    }
+    return delta;
+}
+
+// Determine which axis has more motion in this report.
+// The dominant axis "wins" — only that axis emits arrow keys.
+// This prevents diagonal trackball movement from producing both
+// horizontal and vertical arrows simultaneously.
+static inline void arrow_update_dominant_axis(int16_t dx, int16_t dy) {
+    int16_t ax = dx >= 0 ? dx : -dx;
+    int16_t ay = dy >= 0 ? dy : -dy;
+    if (ax > ay && ax > 0)
+        arrow_axis_is_x = true;
+    else if (ay > ax && ay > 0)
+        arrow_axis_is_x = false;
+}
+
+static report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
+    int16_t dx = mouse_report.x;
+    int16_t dy = mouse_report.y;
+
+    arrow_update_dominant_axis(dx, dy);
+
+    if (arrow_axis_is_x) {
+        if (dx != 0) {
+            int8_t dir = (dx > 0) ? 1 : -1;
+            if (arrow_last_x_dir != 0 && dir != arrow_last_x_dir) arrow_acc_x = 0;
+            arrow_last_x_dir = dir;
+        }
+        arrow_acc_x += dx;
+        arrow_acc_x = arrow_emit_many(arrow_acc_x, KC_RIGHT, KC_LEFT, ARROW_THRESHOLD_X);
+
+        // Suppress the off-axis to prevent accidental vertical movement.
+        if (dy != 0) {
+            arrow_acc_y      = 0;
+            arrow_last_y_dir = 0;
+        }
+    } else {
+        if (dy != 0) {
+            int8_t dir = (dy > 0) ? 1 : -1;
+            if (arrow_last_y_dir != 0 && dir != arrow_last_y_dir) arrow_acc_y = 0;
+            arrow_last_y_dir = dir;
+        }
+        arrow_acc_y += dy;
+        arrow_acc_y = arrow_emit_many(arrow_acc_y, KC_DOWN, KC_UP, ARROW_THRESHOLD_Y);
+
+        // Suppress the off-axis to prevent accidental horizontal movement.
+        if (dx != 0) {
+            arrow_acc_x      = 0;
+            arrow_last_x_dir = 0;
+        }
+    }
+
+    return freeze_mouse();
+}
+
+#else  // POINTING_DEVICE_ENABLE not defined: provide empty stubs so keymap.c compiles.
+static inline report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+static inline report_mouse_t handle_brightness_mode(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+static inline report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+static inline report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+#endif // POINTING_DEVICE_ENABLE

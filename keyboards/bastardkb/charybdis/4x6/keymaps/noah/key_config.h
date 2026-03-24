@@ -136,6 +136,7 @@ typedef struct {
     bool     immediate;   // true = fire hold at threshold, false = wait for release
 } tap_hold_config_t;
 
+// tap          hold         longer_hold  immediate
 static const tap_hold_config_t tap_hold_config[] = {
     // Number row → shifted symbols
     {KC_1, KC_EXLM, KC_NO, true}, // 1 → !
@@ -171,36 +172,35 @@ static const tap_hold_config_t tap_hold_config[] = {
 // ─── Macros ─────────────────────────────────────────────────────────────────
 //
 // Each macro maps a custom keycode to a SEND_STRING expression.
-// SEND_STRING is a macro itself, so we can't store the strings in a plain
-// array — instead we use a lookup function.  But the definitions live here
-// so all key behavior config is in one place.
+// Returns true if the keycode was handled, false otherwise.
 //
 // To add a macro: add a case below, and make sure the keycode exists in the
 // custom_keycodes enum above.
 
-#define MACRO_DISPATCH(keycode)                                         \
-    switch (keycode) {                                                  \
-        case MACRO_0: /* Spotlight search (macOS): GUI + Space */       \
-            SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));                      \
-            break;                                                      \
-        case MACRO_1: /* Claude: Alt + Space */                         \
-            SEND_STRING(SS_LALT(SS_TAP(X_SPACE)));                      \
-            break;                                                      \
-        case MACRO_2: /* Terminal: Alt + GUI + Space */                 \
-            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_SPACE))));             \
-            break;                                                      \
-        case MACRO_3: /* OCR text copy (macOS): Ctrl + Alt + GUI + C */ \
-            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("c"))));                \
-            break;                                                      \
-        case MACRO_4: /* Screenshot (macOS): Ctrl + Alt + GUI + X */    \
-            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("x"))));                \
-            break;                                                      \
-        case MACRO_5: /* Emoji picker (macOS): Ctrl + GUI + Space */    \
-            SEND_STRING(SS_LCTL(SS_LGUI(SS_TAP(X_SPACE))));             \
-            break;                                                      \
-        default:                                                        \
-            return true;                                                \
+static inline bool macro_dispatch(uint16_t keycode) {
+    switch (keycode) {
+        case MACRO_0: // Spotlight search (macOS): GUI + Space
+            SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
+            return true;
+        case MACRO_1: // Claude: Alt + Space
+            SEND_STRING(SS_LALT(SS_TAP(X_SPACE)));
+            return true;
+        case MACRO_2: // Terminal: Alt + GUI + Space
+            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_SPACE))));
+            return true;
+        case MACRO_3: // OCR text copy (macOS): Ctrl + Alt + GUI + C
+            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("c"))));
+            return true;
+        case MACRO_4: // Screenshot (macOS): Ctrl + Alt + GUI + X
+            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("x"))));
+            return true;
+        case MACRO_5: // Emoji picker (macOS): Ctrl + GUI + Space
+            SEND_STRING(SS_LCTL(SS_LGUI(SS_TAP(X_SPACE))));
+            return true;
+        default:
+            return false;
     }
+}
 
 // ─── Keymap Layouts ─────────────────────────────────────────────────────────
 //

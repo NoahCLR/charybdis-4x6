@@ -23,6 +23,7 @@
 // Layer indicator colors (HSV), indexed by layer enum.
 // {0,0,0} means "no solid color" — LAYER_BASE falls through to the default
 // RGB matrix effect, LAYER_POINTER uses the auto-mouse gradient instead.
+//                    {hue, sat, val}
 static const hsv_t layer_colors[LAYER_COUNT] = {
     [LAYER_BASE]    = {0,   0,   0},                                  // no override
     [LAYER_NUM]     = {85,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},      // green
@@ -41,6 +42,7 @@ typedef struct {
     hsv_t   color;
 } pd_mode_color_t;
 
+// mode_flag             {hue, sat, val}
 static const pd_mode_color_t pd_mode_colors[] = {
     {PD_MODE_DRAGSCROLL,  {21,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // orange
     {PD_MODE_VOLUME,      {43,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // yellow
@@ -66,6 +68,7 @@ typedef struct {
     uint8_t        count;
 } layer_led_group_t;
 
+// layer         {hue, sat, val}                            leds                  count
 static const layer_led_group_t layer_led_groups[] = {
     {LAYER_RAISE, {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, raise_highlight_leds, sizeof(raise_highlight_leds)},  // red
     {LAYER_LOWER, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, lower_highlight_leds, sizeof(lower_highlight_leds)},  // yellow
