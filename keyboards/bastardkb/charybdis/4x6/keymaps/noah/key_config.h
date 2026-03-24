@@ -160,8 +160,11 @@ static const mode_tap_override_t mode_tap_overrides[] = {
 // To add a combo:
 //   1. Define a PROGMEM key array ending with COMBO_END.
 //   2. Add a COMBO() entry to key_combos[] in the same order.
+//
+// Important: trigger keys must match the exact keycode in the layout,
+// including any LT() or MT() wrappers (e.g. LT(LAYER_RAISE, KC_F), not KC_F).
 
-const uint16_t PROGMEM combo_keys_1[] = {KC_D, KC_F, COMBO_END};
+const uint16_t PROGMEM combo_keys_1[] = {KC_D, LT(LAYER_RAISE, KC_F), COMBO_END};
 
 combo_t key_combos[] = {
     COMBO(combo_keys_1, KC_TAB), // D + F → Tab
