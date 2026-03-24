@@ -404,8 +404,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         dt_timer     = timer_read();
                         dt_keycode   = keycode;
                         // For MO() keys, tap sends nothing (layer was already on/off).
-                        // For hold_keys, tap sends the keycode itself.
-                        dt_tap_keycode = rel_hold ? keycode : KC_NO;
+                        // For regular keys, tap sends the keycode itself.
+                        dt_tap_keycode = is_mo ? KC_NO : keycode;
                     } else if (rel_hold) {
                         tap_code16(keycode);
                     }
