@@ -118,6 +118,86 @@ enum charybdis_keymap_layers {
     LAYER_POINTER,  // Auto-mouse layer: activates on trackball movement, deactivates after timeout
 };
 
+// ─── Tap Dance ──────────────────────────────────────────────────────────────
+//
+// QMK tap dance lets a single key do different things based on how many
+// times it's tapped in quick succession.
+//
+//   TD_6:  single tap → 6, hold → ^,  double tap → play/pause
+//   TD_7:  single tap → 7, hold → &,  double tap → next track
+//   TD_8:  single tap → 8, hold → *,  double tap → previous track
+
+enum tap_dances {
+    TD_6,
+    TD_7,
+    TD_8,
+    TD_LWR,
+    TD_RSE,
+    TD_COUNT,
+};
+
+// Per-tap-dance config: what to send on tap, hold, and double tap.
+// If hold_layer is non-zero, hold activates that layer instead of sending
+// the hold keycode.  (Layer 0 is always active so 0 means "use keycode".)
+typedef struct {
+    uint16_t tap;
+    uint16_t hold;
+    uint16_t double_tap;
+    uint8_t  hold_layer;
+} td_config_t;
+
+static const td_config_t td_config[TD_COUNT] = {
+    [TD_6]   = {KC_6,  KC_CIRC, KC_MPLY, 0},
+    [TD_7]   = {KC_7,  KC_AMPR, KC_MNXT, 0},
+    [TD_8]   = {KC_8,  KC_ASTR, KC_MPRV, 0},
+    [TD_LWR] = {KC_NO, KC_NO,   KC_MPLY, LAYER_LOWER},
+    [TD_RSE] = {KC_NO, KC_NO,   KC_MPLY, LAYER_RAISE},
+};
+
+// Tracks which layer a tap-dance hold activated, so reset can deactivate it.
+static uint8_t td_hold_layer_active = 0;
+
+// Shared callback — the config is passed via user_data.
+static void td_finished(tap_dance_state_t *state, void *user_data) {
+    const td_config_t *cfg = (const td_config_t *)user_data;
+
+    if (state->count == 1) {
+        if (state->pressed) {
+            if (cfg->hold_layer) {
+                layer_on(cfg->hold_layer);
+                td_hold_layer_active = cfg->hold_layer;
+            } else {
+                tap_code16(cfg->hold);
+            }
+        } else {
+            if (cfg->tap != KC_NO) tap_code16(cfg->tap);
+        }
+    } else if (state->count == 2 && !state->pressed) {
+        tap_code16(cfg->double_tap);
+    }
+}
+
+static void td_reset(tap_dance_state_t *state, void *user_data) {
+    if (td_hold_layer_active) {
+        layer_off(td_hold_layer_active);
+        td_hold_layer_active = 0;
+    }
+}
+
+#define TD_ENTRY(idx)                                            \
+    {                                                            \
+        .fn        = {NULL, td_finished, td_reset, NULL},        \
+        .user_data = (void *)&td_config[idx],                    \
+    }
+
+tap_dance_action_t tap_dance_actions[] = {
+    [TD_6]   = TD_ENTRY(TD_6),
+    [TD_7]   = TD_ENTRY(TD_7),
+    [TD_8]   = TD_ENTRY(TD_8),
+    [TD_LWR] = TD_ENTRY(TD_LWR),
+    [TD_RSE] = TD_ENTRY(TD_RSE),
+};
+
 // ─── Keymap Layouts ─────────────────────────────────────────────────────────
 //
 // QMK key prefixes quick reference:
@@ -137,7 +217,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
     [LAYER_BASE] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  QK_GESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,                 KC_6,              KC_7,              KC_8,              KC_9,              KC_0,           KC_MINS,
+                  QK_GESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,        TD(TD_6),     TD(TD_7),     TD(TD_8),              KC_9,              KC_0,           KC_MINS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                    KC_TAB,              KC_Q,              KC_W,              KC_E,              KC_R,              KC_T,                 KC_Y,              KC_U,              KC_I,              KC_O,              KC_P,           KC_BSLS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -145,7 +225,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
              KC_LEFT_CTRL,        LT(2,KC_Z),              KC_X,              KC_C,              KC_V,        LT(1,KC_B),                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(3,KC_SLSH),      KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,             MO(2),             MO(3),            KC_ENT,
+                                                                       KC_LEFT_GUI,            KC_SPC,       TD(TD_LWR),       TD(TD_RSE),            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,           KC_BSPC
   //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
     ),
@@ -228,6 +308,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 //   CUSTOM_TAP_HOLD_TERM      = 150ms
 //   CUSTOM_LONGER_HOLD_TERM   = 400ms
 static uint16_t tap_hold_timer;
+static uint16_t tap_hold_keycode = KC_NO; // which key is currently held
+static bool     tap_hold_fired   = false; // whether the hold action already sent
 
 // Send the hold variant (triggered at 150–400ms hold).
 // Maps each key to its shifted symbol.
@@ -452,17 +534,16 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     // --- 2) Custom tap/hold/longer-hold keys (react on both press and release) ---
-    // These keys don't register on key-down.  Instead we start a timer, and
-    // on key-up we decide what to send based on how long the key was held.
+    // Most keys fire their hold variant immediately when the threshold is
+    // reached (via matrix_scan_user), so you don't have to release the key.
+    // Arrow keys keep the old release-based behavior because they have a
+    // third tier (longer hold → GUI+Arrow) that requires waiting for release.
     switch (keycode) {
         case KC_1:
         case KC_2:
         case KC_3:
         case KC_4:
         case KC_5:
-        case KC_6:
-        case KC_7:
-        case KC_8:
         case KC_9:
         case KC_0:
         case KC_MINS:
@@ -479,19 +560,27 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case KC_RIGHT:
         case KC_ENT:
             if (record->event.pressed) {
-                tap_hold_timer = timer_read();
+                tap_hold_timer   = timer_read();
+                tap_hold_keycode = keycode;
+                tap_hold_fired   = false;
             } else {
-                uint16_t tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
-
-                if (tap_hold_elapsed_time < CUSTOM_TAP_HOLD_TERM) {
-                    // TAP: send the plain key (1, 2, -, etc.)
-                    tap_code16(keycode);
-                } else if (tap_hold_elapsed_time > CUSTOM_LONGER_HOLD_TERM) {
-                    // LONGER HOLD: third-tier action (GUI+Arrow for navigation)
-                    send_longer_hold_variant(keycode);
+                tap_hold_keycode = KC_NO;
+                if (tap_hold_fired) {
+                    // Hold variant was already sent by matrix_scan_user.
+                    tap_hold_fired = false;
                 } else {
-                    // HOLD: shifted variant (!, @, _, etc.)
-                    send_hold_variant(keycode);
+                    uint16_t tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
+
+                    if (tap_hold_elapsed_time < CUSTOM_TAP_HOLD_TERM) {
+                        // TAP: send the plain key (1, 2, -, etc.)
+                        tap_code16(keycode);
+                    } else if (tap_hold_elapsed_time > CUSTOM_LONGER_HOLD_TERM) {
+                        // LONGER HOLD: third-tier action (GUI+Arrow for navigation)
+                        send_longer_hold_variant(keycode);
+                    } else {
+                        // HOLD: shifted variant (!, @, _, etc.)
+                        send_hold_variant(keycode);
+                    }
                 }
             }
             return false;
@@ -530,6 +619,26 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     return true;
+}
+
+// ─── Immediate Hold Detection ────────────────────────────────────────────────
+//
+// Called every matrix scan cycle (~1ms).  When a tap/hold key has been held
+// past CUSTOM_TAP_HOLD_TERM, fire the hold variant immediately instead of
+// waiting for release.  Arrow keys are excluded — they use the release-based
+// three-tier system so you can choose between hold (Alt+Arrow) and longer
+// hold (GUI+Arrow).
+void matrix_scan_user(void) {
+    if (tap_hold_keycode != KC_NO && !tap_hold_fired) {
+        // Arrow keys keep release-based behavior for their three-tier system.
+        if (tap_hold_keycode == KC_LEFT || tap_hold_keycode == KC_RIGHT) {
+            return;
+        }
+        if (timer_elapsed(tap_hold_timer) >= CUSTOM_TAP_HOLD_TERM) {
+            send_hold_variant(tap_hold_keycode);
+            tap_hold_fired = true;
+        }
+    }
 }
 
 // ─── Pointing Device Integration ────────────────────────────────────────────

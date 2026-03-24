@@ -7,6 +7,9 @@ POINTING_DEVICE_HIRES_SCROLL_ENABLE = yes
 # Link-time optimization: reduces binary size.
 LTO_ENABLE = yes
 
+# Tap dance: allows multi-tap key behaviors (e.g. double-tap 6 for play/pause).
+TAP_DANCE_ENABLE = yes
+
 # Split role override: build with FORCE_MASTER=yes or FORCE_SLAVE=yes
 # to force a specific half's role when both have USB connected.
 ifdef FORCE_MASTER

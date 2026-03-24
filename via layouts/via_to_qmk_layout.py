@@ -105,7 +105,22 @@ REPLACEMENTS = {
     "CUSTOM(82)": "ARROW_MODE",       # enum position 18
     "CUSTOM(83)": "ZOOM_MODE",        # enum position 19
     "CUSTOM(84)": "DRG_TOG_ON_HOLD",  # enum position 20
+
 }
+
+# Tap dance keycodes (VIA exports these as raw hex: 0x5700 + index).
+# → Adding or renaming a tap dance?  Update this list to match the
+#   tap_dances enum in keymap.c.
+TAP_DANCE_NAMES = [
+    "TD_6",
+    "TD_7",
+    "TD_8",
+    "TD_LWR",
+    "TD_RSE",
+]
+QK_TAP_DANCE = 0x5700  # from QMK keycodes.h — stable keycode range base
+for i, name in enumerate(TAP_DANCE_NAMES):
+    REPLACEMENTS[f"0x{QK_TAP_DANCE + i:04X}"] = f"TD({name})"
 
 # VIA represents macros as both MACRO(n) and CUSTOM(64+n) depending on
 # firmware version.  Generate both mappings → MACRO_n.
