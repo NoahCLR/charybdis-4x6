@@ -148,7 +148,7 @@ ROW_COMMENTS = [
     "  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤",
     "  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤",
     "  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
-    "  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯",
+    "  //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯",
 ]
 
 # Formatting constants
@@ -230,12 +230,18 @@ def format_split_row(row_tokens):
     return f"{INDENT_MAIN}{left_str},    {right_str},"
 
 def format_thumb_row1(row_tokens):
-    inner = format_group(row_tokens, 5)
-    return f"{INDENT_THUMB1}{inner},"
+    left  = row_tokens[:3]
+    right = row_tokens[3:]
+    left_str  = format_group(left, 3)
+    right_str = format_group(right, 2)
+    return f"{INDENT_THUMB1}{left_str},    {right_str},"
 
 def format_thumb_row2(row_tokens):
-    inner = format_group(row_tokens, 3)
-    return f"{INDENT_THUMB2}{inner}"
+    left  = row_tokens[:2]
+    right = row_tokens[2:]
+    left_str  = format_group(left, 2)
+    right_str = format_group(right, 1)
+    return f"{INDENT_THUMB2}{left_str},    {right_str}"
 
 def render_layer(layer_name, tokens, indent="  "):
     out = [f"{indent}[{layer_name}] = LAYOUT("]
