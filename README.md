@@ -112,7 +112,8 @@ The top of the script has a configuration section with the things you'd need to 
 
 ```
 keyboards/bastardkb/charybdis/4x6/keymaps/noah/
-  keymap.c                  Main keymap: layers, key processing, RGB indicators
+  keymap.c                  Processing logic: key event handlers, RGB indicators
+  key_config.h              Key behavior config: enums, tap dance table, tap/hold table, macros, LAYOUT arrays
   config.h                  QMK/Charybdis configuration overrides
   pointing_device_modes.h   Trackball mode system (volume, brightness, zoom, arrow, dragscroll)
   split_sync.h              Master → slave state sync via RPC (mode flags + elapsed time)

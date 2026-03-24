@@ -236,9 +236,9 @@ The split boundary is fixed at LED index 29 (`RGB_LEFT_LED_COUNT`), matching `RG
 
 The `via layouts/via_to_qmk_layout.py` script converts VIA JSON exports into QMK `LAYOUT()` blocks. VIA uses a flat key index and its own token format (`CUSTOM(80)`, `KC_NO`, etc.) that doesn't match QMK's matrix order or keycode names.
 
-When adding a custom keycode to the keymap, also add the VIA token mapping in the `REPLACEMENTS` dict at the top of the script. The dict translates VIA's `CUSTOM(N)` tokens to the corresponding enum name in `keymap.c`.
+When adding a custom keycode to the keymap, also add the VIA token mapping in the `REPLACEMENTS` dict at the top of the script. The dict translates VIA's `CUSTOM(N)` tokens to the corresponding enum name in `key_config.h`.
 
-Tap dance keycodes are handled separately: VIA exports them as raw hex (`0x5700`, `0x5701`, ...) based on `QK_TAP_DANCE` (0x5700) + index. The `TAP_DANCE_NAMES` list at the top of the script generates the hex → `TD(name)` mappings automatically — keep it in sync with the `tap_dances` enum in `keymap.c`.
+Tap dance keycodes are handled separately: VIA exports them as raw hex (`0x5700`, `0x5701`, ...) based on `QK_TAP_DANCE` (0x5700) + index. The `TAP_DANCE_NAMES` list at the top of the script generates the hex → `TD(name)` mappings automatically — keep it in sync with the `tap_dances` enum in `key_config.h`.
 
 ## Adding a New Trackball Mode
 
@@ -246,7 +246,7 @@ See the step-by-step guide in the header comment of `pointing_device_modes.h`. S
 
 1. Add a `PD_MODE_xxx` define (next free bit)
 2. Add it to `pd_mode_priority[]`, update `PD_MODE_COUNT`
-3. Add a custom keycode in `keymap.c`'s enum
+3. Add a custom keycode in `key_config.h`'s enum
 4. Add the keycode to the tap/hold mode key handler in `process_record_user`
 5. Add a handler case in `pointing_device_task_user`'s switch
 6. Add an RGB color and `pd_mode_rgb[]` entry in the RGB section

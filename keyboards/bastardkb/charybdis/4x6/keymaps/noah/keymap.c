@@ -8,9 +8,14 @@
 // Architecture overview:
 //
 //   keymap.c (this file)
-//     Main keymap file.  Defines layers, key behavior, macros, pointing
-//     device integration, and RGB layer indicators.  Ties together the
-//     four helper headers below.
+//     Processing logic: key event handlers, pointing device integration,
+//     and RGB layer indicators.  Ties together the helper headers below.
+//
+//   key_config.h
+//     All key behavior configuration: enums (layers, custom keycodes,
+//     tap dances), tap dance config table, tap/hold mapping table,
+//     macro definitions, and LAYOUT arrays.  Edit this file to change
+//     what keys do.
 //
 //   pointing_device_modes.h
 //     Bitfield-based mode system that changes what the trackball does.
@@ -59,6 +64,7 @@
 
 #include QMK_KEYBOARD_H
 
+#include "key_config.h"
 #include "pointing_device_modes.h"
 #include "split_sync.h"
 #include "rgb_automouse.h"
@@ -82,90 +88,12 @@ bool is_keyboard_master_impl(void) {
 }
 #endif
 
-// ─── Custom Keycodes & Keymap Layers ────────────────────────────────────────
+// ─── Tap Dance Callbacks ────────────────────────────────────────────────────
+// Config (enums, types, tables) is in key_config.h.  Only the callbacks
+// live here; tap_dance_actions[] is populated from td_config[] at init.
 
-// Custom keycodes are assigned values starting from SAFE_RANGE so they don't
-// collide with any built-in QMK or Charybdis keycodes.
-//
-// MACRO_0–15 are generic macro slots (some used, rest reserved for VIA).
-// VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE activate pointing device modes while held.
-// DRG_TOG_ON_HOLD is a dual-purpose key: tap sends the base-layer key at
-// that position, hold toggles drag-scroll lock.
-enum custom_keycodes {
-    MACRO_0 = SAFE_RANGE,
-    MACRO_1,
-    MACRO_2,
-    MACRO_3,
-    MACRO_4,
-    MACRO_5,
-    MACRO_6,  // reserved for VIA
-    MACRO_7,  // reserved for VIA
-    MACRO_8,  // reserved for VIA
-    MACRO_9,  // reserved for VIA
-    MACRO_10, // reserved for VIA
-    MACRO_11, // reserved for VIA
-    MACRO_12, // reserved for VIA
-    MACRO_13, // reserved for VIA
-    MACRO_14, // reserved for VIA
-    MACRO_15, // reserved for VIA
-    VOLUME_MODE,
-    BRIGHTNESS_MODE,
-    ARROW_MODE,
-    ZOOM_MODE,
-    DRG_TOG_ON_HOLD,
-};
-
-// Layers are stacked: higher layers override lower ones.
-// Keys marked _______ let the layer below show through.
-enum charybdis_keymap_layers {
-    LAYER_BASE = 0, // Default QWERTY typing layer
-    LAYER_NUM,      // Numpad on the right half (activated by holding Z or B)
-    LAYER_LOWER,    // Symbols and DPI controls (blue RGB)
-    LAYER_RAISE,    // Navigation, media, and mouse buttons (purple RGB, sniping enabled)
-    LAYER_POINTER,  // Auto-mouse layer: activates on trackball movement, deactivates after timeout
-};
-
-// ─── Tap Dance ──────────────────────────────────────────────────────────────
-//
-// QMK tap dance lets a single key do different things based on how many
-// times it's tapped in quick succession.
-//
-// Named by LED index (see LED Index Map near RGB section) so the
-// identifier stays stable regardless of what keycode is mapped there.
-//
-//   TD_49 (6 key):   single tap → 6, hold → ^,    double tap → play/pause
-//   TD_45 (7 key):   single tap → 7, hold → &,    double tap → next track
-//   TD_44 (8 key):   single tap → 8, hold → *,    double tap → prev track
-//   TD_28 (L thumb): hold → Lower layer,           double tap → play/pause
-//   TD_53 (R thumb): hold → Raise layer,           double tap → play/pause
-
-enum tap_dances {
-    TD_49,
-    TD_45,
-    TD_44,
-    TD_28,
-    TD_53,
-    TD_COUNT,
-};
-
-// Per-tap-dance config: what to send on tap, hold, and double tap.
-// If hold_layer is non-zero, hold activates that layer instead of sending
-// the hold keycode.  (Layer 0 is always active so 0 means "use keycode".)
-typedef struct {
-    uint16_t tap;
-    uint16_t hold;
-    uint16_t double_tap;
-    uint8_t  hold_layer;
-} td_config_t;
-
-static const td_config_t td_config[TD_COUNT] = {
-    [TD_49] = {KC_6, KC_CIRC, KC_MPLY, 0}, [TD_45] = {KC_7, KC_AMPR, KC_MNXT, 0}, [TD_44] = {KC_8, KC_ASTR, KC_MPRV, 0}, [TD_28] = {KC_NO, KC_NO, KC_MPLY, LAYER_LOWER}, [TD_53] = {KC_NO, KC_NO, KC_MPLY, LAYER_RAISE},
-};
-
-// Tracks which layer a tap-dance hold activated, so reset can deactivate it.
 static uint8_t td_hold_layer_active = 0;
 
-// Shared callback — the config is passed via user_data.
 static void td_finished(tap_dance_state_t *state, void *user_data) {
     const td_config_t *cfg = (const td_config_t *)user_data;
 
@@ -192,246 +120,30 @@ static void td_reset(tap_dance_state_t *state, void *user_data) {
     }
 }
 
-#define TD_ENTRY(idx)                                     \
-    {                                                     \
-        .fn        = {NULL, td_finished, td_reset, NULL}, \
-        .user_data = (void *)&td_config[idx],             \
-    }
-
-tap_dance_action_t tap_dance_actions[] = {
-    [TD_49] = TD_ENTRY(TD_49), [TD_45] = TD_ENTRY(TD_45), [TD_44] = TD_ENTRY(TD_44), [TD_28] = TD_ENTRY(TD_28), [TD_53] = TD_ENTRY(TD_53),
-};
-
-// ─── Keymap Layouts ─────────────────────────────────────────────────────────
-//
-// ╭────────────────────────╮                 ╭────────────────────────╮
-//    0   7   8  15  16  20                     49  45  44  37  36  29
-// ├────────────────────────┤                 ├────────────────────────┤
-//    1   6   9  14  17  21                     50  46  43  38  35  30
-// ├────────────────────────┤                 ├────────────────────────┤
-//    2   5  10  13  18  22                     51  47  42  39  34  31
-// ├────────────────────────┤                 ├────────────────────────┤
-//    3   4  11  12  19  23                     52  48  41  40  33  32
-// ╰────────────────────────╯                 ╰────────────────────────╯
-//                       26  27  28     53  54  XX
-//                           25  24     55  XX
-//                     ╰────────────╯ ╰────────────╯
-//
-// QMK key prefixes quick reference:
-//   KC_     = plain keycode              MT() = mod on hold, key on tap
-//   LT(l,k) = layer l on hold, k on tap  MO() = momentary layer while held
-//   G()     = GUI + key                   A()  = Alt + key
-//   S()     = Shift + key                 LCAG() = Ctrl+Alt+GUI + key
-//   LSG()   = Left Shift+GUI + key        LAG()  = Left Alt+GUI + key
-//
-//   - XXXXXXX = key does nothing on this layer.
-//     _______ = transparent, falls through to the layer below.
-//
-// The number row (KC_1–KC_0) and punctuation keys use a custom tap/hold
-// system defined below — they are NOT using QMK's built-in mod-tap.
-// See process_record_user() for details.
-const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-    // clang-format off
-    [LAYER_BASE] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  QK_GESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,        TD(TD_49),     TD(TD_45),     TD(TD_44),              KC_9,              KC_0,           KC_MINS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                   KC_TAB,              KC_Q,              KC_W,              KC_E,              KC_R,              KC_T,                 KC_Y,              KC_U,              KC_I,              KC_O,              KC_P,           KC_BSLS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-         MT(MOD_LSFT,KC_CAPS),             KC_A,             KC_S,             KC_D,       LT(3,KC_F),              KC_G,                 KC_H,        LT(2,KC_J),              KC_K,              KC_L,           KC_SCLN,           KC_QUOT,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-             KC_LEFT_CTRL,        LT(2,KC_Z),              KC_X,              KC_C,              KC_V,        LT(1,KC_B),                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(3,KC_SLSH),      KC_RIGHT_ALT,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,       TD(TD_28),       TD(TD_53),            KC_ENT,
-                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
-  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-    ),
-
-    [LAYER_NUM] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P7,             KC_P8,             KC_P9,           XXXXXXX,           KC_PPLS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,             MO(3),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,             MO(2),             MO(3),             KC_P0,
-                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
-  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-    ),
-
-    [LAYER_LOWER] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                   KC_ESC,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LPRN,           KC_RPRN,           KC_QUOT,           KC_PPLS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-            KC_LEFT_SHIFT,           XXXXXXX,           XXXXXXX,           XXXXXXX,            KC_ESC,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,           KC_DQUO,           KC_PEQL,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-             KC_LEFT_CTRL,           XXXXXXX,        LCAG(KC_X),        LCAG(KC_C),         LSG(KC_V),           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LCBR,           KC_RCBR,           XXXXXXX,      KC_RIGHT_ALT,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,           XXXXXXX,             MO(3),           XXXXXXX,
-                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
-  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-    ),
-
-    [LAYER_RAISE] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-              LAG(KC_ESC),           XXXXXXX,           XXXXXXX,        LCAG(KC_V),           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-         MT(MOD_LSFT,KC_CAPS),        LSG(KC_Z),          XXXXXXX,          G(KC_C),          XXXXXXX,           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,           MS_BTN1,           MS_BTN2,           DRGSCRL,           XXXXXXX,        ARROW_MODE,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,           XXXXXXX,       KC_LEFT_ALT,            KC_ENT,
-                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
-  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-    ),
-
-    [LAYER_POINTER] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-            KC_LEFT_SHIFT,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,         ZOOM_MODE,           MS_BTN3,   DRG_TOG_ON_HOLD,           SNP_TOG,      KC_RIGHT_GUI,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,           DRGSCRL,           _______,        ARROW_MODE,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,      LT(1,KC_SPC),             MO(2),             MO(3),            KC_ENT,
-                                                                                               KC_DEL,           KC_BSPC,           KC_BSPC
-  //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
-    ),
-    // clang-format on
-};
+// QMK requires this array to exist.  Entries are populated at init time
+// from td_config[] so adding a new tap dance only requires one line in
+// key_config.h — no changes needed here.
+tap_dance_action_t tap_dance_actions[TD_COUNT];
 
 // ─── Custom Tap / Hold / Longer-Hold System ─────────────────────────────────
 //
-// This keymap does NOT use QMK's built-in mod-tap for the number row and
-// punctuation.  Instead, it implements its own three-tier timing system:
+// The mapping table lives in key_config.h (tap_hold_config[]).
+// This section contains only the processing state and lookup logic.
 //
-//   Tap   (< 150ms):  Send the plain key.          e.g. "1"
-//   Hold  (150–400ms): Send the shifted variant.    e.g. "!" (Shift+1)
-//   Longer hold (> 400ms): Send a third action.     e.g. GUI+Arrow
-//
-// This means key-down does NOT immediately register — the character is only
-// sent on key-up, after measuring how long the key was held.
-//
-// The thresholds are defined in config.h:
+// Thresholds are defined in config.h:
 //   CUSTOM_TAP_HOLD_TERM      = 150ms
 //   CUSTOM_LONGER_HOLD_TERM   = 400ms
 static uint16_t tap_hold_timer;
-static uint16_t tap_hold_keycode = KC_NO; // which key is currently held
-static bool     tap_hold_fired   = false; // whether the hold action already sent
+static uint16_t tap_hold_keycode = KC_NO;
+static bool     tap_hold_fired   = false;
+static const tap_hold_config_t *tap_hold_active_cfg = NULL;
 
-// Send the hold variant (triggered at 150–400ms hold).
-// Maps each key to its shifted symbol.
-static void send_hold_variant(uint16_t keycode) {
-    switch (keycode) {
-        // Number row → shifted symbols
-        case KC_1:
-            tap_code16(KC_EXLM);
-            break; // !
-        case KC_2:
-            tap_code16(KC_AT);
-            break; // @
-        case KC_3:
-            tap_code16(KC_HASH);
-            break; // #
-        case KC_4:
-            tap_code16(KC_DLR);
-            break; // $
-        case KC_5:
-            tap_code16(KC_PERC);
-            break; // %
-        case KC_6:
-            tap_code16(KC_CIRC);
-            break; // ^
-        case KC_7:
-            tap_code16(KC_AMPR);
-            break; // &
-        case KC_8:
-            tap_code16(KC_ASTR);
-            break; // *
-        case KC_9:
-            tap_code16(KC_LPRN);
-            break; // (
-        case KC_0:
-            tap_code16(KC_RPRN);
-            break; // )
-
-        // Punctuation → shifted variants
-        case KC_MINS:
-            tap_code16(KC_UNDS);
-            break; // _
-        case KC_EQL:
-            tap_code16(KC_PLUS);
-            break; // +
-        case KC_LBRC:
-            tap_code16(KC_LCBR);
-            break; // {
-        case KC_RBRC:
-            tap_code16(KC_RCBR);
-            break; // }
-        case KC_BSLS:
-            tap_code16(KC_PIPE);
-            break; // |
-        case KC_GRV:
-            tap_code16(KC_TILD);
-            break; // ~
-        case KC_SCLN:
-            tap_code16(KC_COLN);
-            break; // :
-        case KC_QUOT:
-            tap_code16(KC_DQUO);
-            break; // "
-        case KC_COMM:
-            tap_code16(KC_LABK);
-            break; // <
-        case KC_DOT:
-            tap_code16(KC_RABK);
-            break; // >
-
-        // Arrows → Alt+Arrow (word-jump on macOS)
-        case KC_LEFT:
-            tap_code16(A(KC_LEFT));
-            break;
-        case KC_RIGHT:
-            tap_code16(A(KC_RIGHT));
-            break;
-
-        // Enter → Shift+Enter (e.g. new line without send in chat apps)
-        case KC_ENT:
-            tap_code16(S(KC_ENT));
-            break;
-
-        default:
-            tap_code16(keycode);
-            break;
+// Look up a keycode in the tap_hold_config table.  Returns NULL if not found.
+static const tap_hold_config_t *tap_hold_lookup(uint16_t keycode) {
+    for (uint8_t i = 0; i < TAP_HOLD_CONFIG_COUNT; i++) {
+        if (tap_hold_config[i].tap == keycode) return &tap_hold_config[i];
     }
-}
-
-// Send the longer-hold variant (triggered at >400ms hold).
-// Only a few keys have a third tier; everything else falls back to hold variant.
-static void send_longer_hold_variant(uint16_t keycode) {
-    switch (keycode) {
-        // Arrows → GUI+Arrow (line-jump on macOS: Home/End equivalent)
-        case KC_LEFT:
-            tap_code16(G(KC_LEFT));
-            break;
-        case KC_RIGHT:
-            tap_code16(G(KC_RIGHT));
-            break;
-
-        // All other keys: fall back to the normal hold variant.
-        default:
-            send_hold_variant(keycode);
-            break;
-    }
+    return NULL;
 }
 
 // Simulate a full press+release of a Charybdis firmware keycode (e.g.
@@ -551,56 +263,35 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     // --- 2) Custom tap/hold/longer-hold keys (react on both press and release) ---
-    // Most keys fire their hold variant immediately when the threshold is
-    // reached (via matrix_scan_user), so you don't have to release the key.
-    // Arrow keys keep the old release-based behavior because they have a
-    // third tier (longer hold → GUI+Arrow) that requires waiting for release.
-    switch (keycode) {
-        case KC_1:
-        case KC_2:
-        case KC_3:
-        case KC_4:
-        case KC_5:
-        case KC_9:
-        case KC_0:
-        case KC_MINS:
-        case KC_EQL:
-        case KC_LBRC:
-        case KC_RBRC:
-        case KC_BSLS:
-        case KC_GRV:
-        case KC_SCLN:
-        case KC_QUOT:
-        case KC_COMM:
-        case KC_DOT:
-        case KC_LEFT:
-        case KC_RIGHT:
-        case KC_ENT:
+    // Config table is in key_config.h.  Keys with immediate=true fire their
+    // hold variant at the threshold via matrix_scan_user (no release needed).
+    {
+        const tap_hold_config_t *cfg = tap_hold_lookup(keycode);
+        if (cfg) {
             if (record->event.pressed) {
-                tap_hold_timer   = timer_read();
-                tap_hold_keycode = keycode;
-                tap_hold_fired   = false;
+                tap_hold_timer      = timer_read();
+                tap_hold_keycode    = keycode;
+                tap_hold_active_cfg = cfg;
+                tap_hold_fired      = false;
             } else {
-                tap_hold_keycode = KC_NO;
+                tap_hold_keycode    = KC_NO;
+                tap_hold_active_cfg = NULL;
                 if (tap_hold_fired) {
-                    // Hold variant was already sent by matrix_scan_user.
                     tap_hold_fired = false;
                 } else {
-                    uint16_t tap_hold_elapsed_time = timer_elapsed(tap_hold_timer);
+                    uint16_t elapsed = timer_elapsed(tap_hold_timer);
 
-                    if (tap_hold_elapsed_time < CUSTOM_TAP_HOLD_TERM) {
-                        // TAP: send the plain key (1, 2, -, etc.)
-                        tap_code16(keycode);
-                    } else if (tap_hold_elapsed_time > CUSTOM_LONGER_HOLD_TERM) {
-                        // LONGER HOLD: third-tier action (GUI+Arrow for navigation)
-                        send_longer_hold_variant(keycode);
+                    if (elapsed < CUSTOM_TAP_HOLD_TERM) {
+                        tap_code16(cfg->tap);
+                    } else if (elapsed > CUSTOM_LONGER_HOLD_TERM && cfg->longer_hold != KC_NO) {
+                        tap_code16(cfg->longer_hold);
                     } else {
-                        // HOLD: shifted variant (!, @, _, etc.)
-                        send_hold_variant(keycode);
+                        tap_code16(cfg->hold);
                     }
                 }
             }
             return false;
+        }
     }
 
     // --- 3) Everything below is press-only — let releases pass through. ---
@@ -608,53 +299,38 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         return true;
     }
 
-    // --- 4) Macros (fire once on key-down, using SEND_STRING for combos) ---
-    switch (keycode) {
-        case MACRO_0: // Spotlight search (macOS): GUI + Space
-            SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
-            return false;
-
-        case MACRO_1: // Claude: Alt + Space
-            SEND_STRING(SS_LALT(SS_TAP(X_SPACE)));
-            return false;
-
-        case MACRO_2: // Terminal: Alt + GUI + Space
-            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_SPACE))));
-            return false;
-
-        case MACRO_3: // OCR text copy (macOS): Ctrl + Alt + GUI + C
-            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("c"))));
-            return false;
-
-        case MACRO_4: // Screenshot (macOS): Ctrl + Alt + GUI + X
-            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("x"))));
-            return false;
-
-        case MACRO_5: // Emoji picker (macOS): Ctrl + GUI + Space
-            SEND_STRING(SS_LCTL(SS_LGUI(SS_TAP(X_SPACE))));
-            return false;
-    }
-
-    return true;
+    // --- 4) Macros (fire once on key-down, defined in key_config.h) ---
+    MACRO_DISPATCH(keycode);
+    return false;
 }
 
 // ─── Immediate Hold Detection ────────────────────────────────────────────────
 //
-// Called every matrix scan cycle (~1ms).  When a tap/hold key has been held
-// past CUSTOM_TAP_HOLD_TERM, fire the hold variant immediately instead of
-// waiting for release.  Arrow keys are excluded — they use the release-based
-// three-tier system so you can choose between hold (Alt+Arrow) and longer
-// hold (GUI+Arrow).
+// Called every matrix scan cycle (~1ms).  For keys with immediate=true in
+// tap_hold_config[], fires the hold variant as soon as CUSTOM_TAP_HOLD_TERM
+// is reached — no release needed.  Keys with immediate=false (e.g. arrows)
+// are handled entirely on release in process_record_user().
 void matrix_scan_user(void) {
-    if (tap_hold_keycode != KC_NO && !tap_hold_fired) {
-        // Arrow keys keep release-based behavior for their three-tier system.
-        if (tap_hold_keycode == KC_LEFT || tap_hold_keycode == KC_RIGHT) {
-            return;
-        }
+    if (tap_hold_active_cfg && !tap_hold_fired) {
+        if (!tap_hold_active_cfg->immediate) return;
         if (timer_elapsed(tap_hold_timer) >= CUSTOM_TAP_HOLD_TERM) {
-            send_hold_variant(tap_hold_keycode);
+            tap_code16(tap_hold_active_cfg->hold);
             tap_hold_fired = true;
         }
+    }
+}
+
+// ─── Initialization ─────────────────────────────────────────────────────────
+
+void keyboard_post_init_user(void) {
+    // Populate tap_dance_actions[] from td_config[] so adding a new
+    // tap dance only requires one line in key_config.h.
+    for (uint8_t i = 0; i < TD_COUNT; i++) {
+        tap_dance_actions[i].fn.on_each_tap       = NULL;
+        tap_dance_actions[i].fn.on_dance_finished = td_finished;
+        tap_dance_actions[i].fn.on_reset          = td_reset;
+        tap_dance_actions[i].fn.on_each_release   = NULL;
+        tap_dance_actions[i].user_data            = (void *)&td_config[i];
     }
 }
 
