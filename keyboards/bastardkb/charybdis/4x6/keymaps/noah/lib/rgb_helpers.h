@@ -19,7 +19,7 @@
 
 #if defined(RGB_MATRIX_ENABLE)
 
-#    include "rgb_matrix.h"
+#    include "rgb_matrix.h" // QMK
 
 // ─── Core helpers ───────────────────────────────────────────────────────────
 

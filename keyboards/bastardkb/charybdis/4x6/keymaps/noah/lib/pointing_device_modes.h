@@ -34,6 +34,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include "key_config.h" // VOLUME_MODE, BRIGHTNESS_MODE, etc.
+
 // ─── Mode flags (bitfield) ────────────────────────────────────────────────
 // Each mode is a single bit.  Multiple modes could theoretically be active
 // at once; pd_modes[] defines which one wins (checked first = highest).

@@ -12,7 +12,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "rgb_helpers.h"
+#include "key_config.h"                // LAYER_COUNT, LAYER_BASE, etc.
+#include "lib/pointing_device_modes.h" // PD_MODE_* flags
+#include "lib/rgb_helpers.h"           // rgb_set_*, hsv_t, rgb_t
 
 #if defined(RGB_MATRIX_ENABLE)
 
@@ -65,8 +67,8 @@ typedef struct {
 } layer_led_group_t;
 
 static const layer_led_group_t layer_led_groups[] = {
-    {LAYER_RAISE, {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, raise_highlight_leds, 2},  // red
-    {LAYER_LOWER, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, lower_highlight_leds, 2},  // yellow
+    {LAYER_RAISE, {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, raise_highlight_leds, sizeof(raise_highlight_leds)},  // red
+    {LAYER_LOWER, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, lower_highlight_leds, sizeof(lower_highlight_leds)},  // yellow
 };
 
 #    define LAYER_LED_GROUP_COUNT (sizeof(layer_led_groups) / sizeof(layer_led_groups[0]))

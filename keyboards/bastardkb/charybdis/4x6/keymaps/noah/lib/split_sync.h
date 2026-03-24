@@ -28,9 +28,9 @@
 
 #if defined(SPLIT_TRANSACTION_IDS_USER) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 
-#    include "pointing_device_auto_mouse.h"
+#    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
 #    include "pointing_device_modes.h"
-#    include "transactions.h"
+#    include "transactions.h" // QMK
 
 // ─── Sync packet ─────────────────────────────────────────────────────────────
 

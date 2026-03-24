@@ -12,7 +12,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H
+#include QMK_KEYBOARD_H // QMK
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,13 @@ enum charybdis_keymap_layers {
     LAYER_POINTER,  // Auto-mouse layer: activates on trackball movement, deactivates after timeout
     LAYER_COUNT,
 };
+
+// DYNAMIC_KEYMAP_LAYER_COUNT in config.h must match LAYER_COUNT.
+// If you add or remove a layer, update both.
+#ifdef VIA_ENABLE
+_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT,
+               "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
+#endif
 
 // ─── Custom Keycodes ────────────────────────────────────────────────────────
 //
@@ -93,24 +100,24 @@ typedef struct {
     uint8_t  hold_layer;
 } td_config_t;
 
-// Single source of truth for tap dances.  To add a new one, add one X()
+// Single source of truth for tap dances.  To add a new one, add one TDE()
 // line here — the enum, config array, and TD_COUNT are all generated from it.
 //
-//              name    tap    hold      double-tap   hold_layer
-#define TD_LIST \
-    X(TD_49,    KC_6,  KC_CIRC, KC_MPLY, 0)            \
-    X(TD_45,    KC_7,  KC_AMPR, KC_MNXT, 0)            \
-    X(TD_44,    KC_8,  KC_ASTR, KC_MPRV, 0)            \
-    X(TD_28,    KC_NO, KC_NO,   KC_MPLY, LAYER_LOWER)  \
-    X(TD_53,    KC_NO, KC_NO,   KC_MPLY, LAYER_RAISE)
+//                name    tap    hold      double-tap   hold_layer
+#define TD_LIST                                    \
+    TDE(TD_49, KC_6, KC_CIRC, KC_MPLY, 0)          \
+    TDE(TD_45, KC_7, KC_AMPR, KC_MNXT, 0)          \
+    TDE(TD_44, KC_8, KC_ASTR, KC_MPRV, 0)          \
+    TDE(TD_28, KC_NO, KC_NO, KC_MPLY, LAYER_LOWER) \
+    TDE(TD_53, KC_NO, KC_NO, KC_MPLY, LAYER_RAISE)
 
-#define X(name, ...) name,
+#define TDE(name, ...) name,
 enum tap_dances { TD_LIST TD_COUNT };
-#undef X
+#undef TDE
 
-#define X(name, tap, hold, dtap, layer) [name] = {tap, hold, dtap, layer},
-static const td_config_t td_config[TD_COUNT] = { TD_LIST };
-#undef X
+#define TDE(name, tap, hold, dtap, layer) [name] = {tap, hold, dtap, layer},
+static const td_config_t td_config[TD_COUNT] = {TD_LIST};
+#undef TDE
 
 // ─── Tap / Hold / Longer-Hold Mappings ──────────────────────────────────────
 //

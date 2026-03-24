@@ -66,14 +66,14 @@
 //     most keys; arrow keys keep release-based timing for three tiers.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H
+#include QMK_KEYBOARD_H // QMK
 
 #include "key_config.h"
-#include "pointing_device_modes.h"
-#include "split_sync.h"
-#include "rgb_helpers.h"
+#include "lib/pointing_device_modes.h"
+#include "lib/split_sync.h"
+#include "lib/rgb_helpers.h"
 #include "rgb_config.h"
-#include "rgb_automouse.h"
+#include "lib/rgb_automouse.h"
 
 // Force master/slave role at compile time.  Needed when both halves have
 // their own USB connection (e.g. for full LED brightness on each side
@@ -86,7 +86,7 @@ bool is_keyboard_master_impl(void) {
     return true;
 }
 #elif defined(FORCE_SLAVE)
-#    include "usb_util.h"
+#    include "usb_util.h" // QMK
 bool is_keyboard_master_impl(void) {
     usb_disconnect();
     return false;

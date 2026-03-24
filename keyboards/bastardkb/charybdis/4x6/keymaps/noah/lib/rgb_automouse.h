@@ -24,7 +24,7 @@
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 
-#    include "pointing_device_auto_mouse.h"
+#    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
 #    include "rgb_helpers.h"
 #    include "split_sync.h"
 
