@@ -184,3 +184,4 @@
                                     // 150–400ms = hold (shifted variant)
 #define CUSTOM_LONGER_HOLD_TERM 400 // > 400ms = longer hold (third action)
 #define CUSTOM_DOUBLE_TAP_TERM 200  // max gap between taps for double-tap
+#define COMBO_TERM 50               // max ms between keys to register as a combo

@@ -61,6 +61,18 @@
 #include QMK_KEYBOARD_H // QMK
 
 #include "key_config.h"
+
+#ifdef VIA_ENABLE
+_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT,
+               "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
+#endif
+
+#define HOLD_KEY_COUNT          (sizeof(hold_keys) / sizeof(hold_keys[0]))
+#define LONGER_HOLD_KEY_COUNT   (sizeof(longer_hold_keys) / sizeof(longer_hold_keys[0]))
+#define DOUBLE_TAP_KEY_COUNT    (sizeof(double_tap_keys) / sizeof(double_tap_keys[0]))
+#define TRIPLE_TAP_KEY_COUNT    (sizeof(triple_tap_keys) / sizeof(triple_tap_keys[0]))
+#define MODE_TAP_OVERRIDE_COUNT (sizeof(mode_tap_overrides) / sizeof(mode_tap_overrides[0]))
+
 #include "lib/pointing_device_modes.h"
 #include "lib/split_sync.h"
 #include "lib/rgb_helpers.h"

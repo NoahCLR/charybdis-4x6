@@ -1,6 +1,9 @@
 # VIA support: enables runtime key remapping via the VIA desktop app.
 VIA_ENABLE = yes
 
+# Key combos: press multiple keys simultaneously to trigger an action.
+COMBO_ENABLE = yes
+
 # Link-time optimization: reduces binary size.
 LTO_ENABLE = yes
 

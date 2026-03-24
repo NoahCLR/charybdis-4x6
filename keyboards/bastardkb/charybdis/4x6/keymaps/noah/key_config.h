@@ -14,8 +14,11 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-// ─── Layers ─────────────────────────────────────────────────────────────────
+#include "lib/key_types.h"
 
+// ─── Layers ─────────────────────────────────────────────────────────────────
+//
+// If you add or remove a layer, also update DYNAMIC_KEYMAP_LAYER_COUNT in config.h.
 enum charybdis_keymap_layers {
     LAYER_BASE = 0, // Default QWERTY typing layer
     LAYER_NUM,      // Numpad on the right half (activated by holding Z or B)
@@ -24,12 +27,6 @@ enum charybdis_keymap_layers {
     LAYER_POINTER,  // Auto-mouse layer: activates on trackball movement, deactivates after timeout
     LAYER_COUNT,
 };
-
-// DYNAMIC_KEYMAP_LAYER_COUNT in config.h must match LAYER_COUNT.
-// If you add or remove a layer, update both.
-#ifdef VIA_ENABLE
-_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
-#endif
 
 // ─── Custom Keycodes ────────────────────────────────────────────────────────
 //
@@ -77,18 +74,6 @@ enum custom_keycodes {
 //   CUSTOM_DOUBLE_TAP_TERM  = 200ms  (max gap between taps for double-tap)
 
 // ─── Hold Keys ──────────────────────────────────────────────────────────────
-//
-// On tap (< CUSTOM_TAP_HOLD_TERM), sends the keycode itself.
-// On hold (>= CUSTOM_TAP_HOLD_TERM), sends the hold keycode.
-//
-// immediate = true:  hold fires at threshold without waiting for release.
-// immediate = false: action is determined on release based on elapsed time.
-
-typedef struct {
-    uint16_t keycode;
-    uint16_t hold;
-    bool     immediate;
-} hold_key_t;
 
 // keycode     hold           immediate
 static const hold_key_t hold_keys[] = {
@@ -124,21 +109,7 @@ static const hold_key_t hold_keys[] = {
     {KC_RIGHT, A(KC_RIGHT), false}, // → → word jump
 };
 
-#define HOLD_KEY_COUNT (sizeof(hold_keys) / sizeof(hold_keys[0]))
-
 // ─── Longer Hold Keys ───────────────────────────────────────────────────────
-//
-// Third-tier action when held past CUSTOM_LONGER_HOLD_TERM.
-// The key must also appear in hold_keys for the base hold behavior.
-//
-// immediate = true:  longer hold fires at threshold without waiting for release.
-// immediate = false: action is determined on release based on elapsed time.
-
-typedef struct {
-    uint16_t keycode;
-    uint16_t longer_hold;
-    bool     immediate;
-} longer_hold_key_t;
 
 // keycode     longer_hold    immediate
 static const longer_hold_key_t longer_hold_keys[] = {
@@ -146,19 +117,7 @@ static const longer_hold_key_t longer_hold_keys[] = {
     {KC_RIGHT, G(KC_RIGHT), true}, // → → line jump
 };
 
-#define LONGER_HOLD_KEY_COUNT (sizeof(longer_hold_keys) / sizeof(longer_hold_keys[0]))
-
 // ─── Multi-Tap Keys ─────────────────────────────────────────────────────────
-//
-// Sends an action when tapped twice (or three times) within CUSTOM_DOUBLE_TAP_TERM.
-// Note: adds a small delay to single taps (waiting for potential second press).
-// If triple_action is set, double-tap is also deferred while waiting for a
-// potential third press.
-
-typedef struct {
-    uint16_t keycode;
-    uint16_t action; // double-tap action
-} double_tap_key_t;
 
 // keycode                action
 static const double_tap_key_t double_tap_keys[] = {
@@ -170,18 +129,7 @@ static const double_tap_key_t double_tap_keys[] = {
     {VOLUME_MODE, KC_MUTE},     // mute
 };
 
-#define DOUBLE_TAP_KEY_COUNT (sizeof(double_tap_keys) / sizeof(double_tap_keys[0]))
-
 // ─── Triple-Tap Keys ────────────────────────────────────────────────────────
-//
-// Third-tap action for keys that already appear in double_tap_keys[].
-// Adds one extra deferral window (CUSTOM_DOUBLE_TAP_TERM) to double-taps
-// while waiting for a potential third press.
-
-typedef struct {
-    uint16_t keycode;
-    uint16_t action; // triple-tap action
-} triple_tap_key_t;
 
 // keycode                action
 static const triple_tap_key_t triple_tap_keys[] = {
@@ -189,24 +137,33 @@ static const triple_tap_key_t triple_tap_keys[] = {
     {MO(LAYER_LOWER), KC_MPRV}, // prev track on triple-tap
 };
 
-#define TRIPLE_TAP_KEY_COUNT (sizeof(triple_tap_keys) / sizeof(triple_tap_keys[0]))
-
 // ─── Mode Tap Overrides ─────────────────────────────────────────────────────
-//
-// By default, tapping a pointing device mode key sends whatever is at that
-// position on LAYER_BASE.  Add an entry here to override that default.
-
-typedef struct {
-    uint16_t keycode;
-    uint16_t tap;
-} mode_tap_override_t;
 
 // keycode            tap
 static const mode_tap_override_t mode_tap_overrides[] = {
-    {VOLUME_MODE, KC_N}, // example: tap volume mode → mute
+    {VOLUME_MODE, KC_N}, // tap volume mode key → N
+
 };
 
-#define MODE_TAP_OVERRIDE_COUNT (sizeof(mode_tap_overrides) / sizeof(mode_tap_overrides[0]))
+// ─── Combos ─────────────────────────────────────────────────────────────────
+//
+// Press multiple keys simultaneously to trigger a different action.
+// COMBO_TERM (in config.h) controls the max time window for keys to
+// register as a combo.
+//
+// To add a combo:
+//   1. Define a PROGMEM key array ending with COMBO_END.
+//   2. Add a COMBO() entry to key_combos[] in the same order.
+
+// clang-format off
+const uint16_t PROGMEM combo_keys_0[] = {KC_J, KC_K, COMBO_END};
+const uint16_t PROGMEM combo_keys_1[] = {KC_D, KC_F, COMBO_END};
+
+combo_t key_combos[] = {
+    COMBO(combo_keys_0, VOLUME_MODE), // J + K → Volume mode (hold)
+    COMBO(combo_keys_1, KC_TAB),      // D + F → Tab
+};
+// clang-format on
 
 // ─── Macros ─────────────────────────────────────────────────────────────────
 //
