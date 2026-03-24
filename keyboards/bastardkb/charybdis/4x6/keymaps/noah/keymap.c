@@ -172,6 +172,7 @@ static inline void dt_flush(void) {
 static rgb_t layer_rgb[LAYER_COUNT];
 static rgb_t pd_mode_rgb[PD_MODE_COUNT];
 static rgb_t led_group_rgb[LAYER_LED_GROUP_COUNT];
+static rgb_t pd_mode_led_group_rgb[PD_MODE_LED_GROUP_COUNT];
 #endif
 
 // Simulate a full press+release of a Charybdis firmware keycode (e.g.
@@ -481,6 +482,8 @@ void keyboard_post_init_user(void) {
     }
     for (uint8_t i = 0; i < LAYER_LED_GROUP_COUNT; i++)
         led_group_rgb[i] = hsv_to_rgb(layer_led_groups[i].color);
+    for (uint8_t i = 0; i < PD_MODE_LED_GROUP_COUNT; i++)
+        pd_mode_led_group_rgb[i] = hsv_to_rgb(pd_mode_led_groups[i].color);
 #endif
 }
 
@@ -582,6 +585,12 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         if (pd_mode_active(pd_modes[i].mode_flag)) {
             rgb_set_right_half(pd_mode_rgb[i], led_min, led_max);
             break;
+        }
+    }
+
+    for (uint8_t g = 0; g < PD_MODE_LED_GROUP_COUNT; g++) {
+        if (pd_mode_active(pd_mode_led_groups[g].mode_flag)) {
+            rgb_set_led_group(pd_mode_led_groups[g].leds, pd_mode_led_groups[g].count, led_min, led_max, pd_mode_led_group_rgb[g]);
         }
     }
 

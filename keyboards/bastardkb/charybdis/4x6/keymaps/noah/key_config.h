@@ -186,6 +186,7 @@ typedef struct {
 // keycode                action
 static const triple_tap_key_t triple_tap_keys[] = {
     {MO(LAYER_RAISE), KC_MNXT}, // next track on triple-tap
+    {MO(LAYER_LOWER), KC_MPRV}, // prev track on triple-tap
 };
 
 #define TRIPLE_TAP_KEY_COUNT (sizeof(triple_tap_keys) / sizeof(triple_tap_keys[0]))
