@@ -1,6 +1,6 @@
 # Noah's Charybdis 4x6 Keymap - QMK 0.32.5 - 03-2026
 
-> **Branch notice:** This is the `qmk-latest` branch, which targets a newer version of QMK (0.32.5) than the `main` branch. It builds against the [`qmk-latest`](https://github.com/NoahCLR/bastardkb-qmk/tree/qmk-latest) branch of the firmware fork (instead of `bkb-master` on `main`). The two branches are **not interchangeable** — keycodes and APIs differ between QMK versions.
+> **Branch notice:** This is the refactored `qmk-latest` branch, which targets a newer version of QMK (0.32.5) than the `archive/pre-refactor` branch. It builds against the [`qmk-latest`](https://github.com/NoahCLR/bastardkb-qmk/tree/qmk-latest) branch of the firmware fork (instead of `bkb-master`). The two branches are **not interchangeable** — keycodes and APIs differ between QMK versions.
 
 A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/charybdis/), a split ergonomic keyboard with a built-in trackball on the right half.
 
