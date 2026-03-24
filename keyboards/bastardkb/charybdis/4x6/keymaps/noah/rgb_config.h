@@ -108,14 +108,22 @@ static const hsv_t layer_colors[LAYER_COUNT] = {
 };
 
 // Pointing device mode overlay colors (right half only).
-// Indexed to match pd_mode_priority[] in pointing_device_modes.h.
-static const hsv_t pd_mode_colors[PD_MODE_COUNT] = {
-    {21,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},  // [0] dragscroll → orange
-    {43,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},  // [1] volume     → yellow
-    {213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},  // [2] brightness → magenta
-    {64,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},  // [3] zoom       → chartreuse
-    {127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},  // [4] arrow      → cyan
+// Each entry is tagged with its mode flag so the order doesn't need to
+// match pd_modes[] — adding or reordering modes won't silently break colors.
+typedef struct {
+    uint8_t mode_flag;
+    hsv_t   color;
+} pd_mode_color_t;
+
+static const pd_mode_color_t pd_mode_colors[] = {
+    {PD_MODE_DRAGSCROLL,  {21,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // orange
+    {PD_MODE_VOLUME,      {43,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // yellow
+    {PD_MODE_BRIGHTNESS,  {213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // magenta
+    {PD_MODE_ZOOM,        {64,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // chartreuse
+    {PD_MODE_ARROW,       {127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // cyan
 };
+
+#    define PD_MODE_COLOR_COUNT (sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]))
 
 // Per-layer LED group highlights.
 // Paint specific LEDs a different color when a layer is active (e.g. to mark

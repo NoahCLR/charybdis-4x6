@@ -134,7 +134,7 @@ The trackball mode system is a bitfield-based design in `pointing_device_modes.h
 
 ### Mode resolution
 
-`pd_mode_priority[]` defines which mode wins when multiple are held simultaneously. Both the motion handler and the RGB overlay iterate this array, so the priority order is consistent everywhere: dragscroll > volume > brightness > zoom > arrow.
+`pd_modes[]` defines which mode wins when multiple are held simultaneously. Both the motion handler and the RGB overlay iterate this array, so the priority order is consistent everywhere: dragscroll > volume > brightness > zoom > arrow.
 
 ### Mode key behavior
 
@@ -174,7 +174,7 @@ QMK renders the default RGB effect first, then calls `rgb_matrix_indicators_adva
 
 This top-down iteration means higher layers always take priority. For example, LAYER_RAISE (layer 3) wins over LAYER_NUM (layer 1) when both are active. Colors are defined as HSV in `layer_colors[]` in `rgb_config.h` and pre-converted to RGB once at first render.
 
-**Pass 2 — Mode overlay.** Iterates `pd_mode_priority[]` and paints the first active mode's color from `pd_mode_colors[]` (defined in `rgb_config.h`) onto the right half. The helpers support targeting any half, both halves, or individual LEDs — the right-half-only choice is a UX decision, not a technical limitation.
+**Pass 2 — Mode overlay.** Iterates `pd_modes[]` and paints the first active mode's color from `pd_mode_colors[]` (defined in `rgb_config.h`) onto the right half. The helpers support targeting any half, both halves, or individual LEDs — the right-half-only choice is a UX decision, not a technical limitation.
 
 **Return value:** Returns `layer_painted` (true if pass 1 set a color, false for LAYER_BASE). On LAYER_BASE with no mode active, the default RGB effect is preserved untouched. On LAYER_BASE with a mode active, pass 2 still paints the mode color over the default effect.
 
@@ -237,11 +237,11 @@ Tap dance keycodes are handled separately: VIA exports them as raw hex (`0x5700`
 
 See the step-by-step guide in the header comment of `pointing_device_modes.h`. Summary:
 
-1. Add a `PD_MODE_xxx` define (next free bit)
-2. Add it to `pd_mode_priority[]`, update `PD_MODE_COUNT`
-3. Add a custom keycode in `key_config.h`'s enum
-4. Add the keycode to the tap/hold mode key handler in `process_record_user`
-5. Add a handler case in `pointing_device_task_user`'s switch
-6. Add an HSV color entry to `pd_mode_colors[]` in `rgb_config.h`
-7. Add the keycode to `is_mouse_record_user` (keeps auto-mouse alive)
-8. Add the VIA token mapping in `via_to_qmk_layout.py`
+1. Add a `PD_MODE_xxx` define in `pointing_device_modes.h` (next free bit)
+2. Add a custom keycode in `key_config.h`'s enum
+3. Add an entry to `pd_modes[]` in `pointing_device_modes.h` (flag + keycode) — position = priority
+4. Add a handler case in `pointing_device_task_user`'s switch in `keymap.c`
+5. Add an HSV color entry to `pd_mode_colors[]` in `rgb_config.h`
+6. Add the VIA token mapping in `via_to_qmk_layout.py`
+
+`process_record_user`, `is_mouse_record_user`, and RGB rendering all iterate `pd_modes[]` automatically — no manual keycode lists to update.

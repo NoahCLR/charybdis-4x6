@@ -28,19 +28,20 @@
 //
 // How to add a new mode:
 //   1. Add a PD_MODE_xxx define here (next free bit)
-//   2. Add it to pd_mode_priority[] at the desired position, update PD_MODE_COUNT
-//   3. Add a custom keycode in keymap.c's enum
-//   4. Add the keycode to the tap/hold mode key handler in process_record_user
-//   5. Add a handler case in pointing_device_task_user's switch
-//   6. Add an RGB color and pd_mode_rgb[] entry in rgb_matrix_indicators (optional)
-//   7. Add the keycode to is_mouse_record_user (keeps auto-mouse alive)
+//   2. Add a custom keycode in key_config.h's enum
+//   3. Add an entry to pd_modes[] here (flag + keycode) — position = priority
+//   4. Add a handler case in pointing_device_task_user's switch (keymap.c)
+//   5. Add an HSV color entry to pd_mode_colors[] in rgb_config.h
+//
+// That's it — process_record_user, is_mouse_record_user, and RGB rendering
+// all iterate pd_modes[] automatically.  No manual keycode lists to update.
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 // ─── Mode flags (bitfield) ────────────────────────────────────────────────
 // Each mode is a single bit.  Multiple modes could theoretically be active
-// at once; pd_mode_priority[] defines which one wins (checked first = highest).
+// at once; pd_modes[] defines which one wins (checked first = highest).
 
 #define PD_MODE_VOLUME (1 << 0)     // Trackball Y → volume up/down
 #define PD_MODE_ARROW (1 << 1)      // Trackball → arrow keys
@@ -50,14 +51,35 @@
 // #define PD_MODE_xxx       (1 << 5)  // next free slot
 // ... up to (1 << 7) for 8 modes in a uint8_t
 
-// Priority order for mode resolution — first active mode wins.
-// Both pointing_device_task_user (handler dispatch) and
-// rgb_matrix_indicators_advanced_user (right-half color overlay) iterate this
-// array, so reordering here changes behavior in both places.
-#define PD_MODE_COUNT 5
-static const uint8_t pd_mode_priority[PD_MODE_COUNT] = {
-    PD_MODE_DRAGSCROLL, PD_MODE_VOLUME, PD_MODE_BRIGHTNESS, PD_MODE_ZOOM, PD_MODE_ARROW,
+// ─── Mode definitions ─────────────────────────────────────────────────────
+// Each mode has a flag (bitfield value) and an optional custom keycode.
+// Array order = priority order — first active mode wins for both handler
+// dispatch and RGB overlay.  KC_NO means the mode has no dedicated keycode
+// (e.g. dragscroll is activated via Charybdis firmware keycodes).
+
+typedef struct {
+    uint8_t  mode_flag;
+    uint16_t keycode;   // KC_NO for firmware-handled modes
+} pd_mode_def_t;
+
+static const pd_mode_def_t pd_modes[] = {
+    {PD_MODE_DRAGSCROLL,  KC_NO},
+    {PD_MODE_VOLUME,      VOLUME_MODE},
+    {PD_MODE_BRIGHTNESS,  BRIGHTNESS_MODE},
+    {PD_MODE_ZOOM,        ZOOM_MODE},
+    {PD_MODE_ARROW,       ARROW_MODE},
 };
+
+#define PD_MODE_COUNT (sizeof(pd_modes) / sizeof(pd_modes[0]))
+
+// Look up which mode flag a keycode activates.  Returns 0 if not found.
+static inline uint8_t pd_mode_for_keycode(uint16_t keycode) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode)
+            return pd_modes[i].mode_flag;
+    }
+    return 0;
+}
 
 // ─── Global mode state ─────────────────────────────────────────────────────
 // Single translation unit (keymap.c includes this header) — static is safe.

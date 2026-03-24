@@ -16,7 +16,7 @@ flowchart TD
 
     subgraph STATE["Shared State"]
         FLAGS["pd_mode_flags (uint8_t bitfield)"]
-        PRIO["pd_mode_priority[] (resolution order)"]
+        PRIO["pd_modes[] (resolution order)"]
         ELAPSED["auto-mouse elapsed timer"]
     end
 
@@ -125,7 +125,7 @@ QMK calls `pointing_device_task_user()` every scan cycle (~1000Hz) with the trac
 ```mermaid
 flowchart TD
     A["Trackball motion (x, y)"] --> B[pointing_device_task_user]
-    B --> C{Walk pd_mode_priority array}
+    B --> C{Walk pd_modes[] array}
 
     C -- "Dragscroll active" --> D["Handled by charybdis firmware
     (scroll output)"]
@@ -147,7 +147,7 @@ flowchart TD
     style G fill:#0ff,color:#000
 ```
 
-> **Priority:** If multiple modes are held simultaneously, only the highest-priority one runs. The priority order is defined once in `pd_mode_priority[]`: dragscroll > volume > brightness > zoom > arrow.
+> **Priority:** If multiple modes are held simultaneously, only the highest-priority one runs. The priority order is defined once in `pd_modes[]`: dragscroll > volume > brightness > zoom > arrow.
 
 ## RGB Rendering
 

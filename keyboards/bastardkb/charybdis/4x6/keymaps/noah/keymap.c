@@ -173,18 +173,12 @@ static void tap_custom_bk_keycode(uint16_t kc) {
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 1) Pointing device mode keys (react on both press and release) ---
-    switch (keycode) {
-        // VOLUME_MODE / BRIGHTNESS_MODE / ZOOM_MODE / ARROW_MODE:
-        // Dual-purpose keys: tap sends the base-layer key at this position,
-        // hold activates the trackball mode.  The mode activates immediately
-        // on press so it's ready if you move the trackball; if released
-        // quickly (< CUSTOM_TAP_HOLD_TERM), the mode is cancelled and the
-        // base-layer key is sent instead.
-        case VOLUME_MODE:
-        case BRIGHTNESS_MODE:
-        case ZOOM_MODE:
-        case ARROW_MODE: {
-            uint8_t mode = (keycode == VOLUME_MODE) ? PD_MODE_VOLUME : (keycode == BRIGHTNESS_MODE) ? PD_MODE_BRIGHTNESS : (keycode == ZOOM_MODE) ? PD_MODE_ZOOM : PD_MODE_ARROW;
+
+    // 1a) Generic mode keys: tap sends base-layer key, hold activates mode.
+    // Keycodes are looked up from pd_modes[] — no hardcoded cases needed.
+    {
+        uint8_t mode = pd_mode_for_keycode(keycode);
+        if (mode) {
             if (record->event.pressed) {
                 tap_hold_timer = timer_read();
                 pd_mode_update(mode, true);
@@ -198,7 +192,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             pd_state_sync();
             return false;
         }
+    }
 
+    // 1b) Special dragscroll keys (need custom press/release logic).
+    switch (keycode) {
         // DRAGSCROLL_MODE (Charybdis firmware keycode, not in our enum):
         // Dual-purpose like the other mode keys: tap sends the base-layer
         // key, hold activates drag-scroll.  Also adds unlock behavior:
@@ -358,8 +355,13 @@ void pointing_device_init_user(void) {
 // them keeps the auto-mouse layer alive (prevents it from timing out while
 // you're actively using trackball features).
 bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
+    // Mode keycodes from pd_modes[] — auto-discovered, no manual list needed.
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode)
+            return true;
+    }
+    // Charybdis firmware keycodes + special custom keys (not in pd_modes[]).
     switch (keycode) {
-        // Charybdis firmware keycodes
         case SNIPING_MODE:
         case SNIPING_MODE_TOGGLE:
         case DRAGSCROLL_MODE:
@@ -368,12 +370,7 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
         case DPI_RMOD:
         case S_D_MOD:
         case S_D_RMOD:
-        // Custom keycodes (from our enum)
         case DRG_TOG_ON_HOLD:
-        case ARROW_MODE:
-        case ZOOM_MODE:
-        case BRIGHTNESS_MODE:
-        case VOLUME_MODE:
             return true;
     }
     return false;
@@ -383,8 +380,8 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 // Called every scan cycle with the trackball's motion report.
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (!pd_mode_active(pd_mode_priority[i])) continue;
-        switch (pd_mode_priority[i]) {
+        if (!pd_mode_active(pd_modes[i].mode_flag)) continue;
+        switch (pd_modes[i].mode_flag) {
             case PD_MODE_VOLUME:
                 return handle_volume_mode(mouse_report);
             case PD_MODE_BRIGHTNESS:
@@ -482,8 +479,15 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     if (!rgb_colors_init) {
         for (uint8_t i = 0; i < LAYER_COUNT; i++)
             layer_rgb[i] = hsv_to_rgb(layer_colors[i]);
-        for (uint8_t i = 0; i < PD_MODE_COUNT; i++)
-            pd_mode_rgb[i] = hsv_to_rgb(pd_mode_colors[i]);
+        // Map each mode's color by matching mode_flag from pd_modes[] to pd_mode_colors[].
+        for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+            for (uint8_t c = 0; c < PD_MODE_COLOR_COUNT; c++) {
+                if (pd_mode_colors[c].mode_flag == pd_modes[i].mode_flag) {
+                    pd_mode_rgb[i] = hsv_to_rgb(pd_mode_colors[c].color);
+                    break;
+                }
+            }
+        }
         for (uint8_t i = 0; i < LAYER_LED_GROUP_COUNT; i++)
             led_group_rgb[i] = hsv_to_rgb(layer_led_groups[i].color);
         rgb_colors_init = true;
@@ -519,9 +523,9 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 
     // If a pointing device mode is active, override the right half with the
     // mode's color.  This provides instant visual feedback for which mode
-    // the trackball is in.  Priority order comes from pd_mode_priority[].
+    // the trackball is in.  Priority order comes from pd_modes[].
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_active(pd_mode_priority[i])) {
+        if (pd_mode_active(pd_modes[i].mode_flag)) {
             rgb_set_right_half(pd_mode_rgb[i], led_min, led_max);
             break;
         }

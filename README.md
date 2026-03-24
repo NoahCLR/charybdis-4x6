@@ -89,24 +89,24 @@ For most keys, the hold variant fires immediately when the 150ms threshold is re
 The `via layouts/` directory contains VIA layout JSON files and a conversion script:
 
 - `charybdis.layout.json` — the current keymap exported from VIA
-- `via_to_qmk_layout.py` — converts the VIA JSON into the `keymaps` array for `keymap.c`
+- `via_to_qmk_layout.py` — converts the VIA JSON into the `keymaps` array for `key_config.h`
 
 VIA uses a flat key index and its own token format (`CUSTOM(80)`, `KC_NO`, etc.) that doesn't match the QMK `LAYOUT()` macro's matrix order or keycode names. The script handles the index remapping and token translation so you can freely edit in VIA's GUI, export, and update the keymap without manually reformatting 5 layers of 56 keys each.
 
 ```bash
 python via_to_qmk_layout.py          # default mode (set via MODE variable in script)
-python via_to_qmk_layout.py --write  # update keymap.c in-place
+python via_to_qmk_layout.py --write  # update key_config.h in-place
 python via_to_qmk_layout.py --print  # print to stdout
 ```
 
 The top of the script has a configuration section with the things you'd need to update when the keymap changes:
 
 - `VIA_JSON` — path to the VIA layout JSON (default: `charybdis.layout.json` next to the script)
-- `KEYMAP_C` — path to `keymap.c` (default: `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`)
+- `KEYMAP_C` — path to `key_config.h` (default: `keyboards/bastardkb/charybdis/4x6/keymaps/noah/key_config.h`)
 - `MODE` — default output mode (`"write"` or `"print"`)
-- `LAYER_NAMES` — layer names in enum order, must match `keymap.c`
+- `LAYER_NAMES` — layer names in enum order, must match `key_config.h`
 - `REPLACEMENTS` — VIA token → QMK keycode translations (add new custom keycodes here)
-- `TAP_DANCE_NAMES` — tap dance enum names in index order, must match `keymap.c` (generates hex → `TD(name)` mappings)
+- `TAP_DANCE_NAMES` — tap dance enum names in index order, must match `key_config.h` (generates hex → `TD(name)` mappings)
 
 ## File Structure
 
