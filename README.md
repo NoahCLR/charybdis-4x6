@@ -73,7 +73,7 @@ Multi-tap is data-driven — add one line to `double_tap_keys[]` (and optionally
 
 ## Tap / Hold / Longer Hold
 
-Number row keys, punctuation, arrows, and Enter use a custom three-tier system (not QMK's built-in mod-tap or tap dance):
+Number row keys, punctuation, arrows, and Enter use a custom three-tier system instead of QMK's built-in mod-tap or tap dance. The custom system supports arbitrary keycodes on hold (not just modifiers), three timing tiers, immediate hold firing for trackball responsiveness, and composable per-feature tables — see [Design Decisions](INTERNALS.md#design-decisions) in INTERNALS.md for the full rationale.
 
 | Duration | Action | Example (`1` key) |
 |----------|--------|-------------------|

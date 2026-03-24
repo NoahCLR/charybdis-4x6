@@ -186,9 +186,51 @@ If neither flag is set, the firmware falls through to QMK's default USB detectio
 
 `LTO_ENABLE = yes` in `rules.mk` — Link-time optimization reduces the binary size.
 
+## Design Decisions
+
+### Why not QMK's mod-tap?
+
+QMK's built-in `MT()` maps a key to modifier+keycode on hold. It has two limitations that don't work for this keymap:
+
+1. **Hold action is restricted to modifier combos.** `MT(MOD_LCTL, KC_A)` can send Ctrl on hold, but can't send an arbitrary keycode like `KC_EXLM` or `KC_MPLY`. This keymap needs number row keys to send shifted symbols on hold (e.g. hold `1` → `!`), which mod-tap can't express.
+
+2. **No three-tier timing.** Mod-tap is tap-or-hold (one threshold). This keymap uses three tiers: tap (< 150ms), hold (150–400ms), longer hold (> 400ms). Arrow keys use all three: tap = arrow, hold = word jump (Alt+Arrow), longer hold = line jump (Cmd+Arrow). There's no way to do this with mod-tap.
+
+3. **No immediate hold firing.** Mod-tap fires the held modifier either after TAPPING_TERM expires *and* the key is released, or when another key is pressed (with `HOLD_ON_OTHER_KEY_PRESS`). Neither option fires at the threshold moment while the key is still held. For a trackball keyboard, mode keys (VOLUME_MODE, etc.) need to activate the instant the hold threshold is reached so they're ready when you move the ball — waiting for release or another keypress adds perceptible lag.
+
+### Why not QMK's tap dance?
+
+QMK's built-in tap dance can handle multi-tap and tap-vs-hold, but the configuration model is heavier and doesn't compose with other features:
+
+1. **Per-key boilerplate.** A simple "double-tap KC_6 → KC_MPLY" in QMK tap dance requires: (a) an enum entry, (b) a `tap_dance_actions[]` table entry, (c) using `TD(name)` in the keymap instead of the plain keycode. With advanced behavior (hold + double-tap on the same key), you also need a custom callback function with manual state/timer checks — per key. In this keymap, it's one row in `double_tap_keys[]` and the plain keycode stays in the LAYOUT array.
+
+2. **Features don't stack.** In QMK, `TD()` and `MT()` are mutually exclusive on the same key — each consumes the keycode slot. If you want hold *and* double-tap on the same key, you must implement everything inside a single tap dance callback. This keymap's table system is composable: a key can independently appear in `hold_keys[]`, `double_tap_keys[]`, `triple_tap_keys[]`, and `longer_hold_keys[]`, and the processing logic handles all of them.
+
+3. **Tap dance can't do immediate hold.** Tap dance's `on_dance_finished` callback fires when the tap dance resolves (after timeout or interrupt), not at a specific hold duration. Implementing "fire at 150ms while still held" requires manual timer logic inside a custom callback — at which point you've reimplemented what this keymap's `matrix_scan_user()` already does declaratively.
+
+**What's the same:** Both QMK tap dance and this keymap's multi-tap delay the single-tap action while waiting for a possible second press. This is inherent to multi-tap detection — there's no way around it. The delay window (200ms `CUSTOM_DOUBLE_TAP_TERM`) is comparable to QMK's `TAPPING_TERM`. Keys that aren't in `double_tap_keys[]` are not affected and send immediately.
+
+### Why not QMK's Auto Shift?
+
+Auto Shift is the closest built-in match for "hold `1` → `!`" — it automatically sends the shifted variant of a key when held past a timeout. For the basic number-row use case it works out of the box with no per-key config. Where it falls short:
+
+1. **Only sends the shifted variant by default.** Auto Shift applies the Shift modifier to the same keycode. To send a completely different keycode on hold (e.g. hold `6` → `KC_MPLY`), you need to override `autoshift_press_user()` with a per-key `switch` statement. This keymap's `hold_keys[]` table handles arbitrary keycodes declaratively — one row per key, no callback.
+
+2. **Binary, not three-tier.** Auto Shift is tap-or-hold. There's no "hold longer for a third action" — you get the unshifted or the shifted key, nothing more. This keymap's arrow keys need three tiers (tap = arrow, hold = word jump, longer hold = line jump), which Auto Shift can't express.
+
+3. **Doesn't compose with multi-tap.** Auto Shift owns the key's timing. Stacking double-tap detection on top would require intercepting Auto Shift's internal state, which isn't designed for that. The custom system handles hold and multi-tap in the same processing path.
+
+4. **Delays every tap.** Auto Shift holds the keycode until you release the key or the timeout fires — even for plain taps. For keys not in `double_tap_keys[]`, this keymap sends the tap immediately on release with no waiting period.
+
+**Where Auto Shift wins:** Zero-config shifted symbols on alpha keys. If all you need is "hold any letter to capitalize it," Auto Shift is simpler. This keymap doesn't use it because the number row, punctuation, and arrow keys need behaviors Auto Shift can't provide, and running two parallel hold-timing systems on the same keys would conflict.
+
+### Why not both?
+
+The custom system replaces mod-tap, tap dance, and Auto Shift entirely rather than layering on top of them. This is intentional: a single processing path in `process_record_user()` handles tap, hold, longer-hold, multi-tap, MO() layers, and mode activation uniformly. Mixing custom timing with QMK's built-in tap/hold state machines would create conflicting ownership over key events and timers.
+
 ## Key Behavior System
 
-This keymap does NOT use QMK's built-in mod-tap or tap dance. Instead, `process_record_user()` implements its own timing system with independent, composable per-feature tables in `key_config.h`. A key can appear in multiple tables to combine behaviors.
+This keymap uses its own timing system in `process_record_user()` with independent, composable per-feature tables in `key_config.h`. A key can appear in multiple tables to combine behaviors (see [Design Decisions](#design-decisions) above for why).
 
 ### Tables
 
@@ -283,7 +325,7 @@ HSV → RGB conversion is cached — only recomputed when the interpolated HSV a
 
 ### Color precomputation
 
-All layer and mode HSV colors are converted to RGB once at first render and cached in static variables, avoiding expensive `hsv_to_rgb()` calls every frame.
+All layer and mode HSV colors are converted to RGB once at first render and cached in static variables, avoiding `hsv_to_rgb()` calls every frame.
 
 ## Split Sync Protocol
 

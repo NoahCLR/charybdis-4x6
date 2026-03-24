@@ -134,7 +134,7 @@ QMK calls `pointing_device_task_user()` every scan cycle (~1000Hz) with the trac
 ```mermaid
 flowchart TD
     A["Trackball motion (x, y)"] --> B[pointing_device_task_user]
-    B --> C{Walk pd_modes[] array}
+    B --> C{"Walk pd_modes array"}
 
     C -- "Dragscroll active" --> D["Handled by charybdis firmware
     (scroll output)"]
