@@ -21,9 +21,9 @@
 // If you add or remove a layer, also update DYNAMIC_KEYMAP_LAYER_COUNT in config.h.
 enum charybdis_keymap_layers {
     LAYER_BASE = 0, // Default QWERTY typing layer
-    LAYER_NUM,      // Numpad on the right half (activated by holding Z or B)
-    LAYER_LOWER,    // Symbols and DPI controls (blue RGB)
-    LAYER_RAISE,    // Navigation, media, and mouse buttons (purple RGB, sniping enabled)
+    LAYER_NUM,      // Numpad on the right half
+    LAYER_LOWER,    // Symbols and DPI controls
+    LAYER_RAISE,    // Navigation, media, and mouse buttons (sniping enabled)
     LAYER_POINTER,  // Auto-mouse layer: activates on trackball movement, deactivates after timeout
     LAYER_COUNT,
 };
@@ -72,6 +72,7 @@ enum custom_keycodes {
 //   CUSTOM_TAP_HOLD_TERM    = 150ms  (tap vs hold boundary)
 //   CUSTOM_LONGER_HOLD_TERM = 400ms  (hold vs longer-hold boundary)
 //   CUSTOM_DOUBLE_TAP_TERM  = 200ms  (max gap between taps for double-tap)
+//   COMBO_TERM              = 50ms   (max gap between keys for combos)
 
 // ─── Hold Keys ──────────────────────────────────────────────────────────────
 
@@ -117,7 +118,7 @@ static const longer_hold_key_t longer_hold_keys[] = {
     {KC_RIGHT, G(KC_RIGHT), true}, // → → line jump
 };
 
-// ─── Multi-Tap Keys ─────────────────────────────────────────────────────────
+// ─── Double-Tap Keys ─────────────────────────────────────────────────────────
 
 // keycode                action
 static const double_tap_key_t double_tap_keys[] = {
@@ -138,6 +139,10 @@ static const triple_tap_key_t triple_tap_keys[] = {
 };
 
 // ─── Mode Tap Overrides ─────────────────────────────────────────────────────
+//
+// Pointing device mode keys (VOLUME_MODE, etc.) default to sending whatever
+// key is at that position on LAYER_BASE when tapped.  Add an entry here to
+// override that fallback with a specific keycode.
 
 // keycode            tap
 static const mode_tap_override_t mode_tap_overrides[] = {
@@ -148,6 +153,7 @@ static const mode_tap_override_t mode_tap_overrides[] = {
 // ─── Combos ─────────────────────────────────────────────────────────────────
 //
 // Press multiple keys simultaneously to trigger a different action.
+// Each combo can use 2 or more trigger keys — there is no hard limit.
 // COMBO_TERM (in config.h) controls the max time window for keys to
 // register as a combo.
 //
@@ -155,15 +161,11 @@ static const mode_tap_override_t mode_tap_overrides[] = {
 //   1. Define a PROGMEM key array ending with COMBO_END.
 //   2. Add a COMBO() entry to key_combos[] in the same order.
 
-// clang-format off
-const uint16_t PROGMEM combo_keys_0[] = {KC_J, KC_K, COMBO_END};
 const uint16_t PROGMEM combo_keys_1[] = {KC_D, KC_F, COMBO_END};
 
 combo_t key_combos[] = {
-    COMBO(combo_keys_0, VOLUME_MODE), // J + K → Volume mode (hold)
-    COMBO(combo_keys_1, KC_TAB),      // D + F → Tab
+    COMBO(combo_keys_1, KC_TAB), // D + F → Tab
 };
-// clang-format on
 
 // ─── Macros ─────────────────────────────────────────────────────────────────
 //
