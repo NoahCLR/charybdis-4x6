@@ -112,11 +112,11 @@ REPLACEMENTS = {
 # → Adding or renaming a tap dance?  Update this list to match the
 #   tap_dances enum in keymap.c.
 TAP_DANCE_NAMES = [
-    "TD_6",
-    "TD_7",
-    "TD_8",
-    "TD_LWR",
-    "TD_RSE",
+    "TD_49",
+    "TD_45",
+    "TD_44",
+    "TD_28",
+    "TD_53",
 ]
 QK_TAP_DANCE = 0x5700  # from QMK keycodes.h — stable keycode range base
 for i, name in enumerate(TAP_DANCE_NAMES):

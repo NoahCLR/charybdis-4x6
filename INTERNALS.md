@@ -97,17 +97,31 @@ If neither flag is set, the firmware falls through to QMK's default USB detectio
 
 `LTO_ENABLE = yes` in `rules.mk` — Link-time optimization reduces the binary size.
 
+## Tap Dance
+
+Keys `6`, `7`, `8` and the layer keys (Lower, Raise) use QMK's tap dance (`TAP_DANCE_ENABLE = yes` in `rules.mk`). The implementation is data-driven:
+
+- **`td_config_t`** struct defines tap, hold, double-tap keycodes, and an optional `hold_layer` for layer-hold tap dances.
+- **`td_config[]`** array holds one entry per tap dance, indexed by the `tap_dances` enum.
+- **`td_finished()`** and **`td_reset()`** are shared callbacks that read the config via `user_data`. No per-key callback duplication.
+- Layer-hold tap dances (TD_28, TD_53) use `layer_on()`/`layer_off()` instead of `tap_code16()`. A static `td_hold_layer_active` variable tracks which layer to deactivate on reset.
+- Tap dances are named by LED index (e.g. TD_49 for the key at LED position 49) so identifiers stay stable regardless of what keycode is mapped there.
+
+**Adding a new tap dance:** Add one line to the enum, one to `td_config[]`, one to `tap_dance_actions[]`, and one to `TAP_DANCE_NAMES` in `via_to_qmk_layout.py`.
+
 ## Custom Tap / Hold / Longer-Hold System
 
-This keymap does NOT use QMK's built-in mod-tap for the number row and punctuation. Instead, `process_record_user()` implements its own three-tier timing system:
+This keymap does NOT use QMK's built-in mod-tap for the remaining number row keys and punctuation. Instead, `process_record_user()` implements its own three-tier timing system:
 
 - **Tap** (< 150ms): Send the plain key (e.g. `1`)
 - **Hold** (150–400ms): Send the shifted variant (e.g. `!`)
 - **Longer hold** (> 400ms): Send a third action (e.g. GUI+Arrow for line jump)
 
-Key-down does NOT immediately register — the character is only sent on key-up, after measuring how long the key was held.
+**Immediate hold detection:** For most keys, `matrix_scan_user()` checks the hold timer every scan cycle (~1ms) and fires the hold variant as soon as the 150ms threshold is reached — no release needed. Arrow keys are excluded from this and keep the release-based behavior so the user can choose between the hold and longer-hold tiers.
 
-**Applies to:** Number row (1–0), punctuation (- = [ ] \ \` ; ' , .), Left/Right arrows, Enter.
+State tracking uses three statics: `tap_hold_timer` (when the key was pressed), `tap_hold_keycode` (which key is held), and `tap_hold_fired` (whether the hold action already sent). On release, if `tap_hold_fired` is true, it's a no-op.
+
+**Applies to:** Number row (1–5, 9–0), punctuation (- = [ ] \ \` ; ' , .), Left/Right arrows, Enter. Keys 6, 7, 8 are handled by tap dance instead.
 
 **Longer hold special cases:**
 - Left/Right arrows: tap = arrow, hold = Alt+Arrow (word jump), longer hold = GUI+Arrow (line jump)
@@ -223,6 +237,8 @@ The split boundary is fixed at LED index 29 (`RGB_LEFT_LED_COUNT`), matching `RG
 The `via layouts/via_to_qmk_layout.py` script converts VIA JSON exports into QMK `LAYOUT()` blocks. VIA uses a flat key index and its own token format (`CUSTOM(80)`, `KC_NO`, etc.) that doesn't match QMK's matrix order or keycode names.
 
 When adding a custom keycode to the keymap, also add the VIA token mapping in the `REPLACEMENTS` dict at the top of the script. The dict translates VIA's `CUSTOM(N)` tokens to the corresponding enum name in `keymap.c`.
+
+Tap dance keycodes are handled separately: VIA exports them as raw hex (`0x5700`, `0x5701`, ...) based on `QK_TAP_DANCE` (0x5700) + index. The `TAP_DANCE_NAMES` list at the top of the script generates the hex → `TD(name)` mappings automatically — keep it in sync with the `tap_dances` enum in `keymap.c`.
 
 ## Adding a New Trackball Mode
 

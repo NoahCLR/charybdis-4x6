@@ -47,9 +47,14 @@
 //     the relevant keycodes in process_record_user() and setting flags that
 //     the pointing device code checks to decide what to do with pointing device movement.
 //
-//   - "Tap vs Hold":  A key can do different things depending on how
-//     long you press it.  This keymap implements a custom three-tier
-//     system: tap (<150ms), hold (150–400ms), and longer hold (>400ms).
+//   - "Tap dance":  Some keys (6, 7, 8, Lower, Raise) use QMK's tap
+//     dance for double-tap actions (media controls).  Config is data-
+//     driven via td_config[].
+//
+//   - "Tap vs Hold":  Remaining number/punctuation keys use a custom
+//     three-tier system: tap (<150ms), hold (150–400ms), longer hold
+//     (>400ms).  Hold fires immediately via matrix_scan_user() for
+//     most keys; arrow keys keep release-based timing for three tiers.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H
@@ -66,7 +71,9 @@
 // is still determined by MASTER_RIGHT in the keyboard-level config in the qmk repo.
 // Build with: -e FORCE_MASTER=yes or -e FORCE_SLAVE=yes
 #if defined(FORCE_MASTER)
-bool is_keyboard_master_impl(void) { return true; }
+bool is_keyboard_master_impl(void) {
+    return true;
+}
 #elif defined(FORCE_SLAVE)
 #    include "usb_util.h"
 bool is_keyboard_master_impl(void) {
@@ -123,16 +130,21 @@ enum charybdis_keymap_layers {
 // QMK tap dance lets a single key do different things based on how many
 // times it's tapped in quick succession.
 //
-//   TD_6:  single tap → 6, hold → ^,  double tap → play/pause
-//   TD_7:  single tap → 7, hold → &,  double tap → next track
-//   TD_8:  single tap → 8, hold → *,  double tap → previous track
+// Named by LED index (see LED Index Map near RGB section) so the
+// identifier stays stable regardless of what keycode is mapped there.
+//
+//   TD_49 (6 key):   single tap → 6, hold → ^,    double tap → play/pause
+//   TD_45 (7 key):   single tap → 7, hold → &,    double tap → next track
+//   TD_44 (8 key):   single tap → 8, hold → *,    double tap → prev track
+//   TD_28 (L thumb): hold → Lower layer,           double tap → play/pause
+//   TD_53 (R thumb): hold → Raise layer,           double tap → play/pause
 
 enum tap_dances {
-    TD_6,
-    TD_7,
-    TD_8,
-    TD_LWR,
-    TD_RSE,
+    TD_49,
+    TD_45,
+    TD_44,
+    TD_28,
+    TD_53,
     TD_COUNT,
 };
 
@@ -147,11 +159,7 @@ typedef struct {
 } td_config_t;
 
 static const td_config_t td_config[TD_COUNT] = {
-    [TD_6]   = {KC_6,  KC_CIRC, KC_MPLY, 0},
-    [TD_7]   = {KC_7,  KC_AMPR, KC_MNXT, 0},
-    [TD_8]   = {KC_8,  KC_ASTR, KC_MPRV, 0},
-    [TD_LWR] = {KC_NO, KC_NO,   KC_MPLY, LAYER_LOWER},
-    [TD_RSE] = {KC_NO, KC_NO,   KC_MPLY, LAYER_RAISE},
+    [TD_49] = {KC_6, KC_CIRC, KC_MPLY, 0}, [TD_45] = {KC_7, KC_AMPR, KC_MNXT, 0}, [TD_44] = {KC_8, KC_ASTR, KC_MPRV, 0}, [TD_28] = {KC_NO, KC_NO, KC_MPLY, LAYER_LOWER}, [TD_53] = {KC_NO, KC_NO, KC_MPLY, LAYER_RAISE},
 };
 
 // Tracks which layer a tap-dance hold activated, so reset can deactivate it.
@@ -184,21 +192,30 @@ static void td_reset(tap_dance_state_t *state, void *user_data) {
     }
 }
 
-#define TD_ENTRY(idx)                                            \
-    {                                                            \
-        .fn        = {NULL, td_finished, td_reset, NULL},        \
-        .user_data = (void *)&td_config[idx],                    \
+#define TD_ENTRY(idx)                                     \
+    {                                                     \
+        .fn        = {NULL, td_finished, td_reset, NULL}, \
+        .user_data = (void *)&td_config[idx],             \
     }
 
 tap_dance_action_t tap_dance_actions[] = {
-    [TD_6]   = TD_ENTRY(TD_6),
-    [TD_7]   = TD_ENTRY(TD_7),
-    [TD_8]   = TD_ENTRY(TD_8),
-    [TD_LWR] = TD_ENTRY(TD_LWR),
-    [TD_RSE] = TD_ENTRY(TD_RSE),
+    [TD_49] = TD_ENTRY(TD_49), [TD_45] = TD_ENTRY(TD_45), [TD_44] = TD_ENTRY(TD_44), [TD_28] = TD_ENTRY(TD_28), [TD_53] = TD_ENTRY(TD_53),
 };
 
 // ─── Keymap Layouts ─────────────────────────────────────────────────────────
+//
+// ╭────────────────────────╮                 ╭────────────────────────╮
+//    0   7   8  15  16  20                     49  45  44  37  36  29
+// ├────────────────────────┤                 ├────────────────────────┤
+//    1   6   9  14  17  21                     50  46  43  38  35  30
+// ├────────────────────────┤                 ├────────────────────────┤
+//    2   5  10  13  18  22                     51  47  42  39  34  31
+// ├────────────────────────┤                 ├────────────────────────┤
+//    3   4  11  12  19  23                     52  48  41  40  33  32
+// ╰────────────────────────╯                 ╰────────────────────────╯
+//                       26  27  28     53  54  XX
+//                           25  24     55  XX
+//                     ╰────────────╯ ╰────────────╯
 //
 // QMK key prefixes quick reference:
 //   KC_     = plain keycode              MT() = mod on hold, key on tap
@@ -217,7 +234,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
     [LAYER_BASE] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  QK_GESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,        TD(TD_6),     TD(TD_7),     TD(TD_8),              KC_9,              KC_0,           KC_MINS,
+                  QK_GESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,        TD(TD_49),     TD(TD_45),     TD(TD_44),              KC_9,              KC_0,           KC_MINS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                    KC_TAB,              KC_Q,              KC_W,              KC_E,              KC_R,              KC_T,                 KC_Y,              KC_U,              KC_I,              KC_O,              KC_P,           KC_BSLS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -225,7 +242,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
              KC_LEFT_CTRL,        LT(2,KC_Z),              KC_X,              KC_C,              KC_V,        LT(1,KC_B),                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(3,KC_SLSH),      KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,       TD(TD_LWR),       TD(TD_RSE),            KC_ENT,
+                                                                       KC_LEFT_GUI,            KC_SPC,       TD(TD_28),       TD(TD_53),            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,           KC_BSPC
   //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
     ),
@@ -478,7 +495,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case DRAGSCROLL_MODE: {
             static bool dragscroll_was_locked = false;
             if (record->event.pressed) {
-                tap_hold_timer = timer_read();
+                tap_hold_timer        = timer_read();
                 dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
                 pd_mode_update(PD_MODE_DRAGSCROLL, true);
                 pd_state_sync();

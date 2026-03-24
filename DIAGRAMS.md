@@ -88,20 +88,31 @@ flowchart TD
     F --> STOP
     G --> STOP
 
-    B -- No --> H{Stage 2: Tap/hold key?}
+    B -- No --> TD{Stage 2: Tap dance key?}
+    TD -- "LED 49/45/44/28/53" --> TD1{Count taps}
+    TD1 -- "Single tap" --> TD2[Send plain key]
+    TD1 -- "Single hold" --> TD3[Send shifted variant / activate layer]
+    TD1 -- "Double tap" --> TD4[Send media key]
+    TD2 --> STOP
+    TD3 --> STOP
+    TD4 --> STOP
+
+    TD -- No --> H{Stage 3: Tap/hold key?}
     H -- Yes, pressed --> I[Start hold timer]
-    H -- Yes, released --> J{How long held?}
-    J -- "< 150ms" --> K[Tap: plain key]
-    J -- "150-400ms" --> L[Hold: shifted variant]
-    J -- "> 400ms" --> M[Longer hold: third action]
+    H -- Yes, released --> J{Already fired by matrix_scan?}
+    J -- Yes --> STOP
+    J -- No --> J2{How long held?}
+    J2 -- "< 150ms" --> K[Tap: plain key]
+    J2 -- "150-400ms" --> L[Hold: shifted variant]
+    J2 -- "> 400ms" --> M[Longer hold: third action]
     K --> STOP
     L --> STOP
     M --> STOP
 
-    H -- No --> N{Stage 3: Release?}
+    H -- No --> N{Stage 4: Release?}
     N -- Yes --> PASS([return true])
 
-    N -- "No (press only)" --> O{Stage 4: Macro?}
+    N -- "No (press only)" --> O{Stage 5: Macro?}
     O -- Yes --> P[Send macro shortcut]
     P --> STOP
     O -- No --> PASS
