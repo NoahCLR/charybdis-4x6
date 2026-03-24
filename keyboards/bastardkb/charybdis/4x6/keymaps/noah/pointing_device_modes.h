@@ -26,15 +26,10 @@
 //                  Charybdis firmware's native drag-scroll is active,
 //                  so RGB can reflect the state.
 //
-// How to add a new mode:
-//   1. Add a PD_MODE_xxx define here (next free bit)
-//   2. Add a custom keycode in key_config.h's enum
-//   3. Write a handle_xxx_mode() function here (below the existing handlers)
-//   4. Add an entry to pd_modes[] here (flag + keycode + handler) — position = priority
-//   5. Add an HSV color entry to pd_mode_colors[] in rgb_config.h
-//
-// That's it — process_record_user, is_mouse_record_user, pointing_device_task_user,
-// and RGB rendering all iterate pd_modes[] automatically.
+// How to add a new mode: see INTERNALS.md → "Add a new trackball mode".
+// Short version: define a flag here, write a handler here, add it to
+// pd_modes[] here, then add a keycode and color in the other config files.
+// Everything else (key handling, mouse record, dispatch, RGB) is automatic.
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once

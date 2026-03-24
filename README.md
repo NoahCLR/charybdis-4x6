@@ -117,8 +117,9 @@ keyboards/bastardkb/charybdis/4x6/keymaps/noah/
   config.h                  QMK/Charybdis configuration overrides
   pointing_device_modes.h   Trackball mode system (volume, brightness, zoom, arrow, dragscroll)
   split_sync.h              Master → slave state sync via RPC (mode flags + elapsed time)
+  rgb_helpers.h             Split-safe LED helper functions for rgb_matrix_set_color()
+  rgb_config.h              RGB color definitions (layer colors, mode overlays, LED groups, gradient)
   rgb_automouse.h           Auto-mouse countdown gradient (white → red)
-  rgb_config.h              RGB color definitions and split-safe helper functions
   rules.mk                  Build flags (VIA, hi-res scroll)
 
 via layouts/
@@ -131,7 +132,7 @@ via layouts/
 | File | Contents |
 |------|----------|
 | [README.md](README.md) | This file — feature overview, layers, modes, macros |
-| [INTERNALS.md](INTERNALS.md) | Technical deep-dive: custom firmware fork, split serial timeout fix, split sync protocol, how to add a new trackball mode |
+| [INTERNALS.md](INTERNALS.md) | Technical deep-dive and **"how to add" quick reference** for all data-driven features (modes, tap dances, tap/hold keys, macros, layers, LED highlights, colors) |
 | [DIAGRAMS.md](DIAGRAMS.md) | Mermaid diagrams: architecture overview, auto-mouse lifecycle, key processing pipeline, trackball motion flow, RGB rendering, split sync sequence |
 
 ## Building & Flashing

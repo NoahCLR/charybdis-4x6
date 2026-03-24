@@ -2,6 +2,85 @@
 
 Technical notes for developers working on this keymap. For feature overview, see [README.md](README.md). For visual flow diagrams, see [DIAGRAMS.md](DIAGRAMS.md).
 
+## Quick Reference: Adding Features
+
+Most features in this keymap are data-driven — you add one or two lines to a config table and the processing logic picks them up automatically. Here's where to go for each type of change.
+
+### Add a new trackball mode
+
+A mode intercepts trackball motion and converts it to keypresses (volume, arrows, etc.).
+
+| Step | File | What to do |
+|------|------|------------|
+| 1 | `pointing_device_modes.h` | Add a `#define PD_MODE_xxx (1 << N)` (next free bit) |
+| 2 | `key_config.h` | Add a keycode to the `custom_keycodes` enum (e.g. `XXX_MODE`) |
+| 3 | `pointing_device_modes.h` | Write a `handle_xxx_mode()` function (see existing handlers for the pattern) |
+| 4 | `pointing_device_modes.h` | Add an entry to `pd_modes[]`: `{PD_MODE_xxx, XXX_MODE, handle_xxx_mode}` — array position = priority |
+| 5 | `rgb_config.h` | Add a tagged color entry to `pd_mode_colors[]`: `{PD_MODE_xxx, {hue, sat, val}}` |
+| 6 | `via_to_qmk_layout.py` | Add a `CUSTOM(N)` → `XXX_MODE` mapping to `REPLACEMENTS` |
+
+Everything else is automatic: `process_record_user` activates/deactivates the mode on key press/release, `is_mouse_record_user` keeps the auto-mouse layer alive, `pointing_device_task_user` dispatches to your handler, and RGB paints the right-half overlay color.
+
+### Add a new tap dance
+
+A tap dance gives a key different actions for single tap, hold, and double tap.
+
+| Step | File | What to do |
+|------|------|------------|
+| 1 | `key_config.h` | Add one line to `TD_LIST`: `X(TD_xx, tap_kc, hold_kc, double_tap_kc, hold_layer)` |
+| 2 | `via_to_qmk_layout.py` | Add the name to `TAP_DANCE_NAMES` (must match enum order) |
+
+The enum, config array, `TD_COUNT`, and runtime action wiring are all auto-generated from `TD_LIST`. Use `hold_layer` (e.g. `LAYER_LOWER`) for layer-hold tap dances; use `0` for keycode-hold.
+
+### Add a new tap/hold/longer-hold key
+
+These keys send different keycodes based on hold duration (tap < 150ms, hold 150–400ms, longer hold > 400ms).
+
+| Step | File | What to do |
+|------|------|------------|
+| 1 | `key_config.h` | Add one line to `tap_hold_config[]`: `{tap_kc, hold_kc, longer_hold_kc, immediate}` |
+
+Set `immediate` to `true` for keys that should fire the hold action at the threshold without waiting for release (most keys). Set to `false` for keys where you want to choose between hold and longer-hold on release (arrows).
+
+### Add a new macro
+
+A macro sends a key combination on a single keypress.
+
+| Step | File | What to do |
+|------|------|------------|
+| 1 | `key_config.h` | Add a `case MACRO_N:` to the `MACRO_DISPATCH` switch with a `SEND_STRING(...)` call |
+| 2 | `key_config.h` | Make sure the keycode exists in `custom_keycodes` (MACRO_0–15 are pre-reserved) |
+| 3 | `via_to_qmk_layout.py` | Macro mappings are auto-generated — no change needed unless using MACRO_16+ |
+
+### Add a new layer
+
+| Step | File | What to do |
+|------|------|------------|
+| 1 | `key_config.h` | Add the layer to the `charybdis_keymap_layers` enum (before `LAYER_COUNT`) |
+| 2 | `key_config.h` | Add a `LAYOUT()` block in the `keymaps[]` array |
+| 3 | `rgb_config.h` | Add an HSV entry to `layer_colors[]` at the new layer's index (`{0,0,0}` for no override) |
+| 4 | `config.h` | Update `DYNAMIC_KEYMAP_LAYER_COUNT` if using VIA |
+| 5 | `via_to_qmk_layout.py` | Add the layer name to `LAYER_NAMES` |
+
+### Add a per-layer LED group highlight
+
+Highlight specific LEDs with a different color when a layer is active (e.g. marking modifier keys).
+
+| Step | File | What to do |
+|------|------|------------|
+| 1 | `rgb_config.h` | Define an LED index array: `static const uint8_t xxx_leds[] = {led1, led2, ...};` |
+| 2 | `rgb_config.h` | Add one line to `layer_led_groups[]`: `{LAYER_xxx, {hue, sat, val}, xxx_leds, count}` |
+
+Use the LED Index Map in `keymap.c` to find the LED indices for each physical key position.
+
+### Change a layer's color
+
+Edit the corresponding entry in `layer_colors[]` in `rgb_config.h`. Colors are HSV values — see `hsv colors.jpg` for a quick hue reference. Changes take effect on next build with no other edits needed.
+
+### Change a mode's overlay color
+
+Edit the corresponding entry in `pd_mode_colors[]` in `rgb_config.h`. Entries are tagged by `mode_flag` so order doesn't matter.
+
 ## Custom Firmware Fork
 
 This keymap depends on [NoahCLR/bastardkb-qmk](https://github.com/NoahCLR/bastardkb-qmk) (branch `qmk-latest`), which modifies two areas of the firmware:
@@ -130,11 +209,11 @@ State tracking uses three statics: `tap_hold_timer` (when the key was pressed), 
 
 ## Pointing Device Modes
 
-The trackball mode system is a bitfield-based design in `pointing_device_modes.h`. Each mode is a single bit in `pd_mode_flags`. When a mode is active, `pointing_device_task_user()` intercepts the trackball motion report and converts it to keypresses (volume, brightness, zoom, arrow) instead of cursor movement.
+The trackball mode system is a bitfield-based design in `pointing_device_modes.h`. Each mode is a single bit in `pd_mode_flags`. When a mode is active, `pointing_device_task_user()` intercepts the trackball motion report and dispatches to the mode's handler function pointer (stored in `pd_modes[]`), which converts it to keypresses (volume, brightness, zoom, arrow) instead of cursor movement.
 
 ### Mode resolution
 
-`pd_modes[]` defines which mode wins when multiple are held simultaneously. Both the motion handler and the RGB overlay iterate this array, so the priority order is consistent everywhere: dragscroll > volume > brightness > zoom > arrow.
+`pd_modes[]` is the single source of truth for mode config: each entry holds the flag, keycode, and handler function pointer. `pointing_device_task_user` dispatches to the first active mode's handler; modes with a `NULL` handler (dragscroll) are skipped — they're handled by the charybdis firmware. The RGB overlay iterates the same array, so priority order is consistent everywhere: dragscroll > volume > brightness > zoom > arrow.
 
 ### Mode key behavior
 
@@ -209,9 +288,9 @@ typedef struct __attribute__((packed)) {
 
 **Slave-side handler:** `pd_sync_slave_rpc()` updates both `pd_sync_remote` (for RGB rendering) and `pd_mode_flags` (for mode overlay colors).
 
-## RGB Configuration & Helpers (`rgb_config.h`)
+## RGB Helpers (`rgb_helpers.h`)
 
-All RGB color definitions (layer indicators, mode overlays, auto-mouse gradient) and split-safe wrappers around `rgb_matrix_set_color()`. On a split keyboard, `rgb_matrix_indicators_advanced_user()` is called in chunks — each half only processes its own LEDs. The helpers clamp to the current chunk so callers can use global LED indices (0–57) without worrying about which half they're on.
+Split-safe wrappers around `rgb_matrix_set_color()`. On a split keyboard, `rgb_matrix_indicators_advanced_user()` is called in chunks — each half only processes its own LEDs. The helpers clamp to the current chunk so callers can use global LED indices (0–57) without worrying about which half they're on.
 
 | Function | What it does |
 |----------|-------------|
@@ -225,6 +304,10 @@ All RGB color definitions (layer indicators, mode overlays, auto-mouse gradient)
 
 The split boundary is fixed at LED index 29 (`RGB_LEFT_LED_COUNT`), matching `RGB_MATRIX_SPLIT {29, 29}`.
 
+## RGB Color Configuration (`rgb_config.h`)
+
+Pure color data — no logic. Contains layer indicator colors (`layer_colors[]`), mode overlay colors (`pd_mode_colors[]`), per-layer LED group highlights (`layer_led_groups[]`), and auto-mouse gradient endpoints. Mirrors the `key_config.h` pattern: config data only, rendering logic lives in `keymap.c`.
+
 ## VIA Layout Conversion
 
 The `via layouts/via_to_qmk_layout.py` script converts VIA JSON exports into QMK `LAYOUT()` blocks. VIA uses a flat key index and its own token format (`CUSTOM(80)`, `KC_NO`, etc.) that doesn't match QMK's matrix order or keycode names.
@@ -235,13 +318,6 @@ Tap dance keycodes are handled separately: VIA exports them as raw hex (`0x5700`
 
 ## Adding a New Trackball Mode
 
-See the step-by-step guide in the header comment of `pointing_device_modes.h`. Summary:
+See the [quick reference](#add-a-new-trackball-mode) at the top for the step-by-step checklist. The full config lives in `pointing_device_modes.h` — the handler function, `pd_modes[]` entry, and mode flag define are all in the same file.
 
-1. Add a `PD_MODE_xxx` define in `pointing_device_modes.h` (next free bit)
-2. Add a custom keycode in `key_config.h`'s enum
-3. Add an entry to `pd_modes[]` in `pointing_device_modes.h` (flag + keycode) — position = priority
-4. Add a handler case in `pointing_device_task_user`'s switch in `keymap.c`
-5. Add an HSV color entry to `pd_mode_colors[]` in `rgb_config.h`
-6. Add the VIA token mapping in `via_to_qmk_layout.py`
-
-`process_record_user`, `is_mouse_record_user`, and RGB rendering all iterate `pd_modes[]` automatically — no manual keycode lists to update.
+`process_record_user`, `is_mouse_record_user`, `pointing_device_task_user`, and RGB rendering all iterate `pd_modes[]` automatically — no manual keycode lists or switch cases to update in `keymap.c`.

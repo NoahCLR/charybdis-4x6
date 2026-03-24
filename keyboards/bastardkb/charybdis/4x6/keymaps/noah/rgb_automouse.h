@@ -25,7 +25,7 @@
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 
 #    include "pointing_device_auto_mouse.h"
-#    include "rgb_config.h"
+#    include "rgb_helpers.h"
 #    include "split_sync.h"
 
 // How long the color stays at the start value before the gradient begins.

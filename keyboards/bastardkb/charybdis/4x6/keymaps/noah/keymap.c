@@ -28,13 +28,17 @@
 //     from the master half to the slave half over QMK's split RPC
 //     transport.  Both values travel in a single 3-byte packet.
 //
+//   rgb_helpers.h
+//     Split-safe helper functions for rgb_matrix_set_color().  Handles
+//     LED chunk boundaries so callers can use global LED indices (0–57).
+//
+//   rgb_config.h
+//     All RGB color definitions: layer indicators, mode overlays, LED
+//     group highlights, and auto-mouse gradient endpoints.
+//
 //   rgb_automouse.h
 //     Renders the auto-mouse countdown gradient (white → red) based on
 //     how much of the timeout has elapsed.
-//
-//   rgb_config.h
-//     All RGB color definitions (layer indicators, mode overlays, auto-mouse
-//     gradient) and split-safe helper functions for rgb_matrix_set_color().
 //
 // Key concepts for newcomers:
 //
@@ -67,8 +71,9 @@
 #include "key_config.h"
 #include "pointing_device_modes.h"
 #include "split_sync.h"
-#include "rgb_automouse.h"
+#include "rgb_helpers.h"
 #include "rgb_config.h"
+#include "rgb_automouse.h"
 
 // Force master/slave role at compile time.  Needed when both halves have
 // their own USB connection (e.g. for full LED brightness on each side
@@ -433,7 +438,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 // half (the trackball side) so you can tell which mode the trackball is in.
 //
 // Colors are defined in rgb_config.h.  This section is rendering logic only.
-// See rgb_config.h for the split-safe helper API and all color values.
+// See rgb_helpers.h for the split-safe helper API and rgb_config.h for color values.
 
 // ─── LED Index Map ──────────────────────────────────────────────────────────
 //
