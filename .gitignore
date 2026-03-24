@@ -5,10 +5,11 @@
 .DS_Store
 ._*
 
-# Firmware files
+# Build artifacts
 *.hex
 *.bin
 *.uf2
+compile_commands.json
 
 # Claude Code
 .claude/
