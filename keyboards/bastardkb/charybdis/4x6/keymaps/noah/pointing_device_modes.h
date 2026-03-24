@@ -29,12 +29,12 @@
 // How to add a new mode:
 //   1. Add a PD_MODE_xxx define here (next free bit)
 //   2. Add a custom keycode in key_config.h's enum
-//   3. Add an entry to pd_modes[] here (flag + keycode) — position = priority
-//   4. Add a handler case in pointing_device_task_user's switch (keymap.c)
+//   3. Write a handle_xxx_mode() function here (below the existing handlers)
+//   4. Add an entry to pd_modes[] here (flag + keycode + handler) — position = priority
 //   5. Add an HSV color entry to pd_mode_colors[] in rgb_config.h
 //
-// That's it — process_record_user, is_mouse_record_user, and RGB rendering
-// all iterate pd_modes[] automatically.  No manual keycode lists to update.
+// That's it — process_record_user, is_mouse_record_user, pointing_device_task_user,
+// and RGB rendering all iterate pd_modes[] automatically.
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
@@ -51,35 +51,25 @@
 // #define PD_MODE_xxx       (1 << 5)  // next free slot
 // ... up to (1 << 7) for 8 modes in a uint8_t
 
-// ─── Mode definitions ─────────────────────────────────────────────────────
-// Each mode has a flag (bitfield value) and an optional custom keycode.
+// ─── Mode handler type ──────────────────────────────────────────────────
+// NULL means the mode is handled externally (e.g. dragscroll by charybdis firmware).
+#if defined(POINTING_DEVICE_ENABLE)
+typedef report_mouse_t (*pd_mode_handler_t)(report_mouse_t);
+#else
+typedef void *pd_mode_handler_t; // unused stub — lets the struct compile
+#endif
+
+// ─── Mode definition struct ─────────────────────────────────────────────
+// Each mode has a flag, an optional custom keycode, and a handler function.
 // Array order = priority order — first active mode wins for both handler
 // dispatch and RGB overlay.  KC_NO means the mode has no dedicated keycode
 // (e.g. dragscroll is activated via Charybdis firmware keycodes).
 
 typedef struct {
-    uint8_t  mode_flag;
-    uint16_t keycode;   // KC_NO for firmware-handled modes
+    uint8_t            mode_flag;
+    uint16_t           keycode;   // KC_NO for firmware-handled modes
+    pd_mode_handler_t  handler;   // NULL for firmware-handled modes
 } pd_mode_def_t;
-
-static const pd_mode_def_t pd_modes[] = {
-    {PD_MODE_DRAGSCROLL,  KC_NO},
-    {PD_MODE_VOLUME,      VOLUME_MODE},
-    {PD_MODE_BRIGHTNESS,  BRIGHTNESS_MODE},
-    {PD_MODE_ZOOM,        ZOOM_MODE},
-    {PD_MODE_ARROW,       ARROW_MODE},
-};
-
-#define PD_MODE_COUNT (sizeof(pd_modes) / sizeof(pd_modes[0]))
-
-// Look up which mode flag a keycode activates.  Returns 0 if not found.
-static inline uint8_t pd_mode_for_keycode(uint16_t keycode) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode)
-            return pd_modes[i].mode_flag;
-    }
-    return 0;
-}
 
 // ─── Global mode state ─────────────────────────────────────────────────────
 // Single translation unit (keymap.c includes this header) — static is safe.
@@ -327,3 +317,26 @@ static inline report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
 #endif // POINTING_DEVICE_ENABLE
+
+// ─── Mode config table ──────────────────────────────────────────────────────
+// Defined after the handler functions so the function pointers resolve.
+// NULL handler means the mode is handled externally (dragscroll by firmware).
+
+static const pd_mode_def_t pd_modes[] = {
+    {PD_MODE_DRAGSCROLL,  KC_NO,           NULL},
+    {PD_MODE_VOLUME,      VOLUME_MODE,     handle_volume_mode},
+    {PD_MODE_BRIGHTNESS,  BRIGHTNESS_MODE, handle_brightness_mode},
+    {PD_MODE_ZOOM,        ZOOM_MODE,       handle_zoom_mode},
+    {PD_MODE_ARROW,       ARROW_MODE,      handle_arrow_mode},
+};
+
+#define PD_MODE_COUNT (sizeof(pd_modes) / sizeof(pd_modes[0]))
+
+// Look up which mode flag a keycode activates.  Returns 0 if not found.
+static inline uint8_t pd_mode_for_keycode(uint16_t keycode) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode)
+            return pd_modes[i].mode_flag;
+    }
+    return 0;
+}

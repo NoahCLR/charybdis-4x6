@@ -378,20 +378,13 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
 // Called every scan cycle with the trackball's motion report.
+// Dispatches to the first active mode's handler (priority = pd_modes[] order).
+// Modes with NULL handlers (e.g. dragscroll) are skipped — they're handled
+// by the charybdis firmware before this function is called.
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (!pd_mode_active(pd_modes[i].mode_flag)) continue;
-        switch (pd_modes[i].mode_flag) {
-            case PD_MODE_VOLUME:
-                return handle_volume_mode(mouse_report);
-            case PD_MODE_BRIGHTNESS:
-                return handle_brightness_mode(mouse_report);
-            case PD_MODE_ZOOM:
-                return handle_zoom_mode(mouse_report);
-            case PD_MODE_ARROW:
-                return handle_arrow_mode(mouse_report);
-            default:
-                break; // PD_MODE_DRAGSCROLL: handled by charybdis firmware
+        if (pd_mode_active(pd_modes[i].mode_flag) && pd_modes[i].handler) {
+            return pd_modes[i].handler(mouse_report);
         }
     }
     return mouse_report;
