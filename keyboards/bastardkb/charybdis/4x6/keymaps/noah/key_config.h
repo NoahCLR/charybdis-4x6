@@ -2,9 +2,9 @@
 // Key Configuration — what each key does
 // ────────────────────────────────────────────────────────────────────────────
 //
-// This file holds all the behavioral data for the keymap: enums, tap dance
-// configs, tap/hold mappings, and macro definitions.  The processing logic
-// that uses these tables lives in keymap.c.
+// This file holds all the behavioral data for the keymap: enums, the unified
+// key behavior table, macro definitions, and LAYOUT arrays.  The processing
+// logic that uses these tables lives in keymap.c.
 //
 // Want to change what a key does?  Edit this file.
 // Want to change how keys are processed?  Edit keymap.c.
@@ -28,8 +28,7 @@ enum charybdis_keymap_layers {
 // DYNAMIC_KEYMAP_LAYER_COUNT in config.h must match LAYER_COUNT.
 // If you add or remove a layer, update both.
 #ifdef VIA_ENABLE
-_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT,
-               "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
+_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
 #endif
 
 // ─── Custom Keycodes ────────────────────────────────────────────────────────
@@ -41,6 +40,7 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT,
 // VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE activate pointing device modes while held.
 // DRG_TOG_ON_HOLD is a dual-purpose key: tap sends the base-layer key at
 // that position, hold toggles drag-scroll lock.
+// LOWER / RAISE are layer activation keys with double-tap support.
 
 enum custom_keycodes {
     MACRO_0 = SAFE_RANGE,
@@ -64,110 +64,86 @@ enum custom_keycodes {
     ARROW_MODE,
     ZOOM_MODE,
     DRG_TOG_ON_HOLD,
+    LOWER,
+    RAISE,
 };
 
-// ─── Tap Dance ──────────────────────────────────────────────────────────────
+// ─── Key Behaviors ──────────────────────────────────────────────────────────
 //
-// Named by LED index (see LED Index Map in keymap.c) so the identifier
-// stays stable regardless of what keycode is mapped at that position.
+// Unified data-driven key behavior system.  Each entry maps a keycode to
+// up to five actions depending on how the key is pressed:
 //
-//   TD_49 (6 key):   single tap → 6, hold → ^,    double tap → play/pause
-//   TD_45 (7 key):   single tap → 7, hold → &,    double tap → next track
-//   TD_44 (8 key):   single tap → 8, hold → *,    double tap → prev track
-//   TD_28 (L thumb): hold → Lower layer,           double tap → play/pause
-//   TD_53 (R thumb): hold → Raise layer,           double tap → play/pause
+//   keycode     — the keycode that triggers this entry (what goes in the keymap)
+//   tap         — sent on quick press (< CUSTOM_TAP_HOLD_TERM, KC_NO = nothing)
+//   hold        — sent when held past CUSTOM_TAP_HOLD_TERM (KC_NO = nothing)
+//   longer_hold — sent when held past CUSTOM_LONGER_HOLD_TERM (KC_NO = fall back to hold)
+//   double_tap  — sent on double-tap within CUSTOM_DOUBLE_TAP_TERM (KC_NO = disabled)
+//   hold_layer  — layer to activate on hold instead of sending hold keycode (0 = use keycode)
+//   immediate   — if true, hold fires at threshold without waiting for release
 //
-// ╭────────────────────────╮                 ╭────────────────────────╮
-//    0   7   8  15  16  20                     49  45  44  37  36  29
-// ├────────────────────────┤                 ├────────────────────────┤
-//    1   6   9  14  17  21                     50  46  43  38  35  30
-// ├────────────────────────┤                 ├────────────────────────┤
-//    2   5  10  13  18  22                     51  47  42  39  34  31
-// ├────────────────────────┤                 ├────────────────────────┤
-//    3   4  11  12  19  23                     52  48  41  40  33  32
-// ╰────────────────────────╯                 ╰────────────────────────╯
-//                       26  27  28     53  54  XX
-//                           25  24     55  XX
-//                     ╰────────────╯ ╰────────────╯
+// Notes:
+//   - When hold_layer != 0, the layer always activates at the threshold
+//     (like immediate=true) since you need it active while holding.
+//   - Keys with double_tap != KC_NO add a small delay to single taps
+//     (waiting for potential second press).  Keys without double-tap
+//     have zero-latency taps.
 //
-// Per-tap-dance config: what to send on tap, hold, and double tap.
-// If hold_layer is non-zero, hold activates that layer instead of sending
-// the hold keycode.  (Layer 0 is always active so 0 means "use keycode".)
-typedef struct {
-    uint16_t tap;
-    uint16_t hold;
-    uint16_t double_tap;
-    uint8_t  hold_layer;
-} td_config_t;
-
-// Single source of truth for tap dances.  To add a new one, add one TDE()
-// line here — the enum, config array, and TD_COUNT are all generated from it.
-//
-//                name    tap    hold      double-tap   hold_layer
-#define TD_LIST                                    \
-    TDE(TD_49, KC_6, KC_CIRC, KC_MPLY, 0)          \
-    TDE(TD_45, KC_7, KC_AMPR, KC_MNXT, 0)          \
-    TDE(TD_44, KC_8, KC_ASTR, KC_MPRV, 0)          \
-    TDE(TD_28, KC_NO, KC_NO, KC_MPLY, LAYER_LOWER) \
-    TDE(TD_53, KC_NO, KC_NO, KC_MPLY, LAYER_RAISE)
-
-#define TDE(name, ...) name,
-enum tap_dances { TD_LIST TD_COUNT };
-#undef TDE
-
-#define TDE(name, tap, hold, dtap, layer) [name] = {tap, hold, dtap, layer},
-static const td_config_t td_config[TD_COUNT] = {TD_LIST};
-#undef TDE
-
-// ─── Tap / Hold / Longer-Hold Mappings ──────────────────────────────────────
-//
-// Data-driven three-tier key behavior.  Each entry maps a keycode to:
-//   tap          — sent on quick press (< CUSTOM_TAP_HOLD_TERM)
-//   hold         — sent when held past CUSTOM_TAP_HOLD_TERM
-//   longer_hold  — sent when held past CUSTOM_LONGER_HOLD_TERM (KC_NO = fall back to hold)
-//   immediate    — if true, hold fires at threshold without waiting for release
+// Timing thresholds are defined in config.h:
+//   CUSTOM_TAP_HOLD_TERM    = 150ms  (tap vs hold boundary)
+//   CUSTOM_LONGER_HOLD_TERM = 400ms  (hold vs longer-hold boundary)
+//   CUSTOM_DOUBLE_TAP_TERM  = 200ms  (max gap between taps for double-tap)
 //
 // The processing logic in keymap.c iterates this table to decide what to do.
 
 typedef struct {
+    uint16_t keycode;
     uint16_t tap;
     uint16_t hold;
-    uint16_t longer_hold; // KC_NO = fall back to hold
-    bool     immediate;   // true = fire hold at threshold, false = wait for release
-} tap_hold_config_t;
+    uint16_t longer_hold;
+    uint16_t double_tap;
+    uint8_t  hold_layer;
+    bool     immediate;
+} key_behavior_t;
 
-// tap          hold         longer_hold  immediate
-static const tap_hold_config_t tap_hold_config[] = {
-    // Number row → shifted symbols
-    {KC_1, KC_EXLM, KC_NO, true}, // 1 → !
-    {KC_2, KC_AT, KC_NO, true},   // 2 → @
-    {KC_3, KC_HASH, KC_NO, true}, // 3 → #
-    {KC_4, KC_DLR, KC_NO, true},  // 4 → $
-    {KC_5, KC_PERC, KC_NO, true}, // 5 → %
-    {KC_9, KC_LPRN, KC_NO, true}, // 9 → (
-    {KC_0, KC_RPRN, KC_NO, true}, // 0 → )
+// keycode    tap        hold           longer_hold    double_tap  hold_layer   immediate
+static const key_behavior_t key_behaviors[] = {
+    // Number row → shifted symbols (6/7/8 also have double-tap for media)
+    {KC_1,     KC_1,      KC_EXLM,       KC_NO,         KC_NO,      0,           true},  // 1 → !
+    {KC_2,     KC_2,      KC_AT,         KC_NO,         KC_NO,      0,           true},  // 2 → @
+    {KC_3,     KC_3,      KC_HASH,       KC_NO,         KC_NO,      0,           true},  // 3 → #
+    {KC_4,     KC_4,      KC_DLR,        KC_NO,         KC_NO,      0,           true},  // 4 → $
+    {KC_5,     KC_5,      KC_PERC,       KC_NO,         KC_NO,      0,           true},  // 5 → %
+    {KC_6,     KC_6,      KC_CIRC,       KC_NO,         KC_MPLY,    0,           true},  // 6 → ^ / play
+    {KC_7,     KC_7,      KC_AMPR,       KC_NO,         KC_MNXT,    0,           true},  // 7 → & / next
+    {KC_8,     KC_8,      KC_ASTR,       KC_NO,         KC_MPRV,    0,           true},  // 8 → * / prev
+    {KC_9,     KC_9,      KC_LPRN,       KC_NO,         KC_NO,      0,           true},  // 9 → (
+    {KC_0,     KC_0,      KC_RPRN,       KC_NO,         KC_NO,      0,           true},  // 0 → )
 
     // Punctuation → shifted variants
-    {KC_MINS, KC_UNDS, KC_NO, true}, // - → _
-    {KC_EQL, KC_PLUS, KC_NO, true},  // = → +
-    {KC_LBRC, KC_LCBR, KC_NO, true}, // [ → {
-    {KC_RBRC, KC_RCBR, KC_NO, true}, // ] → }
-    {KC_BSLS, KC_PIPE, KC_NO, true}, // \ → |
-    {KC_GRV, KC_TILD, KC_NO, true},  // ` → ~
-    {KC_SCLN, KC_COLN, KC_NO, true}, // ; → :
-    {KC_QUOT, KC_DQUO, KC_NO, true}, // ' → "
-    {KC_COMM, KC_LABK, KC_NO, true}, // , → <
-    {KC_DOT, KC_RABK, KC_NO, true},  // . → >
+    {KC_MINS,  KC_MINS,   KC_UNDS,       KC_NO,         KC_NO,      0,           true},  // - → _
+    {KC_EQL,   KC_EQL,    KC_PLUS,       KC_NO,         KC_NO,      0,           true},  // = → +
+    {KC_LBRC,  KC_LBRC,   KC_LCBR,       KC_NO,         KC_NO,      0,           true},  // [ → {
+    {KC_RBRC,  KC_RBRC,   KC_RCBR,       KC_NO,         KC_NO,      0,           true},  // ] → }
+    {KC_BSLS,  KC_BSLS,   KC_PIPE,       KC_NO,         KC_NO,      0,           true},  // \ → |
+    {KC_GRV,   KC_GRV,    KC_TILD,       KC_NO,         KC_NO,      0,           true},  // ` → ~
+    {KC_SCLN,  KC_SCLN,   KC_COLN,       KC_NO,         KC_NO,      0,           true},  // ; → :
+    {KC_QUOT,  KC_QUOT,   KC_DQUO,       KC_NO,         KC_NO,      0,           true},  // ' → "
+    {KC_COMM,  KC_COMM,   KC_LABK,       KC_NO,         KC_NO,      0,           true},  // , → <
+    {KC_DOT,   KC_DOT,    KC_RABK,       KC_NO,         KC_NO,      0,           true},  // . → >
 
     // Enter → Shift+Enter (new line without send in chat apps)
-    {KC_ENT, S(KC_ENT), KC_NO, true},
+    {KC_ENT,   KC_ENT,    S(KC_ENT),     KC_NO,         KC_NO,      0,           true},
 
     // Arrows — release-based (immediate=false) for three-tier support
-    {KC_LEFT, A(KC_LEFT), G(KC_LEFT), false},    // tap → ←, hold → word jump, longer → line jump
-    {KC_RIGHT, A(KC_RIGHT), G(KC_RIGHT), false}, // tap → →, hold → word jump, longer → line jump
+    {KC_LEFT,  KC_LEFT,   A(KC_LEFT),    G(KC_LEFT),    KC_NO,      0,           false}, // ← / word / line
+    {KC_RIGHT, KC_RIGHT,  A(KC_RIGHT),   G(KC_RIGHT),   KC_NO,      0,           false}, // → / word / line
+
+    // Layer activation keys (hold → layer, double-tap → media)
+    {LOWER,    KC_NO,     KC_NO,         KC_NO,         KC_MPLY,    LAYER_LOWER, false},
+    {RAISE,    KC_NO,     KC_NO,         KC_NO,         KC_MPLY,    LAYER_RAISE, false},
 };
 
-#define TAP_HOLD_CONFIG_COUNT (sizeof(tap_hold_config) / sizeof(tap_hold_config[0]))
+#define KEY_BEHAVIOR_COUNT (sizeof(key_behaviors) / sizeof(key_behaviors[0]))
 
 // ─── Macros ─────────────────────────────────────────────────────────────────
 //
@@ -214,14 +190,14 @@ static inline bool macro_dispatch(uint16_t keycode) {
 //   - XXXXXXX = key does nothing on this layer.
 //     _______ = transparent, falls through to the layer below.
 //
-// The number row (KC_1–KC_0) and punctuation keys use a custom tap/hold
-// system defined below — they are NOT using QMK's built-in mod-tap.
-// See process_record_user() for details.
+// The number row (KC_1–KC_0) and punctuation keys use the unified key
+// behavior system defined above — they are NOT using QMK's built-in mod-tap.
+// See process_record_user() in keymap.c for details.
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
     [LAYER_BASE] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  QK_GESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,        TD(TD_49),     TD(TD_45),     TD(TD_44),              KC_9,              KC_0,           KC_MINS,
+                  QK_GESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,              KC_6,              KC_7,              KC_8,              KC_9,              KC_0,           KC_MINS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                    KC_TAB,              KC_Q,              KC_W,              KC_E,              KC_R,              KC_T,                 KC_Y,              KC_U,              KC_I,              KC_O,              KC_P,           KC_BSLS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -229,7 +205,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
              KC_LEFT_CTRL,        LT(2,KC_Z),              KC_X,              KC_C,              KC_V,        LT(1,KC_B),                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(3,KC_SLSH),      KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,       TD(TD_28),       TD(TD_53),            KC_ENT,
+                                                                       KC_LEFT_GUI,            KC_SPC,             LOWER,             RAISE,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,           KC_BSPC
   //                                                                    ╰────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
     ),

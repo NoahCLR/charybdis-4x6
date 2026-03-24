@@ -180,6 +180,7 @@
 // Used by the custom three-tier tap/hold system in keymap.c.
 // These are NOT QMK's built-in TAPPING_TERM — they're checked manually
 // in process_record_user().
-#define CUSTOM_TAP_HOLD_TERM 150 // < 150ms = tap (send plain key)
-// 150–400ms = hold (shifted variant)
+#define CUSTOM_TAP_HOLD_TERM 150    // < 150ms = tap (send plain key)
+                                    // 150–400ms = hold (shifted variant)
 #define CUSTOM_LONGER_HOLD_TERM 400 // > 400ms = longer hold (third action)
+#define CUSTOM_DOUBLE_TAP_TERM 200  // max gap between taps for double-tap

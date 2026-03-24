@@ -12,10 +12,9 @@
 //     and RGB layer indicators.  Ties together the helper headers below.
 //
 //   key_config.h
-//     All key behavior configuration: enums (layers, custom keycodes,
-//     tap dances), tap dance config table, tap/hold mapping table,
-//     macro definitions, and LAYOUT arrays.  Edit this file to change
-//     what keys do.
+//     All key behavior configuration: enums (layers, custom keycodes),
+//     the unified key behavior table, macro definitions, and LAYOUT arrays.
+//     Edit this file to change what keys do.
 //
 //   pointing_device_modes.h
 //     Bitfield-based mode system that changes what the trackball does.
@@ -58,14 +57,10 @@
 //     the relevant keycodes in process_record_user() and setting flags that
 //     the pointing device code checks to decide what to do with pointing device movement.
 //
-//   - "Tap dance":  Some keys (6, 7, 8, Lower, Raise) use QMK's tap
-//     dance for double-tap actions (media controls).  Config is data-
-//     driven via td_config[].
-//
-//   - "Tap vs Hold":  Remaining number/punctuation keys use a custom
-//     three-tier system: tap (<150ms), hold (150–400ms), longer hold
-//     (>400ms).  Hold fires immediately via matrix_scan_user() for
-//     most keys; arrow keys keep release-based timing for three tiers.
+//   - "Key behaviors":  A unified data-driven system for keys that do
+//     different things depending on how they're pressed: tap, hold,
+//     longer hold, or double-tap.  Config lives in key_behaviors[] in
+//     key_config.h; processing logic lives here.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // QMK
@@ -95,60 +90,42 @@ bool is_keyboard_master_impl(void) {
 }
 #endif
 
-// ─── Tap Dance Callbacks ────────────────────────────────────────────────────
-// Config (enums, types, tables) is in key_config.h.  Only the callbacks
-// live here; tap_dance_actions[] is populated from td_config[] at init.
-
-static uint8_t td_hold_layer_active = 0;
-
-static void td_finished(tap_dance_state_t *state, void *user_data) {
-    const td_config_t *cfg = (const td_config_t *)user_data;
-
-    if (state->count == 1) {
-        if (state->pressed) {
-            if (cfg->hold_layer) {
-                layer_on(cfg->hold_layer);
-                td_hold_layer_active = cfg->hold_layer;
-            } else {
-                tap_code16(cfg->hold);
-            }
-        } else {
-            if (cfg->tap != KC_NO) tap_code16(cfg->tap);
-        }
-    } else if (state->count == 2 && !state->pressed) {
-        tap_code16(cfg->double_tap);
-    }
-}
-
-static void td_reset(tap_dance_state_t *state, void *user_data) {
-    if (td_hold_layer_active) {
-        layer_off(td_hold_layer_active);
-        td_hold_layer_active = 0;
-    }
-}
-
-// QMK requires this array to exist.  Entries are populated at init time
-// from td_config[] so adding a new tap dance only requires one line in
-// key_config.h — no changes needed here.
-tap_dance_action_t tap_dance_actions[TD_COUNT];
-
 // ─── Pointing Device Mode Timer ──────────────────────────────────────────────
-// Separate from tap_hold_timer so PD mode keys and tap/hold keys don't
+// Separate from key_timer so PD mode keys and key behavior keys don't
 // stomp each other's timers if pressed in quick succession.
 static uint16_t pd_mode_timer;
 
-// ─── Custom Tap / Hold / Longer-Hold System ─────────────────────────────────
+// ─── Unified Key Behavior System ────────────────────────────────────────────
 //
-// The mapping table lives in key_config.h (tap_hold_config[]).
+// The config table lives in key_config.h (key_behaviors[]).
 // This section contains only the processing state and lookup logic.
 //
 // Thresholds are defined in config.h:
 //   CUSTOM_TAP_HOLD_TERM      = 150ms
 //   CUSTOM_LONGER_HOLD_TERM   = 400ms
-static uint16_t tap_hold_timer;
-static uint16_t tap_hold_keycode = KC_NO;
-static bool     tap_hold_fired   = false;
-static const tap_hold_config_t *tap_hold_active_cfg = NULL;
+//   CUSTOM_DOUBLE_TAP_TERM    = 200ms
+
+// Active key tracking — only one key behavior key tracked at a time.
+static uint16_t key_timer;
+static uint16_t key_active = KC_NO;
+static const key_behavior_t *key_cfg = NULL;
+static bool     key_hold_fired  = false;
+static uint8_t  key_hold_layer  = 0;     // which layer was activated by hold
+
+// Double-tap pending state — after a quick tap of a double-tap-capable key,
+// we wait briefly for a possible second press before sending the tap action.
+static bool     dt_pending = false;
+static uint16_t dt_timer;
+static uint16_t dt_keycode = KC_NO;
+static const key_behavior_t *dt_cfg = NULL;
+
+// Flush a pending double-tap: send the tap action and clear pending state.
+static inline void dt_flush(void) {
+    if (dt_cfg && dt_cfg->tap != KC_NO) tap_code16(dt_cfg->tap);
+    dt_pending = false;
+    dt_keycode = KC_NO;
+    dt_cfg     = NULL;
+}
 
 // ─── RGB Color Cache ─────────────────────────────────────────────────────────
 // Pre-computed HSV → RGB conversions, populated once in keyboard_post_init_user.
@@ -159,10 +136,10 @@ static rgb_t pd_mode_rgb[PD_MODE_COUNT];
 static rgb_t led_group_rgb[LAYER_LED_GROUP_COUNT];
 #endif
 
-// Look up a keycode in the tap_hold_config table.  Returns NULL if not found.
-static const tap_hold_config_t *tap_hold_lookup(uint16_t keycode) {
-    for (uint8_t i = 0; i < TAP_HOLD_CONFIG_COUNT; i++) {
-        if (tap_hold_config[i].tap == keycode) return &tap_hold_config[i];
+// Look up a keycode in the key_behaviors table.  Returns NULL if not found.
+static const key_behavior_t *key_behavior_lookup(uint16_t keycode) {
+    for (uint8_t i = 0; i < KEY_BEHAVIOR_COUNT; i++) {
+        if (key_behaviors[i].keycode == keycode) return &key_behaviors[i];
     }
     return NULL;
 }
@@ -187,15 +164,22 @@ static void tap_custom_bk_keycode(uint16_t kc) {
 // "pass it along to the next handler."
 //
 // The logic is organized in stages:
-//   1) Pointing device mode keys (press + release)
-//   2) Tap/hold/longer-hold keys (press + release)
-//   3) Early return for releases (everything below is press-only)
-//   4) Macros (press-only)
+//   1) Flush pending double-tap on any different key press
+//   2) Pointing device mode keys (press + release)
+//   3) Unified key behaviors (press + release)
+//   4) Early return for releases (everything below is press-only)
+//   5) Macros (press-only)
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // --- 1) Pointing device mode keys (react on both press and release) ---
+    // --- 1) Flush pending double-tap if a different key is pressed ---
+    // This ensures the first tap registers before the new key is processed.
+    if (dt_pending && record->event.pressed && keycode != dt_keycode) {
+        dt_flush();
+    }
 
-    // 1a) Generic mode keys: tap sends base-layer key, hold activates mode.
+    // --- 2) Pointing device mode keys (react on both press and release) ---
+
+    // 2a) Generic mode keys: tap sends base-layer key, hold activates mode.
     // Keycodes are looked up from pd_modes[] — no hardcoded cases needed.
     {
         uint8_t mode = pd_mode_for_keycode(keycode);
@@ -215,7 +199,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    // 1b) Special dragscroll keys (need custom press/release logic).
+    // 2b) Special dragscroll keys (need custom press/release logic).
     switch (keycode) {
         // DRAGSCROLL_MODE (Charybdis firmware keycode, not in our enum):
         // Dual-purpose like the other mode keys: tap sends the base-layer
@@ -280,77 +264,113 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 
-    // --- 2) Custom tap/hold/longer-hold keys (react on both press and release) ---
-    // Config table is in key_config.h.  Keys with immediate=true fire their
-    // hold variant at the threshold via matrix_scan_user (no release needed).
+    // --- 3) Unified key behaviors (react on both press and release) ---
+    // Config table is in key_config.h (key_behaviors[]).
+    // Supports: tap, hold, longer-hold, double-tap, hold-for-layer.
     {
-        const tap_hold_config_t *cfg = tap_hold_lookup(keycode);
+        const key_behavior_t *cfg = key_behavior_lookup(keycode);
         if (cfg) {
             if (record->event.pressed) {
-                tap_hold_timer      = timer_read();
-                tap_hold_keycode    = keycode;
-                tap_hold_active_cfg = cfg;
-                tap_hold_fired      = false;
-            } else {
-                tap_hold_keycode    = KC_NO;
-                tap_hold_active_cfg = NULL;
-                if (tap_hold_fired) {
-                    tap_hold_fired = false;
-                } else {
-                    uint16_t elapsed = timer_elapsed(tap_hold_timer);
+                // Double-tap detection: same key pressed again while pending.
+                if (dt_pending && dt_keycode == keycode && cfg->double_tap != KC_NO) {
+                    tap_code16(cfg->double_tap);
+                    dt_pending = false;
+                    dt_keycode = KC_NO;
+                    dt_cfg     = NULL;
+                    return false; // consumed — don't track this press
+                }
 
-                    if (elapsed < CUSTOM_TAP_HOLD_TERM) {
-                        tap_code16(cfg->tap);
-                    } else if (elapsed > CUSTOM_LONGER_HOLD_TERM && cfg->longer_hold != KC_NO) {
-                        tap_code16(cfg->longer_hold);
+                // Normal press — start tracking.
+                key_timer      = timer_read();
+                key_active     = keycode;
+                key_cfg        = cfg;
+                key_hold_fired = false;
+            } else {
+                // Release — only process if this matches the key we're tracking.
+                // (A double-tap second press returns false above without setting
+                // key_active, so its release falls through harmlessly.)
+                if (key_active != keycode) return false;
+
+                key_active = KC_NO;
+                key_cfg    = NULL;
+
+                // Hold-for-layer: deactivate the layer on release.
+                if (key_hold_layer) {
+                    layer_off(key_hold_layer);
+                    key_hold_layer = 0;
+                    return false;
+                }
+
+                // If hold already fired (immediate mode), nothing more to do.
+                if (key_hold_fired) {
+                    key_hold_fired = false;
+                    return false;
+                }
+
+                // Determine action based on elapsed time.
+                uint16_t elapsed = timer_elapsed(key_timer);
+
+                if (elapsed < CUSTOM_TAP_HOLD_TERM) {
+                    // TAP — but if double-tap is enabled, defer.
+                    if (cfg->double_tap != KC_NO) {
+                        dt_pending = true;
+                        dt_timer   = timer_read();
+                        dt_keycode = keycode;
+                        dt_cfg     = cfg;
                     } else {
-                        tap_code16(cfg->hold);
+                        if (cfg->tap != KC_NO) tap_code16(cfg->tap);
                     }
+                } else if (elapsed > CUSTOM_LONGER_HOLD_TERM && cfg->longer_hold != KC_NO) {
+                    tap_code16(cfg->longer_hold);
+                } else {
+                    if (cfg->hold != KC_NO) tap_code16(cfg->hold);
                 }
             }
             return false;
         }
     }
 
-    // --- 3) Everything below is press-only — let releases pass through. ---
+    // --- 4) Everything below is press-only — let releases pass through. ---
     if (!record->event.pressed) {
         return true;
     }
 
-    // --- 4) Macros (fire once on key-down, defined in key_config.h) ---
+    // --- 5) Macros (fire once on key-down, defined in key_config.h) ---
     if (macro_dispatch(keycode)) return false;
     return true;
 }
 
-// ─── Immediate Hold Detection ────────────────────────────────────────────────
+// ─── Matrix Scan: Hold Detection + Double-Tap Flush ─────────────────────────
 //
-// Called every matrix scan cycle (~1ms).  For keys with immediate=true in
-// tap_hold_config[], fires the hold variant as soon as CUSTOM_TAP_HOLD_TERM
-// is reached — no release needed.  Keys with immediate=false (e.g. arrows)
-// are handled entirely on release in process_record_user().
+// Called every matrix scan cycle (~1ms).
+//   1. For keys with immediate=true or hold_layer!=0: fires the hold action
+//      as soon as CUSTOM_TAP_HOLD_TERM is reached — no release needed.
+//   2. Flushes pending double-taps when the window expires.
 void matrix_scan_user(void) {
-    if (tap_hold_active_cfg && !tap_hold_fired) {
-        if (!tap_hold_active_cfg->immediate) return;
-        if (timer_elapsed(tap_hold_timer) >= CUSTOM_TAP_HOLD_TERM) {
-            tap_code16(tap_hold_active_cfg->hold);
-            tap_hold_fired = true;
+    // 1. Immediate hold / hold-for-layer detection.
+    if (key_cfg && !key_hold_fired) {
+        if (timer_elapsed(key_timer) >= CUSTOM_TAP_HOLD_TERM) {
+            if (key_cfg->hold_layer != 0) {
+                // Activate the layer while held.
+                layer_on(key_cfg->hold_layer);
+                key_hold_layer = key_cfg->hold_layer;
+                key_hold_fired = true;
+            } else if (key_cfg->immediate) {
+                if (key_cfg->hold != KC_NO) tap_code16(key_cfg->hold);
+                key_hold_fired = true;
+            }
         }
+    }
+
+    // 2. Flush pending double-tap when the window expires.
+    if (dt_pending && timer_elapsed(dt_timer) >= CUSTOM_DOUBLE_TAP_TERM) {
+        dt_flush();
     }
 }
 
 // ─── Initialization ─────────────────────────────────────────────────────────
 
 void keyboard_post_init_user(void) {
-    // Populate tap_dance_actions[] from td_config[] so adding a new
-    // tap dance only requires one line in key_config.h.
-    for (uint8_t i = 0; i < TD_COUNT; i++) {
-        tap_dance_actions[i].fn.on_each_tap       = NULL;
-        tap_dance_actions[i].fn.on_dance_finished = td_finished;
-        tap_dance_actions[i].fn.on_reset          = td_reset;
-        tap_dance_actions[i].fn.on_each_release   = NULL;
-        tap_dance_actions[i].user_data            = (void *)&td_config[i];
-    }
-
 #ifdef RGB_MATRIX_ENABLE
     // Pre-compute HSV → RGB conversions for all color tables so the
     // per-frame render callback doesn't need to do it.
