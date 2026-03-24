@@ -67,11 +67,16 @@ stateDiagram-v2
 
 ## Key Press Processing
 
-QMK calls `process_record_user()` for every key press and release. The function is organized in four stages, evaluated top to bottom. Returning `false` stops further processing.
+QMK calls `process_record_user()` for every key press and release. The function is organized in stages, evaluated top to bottom. Returning `false` stops further processing.
 
 ```mermaid
 flowchart TD
-    A[Key press/release event] --> B{Stage 1: Mode key?}
+    A[Key press/release event] --> FLUSH{Pending multi-tap\nfor different key?}
+    FLUSH -- Yes --> FLUSH1[Flush pending action]
+    FLUSH1 --> B
+    FLUSH -- No --> B
+
+    B{Stage 1: Mode key?}
     B -- "VOLUME / BRIGHTNESS / ZOOM / ARROW" --> C{Press or release?}
     C -- Press --> C1[Start timer + activate mode]
     C -- Release --> C2{Held < 150ms?}
@@ -88,31 +93,35 @@ flowchart TD
     F --> STOP
     G --> STOP
 
-    B -- No --> TD{Stage 2: Tap dance key?}
-    TD -- "LED 49/45/44/28/53" --> TD1{Count taps}
-    TD1 -- "Single tap" --> TD2[Send plain key]
-    TD1 -- "Single hold" --> TD3[Send shifted variant / activate layer]
-    TD1 -- "Double tap" --> TD4[Send media key]
-    TD2 --> STOP
-    TD3 --> STOP
-    TD4 --> STOP
+    B -- No --> H{Stage 2: Key behavior table\nor MO&lpar;&rpar; key?}
+    H -- Yes, pressed --> DT{Multi-tap pending\nfor same key?}
+    DT -- Yes --> DT1{Triple-tap\nenabled?}
+    DT1 -- "Yes, count=1" --> DT2[Escalate to count=2\nwait for 3rd tap]
+    DT1 -- "No, or count=2" --> DT3[Fire double/triple action]
+    DT -- No --> I["MO()? → layer_on()\nStart hold timer\nCache lookups"]
 
-    TD -- No --> H{Stage 3: Tap/hold key?}
-    H -- Yes, pressed --> I[Start hold timer]
-    H -- Yes, released --> J{Already fired by matrix_scan?}
+    H -- Yes, released --> MO_OFF["MO()? → layer_off()"]
+    MO_OFF --> J{Already fired\nby matrix_scan?}
     J -- Yes --> STOP
     J -- No --> J2{How long held?}
-    J2 -- "< 150ms" --> K[Tap: plain key]
+    J2 -- "< 150ms" --> K{Double-tap\nenabled?}
+    K -- Yes --> K1[Defer tap\nstart multi-tap timer]
+    K -- No --> K2[Tap: plain key]
     J2 -- "150-400ms" --> L[Hold: shifted variant]
     J2 -- "> 400ms" --> M[Longer hold: third action]
-    K --> STOP
+
+    DT2 --> STOP
+    DT3 --> STOP
+    I --> STOP
+    K1 --> STOP
+    K2 --> STOP
     L --> STOP
     M --> STOP
 
-    H -- No --> N{Stage 4: Release?}
+    H -- No --> N{Stage 3: Release?}
     N -- Yes --> PASS([return true])
 
-    N -- "No (press only)" --> O{Stage 5: Macro?}
+    N -- "No (press only)" --> O{Stage 4: Macro?}
     O -- Yes --> P[Send macro shortcut]
     P --> STOP
     O -- No --> PASS
@@ -155,7 +164,7 @@ QMK calls `rgb_matrix_indicators_advanced_user()` in LED chunks. Layer colors an
 
 ```mermaid
 flowchart TD
-    A[RGB frame tick] --> B["Loop layers
+    A[RGB frame tick] --> B["Pass 1: Loop layers
     LAYER_COUNT-1 down to 1"]
 
     B --> C{"layer_colors[i]
@@ -172,15 +181,20 @@ flowchart TD
     E -- No --> G["Default RGB effect
     (no override)"]
 
-    D --> H{Mode active?}
-    F --> H
-    G --> H
+    D --> LG
+    F --> LG
+    G --> LG
 
-    H -- Yes --> I["Override right half
+    LG["Pass 2: Layer + mode
+    LED group highlights"] --> H{Mode active?}
+
+    H -- Yes --> I["Pass 3: Override right half
     with mode color
     from pd_mode_colors[]"]
+    I --> I2["Apply pd_mode_led_groups
+    highlights on top"]
     H -- No --> J[Done]
-    I --> J
+    I2 --> J
 ```
 
 ## Split Sync (Master → Slave)

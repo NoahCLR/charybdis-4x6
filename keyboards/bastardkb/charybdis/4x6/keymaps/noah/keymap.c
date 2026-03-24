@@ -43,10 +43,6 @@
 //
 // Key concepts for newcomers:
 //
-//   - "Split keyboard":  Each physical half has its own MCU.  The right
-//     half (master) runs the keymap logic and sends state to the left
-//     half (slave) so it can update its own LEDs.
-//
 //   - "Auto-mouse layer":  QMK can automatically activate a layer when
 //     it detects trackball movement, and deactivate it after a timeout.
 //     We use this for LAYER_POINTER.

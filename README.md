@@ -9,7 +9,7 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 - **5 layers** — Base (QWERTY), Numpad, Lower (symbols), Raise (navigation/media), and Pointer (auto-mouse)
 - **Trackball modes** — Hold a key to turn the trackball into a volume knob, arrow-key emitter, scroll wheel, or zoom control
 - **Auto-mouse layer with countdown gradient** — The pointer layer activates automatically when you move the trackball. LEDs fade from white to red over 1.2 seconds to show remaining time before the layer deactivates, giving you a visual countdown. The gradient is synced to the slave half over RPC so both sides animate together.
-- **Tap dance** — Double-tap `6` for play/pause, `7` for next track, `8` for previous track. Double-tap `MO(2)` or `MO(3)` for play/pause. Single tap and hold behavior is preserved.
+- **Multi-tap actions** — Double-tap `6` for play/pause, `7` for next track, `8` for previous track. Double-tap `MO(Lower)` or `MO(Raise)` for play/pause. Triple-tap is also supported. Single tap and hold behavior is preserved.
 - **Custom tap/hold system** — Number row and punctuation keys do different things based on hold duration: tap for the plain key, hold for the shifted symbol (fires immediately without waiting for release), longer hold for a third action. Arrow keys keep release-based timing for their three-tier system.
 - **Per-layer RGB indicators** — Each layer has a distinct color; trackball modes overlay a color on the right half. Colors are defined as HSV values in `rgb_config.h` — see [hsv colors.jpg](hsv%20colors.jpg) for a quick reference of hue values. Split-safe RGB helpers in `lib/rgb_helpers.h` handle LED chunk boundaries so you can target individual LEDs, specific halves, or both without worrying about the split addressing.
 - **Hi-res scroll** — 120x scroll multiplier for smooth, precise scrolling
@@ -21,8 +21,8 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 |-------|-----------|-------|---------|
 | Base | Default | RGB effect | QWERTY typing |
 | Num | Hold `B`| Green | Numpad on the right half |
-| Lower | `TD(TD_28)` / Hold `J` | Blue | Symbols, DPI controls, brackets. Double-tap for play/pause. |
-| Raise | `TD(TD_53)` / Hold `F` / Hold `/` | Purple | Navigation, media, mouse buttons, macOS shortcuts. Sniping (lower DPI) auto-enables; auto-mouse is disabled to avoid conflicts. Double-tap for play/pause. |
+| Lower | `MO(LAYER_LOWER)` / Hold `J` | Blue | Symbols, DPI controls, brackets. Double-tap for play/pause. |
+| Raise | `MO(LAYER_RAISE)` / Hold `F` / Hold `/` | Purple | Navigation, media, mouse buttons, macOS shortcuts. Sniping (lower DPI) auto-enables; auto-mouse is disabled to avoid conflicts. Double-tap for play/pause. |
 | Pointer | Auto (trackball movement) | White-to-red gradient | Mouse buttons, scroll, trackball mode toggles. Automatically stripped when another layer is explicitly active to prevent flickering. |
 
 The Caps Lock position is a dual-purpose key: hold for Shift, tap for Caps Lock.
@@ -56,25 +56,24 @@ Sniping (lower DPI) works during trackball modes — it slows down the trackball
 | `MACRO_4` | Ctrl + Alt + GUI + X | Screenshot |
 | `MACRO_5` | Ctrl + GUI + Space | Emoji picker |
 
-## Tap Dance
+## Multi-Tap Actions
 
-Keys `6`, `7`, `8` and the layer keys (`MO(2)`, `MO(3)`) use QMK's tap dance system for double-tap actions:
+Keys `6`, `7`, `8` and the layer keys (`MO(Lower)`, `MO(Raise)`) support double-tap actions. A key can also have a triple-tap action via a separate config table.
 
-Tap dances are named by LED index (see LED Index Map in `keymap.c`) so identifiers stay stable regardless of what's mapped at that position.
+| Key | Single tap | Hold | Double tap |
+|-----|-----------|------|------------|
+| `6` | `6` | `^` | Play/Pause |
+| `7` | `7` | `&` | Next track |
+| `8` | `8` | `*` | Previous track |
+| `MO(Lower)` | — | Lower layer | Play/Pause |
+| `MO(Raise)` | — | Raise layer | Play/Pause |
+| `VOLUME_MODE` | base-layer key | Volume mode | Mute |
 
-| LED index | Base key | Single tap | Hold | Double tap |
-|-----------|----------|-----------|------|------------|
-| 49 | `6` | `6` | `^` | Play/Pause |
-| 45 | `7` | `7` | `&` | Next track |
-| 44 | `8` | `8` | `*` | Previous track |
-| 28 | L thumb | — | Lower layer | Play/Pause |
-| 53 | R thumb | — | Raise layer | Play/Pause |
-
-The tap dance config is data-driven — adding a new entry requires one line in the enum, one in the config array, and one in the actions array. Layer-hold tap dances use `hold_layer` to activate a layer on hold instead of sending a keycode.
+Multi-tap is data-driven — add one line to `double_tap_keys[]` (and optionally `triple_tap_keys[]`) in `key_config.h`. Layer keys use QMK's native `MO()` and are detected via `IS_QK_MOMENTARY()` — no custom keycodes needed.
 
 ## Tap / Hold / Longer Hold
 
-The remaining number row keys, punctuation, arrows, and Enter use a custom three-tier system (not QMK's built-in mod-tap):
+Number row keys, punctuation, arrows, and Enter use a custom three-tier system (not QMK's built-in mod-tap or tap dance):
 
 | Duration | Action | Example (`1` key) |
 |----------|--------|-------------------|
@@ -106,17 +105,16 @@ The top of the script has a configuration section with the things you'd need to 
 - `MODE` — default output mode (`"write"` or `"print"`)
 - `LAYER_NAMES` — layer names in enum order, must match `key_config.h`
 - `REPLACEMENTS` — VIA token → QMK keycode translations (add new custom keycodes here)
-- `TAP_DANCE_NAMES` — tap dance enum names in index order, must match `key_config.h` (generates hex → `TD(name)` mappings)
 
 ## File Structure
 
 ```
 keyboards/bastardkb/charybdis/4x6/keymaps/noah/
   keymap.c                  Processing logic: key event handlers, RGB indicators
-  key_config.h              Key behavior config: enums, tap dance table, tap/hold table, macros, LAYOUT arrays
+  key_config.h              Key behavior config: enums, hold/double-tap/triple-tap tables, macros, LAYOUT arrays
   config.h                  QMK/Charybdis configuration overrides
   rgb_config.h              RGB color definitions (layer colors, mode overlays, LED groups, gradient)
-  rules.mk                  Build flags (VIA, hi-res scroll, tap dance)
+  rules.mk                  Build flags (VIA, LTO)
   lib/
     pointing_device_modes.h Trackball mode system (volume, brightness, zoom, arrow, dragscroll)
     split_sync.h            Master → slave state sync via RPC (mode flags + elapsed time)
@@ -133,7 +131,7 @@ via layouts/
 | File | Contents |
 |------|----------|
 | [README.md](README.md) | This file — feature overview, layers, modes, macros |
-| [INTERNALS.md](INTERNALS.md) | Technical deep-dive and **"how to add" quick reference** for all data-driven features (modes, tap dances, tap/hold keys, macros, layers, LED highlights, colors) |
+| [INTERNALS.md](INTERNALS.md) | Technical deep-dive and **"how to add" quick reference** for all data-driven features (modes, multi-tap, tap/hold keys, macros, layers, LED highlights, colors) |
 | [DIAGRAMS.md](DIAGRAMS.md) | Mermaid diagrams: architecture overview, auto-mouse lifecycle, key processing pipeline, trackball motion flow, RGB rendering, split sync sequence |
 
 ## Building & Flashing

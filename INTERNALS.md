@@ -21,16 +21,16 @@ A mode intercepts trackball motion and converts it to keypresses (volume, arrows
 
 Everything else is automatic: `process_record_user` activates/deactivates the mode on key press/release, `is_mouse_record_user` keeps the auto-mouse layer alive, `pointing_device_task_user` dispatches to your handler, and RGB paints the right-half overlay color.
 
-### Add a new tap dance
+### Add a double-tap / triple-tap action
 
-A tap dance gives a key different actions for single tap, hold, and double tap.
+A multi-tap gives a key an extra action on rapid double (or triple) tap.
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `key_config.h` | Add one line to `TD_LIST`: `TDE(TD_xx, tap_kc, hold_kc, double_tap_kc, hold_layer)` |
-| 2 | `via_to_qmk_layout.py` | Add the name to `TAP_DANCE_NAMES` (must match enum order) |
+| 1 | `key_config.h` | Add one line to `double_tap_keys[]`: `{keycode, action}` |
+| 2 | `key_config.h` | (Optional) For triple-tap, also add to `triple_tap_keys[]`: `{keycode, action}` |
 
-The enum, config array, `TD_COUNT`, and runtime action wiring are all auto-generated from `TD_LIST`. Use `hold_layer` (e.g. `LAYER_LOWER`) for layer-hold tap dances; use `0` for keycode-hold.
+The key must already exist in the keymap (a regular key, `MO()`, or a mode key). Single-tap behavior is unaffected — it just adds a small delay while waiting for a potential second press. Triple-tap entries add one more deferral window on top of double-tap.
 
 ### Add a new tap/hold/longer-hold key
 
@@ -38,7 +38,8 @@ These keys send different keycodes based on hold duration (tap < 150ms, hold 150
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `key_config.h` | Add one line to `tap_hold_config[]`: `{tap_kc, hold_kc, longer_hold_kc, immediate}` |
+| 1 | `key_config.h` | Add one line to `hold_keys[]`: `{keycode, hold, immediate}` |
+| 2 | `key_config.h` | (Optional) For a third-tier action, also add to `longer_hold_keys[]`: `{keycode, longer_hold, immediate}` |
 
 Set `immediate` to `true` for keys that should fire the hold action at the threshold without waiting for release (most keys). Set to `false` for keys where you want to choose between hold and longer-hold on release (arrows).
 
@@ -48,7 +49,7 @@ A macro sends a key combination on a single keypress.
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `key_config.h` | Add a `case MACRO_N:` to the `MACRO_DISPATCH` switch with a `SEND_STRING(...)` call |
+| 1 | `key_config.h` | Add a `case MACRO_N:` to the `macro_dispatch()` switch with a `SEND_STRING(...)` call |
 | 2 | `key_config.h` | Make sure the keycode exists in `custom_keycodes` (MACRO_0–15 are pre-reserved) |
 | 3 | `via_to_qmk_layout.py` | Macro mappings are auto-generated — no change needed unless using MACRO_16+ |
 
@@ -71,7 +72,16 @@ Highlight specific LEDs with a different color when a layer is active (e.g. mark
 | 1 | `rgb_config.h` | Define an LED index array: `static const uint8_t xxx_leds[] = {led1, led2, ...};` |
 | 2 | `rgb_config.h` | Add one line to `layer_led_groups[]`: `{LAYER_xxx, {hue, sat, val}, xxx_leds, sizeof(xxx_leds)}` |
 
-Use the LED Index Map in `keymap.c` to find the LED indices for each physical key position.
+Use the LED Index Map in `rgb_config.h` to find the LED indices for each physical key position.
+
+### Add a per-mode LED group highlight
+
+Highlight specific LEDs with a different color when a pointing device mode is active.
+
+| Step | File | What to do |
+|------|------|------------|
+| 1 | `rgb_config.h` | Define an LED index array (or reuse an existing one) |
+| 2 | `rgb_config.h` | Add one line to `pd_mode_led_groups[]`: `{PD_MODE_xxx, {hue, sat, val}, xxx_leds, sizeof(xxx_leds)}` |
 
 ### Change a layer's color
 
@@ -176,36 +186,40 @@ If neither flag is set, the firmware falls through to QMK's default USB detectio
 
 `LTO_ENABLE = yes` in `rules.mk` — Link-time optimization reduces the binary size.
 
-## Tap Dance
+## Key Behavior System
 
-Keys `6`, `7`, `8` and the layer keys (Lower, Raise) use QMK's tap dance (`TAP_DANCE_ENABLE = yes` in `rules.mk`). The implementation is data-driven:
+This keymap does NOT use QMK's built-in mod-tap or tap dance. Instead, `process_record_user()` implements its own timing system with independent, composable per-feature tables in `key_config.h`. A key can appear in multiple tables to combine behaviors.
 
-- **`td_config_t`** struct defines tap, hold, double-tap keycodes, and an optional `hold_layer` for layer-hold tap dances.
-- **`TD_LIST` TDE-macro** is the single source of truth: each line defines the enum name, tap keycode, hold keycode, double-tap keycode, and optional hold-layer. The macro expands twice — once to generate the `tap_dances` enum and `TD_COUNT`, once to populate the `td_config[]` array.
-- **`tap_dance_actions[]`** is declared as an empty array of size `TD_COUNT` and populated at runtime in `keyboard_post_init_user()`, which wires every entry to the shared `td_finished`/`td_reset` callbacks with the corresponding `td_config` pointer as `user_data`.
-- **`td_finished()`** and **`td_reset()`** are shared callbacks that read the config via `user_data`. No per-key callback duplication.
-- Layer-hold tap dances (TD_28, TD_53) use `layer_on()`/`layer_off()` instead of `tap_code16()`. A static `td_hold_layer_active` variable tracks which layer to deactivate on reset.
-- Tap dances are named by LED index (e.g. TD_49 for the key at LED position 49) so identifiers stay stable regardless of what keycode is mapped there.
+### Tables
 
-**Adding a new tap dance:** Add one line to `TD_LIST` in `key_config.h` and one to `TAP_DANCE_NAMES` in `via_to_qmk_layout.py`. The enum, config array, and runtime action wiring are all auto-generated.
+| Table | Purpose | Fields |
+|-------|---------|--------|
+| `hold_keys[]` | Tap vs hold (2-tier) | `keycode`, `hold`, `immediate` |
+| `longer_hold_keys[]` | Third-tier action past 400ms | `keycode`, `longer_hold`, `immediate` |
+| `double_tap_keys[]` | Action on rapid double-tap | `keycode`, `action` |
+| `triple_tap_keys[]` | Action on rapid triple-tap | `keycode`, `action` |
 
-## Custom Tap / Hold / Longer-Hold System
-
-This keymap does NOT use QMK's built-in mod-tap for the remaining number row keys and punctuation. Instead, `process_record_user()` implements its own three-tier timing system:
+### How it works
 
 - **Tap** (< 150ms): Send the plain key (e.g. `1`)
-- **Hold** (150–400ms): Send the shifted variant (e.g. `!`)
+- **Hold** (150–400ms): Send the hold variant (e.g. `!`)
 - **Longer hold** (> 400ms): Send a third action (e.g. GUI+Arrow for line jump)
+- **Double-tap**: Quick tap twice within 200ms → fires the double-tap action
+- **Triple-tap**: Quick tap three times within 200ms windows → fires the triple-tap action (only if the key also has a `triple_tap_keys[]` entry)
 
 **Immediate hold detection:** For most keys, `matrix_scan_user()` checks the hold timer every scan cycle (~1ms) and fires the hold variant as soon as the 150ms threshold is reached — no release needed. Arrow keys are excluded from this and keep the release-based behavior so the user can choose between the hold and longer-hold tiers.
 
-State tracking uses three statics: `tap_hold_timer` (when the key was pressed), `tap_hold_keycode` (which key is held), and `tap_hold_fired` (whether the hold action already sent). On release, if `tap_hold_fired` is true, it's a no-op.
+State tracking uses three statics: `key_timer` (when the key was pressed), `key_active` (which key is held), and `key_hold_fired` (whether the hold action already sent). On release, if `key_hold_fired` is true, it's a no-op.
 
-**Applies to:** Number row (1–5, 9–0), punctuation (- = [ ] \ \` ; ' , .), Left/Right arrows, Enter. Keys 6, 7, 8 are handled by tap dance instead.
+**MO() layer keys:** `MO(LAYER_LOWER)` and `MO(LAYER_RAISE)` are intercepted via `IS_QK_MOMENTARY()` — no custom keycodes needed. The layer activates immediately on press and deactivates on release (native MO behavior), while double-tap is handled alongside via `double_tap_keys[]`.
+
+**Applies to:** Number row (1–0), punctuation (- = [ ] \ \` ; ' , .), Left/Right arrows, Enter, and MO() layer keys.
 
 **Longer hold special cases:**
 - Left/Right arrows: tap = arrow, hold = Alt+Arrow (word jump), longer hold = GUI+Arrow (line jump)
-- All other keys: longer hold falls back to the hold variant
+- All other keys: only in `hold_keys[]` (no longer-hold tier)
+
+**Multi-tap note:** Adding a key to `double_tap_keys[]` introduces a small delay on single taps (waiting for potential second press). Adding a `triple_tap_keys[]` entry adds one more deferral window on top of that.
 
 ## Pointing Device Modes
 
@@ -253,9 +267,11 @@ QMK renders the default RGB effect first, then calls `rgb_matrix_indicators_adva
 
 This top-down iteration means higher layers always take priority. For example, LAYER_RAISE (layer 3) wins over LAYER_NUM (layer 1) when both are active. Colors are defined as HSV in `layer_colors[]` in `rgb_config.h` and pre-converted to RGB once at first render.
 
-**Pass 2 — Mode overlay.** Iterates `pd_modes[]` and paints the first active mode's color from `pd_mode_colors[]` (defined in `rgb_config.h`) onto the right half. The helpers support targeting any half, both halves, or individual LEDs — the right-half-only choice is a UX decision, not a technical limitation.
+**Pass 2 — LED group highlights.** Iterates `layer_led_groups[]` and paints specific LEDs a different color when their associated layer is active. Then iterates `pd_mode_led_groups[]` for mode-specific LED highlights.
 
-**Return value:** Returns `layer_painted` (true if pass 1 set a color, false for LAYER_BASE). On LAYER_BASE with no mode active, the default RGB effect is preserved untouched. On LAYER_BASE with a mode active, pass 2 still paints the mode color over the default effect.
+**Pass 3 — Mode overlay.** Iterates `pd_modes[]` and paints the first active mode's color from `pd_mode_colors[]` (defined in `rgb_config.h`) onto the right half. Then applies per-mode LED group highlights from `pd_mode_led_groups[]` on top. The helpers support targeting any half, both halves, or individual LEDs — the right-half-only choice is a UX decision, not a technical limitation.
+
+**Return value:** Returns `layer_painted` (true if pass 1 set a color, false for LAYER_BASE). On LAYER_BASE with no mode active, the default RGB effect is preserved untouched. On LAYER_BASE with a mode active, pass 3 still paints the mode color over the default effect.
 
 ### Auto-mouse countdown gradient
 
@@ -306,15 +322,13 @@ The split boundary is fixed at LED index 29 (`RGB_LEFT_LED_COUNT`), matching `RG
 
 ## RGB Color Configuration (`rgb_config.h`)
 
-Pure color data — no logic. Contains layer indicator colors (`layer_colors[]`), mode overlay colors (`pd_mode_colors[]`), per-layer LED group highlights (`layer_led_groups[]`), and auto-mouse gradient endpoints. Mirrors the `key_config.h` pattern: config data only, rendering logic lives in `keymap.c`.
+Pure color data — no logic. Contains layer indicator colors (`layer_colors[]`), mode overlay colors (`pd_mode_colors[]`), per-layer LED group highlights (`layer_led_groups[]`), per-mode LED group highlights (`pd_mode_led_groups[]`), and auto-mouse gradient endpoints. Also houses the LED Index Map and LED index arrays used by the group highlights. Mirrors the `key_config.h` pattern: config data only, rendering logic lives in `keymap.c`.
 
 ## VIA Layout Conversion
 
 The `via layouts/via_to_qmk_layout.py` script converts VIA JSON exports into QMK `LAYOUT()` blocks. VIA uses a flat key index and its own token format (`CUSTOM(80)`, `KC_NO`, etc.) that doesn't match QMK's matrix order or keycode names.
 
 When adding a custom keycode to the keymap, also add the VIA token mapping in the `REPLACEMENTS` dict at the top of the script. The dict translates VIA's `CUSTOM(N)` tokens to the corresponding enum name in `key_config.h`.
-
-Tap dance keycodes are handled separately: VIA exports them as raw hex (`0x5700`, `0x5701`, ...) based on `QK_TAP_DANCE` (0x5700) + index. The `TAP_DANCE_NAMES` list at the top of the script generates the hex → `TD(name)` mappings automatically — keep it in sync with the `tap_dances` enum in `key_config.h`.
 
 ## Adding a New Trackball Mode
 

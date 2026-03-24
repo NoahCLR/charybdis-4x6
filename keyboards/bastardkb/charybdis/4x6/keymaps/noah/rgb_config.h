@@ -70,7 +70,7 @@ static const pd_mode_color_t pd_mode_colors[] = {
 
 static const uint8_t raise_highlight_leds[]  = {33, 18};
 static const uint8_t lower_highlight_leds[]  = {4, 47};
-static const uint8_t volume_highlight_leds[] = {29, 36};
+static const uint8_t volume_highlight_leds[] = {52};
 
 // ─── Per-layer LED group highlights ─────────────────────────────────────────
 //
