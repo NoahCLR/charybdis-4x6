@@ -151,37 +151,36 @@ flowchart TD
 
 ## RGB Rendering
 
-QMK calls `rgb_matrix_indicators_advanced_user()` in LED chunks. Each layer has a base color; active pointing device modes overlay a color on the right half (where the trackball is).
+QMK calls `rgb_matrix_indicators_advanced_user()` in LED chunks. Layer colors and mode colors are defined as HSV arrays in `rgb_config.h` and pre-converted to RGB once at first render. The rendering is fully data-driven — no layer names are hardcoded in the rendering logic.
 
 ```mermaid
 flowchart TD
-    A[RGB frame tick] --> B{Active layer?}
+    A[RGB frame tick] --> B["Loop layers
+    LAYER_COUNT-1 down to 1"]
 
-    B -- Base --> C["Default RGB effect
-    (no override)"]
-    B -- Pointer --> D["Auto-mouse gradient
+    B --> C{"layer_colors[i]
+    is {0,0,0}?"}
+    C -- "Yes (skip)" --> B
+    C -- No --> D["Paint solid color
+    (both halves)"]
+
+    B -- "No active layer
+    with color" --> E{Auto-mouse
+    layer active?}
+    E -- Yes --> F["Auto-mouse gradient
     white → red over 1.2s"]
-    B -- Num --> E["Solid green
-    (both halves)"]
-    B -- Lower --> F["Solid blue
-    (both halves)"]
-    B -- Raise --> G["Solid purple
-    (both halves)"]
+    E -- No --> G["Default RGB effect
+    (no override)"]
 
     D --> H{Mode active?}
-    E --> H
     F --> H
     G --> H
 
     H -- Yes --> I["Override right half
-    with mode color"]
+    with mode color
+    from pd_mode_colors[]"]
     H -- No --> J[Done]
     I --> J
-
-    style D fill:#fff,color:#000
-    style E fill:#0f0,color:#000
-    style F fill:#00f,color:#fff
-    style G fill:#808,color:#fff
 ```
 
 ## Split Sync (Master → Slave)

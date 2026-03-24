@@ -32,9 +32,9 @@
 //     Renders the auto-mouse countdown gradient (white → red) based on
 //     how much of the timeout has elapsed.
 //
-//   rgb_helpers.h
-//     Thin wrappers around rgb_matrix_set_color() that are safe to call
-//     on a split keyboard (they clamp to the current half's LED range).
+//   rgb_config.h
+//     All RGB color definitions (layer indicators, mode overlays, auto-mouse
+//     gradient) and split-safe helper functions for rgb_matrix_set_color().
 //
 // Key concepts for newcomers:
 //
@@ -68,7 +68,7 @@
 #include "pointing_device_modes.h"
 #include "split_sync.h"
 #include "rgb_automouse.h"
-#include "rgb_helpers.h"
+#include "rgb_config.h"
 
 // Force master/slave role at compile time.  Needed when both halves have
 // their own USB connection (e.g. for full LED brightness on each side
@@ -442,23 +442,8 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 // active at a glance.  Pointing device modes overlay a color on the right
 // half (the trackball side) so you can tell which mode the trackball is in.
 //
-// Color scheme:
-//   LAYER_POINTER → animated white-to-red gradient (auto-mouse countdown)
-//   LAYER_NUM     → green
-//   LAYER_LOWER   → blue
-//   LAYER_RAISE   → purple
-//
-// Mode overlays (right half only, highest priority first):
-//   Drag scroll   → orange
-//   Volume        → yellow
-//   Brightness    → magenta
-//   Zoom          → chartreuse/lime
-//   Arrow         → cyan
-//
-// LAYER_BASE has no custom indicator — it uses the default RGB matrix effect.
-//
-// See rgb_helpers.h for the full split-safe helper API (rgb_set_both_halves,
-// rgb_set_right_half, rgb_set_led_group, etc.).
+// Colors are defined in rgb_config.h.  This section is rendering logic only.
+// See rgb_config.h for the split-safe helper API and all color values.
 
 // ─── LED Index Map ──────────────────────────────────────────────────────────
 //
@@ -481,32 +466,10 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 // 0–28  → left half (29 LEDs)
 // 29–57 → right half (29 LEDs, 2 are dummy/unused on pointer side)
 
-// LED groups for future per-key highlights (e.g. lighting up modifier keys on specific layers).
-static const uint8_t layer_raise_mods[] = {33, 18};
-static const uint8_t layer_lower_mods[] = {4, 47};
-
-// Auto-mouse gradient: starts white, fades to red as the timeout approaches.
-// White is capped at v=150 (not MAX_BRIGHTNESS) to limit current draw — all LEDs
-// lit white at full brightness exceeds the USB power budget.
-static const hsv_t automouse_color_start = {.h = 0, .s = 0, .v = 150};                             // white
-static const hsv_t automouse_color_end   = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // red
-
-// Layer indicator colors (defined as HSV, converted to RGB once on first render).
-static const hsv_t layer_lower_hsv = {.h = 169, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // blue
-static const hsv_t layer_raise_hsv = {.h = 180, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // purple
-static const hsv_t layer_num_hsv   = {.h = 85, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // green
-
-// Pointing device mode overlay colors.
-static const hsv_t mode_dragscroll_hsv = {.h = 21, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // orange
-static const hsv_t mode_volume_hsv     = {.h = 43, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // yellow
-static const hsv_t mode_brightness_hsv = {.h = 213, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // magenta
-static const hsv_t mode_arrow_hsv      = {.h = 127, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // cyan
-static const hsv_t mode_zoom_hsv       = {.h = 64, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};  // chartreuse/lime
-
 // Pre-computed RGB cache.  hsv_to_rgb() is called once at init instead of
 // every frame (~30fps × 2 chunks = ~60 calls/sec saved).
-static rgb_t layer_lower_rgb, layer_raise_rgb, layer_num_rgb;
-// Mode overlay colors, indexed to match pd_mode_priority[].
+// HSV source arrays live in rgb_config.h (layer_colors[], pd_mode_colors[]).
+static rgb_t layer_rgb[LAYER_COUNT];
 static rgb_t pd_mode_rgb[PD_MODE_COUNT];
 static bool  rgb_colors_init = false;
 
@@ -516,38 +479,32 @@ static bool  rgb_colors_init = false;
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     // One-time initialization: convert all HSV colors to RGB.
     if (!rgb_colors_init) {
-        layer_lower_rgb = hsv_to_rgb(layer_lower_hsv);
-        layer_raise_rgb = hsv_to_rgb(layer_raise_hsv);
-        layer_num_rgb   = hsv_to_rgb(layer_num_hsv);
-        // Mode overlay colors, indexed to match pd_mode_priority[]:
-        // [0] dragscroll, [1] volume, [2] brightness, [3] zoom, [4] arrow
-        pd_mode_rgb[0]  = hsv_to_rgb(mode_dragscroll_hsv);
-        pd_mode_rgb[1]  = hsv_to_rgb(mode_volume_hsv);
-        pd_mode_rgb[2]  = hsv_to_rgb(mode_brightness_hsv);
-        pd_mode_rgb[3]  = hsv_to_rgb(mode_zoom_hsv);
-        pd_mode_rgb[4]  = hsv_to_rgb(mode_arrow_hsv);
+        for (uint8_t i = 0; i < LAYER_COUNT; i++)
+            layer_rgb[i] = hsv_to_rgb(layer_colors[i]);
+        for (uint8_t i = 0; i < PD_MODE_COUNT; i++)
+            pd_mode_rgb[i] = hsv_to_rgb(pd_mode_colors[i]);
         rgb_colors_init = true;
     }
 
-    // Paint all LEDs with the active layer's color.
-    // Check explicitly-activated layers before auto-activated LAYER_POINTER,
-    // so that e.g. sniping (LAYER_RAISE) shows purple even when LAYER_POINTER
-    // is also active due to a held mode key.
-    // On LAYER_BASE, skip layer painting — the default RGB effect has already
-    // rendered — but still fall through to the mode overlay below so that
-    // e.g. drag-scroll lock shows orange on the right half.
-    bool layer_painted = true;
-    if (layer_state_cmp(layer_state, LAYER_RAISE)) {
-        rgb_set_both_halves(layer_raise_rgb, led_min, led_max);
-    } else if (layer_state_cmp(layer_state, LAYER_LOWER)) {
-        rgb_set_both_halves(layer_lower_rgb, led_min, led_max);
-    } else if (layer_state_cmp(layer_state, LAYER_NUM)) {
-        rgb_set_both_halves(layer_num_rgb, led_min, led_max);
-    } else if (layer_state_cmp(layer_state, LAYER_POINTER)) {
-        automouse_rgb_render(led_min, led_max, automouse_color_start, automouse_color_end);
-    } else {
-        layer_painted = false;
+    // Paint all LEDs with the highest active layer's color.
+    // Layers with {0,0,0} in layer_colors[] are skipped (BASE uses the
+    // default RGB effect, POINTER uses the auto-mouse gradient below).
+    // The layer-stripping logic in layer_state_set_user ensures that
+    // explicit layers take priority over the auto-activated pointer layer.
+    bool layer_painted = false;
+    for (int8_t i = LAYER_COUNT - 1; i > 0; i--) {
+        if (!layer_state_cmp(layer_state, i)) continue;
+        if (layer_colors[i].s == 0 && layer_colors[i].v == 0) continue;
+        rgb_set_both_halves(layer_rgb[i], led_min, led_max);
+        layer_painted = true;
+        break;
     }
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    if (!layer_painted && layer_state_cmp(layer_state, get_auto_mouse_layer())) {
+        automouse_rgb_render(led_min, led_max, automouse_color_start, automouse_color_end);
+        layer_painted = true;
+    }
+#    endif
 
     // If a pointing device mode is active, override the right half with the
     // mode's color.  This provides instant visual feedback for which mode

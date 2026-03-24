@@ -22,6 +22,7 @@ enum charybdis_keymap_layers {
     LAYER_LOWER,    // Symbols and DPI controls (blue RGB)
     LAYER_RAISE,    // Navigation, media, and mouse buttons (purple RGB, sniping enabled)
     LAYER_POINTER,  // Auto-mouse layer: activates on trackball movement, deactivates after timeout
+    LAYER_COUNT,
 };
 
 // ─── Custom Keycodes ────────────────────────────────────────────────────────

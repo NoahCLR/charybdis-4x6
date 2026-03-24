@@ -102,12 +102,13 @@ If neither flag is set, the firmware falls through to QMK's default USB detectio
 Keys `6`, `7`, `8` and the layer keys (Lower, Raise) use QMK's tap dance (`TAP_DANCE_ENABLE = yes` in `rules.mk`). The implementation is data-driven:
 
 - **`td_config_t`** struct defines tap, hold, double-tap keycodes, and an optional `hold_layer` for layer-hold tap dances.
-- **`td_config[]`** array holds one entry per tap dance, indexed by the `tap_dances` enum.
+- **`TD_LIST` X-macro** is the single source of truth: each line defines the enum name, tap keycode, hold keycode, double-tap keycode, and optional hold-layer. The macro expands twice — once to generate the `tap_dances` enum and `TD_COUNT`, once to populate the `td_config[]` array.
+- **`tap_dance_actions[]`** is declared as an empty array of size `TD_COUNT` and populated at runtime in `keyboard_post_init_user()`, which wires every entry to the shared `td_finished`/`td_reset` callbacks with the corresponding `td_config` pointer as `user_data`.
 - **`td_finished()`** and **`td_reset()`** are shared callbacks that read the config via `user_data`. No per-key callback duplication.
 - Layer-hold tap dances (TD_28, TD_53) use `layer_on()`/`layer_off()` instead of `tap_code16()`. A static `td_hold_layer_active` variable tracks which layer to deactivate on reset.
 - Tap dances are named by LED index (e.g. TD_49 for the key at LED position 49) so identifiers stay stable regardless of what keycode is mapped there.
 
-**Adding a new tap dance:** Add one line to the enum, one to `td_config[]`, one to `tap_dance_actions[]`, and one to `TAP_DANCE_NAMES` in `via_to_qmk_layout.py`.
+**Adding a new tap dance:** Add one line to `TD_LIST` in `key_config.h` and one to `TAP_DANCE_NAMES` in `via_to_qmk_layout.py`. The enum, config array, and runtime action wiring are all auto-generated.
 
 ## Custom Tap / Hold / Longer-Hold System
 
@@ -169,19 +170,11 @@ Auto-mouse stays enabled throughout — it may re-activate POINTER on the next t
 
 QMK renders the default RGB effect first, then calls `rgb_matrix_indicators_advanced_user()` in LED chunks (led_min to led_max). Any LEDs set by this function override the default effect for that frame. The function does two passes:
 
-**Pass 1 — Layer color.** Uses `layer_state_cmp(layer_state, ...)` to check which layers are present in the layer state (not just the highest). The first match wins:
+**Pass 1 — Layer color.** Iterates from the highest layer (`LAYER_COUNT - 1`) down to layer 1, checking `layer_state_cmp()`. The first active layer whose `layer_colors[]` entry is not `{0,0,0}` wins — its color is painted on both halves. Layers with `{0,0,0}` are skipped: LAYER_BASE falls through to the default RGB effect, and LAYER_POINTER falls through to the auto-mouse gradient. If no solid-color layer is active but `get_auto_mouse_layer()` is, the white→red countdown gradient renders instead.
 
-| Priority | Layer | Color | Notes |
-|----------|-------|-------|-------|
-| 1 | LAYER_RAISE | Purple | Both halves |
-| 2 | LAYER_LOWER | Blue | Both halves |
-| 3 | LAYER_NUM | Green | Both halves |
-| 4 | LAYER_POINTER | White→red gradient | Both halves, animated countdown |
-| — | LAYER_BASE | (none) | Default RGB effect shows through |
+This top-down iteration means higher layers always take priority. For example, LAYER_RAISE (layer 3) wins over LAYER_NUM (layer 1) when both are active. Colors are defined as HSV in `layer_colors[]` in `rgb_config.h` and pre-converted to RGB once at first render.
 
-LAYER_RAISE is checked first because it and LAYER_POINTER can be active simultaneously (e.g. holding a mode key keeps LAYER_POINTER alive via the key tracker, then pressing MO(3) adds LAYER_RAISE). Without explicit priority, `get_highest_layer()` would return LAYER_POINTER (layer 4 > 3) and show the gradient instead of purple.
-
-**Pass 2 — Mode overlay.** If any pointing device mode is active, the highest-priority mode's color is painted over LEDs. Currently uses `rgb_set_right_half()` to paint only the trackball side, but the helpers support targeting any half, both halves, or individual LEDs — the right-half-only choice is a UX decision, not a technical limitation. Priority order follows `pd_mode_priority[]`.
+**Pass 2 — Mode overlay.** Iterates `pd_mode_priority[]` and paints the first active mode's color from `pd_mode_colors[]` (defined in `rgb_config.h`) onto the right half. The helpers support targeting any half, both halves, or individual LEDs — the right-half-only choice is a UX decision, not a technical limitation.
 
 **Return value:** Returns `layer_painted` (true if pass 1 set a color, false for LAYER_BASE). On LAYER_BASE with no mode active, the default RGB effect is preserved untouched. On LAYER_BASE with a mode active, pass 2 still paints the mode color over the default effect.
 
@@ -216,9 +209,9 @@ typedef struct __attribute__((packed)) {
 
 **Slave-side handler:** `pd_sync_slave_rpc()` updates both `pd_sync_remote` (for RGB rendering) and `pd_mode_flags` (for mode overlay colors).
 
-## RGB Helpers (`rgb_helpers.h`)
+## RGB Configuration & Helpers (`rgb_config.h`)
 
-Split-safe wrappers around `rgb_matrix_set_color()`. On a split keyboard, `rgb_matrix_indicators_advanced_user()` is called in chunks — each half only processes its own LEDs. The helpers clamp to the current chunk so callers can use global LED indices (0–57) without worrying about which half they're on.
+All RGB color definitions (layer indicators, mode overlays, auto-mouse gradient) and split-safe wrappers around `rgb_matrix_set_color()`. On a split keyboard, `rgb_matrix_indicators_advanced_user()` is called in chunks — each half only processes its own LEDs. The helpers clamp to the current chunk so callers can use global LED indices (0–57) without worrying about which half they're on.
 
 | Function | What it does |
 |----------|-------------|
@@ -249,6 +242,6 @@ See the step-by-step guide in the header comment of `pointing_device_modes.h`. S
 3. Add a custom keycode in `key_config.h`'s enum
 4. Add the keycode to the tap/hold mode key handler in `process_record_user`
 5. Add a handler case in `pointing_device_task_user`'s switch
-6. Add an RGB color and `pd_mode_rgb[]` entry in the RGB section
+6. Add an HSV color entry to `pd_mode_colors[]` in `rgb_config.h`
 7. Add the keycode to `is_mouse_record_user` (keeps auto-mouse alive)
 8. Add the VIA token mapping in `via_to_qmk_layout.py`
