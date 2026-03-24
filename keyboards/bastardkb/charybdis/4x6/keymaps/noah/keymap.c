@@ -13,8 +13,8 @@
 //
 //   key_config.h
 //     All key behavior configuration: enums (layers, custom keycodes),
-//     the unified key behavior table, macro definitions, and LAYOUT arrays.
-//     Edit this file to change what keys do.
+//     per-feature config tables, macro definitions, and LAYOUT arrays.
+//     Edit that file to change what keys do.
 //
 //   pointing_device_modes.h
 //     Bitfield-based mode system that changes what the trackball does.
@@ -51,16 +51,15 @@
 //     it detects trackball movement, and deactivate it after a timeout.
 //     We use this for LAYER_POINTER.
 //
-//   - "Pointing device modes":  We define custom modes that change the behavior of the
-//     pointing device (e.g. volume control, scroll, mouse movement) and tie
-//     them to keys in the keymap.  These modes are implemented by intercepting
-//     the relevant keycodes in process_record_user() and setting flags that
-//     the pointing device code checks to decide what to do with pointing device movement.
+//   - "Pointing device modes":  We define custom modes that change the
+//     behavior of the pointing device (e.g. volume control, scroll) and
+//     tie them to keys in the keymap.  Modes are activated by holding
+//     the key and deactivated on release.
 //
-//   - "Key behaviors":  A unified data-driven system for keys that do
-//     different things depending on how they're pressed: tap, hold,
-//     longer hold, or double-tap.  Config lives in key_behaviors[] in
-//     key_config.h; processing logic lives here.
+//   - "Key behavior tables":  Per-feature config tables in key_config.h.
+//     A key can appear in multiple tables to combine behaviors (e.g.
+//     KC_6 is in hold_keys AND double_tap_keys).  Processing logic here
+//     looks up each table independently.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // QMK
@@ -95,10 +94,42 @@ bool is_keyboard_master_impl(void) {
 // stomp each other's timers if pressed in quick succession.
 static uint16_t pd_mode_timer;
 
-// ─── Unified Key Behavior System ────────────────────────────────────────────
+// ─── Key Behavior Lookups ───────────────────────────────────────────────────
 //
-// The config table lives in key_config.h (key_behaviors[]).
-// This section contains only the processing state and lookup logic.
+// Each lookup scans a small config table from key_config.h.
+// Returns NULL if the keycode isn't in that table.
+
+static const hold_key_t *hold_lookup(uint16_t keycode) {
+    for (uint8_t i = 0; i < HOLD_KEY_COUNT; i++)
+        if (hold_keys[i].keycode == keycode) return &hold_keys[i];
+    return NULL;
+}
+
+static const longer_hold_key_t *longer_hold_lookup(uint16_t keycode) {
+    for (uint8_t i = 0; i < LONGER_HOLD_KEY_COUNT; i++)
+        if (longer_hold_keys[i].keycode == keycode) return &longer_hold_keys[i];
+    return NULL;
+}
+
+static const double_tap_key_t *double_tap_lookup(uint16_t keycode) {
+    for (uint8_t i = 0; i < DOUBLE_TAP_KEY_COUNT; i++)
+        if (double_tap_keys[i].keycode == keycode) return &double_tap_keys[i];
+    return NULL;
+}
+
+static const triple_tap_key_t *triple_tap_lookup(uint16_t keycode) {
+    for (uint8_t i = 0; i < TRIPLE_TAP_KEY_COUNT; i++)
+        if (triple_tap_keys[i].keycode == keycode) return &triple_tap_keys[i];
+    return NULL;
+}
+
+static const mode_tap_override_t *mode_tap_override_lookup(uint16_t keycode) {
+    for (uint8_t i = 0; i < MODE_TAP_OVERRIDE_COUNT; i++)
+        if (mode_tap_overrides[i].keycode == keycode) return &mode_tap_overrides[i];
+    return NULL;
+}
+
+// ─── Key Behavior State ─────────────────────────────────────────────────────
 //
 // Thresholds are defined in config.h:
 //   CUSTOM_TAP_HOLD_TERM      = 150ms
@@ -107,42 +138,41 @@ static uint16_t pd_mode_timer;
 
 // Active key tracking — only one key behavior key tracked at a time.
 static uint16_t key_timer;
-static uint16_t key_active = KC_NO;
-static const key_behavior_t *key_cfg = NULL;
-static bool     key_hold_fired  = false;
-static uint8_t  key_hold_layer  = 0;     // which layer was activated by hold
+static uint16_t key_active     = KC_NO;
+static bool     key_hold_fired = false;
 
-// Double-tap pending state — after a quick tap of a double-tap-capable key,
-// we wait briefly for a possible second press before sending the tap action.
-static bool     dt_pending = false;
+// Cached lookups for the currently active key (populated on press, cleared on release).
+static const hold_key_t        *active_hold   = NULL;
+static const longer_hold_key_t *active_longer = NULL;
+
+// Multi-tap pending state — after a quick tap of a multi-tap-capable key,
+// we wait briefly for a possible second (or third) press before committing.
+static uint8_t  dt_tap_count = 0; // 0 = idle, 1 = single pending, 2 = double pending
 static uint16_t dt_timer;
-static uint16_t dt_keycode = KC_NO;
-static const key_behavior_t *dt_cfg = NULL;
+static uint16_t dt_keycode       = KC_NO;
+static uint16_t dt_tap_keycode   = KC_NO; // what to send on count=1 timeout
+static uint16_t dt_double_action = KC_NO; // what to send on count=2 timeout
 
-// Flush a pending double-tap: send the tap action and clear pending state.
+// Flush a pending multi-tap: send the appropriate action and clear state.
 static inline void dt_flush(void) {
-    if (dt_cfg && dt_cfg->tap != KC_NO) tap_code16(dt_cfg->tap);
-    dt_pending = false;
-    dt_keycode = KC_NO;
-    dt_cfg     = NULL;
+    if (dt_tap_count == 1) {
+        if (dt_tap_keycode != KC_NO) tap_code16(dt_tap_keycode);
+    } else if (dt_tap_count == 2) {
+        tap_code16(dt_double_action);
+    }
+    dt_tap_count     = 0;
+    dt_keycode       = KC_NO;
+    dt_tap_keycode   = KC_NO;
+    dt_double_action = KC_NO;
 }
 
 // ─── RGB Color Cache ─────────────────────────────────────────────────────────
 // Pre-computed HSV → RGB conversions, populated once in keyboard_post_init_user.
-// Declared here (before init) so both init and the render callback can see them.
 #ifdef RGB_MATRIX_ENABLE
 static rgb_t layer_rgb[LAYER_COUNT];
 static rgb_t pd_mode_rgb[PD_MODE_COUNT];
 static rgb_t led_group_rgb[LAYER_LED_GROUP_COUNT];
 #endif
-
-// Look up a keycode in the key_behaviors table.  Returns NULL if not found.
-static const key_behavior_t *key_behavior_lookup(uint16_t keycode) {
-    for (uint8_t i = 0; i < KEY_BEHAVIOR_COUNT; i++) {
-        if (key_behaviors[i].keycode == keycode) return &key_behaviors[i];
-    }
-    return NULL;
-}
 
 // Simulate a full press+release of a Charybdis firmware keycode (e.g.
 // DRAGSCROLL_MODE_TOGGLE).  Uses process_record_kb (not _user) to avoid
@@ -164,34 +194,72 @@ static void tap_custom_bk_keycode(uint16_t kc) {
 // "pass it along to the next handler."
 //
 // The logic is organized in stages:
-//   1) Flush pending double-tap on any different key press
+//   1) Flush pending multi-tap on any different key press
 //   2) Pointing device mode keys (press + release)
-//   3) Unified key behaviors (press + release)
+//   3) Key behavior tables (press + release)
 //   4) Early return for releases (everything below is press-only)
 //   5) Macros (press-only)
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // --- 1) Flush pending double-tap if a different key is pressed ---
-    // This ensures the first tap registers before the new key is processed.
-    if (dt_pending && record->event.pressed && keycode != dt_keycode) {
+    // --- 1) Flush pending multi-tap if a different key is pressed ---
+    if (dt_tap_count > 0 && record->event.pressed && keycode != dt_keycode) {
         dt_flush();
     }
 
     // --- 2) Pointing device mode keys (react on both press and release) ---
 
-    // 2a) Generic mode keys: tap sends base-layer key, hold activates mode.
-    // Keycodes are looked up from pd_modes[] — no hardcoded cases needed.
+    // 2a) Generic mode keys: tap sends base-layer key (or override), hold activates mode.
+    //     Also supports double-tap via double_tap_keys[].
     {
         uint8_t mode = pd_mode_for_keycode(keycode);
         if (mode) {
             if (record->event.pressed) {
+                // Multi-tap detection: same key pressed again while pending.
+                const double_tap_key_t *dtap = double_tap_lookup(keycode);
+                if (dt_tap_count > 0 && dt_keycode == keycode && dtap) {
+                    const triple_tap_key_t *ttap = triple_tap_lookup(keycode);
+                    if (dt_tap_count == 1 && ttap) {
+                        // Could be triple — wait for 3rd tap.
+                        dt_tap_count     = 2;
+                        dt_timer         = timer_read();
+                        dt_double_action = dtap->action;
+                    } else {
+                        // Fire double or triple-tap action.
+                        uint16_t action = (dt_tap_count == 2 && ttap) ? ttap->action : dtap->action;
+                        tap_code16(action);
+                        dt_tap_count     = 0;
+                        dt_keycode       = KC_NO;
+                        dt_tap_keycode   = KC_NO;
+                        dt_double_action = KC_NO;
+                    }
+                    return false;
+                }
+
                 pd_mode_timer = timer_read();
                 pd_mode_update(mode, true);
             } else {
                 pd_mode_update(mode, false);
                 if (timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
-                    uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
-                    tap_code16(fallback_key);
+                    // Tap — check for multi-tap deferral first.
+                    const double_tap_key_t *dtap = double_tap_lookup(keycode);
+                    if (dtap) {
+                        // Resolve tap key: override > base-layer fallback.
+                        const mode_tap_override_t *ovr     = mode_tap_override_lookup(keycode);
+                        uint16_t                   tap_key = ovr ? ovr->tap : keymap_key_to_keycode(LAYER_BASE, record->event.key);
+
+                        dt_tap_count   = 1;
+                        dt_timer       = timer_read();
+                        dt_keycode     = keycode;
+                        dt_tap_keycode = tap_key;
+                    } else {
+                        const mode_tap_override_t *ovr = mode_tap_override_lookup(keycode);
+                        if (ovr) {
+                            tap_code16(ovr->tap);
+                        } else {
+                            uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
+                            tap_code16(fallback_key);
+                        }
+                    }
                 }
             }
             pd_state_sync();
@@ -201,11 +269,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
     // 2b) Special dragscroll keys (need custom press/release logic).
     switch (keycode) {
-        // DRAGSCROLL_MODE (Charybdis firmware keycode, not in our enum):
-        // Dual-purpose like the other mode keys: tap sends the base-layer
-        // key, hold activates drag-scroll.  Also adds unlock behavior:
-        // if drag-scroll was already *toggled on* (locked), pressing and
-        // releasing the momentary key will unlock it instead.
         case DRAGSCROLL_MODE: {
             static bool dragscroll_was_locked = false;
             if (record->event.pressed) {
@@ -216,7 +279,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 return true;
             } else {
                 if (dragscroll_was_locked) {
-                    // It was locked — turn off the toggle and clear mode flag.
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
                     pd_state_sync();
@@ -225,7 +287,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 pd_mode_update(PD_MODE_DRAGSCROLL, false);
                 pd_state_sync();
                 if (timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
-                    // Tap: disable dragscroll if it was enabled, then send the base-layer key.
                     charybdis_set_pointer_dragscroll_enabled(false);
                     uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
                     tap_code16(fallback_key);
@@ -235,10 +296,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
         }
 
-        // DRG_TOG_ON_HOLD: Dual-purpose key for the auto-mouse layer.
-        //   Tap  → sends whatever key is at this position on LAYER_BASE.
-        //   Hold → enables drag-scroll lock.
-        //   When already locked, any press (tap or hold) unlocks.
         case DRG_TOG_ON_HOLD:
             if (record->event.pressed) {
                 pd_mode_timer = timer_read();
@@ -246,17 +303,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 bool dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
 
                 if (dragscroll_was_locked) {
-                    // Already locked — any release (tap or hold) unlocks.
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
                     pd_state_sync();
                 } else if (timer_elapsed(pd_mode_timer) > CUSTOM_TAP_HOLD_TERM) {
-                    // HOLD: toggle drag-scroll lock on
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
                     pd_state_sync();
                 } else {
-                    // TAP: look up and send the base-layer key at this matrix position
                     uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
                     tap_code16(fallback_key);
                 }
@@ -264,42 +318,78 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
     }
 
-    // --- 3) Unified key behaviors (react on both press and release) ---
-    // Config table is in key_config.h (key_behaviors[]).
-    // Supports: tap, hold, longer-hold, double-tap, hold-for-layer.
+    // --- 3) Key behavior tables (react on both press and release) ---
+    //
+    // A keycode can appear in multiple tables.  We look up each table
+    // independently and combine the results.
+    //
+    // MO() keycodes that appear in double_tap_keys[] are intercepted here
+    // so we can add double-tap behavior.  We handle layer_on/layer_off
+    // ourselves and return false to prevent QMK from doing it twice.
     {
-        const key_behavior_t *cfg = key_behavior_lookup(keycode);
-        if (cfg) {
+        const hold_key_t       *hold  = hold_lookup(keycode);
+        const double_tap_key_t *dtap  = double_tap_lookup(keycode);
+        bool                    is_mo = IS_QK_MOMENTARY(keycode);
+
+        // If the keycode is in any behavior table, we handle it.
+        if (hold || dtap || is_mo) {
             if (record->event.pressed) {
-                // Double-tap detection: same key pressed again while pending.
-                if (dt_pending && dt_keycode == keycode && cfg->double_tap != KC_NO) {
-                    tap_code16(cfg->double_tap);
-                    dt_pending = false;
-                    dt_keycode = KC_NO;
-                    dt_cfg     = NULL;
-                    return false; // consumed — don't track this press
-                }
-
-                // Normal press — start tracking.
-                key_timer      = timer_read();
-                key_active     = keycode;
-                key_cfg        = cfg;
-                key_hold_fired = false;
-            } else {
-                // Release — only process if this matches the key we're tracking.
-                // (A double-tap second press returns false above without setting
-                // key_active, so its release falls through harmlessly.)
-                if (key_active != keycode) return false;
-
-                key_active = KC_NO;
-                key_cfg    = NULL;
-
-                // Hold-for-layer: deactivate the layer on release.
-                if (key_hold_layer) {
-                    layer_off(key_hold_layer);
-                    key_hold_layer = 0;
+                // Multi-tap detection: same key pressed again while pending.
+                if (dt_tap_count > 0 && dt_keycode == keycode && dtap) {
+                    const triple_tap_key_t *ttap = triple_tap_lookup(keycode);
+                    if (dt_tap_count == 1 && ttap) {
+                        // Could be triple — wait for 3rd tap.
+                        dt_tap_count     = 2;
+                        dt_timer         = timer_read();
+                        dt_double_action = dtap->action;
+                    } else {
+                        // Fire double or triple-tap action.
+                        uint16_t action = (dt_tap_count == 2 && ttap) ? ttap->action : dtap->action;
+                        tap_code16(action);
+                        dt_tap_count     = 0;
+                        dt_keycode       = KC_NO;
+                        dt_tap_keycode   = KC_NO;
+                        dt_double_action = KC_NO;
+                    }
+                    // Still activate layer for MO() so it's on while held.
+                    if (is_mo) {
+                        layer_on(QK_MOMENTARY_GET_LAYER(keycode));
+                        key_active     = keycode;
+                        key_timer      = timer_read();
+                        key_hold_fired = true;
+                        active_hold    = NULL;
+                        active_longer  = NULL;
+                    }
                     return false;
                 }
+
+                // MO() layer activation — always turn on immediately.
+                if (is_mo) {
+                    layer_on(QK_MOMENTARY_GET_LAYER(keycode));
+                }
+
+                // Normal press — start tracking + cache lookups.
+                key_timer      = timer_read();
+                key_active     = keycode;
+                key_hold_fired = false;
+                active_hold    = hold;
+                active_longer  = longer_hold_lookup(keycode);
+            } else {
+                // Release — MO() layer always deactivates.
+                if (is_mo) {
+                    layer_off(QK_MOMENTARY_GET_LAYER(keycode));
+                }
+
+                // Only process if this matches the key we're tracking.
+                if (key_active != keycode) return false;
+
+                // Snapshot cached lookups before clearing.
+                const hold_key_t        *rel_hold   = active_hold;
+                const longer_hold_key_t *rel_longer = active_longer;
+
+                key_active    = KC_NO;
+                active_hold   = NULL;
+                active_longer = NULL;
 
                 // If hold already fired (immediate mode), nothing more to do.
                 if (key_hold_fired) {
@@ -311,19 +401,23 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 uint16_t elapsed = timer_elapsed(key_timer);
 
                 if (elapsed < CUSTOM_TAP_HOLD_TERM) {
-                    // TAP — but if double-tap is enabled, defer.
-                    if (cfg->double_tap != KC_NO) {
-                        dt_pending = true;
-                        dt_timer   = timer_read();
-                        dt_keycode = keycode;
-                        dt_cfg     = cfg;
-                    } else {
-                        if (cfg->tap != KC_NO) tap_code16(cfg->tap);
+                    // TAP — if multi-tap is enabled, defer; otherwise send immediately.
+                    if (dtap) {
+                        dt_tap_count = 1;
+                        dt_timer     = timer_read();
+                        dt_keycode   = keycode;
+                        // For MO() keys, tap sends nothing (layer was already on/off).
+                        // For hold_keys, tap sends the keycode itself.
+                        dt_tap_keycode = rel_hold ? keycode : KC_NO;
+                    } else if (rel_hold) {
+                        tap_code16(keycode);
                     }
-                } else if (elapsed > CUSTOM_LONGER_HOLD_TERM && cfg->longer_hold != KC_NO) {
-                    tap_code16(cfg->longer_hold);
+                    // MO()-only with no dtap: tap does nothing (layer already toggled).
+                } else if (rel_longer && elapsed > CUSTOM_LONGER_HOLD_TERM) {
+                    tap_code16(rel_longer->longer_hold);
                 } else {
-                    if (cfg->hold != KC_NO) tap_code16(cfg->hold);
+                    if (rel_hold) tap_code16(rel_hold->hold);
+                    // MO()-only held: layer was already active, nothing extra to send.
                 }
             }
             return false;
@@ -340,30 +434,30 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 
-// ─── Matrix Scan: Hold Detection + Double-Tap Flush ─────────────────────────
+// ─── Matrix Scan: Hold Detection + Multi-Tap Flush ──────────────────────────
 //
 // Called every matrix scan cycle (~1ms).
-//   1. For keys with immediate=true or hold_layer!=0: fires the hold action
-//      as soon as CUSTOM_TAP_HOLD_TERM is reached — no release needed.
-//   2. Flushes pending double-taps when the window expires.
+//   1. For keys with immediate hold or immediate longer-hold:
+//      fires the action as soon as the threshold is reached.
+//   2. Flushes pending multi-taps when the window expires.
 void matrix_scan_user(void) {
-    // 1. Immediate hold / hold-for-layer detection.
-    if (key_cfg && !key_hold_fired) {
-        if (timer_elapsed(key_timer) >= CUSTOM_TAP_HOLD_TERM) {
-            if (key_cfg->hold_layer != 0) {
-                // Activate the layer while held.
-                layer_on(key_cfg->hold_layer);
-                key_hold_layer = key_cfg->hold_layer;
-                key_hold_fired = true;
-            } else if (key_cfg->immediate) {
-                if (key_cfg->hold != KC_NO) tap_code16(key_cfg->hold);
-                key_hold_fired = true;
-            }
+    // 1. Threshold-based hold detection.
+    if (key_active != KC_NO && !key_hold_fired) {
+        uint16_t elapsed = timer_elapsed(key_timer);
+        // Immediate longer hold fires at CUSTOM_LONGER_HOLD_TERM.
+        if (active_longer && active_longer->immediate && elapsed >= CUSTOM_LONGER_HOLD_TERM) {
+            tap_code16(active_longer->longer_hold);
+            key_hold_fired = true;
+        }
+        // Immediate hold fires at CUSTOM_TAP_HOLD_TERM.
+        else if (active_hold && active_hold->immediate && elapsed >= CUSTOM_TAP_HOLD_TERM) {
+            tap_code16(active_hold->hold);
+            key_hold_fired = true;
         }
     }
 
-    // 2. Flush pending double-tap when the window expires.
-    if (dt_pending && timer_elapsed(dt_timer) >= CUSTOM_DOUBLE_TAP_TERM) {
+    // 2. Flush pending multi-tap when the window expires.
+    if (dt_tap_count > 0 && timer_elapsed(dt_timer) >= CUSTOM_DOUBLE_TAP_TERM) {
         dt_flush();
     }
 }
@@ -391,35 +485,19 @@ void keyboard_post_init_user(void) {
 }
 
 // ─── Pointing Device Integration ────────────────────────────────────────────
-//
-// The Charybdis has a trackball on the right half.  QMK's pointing
-// device subsystem calls these hooks to let us customize behavior.
-//
-// Key features:
-//   - Auto-mouse: LAYER_POINTER activates when the trackball moves and
-//     deactivates after AUTO_MOUSE_TIME (1200ms) of no movement.
-//   - Sniping: Automatically enabled on LAYER_RAISE for precision work
-//     (lower DPI while that layer is active).
-//   - Mode interception: Volume, Brightness, Zoom, and Arrow modes intercept
-//     trackball reports before they reach the OS (see pointing_device_modes.h).
 #ifdef POINTING_DEVICE_ENABLE
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 void pointing_device_init_user(void) {
     set_auto_mouse_layer(LAYER_POINTER);
     set_auto_mouse_enable(true);
-    split_sync_init(); // register split RPC handler for state sync
+    split_sync_init();
 }
-// Tell QMK which custom keycodes count as "mouse activity" so that pressing
-// them keeps the auto-mouse layer alive (prevents it from timing out while
-// you're actively using trackball features).
+
 bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
-    // Mode keycodes from pd_modes[] — auto-discovered, no manual list needed.
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode)
-            return true;
+        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode) return true;
     }
-    // Charybdis firmware keycodes + special custom keys (not in pd_modes[]).
     switch (keycode) {
         case SNIPING_MODE:
         case SNIPING_MODE_TOGGLE:
@@ -436,10 +514,6 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
-// Called every scan cycle with the trackball's motion report.
-// Dispatches to the first active mode's handler (priority = pd_modes[] order).
-// Modes with NULL handlers (e.g. dragscroll) are skipped — they're handled
-// by the charybdis firmware before this function is called.
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_mode_active(pd_modes[i].mode_flag) && pd_modes[i].handler) {
@@ -449,31 +523,13 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     return mouse_report;
 }
 
-// Called whenever the active layer set changes.
-// We use this to:
-//   1. Prevent the auto-mouse pointer layer from stacking on top of other
-//      active layers (which would cause flickering / stuck states).
-//   2. Enable sniping (lower DPI) automatically on LAYER_RAISE.
-//   3. Disable auto-mouse while LAYER_RAISE is active, because sniping
-//      and auto-mouse fight over pointer behavior.
 layer_state_t layer_state_set_user(layer_state_t state) {
-    // Enable sniping (lower DPI) automatically on LAYER_RAISE.
     charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    // Strip LAYER_POINTER when LAYER_RAISE is active to avoid key
-    // conflicts (both layers define different keys at the same positions).
-    // Auto-mouse stays enabled — it may re-activate POINTER on trackball
-    // movement, but the strip will remove it again on the next layer
-    // state update.  This avoids calling set_auto_mouse_enable() which
-    // destructively resets all auto-mouse state (key tracker, toggle,
-    // timers), breaking drag-scroll lock and momentary drag-scroll.
     if (layer_state_cmp(state, LAYER_POINTER) && layer_state_cmp(state, LAYER_RAISE)) {
         state &= ~((layer_state_t)1 << LAYER_POINTER);
-    }
-    // For other non-base layers, strip POINTER only if nothing is holding
-    // it active (no toggle, no held mouse key, no drag scroll).
-    else if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0 && !charybdis_get_pointer_dragscroll_enabled()) {
+    } else if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0 && !charybdis_get_pointer_dragscroll_enabled()) {
         state &= ~((layer_state_t)1 << LAYER_POINTER);
     }
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
@@ -485,19 +541,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 
 #ifdef RGB_MATRIX_ENABLE
 
-// ─── RGB Matrix Layer Indicators ────────────────────────────────────────────
-//
-// Each layer gets a distinct LED color so you always know which layer is
-// active at a glance.  Pointing device modes overlay a color on the right
-// half (the trackball side) so you can tell which mode the trackball is in.
-//
-// Colors are defined in rgb_config.h.  This section is rendering logic only.
-// See rgb_helpers.h for the split-safe helper API and rgb_config.h for color values.
-
 // ─── LED Index Map ──────────────────────────────────────────────────────────
-//
-// Physical LED positions for reference when targeting specific LEDs.
-// Numbers are the LED index passed to rgb_matrix_set_color().
 //
 // ╭────────────────────────╮                 ╭────────────────────────╮
 //    0   7   8  15  16  20                     49  45  44  37  36  29
@@ -511,19 +555,8 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 //                       26  27  28     53  54  XX
 //                           25  24     55  XX
 //                     ╰────────────╯ ╰────────────╯
-//
-// 0–28  → left half (29 LEDs)
-// 29–57 → right half (29 LEDs, 2 are dummy/unused on pointer side)
 
-// QMK calls this in batches (led_min to led_max) — potentially multiple
-// times per frame, once per "chunk" of LEDs.  On a split keyboard, each
-// half only processes its own LEDs.
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    // Paint all LEDs with the highest active layer's color.
-    // Layers with {0,0,0} in layer_colors[] are skipped (BASE uses the
-    // default RGB effect, POINTER uses the auto-mouse gradient below).
-    // The layer-stripping logic in layer_state_set_user ensures that
-    // explicit layers take priority over the auto-activated pointer layer.
     bool layer_painted = false;
     for (int8_t i = LAYER_COUNT - 1; i > 0; i--) {
         if (!layer_state_cmp(layer_state, i)) continue;
@@ -539,17 +572,12 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     }
 #    endif
 
-    // Paint per-layer LED group highlights (e.g. modifier keys on specific layers).
     for (uint8_t g = 0; g < LAYER_LED_GROUP_COUNT; g++) {
         if (layer_state_cmp(layer_state, layer_led_groups[g].layer)) {
-            rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count,
-                              led_min, led_max, led_group_rgb[g]);
+            rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max, led_group_rgb[g]);
         }
     }
 
-    // If a pointing device mode is active, override the right half with the
-    // mode's color.  This provides instant visual feedback for which mode
-    // the trackball is in.  Priority order comes from pd_modes[].
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_mode_active(pd_modes[i].mode_flag)) {
             rgb_set_right_half(pd_mode_rgb[i], led_min, led_max);
