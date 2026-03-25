@@ -13,8 +13,12 @@
 //
 //   key_config.h
 //     All key behavior configuration: enums (layers, custom keycodes),
-//     per-feature config tables, macro definitions, and LAYOUT arrays.
-//     Edit that file to change what keys do.
+//     per-feature config tables, combos, macro definitions, and LAYOUT
+//     arrays.  Edit that file to change what keys do.
+//
+//   lib/key_types.h
+//     Struct typedefs for the key behavior tables (hold_key_t, etc.).
+//     Keeps key_config.h focused on data.
 //
 //   pointing_device_modes.h
 //     Bitfield-based mode system that changes what the trackball does.
@@ -30,8 +34,9 @@
 //     transport.  Both values travel in a single 3-byte packet.
 //
 //   rgb_helpers.h
-//     Split-safe helper functions for rgb_matrix_set_color().  Handles
-//     LED chunk boundaries so callers can use global LED indices (0–57).
+//     Split-safe helper functions for rgb_matrix_set_color() and struct
+//     typedefs for RGB config tables.  Handles LED chunk boundaries so
+//     callers can use global LED indices (0–57).
 //
 //   rgb_config.h
 //     All RGB color definitions: layer indicators, mode overlays, LED
@@ -55,7 +60,8 @@
 //   - "Key behavior tables":  Per-feature config tables in key_config.h.
 //     A key can appear in multiple tables to combine behaviors (e.g.
 //     KC_6 is in hold_keys AND double_tap_keys).  Processing logic here
-//     looks up each table independently.
+//     looks up each table independently.  Combos are also defined in
+//     key_config.h but handled by QMK before process_record_user runs.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // QMK
@@ -63,14 +69,13 @@
 #include "key_config.h"
 
 #ifdef VIA_ENABLE
-_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT,
-               "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
+_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
 #endif
 
-#define HOLD_KEY_COUNT          (sizeof(hold_keys) / sizeof(hold_keys[0]))
-#define LONGER_HOLD_KEY_COUNT   (sizeof(longer_hold_keys) / sizeof(longer_hold_keys[0]))
-#define DOUBLE_TAP_KEY_COUNT    (sizeof(double_tap_keys) / sizeof(double_tap_keys[0]))
-#define TRIPLE_TAP_KEY_COUNT    (sizeof(triple_tap_keys) / sizeof(triple_tap_keys[0]))
+#define HOLD_KEY_COUNT (sizeof(hold_keys) / sizeof(hold_keys[0]))
+#define LONGER_HOLD_KEY_COUNT (sizeof(longer_hold_keys) / sizeof(longer_hold_keys[0]))
+#define DOUBLE_TAP_KEY_COUNT (sizeof(double_tap_keys) / sizeof(double_tap_keys[0]))
+#define TRIPLE_TAP_KEY_COUNT (sizeof(triple_tap_keys) / sizeof(triple_tap_keys[0]))
 #define MODE_TAP_OVERRIDE_COUNT (sizeof(mode_tap_overrides) / sizeof(mode_tap_overrides[0]))
 
 #include "lib/pointing_device_modes.h"
@@ -79,8 +84,8 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT,
 #include "rgb_config.h"
 #include "lib/rgb_automouse.h"
 
-#define PD_MODE_COLOR_COUNT     (sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]))
-#define LAYER_LED_GROUP_COUNT   (sizeof(layer_led_groups) / sizeof(layer_led_groups[0]))
+#define PD_MODE_COLOR_COUNT (sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]))
+#define LAYER_LED_GROUP_COUNT (sizeof(layer_led_groups) / sizeof(layer_led_groups[0]))
 #define PD_MODE_LED_GROUP_COUNT (sizeof(pd_mode_led_groups) / sizeof(pd_mode_led_groups[0]))
 
 // Force master/slave role at compile time.  Needed when both halves have
@@ -147,6 +152,7 @@ static const mode_tap_override_t *mode_tap_override_lookup(uint16_t keycode) {
 //   CUSTOM_TAP_HOLD_TERM      = 150ms
 //   CUSTOM_LONGER_HOLD_TERM   = 400ms
 //   CUSTOM_DOUBLE_TAP_TERM    = 200ms
+//   COMBO_TERM                = 50ms
 
 // Active key tracking — only one key behavior key tracked at a time.
 static uint16_t key_timer;
