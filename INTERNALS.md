@@ -43,6 +43,17 @@ These keys send different keycodes based on hold duration (tap < 150ms, hold 150
 
 Set `immediate` to `true` for keys that should fire the hold action at the threshold without waiting for release (most keys). Set to `false` for keys where you want to choose between hold and longer-hold on release (arrows).
 
+### Add a key combo
+
+A combo fires an action when multiple keys are pressed simultaneously.
+
+| Step | File | What to do |
+|------|------|------------|
+| 1 | `key_config.h` | Define a `PROGMEM` key array: `const uint16_t PROGMEM combo_keys_N[] = {KEY1, KEY2, COMBO_END};` |
+| 2 | `key_config.h` | Add a `COMBO()` entry to `key_combos[]`: `COMBO(combo_keys_N, ACTION)` |
+
+Trigger keys must match the exact keycode in the layout (e.g. `LT(LAYER_RAISE, KC_F)`, not `KC_F`). Combos can use 2 or more trigger keys. `COMBO_TERM` (50ms) in `config.h` controls the detection window. Keys in combo definitions get buffered for up to `COMBO_TERM` when pressed alone, adding slight input lag.
+
 ### Add a new macro
 
 A macro sends a key combination on a single keypress.
@@ -70,9 +81,9 @@ Highlight specific LEDs with a different color when a layer is active (e.g. mark
 | Step | File | What to do |
 |------|------|------------|
 | 1 | `rgb_config.h` | Define an LED index array: `static const uint8_t xxx_leds[] = {led1, led2, ...};` |
-| 2 | `rgb_config.h` | Add one line to `layer_led_groups[]`: `{LAYER_xxx, {hue, sat, val}, xxx_leds, sizeof(xxx_leds)}` |
+| 2 | `rgb_config.h` | Add one line to `layer_led_groups[]`: `{L(LAYER_xxx), {hue, sat, val}, xxx_leds, sizeof(xxx_leds)}` |
 
-Use the LED Index Map in `rgb_config.h` to find the LED indices for each physical key position.
+The `layers` field is a bitmask — use `L()` to target layers: `L(LAYER_RAISE)` for one layer, `L(LAYER_RAISE) | L(LAYER_LOWER)` for multiple, or `LAYER_ALL` for always-on. Use the LED Index Map in `rgb_config.h` to find the LED indices for each physical key position.
 
 ### Add a per-mode LED group highlight
 
@@ -153,6 +164,8 @@ These are NOT QMK's built-in `TAPPING_TERM` — they're checked manually in `pro
 | `CUSTOM_TAP_HOLD_TERM` | 150ms | Below this = tap (plain key) |
 | Between 150–400ms | — | Hold (shifted variant) |
 | `CUSTOM_LONGER_HOLD_TERM` | 400ms | Above this = longer hold (third action) |
+| `CUSTOM_DOUBLE_TAP_TERM` | 200ms | Max gap between taps for double-tap |
+| `COMBO_TERM` | 50ms | Max gap between keys for combo detection |
 
 ### VIA
 
@@ -240,6 +253,8 @@ This keymap uses its own timing system in `process_record_user()` with independe
 | `longer_hold_keys[]` | Third-tier action past 400ms | `keycode`, `longer_hold`, `immediate` |
 | `double_tap_keys[]` | Action on rapid double-tap | `keycode`, `action` |
 | `triple_tap_keys[]` | Action on rapid triple-tap | `keycode`, `action` |
+| `mode_tap_overrides[]` | Override tap action for mode keys | `keycode`, `tap` |
+| `key_combos[]` | Simultaneous key press → action | QMK `COMBO()` entries |
 
 ### How it works
 
@@ -309,7 +324,7 @@ QMK renders the default RGB effect first, then calls `rgb_matrix_indicators_adva
 
 This top-down iteration means higher layers always take priority. For example, LAYER_RAISE (layer 3) wins over LAYER_NUM (layer 1) when both are active. Colors are defined as HSV in `layer_colors[]` in `rgb_config.h` and pre-converted to RGB once at first render.
 
-**Pass 2 — LED group highlights.** Iterates `layer_led_groups[]` and paints specific LEDs a different color when their associated layer is active. Then iterates `pd_mode_led_groups[]` for mode-specific LED highlights.
+**Pass 2 — LED group highlights.** Iterates `layer_led_groups[]` and paints specific LEDs a different color when any of their target layers are active (the `layers` field is a bitmask — use `L()` for individual layers, `LAYER_ALL` for always-on). Then iterates `pd_mode_led_groups[]` for mode-specific LED highlights.
 
 **Pass 3 — Mode overlay.** Iterates `pd_modes[]` and paints the first active mode's color from `pd_mode_colors[]` (defined in `rgb_config.h`) onto the right half. Then applies per-mode LED group highlights from `pd_mode_led_groups[]` on top. The helpers support targeting any half, both halves, or individual LEDs — the right-half-only choice is a UX decision, not a technical limitation.
 
@@ -348,7 +363,7 @@ typedef struct __attribute__((packed)) {
 
 ## RGB Helpers (`lib/rgb_helpers.h`)
 
-Split-safe wrappers around `rgb_matrix_set_color()`. On a split keyboard, `rgb_matrix_indicators_advanced_user()` is called in chunks — each half only processes its own LEDs. The helpers clamp to the current chunk so callers can use global LED indices (0–57) without worrying about which half they're on.
+Split-safe wrappers around `rgb_matrix_set_color()` and struct typedefs for the RGB config tables (`pd_mode_color_t`, `layer_led_group_t`, `pd_mode_led_group_t`). On a split keyboard, `rgb_matrix_indicators_advanced_user()` is called in chunks — each half only processes its own LEDs. The helpers clamp to the current chunk so callers can use global LED indices (0–57) without worrying about which half they're on.
 
 | Function | What it does |
 |----------|-------------|
@@ -364,7 +379,7 @@ The split boundary is fixed at LED index 29 (`RGB_LEFT_LED_COUNT`), matching `RG
 
 ## RGB Color Configuration (`rgb_config.h`)
 
-Pure color data — no logic. Contains layer indicator colors (`layer_colors[]`), mode overlay colors (`pd_mode_colors[]`), per-layer LED group highlights (`layer_led_groups[]`), per-mode LED group highlights (`pd_mode_led_groups[]`), and auto-mouse gradient endpoints. Also houses the LED Index Map and LED index arrays used by the group highlights. Mirrors the `key_config.h` pattern: config data only, rendering logic lives in `keymap.c`.
+Pure color data — no logic. Contains layer indicator colors (`layer_colors[]`), mode overlay colors (`pd_mode_colors[]`), per-layer LED group highlights (`layer_led_groups[]`), per-mode LED group highlights (`pd_mode_led_groups[]`), and auto-mouse gradient endpoints. Also houses the LED Index Map and LED index arrays used by the group highlights. Mirrors the `key_config.h` pattern: config data only, rendering logic lives in `keymap.c`. Struct typedefs live in `lib/rgb_helpers.h`; count macros live in `keymap.c`.
 
 ## VIA Layout Conversion
 

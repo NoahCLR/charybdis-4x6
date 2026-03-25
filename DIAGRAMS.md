@@ -71,7 +71,10 @@ QMK calls `process_record_user()` for every key press and release. The function 
 
 ```mermaid
 flowchart TD
-    A[Key press/release event] --> FLUSH{Pending multi-tap\nfor different key?}
+    A[Key press/release event] --> COMBO{QMK combo\ndetected?}
+    COMBO -- Yes --> COMBO1["Send combo action\n(before process_record_user)"]
+    COMBO1 --> STOP2([done])
+    COMBO -- No --> FLUSH{Pending multi-tap\nfor different key?}
     FLUSH -- Yes --> FLUSH1[Flush pending action]
     FLUSH1 --> B
     FLUSH -- No --> B

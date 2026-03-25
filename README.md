@@ -10,6 +10,7 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 - **Trackball modes** — Hold a key to turn the trackball into a volume knob, arrow-key emitter, scroll wheel, or zoom control
 - **Auto-mouse layer with countdown gradient** — The pointer layer activates automatically when you move the trackball. LEDs fade from white to red over 1.2 seconds to show remaining time before the layer deactivates, giving you a visual countdown. The gradient is synced to the slave half over RPC so both sides animate together.
 - **Multi-tap actions** — Double-tap `6` for play/pause, `7` for next track, `8` for previous track. Double-tap `MO(Lower)` or `MO(Raise)` for play/pause. Triple-tap is also supported. Single tap and hold behavior is preserved.
+- **Key combos** — Press multiple keys simultaneously to trigger a different action (e.g. D+F → Tab). Combos can use 2 or more trigger keys and work across layers via transparent fallthrough. Configured in `key_config.h`.
 - **Custom tap/hold system** — Number row and punctuation keys do different things based on hold duration: tap for the plain key, hold for the shifted symbol (fires immediately without waiting for release), longer hold for a third action. Arrow keys keep release-based timing for their three-tier system.
 - **Per-layer RGB indicators** — Each layer has a distinct color; trackball modes overlay a color on the right half. Colors are defined as HSV values in `rgb_config.h` — see [hsv colors.jpg](hsv%20colors.jpg) for a quick reference of hue values. Split-safe RGB helpers in `lib/rgb_helpers.h` handle LED chunk boundaries so you can target individual LEDs, specific halves, or both without worrying about the split addressing.
 - **Hi-res scroll** — 120x scroll multiplier for smooth, precise scrolling
@@ -71,6 +72,18 @@ Keys `6`, `7`, `8` and the layer keys (`MO(Lower)`, `MO(Raise)`) support double-
 
 Multi-tap is data-driven — add one line to `double_tap_keys[]` (and optionally `triple_tap_keys[]`) in `key_config.h`. Layer keys use QMK's native `MO()` and are detected via `IS_QK_MOMENTARY()` — no custom keycodes needed.
 
+## Key Combos
+
+Press multiple keys simultaneously to trigger a different action. Combos are detected by QMK before `process_record_user` runs, so they don't conflict with the custom tap/hold or multi-tap logic.
+
+| Trigger | Action |
+|---------|--------|
+| `D` + `F` | Tab |
+
+Trigger keys must match the exact keycode in the layout, including any `LT()` or `MT()` wrappers (e.g. `LT(LAYER_RAISE, KC_F)`, not `KC_F`). Combos can use 2 or more trigger keys — there is no hard limit. `COMBO_TERM` (50ms) in `config.h` controls the max time window for keys to register as a combo.
+
+**Note:** Every key that appears in a combo definition gets buffered for up to `COMBO_TERM` (50ms) when pressed alone, adding slight input lag to those keys. Avoid using high-frequency homerow keys in combos if this is noticeable.
+
 ## Tap / Hold / Longer Hold
 
 Number row keys, punctuation, arrows, and Enter use a custom three-tier system instead of QMK's built-in mod-tap or tap dance. The custom system supports arbitrary keycodes on hold (not just modifiers), three timing tiers, immediate hold firing for trackball responsiveness, and composable per-feature tables — see [Design Decisions](INTERNALS.md#design-decisions) in INTERNALS.md for the full rationale.
@@ -80,6 +93,8 @@ Number row keys, punctuation, arrows, and Enter use a custom three-tier system i
 | < 150ms | Tap — plain key | `1` |
 | 150–400ms | Hold — shifted variant (fires immediately) | `!` |
 | > 400ms | Longer hold — third action | (falls back to hold for most keys) |
+
+Timing thresholds are defined in `config.h`: `CUSTOM_TAP_HOLD_TERM` (150ms), `CUSTOM_LONGER_HOLD_TERM` (400ms), `CUSTOM_DOUBLE_TAP_TERM` (200ms), and `COMBO_TERM` (50ms).
 
 For most keys, the hold variant fires immediately when the 150ms threshold is reached — you don't need to release the key. Arrow keys are the exception: they keep the release-based three-tier system so you can choose between hold (Alt+Arrow, word jump) and longer hold (GUI+Arrow, line jump).
 
@@ -111,14 +126,15 @@ The top of the script has a configuration section with the things you'd need to 
 ```
 keyboards/bastardkb/charybdis/4x6/keymaps/noah/
   keymap.c                  Processing logic: key event handlers, RGB indicators
-  key_config.h              Key behavior config: enums, hold/double-tap/triple-tap tables, macros, LAYOUT arrays
+  key_config.h              Key behavior config: enums, hold/double-tap/triple-tap/combo tables, macros, LAYOUT arrays
   config.h                  QMK/Charybdis configuration overrides
   rgb_config.h              RGB color definitions (layer colors, mode overlays, LED groups, gradient)
-  rules.mk                  Build flags (VIA, LTO)
+  rules.mk                  Build flags (VIA, LTO, combos)
   lib/
+    key_types.h             Struct typedefs for key behavior tables
     pointing_device_modes.h Trackball mode system (volume, brightness, zoom, arrow, dragscroll)
     split_sync.h            Master → slave state sync via RPC (mode flags + elapsed time)
-    rgb_helpers.h           Split-safe LED helper functions for rgb_matrix_set_color()
+    rgb_helpers.h           Split-safe LED helper functions and RGB config types
     rgb_automouse.h         Auto-mouse countdown gradient (white → red)
 
 via layouts/
