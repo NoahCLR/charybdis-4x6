@@ -177,6 +177,32 @@ static const longer_hold_key_t *active_longer = NULL;
 // Multi-tap state — see lib/multi_tap.h for the state machine.
 static multi_tap_t multi_tap = {0};
 
+// Layer lock — which layer (if any) is locked on via multi-tap hold.
+// 0 = no layer locked.
+static uint8_t locked_layer = 0;
+
+// Hold-after-multi-tap: the keycode currently registered (held down) via
+// the hold path.  KC_NO = nothing held.  Unregistered on key release.
+static uint16_t held_action_keycode = KC_NO;
+
+// Dispatch an action keycode.  Handles LAYER_LOCK(n) dynamically;
+// everything else falls through to tap_code16.
+static void dispatch_action(uint16_t action) {
+    if (action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT) {
+        uint8_t layer = action - LAYER_LOCK_BASE;
+        if (locked_layer == layer) {
+            layer_off(layer);
+            locked_layer = 0;
+        } else {
+            if (locked_layer) layer_off(locked_layer);
+            layer_on(layer);
+            locked_layer = layer;
+        }
+        return;
+    }
+    tap_code16(action);
+}
+
 // ─── RGB Color Cache ─────────────────────────────────────────────────────────
 // Pre-computed HSV → RGB conversions, populated once in keyboard_post_init_user.
 #ifdef RGB_MATRIX_ENABLE
@@ -215,7 +241,7 @@ static void tap_custom_bk_keycode(uint16_t kc) {
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 1) Flush pending multi-tap if a different key is pressed ---
     if (multi_tap_active(&multi_tap) && record->event.pressed && keycode != multi_tap.keycode) {
-        multi_tap_flush(&multi_tap, tap_action_lookup);
+        multi_tap_flush(&multi_tap, tap_action_lookup, dispatch_action);
     }
 
     // --- 2) Pointing device mode keys (react on both press and release) ---
@@ -229,7 +255,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 // Multi-tap detection: same key pressed again while pending.
                 if (multi_tap_active(&multi_tap) && multi_tap.keycode == keycode && is_multi_tap_key(keycode)) {
                     uint16_t action = multi_tap_advance(&multi_tap, keycode, tap_action_lookup, has_more_taps);
-                    if (action != KC_NO) tap_code16(action);
+                    if (action != KC_NO) dispatch_action(action);
                     return false;
                 }
 
@@ -330,13 +356,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 // Multi-tap detection: same key pressed again while pending.
                 if (multi_tap_active(&multi_tap) && multi_tap.keycode == keycode && mt_key) {
                     uint16_t action = multi_tap_advance(&multi_tap, keycode, tap_action_lookup, has_more_taps);
-                    if (action != KC_NO) tap_code16(action);
-                    // Still activate layer for MO() so it's on while held.
-                    if (is_mo) {
-                        layer_on(QK_MOMENTARY_GET_LAYER(keycode));
+                    if (action != KC_NO) dispatch_action(action);
+                    // Activate MO() layer so it's on while held.
+                    if (is_mo) layer_on(QK_MOMENTARY_GET_LAYER(keycode));
+                    // Track key for release handling when pending hold or MO layer.
+                    if (multi_tap_pending_hold(&multi_tap) || is_mo) {
                         key_active     = keycode;
                         key_timer      = timer_read();
-                        key_hold_fired = true;
+                        // If pending_hold, keep key_hold_fired false so release runs.
+                        key_hold_fired = !multi_tap_pending_hold(&multi_tap);
                         active_hold    = NULL;
                         active_longer  = NULL;
                     }
@@ -355,9 +383,25 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 active_hold    = hold;
                 active_longer  = longer_hold_lookup(keycode);
             } else {
-                // Release — MO() layer always deactivates.
+                // Release — resolve pending hold-after-multi-tap first.
+                if (multi_tap_pending_hold(&multi_tap) && multi_tap.keycode == keycode) {
+                    uint16_t action = multi_tap_resolve_hold(&multi_tap, keycode, has_more_taps);
+                    if (action != KC_NO) dispatch_action(action);
+                    // Deactivate MO() layer unless it was just locked.
+                    if (is_mo) {
+                        uint8_t layer = QK_MOMENTARY_GET_LAYER(keycode);
+                        if (locked_layer != layer) layer_off(layer);
+                    }
+                    key_active    = KC_NO;
+                    active_hold   = NULL;
+                    active_longer = NULL;
+                    return false;
+                }
+
+                // MO() layer deactivates on release (unless locked).
                 if (is_mo) {
-                    layer_off(QK_MOMENTARY_GET_LAYER(keycode));
+                    uint8_t layer = QK_MOMENTARY_GET_LAYER(keycode);
+                    if (locked_layer != layer) layer_off(layer);
                 }
 
                 // Only process if this matches the key we're tracking.
@@ -371,9 +415,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 active_hold   = NULL;
                 active_longer = NULL;
 
-                // If hold already fired (immediate mode), nothing more to do.
+                // If hold already fired (immediate mode or hold-after-multi-tap),
+                // unregister any held keycode and we're done.
                 if (key_hold_fired) {
                     key_hold_fired = false;
+                    if (held_action_keycode != KC_NO) {
+                        unregister_code16(held_action_keycode);
+                        held_action_keycode = KC_NO;
+                    }
                     return false;
                 }
 
@@ -381,8 +430,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 uint16_t elapsed = timer_elapsed(key_timer);
 
                 if (elapsed < CUSTOM_TAP_HOLD_TERM) {
-                    // TAP — if multi-tap is enabled, defer; otherwise send immediately.
-                    if (mt_key) {
+                    // TAP while layer locked → unlock immediately.
+                    if (is_mo && locked_layer == QK_MOMENTARY_GET_LAYER(keycode)) {
+                        layer_off(locked_layer);
+                        locked_layer = 0;
+                    } else if (mt_key) {
                         // For MO() keys, tap sends nothing (layer was already on/off).
                         // For regular keys, tap sends the keycode itself.
                         multi_tap_begin(&multi_tap, keycode, is_mo ? KC_NO : keycode);
@@ -416,7 +468,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 // Called every matrix scan cycle (~1ms).
 //   1. For keys with immediate hold or immediate longer-hold:
 //      fires the action as soon as the threshold is reached.
-//   2. Flushes pending multi-taps when the window expires.
+//   2. Hold-after-multi-tap: fires hold action once CUSTOM_TAP_HOLD_TERM is reached.
+//   3. Flushes pending multi-taps when the window expires.
 void matrix_scan_user(void) {
     // 1. Threshold-based hold detection.
     if (key_active != KC_NO && !key_hold_fired) {
@@ -433,9 +486,24 @@ void matrix_scan_user(void) {
         }
     }
 
-    // 2. Flush pending multi-tap when the window expires.
+    // 2. Hold-after-multi-tap: fire hold action once threshold is reached.
+    //    Custom actions (layer lock) dispatch once; regular keycodes are
+    //    registered (held) and unregistered when the physical key is released.
+    if (multi_tap_hold_elapsed(&multi_tap)) {
+        uint16_t action = multi_tap.hold_action;
+        if (action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT) {
+            dispatch_action(action);
+        } else {
+            register_code16(action);
+            held_action_keycode = action;
+        }
+        key_hold_fired = true;
+        multi_tap_reset(&multi_tap);
+    }
+
+    // 3. Flush pending multi-tap when the window expires.
     if (multi_tap_expired(&multi_tap)) {
-        multi_tap_flush(&multi_tap, tap_action_lookup);
+        multi_tap_flush(&multi_tap, tap_action_lookup, dispatch_action);
     }
 }
 

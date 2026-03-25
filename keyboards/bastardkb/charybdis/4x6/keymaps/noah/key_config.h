@@ -61,7 +61,13 @@ enum custom_keycodes {
     ARROW_MODE,
     ZOOM_MODE,
     DRG_TOG_ON_HOLD,
+    LAYER_LOCK_BASE, // reserves LAYER_COUNT keycodes — use LAYER_LOCK(n) macro
+    CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
+
+// Lock a layer on via hold-after-multi-tap.  Works for any layer.
+// Usage in tap_actions[]:  {MO(LAYER_LOWER), 2, KC_MPLY, LAYER_LOCK(LAYER_LOWER)}
+#define LAYER_LOCK(layer) (LAYER_LOCK_BASE + (layer))
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
@@ -122,20 +128,24 @@ static const longer_hold_key_t longer_hold_keys[] = {
 //
 // Each entry maps (keycode, tap_count) → action.
 // A key can appear at multiple tap counts; group entries by key for clarity.
+//
+// The optional 4th field (hold_action) fires when the final tap is held
+// past CUSTOM_TAP_HOLD_TERM instead of released quickly.  Omit for no
+// hold variant.
 
-// keycode                taps  action
+// keycode                taps  action          hold_action
 static const tap_action_t tap_actions[] = {
     // Number row — media controls
     {KC_6, 2, KC_MPLY}, // play/pause
     {KC_7, 2, KC_MNXT}, // next track
     {KC_8, 2, KC_MPRV}, // prev track
 
-    // Layer keys — media controls
-    {MO(LAYER_LOWER), 2, KC_MPLY}, // play/pause
-    {MO(LAYER_LOWER), 3, KC_MPRV}, // prev track
+    // Layer keys — media controls + layer lock on hold
+    {MO(LAYER_LOWER), 2, KC_MPLY, LAYER_LOCK(LAYER_NUM)},
+    {MO(LAYER_LOWER), 3, KC_MPRV, KC_MPRV},
 
-    {MO(LAYER_RAISE), 2, KC_MPLY}, // play/pause
-    {MO(LAYER_RAISE), 3, KC_MNXT}, // next track
+    {MO(LAYER_RAISE), 2, KC_MPLY, LAYER_LOCK(LAYER_NUM)},
+    {MO(LAYER_RAISE), 3, KC_MNXT, KC_MNXT},
 
     // Pointing device mode keys
     {VOLUME_MODE, 2, KC_MUTE}, // mute

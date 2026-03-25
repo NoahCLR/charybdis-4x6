@@ -44,13 +44,20 @@ typedef struct {
 // Each entry maps a (keycode, tap_count) pair to an action.
 // A key can have entries at multiple tap counts (e.g. 2 and 3).
 //
+// hold_action (optional): if set (!= KC_NO), distinguishes between
+// "multi-tap and release" (fires action) vs "multi-tap and hold past
+// CUSTOM_TAP_HOLD_TERM" (fires hold_action).  Omit or set to KC_NO
+// to disable — existing entries with 3 fields get KC_NO automatically
+// via C99 zero-initialization.
+//
 // Note: any key in this table gets a small delay on single taps
 // (waiting for a potential next press).
 
 typedef struct {
     uint16_t keycode;
-    uint8_t  tap_count; // 2 = double-tap, 3 = triple-tap, etc.
-    uint16_t action;
+    uint8_t  tap_count;   // 2 = double-tap, 3 = triple-tap, etc.
+    uint16_t action;       // fires on tap (quick release after multi-tap)
+    uint16_t hold_action;  // fires on hold (KC_NO = disabled)
 } tap_action_t;
 
 // ─── Mode Tap Overrides ─────────────────────────────────────────────────────
