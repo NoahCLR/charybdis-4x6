@@ -88,6 +88,30 @@ static inline hsv_t clamp_hsv_value(hsv_t hsv, uint8_t max_value) {
     return hsv;
 }
 
+// ─── RGB config types ───────────────────────────────────────────────────────
+
+typedef struct {
+    uint8_t mode_flag;
+    hsv_t   color;
+} pd_mode_color_t;
+
+#define L(layer) (1 << (layer))
+#define LAYER_ALL 0xFF
+
+typedef struct {
+    uint8_t        layers; // bitmask: L(LAYER_BASE) | L(LAYER_RAISE), or LAYER_ALL
+    hsv_t          color;
+    const uint8_t *leds;
+    uint8_t        count;
+} layer_led_group_t;
+
+typedef struct {
+    uint8_t        mode_flag;
+    hsv_t          color;
+    const uint8_t *leds;
+    uint8_t        count;
+} pd_mode_led_group_t;
+
 #else  // RGB_MATRIX_ENABLE not defined: provide empty stubs so files compile.
 static inline void  rgb_set_led(uint8_t index, uint8_t led_min, uint8_t led_max, uint8_t r, uint8_t g, uint8_t b) {}
 static inline void  rgb_set_led_color(uint8_t index, uint8_t led_min, uint8_t led_max, rgb_t color) {}

@@ -79,6 +79,10 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT,
 #include "rgb_config.h"
 #include "lib/rgb_automouse.h"
 
+#define PD_MODE_COLOR_COUNT     (sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]))
+#define LAYER_LED_GROUP_COUNT   (sizeof(layer_led_groups) / sizeof(layer_led_groups[0]))
+#define PD_MODE_LED_GROUP_COUNT (sizeof(pd_mode_led_groups) / sizeof(pd_mode_led_groups[0]))
+
 // Force master/slave role at compile time.  Needed when both halves have
 // their own USB connection (e.g. for full LED brightness on each side
 // when using a long cable) so they don't both detect USB and fight over
@@ -584,7 +588,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 #    endif
 
     for (uint8_t g = 0; g < LAYER_LED_GROUP_COUNT; g++) {
-        if (layer_state_cmp(layer_state, layer_led_groups[g].layer)) {
+        if (layer_led_groups[g].layers & layer_state) {
             rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max, led_group_rgb[g]);
         }
     }

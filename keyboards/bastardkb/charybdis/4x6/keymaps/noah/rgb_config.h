@@ -14,7 +14,7 @@
 
 #include "key_config.h"                // LAYER_COUNT, LAYER_BASE, etc.
 #include "lib/pointing_device_modes.h" // PD_MODE_* flags
-#include "lib/rgb_helpers.h"           // rgb_set_*, hsv_t, rgb_t
+#include "lib/rgb_helpers.h"           // rgb_set_*, hsv_t, rgb_t, config types
 
 #if defined(RGB_MATRIX_ENABLE)
 
@@ -37,11 +37,6 @@ static const hsv_t layer_colors[LAYER_COUNT] = {
 // Overlay colors for the right half when a trackball mode is active.
 // Each entry is tagged with its mode flag so the order doesn't need to
 // match pd_modes[] — adding or reordering modes won't silently break colors.
-typedef struct {
-    uint8_t mode_flag;
-    hsv_t   color;
-} pd_mode_color_t;
-
 // mode_flag             {hue, sat, val}
 static const pd_mode_color_t pd_mode_colors[] = {
     {PD_MODE_DRAGSCROLL, {21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // orange
@@ -51,9 +46,10 @@ static const pd_mode_color_t pd_mode_colors[] = {
     {PD_MODE_ARROW, {127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},      // cyan
 };
 
-#    define PD_MODE_COLOR_COUNT (sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]))
-
-// ─── LED Index Map ──────────────────────────────────────────────────────────
+// ─── Per-layer LED group highlights ─────────────────────────────────────────
+//
+// Paint specific LEDs a different color when a layer is active (e.g. to mark
+// modifier keys).  Define an LED index array, then add a row to the table.
 //
 // ╭────────────────────────╮                 ╭────────────────────────╮
 //    0   7   8  15  16  20                     49  45  44  37  36  29
@@ -72,44 +68,25 @@ static const uint8_t raise_highlight_leds[]  = {33, 18};
 static const uint8_t lower_highlight_leds[]  = {4, 47};
 static const uint8_t volume_highlight_leds[] = {52};
 
-// ─── Per-layer LED group highlights ─────────────────────────────────────────
+// Highlight specific LEDs when a keyboard layer is active.
 //
-// Paint specific LEDs a different color when a layer is active (e.g. to mark
-// modifier keys).  Uses the LED index arrays and map above.
-// Adding a highlight: define an LED array above, add one line here.
-
-typedef struct {
-    uint8_t        layer;
-    hsv_t          color;
-    const uint8_t *leds;
-    uint8_t        count;
-} layer_led_group_t;
-
-// layer         {hue, sat, val}                            leds                  count
+// {L(LAYER_RAISE), ...}                          // only on raise
+// {L(LAYER_RAISE) | L(LAYER_LOWER), ...}         // on raise or lower
+// {LAYER_ALL, ...}                                // always on
+//
+// layers                          {hue, sat, val}                            leds                  count
 static const layer_led_group_t layer_led_groups[] = {
-    //    {LAYER_RAISE, {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, raise_highlight_leds, sizeof(raise_highlight_leds)},  // red
-    //    {LAYER_LOWER, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, lower_highlight_leds, sizeof(lower_highlight_leds)},  // yellow
+    //    {L(LAYER_RAISE), {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, raise_highlight_leds, sizeof(raise_highlight_leds)},  // red
+    //    {L(LAYER_LOWER), {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, lower_highlight_leds, sizeof(lower_highlight_leds)},  // yellow
 };
 
-#    define LAYER_LED_GROUP_COUNT (sizeof(layer_led_groups) / sizeof(layer_led_groups[0]))
-
-// ─── Per-mode LED group highlights ────────────────────────────────────────────
+// Same as above, but keyed on pointing device mode instead of layers.
+// Active while a trackball mode (volume, zoom, etc.) is being held.
 //
-// Same as layer_led_groups but keyed on pointing device mode_flag.
-// Paint specific LEDs a different color when a PD mode is active.// Uses the LED index arrays and map above.
-typedef struct {
-    uint8_t        mode_flag;
-    hsv_t          color;
-    const uint8_t *leds;
-    uint8_t        count;
-} pd_mode_led_group_t;
-
 // mode_flag            {hue, sat, val}                            leds                  count
 static const pd_mode_led_group_t pd_mode_led_groups[] = {
     // {PD_MODE_VOLUME, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, volume_highlight_leds, sizeof(volume_highlight_leds)},
 };
-
-#    define PD_MODE_LED_GROUP_COUNT (sizeof(pd_mode_led_groups) / sizeof(pd_mode_led_groups[0]))
 
 // ─── Auto-mouse gradient ────────────────────────────────────────────────────
 //
