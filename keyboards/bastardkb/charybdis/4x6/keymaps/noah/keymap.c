@@ -59,7 +59,7 @@
 //
 //   - "Key behavior tables":  Per-feature config tables in key_config.h.
 //     A key can appear in multiple tables to combine behaviors (e.g.
-//     KC_6 is in hold_keys AND double_tap_keys).  Processing logic here
+//     KC_6 is in hold_keys AND tap_actions).  Processing logic here
 //     looks up each table independently.  Combos are also defined in
 //     key_config.h but handled by QMK before process_record_user runs.
 // ────────────────────────────────────────────────────────────────────────────
@@ -74,10 +74,10 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAM
 
 #define HOLD_KEY_COUNT (sizeof(hold_keys) / sizeof(hold_keys[0]))
 #define LONGER_HOLD_KEY_COUNT (sizeof(longer_hold_keys) / sizeof(longer_hold_keys[0]))
-#define DOUBLE_TAP_KEY_COUNT (sizeof(double_tap_keys) / sizeof(double_tap_keys[0]))
-#define TRIPLE_TAP_KEY_COUNT (sizeof(triple_tap_keys) / sizeof(triple_tap_keys[0]))
+#define TAP_ACTION_COUNT (sizeof(tap_actions) / sizeof(tap_actions[0]))
 #define MODE_TAP_OVERRIDE_COUNT (sizeof(mode_tap_overrides) / sizeof(mode_tap_overrides[0]))
 
+#include "lib/multi_tap.h"
 #include "lib/pointing_device_modes.h"
 #include "lib/split_sync.h"
 #include "lib/rgb_helpers.h"
@@ -128,16 +128,27 @@ static const longer_hold_key_t *longer_hold_lookup(uint16_t keycode) {
     return NULL;
 }
 
-static const double_tap_key_t *double_tap_lookup(uint16_t keycode) {
-    for (uint8_t i = 0; i < DOUBLE_TAP_KEY_COUNT; i++)
-        if (double_tap_keys[i].keycode == keycode) return &double_tap_keys[i];
+// Find the tap_action entry for (keycode, tap_count), or NULL.
+static const tap_action_t *tap_action_lookup(uint16_t keycode, uint8_t tap_count) {
+    for (uint8_t i = 0; i < TAP_ACTION_COUNT; i++)
+        if (tap_actions[i].keycode == keycode && tap_actions[i].tap_count == tap_count)
+            return &tap_actions[i];
     return NULL;
 }
 
-static const triple_tap_key_t *triple_tap_lookup(uint16_t keycode) {
-    for (uint8_t i = 0; i < TRIPLE_TAP_KEY_COUNT; i++)
-        if (triple_tap_keys[i].keycode == keycode) return &triple_tap_keys[i];
-    return NULL;
+// Does this key have any tap_action entry with tap_count > count?
+static bool has_more_taps(uint16_t keycode, uint8_t count) {
+    for (uint8_t i = 0; i < TAP_ACTION_COUNT; i++)
+        if (tap_actions[i].keycode == keycode && tap_actions[i].tap_count > count)
+            return true;
+    return false;
+}
+
+// Does this key appear in tap_actions[] at all?
+static bool is_multi_tap_key(uint16_t keycode) {
+    for (uint8_t i = 0; i < TAP_ACTION_COUNT; i++)
+        if (tap_actions[i].keycode == keycode) return true;
+    return false;
 }
 
 static const mode_tap_override_t *mode_tap_override_lookup(uint16_t keycode) {
@@ -149,10 +160,10 @@ static const mode_tap_override_t *mode_tap_override_lookup(uint16_t keycode) {
 // ─── Key Behavior State ─────────────────────────────────────────────────────
 //
 // Thresholds are defined in config.h:
-//   CUSTOM_TAP_HOLD_TERM      = 150ms
-//   CUSTOM_LONGER_HOLD_TERM   = 400ms
-//   CUSTOM_DOUBLE_TAP_TERM    = 200ms
-//   COMBO_TERM                = 50ms
+//   CUSTOM_TAP_HOLD_TERM      — tap vs hold boundary
+//   CUSTOM_LONGER_HOLD_TERM   — hold vs longer-hold boundary
+//   CUSTOM_MULTI_TAP_TERM     — max gap between consecutive taps
+//   COMBO_TERM                — max gap between keys for combos
 
 // Active key tracking — only one key behavior key tracked at a time.
 static uint16_t key_timer;
@@ -163,26 +174,8 @@ static bool     key_hold_fired = false;
 static const hold_key_t        *active_hold   = NULL;
 static const longer_hold_key_t *active_longer = NULL;
 
-// Multi-tap pending state — after a quick tap of a multi-tap-capable key,
-// we wait briefly for a possible second (or third) press before committing.
-static uint8_t  dt_tap_count = 0; // 0 = idle, 1 = single pending, 2 = double pending
-static uint16_t dt_timer;
-static uint16_t dt_keycode       = KC_NO;
-static uint16_t dt_tap_keycode   = KC_NO; // what to send on count=1 timeout
-static uint16_t dt_double_action = KC_NO; // what to send on count=2 timeout
-
-// Flush a pending multi-tap: send the appropriate action and clear state.
-static inline void dt_flush(void) {
-    if (dt_tap_count == 1) {
-        if (dt_tap_keycode != KC_NO) tap_code16(dt_tap_keycode);
-    } else if (dt_tap_count == 2) {
-        tap_code16(dt_double_action);
-    }
-    dt_tap_count     = 0;
-    dt_keycode       = KC_NO;
-    dt_tap_keycode   = KC_NO;
-    dt_double_action = KC_NO;
-}
+// Multi-tap state — see lib/multi_tap.h for the state machine.
+static multi_tap_t multi_tap = {0};
 
 // ─── RGB Color Cache ─────────────────────────────────────────────────────────
 // Pre-computed HSV → RGB conversions, populated once in keyboard_post_init_user.
@@ -221,36 +214,22 @@ static void tap_custom_bk_keycode(uint16_t kc) {
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 1) Flush pending multi-tap if a different key is pressed ---
-    if (dt_tap_count > 0 && record->event.pressed && keycode != dt_keycode) {
-        dt_flush();
+    if (multi_tap_active(&multi_tap) && record->event.pressed && keycode != multi_tap.keycode) {
+        multi_tap_flush(&multi_tap, tap_action_lookup);
     }
 
     // --- 2) Pointing device mode keys (react on both press and release) ---
 
     // 2a) Generic mode keys: tap sends base-layer key (or override), hold activates mode.
-    //     Also supports double-tap via double_tap_keys[].
+    //     Also supports multi-tap via tap_actions[].
     {
         uint8_t mode = pd_mode_for_keycode(keycode);
         if (mode) {
             if (record->event.pressed) {
                 // Multi-tap detection: same key pressed again while pending.
-                const double_tap_key_t *dtap = double_tap_lookup(keycode);
-                if (dt_tap_count > 0 && dt_keycode == keycode && dtap) {
-                    const triple_tap_key_t *ttap = triple_tap_lookup(keycode);
-                    if (dt_tap_count == 1 && ttap) {
-                        // Could be triple — wait for 3rd tap.
-                        dt_tap_count     = 2;
-                        dt_timer         = timer_read();
-                        dt_double_action = dtap->action;
-                    } else {
-                        // Fire double or triple-tap action.
-                        uint16_t action = (dt_tap_count == 2 && ttap) ? ttap->action : dtap->action;
-                        tap_code16(action);
-                        dt_tap_count     = 0;
-                        dt_keycode       = KC_NO;
-                        dt_tap_keycode   = KC_NO;
-                        dt_double_action = KC_NO;
-                    }
+                if (multi_tap_active(&multi_tap) && multi_tap.keycode == keycode && is_multi_tap_key(keycode)) {
+                    uint16_t action = multi_tap_advance(&multi_tap, keycode, tap_action_lookup, has_more_taps);
+                    if (action != KC_NO) tap_code16(action);
                     return false;
                 }
 
@@ -260,16 +239,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 pd_mode_update(mode, false);
                 if (timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
                     // Tap — check for multi-tap deferral first.
-                    const double_tap_key_t *dtap = double_tap_lookup(keycode);
-                    if (dtap) {
+                    if (is_multi_tap_key(keycode)) {
                         // Resolve tap key: override > base-layer fallback.
                         const mode_tap_override_t *ovr     = mode_tap_override_lookup(keycode);
                         uint16_t                   tap_key = ovr ? ovr->tap : keymap_key_to_keycode(LAYER_BASE, record->event.key);
-
-                        dt_tap_count   = 1;
-                        dt_timer       = timer_read();
-                        dt_keycode     = keycode;
-                        dt_tap_keycode = tap_key;
+                        multi_tap_begin(&multi_tap, keycode, tap_key);
                     } else {
                         const mode_tap_override_t *ovr = mode_tap_override_lookup(keycode);
                         if (ovr) {
@@ -342,34 +316,21 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // A keycode can appear in multiple tables.  We look up each table
     // independently and combine the results.
     //
-    // MO() keycodes that appear in double_tap_keys[] are intercepted here
-    // so we can add double-tap behavior.  We handle layer_on/layer_off
+    // MO() keycodes that appear in tap_actions[] are intercepted here
+    // so we can add multi-tap behavior.  We handle layer_on/layer_off
     // ourselves and return false to prevent QMK from doing it twice.
     {
-        const hold_key_t       *hold  = hold_lookup(keycode);
-        const double_tap_key_t *dtap  = double_tap_lookup(keycode);
-        bool                    is_mo = IS_QK_MOMENTARY(keycode);
+        const hold_key_t *hold    = hold_lookup(keycode);
+        bool              mt_key  = is_multi_tap_key(keycode);
+        bool              is_mo   = IS_QK_MOMENTARY(keycode);
 
         // If the keycode is in any behavior table, we handle it.
-        if (hold || dtap || is_mo) {
+        if (hold || mt_key || is_mo) {
             if (record->event.pressed) {
                 // Multi-tap detection: same key pressed again while pending.
-                if (dt_tap_count > 0 && dt_keycode == keycode && dtap) {
-                    const triple_tap_key_t *ttap = triple_tap_lookup(keycode);
-                    if (dt_tap_count == 1 && ttap) {
-                        // Could be triple — wait for 3rd tap.
-                        dt_tap_count     = 2;
-                        dt_timer         = timer_read();
-                        dt_double_action = dtap->action;
-                    } else {
-                        // Fire double or triple-tap action.
-                        uint16_t action = (dt_tap_count == 2 && ttap) ? ttap->action : dtap->action;
-                        tap_code16(action);
-                        dt_tap_count     = 0;
-                        dt_keycode       = KC_NO;
-                        dt_tap_keycode   = KC_NO;
-                        dt_double_action = KC_NO;
-                    }
+                if (multi_tap_active(&multi_tap) && multi_tap.keycode == keycode && mt_key) {
+                    uint16_t action = multi_tap_advance(&multi_tap, keycode, tap_action_lookup, has_more_taps);
+                    if (action != KC_NO) tap_code16(action);
                     // Still activate layer for MO() so it's on while held.
                     if (is_mo) {
                         layer_on(QK_MOMENTARY_GET_LAYER(keycode));
@@ -421,17 +382,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
                 if (elapsed < CUSTOM_TAP_HOLD_TERM) {
                     // TAP — if multi-tap is enabled, defer; otherwise send immediately.
-                    if (dtap) {
-                        dt_tap_count = 1;
-                        dt_timer     = timer_read();
-                        dt_keycode   = keycode;
+                    if (mt_key) {
                         // For MO() keys, tap sends nothing (layer was already on/off).
                         // For regular keys, tap sends the keycode itself.
-                        dt_tap_keycode = is_mo ? KC_NO : keycode;
+                        multi_tap_begin(&multi_tap, keycode, is_mo ? KC_NO : keycode);
                     } else if (rel_hold) {
                         tap_code16(keycode);
                     }
-                    // MO()-only with no dtap: tap does nothing (layer already toggled).
+                    // MO()-only with no multi-tap: tap does nothing (layer already toggled).
                 } else if (rel_longer && elapsed > CUSTOM_LONGER_HOLD_TERM) {
                     tap_code16(rel_longer->longer_hold);
                 } else {
@@ -476,8 +434,8 @@ void matrix_scan_user(void) {
     }
 
     // 2. Flush pending multi-tap when the window expires.
-    if (dt_tap_count > 0 && timer_elapsed(dt_timer) >= CUSTOM_DOUBLE_TAP_TERM) {
-        dt_flush();
+    if (multi_tap_expired(&multi_tap)) {
+        multi_tap_flush(&multi_tap, tap_action_lookup);
     }
 }
 

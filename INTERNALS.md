@@ -21,16 +21,15 @@ A mode intercepts trackball motion and converts it to keypresses (volume, arrows
 
 Everything else is automatic: `process_record_user` activates/deactivates the mode on key press/release, `is_mouse_record_user` keeps the auto-mouse layer alive, `pointing_device_task_user` dispatches to your handler, and RGB paints the right-half overlay color.
 
-### Add a double-tap / triple-tap action
+### Add a multi-tap action
 
-A multi-tap gives a key an extra action on rapid double (or triple) tap.
+A multi-tap gives a key an extra action on rapid repeated taps (double, triple, or any count).
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `key_config.h` | Add one line to `double_tap_keys[]`: `{keycode, action}` |
-| 2 | `key_config.h` | (Optional) For triple-tap, also add to `triple_tap_keys[]`: `{keycode, action}` |
+| 1 | `key_config.h` | Add one row to `tap_actions[]`: `{keycode, tap_count, action}` |
 
-The key must already exist in the keymap (a regular key, `MO()`, or a mode key). Single-tap behavior is unaffected — it just adds a small delay while waiting for a potential second press. Triple-tap entries add one more deferral window on top of double-tap.
+That's it. The key must already exist in the keymap (a regular key, `MO()`, or a mode key). Tap counts don't need to be contiguous — you can define only a triple-tap (count 3) without a double-tap (count 2). If the timer expires at an undefined count, the state machine walks backwards to the highest defined action, falling back to the single-tap key. Each tap must arrive within `CUSTOM_MULTI_TAP_TERM` (150ms) of the previous one. Single taps on multi-tap keys are delayed by one window while waiting for a potential next press.
 
 ### Add a new tap/hold/longer-hold key
 
@@ -164,7 +163,7 @@ These are NOT QMK's built-in `TAPPING_TERM` — they're checked manually in `pro
 | `CUSTOM_TAP_HOLD_TERM` | 150ms | Below this = tap (plain key) |
 | Between 150–400ms | — | Hold (shifted variant) |
 | `CUSTOM_LONGER_HOLD_TERM` | 400ms | Above this = longer hold (third action) |
-| `CUSTOM_DOUBLE_TAP_TERM` | 200ms | Max gap between taps for double-tap |
+| `CUSTOM_MULTI_TAP_TERM` | 150ms | Max gap between consecutive taps |
 | `COMBO_TERM` | 50ms | Max gap between keys for combo detection |
 
 ### VIA
@@ -215,13 +214,13 @@ QMK's built-in `MT()` maps a key to modifier+keycode on hold. It has two limitat
 
 QMK's built-in tap dance can handle multi-tap and tap-vs-hold, but the configuration model is heavier and doesn't compose with other features:
 
-1. **Per-key boilerplate.** A simple "double-tap KC_6 → KC_MPLY" in QMK tap dance requires: (a) an enum entry, (b) a `tap_dance_actions[]` table entry, (c) using `TD(name)` in the keymap instead of the plain keycode. With advanced behavior (hold + double-tap on the same key), you also need a custom callback function with manual state/timer checks — per key. In this keymap, it's one row in `double_tap_keys[]` and the plain keycode stays in the LAYOUT array.
+1. **Per-key boilerplate.** A simple "double-tap KC_6 → KC_MPLY" in QMK tap dance requires: (a) an enum entry, (b) a `tap_dance_actions[]` table entry, (c) using `TD(name)` in the keymap instead of the plain keycode. With advanced behavior (hold + double-tap on the same key), you also need a custom callback function with manual state/timer checks — per key. In this keymap, it's one row in `tap_actions[]` and the plain keycode stays in the LAYOUT array.
 
-2. **Features don't stack.** In QMK, `TD()` and `MT()` are mutually exclusive on the same key — each consumes the keycode slot. If you want hold *and* double-tap on the same key, you must implement everything inside a single tap dance callback. This keymap's table system is composable: a key can independently appear in `hold_keys[]`, `double_tap_keys[]`, `triple_tap_keys[]`, and `longer_hold_keys[]`, and the processing logic handles all of them.
+2. **Features don't stack.** In QMK, `TD()` and `MT()` are mutually exclusive on the same key — each consumes the keycode slot. If you want hold *and* double-tap on the same key, you must implement everything inside a single tap dance callback. This keymap's table system is composable: a key can independently appear in `hold_keys[]`, `tap_actions[]`, and `longer_hold_keys[]`, and the processing logic handles all of them.
 
 3. **Tap dance can't do immediate hold.** Tap dance's `on_dance_finished` callback fires when the tap dance resolves (after timeout or interrupt), not at a specific hold duration. Implementing "fire at 150ms while still held" requires manual timer logic inside a custom callback — at which point you've reimplemented what this keymap's `matrix_scan_user()` already does declaratively.
 
-**What's the same:** Both QMK tap dance and this keymap's multi-tap delay the single-tap action while waiting for a possible second press. This is inherent to multi-tap detection — there's no way around it. The delay window (200ms `CUSTOM_DOUBLE_TAP_TERM`) is comparable to QMK's `TAPPING_TERM`. Keys that aren't in `double_tap_keys[]` are not affected and send immediately.
+**What's the same:** Both QMK tap dance and this keymap's multi-tap delay the single-tap action while waiting for a possible second press. This is inherent to multi-tap detection — there's no way around it. The delay window (`CUSTOM_MULTI_TAP_TERM`, 150ms) is comparable to QMK's `TAPPING_TERM`. Keys that aren't in `tap_actions[]` are not affected and send immediately.
 
 ### Why not QMK's Auto Shift?
 
@@ -233,7 +232,7 @@ Auto Shift is the closest built-in match for "hold `1` → `!`" — it automatic
 
 3. **Doesn't compose with multi-tap.** Auto Shift owns the key's timing. Stacking double-tap detection on top would require intercepting Auto Shift's internal state, which isn't designed for that. The custom system handles hold and multi-tap in the same processing path.
 
-4. **Delays every tap.** Auto Shift holds the keycode until you release the key or the timeout fires — even for plain taps. For keys not in `double_tap_keys[]`, this keymap sends the tap immediately on release with no waiting period.
+4. **Delays every tap.** Auto Shift holds the keycode until you release the key or the timeout fires — even for plain taps. For keys not in `tap_actions[]`, this keymap sends the tap immediately on release with no waiting period.
 
 **Where Auto Shift wins:** Zero-config shifted symbols on alpha keys. If all you need is "hold any letter to capitalize it," Auto Shift is simpler. This keymap doesn't use it because the number row, punctuation, and arrow keys need behaviors Auto Shift can't provide, and running two parallel hold-timing systems on the same keys would conflict.
 
@@ -251,8 +250,7 @@ This keymap uses its own timing system in `process_record_user()` with independe
 |-------|---------|--------|
 | `hold_keys[]` | Tap vs hold (2-tier) | `keycode`, `hold`, `immediate` |
 | `longer_hold_keys[]` | Third-tier action past 400ms | `keycode`, `longer_hold`, `immediate` |
-| `double_tap_keys[]` | Action on rapid double-tap | `keycode`, `action` |
-| `triple_tap_keys[]` | Action on rapid triple-tap | `keycode`, `action` |
+| `tap_actions[]` | Action on rapid multi-tap (any count) | `keycode`, `tap_count`, `action` |
 | `mode_tap_overrides[]` | Override tap action for mode keys | `keycode`, `tap` |
 | `key_combos[]` | Simultaneous key press → action | QMK `COMBO()` entries |
 
@@ -261,14 +259,13 @@ This keymap uses its own timing system in `process_record_user()` with independe
 - **Tap** (< 150ms): Send the plain key (e.g. `1`)
 - **Hold** (150–400ms): Send the hold variant (e.g. `!`)
 - **Longer hold** (> 400ms): Send a third action (e.g. GUI+Arrow for line jump)
-- **Double-tap**: Quick tap twice within 200ms → fires the double-tap action
-- **Triple-tap**: Quick tap three times within 200ms windows → fires the triple-tap action (only if the key also has a `triple_tap_keys[]` entry)
+- **Multi-tap**: Tap rapidly N times (each within 150ms of the last) → fires the action configured for that tap count in `tap_actions[]`. If the max configured count is reached, it fires immediately; otherwise it waits one more window. If the timer expires at an undefined count, it falls back to the highest defined action below.
 
 **Immediate hold detection:** For most keys, `matrix_scan_user()` checks the hold timer every scan cycle (~1ms) and fires the hold variant as soon as the 150ms threshold is reached — no release needed. Arrow keys are excluded from this and keep the release-based behavior so the user can choose between the hold and longer-hold tiers.
 
-State tracking uses three statics: `key_timer` (when the key was pressed), `key_active` (which key is held), and `key_hold_fired` (whether the hold action already sent). On release, if `key_hold_fired` is true, it's a no-op.
+Hold state tracking uses three statics: `key_timer` (when the key was pressed), `key_active` (which key is held), and `key_hold_fired` (whether the hold action already sent). On release, if `key_hold_fired` is true, it's a no-op. Multi-tap state lives in a `multi_tap_t` struct (defined in `lib/multi_tap.h`) that tracks the tap count, timer, and pending actions.
 
-**MO() layer keys:** `MO(LAYER_LOWER)` and `MO(LAYER_RAISE)` are intercepted via `IS_QK_MOMENTARY()` — no custom keycodes needed. The layer activates immediately on press and deactivates on release (native MO behavior), while double-tap is handled alongside via `double_tap_keys[]`.
+**MO() layer keys:** `MO(LAYER_LOWER)` and `MO(LAYER_RAISE)` are intercepted via `IS_QK_MOMENTARY()` — no custom keycodes needed. The layer activates immediately on press and deactivates on release (native MO behavior), while multi-tap is handled alongside via `tap_actions[]`.
 
 **Applies to:** Number row (1–0), punctuation (- = [ ] \ \` ; ' , .), Left/Right arrows, Enter, and MO() layer keys.
 
@@ -276,7 +273,7 @@ State tracking uses three statics: `key_timer` (when the key was pressed), `key_
 - Left/Right arrows: tap = arrow, hold = Alt+Arrow (word jump), longer hold = GUI+Arrow (line jump)
 - All other keys: only in `hold_keys[]` (no longer-hold tier)
 
-**Multi-tap note:** Adding a key to `double_tap_keys[]` introduces a small delay on single taps (waiting for potential second press). Adding a `triple_tap_keys[]` entry adds one more deferral window on top of that.
+**Multi-tap note:** Adding a key to `tap_actions[]` introduces a small delay on single taps (one `CUSTOM_MULTI_TAP_TERM` window while waiting for a potential next press). Keys not in the table are unaffected.
 
 ## Pointing Device Modes
 

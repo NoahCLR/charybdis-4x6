@@ -66,13 +66,13 @@ enum custom_keycodes {
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
 // Each table covers one feature.  A key can appear in multiple tables to
-// combine behaviors (e.g. KC_6 is in hold_keys AND double_tap_keys).
+// combine behaviors (e.g. KC_6 is in hold_keys AND tap_actions).
 //
 // Timing thresholds are defined in config.h:
-//   CUSTOM_TAP_HOLD_TERM    = 150ms  (tap vs hold boundary)
-//   CUSTOM_LONGER_HOLD_TERM = 400ms  (hold vs longer-hold boundary)
-//   CUSTOM_DOUBLE_TAP_TERM  = 200ms  (max gap between taps for double-tap)
-//   COMBO_TERM              = 50ms   (max gap between keys for combos)
+//   CUSTOM_TAP_HOLD_TERM    — tap vs hold boundary
+//   CUSTOM_LONGER_HOLD_TERM — hold vs longer-hold boundary
+//   CUSTOM_MULTI_TAP_TERM   — max gap between consecutive taps
+//   COMBO_TERM              — max gap between keys for combos
 
 // ─── Hold Keys ──────────────────────────────────────────────────────────────
 
@@ -118,27 +118,30 @@ static const longer_hold_key_t longer_hold_keys[] = {
     {KC_RIGHT, G(KC_RIGHT), true}, // → → line jump
 };
 
-// ─── Double-Tap Keys ─────────────────────────────────────────────────────────
+// ─── Multi-Tap Keys ─────────────────────────────────────────────────────────
+//
+// Each entry maps (keycode, tap_count) → action.
+// A key can appear at multiple tap counts; group entries by key for clarity.
 
-// keycode                action
-static const double_tap_key_t double_tap_keys[] = {
-    {KC_6, KC_MPLY},            // play/pause
-    {KC_7, KC_MNXT},            // next track
-    {KC_8, KC_MPRV},            // prev track
-    {MO(LAYER_LOWER), KC_MPLY}, // play/pause
-    {MO(LAYER_RAISE), KC_MPLY}, // play/pause
-    {VOLUME_MODE, KC_MUTE},     // mute
+// keycode                taps  action
+static const tap_action_t tap_actions[] = {
+    // Number row — media controls
+    {KC_6, 2, KC_MPLY}, // play/pause
+    {KC_7, 2, KC_MNXT}, // next track
+    {KC_8, 2, KC_MPRV}, // prev track
+
+    // Layer keys — media controls
+    {MO(LAYER_LOWER), 2, KC_MPLY}, // play/pause
+    {MO(LAYER_LOWER), 3, KC_MPRV}, // prev track
+
+    {MO(LAYER_RAISE), 2, KC_MPLY}, // play/pause
+    {MO(LAYER_RAISE), 3, KC_MNXT}, // next track
+
+    // Pointing device mode keys
+    {VOLUME_MODE, 2, KC_MUTE}, // mute
 };
 
-// ─── Triple-Tap Keys ────────────────────────────────────────────────────────
-
-// keycode                action
-static const triple_tap_key_t triple_tap_keys[] = {
-    {MO(LAYER_RAISE), KC_MNXT}, // next track on triple-tap
-    {MO(LAYER_LOWER), KC_MPRV}, // prev track on triple-tap
-};
-
-// ─── Mode Tap Overrides ─────────────────────────────────────────────────────
+// ─── Pointing Device Mode Tap Overrides ─────────────────────────────────────
 //
 // Pointing device mode keys (VOLUME_MODE, etc.) default to sending whatever
 // key is at that position on LAYER_BASE when tapped.  Add an entry here to

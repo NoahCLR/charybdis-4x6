@@ -38,26 +38,20 @@ typedef struct {
     bool     immediate;
 } longer_hold_key_t;
 
-// ─── Double-Tap Keys ────────────────────────────────────────────────────────
+// ─── Multi-Tap Keys ─────────────────────────────────────────────────────────
 //
-// Sends an action when tapped twice within CUSTOM_DOUBLE_TAP_TERM.
-// Note: adds a small delay to single taps (waiting for potential second press).
+// Sends an action when tapped N times within CUSTOM_MULTI_TAP_TERM.
+// Each entry maps a (keycode, tap_count) pair to an action.
+// A key can have entries at multiple tap counts (e.g. 2 and 3).
+//
+// Note: any key in this table gets a small delay on single taps
+// (waiting for a potential next press).
 
 typedef struct {
     uint16_t keycode;
+    uint8_t  tap_count; // 2 = double-tap, 3 = triple-tap, etc.
     uint16_t action;
-} double_tap_key_t;
-
-// ─── Triple-Tap Keys ────────────────────────────────────────────────────────
-//
-// Third-tap action for keys that already appear in double_tap_keys[].
-// Adds one extra deferral window to double-taps while waiting for a
-// potential third press.
-
-typedef struct {
-    uint16_t keycode;
-    uint16_t action;
-} triple_tap_key_t;
+} tap_action_t;
 
 // ─── Mode Tap Overrides ─────────────────────────────────────────────────────
 //

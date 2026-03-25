@@ -37,11 +37,9 @@
 // #define FORCE_MASTER
 // #define FORCE_SLAVE
 
-// The default split serial timeout (20ms) is far too long for a keyboard
-// with a trackball — a single failed transaction blocks the main loop for
-// 20ms, causing the sensor to accumulate motion into a huge cursor jump.
-// At 230400 baud a full transaction completes in <1ms; 5ms is generous
-// headroom while keeping worst-case stalls well below perceptible.
+// The default split serial timeout is far too long for a keyboard with a
+// trackball — a single failed transaction blocks the main loop for the
+// full timeout, causing the sensor to accumulate motion into a cursor jump.
 #    undef SERIAL_USART_TIMEOUT
 #    define SERIAL_USART_TIMEOUT 5
 
@@ -111,13 +109,13 @@
 #    define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
 
 // Minimum ms between RGB matrix updates.  Higher = less CPU load but
-// choppier animations.  32ms ≈ 30 FPS.
+// choppier animations.
 #    ifdef RGB_MATRIX_LED_FLUSH_LIMIT
 #        undef RGB_MATRIX_LED_FLUSH_LIMIT
 #    endif
 #    define RGB_MATRIX_LED_FLUSH_LIMIT 32
 
-// Turn off LEDs after 15 minutes (900,000ms) of inactivity.
+// Turn off LEDs after this many ms of inactivity.
 // Requires SPLIT_ACTIVITY_ENABLE to keep both halves in sync.
 #    ifdef RGB_MATRIX_TIMEOUT
 #        undef RGB_MATRIX_TIMEOUT
@@ -176,12 +174,22 @@
 
 #endif // POINTING_DEVICE_ENABLE
 
-// ─── Custom tap/hold timing ────────────────────────────────────────────────
-// Used by the custom three-tier tap/hold system in keymap.c.
+// ─── Custom key behavior timing ───────────────────────────────────────────
+// Used by the custom key behavior system in keymap.c.
 // These are NOT QMK's built-in TAPPING_TERM — they're checked manually
-// in process_record_user().
-#define CUSTOM_TAP_HOLD_TERM 150    // < 150ms = tap (send plain key)
-                                    // 150–400ms = hold (shifted variant)
-#define CUSTOM_LONGER_HOLD_TERM 400 // > 400ms = longer hold (third action)
-#define CUSTOM_DOUBLE_TAP_TERM 200  // max gap between taps for double-tap
+// in process_record_user() and matrix_scan_user().
+//
+// Single key timeline:
+//   < CUSTOM_TAP_HOLD_TERM                          = tap (send plain key)
+//   CUSTOM_TAP_HOLD_TERM – CUSTOM_LONGER_HOLD_TERM  = hold (shifted variant / alt action)
+//   > CUSTOM_LONGER_HOLD_TERM                        = longer hold (third-tier action)
+//
+// Multi-tap timing:
+//   Each tap must arrive within CUSTOM_MULTI_TAP_TERM of the previous tap.
+//   A double-tap takes up to 2x the term, triple up to 3x, etc.
+//   Single taps on multi-tap keys are delayed by one window.
+//
+#define CUSTOM_TAP_HOLD_TERM 150    // tap vs hold boundary
+#define CUSTOM_LONGER_HOLD_TERM 400 // hold vs longer-hold boundary
+#define CUSTOM_MULTI_TAP_TERM 150   // max gap between consecutive taps
 #define COMBO_TERM 50               // max ms between keys to register as a combo

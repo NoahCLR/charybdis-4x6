@@ -8,11 +8,11 @@
 // transport to send a small packet (3 bytes) from master → slave
 // whenever the state changes.
 //
-// To minimize RPC traffic, the elapsed time is quantized to 50ms steps
-// and the packet is only sent when it differs from the last one sent.
-// During continuous mouse movement, elapsed stays at 0, so no RPCs
-// fire.  RPCs only happen during the countdown after the user stops
-// moving (~24 RPCs total over the 1200ms timeout).
+// To minimize RPC traffic, the elapsed time is quantized to
+// PD_SYNC_ELAPSED_STEP increments and the packet is only sent when it
+// differs from the last one sent.  During continuous mouse movement,
+// elapsed stays at 0, so no RPCs fire.  RPCs only happen during the
+// countdown after the user stops moving.
 //
 // Both the auto-mouse elapsed time and the pointing device mode flags
 // are bundled into a single 3-byte packet to avoid the overhead of
@@ -35,7 +35,7 @@
 // ─── Sync packet ─────────────────────────────────────────────────────────────
 
 // Quantization step for elapsed time.  Smaller = more RPCs but smoother
-// gradient on the slave.  50ms gives ~24 updates over the countdown.
+// gradient on the slave.
 #    ifndef PD_SYNC_ELAPSED_STEP
 #        define PD_SYNC_ELAPSED_STEP 50
 #    endif
@@ -54,7 +54,7 @@ static pd_sync_packet_t pd_sync_last_sent = {0};
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 // Quantize a raw elapsed time to reduce unnecessary RPC sends.
-// E.g. 137ms → 100ms, 1500ms → 1200ms (clamped to AUTO_MOUSE_TIME).
+// Rounds down to the nearest PD_SYNC_ELAPSED_STEP, clamped to AUTO_MOUSE_TIME.
 static inline uint16_t pd_sync_quantize(uint16_t raw) {
     if (raw > AUTO_MOUSE_TIME) raw = AUTO_MOUSE_TIME;
     return raw / PD_SYNC_ELAPSED_STEP * PD_SYNC_ELAPSED_STEP;

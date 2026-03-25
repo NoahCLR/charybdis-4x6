@@ -98,16 +98,16 @@ flowchart TD
 
     B -- No --> H{Stage 2: Key behavior table\nor MO&lpar;&rpar; key?}
     H -- Yes, pressed --> DT{Multi-tap pending\nfor same key?}
-    DT -- Yes --> DT1{Triple-tap\nenabled?}
-    DT1 -- "Yes, count=1" --> DT2[Escalate to count=2\nwait for 3rd tap]
-    DT1 -- "No, or count=2" --> DT3[Fire double/triple action]
+    DT -- Yes --> DT1{Higher tap\ncount exists?}
+    DT1 -- Yes --> DT2[Advance count\nwait for next tap]
+    DT1 -- No --> DT3[Fire action for\ncurrent count]
     DT -- No --> I["MO()? → layer_on()\nStart hold timer\nCache lookups"]
 
     H -- Yes, released --> MO_OFF["MO()? → layer_off()"]
     MO_OFF --> J{Already fired\nby matrix_scan?}
     J -- Yes --> STOP
     J -- No --> J2{How long held?}
-    J2 -- "< 150ms" --> K{Double-tap\nenabled?}
+    J2 -- "< 150ms" --> K{In tap_actions\ntable?}
     K -- Yes --> K1[Defer tap\nstart multi-tap timer]
     K -- No --> K2[Tap: plain key]
     J2 -- "150-400ms" --> L[Hold: shifted variant]

@@ -29,7 +29,7 @@
 #    include "split_sync.h"
 
 // How long the color stays at the start value before the gradient begins.
-// Default: first 1/3 of AUTO_MOUSE_TIME (400ms of 1200ms).
+// Default: first 1/3 of AUTO_MOUSE_TIME.
 #    ifndef AUTOMOUSE_RGB_DEAD_TIME
 #        define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3)
 #    endif
