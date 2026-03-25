@@ -430,8 +430,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 uint16_t elapsed = timer_elapsed(key_timer);
 
                 if (elapsed < CUSTOM_TAP_HOLD_TERM) {
-                    // TAP while layer locked → unlock immediately.
-                    if (is_mo && locked_layer == QK_MOMENTARY_GET_LAYER(keycode)) {
+                    // TAP while any layer is locked → unlock immediately.
+                    if (is_mo && locked_layer) {
                         layer_off(locked_layer);
                         locked_layer = 0;
                     } else if (mt_key) {
@@ -493,6 +493,12 @@ void matrix_scan_user(void) {
         uint16_t action = multi_tap.hold_action;
         if (action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT) {
             dispatch_action(action);
+            // Drop the MO layer so the locked layer is immediately visible
+            // while the key is still held.  The release path will layer_off
+            // again, but turning off an already-off layer is a no-op.
+            if (IS_QK_MOMENTARY(key_active)) {
+                layer_off(QK_MOMENTARY_GET_LAYER(key_active));
+            }
         } else {
             register_code16(action);
             held_action_keycode = action;
