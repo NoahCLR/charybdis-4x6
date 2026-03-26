@@ -2,67 +2,66 @@
 // Key Behavior Types
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Struct definitions used by the config tables in key_config.h.
-// Processing logic that reads these tables lives in keymap.c.
+// Struct definitions used by the behavior config in key_config.h.
+// Processing logic that reads these types lives in key_behavior.h,
+// multi_tap.h, and keymap.c.
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include QMK_KEYBOARD_H // QMK
 
-// ─── Hold Keys ──────────────────────────────────────────────────────────────
+#define KEY_BEHAVIOR_MAX_TAP_COUNT 3
+
+// ─── Hold Tiers ─────────────────────────────────────────────────────────────
 //
-// On tap (< CUSTOM_TAP_HOLD_TERM), sends the keycode itself.
-// On hold (>= CUSTOM_TAP_HOLD_TERM), sends the hold keycode.
+// A hold tier is an action plus its timing mode.
 //
-// immediate = true:  hold fires at threshold without waiting for release.
-// immediate = false: action is determined on release based on elapsed time.
+// immediate = true:  fire at threshold and keep registered while held.
+// immediate = false: resolve on release based on elapsed time.
 
 typedef struct {
-    uint16_t keycode;
-    uint16_t hold;
+    bool     present;
+    uint16_t action;
     bool     immediate;
-} hold_key_t;
+} hold_behavior_t;
 
-// ─── Longer Hold Keys ───────────────────────────────────────────────────────
+// ─── Per-Tap-Count Behavior ─────────────────────────────────────────────────
 //
-// Third-tier action when held past CUSTOM_LONGER_HOLD_TERM.
-// The key must also appear in hold_keys for the base hold behavior.
+// Represents what a key does for one tap count.
 //
-// immediate = true:  longer hold fires at threshold without waiting for release.
-// immediate = false: action is determined on release based on elapsed time.
-
-typedef struct {
-    uint16_t keycode;
-    uint16_t longer_hold;
-    bool     immediate;
-} longer_hold_key_t;
-
-// ─── Multi-Tap Keys ─────────────────────────────────────────────────────────
+// tap_overrides_default:
+//   false — use the key's normal tap behavior for this count
+//   true  — use tap_action instead
 //
-// Sends an action when tapped N times within CUSTOM_MULTI_TAP_TERM.
-// Each entry maps a (keycode, tap_count) pair to an action.
-// A key can have entries at multiple tap counts (e.g. 2 and 3).
+// For tap_count = 1, "normal tap behavior" means:
+//   - plain keys: the keycode itself
+//   - MO() keys: no tap output unless overridden
 //
-// hold_action (optional): if set (!= KC_NO), distinguishes between
-// "multi-tap and release" (fires action) vs "multi-tap and hold past
-// CUSTOM_TAP_HOLD_TERM" (fires hold_action).  Omit or set to KC_NO
-// to disable — existing entries with 3 fields get KC_NO automatically
-// via C99 zero-initialization.
-//
-// hold_action only works for tap_count >= 2.  For tap_count = 1, the
-// first press-and-hold is already handled by hold_keys (tap/hold/
-// longer-hold), so there is no window for a tap_count=1 hold_action.
-//
-// Note: any key in this table gets a small delay on single taps
-// (waiting for a potential next press).
+// For tap_count >= 2, present steps should set tap_overrides_default = true.
 
 typedef struct {
-    uint16_t keycode;
-    uint8_t  tap_count;   // 2 = double-tap, 3 = triple-tap, etc.
-    uint16_t action;       // fires on tap (quick release after multi-tap)
-    uint16_t hold_action;  // fires on hold (KC_NO = disabled)
-} tap_action_t;
+    bool            present;
+    bool            tap_overrides_default;
+    uint16_t        tap_action;
+    hold_behavior_t hold;
+    hold_behavior_t longer_hold;
+} key_behavior_step_t;
+
+// ─── Key Behavior Config ────────────────────────────────────────────────────
+//
+// A single authored behavior row for one physical keycode.
+//
+// steps[0] = single press
+// steps[1] = double tap
+// steps[2] = triple tap
+//
+// Unused entries stay zero-initialized.
+
+typedef struct {
+    uint16_t            keycode;
+    key_behavior_step_t steps[KEY_BEHAVIOR_MAX_TAP_COUNT];
+} key_behavior_t;
 
 // ─── Mode Tap Overrides ─────────────────────────────────────────────────────
 //

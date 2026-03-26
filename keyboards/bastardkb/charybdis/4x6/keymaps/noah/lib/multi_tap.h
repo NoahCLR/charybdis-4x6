@@ -5,8 +5,8 @@
 // Count-based tap detection: tracks how many times a key has been tapped
 // within CUSTOM_MULTI_TAP_TERM and resolves to the configured action.
 //
-// The tap_actions[] config table (in key_config.h) maps (keycode, tap_count)
-// pairs to actions.  A key can have entries at any tap count (1, 2, 3, ...),
+// The normalized key_behavior view maps (keycode, tap_count) pairs to
+// behavior steps.  A key can have entries at any tap count (1, 2, 3, ...),
 // and the state machine handles them all uniformly.  A tap_count=1 entry
 // overrides the single-tap action (useful for giving MO keys a tap action).
 //
@@ -17,13 +17,21 @@
 //
 // Hold-after-multi-tap:
 //
-//   When a tap_action entry has hold_action != KC_NO, the state machine
+//   When a behavior step has hold.present = true, the state machine
 //   enters a "pending hold" state instead of firing immediately.  It then
 //   distinguishes between:
 //     - Quick release → fires the entry's action (tap)
-//     - Held past CUSTOM_TAP_HOLD_TERM → fires hold_action
+//     - Held past CUSTOM_TAP_HOLD_TERM → fires the hold tier
 //   If more taps exist, a quick release resumes normal deferral so the
 //   user can still reach higher tap counts.
+//
+//   hold.immediate controls *when* the hold fires:
+//     true — immediate: fires at threshold via matrix_scan,
+//       registered for auto-repeat, can transition to longer-hold.
+//     false — deferred: does NOT fire at threshold; resolved entirely
+//       on release.  The caller checks elapsed time and the cached
+//       longer-hold tier
+//       to pick the right tier (tap / hold / longer-hold).
 //
 // Usage from keymap.c:
 //
@@ -40,6 +48,8 @@
 
 #include QMK_KEYBOARD_H // QMK
 
+#include "key_behavior.h"
+
 // ─── State ──────────────────────────────────────────────────────────────────
 
 typedef struct {
@@ -49,7 +59,8 @@ typedef struct {
     uint16_t single_action; // what to send if count stays at 1
     bool     pending_hold;  // true = waiting to see if final tap is held
     uint16_t tap_action;    // action to fire on quick release during pending_hold
-    uint16_t hold_action;   // action to fire if held past threshold during pending_hold
+    hold_behavior_t hold;    // hold tier for the current tap count
+    hold_behavior_t longer_hold; // longer-hold tier paired with hold
 } multi_tap_t;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -60,7 +71,8 @@ static inline void multi_tap_reset(multi_tap_t *mt) {
     mt->single_action = KC_NO;
     mt->pending_hold  = false;
     mt->tap_action    = KC_NO;
-    mt->hold_action   = KC_NO;
+    mt->hold          = hold_behavior_none();
+    mt->longer_hold   = hold_behavior_none();
 }
 
 static inline bool multi_tap_active(const multi_tap_t *mt) {
@@ -77,8 +89,11 @@ static inline bool multi_tap_expired(const multi_tap_t *mt) {
 }
 
 // Has the hold threshold been reached during pending_hold?
+// Only returns true for immediate holds so matrix_scan fires them.
+// Deferred holds are resolved entirely on release in process_record_user.
 static inline bool multi_tap_hold_elapsed(const multi_tap_t *mt) {
-    return mt->pending_hold && timer_elapsed(mt->timer) >= CUSTOM_TAP_HOLD_TERM;
+    return mt->pending_hold && mt->hold.present && mt->hold.immediate &&
+           timer_elapsed(mt->timer) >= CUSTOM_TAP_HOLD_TERM;
 }
 
 // ─── Core API ───────────────────────────────────────────────────────────────
@@ -92,16 +107,17 @@ static inline void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t s
     mt->single_action = single_action;
     mt->pending_hold  = false;
     mt->tap_action    = KC_NO;
-    mt->hold_action   = KC_NO;
+    mt->hold          = hold_behavior_none();
+    mt->longer_hold   = hold_behavior_none();
 }
 
 // Commit the pending action and reset (call on timeout or different-key press).
 // Walks backwards from the current count to find the highest defined action.
 // Falls back to single_action if no multi-tap entry matches.
-// tap_action_lookup is provided by keymap.c (depends on config table macros).
+// lookup is provided by keymap.c and returns the normalized behavior step.
 // dispatch is called instead of tap_code16 to support custom action types.
 static inline void multi_tap_flush(multi_tap_t *mt,
-                                   const tap_action_t *(*lookup)(uint16_t, uint8_t),
+                                   key_behavior_step_t (*lookup)(uint16_t, uint8_t),
                                    void (*dispatch)(uint16_t)) {
     // If we're in pending_hold when flushed (e.g. different key pressed),
     // treat it as a tap — fire the tap_action.
@@ -114,9 +130,9 @@ static inline void multi_tap_flush(multi_tap_t *mt,
     if (mt->count >= 2) {
         // Find the highest defined action at or below our count.
         for (uint8_t c = mt->count; c >= 2; c--) {
-            const tap_action_t *entry = lookup(mt->keycode, c);
-            if (entry) {
-                dispatch(entry->action);
+            key_behavior_step_t step = lookup(mt->keycode, c);
+            if (step.present) {
+                dispatch(step.tap_action);
                 multi_tap_reset(mt);
                 return;
             }
@@ -129,29 +145,30 @@ static inline void multi_tap_flush(multi_tap_t *mt,
 
 // Advance the state machine on re-press of the same key.
 // Returns the action to fire immediately, or KC_NO if state was advanced.
-// tap_action_lookup and has_more_taps are provided by keymap.c.
+// lookup and has_more_taps are provided by keymap.c.
 static inline uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode,
-                                         const tap_action_t *(*lookup)(uint16_t, uint8_t),
+                                         key_behavior_step_t (*lookup)(uint16_t, uint8_t),
                                          bool (*has_more)(uint16_t, uint8_t)) {
     mt->count++;
     mt->timer = timer_read();
 
-    const tap_action_t *entry = lookup(keycode, mt->count);
+    key_behavior_step_t step = lookup(keycode, mt->count);
 
     // If the current count has a hold variant, enter pending-hold state.
     // The caller will resolve on release (quick = tap_action) or hold
-    // threshold (matrix_scan = hold_action).  If more taps exist, a quick
+    // threshold (matrix_scan = hold tier).  If more taps exist, a quick
     // release resumes normal deferral.
-    if (entry && entry->hold_action != KC_NO) {
+    if (step.present && step.hold.present) {
         mt->pending_hold = true;
-        mt->tap_action   = entry->action;
-        mt->hold_action  = entry->hold_action;
+        mt->tap_action   = step.tap_action;
+        mt->hold         = step.hold;
+        mt->longer_hold  = step.longer_hold;
         return KC_NO;
     }
 
-    if (entry && !has_more(keycode, mt->count)) {
+    if (step.present && !has_more(keycode, mt->count)) {
         // Max configured tap count reached, no hold variant — fire immediately.
-        uint16_t action = entry->action;
+        uint16_t action = step.tap_action;
         multi_tap_reset(mt);
         return action;
     }
@@ -169,13 +186,14 @@ static inline uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode,
                                               bool (*has_more)(uint16_t, uint8_t)) {
     if (!mt->pending_hold) return KC_NO;
 
-    uint16_t elapsed     = timer_elapsed(mt->timer);
-    uint16_t cached_tap  = mt->tap_action;
-    uint16_t cached_hold = mt->hold_action;
+    uint16_t elapsed        = timer_elapsed(mt->timer);
+    uint16_t cached_tap     = mt->tap_action;
+    uint16_t cached_hold    = mt->hold.action;
 
     mt->pending_hold = false;
     mt->tap_action   = KC_NO;
-    mt->hold_action  = KC_NO;
+    mt->hold         = hold_behavior_none();
+    mt->longer_hold  = hold_behavior_none();
 
     if (elapsed >= CUSTOM_TAP_HOLD_TERM) {
         // Held long enough — fire hold action.
