@@ -143,9 +143,11 @@ static const tap_action_t tap_actions[] = {
     {KC_8, 2, KC_MPRV}, // prev track
 
     // Layer keys — media controls + layer lock on hold
+    {MO(LAYER_LOWER), 1, LAYER_LOCK(LAYER_LOWER)},
     {MO(LAYER_LOWER), 2, KC_MPLY, LAYER_LOCK(LAYER_NUM)},
     {MO(LAYER_LOWER), 3, KC_MPRV, KC_MPRV},
 
+    {MO(LAYER_RAISE), 1, LAYER_LOCK(LAYER_RAISE)},
     {MO(LAYER_RAISE), 2, KC_MPLY, LAYER_LOCK(LAYER_NUM)},
     {MO(LAYER_RAISE), 3, KC_MNXT, KC_MNXT},
 

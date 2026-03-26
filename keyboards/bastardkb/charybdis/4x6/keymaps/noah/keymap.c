@@ -266,9 +266,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 if (timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
                     // Tap — check for multi-tap deferral first.
                     if (is_multi_tap_key(keycode)) {
-                        // Resolve tap key: override > base-layer fallback.
-                        const mode_tap_override_t *ovr     = mode_tap_override_lookup(keycode);
-                        uint16_t                   tap_key = ovr ? ovr->tap : keymap_key_to_keycode(LAYER_BASE, record->event.key);
+                        // Resolve tap key: tap_count=1 > override > base-layer fallback.
+                        const tap_action_t *single = tap_action_lookup(keycode, 1);
+                        uint16_t tap_key;
+                        if (single) {
+                            tap_key = single->action;
+                        } else {
+                            const mode_tap_override_t *ovr = mode_tap_override_lookup(keycode);
+                            tap_key = ovr ? ovr->tap : keymap_key_to_keycode(LAYER_BASE, record->event.key);
+                        }
                         multi_tap_begin(&multi_tap, keycode, tap_key);
                     } else {
                         const mode_tap_override_t *ovr = mode_tap_override_lookup(keycode);
@@ -435,9 +441,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         layer_off(locked_layer);
                         locked_layer = 0;
                     } else if (mt_key) {
-                        // For MO() keys, tap sends nothing (layer was already on/off).
-                        // For regular keys, tap sends the keycode itself.
-                        multi_tap_begin(&multi_tap, keycode, is_mo ? KC_NO : keycode);
+                        // tap_count=1 overrides single-tap action (e.g. give MO keys a tap action).
+                        // Default: regular keys send themselves, MO keys send nothing.
+                        const tap_action_t *single = tap_action_lookup(keycode, 1);
+                        uint16_t single_act = single ? single->action : (is_mo ? KC_NO : keycode);
+                        multi_tap_begin(&multi_tap, keycode, single_act);
                     } else if (rel_hold) {
                         tap_code16(keycode);
                     }
