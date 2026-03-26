@@ -50,6 +50,10 @@ typedef struct {
 // to disable — existing entries with 3 fields get KC_NO automatically
 // via C99 zero-initialization.
 //
+// hold_action only works for tap_count >= 2.  For tap_count = 1, the
+// first press-and-hold is already handled by hold_keys (tap/hold/
+// longer-hold), so there is no window for a tap_count=1 hold_action.
+//
 // Note: any key in this table gets a small delay on single taps
 // (waiting for a potential next press).
 
