@@ -203,6 +203,31 @@ static void dispatch_action(uint16_t action) {
     tap_code16(action);
 }
 
+// Flush the currently tracked key when a new key overwrites key_active.
+// Without this, pressing a second hold-key before releasing the first
+// would silently drop the first key (no tap, no hold — just lost).
+static void flush_active_key(void) {
+    if (key_active == KC_NO) return;
+
+    if (key_hold_fired) {
+        // Immediate hold already fired — unregister the held keycode.
+        key_hold_fired = false;
+        if (held_action_keycode != KC_NO) {
+            unregister_code16(held_action_keycode);
+            held_action_keycode = KC_NO;
+        }
+    } else if (active_hold) {
+        // Still in tap window with hold behavior — send as tap.
+        tap_code16(key_active);
+    }
+    // MO-only or multi-tap-only without hold behavior: layer_off
+    // happens on release (independent of key_active), so no action needed.
+
+    key_active    = KC_NO;
+    active_hold   = NULL;
+    active_longer = NULL;
+}
+
 // ─── RGB Color Cache ─────────────────────────────────────────────────────────
 // Pre-computed HSV → RGB conversions, populated once in keyboard_post_init_user.
 #ifdef RGB_MATRIX_ENABLE
@@ -381,6 +406,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 if (is_mo) {
                     layer_on(QK_MOMENTARY_GET_LAYER(keycode));
                 }
+
+                // If another behavior key is still active (overlapping
+                // keypresses), flush it so it isn't silently dropped.
+                flush_active_key();
 
                 // Normal press — start tracking + cache lookups.
                 key_timer      = timer_read();
