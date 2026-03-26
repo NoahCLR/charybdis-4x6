@@ -102,7 +102,7 @@ Number row keys, punctuation, arrows, and Enter use a custom three-tier system i
 
 Timing thresholds are defined in `config.h`: `CUSTOM_TAP_HOLD_TERM` (150ms), `CUSTOM_LONGER_HOLD_TERM` (400ms), `CUSTOM_MULTI_TAP_TERM` (150ms), and `COMBO_TERM` (50ms).
 
-For most keys, the hold variant fires immediately when the 150ms threshold is reached — you don't need to release the key. Arrow keys are the exception: they keep the release-based three-tier system so you can choose between hold (Alt+Arrow, word jump) and longer hold (GUI+Arrow, line jump).
+For most keys, the hold variant registers immediately when the 150ms threshold is reached — you don't need to release the key. The keycode stays held so the OS can auto-repeat it (e.g. hold `1` → repeated `!`). Arrow keys are the exception: they keep the release-based three-tier system so you can choose between hold (Alt+Arrow, word jump) and longer hold (GUI+Arrow, line jump).
 
 ## VIA Layout Conversion
 
