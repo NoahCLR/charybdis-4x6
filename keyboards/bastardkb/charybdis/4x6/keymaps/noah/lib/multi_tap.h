@@ -6,8 +6,9 @@
 // within CUSTOM_MULTI_TAP_TERM and resolves to the configured action.
 //
 // The tap_actions[] config table (in key_config.h) maps (keycode, tap_count)
-// pairs to actions.  A key can have entries at any tap count (2, 3, 4, ...),
-// and the state machine handles them all uniformly:
+// pairs to actions.  A key can have entries at any tap count (1, 2, 3, ...),
+// and the state machine handles them all uniformly.  A tap_count=1 entry
+// overrides the single-tap action (useful for giving MO keys a tap action).
 //
 //   - On each quick tap, increment the count.
 //   - If a higher tap count exists for this key, defer and wait.

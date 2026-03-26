@@ -68,8 +68,8 @@ Keys can be configured to fire actions on rapid repeated taps. A single unified 
 | `6` | `6` | `^` | Play/Pause | — | — | — |
 | `7` | `7` | `&` | Next track | — | — | — |
 | `8` | `8` | `*` | Previous track | — | — | — |
-| `MO(Lower)` | — | Lower layer | Play/Pause | Lock Num layer | Prev track | Prev track (held) |
-| `MO(Raise)` | — | Raise layer | Play/Pause | Lock Num layer | Next track | Next track (held) |
+| `MO(Lower)` | Lock Lower | Lower layer | Play/Pause | Lock Num layer | Prev track | Prev track (held) |
+| `MO(Raise)` | Lock Raise | Raise layer | Play/Pause | Lock Num layer | Next track | Next track (held) |
 | `VOLUME_MODE` | base-layer key | Volume mode | Mute | — | — | — |
 
 Multi-tap is data-driven — add one row to `tap_actions[]` in `key_config.h` with the key, tap count, and action. An optional 4th field (`hold_action`) makes the final tap distinguish between quick release (fires `action`) and hold past `CUSTOM_TAP_HOLD_TERM` (fires `hold_action`). Regular keycodes in `hold_action` are registered (held down) for the duration of the keypress; `LAYER_LOCK(n)` toggles a layer lock.

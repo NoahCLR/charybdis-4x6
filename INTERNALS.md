@@ -29,7 +29,7 @@ A multi-tap gives a key an extra action on rapid repeated taps (double, triple, 
 |------|------|------------|
 | 1 | `key_config.h` | Add one row to `tap_actions[]`: `{keycode, tap_count, action}` |
 
-That's it. The key must already exist in the keymap (a regular key, `MO()`, or a mode key). Tap counts don't need to be contiguous — you can define only a triple-tap (count 3) without a double-tap (count 2). If the timer expires at an undefined count, the state machine walks backwards to the highest defined action, falling back to the single-tap key. Each tap must arrive within `CUSTOM_MULTI_TAP_TERM` of the previous one. Single taps on multi-tap keys are delayed by one window while waiting for a potential next press.
+That's it. The key must already exist in the keymap (a regular key, `MO()`, or a mode key). Tap counts start at 1: a `tap_count = 1` entry overrides the single-tap action (useful for giving MO keys a tap action — they default to nothing). Counts 2+ fire on rapid repeated taps. Tap counts don't need to be contiguous — you can define only a triple-tap (count 3) without a double-tap (count 2). If the timer expires at an undefined count, the state machine walks backwards to the highest defined action, falling back to the single-tap. Each tap must arrive within `CUSTOM_MULTI_TAP_TERM` of the previous one. Single taps on multi-tap keys are delayed by one window while waiting for a potential next press.
 
 ### Add hold-after-multi-tap
 
