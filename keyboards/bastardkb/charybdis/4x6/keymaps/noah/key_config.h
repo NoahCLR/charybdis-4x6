@@ -39,7 +39,7 @@ enum charybdis_keymap_layers {
 // DRG_TOG_ON_HOLD is a dual-purpose key: tap sends the base-layer key at
 // that position, hold toggles drag-scroll lock.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
-// actions authored in key_behaviors[].  Use the LAYER_LOCK(n) macro there.
+// actions authored in key_behaviors[].  Use the LOCK_LAYER(n) macro there.
 
 enum custom_keycodes {
     MACRO_0 = SAFE_RANGE,
@@ -63,14 +63,14 @@ enum custom_keycodes {
     ARROW_MODE,
     ZOOM_MODE,
     DRG_TOG_ON_HOLD,
-    LAYER_LOCK_BASE, // reserves LAYER_COUNT keycodes — use LAYER_LOCK(n) macro
+    LAYER_LOCK_BASE, // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
 
 // Lock a layer on from any tap or hold tier in key_behaviors[].
 // Example:
-//   { .keycode = MO(LAYER_LOWER), .steps = { [1] = STEP_TAP_HOLD(KC_MPLY, HOLD_IMMEDIATE(LAYER_LOCK(LAYER_NUM))) } }
-#define LAYER_LOCK(layer) (LAYER_LOCK_BASE + (layer))
+//   { .keycode = MO(LAYER_LOWER), .steps = { [1] = TAP_AS_WITH(KC_MPLY, PRESS_AND_HOLD(LOCK_LAYER(LAYER_NUM))) } }
+#define LOCK_LAYER(layer) (LAYER_LOCK_BASE + (layer))
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
@@ -98,10 +98,10 @@ enum custom_keycodes {
 //   COMBO_TERM              — max gap between keys for combos (50ms)
 //
 // Authoring terms:
-//   STEP_DEFAULT_TAP_* = keep the key's normal tap behavior for this step
-//   STEP_TAP_*         = override the tap behavior for this step
-//   HOLD_IMMEDIATE     = register press at threshold, unregister on release
-//   HOLD_ON_RELEASE    = decide on release, then fire once
+//   KEY_TAP_WITH*   = keep the key's normal tap behavior for this step
+//   TAP_AS*         = override the tap behavior for this step
+//   PRESS_AND_HOLD  = register press at threshold, unregister on release
+//   SEND_AFTER_HOLD = decide on release, then fire once
 //
 // The small authoring DSL used below also lives in lib/key_behavior.h, so this
 // file stays focused on configuration data.
@@ -109,59 +109,59 @@ enum custom_keycodes {
 // keycode                single / double / triple behavior
 static const key_behavior_t key_behaviors[] = {
     // Number row — shifted symbols on hold, media on double-tap
-    {.keycode = KC_1, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_EXLM))}},
-    {.keycode = KC_2, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_AT))}},
-    {.keycode = KC_3, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_HASH))}},
-    {.keycode = KC_4, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_DLR))}},
-    {.keycode = KC_5, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_PERC))}},
-    {.keycode = KC_6, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_CIRC)), [1] = STEP_TAP(KC_MPLY)}},
-    {.keycode = KC_7, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_AMPR)), [1] = STEP_TAP(KC_MNXT)}},
-    {.keycode = KC_8, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_ASTR)), [1] = STEP_TAP(KC_MPRV)}},
-    {.keycode = KC_9, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_LPRN))}},
-    {.keycode = KC_0, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_RPRN))}},
+    {.keycode = KC_1, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_EXLM))}},
+    {.keycode = KC_2, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_AT))}},
+    {.keycode = KC_3, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_HASH))}},
+    {.keycode = KC_4, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_DLR))}},
+    {.keycode = KC_5, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_PERC))}},
+    {.keycode = KC_6, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_CIRC)), [1] = TAP_AS(KC_MPLY)}},
+    {.keycode = KC_7, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_AMPR)), [1] = TAP_AS(KC_MNXT)}},
+    {.keycode = KC_8, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_ASTR)), [1] = TAP_AS(KC_MPRV)}},
+    {.keycode = KC_9, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_LPRN))}},
+    {.keycode = KC_0, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_RPRN))}},
 
     // Punctuation → shifted variants
-    {.keycode = KC_MINS, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_UNDS))}},
-    {.keycode = KC_EQL, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_PLUS))}},
-    {.keycode = KC_LBRC, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_LCBR))}},
-    {.keycode = KC_RBRC, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_RCBR))}},
-    {.keycode = KC_BSLS, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_PIPE))}},
-    {.keycode = KC_GRV, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_TILD))}},
-    {.keycode = KC_SCLN, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_COLN))}},
-    {.keycode = KC_QUOT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_DQUO))}},
-    {.keycode = KC_COMM, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_LABK))}},
-    {.keycode = KC_DOT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_RABK))}},
+    {.keycode = KC_MINS, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_UNDS))}},
+    {.keycode = KC_EQL, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_PLUS))}},
+    {.keycode = KC_LBRC, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_LCBR))}},
+    {.keycode = KC_RBRC, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_RCBR))}},
+    {.keycode = KC_BSLS, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_PIPE))}},
+    {.keycode = KC_GRV, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_TILD))}},
+    {.keycode = KC_SCLN, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_COLN))}},
+    {.keycode = KC_QUOT, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_DQUO))}},
+    {.keycode = KC_COMM, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_LABK))}},
+    {.keycode = KC_DOT, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_RABK))}},
 
     // Enter → Shift+Enter (new line without send in chat apps)
-    {.keycode = KC_ENT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(S(KC_ENT)))}},
+    {.keycode = KC_ENT, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(S(KC_ENT)))}},
 
     // Arrows — release-based hold plus immediate longer-hold
-    {.keycode = KC_LEFT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD_LONG(HOLD_ON_RELEASE(A(KC_LEFT)), HOLD_IMMEDIATE(G(KC_LEFT)))}},
-    {.keycode = KC_RIGHT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD_LONG(HOLD_ON_RELEASE(A(KC_RIGHT)), HOLD_IMMEDIATE(G(KC_RIGHT)))}},
+    {.keycode = KC_LEFT, .steps = {[0] = KEY_TAP_WITH_LONG(SEND_AFTER_HOLD(A(KC_LEFT)), PRESS_AND_HOLD(G(KC_LEFT)))}},
+    {.keycode = KC_RIGHT, .steps = {[0] = KEY_TAP_WITH_LONG(SEND_AFTER_HOLD(A(KC_RIGHT)), PRESS_AND_HOLD(G(KC_RIGHT)))}},
 
     // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
     {
         .keycode = MO(LAYER_LOWER),
         .steps = {
-            [0] = STEP_TAP(LAYER_LOCK(LAYER_LOWER)),
-            [1] = STEP_TAP_HOLD(KC_MPLY, HOLD_IMMEDIATE(LAYER_LOCK(LAYER_NUM))),
-            [2] = STEP_TAP_HOLD(KC_MPRV, HOLD_IMMEDIATE(KC_MPRV)),
+            [0] = TAP_AS(LOCK_LAYER(LAYER_LOWER)),
+            [1] = TAP_AS_WITH(KC_MPLY, PRESS_AND_HOLD(LOCK_LAYER(LAYER_NUM))),
+            [2] = TAP_AS_WITH(KC_MPRV, PRESS_AND_HOLD(KC_MPRV)),
         },
     },
 
     {
         .keycode = MO(LAYER_RAISE),
         .steps = {
-            [0] = STEP_TAP(LAYER_LOCK(LAYER_RAISE)),
-            [1] = STEP_TAP_HOLD(KC_MPLY, HOLD_IMMEDIATE(LAYER_LOCK(LAYER_NUM))),
-            [2] = STEP_TAP_HOLD(KC_MNXT, HOLD_IMMEDIATE(KC_MNXT)),
+            [0] = TAP_AS(LOCK_LAYER(LAYER_RAISE)),
+            [1] = TAP_AS_WITH(KC_MPLY, PRESS_AND_HOLD(LOCK_LAYER(LAYER_NUM))),
+            [2] = TAP_AS_WITH(KC_MNXT, PRESS_AND_HOLD(KC_MNXT)),
         },
     },
 
     // Pointing device mode keys.
     // Single tap defaults to the base-layer key at that position unless [0]
     // overrides it here.
-    {.keycode = VOLUME_MODE, .steps = {[1] = STEP_TAP(KC_MUTE)}},
+    {.keycode = VOLUME_MODE, .steps = {[1] = TAP_AS(KC_MUTE)}},
 };
 
 static const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);

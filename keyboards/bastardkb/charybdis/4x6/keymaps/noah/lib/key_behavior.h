@@ -72,40 +72,40 @@ typedef struct {
 // This keeps the config file declarative while the nested struct layout stays
 // encapsulated here.
 
-#define HOLD_IMMEDIATE(action_) \
+#define PRESS_AND_HOLD(action_) \
     { .present = true, .action = (action_), .immediate = true }
 
-#define HOLD_ON_RELEASE(action_) \
+#define SEND_AFTER_HOLD(action_) \
     { .present = true, .action = (action_), .immediate = false }
 
-#define STEP_DEFAULT_TAP_HOLD(hold_) \
+#define KEY_TAP_WITH(hold_) \
     { .present = true, .hold = hold_ }
 
-#define STEP_DEFAULT_TAP_HOLD_LONG(hold_, long_hold_) \
-    {                                                  \
-        .present     = true,                           \
-        .hold        = hold_,                          \
-        .longer_hold = long_hold_,                     \
+#define KEY_TAP_WITH_LONG(hold_, long_hold_) \
+    {                                         \
+        .present     = true,                  \
+        .hold        = hold_,                 \
+        .longer_hold = long_hold_,            \
     }
 
-#define STEP_TAP(tap_action_) \
+#define TAP_AS(tap_action_) \
     { .present = true, .tap_overrides_default = true, .tap_action = (tap_action_) }
 
-#define STEP_TAP_HOLD(tap_action_, hold_) \
-    {                                      \
-        .present               = true,     \
-        .tap_overrides_default = true,     \
+#define TAP_AS_WITH(tap_action_, hold_) \
+    {                                    \
+        .present               = true,   \
+        .tap_overrides_default = true,   \
         .tap_action            = (tap_action_), \
-        .hold                  = hold_,    \
+        .hold                  = hold_,  \
     }
 
-#define STEP_TAP_HOLD_LONG(tap_action_, hold_, long_hold_) \
-    {                                                       \
-        .present               = true,                      \
-        .tap_overrides_default = true,                      \
-        .tap_action            = (tap_action_),             \
-        .hold                  = hold_,                     \
-        .longer_hold           = long_hold_,                \
+#define TAP_AS_WITH_LONG(tap_action_, hold_, long_hold_) \
+    {                                                     \
+        .present               = true,                    \
+        .tap_overrides_default = true,                    \
+        .tap_action            = (tap_action_),           \
+        .hold                  = hold_,                   \
+        .longer_hold           = long_hold_,              \
     }
 
 // key_config.h defines these with internal linkage.

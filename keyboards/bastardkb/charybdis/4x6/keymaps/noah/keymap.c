@@ -150,7 +150,7 @@ static inline bool is_layer_lock_action(uint16_t action) {
     return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
 }
 
-// Dispatch an action keycode.  Handles LAYER_LOCK(n) dynamically;
+// Dispatch an action keycode.  Handles LOCK_LAYER(n) dynamically;
 // everything else falls through to tap_code16.
 static void dispatch_action(uint16_t action) {
     if (is_layer_lock_action(action)) {
