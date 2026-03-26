@@ -479,7 +479,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         tap_code16(keycode);
                     }
                     // MO()-only with no multi-tap: tap does nothing (layer already toggled).
-                } else if (rel_longer && elapsed > CUSTOM_LONGER_HOLD_TERM) {
+                } else if (rel_longer && elapsed >= CUSTOM_LONGER_HOLD_TERM) {
                     tap_code16(rel_longer->longer_hold);
                 } else {
                     if (rel_hold) tap_code16(rel_hold->hold);
