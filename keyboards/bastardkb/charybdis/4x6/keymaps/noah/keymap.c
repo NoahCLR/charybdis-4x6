@@ -450,9 +450,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 active_hold   = NULL;
                 active_longer = NULL;
 
-                // If hold already fired (immediate mode or hold-after-multi-tap),
-                // unregister any held keycode and we're done.
-                if (key_hold_fired) {
+                // If any keycode is registered (immediate hold, multi-tap hold,
+                // or longer-hold), unregister it and we're done.
+                if (key_hold_fired || held_action_keycode != KC_NO) {
                     key_hold_fired = false;
                     if (held_action_keycode != KC_NO) {
                         unregister_code16(held_action_keycode);
@@ -514,6 +514,11 @@ void matrix_scan_user(void) {
         // Immediate longer hold fires at CUSTOM_LONGER_HOLD_TERM.
         // Registered (not tapped) so the OS can auto-repeat while held.
         if (active_longer && active_longer->immediate && elapsed >= CUSTOM_LONGER_HOLD_TERM) {
+            // Unregister any keycode held from a previous tier (e.g. multi-tap
+            // hold transitioning to longer-hold).
+            if (held_action_keycode != KC_NO) {
+                unregister_code16(held_action_keycode);
+            }
             register_code16(active_longer->longer_hold);
             held_action_keycode = active_longer->longer_hold;
             key_hold_fired = true;
@@ -543,6 +548,13 @@ void matrix_scan_user(void) {
         } else {
             register_code16(action);
             held_action_keycode = action;
+            // If the held action has a longer-hold variant, continue tracking
+            // so the three-tier hold system can fire at CUSTOM_LONGER_HOLD_TERM.
+            active_longer = longer_hold_lookup(action);
+            if (active_longer) {
+                multi_tap_reset(&multi_tap);
+                return; // keep key_hold_fired false so longer-hold can fire
+            }
         }
         key_hold_fired = true;
         multi_tap_reset(&multi_tap);
