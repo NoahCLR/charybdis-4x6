@@ -1,19 +1,116 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Key Behavior Lookup Helpers
+// Key Behavior Schema + Lookup Helpers
 // ────────────────────────────────────────────────────────────────────────────
 //
-// key_config.h now authors key behavior through a single key_behaviors[]
-// table.  This header provides small lookup helpers and a runtime view that
-// folds in non-table facts such as "is this key an MO() key?".
+// Shared schema for key behavior config plus small lookup helpers.
+//
+// key_config.h authors key behavior through a single key_behaviors[] table and
+// also defines key_behavior_count.  This header provides the types, forward
+// declarations for that data, and runtime helpers that fold in non-table facts
+// such as "is this key an MO() key?".
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "key_types.h"
+#define KEY_BEHAVIOR_MAX_TAP_COUNT 3
 
-#define KEY_BEHAVIOR_COUNT (sizeof(key_behaviors) / sizeof(key_behaviors[0]))
+// ─── Hold Tiers ─────────────────────────────────────────────────────────────
+//
+// A hold tier is an action plus its timing mode.
+//
+// immediate = true:  fire at threshold and keep registered while held.
+// immediate = false: resolve on release based on elapsed time.
+
+typedef struct {
+    bool     present;
+    uint16_t action;
+    bool     immediate;
+} hold_behavior_t;
+
+// ─── Per-Tap-Count Behavior ─────────────────────────────────────────────────
+//
+// Represents what a key does for one tap count.
+//
+// tap_overrides_default:
+//   false — use the key's normal tap behavior for this count
+//   true  — use tap_action instead
+//
+// For tap_count = 1, "normal tap behavior" means:
+//   - plain keys: the keycode itself
+//   - MO() keys: no tap output unless overridden
+//
+// For tap_count >= 2, present steps should set tap_overrides_default = true.
+
+typedef struct {
+    bool            present;
+    bool            tap_overrides_default;
+    uint16_t        tap_action;
+    hold_behavior_t hold;
+    hold_behavior_t longer_hold;
+} key_behavior_step_t;
+
+// ─── Key Behavior Config ────────────────────────────────────────────────────
+//
+// A single authored behavior row for one physical keycode.
+//
+// steps[0] = single press
+// steps[1] = double tap
+// steps[2] = triple tap
+//
+// Unused entries stay zero-initialized.
+
+typedef struct {
+    uint16_t            keycode;
+    key_behavior_step_t steps[KEY_BEHAVIOR_MAX_TAP_COUNT];
+} key_behavior_t;
+
+// ─── Authoring DSL ──────────────────────────────────────────────────────────
+//
+// Small initializer macros for authoring key_behaviors[] data in key_config.h.
+// This keeps the config file declarative while the nested struct layout stays
+// encapsulated here.
+
+#define HOLD_IMMEDIATE(action_) \
+    { .present = true, .action = (action_), .immediate = true }
+
+#define HOLD_ON_RELEASE(action_) \
+    { .present = true, .action = (action_), .immediate = false }
+
+#define STEP_DEFAULT_TAP_HOLD(hold_) \
+    { .present = true, .hold = hold_ }
+
+#define STEP_DEFAULT_TAP_HOLD_LONG(hold_, long_hold_) \
+    {                                                  \
+        .present     = true,                           \
+        .hold        = hold_,                          \
+        .longer_hold = long_hold_,                     \
+    }
+
+#define STEP_TAP(tap_action_) \
+    { .present = true, .tap_overrides_default = true, .tap_action = (tap_action_) }
+
+#define STEP_TAP_HOLD(tap_action_, hold_) \
+    {                                      \
+        .present               = true,     \
+        .tap_overrides_default = true,     \
+        .tap_action            = (tap_action_), \
+        .hold                  = hold_,    \
+    }
+
+#define STEP_TAP_HOLD_LONG(tap_action_, hold_, long_hold_) \
+    {                                                       \
+        .present               = true,                      \
+        .tap_overrides_default = true,                      \
+        .tap_action            = (tap_action_),             \
+        .hold                  = hold_,                     \
+        .longer_hold           = long_hold_,                \
+    }
+
+// key_config.h defines these with internal linkage.
+static const key_behavior_t key_behaviors[];
+static const uint8_t        key_behavior_count;
 
 typedef struct {
     const key_behavior_t *config;
@@ -33,7 +130,7 @@ static inline key_behavior_step_t key_behavior_step_none(void) {
 }
 
 static inline const key_behavior_t *key_behavior_config_lookup(uint16_t keycode) {
-    for (uint8_t i = 0; i < KEY_BEHAVIOR_COUNT; i++)
+    for (uint8_t i = 0; i < key_behavior_count; i++)
         if (key_behaviors[i].keycode == keycode) return &key_behaviors[i];
     return NULL;
 }

@@ -16,8 +16,8 @@
 //     per-feature config tables, combos, macro definitions, and LAYOUT
 //     arrays.  Edit that file to change what keys do.
 //
-//   lib/key_types.h
-//     Struct typedefs for the unified key behavior config.
+//   lib/key_behavior.h
+//     Unified key behavior schema plus lookup helpers for the runtime view.
 //     Keeps key_config.h focused on data.
 //
 //   pointing_device_modes.h
@@ -72,8 +72,6 @@
 _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
 #endif
 
-#define MODE_TAP_OVERRIDE_COUNT (sizeof(mode_tap_overrides) / sizeof(mode_tap_overrides[0]))
-
 #include "lib/key_behavior.h"
 #include "lib/multi_tap.h"
 #include "lib/pointing_device_modes.h"
@@ -109,15 +107,14 @@ bool is_keyboard_master_impl(void) {
 // stomp each other's timers if pressed in quick succession.
 static uint16_t pd_mode_timer;
 
-static const mode_tap_override_t *mode_tap_override_lookup(uint16_t keycode) {
-    for (uint8_t i = 0; i < MODE_TAP_OVERRIDE_COUNT; i++)
-        if (mode_tap_overrides[i].keycode == keycode) return &mode_tap_overrides[i];
-    return NULL;
-}
-
 static inline uint16_t key_behavior_single_tap_action(key_behavior_view_t behavior) {
     if (behavior.single.tap_overrides_default) return behavior.single.tap_action;
     return behavior.is_momentary_layer ? KC_NO : behavior.keycode;
+}
+
+static inline uint16_t pd_mode_single_tap_action(keyrecord_t *record, key_behavior_view_t behavior) {
+    if (behavior.single.tap_overrides_default) return behavior.single.tap_action;
+    return keymap_key_to_keycode(LAYER_BASE, record->event.key);
 }
 
 // ─── Key Behavior State ─────────────────────────────────────────────────────
@@ -296,24 +293,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 pd_mode_update(mode, false);
                 if (timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
                     // Tap — check for multi-tap deferral first.
+                    uint16_t tap_key = pd_mode_single_tap_action(record, behavior);
                     if (behavior.has_multi_tap) {
-                        // Resolve tap key: tap_count=1 > override > base-layer fallback.
-                        uint16_t tap_key;
-                        if (behavior.single.tap_overrides_default) {
-                            tap_key = behavior.single.tap_action;
-                        } else {
-                            const mode_tap_override_t *ovr = mode_tap_override_lookup(keycode);
-                            tap_key = ovr ? ovr->tap : keymap_key_to_keycode(LAYER_BASE, record->event.key);
-                        }
                         multi_tap_begin(&multi_tap, keycode, tap_key);
                     } else {
-                        const mode_tap_override_t *ovr = mode_tap_override_lookup(keycode);
-                        if (ovr) {
-                            tap_code16(ovr->tap);
-                        } else {
-                            uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
-                            tap_code16(fallback_key);
-                        }
+                        dispatch_action(tap_key);
                     }
                 }
             }

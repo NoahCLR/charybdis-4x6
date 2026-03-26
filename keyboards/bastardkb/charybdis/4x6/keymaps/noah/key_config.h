@@ -14,7 +14,7 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "lib/key_types.h"
+#include "lib/key_behavior.h"
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
 //
@@ -68,7 +68,8 @@ enum custom_keycodes {
 };
 
 // Lock a layer on from any tap or hold tier in key_behaviors[].
-// Example: {MO(LAYER_LOWER), {[1] = STEP_TAP_HOLD(KC_MPLY, LAYER_LOCK(LAYER_NUM), true)}}
+// Example:
+//   { .keycode = MO(LAYER_LOWER), .steps = { [1] = STEP_TAP_HOLD(KC_MPLY, HOLD_IMMEDIATE(LAYER_LOCK(LAYER_NUM))) } }
 #define LAYER_LOCK(layer) (LAYER_LOCK_BASE + (layer))
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
@@ -95,111 +96,75 @@ enum custom_keycodes {
 //   CUSTOM_LONGER_HOLD_TERM — hold vs longer-hold boundary (400ms)
 //   CUSTOM_MULTI_TAP_TERM   — max gap between consecutive taps (150ms)
 //   COMBO_TERM              — max gap between keys for combos (50ms)
-
-// Helper macros for concise key_behaviors[] entries.
-#define HOLD_TIER(action_, immediate_) \
-    { .present = true, .action = (action_), .immediate = (immediate_) }
-
-#define STEP_HOLD(hold_action, immediate_) \
-    { .present = true, .hold = HOLD_TIER((hold_action), (immediate_)) }
-
-#define STEP_HOLD_LONGER(hold_action, hold_immediate, longer_action, longer_immediate) \
-    {                                                                                    \
-        .present     = true,                                                             \
-        .hold        = HOLD_TIER((hold_action), (hold_immediate)),                       \
-        .longer_hold = HOLD_TIER((longer_action), (longer_immediate)),                   \
-    }
-
-#define STEP_TAP(tap_action_) \
-    { .present = true, .tap_overrides_default = true, .tap_action = (tap_action_) }
-
-#define STEP_TAP_HOLD(tap_action_, hold_action, hold_immediate) \
-    {                                                           \
-        .present               = true,                          \
-        .tap_overrides_default = true,                          \
-        .tap_action            = (tap_action_),                 \
-        .hold                  = HOLD_TIER((hold_action), (hold_immediate)), \
-    }
-
-#define STEP_TAP_HOLD_LONGER(tap_action_, hold_action, hold_immediate, longer_action, longer_immediate) \
-    {                                                                                                     \
-        .present               = true,                                                                    \
-        .tap_overrides_default = true,                                                                    \
-        .tap_action            = (tap_action_),                                                           \
-        .hold                  = HOLD_TIER((hold_action), (hold_immediate)),                             \
-        .longer_hold           = HOLD_TIER((longer_action), (longer_immediate)),                         \
-    }
-
-#define KEY_BEHAVIOR(keycode_, ...) \
-    { .keycode = (keycode_), .steps = { __VA_ARGS__ } }
+//
+// Authoring terms:
+//   STEP_DEFAULT_TAP_* = keep the key's normal tap behavior for this step
+//   STEP_TAP_*         = override the tap behavior for this step
+//   HOLD_IMMEDIATE     = register press at threshold, unregister on release
+//   HOLD_ON_RELEASE    = decide on release, then fire once
+//
+// The small authoring DSL used below also lives in lib/key_behavior.h, so this
+// file stays focused on configuration data.
 
 // keycode                single / double / triple behavior
 static const key_behavior_t key_behaviors[] = {
     // Number row — shifted symbols on hold, media on double-tap
-    KEY_BEHAVIOR(KC_1, [0] = STEP_HOLD(KC_EXLM, true)),
-    KEY_BEHAVIOR(KC_2, [0] = STEP_HOLD(KC_AT, true)),
-    KEY_BEHAVIOR(KC_3, [0] = STEP_HOLD(KC_HASH, true)),
-    KEY_BEHAVIOR(KC_4, [0] = STEP_HOLD(KC_DLR, true)),
-    KEY_BEHAVIOR(KC_5, [0] = STEP_HOLD(KC_PERC, true)),
-    KEY_BEHAVIOR(KC_6, [0] = STEP_HOLD(KC_CIRC, true), [1] = STEP_TAP(KC_MPLY)),
-    KEY_BEHAVIOR(KC_7, [0] = STEP_HOLD(KC_AMPR, true), [1] = STEP_TAP(KC_MNXT)),
-    KEY_BEHAVIOR(KC_8, [0] = STEP_HOLD(KC_ASTR, true), [1] = STEP_TAP(KC_MPRV)),
-    KEY_BEHAVIOR(KC_9, [0] = STEP_HOLD(KC_LPRN, true)),
-    KEY_BEHAVIOR(KC_0, [0] = STEP_HOLD(KC_RPRN, true)),
+    {.keycode = KC_1, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_EXLM))}},
+    {.keycode = KC_2, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_AT))}},
+    {.keycode = KC_3, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_HASH))}},
+    {.keycode = KC_4, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_DLR))}},
+    {.keycode = KC_5, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_PERC))}},
+    {.keycode = KC_6, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_CIRC)), [1] = STEP_TAP(KC_MPLY)}},
+    {.keycode = KC_7, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_AMPR)), [1] = STEP_TAP(KC_MNXT)}},
+    {.keycode = KC_8, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_ASTR)), [1] = STEP_TAP(KC_MPRV)}},
+    {.keycode = KC_9, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_LPRN))}},
+    {.keycode = KC_0, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_RPRN))}},
 
     // Punctuation → shifted variants
-    KEY_BEHAVIOR(KC_MINS, [0] = STEP_HOLD(KC_UNDS, true)),
-    KEY_BEHAVIOR(KC_EQL, [0] = STEP_HOLD(KC_PLUS, true)),
-    KEY_BEHAVIOR(KC_LBRC, [0] = STEP_HOLD(KC_LCBR, true)),
-    KEY_BEHAVIOR(KC_RBRC, [0] = STEP_HOLD(KC_RCBR, true)),
-    KEY_BEHAVIOR(KC_BSLS, [0] = STEP_HOLD(KC_PIPE, true)),
-    KEY_BEHAVIOR(KC_GRV, [0] = STEP_HOLD(KC_TILD, true)),
-    KEY_BEHAVIOR(KC_SCLN, [0] = STEP_HOLD(KC_COLN, true)),
-    KEY_BEHAVIOR(KC_QUOT, [0] = STEP_HOLD(KC_DQUO, true)),
-    KEY_BEHAVIOR(KC_COMM, [0] = STEP_HOLD(KC_LABK, true)),
-    KEY_BEHAVIOR(KC_DOT, [0] = STEP_HOLD(KC_RABK, true)),
+    {.keycode = KC_MINS, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_UNDS))}},
+    {.keycode = KC_EQL, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_PLUS))}},
+    {.keycode = KC_LBRC, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_LCBR))}},
+    {.keycode = KC_RBRC, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_RCBR))}},
+    {.keycode = KC_BSLS, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_PIPE))}},
+    {.keycode = KC_GRV, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_TILD))}},
+    {.keycode = KC_SCLN, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_COLN))}},
+    {.keycode = KC_QUOT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_DQUO))}},
+    {.keycode = KC_COMM, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_LABK))}},
+    {.keycode = KC_DOT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(KC_RABK))}},
 
     // Enter → Shift+Enter (new line without send in chat apps)
-    KEY_BEHAVIOR(KC_ENT, [0] = STEP_HOLD(S(KC_ENT), true)),
+    {.keycode = KC_ENT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD(HOLD_IMMEDIATE(S(KC_ENT)))}},
 
     // Arrows — release-based hold plus immediate longer-hold
-    KEY_BEHAVIOR(KC_LEFT, [0] = STEP_HOLD_LONGER(A(KC_LEFT), false, G(KC_LEFT), true)),
-    KEY_BEHAVIOR(KC_RIGHT, [0] = STEP_HOLD_LONGER(A(KC_RIGHT), false, G(KC_RIGHT), true)),
+    {.keycode = KC_LEFT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD_LONG(HOLD_ON_RELEASE(A(KC_LEFT)), HOLD_IMMEDIATE(G(KC_LEFT)))}},
+    {.keycode = KC_RIGHT, .steps = {[0] = STEP_DEFAULT_TAP_HOLD_LONG(HOLD_ON_RELEASE(A(KC_RIGHT)), HOLD_IMMEDIATE(G(KC_RIGHT)))}},
 
     // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
-    KEY_BEHAVIOR(MO(LAYER_LOWER),
-                 [0] = STEP_TAP(LAYER_LOCK(LAYER_LOWER)),
-                 [1] = STEP_TAP_HOLD(KC_MPLY, LAYER_LOCK(LAYER_NUM), true),
-                 [2] = STEP_TAP_HOLD(KC_MPRV, KC_MPRV, true)),
+    {
+        .keycode = MO(LAYER_LOWER),
+        .steps = {
+            [0] = STEP_TAP(LAYER_LOCK(LAYER_LOWER)),
+            [1] = STEP_TAP_HOLD(KC_MPLY, HOLD_IMMEDIATE(LAYER_LOCK(LAYER_NUM))),
+            [2] = STEP_TAP_HOLD(KC_MPRV, HOLD_IMMEDIATE(KC_MPRV)),
+        },
+    },
 
-    KEY_BEHAVIOR(MO(LAYER_RAISE),
-                 [0] = STEP_TAP(LAYER_LOCK(LAYER_RAISE)),
-                 [1] = STEP_TAP_HOLD(KC_MPLY, LAYER_LOCK(LAYER_NUM), true),
-                 [2] = STEP_TAP_HOLD(KC_MNXT, KC_MNXT, true)),
+    {
+        .keycode = MO(LAYER_RAISE),
+        .steps = {
+            [0] = STEP_TAP(LAYER_LOCK(LAYER_RAISE)),
+            [1] = STEP_TAP_HOLD(KC_MPLY, HOLD_IMMEDIATE(LAYER_LOCK(LAYER_NUM))),
+            [2] = STEP_TAP_HOLD(KC_MNXT, HOLD_IMMEDIATE(KC_MNXT)),
+        },
+    },
 
-    // Pointing device mode keys
-    KEY_BEHAVIOR(VOLUME_MODE, [1] = STEP_TAP(KC_MUTE)),
+    // Pointing device mode keys.
+    // Single tap defaults to the base-layer key at that position unless [0]
+    // overrides it here.
+    {.keycode = VOLUME_MODE, .steps = {[1] = STEP_TAP(KC_MUTE)}},
 };
 
-#undef KEY_BEHAVIOR
-#undef HOLD_TIER
-#undef STEP_HOLD
-#undef STEP_HOLD_LONGER
-#undef STEP_TAP
-#undef STEP_TAP_HOLD
-#undef STEP_TAP_HOLD_LONGER
-
-// ─── Pointing Device Mode Tap Overrides ─────────────────────────────────────
-//
-// Pointing device mode keys (VOLUME_MODE, etc.) default to sending whatever
-// key is at that position on LAYER_BASE when tapped.  Add an entry here to
-// override that fallback with a specific keycode.
-
-// keycode            tap
-static const mode_tap_override_t mode_tap_overrides[] = {
-    {VOLUME_MODE, KC_N}, // tap volume mode key → N
-
-};
+static const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);
 
 // ─── Combos ─────────────────────────────────────────────────────────────────
 //
