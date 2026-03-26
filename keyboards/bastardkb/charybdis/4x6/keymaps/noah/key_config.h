@@ -38,6 +38,8 @@ enum charybdis_keymap_layers {
 // device modes while held.
 // DRG_TOG_ON_HOLD is a dual-purpose key: tap sends the base-layer key at
 // that position, hold toggles drag-scroll lock.
+// LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
+// hold-after-multi-tap.  Use the LAYER_LOCK(n) macro in tap_actions[].
 
 enum custom_keycodes {
     MACRO_0 = SAFE_RANGE,

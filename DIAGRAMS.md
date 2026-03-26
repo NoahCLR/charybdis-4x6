@@ -98,24 +98,39 @@ flowchart TD
 
     B -- No --> H{Stage 2: Key behavior table\nor MO&lpar;&rpar; key?}
     H -- Yes, pressed --> DT{Multi-tap pending\nfor same key?}
-    DT -- Yes --> DT1{Higher tap\ncount exists?}
-    DT1 -- Yes --> DT2[Advance count\nwait for next tap]
-    DT1 -- No --> DT3[Fire action for\ncurrent count]
+    DT -- Yes --> DT1{hold_action\ndefined?}
+    DT1 -- Yes --> DT_PH["Enter pending-hold\n(wait for hold vs release)"]
+    DT1 -- No --> DT2{Higher tap\ncount exists?}
+    DT2 -- Yes --> DT3[Advance count\nwait for next tap]
+    DT2 -- No --> DT4[Fire action for\ncurrent count]
     DT -- No --> I["MO()? → layer_on()\nStart hold timer\nCache lookups"]
 
-    H -- Yes, released --> MO_OFF["MO()? → layer_off()"]
+    H -- Yes, released --> PH{Pending hold\nactive?}
+    PH -- Yes --> PH1{Held past\nthreshold?}
+    PH1 -- Yes --> PH2["Fire hold_action\n(layer lock / register key)"]
+    PH1 -- No, more taps --> PH3[Resume multi-tap\ndeferral]
+    PH1 -- No, max count --> PH4[Fire tap action]
+    PH -- No --> MO_OFF["MO()? → layer_off()\n(skip if locked)"]
     MO_OFF --> J{Already fired\nby matrix_scan?}
-    J -- Yes --> STOP
+    J -- Yes --> J1["Unregister held key\n(if any)"]
+    J1 --> STOP
     J -- No --> J2{How long held?}
-    J2 -- "< 150ms" --> K{In tap_actions\ntable?}
+    J2 -- "< tap/hold" --> LOCK{MO key +\nlayer locked?}
+    LOCK -- Yes --> LOCK1[Unlock layer]
+    LOCK -- No --> K{In tap_actions\ntable?}
     K -- Yes --> K1[Defer tap\nstart multi-tap timer]
     K -- No --> K2[Tap: plain key]
-    J2 -- "150-400ms" --> L[Hold: shifted variant]
-    J2 -- "> 400ms" --> M[Longer hold: third action]
+    J2 -- "tap/hold – longer" --> L[Hold: shifted variant]
+    J2 -- "> longer hold" --> M[Longer hold: third action]
 
-    DT2 --> STOP
+    DT_PH --> STOP
     DT3 --> STOP
+    DT4 --> STOP
     I --> STOP
+    PH2 --> STOP
+    PH3 --> STOP
+    PH4 --> STOP
+    LOCK1 --> STOP
     K1 --> STOP
     K2 --> STOP
     L --> STOP

@@ -10,6 +10,8 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 - **Trackball modes** — Hold a key to turn the trackball into a volume knob, arrow-key emitter, scroll wheel, or zoom control
 - **Auto-mouse layer with countdown gradient** — The pointer layer activates automatically when you move the trackball. LEDs fade from white to red over 1.2 seconds to show remaining time before the layer deactivates, giving you a visual countdown. The gradient is synced to the slave half over RPC so both sides animate together.
 - **Multi-tap actions** — Tap a key multiple times quickly to trigger an action. Double-tap `6` for play/pause, `7` for next track, `8` for previous track. Layer keys support double and triple-tap. Configurable to any tap count (2, 3, 4, ...) by adding one row to `tap_actions[]` in `key_config.h`.
+- **Hold-after-multi-tap** — Multi-tap entries can distinguish tap vs hold on the final press. Double-tap and release fires one action; double-tap and hold fires a different one. Regular keycodes are held (registered) for the duration of the physical keypress. Used for layer lock and media fast-forward.
+- **Layer lock via multi-tap** — Double-tap and hold a layer key to lock its target layer on. The MO layer drops immediately so the locked layer is visible while still holding. Tap the same MO key to unlock. Configured via `LAYER_LOCK(n)` in `tap_actions[]` — works for any layer.
 - **Key combos** — Press multiple keys simultaneously to trigger a different action (e.g. D+F → Tab). Combos can use 2 or more trigger keys and work across layers via transparent fallthrough. Configured in `key_config.h`.
 - **Custom tap/hold system** — Number row and punctuation keys do different things based on hold duration: tap for the plain key, hold for the shifted symbol (fires immediately without waiting for release), longer hold for a third action. Arrow keys keep release-based timing for their three-tier system.
 - **Per-layer RGB indicators** — Each layer has a distinct color; trackball modes overlay a color on the right half. Colors are defined as HSV values in `rgb_config.h` — see [hsv colors.jpg](hsv%20colors.jpg) for a quick reference of hue values. Split-safe RGB helpers in `lib/rgb_helpers.h` handle LED chunk boundaries so you can target individual LEDs, specific halves, or both without worrying about the split addressing.
@@ -22,8 +24,8 @@ A QMK keymap for the [Bastard Keyboards Charybdis 4x6](https://bastardkb.com/cha
 |-------|-----------|-------|---------|
 | Base | Default | RGB effect | QWERTY typing |
 | Num | Hold `B`| Green | Numpad on the right half |
-| Lower | `MO(LAYER_LOWER)` / Hold `J` | Blue | Symbols, DPI controls, brackets. Double-tap for play/pause. |
-| Raise | `MO(LAYER_RAISE)` / Hold `F` / Hold `/` | Purple | Navigation, media, mouse buttons, macOS shortcuts. Sniping (lower DPI) auto-enables; auto-mouse is disabled to avoid conflicts. Double-tap for play/pause. |
+| Lower | `MO(LAYER_LOWER)` / Hold `J` | Blue | Symbols, DPI controls, brackets. Double-tap for play/pause, double-tap+hold to lock Num layer. |
+| Raise | `MO(LAYER_RAISE)` / Hold `F` / Hold `/` | Purple | Navigation, media, mouse buttons, macOS shortcuts. Sniping (lower DPI) auto-enables; auto-mouse is disabled to avoid conflicts. Double-tap for play/pause, double-tap+hold to lock Num layer. |
 | Pointer | Auto (trackball movement) | White-to-red gradient | Mouse buttons, scroll, trackball mode toggles. Automatically stripped when another layer is explicitly active to prevent flickering. |
 
 The Caps Lock position is a dual-purpose key: hold for Shift, tap for Caps Lock.
@@ -61,16 +63,20 @@ Sniping (lower DPI) works during trackball modes — it slows down the trackball
 
 Keys can be configured to fire actions on rapid repeated taps. A single unified table (`tap_actions[]` in `key_config.h`) maps (key, tap count) pairs to actions — supporting double-tap, triple-tap, or any number of taps.
 
-| Key | Single tap | Hold | Double tap | Triple tap |
-|-----|-----------|------|------------|------------|
-| `6` | `6` | `^` | Play/Pause | — |
-| `7` | `7` | `&` | Next track | — |
-| `8` | `8` | `*` | Previous track | — |
-| `MO(Lower)` | — | Lower layer | Play/Pause | Previous track |
-| `MO(Raise)` | — | Raise layer | Play/Pause | Next track |
-| `VOLUME_MODE` | base-layer key | Volume mode | Mute | — |
+| Key | Single tap | Hold | Double tap | Double tap + hold | Triple tap | Triple tap + hold |
+|-----|-----------|------|------------|-------------------|------------|-------------------|
+| `6` | `6` | `^` | Play/Pause | — | — | — |
+| `7` | `7` | `&` | Next track | — | — | — |
+| `8` | `8` | `*` | Previous track | — | — | — |
+| `MO(Lower)` | — | Lower layer | Play/Pause | Lock Num layer | Prev track | Prev track (held) |
+| `MO(Raise)` | — | Raise layer | Play/Pause | Lock Num layer | Next track | Next track (held) |
+| `VOLUME_MODE` | base-layer key | Volume mode | Mute | — | — | — |
 
-Multi-tap is data-driven — add one row to `tap_actions[]` in `key_config.h` with the key, tap count, and action. Tap counts don't need to be contiguous (e.g. you can define only a triple-tap without a double-tap). Each tap must arrive within `CUSTOM_MULTI_TAP_TERM` (150ms) of the previous one. Layer keys use QMK's native `MO()` and are detected via `IS_QK_MOMENTARY()` — no custom keycodes needed.
+Multi-tap is data-driven — add one row to `tap_actions[]` in `key_config.h` with the key, tap count, and action. An optional 4th field (`hold_action`) makes the final tap distinguish between quick release (fires `action`) and hold past `CUSTOM_TAP_HOLD_TERM` (fires `hold_action`). Regular keycodes in `hold_action` are registered (held down) for the duration of the keypress; `LAYER_LOCK(n)` toggles a layer lock.
+
+Tap counts don't need to be contiguous (e.g. you can define only a triple-tap without a double-tap). Each tap must arrive within `CUSTOM_MULTI_TAP_TERM` of the previous one. Layer keys use QMK's native `MO()` and are detected via `IS_QK_MOMENTARY()` — no custom keycodes needed.
+
+**Layer lock:** Double-tap and hold an MO key to lock its configured layer. The MO layer drops when the hold threshold is reached so the locked layer becomes visible immediately. Tap any MO key that has a `LAYER_LOCK` for the currently locked layer to unlock it.
 
 ## Key Combos
 
@@ -132,7 +138,7 @@ keyboards/bastardkb/charybdis/4x6/keymaps/noah/
   rules.mk                  Build flags (VIA, LTO, combos)
   lib/
     key_types.h             Struct typedefs for key behavior tables
-    multi_tap.h             Count-based multi-tap state machine (double-tap, triple-tap, N-tap)
+    multi_tap.h             Count-based multi-tap state machine (N-tap, hold-after-multi-tap, layer lock)
     pointing_device_modes.h Trackball mode system (volume, brightness, zoom, arrow, dragscroll)
     split_sync.h            Master → slave state sync via RPC (mode flags + elapsed time)
     rgb_helpers.h           Split-safe LED helper functions and RGB config types
