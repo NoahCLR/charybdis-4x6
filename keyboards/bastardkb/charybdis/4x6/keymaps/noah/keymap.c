@@ -483,13 +483,17 @@ void matrix_scan_user(void) {
     if (key_active != KC_NO && !key_hold_fired) {
         uint16_t elapsed = timer_elapsed(key_timer);
         // Immediate longer hold fires at CUSTOM_LONGER_HOLD_TERM.
+        // Registered (not tapped) so the OS can auto-repeat while held.
         if (active_longer && active_longer->immediate && elapsed >= CUSTOM_LONGER_HOLD_TERM) {
-            tap_code16(active_longer->longer_hold);
+            register_code16(active_longer->longer_hold);
+            held_action_keycode = active_longer->longer_hold;
             key_hold_fired = true;
         }
         // Immediate hold fires at CUSTOM_TAP_HOLD_TERM.
+        // Registered (not tapped) so the OS can auto-repeat while held.
         else if (active_hold && active_hold->immediate && elapsed >= CUSTOM_TAP_HOLD_TERM) {
-            tap_code16(active_hold->hold);
+            register_code16(active_hold->hold);
+            held_action_keycode = active_hold->hold;
             key_hold_fired = true;
         }
     }
