@@ -45,6 +45,9 @@ typedef report_mouse_t (*pd_mode_handler_t)(report_mouse_t);
 typedef void *pd_mode_handler_t; // unused stub — lets the struct compile
 #endif
 
+// Reset callback: called when a mode deactivates to clear accumulated state.
+typedef void (*pd_mode_reset_t)(void);
+
 // ─── Mode definition struct ─────────────────────────────────────────────
 // Each mode has a flag, an optional custom keycode, and a handler function.
 // Array order = priority order — first active mode wins for both handler
@@ -53,8 +56,9 @@ typedef void *pd_mode_handler_t; // unused stub — lets the struct compile
 
 typedef struct {
     uint8_t           mode_flag;
-    uint16_t          keycode; // KC_NO for firmware-handled modes
-    pd_mode_handler_t handler; // NULL for firmware-handled modes
+    uint16_t          keycode;   // KC_NO for firmware-handled modes
+    pd_mode_handler_t handler;   // NULL for firmware-handled modes
+    pd_mode_reset_t   reset;     // called on deactivation (NULL = no-op)
 } pd_mode_def_t;
 
 // ─── Global mode state ─────────────────────────────────────────────────────
@@ -70,16 +74,6 @@ static inline void pd_mode_clear(uint8_t mode) {
 }
 static inline bool pd_mode_active(uint8_t mode) {
     return (pd_mode_flags & mode) != 0;
-}
-
-// Convenience: set or clear a mode based on a boolean.
-// Typical use: pd_mode_update(PD_MODE_VOLUME, record->event.pressed)
-//   → activates on key-down, deactivates on key-up.
-static inline void pd_mode_update(uint8_t mode, bool active) {
-    if (active)
-        pd_mode_set(mode);
-    else
-        pd_mode_clear(mode);
 }
 
 // ─── Handler implementations ─────────────────────────────────────────────
@@ -104,16 +98,33 @@ static inline void pd_mode_update(uint8_t mode, bool active) {
 // Defined after the handler functions so the function pointers resolve.
 // NULL handler means the mode is handled externally (dragscroll by firmware).
 
-// mode_flag            keycode          handler
+// mode_flag            keycode          handler                          reset
 static const pd_mode_def_t pd_modes[] = {
-    {PD_MODE_DRAGSCROLL, KC_NO, NULL},                             //
-    {PD_MODE_VOLUME, VOLUME_MODE, handle_volume_mode},             //
-    {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode}, //
-    {PD_MODE_ZOOM, ZOOM_MODE, handle_zoom_mode},                   //
-    {PD_MODE_ARROW, ARROW_MODE, handle_arrow_mode},                //
+    {PD_MODE_DRAGSCROLL, KC_NO, NULL, NULL},                                             //
+    {PD_MODE_VOLUME, VOLUME_MODE, handle_volume_mode, reset_volume_mode},                //
+    {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, reset_brightness_mode}, //
+    {PD_MODE_ZOOM, ZOOM_MODE, handle_zoom_mode, reset_zoom_mode},                        //
+    {PD_MODE_ARROW, ARROW_MODE, handle_arrow_mode, reset_arrow_mode},                    //
 };
 
 #define PD_MODE_COUNT (sizeof(pd_modes) / sizeof(pd_modes[0]))
+
+// Convenience: set or clear a mode based on a boolean, resetting the
+// handler's accumulators on deactivation so stale state doesn't carry
+// into the next activation.
+static inline void pd_mode_update(uint8_t mode, bool active) {
+    if (active) {
+        pd_mode_set(mode);
+    } else {
+        pd_mode_clear(mode);
+        for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+            if (pd_modes[i].mode_flag == mode && pd_modes[i].reset) {
+                pd_modes[i].reset();
+                break;
+            }
+        }
+    }
+}
 
 // Look up which mode flag a keycode activates.  Returns 0 if not found.
 static inline uint8_t pd_mode_for_keycode(uint16_t keycode) {

@@ -131,19 +131,11 @@
 
 #ifdef POINTING_DEVICE_ENABLE
 
-// Auto-mouse: automatically activates LAYER_POINTER when the trackball
-// moves, and deactivates it after the timeout expires.
-#    define POINTING_DEVICE_AUTO_MOUSE_ENABLE
-#    define AUTO_MOUSE_TIME 1200 // ms of no trackball movement before the pointer layer deactivates
-
 // Register a custom split RPC transaction for syncing pointing device
 // state (auto-mouse elapsed time + mode flags) from master to slave.
 #    ifdef SPLIT_KEYBOARD
 #        define SPLIT_TRANSACTION_IDS_USER PUT_PD_SYNC
 #    endif
-
-// Default pointer DPI (base value before DPI_MOD/DPI_RMOD adjustments).
-#    define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
 
 // Liftoff distance — how high the ball can be lifted before tracking stops.
 // Default is 0x02; higher = tracks further from the surface.
@@ -172,6 +164,14 @@
 #    define CHARYBDIS_SCROLL_SNAP_RATIO 3        // Axis lock: dominant axis must be Nx the other to snap
 #    define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 80 // Discard buffered motion after this many ms idle
 
+// Auto-mouse: automatically activates LAYER_POINTER when the trackball
+// moves, and deactivates it after the timeout expires.
+#    define POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#    define AUTO_MOUSE_TIME 1200 // ms of no trackball movement before the pointer layer deactivates
+
+// Default pointer DPI (base value before DPI_MOD/DPI_RMOD adjustments).
+#    define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
+
 #endif // POINTING_DEVICE_ENABLE
 
 // ─── Custom key behavior timing ───────────────────────────────────────────
@@ -190,7 +190,7 @@
 //   Single taps on multi-tap keys are delayed by one window.
 //
 #define KEY_BEHAVIOR_MAX_TAP_COUNT 3 // max tap-count entries per key (single / double / triple)
-#define CUSTOM_TAP_HOLD_TERM 150    // tap vs hold boundary
-#define CUSTOM_LONGER_HOLD_TERM 400 // hold vs longer-hold boundary
-#define CUSTOM_MULTI_TAP_TERM 150   // max gap between consecutive taps
-#define COMBO_TERM 50               // max ms between keys to register as a combo
+#define CUSTOM_TAP_HOLD_TERM 150     // tap vs hold boundary
+#define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary
+#define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps
+#define COMBO_TERM 50                // max ms between keys to register as a combo

@@ -55,6 +55,11 @@ static report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     return freeze_mouse();
 }
 
+static inline void reset_volume_mode(void) {
+    vol_acc_y    = 0;
+    vol_last_dir = 0;
+}
+
 // ─── Brightness mode ─────────────────────────────────────────────────────────
 // Accumulates trackball Y-axis motion and sends brightness up/down keypresses
 // when the threshold is crossed.  X-axis motion is ignored.
@@ -89,6 +94,11 @@ static report_mouse_t handle_brightness_mode(report_mouse_t mouse_report) {
     return freeze_mouse();
 }
 
+static inline void reset_brightness_mode(void) {
+    bright_acc_y    = 0;
+    bright_last_dir = 0;
+}
+
 // ─── Zoom mode ──────────────────────────────────────────────────────────────
 // Accumulates trackball Y-axis motion and sends GUI+Plus / GUI+Minus
 // when the threshold is crossed.  Works in browsers, editors, Figma, etc.
@@ -121,6 +131,11 @@ static report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
     }
 
     return freeze_mouse();
+}
+
+static inline void reset_zoom_mode(void) {
+    zoom_acc_y    = 0;
+    zoom_last_dir = 0;
 }
 
 // ─── Arrow mode ─────────────────────────────────────────────────────────────
@@ -217,6 +232,14 @@ static report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
     return freeze_mouse();
 }
 
+static inline void reset_arrow_mode(void) {
+    arrow_acc_x      = 0;
+    arrow_acc_y      = 0;
+    arrow_last_x_dir = 0;
+    arrow_last_y_dir = 0;
+    arrow_axis_is_x  = true;
+}
+
 #else  // POINTING_DEVICE_ENABLE not defined: provide empty stubs so keymap.c compiles.
 static inline report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     return mouse_report;
@@ -230,4 +253,8 @@ static inline report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
 static inline report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
+static inline void reset_volume_mode(void) {}
+static inline void reset_brightness_mode(void) {}
+static inline void reset_zoom_mode(void) {}
+static inline void reset_arrow_mode(void) {}
 #endif // POINTING_DEVICE_ENABLE

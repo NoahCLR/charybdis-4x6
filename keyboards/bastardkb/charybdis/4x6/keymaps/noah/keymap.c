@@ -111,6 +111,7 @@ bool is_keyboard_master_impl(void) {
 // Separate from key_timer so PD mode keys and key behavior keys don't
 // stomp each other's timers if pressed in quick succession.
 static uint16_t pd_mode_timer;
+static uint16_t pd_mode_timer_keycode = KC_NO;
 
 static inline uint16_t key_behavior_single_tap_action(key_behavior_view_t behavior) {
     if (behavior.single.tap.present) return behavior.single.tap.action;
@@ -310,11 +311,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     return false;
                 }
 
-                pd_mode_timer = timer_read();
+                pd_mode_timer         = timer_read();
+                pd_mode_timer_keycode = keycode;
                 pd_mode_update(mode, true);
             } else {
                 pd_mode_update(mode, false);
-                if (timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
+                if (pd_mode_timer_keycode == keycode && timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
                     // Tap — check for multi-tap deferral first.
                     uint16_t tap_key = pd_mode_single_tap_action(record, behavior);
                     if (behavior.has_multi_tap) {
@@ -335,6 +337,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             static bool dragscroll_was_locked = false;
             if (record->event.pressed) {
                 pd_mode_timer         = timer_read();
+                pd_mode_timer_keycode = keycode;
                 dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
                 pd_mode_update(PD_MODE_DRAGSCROLL, true);
                 pd_state_sync();
@@ -348,7 +351,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 }
                 pd_mode_update(PD_MODE_DRAGSCROLL, false);
                 pd_state_sync();
-                if (timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
+                if (pd_mode_timer_keycode == keycode && timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
                     charybdis_set_pointer_dragscroll_enabled(false);
                     uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
                     tap_code16(fallback_key);
@@ -360,7 +363,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
         case DRG_TOG_ON_HOLD:
             if (record->event.pressed) {
-                pd_mode_timer = timer_read();
+                pd_mode_timer         = timer_read();
+                pd_mode_timer_keycode = keycode;
             } else {
                 bool dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
 
@@ -368,7 +372,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
                     pd_state_sync();
-                } else if (timer_elapsed(pd_mode_timer) > CUSTOM_TAP_HOLD_TERM) {
+                } else if (pd_mode_timer_keycode == keycode && timer_elapsed(pd_mode_timer) > CUSTOM_TAP_HOLD_TERM) {
                     tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
                     pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
                     pd_state_sync();
