@@ -13,7 +13,7 @@
 //   - On each quick tap, increment the count.
 //   - If a higher tap count exists for this key, defer and wait.
 //   - If this is the max configured count, fire immediately.
-//   - If the timer expires, fire whatever count we've reached.
+//   - If the timer expires, resolve the exact tap count we reached.
 //
 // Hold-after-multi-tap:
 //
@@ -99,7 +99,7 @@ static inline bool multi_tap_hold_elapsed(const multi_tap_t *mt) {
 // ─── Core API ───────────────────────────────────────────────────────────────
 
 // Start tracking a new multi-tap sequence (call on tap release).
-// single_action is what to send if no second tap arrives (KC_NO = nothing).
+// single_action is the normal single-tap action for this key (KC_NO = nothing).
 static inline void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action) {
     mt->count         = 1;
     mt->timer         = timer_read();
@@ -111,37 +111,43 @@ static inline void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t s
     mt->long_hold     = hold_behavior_none();
 }
 
+static inline void multi_tap_dispatch_repeated(uint16_t action, uint8_t count,
+                                               void (*dispatch)(uint16_t)) {
+    if (action == KC_NO) return;
+    for (uint8_t i = 0; i < count; i++) dispatch(action);
+}
+
 // Commit the pending action and reset (call on timeout or different-key press).
-// Walks backwards from the current count to find the highest defined action.
-// Falls back to single_action if no multi-tap entry matches.
+// Uses the exact tap count reached. If that tap count has no explicit tap
+// action, replay the key's normal single tap count times.
 // lookup is provided by keymap.c and returns the normalized behavior step.
 // dispatch is called instead of tap_code16 to support custom action types.
 static inline void multi_tap_flush(multi_tap_t *mt,
                                    key_behavior_step_t (*lookup)(uint16_t, uint8_t),
                                    void (*dispatch)(uint16_t)) {
     // If we're in pending_hold when flushed (e.g. different key pressed),
-    // treat it as a tap — fire the tap_action.
+    // treat it as a tap at the current count.
     if (mt->pending_hold) {
-        if (mt->tap_action != KC_NO) dispatch(mt->tap_action);
+        if (mt->tap_action != KC_NO) {
+            dispatch(mt->tap_action);
+        } else {
+            multi_tap_dispatch_repeated(mt->single_action, mt->count, dispatch);
+        }
         multi_tap_reset(mt);
         return;
     }
 
     if (mt->count >= 2) {
-        // Find the highest defined action at or below our count.
-        for (uint8_t c = mt->count; c >= 2; c--) {
-            key_behavior_step_t step = lookup(mt->keycode, c);
-            if (key_behavior_step_present(step)) {
-                if (step.tap.present && step.tap.action != KC_NO) {
-                    dispatch(step.tap.action);
-                }
-                multi_tap_reset(mt);
-                return;
-            }
+        key_behavior_step_t step = lookup(mt->keycode, mt->count);
+        if (step.tap.present && step.tap.action != KC_NO) {
+            dispatch(step.tap.action);
+            multi_tap_reset(mt);
+            return;
         }
     }
-    // count == 1 or no multi-tap entry matched — send single tap.
-    if (mt->single_action != KC_NO) dispatch(mt->single_action);
+
+    // count == 1 or no explicit tap action matched — replay the actual taps.
+    multi_tap_dispatch_repeated(mt->single_action, mt->count, dispatch);
     multi_tap_reset(mt);
 }
 
@@ -175,22 +181,28 @@ static inline uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode,
         return action;
     }
 
-    // Higher tap count exists — keep waiting.  If we're at a gap
-    // (no entry here but one above), flush will walk backwards to
-    // find the best match when the timer expires.
+    // Higher tap count exists — keep waiting. If we're at a gap
+    // (no entry here but one above), timeout will fall back to the
+    // key's normal single tap repeated count times.
     return KC_NO;
 }
 
 // Resolve the pending-hold state on key release.
-// Returns the action to fire, or KC_NO if resuming multi-tap deferral
+// Returns the action to fire, and writes how many times to fire it into
+// repeat_count. Returns KC_NO if resuming multi-tap deferral
 // (quick release with more taps available).
 static inline uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode,
-                                              bool (*has_more)(uint16_t, uint8_t)) {
+                                              bool (*has_more)(uint16_t, uint8_t),
+                                              uint8_t *repeat_count) {
     if (!mt->pending_hold) return KC_NO;
 
     uint16_t elapsed        = timer_elapsed(mt->timer);
     uint16_t cached_tap     = mt->tap_action;
     uint16_t cached_hold    = mt->hold.action;
+    uint16_t cached_single  = mt->single_action;
+    uint8_t  cached_count   = mt->count;
+
+    *repeat_count = 1;
 
     mt->pending_hold = false;
     mt->tap_action   = KC_NO;
@@ -208,11 +220,16 @@ static inline uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode,
     if (has_more(keycode, mt->count)) {
         // More taps possible — resume normal multi-tap deferral.
         mt->timer = timer_read();
+        *repeat_count = 0;
         return KC_NO;
     }
 
-    // No more taps — fire tap action now.
+    // No more taps — fire the exact tap-count result now.
     uint16_t action = cached_tap;
+    if (action == KC_NO) {
+        action        = cached_single;
+        *repeat_count = cached_count;
+    }
     multi_tap_reset(mt);
     return action;
 }

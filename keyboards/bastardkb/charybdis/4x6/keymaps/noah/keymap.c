@@ -431,12 +431,17 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     bool            was_release_hold = hold_sends_on_release(multi_tap.hold);
                     hold_behavior_t cached_hold = multi_tap.hold;
                     hold_behavior_t cached_long_hold = multi_tap.long_hold;
-                    uint16_t action = multi_tap_resolve_hold(&multi_tap, keycode, key_behavior_has_more_taps);
-                    if (was_release_hold && cached_hold.present && action == cached_hold.action) {
+                    uint8_t         repeat_count = 0;
+                    uint16_t action = multi_tap_resolve_hold(&multi_tap, keycode, key_behavior_has_more_taps,
+                                                             &repeat_count);
+                    if (was_release_hold && cached_hold.present && repeat_count == 1 &&
+                        action == cached_hold.action) {
                         action = select_release_hold_action(timer_elapsed(key_timer), cached_hold.action,
                                                             cached_long_hold);
                     }
-                    if (action != KC_NO) dispatch_action(action);
+                    for (uint8_t i = 0; i < repeat_count; i++) {
+                        if (action != KC_NO) dispatch_action(action);
+                    }
                     // Deactivate MO() layer unless it was just locked.
                     if (behavior.is_momentary_layer) {
                         uint8_t layer = QK_MOMENTARY_GET_LAYER(keycode);

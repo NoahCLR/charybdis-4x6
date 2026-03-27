@@ -82,6 +82,9 @@ enum custom_keycodes {
 //   tap_counts[1] = double tap
 //   tap_counts[2] = triple tap
 //
+// Tap-count entries are exact matches. If a count has no entry, quick taps
+// fall back to the key's normal tap behavior repeated that many times.
+//
 // Within each step:
 //   tap       = what happens on a quick release
 //               omit it to keep the key's normal tap behavior
