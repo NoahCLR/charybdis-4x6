@@ -91,8 +91,7 @@ enum custom_keycodes {
 //   hold      = what happens after CUSTOM_TAP_HOLD_TERM
 //   long_hold = what happens after CUSTOM_LONGER_HOLD_TERM
 //
-// This keeps all behavior for one key in one place instead of splitting it
-// across separate hold and multi-tap tables.
+// This keeps all behavior for one key in one place.
 //
 // Timing thresholds are defined in config.h:
 //   CUSTOM_TAP_HOLD_TERM    — tap vs hold boundary (150ms)

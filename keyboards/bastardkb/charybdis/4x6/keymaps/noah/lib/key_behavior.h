@@ -14,8 +14,6 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#define KEY_BEHAVIOR_MAX_TAP_COUNT 3
-
 // ─── Hold Tiers ─────────────────────────────────────────────────────────────
 //
 // A hold tier is an action plus its timing mode.
