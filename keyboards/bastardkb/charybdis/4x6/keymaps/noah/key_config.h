@@ -69,7 +69,7 @@ enum custom_keycodes {
 
 // Lock a layer on from any tap or hold tier in key_behaviors[].
 // Example:
-//   { .keycode = MO(LAYER_LOWER), .steps = { [1] = TAP_AS_WITH(KC_MPLY, PRESS_AND_HOLD(LOCK_LAYER(LAYER_NUM))) } }
+//   { .keycode = MO(LAYER_LOWER), .tap_counts = { [1] = { .tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LOCK_LAYER(LAYER_NUM)) } } }
 #define LOCK_LAYER(layer) (LAYER_LOCK_BASE + (layer))
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
@@ -77,91 +77,100 @@ enum custom_keycodes {
 // key_behaviors[] is the single authored behavior table for keys handled by
 // the custom state machine.  One row describes one physical key.
 //
-// Each row contains up to KEY_BEHAVIOR_MAX_TAP_COUNT steps:
-//   steps[0] = single press
-//   steps[1] = double tap
-//   steps[2] = triple tap
+// Each row contains up to KEY_BEHAVIOR_MAX_TAP_COUNT tap counts:
+//   tap_counts[0] = single press
+//   tap_counts[1] = double tap
+//   tap_counts[2] = triple tap
 //
 // Within each step:
-//   tap_overrides_default = false → use the key's normal tap behavior
-//   tap_overrides_default = true  → use tap_action
-//   hold        = second tier (≥ CUSTOM_TAP_HOLD_TERM)
-//   longer_hold = third tier  (≥ CUSTOM_LONGER_HOLD_TERM)
+//   tap       = what happens on a quick release
+//               omit it to keep the key's normal tap behavior
+//   hold      = what happens after CUSTOM_TAP_HOLD_TERM
+//   long_hold = what happens after CUSTOM_LONGER_HOLD_TERM
 //
 // This keeps all behavior for one key in one place instead of splitting it
 // across separate hold and multi-tap tables.
 //
 // Timing thresholds are defined in config.h:
 //   CUSTOM_TAP_HOLD_TERM    — tap vs hold boundary (150ms)
-//   CUSTOM_LONGER_HOLD_TERM — hold vs longer-hold boundary (400ms)
+//   CUSTOM_LONGER_HOLD_TERM — hold vs long-hold boundary (400ms)
 //   CUSTOM_MULTI_TAP_TERM   — max gap between consecutive taps (150ms)
 //   COMBO_TERM              — max gap between keys for combos (50ms)
 //
 // Authoring terms:
-//   KEY_TAP_WITH*   = keep the key's normal tap behavior for this step
-//   TAP_AS*         = override the tap behavior for this step
-//   PRESS_AND_HOLD  = register press at threshold, unregister on release
-//   SEND_AFTER_HOLD = decide on release, then fire once
+//   .tap = TAP_SENDS(x)   = tapping sends x
+//   omit .tap             = tapping keeps the key's normal tap behavior
+//   .hold = PRESS_AND_HOLD_UNTIL_RELEASE(x)
+//                         = holding presses x until you release
+//   .hold = TAP_AT_HOLD_THRESHOLD(x)
+//                         = holding sends x once when the hold threshold is reached
+//   .hold = TAP_ON_RELEASE_AFTER_HOLD(x)
+//                         = holding sends x once when you release
+//   .long_hold            = second hold tier after the longer threshold
 //
 // The small authoring DSL used below also lives in lib/key_behavior.h, so this
 // file stays focused on configuration data.
 
 // keycode                single / double / triple behavior
-static const key_behavior_t key_behaviors[] = {
-    // Number row — shifted symbols on hold, media on double-tap
-    {.keycode = KC_1, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_EXLM))}},
-    {.keycode = KC_2, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_AT))}},
-    {.keycode = KC_3, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_HASH))}},
-    {.keycode = KC_4, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_DLR))}},
-    {.keycode = KC_5, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_PERC))}},
-    {.keycode = KC_6, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_CIRC)), [1] = TAP_AS(KC_MPLY)}},
-    {.keycode = KC_7, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_AMPR)), [1] = TAP_AS(KC_MNXT)}},
-    {.keycode = KC_8, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_ASTR)), [1] = TAP_AS(KC_MPRV)}},
-    {.keycode = KC_9, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_LPRN))}},
-    {.keycode = KC_0, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_RPRN))}},
+static const key_behavior_t
+    key_behaviors[] =
+        {
+            // Number row — shifted symbols on hold, media on double-tap
+            {.keycode = KC_1, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)}}},
+            {.keycode = KC_2, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_AT)}}},
+            {.keycode = KC_3, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_HASH)}}},
+            {.keycode = KC_4, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_DLR)}}},
+            {.keycode = KC_5, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_PERC)}}},
+            {.keycode = KC_6, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_CIRC)}, [1] = {.tap = TAP_SENDS(KC_MPLY)}}},
+            {.keycode = KC_7, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_AMPR)}, [1] = {.tap = TAP_SENDS(KC_MNXT)}}},
+            {.keycode = KC_8, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR)}, [1] = {.tap = TAP_SENDS(KC_MPRV)}}},
+            {.keycode = KC_9, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LPRN)}}},
+            {.keycode = KC_0, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RPRN)}}},
 
-    // Punctuation → shifted variants
-    {.keycode = KC_MINS, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_UNDS))}},
-    {.keycode = KC_EQL, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_PLUS))}},
-    {.keycode = KC_LBRC, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_LCBR))}},
-    {.keycode = KC_RBRC, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_RCBR))}},
-    {.keycode = KC_BSLS, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_PIPE))}},
-    {.keycode = KC_GRV, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_TILD))}},
-    {.keycode = KC_SCLN, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_COLN))}},
-    {.keycode = KC_QUOT, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_DQUO))}},
-    {.keycode = KC_COMM, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_LABK))}},
-    {.keycode = KC_DOT, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(KC_RABK))}},
+            // Punctuation → shifted variants
+            {.keycode = KC_MINS, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)}}},
+            {.keycode = KC_EQL, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_PLUS)}}},
+            {.keycode = KC_LBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)}}},
+            {.keycode = KC_RBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)}}},
+            {.keycode = KC_BSLS, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_PIPE)}}},
+            {.keycode = KC_GRV, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_TILD)}}},
+            {.keycode = KC_SCLN, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_COLN)}}},
+            {.keycode = KC_QUOT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)}}},
+            {.keycode = KC_COMM, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)}}},
+            {.keycode = KC_DOT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)}}},
 
-    // Enter → Shift+Enter (new line without send in chat apps)
-    {.keycode = KC_ENT, .steps = {[0] = KEY_TAP_WITH(PRESS_AND_HOLD(S(KC_ENT)))}},
+            // Enter → Shift+Enter (new line without send in chat apps)
+            {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
 
-    // Arrows — release-based hold plus immediate longer-hold
-    {.keycode = KC_LEFT, .steps = {[0] = KEY_TAP_WITH_LONG(SEND_AFTER_HOLD(A(KC_LEFT)), PRESS_AND_HOLD(G(KC_LEFT)))}},
-    {.keycode = KC_RIGHT, .steps = {[0] = KEY_TAP_WITH_LONG(SEND_AFTER_HOLD(A(KC_RIGHT)), PRESS_AND_HOLD(G(KC_RIGHT)))}},
+            // Arrows — release-based hold plus immediate long hold
+            {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
+            {.keycode = KC_RIGHT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))}}},
 
-    // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
-    {
-        .keycode = MO(LAYER_LOWER),
-        .steps = {
-            [0] = TAP_AS(LOCK_LAYER(LAYER_LOWER)),
-            [1] = TAP_AS_WITH(KC_MPLY, PRESS_AND_HOLD(LOCK_LAYER(LAYER_NUM))),
-            [2] = TAP_AS_WITH(KC_MPRV, PRESS_AND_HOLD(KC_MPRV)),
-        },
-    },
+            // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
+            {
+                .keycode = MO(LAYER_LOWER),
+                .tap_counts =
+                    {
+                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_LOWER))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LOCK_LAYER(LAYER_NUM))},
+                        [2] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
+                    },
+            },
 
-    {
-        .keycode = MO(LAYER_RAISE),
-        .steps = {
-            [0] = TAP_AS(LOCK_LAYER(LAYER_RAISE)),
-            [1] = TAP_AS_WITH(KC_MPLY, PRESS_AND_HOLD(LOCK_LAYER(LAYER_NUM))),
-            [2] = TAP_AS_WITH(KC_MNXT, PRESS_AND_HOLD(KC_MNXT)),
-        },
-    },
+            {
+                .keycode = MO(LAYER_RAISE),
+                .tap_counts =
+                    {
+                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_RAISE))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LOCK_LAYER(LAYER_NUM))},
+                        [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
+                    },
+            },
 
-    // Pointing device mode keys.
-    // Single tap defaults to the base-layer key at that position unless [0]
-    // overrides it here.
-    {.keycode = VOLUME_MODE, .steps = {[1] = TAP_AS(KC_MUTE)}},
+            // Pointing device mode keys.
+            // Single tap defaults to the base-layer key at that position unless [0]
+            // overrides it here.
+            {.keycode = VOLUME_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(KC_MUTE)}}},
 };
 
 static const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);
