@@ -13,8 +13,8 @@
 //
 //   key_config.h
 //     All key behavior configuration: enums (layers, custom keycodes),
-//     per-feature config tables, combos, macro definitions, and LAYOUT
-//     arrays.  Edit that file to change what keys do.
+//     unified key_behaviors[] table, combos, macro definitions, and
+//     LAYOUT arrays.  Edit that file to change what keys do.
 //
 //   lib/key_behavior.h
 //     Unified key behavior schema plus lookup helpers for the runtime view.

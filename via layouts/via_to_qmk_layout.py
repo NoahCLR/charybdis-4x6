@@ -3,7 +3,7 @@
 #
 # Usage:
 #   python via_to_qmk_layout.py           Use default MODE (set below)
-#   python via_to_qmk_layout.py --write   Update keymap.c in-place
+#   python via_to_qmk_layout.py --write   Update key_config.h in-place
 #   python via_to_qmk_layout.py --print   Print keymaps block to stdout
 #
 # Reads charybdis.layout.json from the same directory.
@@ -36,7 +36,7 @@ LAYER_NAMES = [
 
 # Token normalisation: VIA JSON format → QMK keymap style.
 # VIA exports keycodes in its own format (CUSTOM(), MACRO(), S(), etc.)
-# that don't match what we use in keymap.c.  This dict translates them.
+# that don't match what we use in key_config.h.  This dict translates them.
 REPLACEMENTS = {
     # Transparent / no key
     "KC_NO": "XXXXXXX",

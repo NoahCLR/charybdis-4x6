@@ -23,13 +23,18 @@ Everything else is automatic: `process_record_user` activates/deactivates the mo
 
 ### Add a multi-tap action
 
-A multi-tap gives a key an extra action on rapid repeated taps (double, triple, or any count).
+A multi-tap gives a key an extra action on rapid repeated taps (double, triple, etc.).
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `key_config.h` | Add one row to `tap_actions[]`: `{keycode, tap_count, action}` |
+| 1 | `key_config.h` | Add or extend an entry in `key_behaviors[]` with a `tap_counts` entry at the desired index: `[1]` = double, `[2]` = triple |
 
-That's it. The key must already exist in the keymap (a regular key, `MO()`, or a mode key). Tap counts start at 1: a `tap_count = 1` entry overrides the single-tap action (useful for giving MO keys a tap action — they default to nothing). Counts 2+ fire on rapid repeated taps. Tap counts don't need to be contiguous — you can define only a triple-tap (count 3) without a double-tap (count 2). If the timer expires at an undefined count, the state machine walks backwards to the highest defined action, falling back to the single-tap. Each tap must arrive within `CUSTOM_MULTI_TAP_TERM` of the previous one. Single taps on multi-tap keys are delayed by one window while waiting for a potential next press.
+Example — double-tap `KC_6` for play/pause:
+```c
+{.keycode = KC_6, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_CIRC)}, [1] = {.tap = TAP_SENDS(KC_MPLY)}}}
+```
+
+The key must already exist in the keymap (a regular key, `MO()`, or a mode key). `tap_counts[0]` = single press, `[1]` = double tap, `[2]` = triple tap. Tap-count entries are exact matches — if a count has no entry, quick taps fall back to the key's normal tap behavior repeated that many times. Each tap must arrive within `CUSTOM_MULTI_TAP_TERM` of the previous one. Single taps on multi-tap keys are delayed by one window while waiting for a potential next press.
 
 ### Add hold-after-multi-tap
 
@@ -37,9 +42,14 @@ Distinguish between "multi-tap and release" vs "multi-tap and hold" on the final
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `key_config.h` | Add a 4th field to a `tap_actions[]` entry: `{keycode, tap_count, action, hold_action}` |
+| 1 | `key_config.h` | Add a `.hold` field to a `tap_counts` entry in `key_behaviors[]` |
 
-The `hold_action` fires when the final tap is held past `CUSTOM_TAP_HOLD_TERM` instead of released quickly. Regular keycodes are registered (held down) for the duration of the physical keypress and unregistered on release — useful for media keys like `KC_MFFD` (fast-forward). Custom keycodes like `LAYER_LOCK(n)` dispatch once (toggle). Omit the 4th field or set it to `KC_NO` to disable.
+Example — double-tap `MO(LAYER_LOWER)` and hold to lock Num layer:
+```c
+[1] = {.tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LOCK_LAYER(LAYER_NUM))}
+```
+
+The `.hold` fires when the final tap is held past `CUSTOM_TAP_HOLD_TERM` instead of released quickly. Hold modes control timing: `PRESS_AND_HOLD_UNTIL_RELEASE` fires at threshold and auto-repeats, `TAP_AT_HOLD_THRESHOLD` fires once at threshold, `TAP_ON_RELEASE_AFTER_HOLD` fires once on release. `LOCK_LAYER(n)` toggles a layer lock. Omit `.hold` to disable hold behavior for that tap count.
 
 ### Add a layer lock
 
@@ -47,9 +57,14 @@ Lock a layer on via multi-tap+hold so it stays active after release. Tap the sam
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `key_config.h` | Add a `tap_actions[]` entry with `LAYER_LOCK(n)` as hold_action: `{MO(LAYER_xxx), 2, KC_MPLY, LAYER_LOCK(LAYER_yyy)}` |
+| 1 | `key_config.h` | Add `LOCK_LAYER(n)` as a `.hold` or `.tap` action in a `key_behaviors[]` entry for an MO key |
 
-The locked layer doesn't have to match the MO key's layer — `MO(LAYER_LOWER)` can lock `LAYER_NUM`. When the hold threshold is reached, the MO layer drops immediately so the locked layer is visible while still holding. Only one layer can be locked at a time; locking a different layer unlocks the previous one. Tapping any MO key whose `tap_actions[]` entries include a `LAYER_LOCK` for the currently locked layer will unlock it.
+Example — double-tap and hold `MO(LAYER_LOWER)` to lock Num layer:
+```c
+{.keycode = MO(LAYER_LOWER), .tap_counts = {[0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_LOWER))}, [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LOCK_LAYER(LAYER_NUM))}}}
+```
+
+The locked layer doesn't have to match the MO key's layer — `MO(LAYER_LOWER)` can lock `LAYER_NUM`. When the hold threshold is reached, the MO layer drops immediately so the locked layer is visible while still holding. Only one layer can be locked at a time; locking a different layer unlocks the previous one. Tapping any MO key while a layer is locked will unlock it.
 
 ### Add a new tap/hold/longer-hold key
 
@@ -57,10 +72,19 @@ These keys send different keycodes based on hold duration (tap < 150ms, hold 150
 
 | Step | File | What to do |
 |------|------|------------|
-| 1 | `key_config.h` | Add one line to `hold_keys[]`: `{keycode, hold, immediate}` |
-| 2 | `key_config.h` | (Optional) For a third-tier action, also add to `longer_hold_keys[]`: `{keycode, longer_hold, immediate}` |
+| 1 | `key_config.h` | Add an entry to `key_behaviors[]` with `.hold` and optionally `.long_hold` in `tap_counts[0]` |
 
-Set `immediate` to `true` for keys that should fire the hold action at the threshold without waiting for release (most keys). Set to `false` for keys where you want to choose between hold and longer-hold on release (arrows).
+Example — hold `KC_1` for `!`:
+```c
+{.keycode = KC_1, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)}}}
+```
+
+Example — arrow key with three tiers (release-based hold, immediate long-hold):
+```c
+{.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}}
+```
+
+Hold modes control when the action fires: `PRESS_AND_HOLD_UNTIL_RELEASE` fires at threshold and auto-repeats (most keys), `TAP_AT_HOLD_THRESHOLD` fires once at threshold, `TAP_ON_RELEASE_AFTER_HOLD` waits for release so the user can choose between hold and long-hold tiers (arrows).
 
 ### Add a key combo
 
@@ -234,25 +258,25 @@ QMK's built-in `MT()` maps a key to modifier+keycode on hold. It has two limitat
 
 QMK's built-in tap dance can handle multi-tap and tap-vs-hold, but the configuration model is heavier and doesn't compose with other features:
 
-1. **Per-key boilerplate.** A simple "double-tap KC_6 → KC_MPLY" in QMK tap dance requires: (a) an enum entry, (b) a `tap_dance_actions[]` table entry, (c) using `TD(name)` in the keymap instead of the plain keycode. With advanced behavior (hold + double-tap on the same key), you also need a custom callback function with manual state/timer checks — per key. In this keymap, it's one row in `tap_actions[]` and the plain keycode stays in the LAYOUT array.
+1. **Per-key boilerplate.** A simple "double-tap KC_6 → KC_MPLY" in QMK tap dance requires: (a) an enum entry, (b) a `tap_dance_actions[]` table entry, (c) using `TD(name)` in the keymap instead of the plain keycode. With advanced behavior (hold + double-tap on the same key), you also need a custom callback function with manual state/timer checks — per key. In this keymap, it's one entry in `key_behaviors[]` and the plain keycode stays in the LAYOUT array.
 
-2. **Features don't stack.** In QMK, `TD()` and `MT()` are mutually exclusive on the same key — each consumes the keycode slot. If you want hold *and* double-tap on the same key, you must implement everything inside a single tap dance callback. This keymap's table system is composable: a key can independently appear in `hold_keys[]`, `tap_actions[]`, and `longer_hold_keys[]`, and the processing logic handles all of them.
+2. **Features don't stack.** In QMK, `TD()` and `MT()` are mutually exclusive on the same key — each consumes the keycode slot. If you want hold *and* double-tap on the same key, you must implement everything inside a single tap dance callback. This keymap uses a single unified `key_behaviors[]` table where each key's tap, hold, long-hold, and multi-tap behaviors are all authored in one place.
 
 3. **Tap dance can't do immediate hold.** Tap dance's `on_dance_finished` callback fires when the tap dance resolves (after timeout or interrupt), not at a specific hold duration. Implementing "fire at 150ms while still held" requires manual timer logic inside a custom callback — at which point you've reimplemented what this keymap's `matrix_scan_user()` already does declaratively.
 
-**What's the same:** Both QMK tap dance and this keymap's multi-tap delay the single-tap action while waiting for a possible second press. This is inherent to multi-tap detection — there's no way around it. The delay window (`CUSTOM_MULTI_TAP_TERM`, 150ms) is comparable to QMK's `TAPPING_TERM`. Keys that aren't in `tap_actions[]` are not affected and send immediately.
+**What's the same:** Both QMK tap dance and this keymap's multi-tap delay the single-tap action while waiting for a possible second press. This is inherent to multi-tap detection — there's no way around it. The delay window (`CUSTOM_MULTI_TAP_TERM`, 150ms) is comparable to QMK's `TAPPING_TERM`. Keys that aren't in `key_behaviors[]` are not affected and send immediately.
 
 ### Why not QMK's Auto Shift?
 
 Auto Shift is the closest built-in match for "hold `1` → `!`" — it automatically sends the shifted variant of a key when held past a timeout. For the basic number-row use case it works out of the box with no per-key config. Where it falls short:
 
-1. **Only sends the shifted variant by default.** Auto Shift applies the Shift modifier to the same keycode. To send a completely different keycode on hold (e.g. hold `6` → `KC_MPLY`), you need to override `autoshift_press_user()` with a per-key `switch` statement. This keymap's `hold_keys[]` table handles arbitrary keycodes declaratively — one row per key, no callback.
+1. **Only sends the shifted variant by default.** Auto Shift applies the Shift modifier to the same keycode. To send a completely different keycode on hold (e.g. hold `6` → `KC_MPLY`), you need to override `autoshift_press_user()` with a per-key `switch` statement. This keymap's `key_behaviors[]` table handles arbitrary keycodes declaratively — one entry per key, no callback.
 
 2. **Binary, not three-tier.** Auto Shift is tap-or-hold. There's no "hold longer for a third action" — you get the unshifted or the shifted key, nothing more. This keymap's arrow keys need three tiers (tap = arrow, hold = word jump, longer hold = line jump), which Auto Shift can't express.
 
 3. **Doesn't compose with multi-tap.** Auto Shift owns the key's timing. Stacking double-tap detection on top would require intercepting Auto Shift's internal state, which isn't designed for that. The custom system handles hold and multi-tap in the same processing path.
 
-4. **Delays every tap.** Auto Shift holds the keycode until you release the key or the timeout fires — even for plain taps. For keys not in `tap_actions[]`, this keymap sends the tap immediately on release with no waiting period.
+4. **Delays every tap.** Auto Shift holds the keycode until you release the key or the timeout fires — even for plain taps. For keys not in `key_behaviors[]`, this keymap sends the tap immediately on release with no waiting period.
 
 **Where Auto Shift wins:** Zero-config shifted symbols on alpha keys. If all you need is "hold any letter to capitalize it," Auto Shift is simpler. This keymap doesn't use it because the number row, punctuation, and arrow keys need behaviors Auto Shift can't provide, and running two parallel hold-timing systems on the same keys would conflict.
 
@@ -262,40 +286,47 @@ The custom system replaces mod-tap, tap dance, and Auto Shift entirely rather th
 
 ## Key Behavior System
 
-This keymap uses its own timing system in `process_record_user()` with independent, composable per-feature tables in `key_config.h`. A key can appear in multiple tables to combine behaviors (see [Design Decisions](#design-decisions) above for why).
+This keymap uses its own timing system in `process_record_user()` with a single unified `key_behaviors[]` table in `key_config.h`. Each entry describes one physical key and contains up to `KEY_BEHAVIOR_MAX_TAP_COUNT` tap-count steps (single, double, triple). Each step can independently define `.tap`, `.hold`, and `.long_hold` actions. The schema and authoring macros live in `lib/key_behavior.h`; processing logic lives in `keymap.c`. See [Design Decisions](#design-decisions) above for why this replaces QMK's built-in systems.
 
-### Tables
+### Table
 
-| Table | Purpose | Fields |
+| Table | Purpose | Schema |
 |-------|---------|--------|
-| `hold_keys[]` | Tap vs hold (2-tier) | `keycode`, `hold`, `immediate` |
-| `longer_hold_keys[]` | Third-tier action past 400ms | `keycode`, `longer_hold`, `immediate` |
-| `tap_actions[]` | Action on rapid multi-tap (any count) | `keycode`, `tap_count`, `action`, `hold_action` (optional) |
-| `mode_tap_overrides[]` | Override tap action for mode keys | `keycode`, `tap` |
+| `key_behaviors[]` | Unified tap/hold/long-hold/multi-tap config | `key_behavior_t` — one row per key, `tap_counts[0..2]` with `.tap`, `.hold`, `.long_hold` |
 | `key_combos[]` | Simultaneous key press → action | QMK `COMBO()` entries |
+
+### Authoring macros
+
+| Macro | Where | Meaning |
+|-------|-------|---------|
+| `TAP_SENDS(x)` | `.tap` | Tapping sends `x` instead of the key's normal tap |
+| `PRESS_AND_HOLD_UNTIL_RELEASE(x)` | `.hold` / `.long_hold` | Fires at threshold, stays registered while held (auto-repeat) |
+| `TAP_AT_HOLD_THRESHOLD(x)` | `.hold` / `.long_hold` | Fires once at threshold |
+| `TAP_ON_RELEASE_AFTER_HOLD(x)` | `.hold` / `.long_hold` | Fires once on release (allows choosing between hold/long-hold tiers) |
+| `LOCK_LAYER(n)` | `.tap` or `.hold` | Toggles layer lock on/off |
 
 ### How it works
 
-- **Tap** (< 150ms): Send the plain key (e.g. `1`)
-- **Hold** (150–400ms): Send the hold variant (e.g. `!`)
-- **Longer hold** (> 400ms): Send a third action (e.g. GUI+Arrow for line jump)
-- **Multi-tap**: Tap rapidly N times (each within `CUSTOM_MULTI_TAP_TERM` of the last) → fires the action configured for that tap count in `tap_actions[]`. If the max configured count is reached, it fires immediately; otherwise it waits one more window. If the timer expires at an undefined count, it falls back to the highest defined action below.
-- **Hold-after-multi-tap**: When a `tap_actions[]` entry has a `hold_action`, the state machine enters a pending-hold state instead of firing immediately. Quick release fires `action` (tap); holding past `CUSTOM_TAP_HOLD_TERM` fires `hold_action`. Regular keycodes are registered (held down) and unregistered on physical key release. Custom keycodes like `LAYER_LOCK(n)` dispatch once (toggle).
-- **Layer lock**: `LAYER_LOCK(n)` in `hold_action` toggles a layer on/off. When the hold threshold is reached in `matrix_scan_user`, the MO layer drops immediately so the locked layer becomes the visible active layer. Only one layer can be locked at a time. Tapping an MO key that has a matching `LAYER_LOCK` entry unlocks the layer.
+- **Tap** (< 150ms): Send the plain key (e.g. `1`), or the `.tap` override if present
+- **Hold** (150–400ms): Send the `.hold` action (e.g. `!`)
+- **Longer hold** (> 400ms): Send the `.long_hold` action (e.g. GUI+Arrow for line jump)
+- **Multi-tap**: Tap rapidly N times (each within `CUSTOM_MULTI_TAP_TERM` of the last) → resolves to `tap_counts[N-1]`. Tap-count entries are exact matches; if a count has no entry, the key's normal tap is replayed that many times. If the max configured count is reached with no hold tier, it fires immediately; otherwise it waits one more window.
+- **Hold-after-multi-tap**: When a tap-count step has `.hold`, the state machine enters a pending-hold state. Quick release fires `.tap` (or resumes deferral if more taps exist); holding past `CUSTOM_TAP_HOLD_TERM` fires `.hold`. Hold modes determine timing behavior (see authoring macros above). `LOCK_LAYER(n)` dispatches once (toggle); regular keycodes are registered and unregistered on release.
+- **Layer lock**: `LOCK_LAYER(n)` toggles a layer on/off. When the hold threshold is reached in `matrix_scan_user`, the MO layer drops immediately so the locked layer becomes the visible active layer. Only one layer can be locked at a time. Tapping any MO key while a layer is locked unlocks it.
 
-**Immediate hold detection:** For most keys, `matrix_scan_user()` checks the hold timer every scan cycle (~1ms) and registers the hold variant as soon as the threshold is reached — no release needed. The keycode stays registered (held down) so the OS can auto-repeat it while the physical key is held, and is unregistered on release. Arrow keys are excluded from immediate detection and keep release-based behavior so the user can choose between the hold and longer-hold tiers. `matrix_scan_user` also handles hold-after-multi-tap detection and multi-tap timeout flushing.
+**Immediate hold detection:** For most keys, `matrix_scan_user()` checks the hold timer every scan cycle (~1ms) and registers the hold variant as soon as the threshold is reached — no release needed. The keycode stays registered (held down) so the OS can auto-repeat it while the physical key is held, and is unregistered on release. Arrow keys use `TAP_ON_RELEASE_AFTER_HOLD` and keep release-based behavior so the user can choose between the hold and longer-hold tiers. `matrix_scan_user` also handles hold-after-multi-tap detection and multi-tap timeout flushing.
 
 Hold state tracking uses three statics: `key_timer` (when the key was pressed), `key_active` (which key is held), and `key_hold_fired` (whether the hold action already sent). On release, if `key_hold_fired` is true, any registered `held_action_keycode` is unregistered. Multi-tap state lives in a `multi_tap_t` struct (defined in `lib/multi_tap.h`) that tracks the tap count, timer, pending-hold state, and cached actions.
 
-**MO() layer keys:** `MO(LAYER_LOWER)` and `MO(LAYER_RAISE)` are intercepted via `IS_QK_MOMENTARY()` — no custom keycodes needed. The layer activates immediately on press and deactivates on release (unless locked via `LAYER_LOCK`). Multi-tap and layer lock are handled alongside via `tap_actions[]`. `LAYER_LOCK_BASE` reserves `LAYER_COUNT` custom keycodes; the `LAYER_LOCK(n)` macro indexes into this range.
+**MO() layer keys:** `MO(LAYER_LOWER)` and `MO(LAYER_RAISE)` are intercepted via `IS_QK_MOMENTARY()` — no custom keycodes needed. The layer activates immediately on press and deactivates on release (unless locked via `LOCK_LAYER`). Multi-tap and layer lock are authored in `key_behaviors[]`. `LAYER_LOCK_BASE` reserves `LAYER_COUNT` custom keycodes; the `LOCK_LAYER(n)` macro indexes into this range.
 
 **Applies to:** Number row (1–0), punctuation (- = [ ] \ \` ; ' , .), Left/Right arrows, Enter, and MO() layer keys.
 
 **Longer hold special cases:**
 - Left/Right arrows: tap = arrow, hold = Alt+Arrow (word jump), longer hold = GUI+Arrow (line jump)
-- All other keys: only in `hold_keys[]` (no longer-hold tier)
+- All other keys: hold only (no longer-hold tier)
 
-**Multi-tap note:** Adding a key to `tap_actions[]` introduces a small delay on single taps (one `CUSTOM_MULTI_TAP_TERM` window while waiting for a potential next press). Keys not in the table are unaffected.
+**Multi-tap note:** Adding a multi-tap entry to `key_behaviors[]` introduces a small delay on single taps (one `CUSTOM_MULTI_TAP_TERM` window while waiting for a potential next press). Keys not in the table are unaffected.
 
 ## Pointing Device Modes
 

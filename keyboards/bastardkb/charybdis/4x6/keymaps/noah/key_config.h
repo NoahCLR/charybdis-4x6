@@ -2,9 +2,9 @@
 // Key Configuration — what each key does
 // ────────────────────────────────────────────────────────────────────────────
 //
-// This file holds all the behavioral data for the keymap: per-feature config
-// tables, macro definitions, and LAYOUT arrays.  The processing logic that
-// uses these tables lives in keymap.c.
+// This file holds all the behavioral data for the keymap: the unified
+// key_behaviors[] table, combos, macro definitions, and LAYOUT arrays.
+// The processing logic that uses this data lives in keymap.c.
 //
 // Want to change what a key does?  Edit this file.
 // Want to change how keys are processed?  Edit keymap.c.
