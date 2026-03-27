@@ -67,11 +67,6 @@ enum custom_keycodes {
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
 
-// Lock a layer on from any tap or hold tier in key_behaviors[].
-// Example:
-//   { .keycode = MO(LAYER_LOWER), .tap_counts = { [1] = { .tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LOCK_LAYER(LAYER_NUM)) } } }
-#define LOCK_LAYER(layer) (LAYER_LOCK_BASE + (layer))
-
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
 // key_behaviors[] is the single authored behavior table for keys handled by

@@ -66,6 +66,11 @@
 
 #include QMK_KEYBOARD_H // QMK
 
+// Lock a layer on from any tap or hold tier in key_behaviors[].
+// Example:
+//   { .keycode = MO(LAYER_LOWER), .tap_counts = { [1] = { .tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LOCK_LAYER(LAYER_NUM)) } } }
+#define LOCK_LAYER(layer) (LAYER_LOCK_BASE + (layer))
+
 #include "key_config.h"
 
 #ifdef VIA_ENABLE
