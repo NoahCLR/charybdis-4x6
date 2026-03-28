@@ -36,8 +36,7 @@ enum charybdis_keymap_layers {
 // MACRO_0–15 are generic macro slots (some used, rest reserved for VIA).
 // VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE activate pointing
 // device modes while held.
-// DRG_TOG_ON_HOLD is a dual-purpose key: tap sends the base-layer key at
-// that position, hold toggles drag-scroll lock.
+// DRG_TOG_ON_HOLD's tap/hold behavior is declared in key_behaviors[] below.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
 // actions authored in key_behaviors[].  Use the LOCK_LAYER(n) macro there.
 
@@ -168,6 +167,11 @@ static const key_behavior_t
             // Single tap defaults to the base-layer key at that position unless [0]
             // overrides it here.
             {.keycode = VOLUME_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(KC_MUTE)}}},
+
+            // Dragscroll toggle on hold — tap sends the base-layer key,
+            // hold toggles drag-scroll lock.  If already locked, any
+            // press unlocks (handled by a pre-check in process_record_user).
+            {.keycode = DRG_TOG_ON_HOLD, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(DRAGSCROLL_MODE_TOGGLE)}}},
 };
 
 static const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);

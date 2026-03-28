@@ -113,9 +113,13 @@ bool is_keyboard_master_impl(void) {
 static uint16_t pd_mode_timer;
 static uint16_t pd_mode_timer_keycode = KC_NO;
 
-static inline uint16_t key_behavior_single_tap_action(key_behavior_view_t behavior) {
+static inline uint16_t key_behavior_single_tap_action(key_behavior_view_t behavior, keyrecord_t *record) {
     if (behavior.single.tap.present) return behavior.single.tap.action;
-    return behavior.is_momentary_layer ? KC_NO : behavior.keycode;
+    if (behavior.is_momentary_layer) return KC_NO;
+    // Custom keycodes (DRG_TOG_ON_HOLD, etc.) have no intrinsic tap — fall
+    // back to whatever key occupies this physical position on the base layer.
+    if (behavior.keycode >= SAFE_RANGE) return keymap_key_to_keycode(LAYER_BASE, record->event.key);
+    return behavior.keycode;
 }
 
 static inline uint16_t pd_mode_single_tap_action(keyrecord_t *record, key_behavior_view_t behavior) {
@@ -156,8 +160,12 @@ static inline bool is_layer_lock_action(uint16_t action) {
     return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
 }
 
-// Dispatch an action keycode.  Handles LOCK_LAYER(n) dynamically;
-// everything else falls through to tap_code16.
+// Forward declaration — defined after RGB cache section.
+static void tap_custom_bk_keycode(uint16_t kc);
+
+// Dispatch an action keycode.  Handles LOCK_LAYER(n) and
+// DRAGSCROLL_MODE_TOGGLE dynamically; everything else falls through
+// to tap_code16.
 static void dispatch_action(uint16_t action) {
     if (is_layer_lock_action(action)) {
         uint8_t layer = action - LAYER_LOCK_BASE;
@@ -169,6 +177,12 @@ static void dispatch_action(uint16_t action) {
             layer_on(layer);
             locked_layer = layer;
         }
+        return;
+    }
+    if (action == DRAGSCROLL_MODE_TOGGLE) {
+        tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
+        pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
+        pd_state_sync();
         return;
     }
     tap_code16(action);
@@ -282,6 +296,7 @@ static void tap_custom_bk_keycode(uint16_t kc) {
 // The logic is organized in stages:
 //   1) Flush pending multi-tap on any different key press
 //   2) Pointing device mode keys (press + release)
+//   2b) Dragscroll unlock override for DRG_TOG_ON_HOLD
 //   3) Normalized key behavior (press + release)
 //   4) Early return for releases (everything below is press-only)
 //   5) Macros (press-only)
@@ -293,16 +308,26 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     // --- 2) Pointing device mode keys (react on both press and release) ---
-
-    // 2a) Generic mode keys: tap sends the base-layer key (or override),
-    //     hold activates the pointing-device mode, and key_behaviors[]
-    //     can add multi-tap behavior.
+    //
+    // Generic mode keys: tap sends the base-layer key (or override),
+    // hold activates the pointing-device mode, and key_behaviors[]
+    // can add multi-tap behavior.
+    //
+    // DRAGSCROLL_MODE has extra logic: if drag-scroll was already locked
+    // (via toggle) when pressed, releasing toggles the lock off instead
+    // of the normal tap/hold behavior.
     {
         uint8_t mode = pd_mode_for_keycode(keycode);
         if (mode) {
+            static bool dragscroll_was_locked = false;
             key_behavior_view_t behavior = key_behavior_lookup(keycode);
 
             if (record->event.pressed) {
+                // Remember lock state before momentary activation.
+                if (mode == PD_MODE_DRAGSCROLL) {
+                    dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
+                }
+
                 // Multi-tap detection: same key pressed again while pending.
                 if (multi_tap_active(&multi_tap) && multi_tap.keycode == keycode && behavior.has_multi_tap) {
                     uint16_t action = multi_tap_advance(&multi_tap, keycode, key_behavior_step_lookup,
@@ -315,6 +340,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 pd_mode_timer_keycode = keycode;
                 pd_mode_update(mode, true);
             } else {
+                // Dragscroll was locked before press — toggle off instead.
+                if (mode == PD_MODE_DRAGSCROLL && dragscroll_was_locked) {
+                    dispatch_action(DRAGSCROLL_MODE_TOGGLE);
+                    return false;
+                }
+
                 pd_mode_update(mode, false);
                 if (pd_mode_timer_keycode == keycode && timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
                     // Tap — check for multi-tap deferral first.
@@ -331,57 +362,27 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    // 2b) Special dragscroll keys (need custom press/release logic).
-    switch (keycode) {
-        case DRAGSCROLL_MODE: {
-            static bool dragscroll_was_locked = false;
+    // --- 2b) Dragscroll unlock override for DRG_TOG_ON_HOLD ---
+    //
+    // DRG_TOG_ON_HOLD's tap/hold behavior is declared in key_behaviors[]
+    // (section 3).  But if drag-scroll was already locked when pressed,
+    // any release unlocks it, bypassing normal tap/hold resolution.
+    {
+        static bool drg_tog_was_locked = false;
+        if (keycode == DRG_TOG_ON_HOLD) {
             if (record->event.pressed) {
-                pd_mode_timer         = timer_read();
-                pd_mode_timer_keycode = keycode;
-                dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
-                pd_mode_update(PD_MODE_DRAGSCROLL, true);
-                pd_state_sync();
-                return true;
-            } else {
-                if (dragscroll_was_locked) {
-                    tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
-                    pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
-                    pd_state_sync();
-                    return false;
+                drg_tog_was_locked = charybdis_get_pointer_dragscroll_enabled();
+            } else if (drg_tog_was_locked) {
+                dispatch_action(DRAGSCROLL_MODE_TOGGLE);
+                if (key_active == keycode) {
+                    key_active        = KC_NO;
+                    active_tap_action = KC_NO;
+                    active_hold       = hold_behavior_none();
+                    active_long_hold  = hold_behavior_none();
                 }
-                pd_mode_update(PD_MODE_DRAGSCROLL, false);
-                pd_state_sync();
-                if (pd_mode_timer_keycode == keycode && timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
-                    charybdis_set_pointer_dragscroll_enabled(false);
-                    uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
-                    tap_code16(fallback_key);
-                    return false;
-                }
-                return true;
+                return false;
             }
         }
-
-        case DRG_TOG_ON_HOLD:
-            if (record->event.pressed) {
-                pd_mode_timer         = timer_read();
-                pd_mode_timer_keycode = keycode;
-            } else {
-                bool dragscroll_was_locked = charybdis_get_pointer_dragscroll_enabled();
-
-                if (dragscroll_was_locked) {
-                    tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
-                    pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
-                    pd_state_sync();
-                } else if (pd_mode_timer_keycode == keycode && timer_elapsed(pd_mode_timer) > CUSTOM_TAP_HOLD_TERM) {
-                    tap_custom_bk_keycode(DRAGSCROLL_MODE_TOGGLE);
-                    pd_mode_update(PD_MODE_DRAGSCROLL, charybdis_get_pointer_dragscroll_enabled());
-                    pd_state_sync();
-                } else {
-                    uint16_t fallback_key = keymap_key_to_keycode(LAYER_BASE, record->event.key);
-                    tap_code16(fallback_key);
-                }
-            }
-            return false;
     }
 
     // --- 3) Key behavior view (react on both press and release) ---
@@ -431,7 +432,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 key_timer        = timer_read();
                 key_active       = keycode;
                 key_hold_fired   = false;
-                active_tap_action = key_behavior_single_tap_action(behavior);
+                active_tap_action = key_behavior_single_tap_action(behavior, record);
                 active_hold      = behavior.single.hold;
                 active_long_hold = behavior.single.long_hold;
             } else {

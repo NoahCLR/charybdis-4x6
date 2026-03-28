@@ -22,9 +22,9 @@
 //   ZOOM mode    — Trackball Y-axis controls zoom level.
 //                  Roll up = zoom in (GUI+Plus), roll down = zoom out (GUI+Minus).
 //
-//   DRAGSCROLL   — Not handled here; this flag just tracks whether the
-//                  Charybdis firmware's native drag-scroll is active,
-//                  so RGB can reflect the state.
+//   DRAGSCROLL   — Momentary drag-scroll while held.  The actual trackball
+//                  behavior is handled by the Charybdis firmware; pd_mode_update
+//                  keeps charybdis_set_pointer_dragscroll_enabled in sync.
 //
 // How to add a new mode: see INTERNALS.md → "Add a new trackball mode".
 // Short version: define a flag here, write a handler in
@@ -51,13 +51,12 @@ typedef void (*pd_mode_reset_t)(void);
 // ─── Mode definition struct ─────────────────────────────────────────────
 // Each mode has a flag, an optional custom keycode, and a handler function.
 // Array order = priority order — first active mode wins for both handler
-// dispatch and RGB overlay.  KC_NO means the mode has no dedicated keycode
-// (e.g. dragscroll is activated via Charybdis firmware keycodes).
+// dispatch and RGB overlay.
 
 typedef struct {
     uint8_t           mode_flag;
-    uint16_t          keycode;   // KC_NO for firmware-handled modes
-    pd_mode_handler_t handler;   // NULL for firmware-handled modes
+    uint16_t          keycode;   // keycode that activates this mode (KC_NO = none)
+    pd_mode_handler_t handler;   // NULL = trackball handled externally (e.g. dragscroll)
     pd_mode_reset_t   reset;     // called on deactivation (NULL = no-op)
 } pd_mode_def_t;
 
@@ -100,7 +99,7 @@ static inline bool pd_mode_active(uint8_t mode) {
 
 // mode_flag            keycode          handler                          reset
 static const pd_mode_def_t pd_modes[] = {
-    {PD_MODE_DRAGSCROLL, KC_NO, NULL, NULL},                                             //
+    {PD_MODE_DRAGSCROLL, DRAGSCROLL_MODE, NULL, NULL},                                    //
     {PD_MODE_VOLUME, VOLUME_MODE, handle_volume_mode, reset_volume_mode},                //
     {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, reset_brightness_mode}, //
     {PD_MODE_ZOOM, ZOOM_MODE, handle_zoom_mode, reset_zoom_mode},                        //
@@ -112,6 +111,10 @@ static const pd_mode_def_t pd_modes[] = {
 // Convenience: set or clear a mode based on a boolean, resetting the
 // handler's accumulators on deactivation so stale state doesn't carry
 // into the next activation.
+//
+// For PD_MODE_DRAGSCROLL the actual trackball behavior lives in the
+// Charybdis firmware (charybdis_set_pointer_dragscroll_enabled).
+// We keep it in sync here so callers don't need to manage two states.
 static inline void pd_mode_update(uint8_t mode, bool active) {
     if (active) {
         pd_mode_set(mode);
@@ -123,6 +126,9 @@ static inline void pd_mode_update(uint8_t mode, bool active) {
                 break;
             }
         }
+    }
+    if (mode == PD_MODE_DRAGSCROLL) {
+        charybdis_set_pointer_dragscroll_enabled(active);
     }
 }
 
