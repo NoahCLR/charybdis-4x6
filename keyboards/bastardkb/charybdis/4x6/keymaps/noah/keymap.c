@@ -610,10 +610,6 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
         if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode) return true;
     }
     switch (keycode) {
-        case SNIPING_MODE:
-        case SNIPING_MODE_TOGGLE:
-        case DRAGSCROLL_MODE:
-        case DRAGSCROLL_MODE_TOGGLE:
         case DPI_MOD:
         case DPI_RMOD:
         case S_D_MOD:
