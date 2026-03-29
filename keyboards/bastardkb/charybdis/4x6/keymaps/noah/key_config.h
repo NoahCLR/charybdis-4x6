@@ -37,7 +37,9 @@ enum charybdis_keymap_layers {
 // MACRO_0–15 are generic macro slots (some used, rest reserved for VIA).
 // VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE activate pointing
 // device modes while held.
-// DRG_TOG_ON_HOLD's tap/hold behavior is declared in key_behaviors[] below.
+// DRAGSCROLL: tap = base-layer key, double-tap = lock dragscroll, hold = momentary.
+// The hold path is handled by the pd_mode key system (section 2 in process_record_user).
+// The double-tap dispatches DRAGSCROLL_LOCK via the key_behaviors[] multi-tap system.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
 // actions authored in key_behaviors[].  Use the LOCK_LAYER(n) macro there.
 
@@ -62,7 +64,8 @@ enum custom_keycodes {
     BRIGHTNESS_MODE,
     ARROW_MODE,
     ZOOM_MODE,
-    DRG_TOG_ON_HOLD,
+    DRAGSCROLL,
+    DRAGSCROLL_LOCK, // dispatched by double-tap DRAGSCROLL; handled in dispatch_action
     LAYER_LOCK_BASE, // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
@@ -174,10 +177,8 @@ static const key_behavior_t
             // overrides it here.
             {.keycode = VOLUME_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(KC_MUTE)}}},
 
-            // Dragscroll toggle on hold — tap sends the base-layer key,
-            // hold toggles drag-scroll lock.  If already locked, any
-            // press unlocks (handled by a pre-check in process_record_user).
-            {.keycode = DRG_TOG_ON_HOLD, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(DRAGSCROLL_MODE_TOGGLE)}}},
+            // Dragscroll: tap = base-layer key, double-tap = lock, hold = momentary (via pd_mode).
+            {.keycode = DRAGSCROLL, .tap_counts = {[1] = {.tap = TAP_SENDS(DRAGSCROLL_LOCK)}}},
 };
 
 static const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);
@@ -305,7 +306,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
          MT(MOD_LSFT,KC_CAPS),        LSG(KC_Z),          XXXXXXX,          G(KC_C),          XXXXXXX,           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,           MS_BTN1,           MS_BTN2,           DRGSCRL,           XXXXXXX,        ARROW_MODE,
+                  MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           XXXXXXX,        ARROW_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                        KC_LEFT_GUI,            KC_SPC,           _______,              _______,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
@@ -318,9 +319,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-            KC_LEFT_SHIFT,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,         ZOOM_MODE,           MS_BTN3,   DRG_TOG_ON_HOLD,           SNP_TOG,      KC_RIGHT_GUI,
+            KC_LEFT_SHIFT,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,         ZOOM_MODE,           MS_BTN3,        DRAGSCROLL,           SNP_TOG,      KC_RIGHT_GUI,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,           DRGSCRL,           _______,        ARROW_MODE,
+                  _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        ARROW_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                        KC_LEFT_GUI,      LT(1,KC_SPC),           _______,              _______,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC

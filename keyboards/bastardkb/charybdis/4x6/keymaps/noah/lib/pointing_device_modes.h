@@ -99,7 +99,7 @@ static inline bool pd_mode_active(uint8_t mode) {
 
 // mode_flag            keycode          handler                          reset
 static const pd_mode_def_t pd_modes[] = {
-    {PD_MODE_DRAGSCROLL, DRAGSCROLL_MODE, NULL, NULL},                                    //
+    {PD_MODE_DRAGSCROLL, DRAGSCROLL, NULL, NULL},                                          //
     {PD_MODE_VOLUME, VOLUME_MODE, handle_volume_mode, reset_volume_mode},                //
     {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, reset_brightness_mode}, //
     {PD_MODE_ZOOM, ZOOM_MODE, handle_zoom_mode, reset_zoom_mode},                        //
