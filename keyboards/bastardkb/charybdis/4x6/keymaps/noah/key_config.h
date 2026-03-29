@@ -172,6 +172,15 @@ static const key_behavior_t
                     },
             },
 
+            // Home-row layer-tap key — double-tap locks LAYER_RAISE (same toggle as the thumb MO key).
+            // tap_hold_term inherits the LT() default (TAPPING_TERM) so typing feel is unchanged.
+            {
+                .keycode = LT(LAYER_RAISE, KC_SLSH),
+                .tap_counts = {
+                    [1] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_RAISE))},
+                },
+            },
+
             // Pointing device mode keys.
             // Single tap defaults to the base-layer key at that position unless [0]
             // overrides it here.

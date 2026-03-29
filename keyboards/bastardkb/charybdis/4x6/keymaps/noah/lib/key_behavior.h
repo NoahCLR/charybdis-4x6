@@ -87,6 +87,7 @@ typedef struct {
 
 typedef struct {
     uint16_t            keycode;
+    uint16_t            tap_hold_term;  // 0 = use default for key type (TAPPING_TERM for LT, CUSTOM_TAP_HOLD_TERM otherwise)
     key_behavior_step_t tap_counts[KEY_BEHAVIOR_MAX_TAP_COUNT];
 } key_behavior_t;
 
@@ -115,8 +116,10 @@ typedef struct {
     const key_behavior_t *config;
     uint16_t              keycode;
     bool                  handled;
-    bool                  is_momentary_layer;
+    bool                  is_momentary_layer; // MO() or LT() — engine handles layer_on/off
+    bool                  is_layer_tap;       // specifically LT() — has embedded tap key
     bool                  has_multi_tap;
+    uint16_t              tap_hold_term;      // resolved: per-key if set, else TAPPING_TERM for LT, else CUSTOM_TAP_HOLD_TERM
     key_behavior_step_t   single;
 } key_behavior_view_t;
 
@@ -184,13 +187,20 @@ static inline bool key_behavior_has_multi_tap(uint16_t keycode) {
 static inline key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     const key_behavior_t *config = key_behavior_config_lookup(keycode);
     bool                  is_mo  = IS_QK_MOMENTARY(keycode);
+    bool                  is_lt  = IS_QK_LAYER_TAP(keycode);
+
+    uint16_t term = CUSTOM_TAP_HOLD_TERM;
+    if      (config && config->tap_hold_term) term = config->tap_hold_term;
+    else if (is_lt)                           term = TAPPING_TERM;
 
     return (key_behavior_view_t){
         .config             = config,
         .keycode            = keycode,
-        .handled            = config || is_mo,
-        .is_momentary_layer = is_mo,
+        .handled            = config || is_mo || is_lt,
+        .is_momentary_layer = is_mo || is_lt,
+        .is_layer_tap       = is_lt,
         .has_multi_tap      = config ? key_behavior_has_multi_tap(keycode) : false,
+        .tap_hold_term      = term,
         .single             = config ? config->tap_counts[0] : key_behavior_step_none(),
     };
 }

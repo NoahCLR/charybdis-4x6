@@ -116,11 +116,22 @@ static uint16_t pd_mode_timer_keycode = KC_NO;
 
 static inline uint16_t key_behavior_single_tap_action(key_behavior_view_t behavior, keyrecord_t *record) {
     if (behavior.single.tap.present) return behavior.single.tap.action;
+    if (behavior.is_layer_tap)       return QK_LAYER_TAP_GET_TAP_KEY(behavior.keycode);
     if (behavior.is_momentary_layer) return KC_NO;
     // Custom keycodes (DRAGSCROLL, VOLUME_MODE, etc.) have no intrinsic tap — fall
     // back to whatever key occupies this physical position on the base layer.
     if (behavior.keycode >= SAFE_RANGE) return keymap_key_to_keycode(LAYER_BASE, record->event.key);
     return behavior.keycode;
+}
+
+// Returns the layer number for MO() and LT() keycodes.
+static inline uint8_t behavior_get_layer(uint16_t keycode) {
+    return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
+}
+
+// True for keycodes that activate a layer while held (MO or LT).
+static inline bool is_layer_key(uint16_t keycode) {
+    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
 static inline uint16_t pd_mode_single_tap_action(keyrecord_t *record, key_behavior_view_t behavior) {
@@ -138,9 +149,10 @@ static inline uint16_t pd_mode_single_tap_action(keyrecord_t *record, key_behavi
 
 // Active key tracking — only one key behavior key tracked at a time.
 static uint16_t key_timer;
-static uint16_t key_active     = KC_NO;
-static bool     key_hold_fired = false;
-static uint16_t active_tap_action = KC_NO;
+static uint16_t key_active          = KC_NO;
+static bool     key_hold_fired      = false;
+static uint16_t active_tap_action   = KC_NO;
+static uint16_t active_tap_hold_term = CUSTOM_TAP_HOLD_TERM;
 
 // Cached lookups for the currently active key (populated on press, cleared on release).
 static hold_behavior_t active_hold;
@@ -259,10 +271,11 @@ static void flush_active_key(void) {
     // MO-only or multi-tap-only without hold behavior: layer_off
     // happens on release (independent of key_active), so no action needed.
 
-    key_active       = KC_NO;
-    active_tap_action = KC_NO;
-    active_hold      = hold_behavior_none();
-    active_long_hold = hold_behavior_none();
+    key_active           = KC_NO;
+    active_tap_action    = KC_NO;
+    active_hold          = hold_behavior_none();
+    active_long_hold     = hold_behavior_none();
+    active_tap_hold_term = CUSTOM_TAP_HOLD_TERM;
 }
 
 // ─── RGB Color Cache ─────────────────────────────────────────────────────────
@@ -362,7 +375,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     // Tap — check for multi-tap deferral first.
                     uint16_t tap_key = pd_mode_single_tap_action(record, behavior);
                     if (behavior.has_multi_tap) {
-                        multi_tap_begin(&multi_tap, keycode, tap_key);
+                        multi_tap_begin(&multi_tap, keycode, tap_key, behavior.tap_hold_term);
                     } else {
                         dispatch_action(tap_key);
                     }
@@ -376,10 +389,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 3) Key behavior view (react on both press and release) ---
     //
     // key_behavior_lookup() exposes the authored key_behaviors[] row plus
-    // runtime facts such as "is this an MO() key?".
+    // runtime facts such as "is this an MO() or LT() key?".
     //
-    // MO() keycodes that appear in the behavior view are intercepted here
-    // so we can add multi-tap behavior.  We handle layer_on/layer_off
+    // MO() and LT() keycodes that appear in the behavior view are intercepted
+    // here so we can add multi-tap behavior.  We handle layer_on/layer_off
     // ourselves and return false to prevent QMK from doing it twice.
     {
         key_behavior_view_t behavior = key_behavior_lookup(keycode);
@@ -392,27 +405,28 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     uint16_t action = multi_tap_advance(&multi_tap, keycode, key_behavior_step_lookup,
                                                         key_behavior_has_more_taps);
                     if (action != KC_NO) dispatch_action(action);
-                    // Activate MO() layer so it's on while held.
-                    if (behavior.is_momentary_layer) layer_on(QK_MOMENTARY_GET_LAYER(keycode));
-                    // Track key for release handling when pending hold or MO layer.
+                    // Activate MO()/LT() layer so it's on while held.
+                    if (behavior.is_momentary_layer) layer_on(behavior_get_layer(keycode));
+                    // Track key for release handling when pending hold or MO/LT layer.
                     // flush_active_key() is not needed here: key_active was cleared on the
                     // first release (line 471) before this re-press arrives, so there is
                     // nothing pending for a different key that could be silently dropped.
                     if (multi_tap_pending_hold(&multi_tap) || behavior.is_momentary_layer) {
-                        key_active       = keycode;
-                        key_timer        = timer_read();
+                        key_active           = keycode;
+                        key_timer            = timer_read();
                         // If pending_hold, keep key_hold_fired false so release runs.
-                        key_hold_fired   = !multi_tap_pending_hold(&multi_tap);
-                        active_tap_action = KC_NO;
-                        active_hold      = hold_behavior_none();
-                        active_long_hold = hold_behavior_none();
+                        key_hold_fired       = !multi_tap_pending_hold(&multi_tap);
+                        active_tap_action    = KC_NO;
+                        active_hold          = hold_behavior_none();
+                        active_long_hold     = hold_behavior_none();
+                        active_tap_hold_term = behavior.tap_hold_term;
                     }
                     return false;
                 }
 
-                // MO() layer activation — always turn on immediately.
+                // MO()/LT() layer activation — always turn on immediately.
                 if (behavior.is_momentary_layer) {
-                    layer_on(QK_MOMENTARY_GET_LAYER(keycode));
+                    layer_on(behavior_get_layer(keycode));
                 }
 
                 // If another behavior key is still active (overlapping
@@ -420,12 +434,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 flush_active_key();
 
                 // Normal press — start tracking + cache lookups.
-                key_timer        = timer_read();
-                key_active       = keycode;
-                key_hold_fired   = false;
-                active_tap_action = key_behavior_single_tap_action(behavior, record);
-                active_hold      = behavior.single.hold;
-                active_long_hold = behavior.single.long_hold;
+                key_timer            = timer_read();
+                key_active           = keycode;
+                key_hold_fired       = false;
+                active_tap_action    = key_behavior_single_tap_action(behavior, record);
+                active_hold          = behavior.single.hold;
+                active_long_hold     = behavior.single.long_hold;
+                active_tap_hold_term = behavior.tap_hold_term;
             } else {
                 // Release — resolve pending hold-after-multi-tap first.
                 if (multi_tap_pending_hold(&multi_tap) && multi_tap.keycode == keycode) {
@@ -445,21 +460,22 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     for (uint8_t i = 0; i < repeat_count; i++) {
                         if (action != KC_NO) dispatch_action(action);
                     }
-                    // Deactivate MO() layer unless it was just locked.
+                    // Deactivate MO()/LT() layer unless it was just locked.
                     if (behavior.is_momentary_layer) {
-                        uint8_t layer = QK_MOMENTARY_GET_LAYER(keycode);
+                        uint8_t layer = behavior_get_layer(keycode);
                         if (locked_layer != layer) layer_off(layer);
                     }
-                    key_active       = KC_NO;
-                    active_tap_action = KC_NO;
-                    active_hold      = hold_behavior_none();
-                    active_long_hold = hold_behavior_none();
+                    key_active           = KC_NO;
+                    active_tap_action    = KC_NO;
+                    active_hold          = hold_behavior_none();
+                    active_long_hold     = hold_behavior_none();
+                    active_tap_hold_term = CUSTOM_TAP_HOLD_TERM;
                     return false;
                 }
 
-                // MO() layer deactivates on release (unless locked).
+                // MO()/LT() layer deactivates on release (unless locked).
                 if (behavior.is_momentary_layer) {
-                    uint8_t layer = QK_MOMENTARY_GET_LAYER(keycode);
+                    uint8_t layer = behavior_get_layer(keycode);
                     if (locked_layer != layer) layer_off(layer);
                 }
 
@@ -467,14 +483,16 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 if (key_active != keycode) return false;
 
                 // Snapshot cached lookups before clearing.
-                uint16_t        rel_tap_action = active_tap_action;
-                hold_behavior_t rel_hold       = active_hold;
-                hold_behavior_t rel_long_hold  = active_long_hold;
+                uint16_t        rel_tap_action    = active_tap_action;
+                uint16_t        rel_tap_hold_term = active_tap_hold_term;
+                hold_behavior_t rel_hold          = active_hold;
+                hold_behavior_t rel_long_hold     = active_long_hold;
 
-                key_active       = KC_NO;
-                active_tap_action = KC_NO;
-                active_hold      = hold_behavior_none();
-                active_long_hold = hold_behavior_none();
+                key_active           = KC_NO;
+                active_tap_action    = KC_NO;
+                active_hold          = hold_behavior_none();
+                active_long_hold     = hold_behavior_none();
+                active_tap_hold_term = CUSTOM_TAP_HOLD_TERM;
 
                 // If any keycode is registered (immediate hold, multi-tap hold,
                 // or long-hold), unregister it and we're done.
@@ -490,13 +508,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 // Determine action based on elapsed time.
                 uint16_t elapsed = timer_elapsed(key_timer);
 
-                if (elapsed < CUSTOM_TAP_HOLD_TERM) {
+                if (elapsed < rel_tap_hold_term) {
                     // TAP while any layer is locked → unlock immediately.
                     if (behavior.is_momentary_layer && locked_layer) {
                         layer_off(locked_layer);
                         locked_layer = 0;
                     } else if (behavior.has_multi_tap) {
-                        multi_tap_begin(&multi_tap, keycode, rel_tap_action);
+                        multi_tap_begin(&multi_tap, keycode, rel_tap_action, rel_tap_hold_term);
                     } else if (rel_tap_action != KC_NO) {
                         dispatch_action(rel_tap_action);
                     }
@@ -546,19 +564,19 @@ void matrix_scan_user(void) {
         if (hold_fires_at_threshold(active_long_hold) && elapsed >= CUSTOM_LONGER_HOLD_TERM) {
             promote_to_long_hold(active_long_hold);
         }
-        // Threshold-fired hold fires at CUSTOM_TAP_HOLD_TERM.
-        else if (hold_fires_at_threshold(active_hold) && elapsed >= CUSTOM_TAP_HOLD_TERM) {
+        // Threshold-fired hold fires at the key's tap_hold_term.
+        else if (hold_fires_at_threshold(active_hold) && elapsed >= active_tap_hold_term) {
             fire_hold_at_threshold(active_hold, active_long_hold);
         }
     }
 
     // 2. Hold-after-multi-tap: fire the hold tier once threshold is reached.
     if (multi_tap_hold_elapsed(&multi_tap)) {
-        // Drop the MO layer so a threshold-fired layer lock is immediately visible
+        // Drop the MO/LT layer so a threshold-fired layer lock is immediately visible
         // while the key is still held. The release path will layer_off again,
         // but turning off an already-off layer is a no-op.
-        if (IS_QK_MOMENTARY(key_active) && is_layer_lock_action(multi_tap.hold.action)) {
-            layer_off(QK_MOMENTARY_GET_LAYER(key_active));
+        if (is_layer_key(key_active) && is_layer_lock_action(multi_tap.hold.action)) {
+            layer_off(behavior_get_layer(key_active));
         }
         active_long_hold = multi_tap.long_hold;
         fire_hold_at_threshold(multi_tap.hold, active_long_hold);
