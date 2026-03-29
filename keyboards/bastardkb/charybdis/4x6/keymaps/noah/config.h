@@ -137,6 +137,11 @@
 #        define SPLIT_TRANSACTION_IDS_USER PUT_PD_SYNC
 #    endif
 
+// Reduce sensor polling rate from 1kHz to 500Hz to ease main-loop pressure.
+// At 800 DPI this is still very smooth and gives the serial/RGB tasks room.
+#    undef POINTING_DEVICE_TASK_THROTTLE_MS
+#    define POINTING_DEVICE_TASK_THROTTLE_MS 2
+
 // Liftoff distance — how high the ball can be lifted before tracking stops.
 // Default is 0x02; higher = tracks further from the surface.
 #    define PMW33XX_LIFTOFF_DISTANCE 0x03
