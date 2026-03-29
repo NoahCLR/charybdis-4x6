@@ -104,7 +104,9 @@ REPLACEMENTS = {
     "CUSTOM(81)": "BRIGHTNESS_MODE",  # enum position 17
     "CUSTOM(82)": "ARROW_MODE",       # enum position 18
     "CUSTOM(83)": "ZOOM_MODE",        # enum position 19
-    "CUSTOM(84)": "DRG_TOG_ON_HOLD",  # enum position 20
+    "CUSTOM(84)": "DRAGSCROLL",        # enum position 20
+    # CUSTOM(85) = DRAGSCROLL_LOCK (position 21) — internal, dispatched by double-tap, not placed on layers
+    # CUSTOM(86+) = LAYER_LOCK_BASE + n (positions 22–26) — internal, not placed on layers
 
 }
 
