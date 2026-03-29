@@ -180,9 +180,7 @@ static void dispatch_action(uint16_t action) {
         bool new_state = !charybdis_get_pointer_dragscroll_enabled();
         pd_mode_update(PD_MODE_DRAGSCROLL, new_state);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-        bool am_toggled = get_auto_mouse_toggle();
-        if (new_state && !am_toggled) auto_mouse_toggle();
-        else if (!new_state && am_toggled) auto_mouse_toggle();
+        if ((bool)get_auto_mouse_toggle() != new_state) auto_mouse_toggle();
 #endif
         pd_state_sync();
         return;
@@ -397,6 +395,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     // Activate MO() layer so it's on while held.
                     if (behavior.is_momentary_layer) layer_on(QK_MOMENTARY_GET_LAYER(keycode));
                     // Track key for release handling when pending hold or MO layer.
+                    // flush_active_key() is not needed here: key_active was cleared on the
+                    // first release (line 471) before this re-press arrives, so there is
+                    // nothing pending for a different key that could be silently dropped.
                     if (multi_tap_pending_hold(&multi_tap) || behavior.is_momentary_layer) {
                         key_active       = keycode;
                         key_timer        = timer_read();
@@ -436,6 +437,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                                                              &repeat_count);
                     if (was_release_hold && cached_hold.present && repeat_count == 1 &&
                         action == cached_hold.action) {
+                        // key_timer and mt->timer are set at the same moment (the press event),
+                        // so key_timer is a valid proxy for the hold duration here.
                         action = select_release_hold_action(timer_elapsed(key_timer), cached_hold.action,
                                                             cached_long_hold);
                     }
@@ -615,7 +618,6 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
         case DPI_RMOD:
         case S_D_MOD:
         case S_D_RMOD:
-        case DRAGSCROLL:
             return true;
     }
     return false;
@@ -637,8 +639,16 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     if (layer_state_cmp(state, LAYER_POINTER) && layer_state_cmp(state, LAYER_RAISE)) {
         state &= ~((layer_state_t)1 << LAYER_POINTER);
-    } else if (layer_state_cmp(state, LAYER_POINTER) && (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0 && !get_auto_mouse_toggle() && get_auto_mouse_key_tracker() == 0 && !charybdis_get_pointer_dragscroll_enabled()) {
-        state &= ~((layer_state_t)1 << LAYER_POINTER);
+    } else if (layer_state_cmp(state, LAYER_POINTER)) {
+        // Drop POINTER if another user layer is active and nothing is anchoring auto-mouse
+        // (no toggle, no tracked key, no dragscroll lock).  When POINTER is the only active
+        // layer the auto-mouse timer is still running and should expire on its own.
+        bool other_layer_active  = (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0;
+        bool auto_mouse_anchored = get_auto_mouse_toggle() || get_auto_mouse_key_tracker() != 0
+                                   || charybdis_get_pointer_dragscroll_enabled();
+        if (other_layer_active && !auto_mouse_anchored) {
+            state &= ~((layer_state_t)1 << LAYER_POINTER);
+        }
     }
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
