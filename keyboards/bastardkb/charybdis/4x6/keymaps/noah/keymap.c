@@ -112,6 +112,9 @@ bool is_keyboard_master_impl(void) {
 // stomp each other's timers if pressed in quick succession.
 static uint16_t pd_mode_timer;
 static uint16_t pd_mode_timer_keycode = KC_NO;
+static uint8_t  pd_mode_press_mode = 0; // mode flag for the current pd-mode key press
+static bool     pd_mode_press_was_locked = false;
+static bool     pd_mode_press_activated  = false; // this press momentarily activated the mode
 
 static inline uint16_t key_behavior_single_tap_action(key_behavior_view_t behavior, keyrecord_t *record) {
     if (behavior.single.tap.present) return behavior.single.tap.action;
@@ -136,6 +139,12 @@ static inline bool is_layer_key(uint16_t keycode) {
 static inline uint16_t pd_mode_single_tap_action(keyrecord_t *record, key_behavior_view_t behavior) {
     if (behavior.single.tap.present) return behavior.single.tap.action;
     return keymap_key_to_keycode(LAYER_BASE, record->event.key);
+}
+
+static inline void pd_mode_press_reset(void) {
+    pd_mode_press_mode       = 0;
+    pd_mode_press_was_locked = false;
+    pd_mode_press_activated  = false;
 }
 
 // ─── Key Behavior State ─────────────────────────────────────────────────────
@@ -176,8 +185,71 @@ static inline bool is_layer_lock_action(uint16_t action) {
     return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
 }
 
-// Dispatch an action keycode.  Handles LOCK_LAYER(n) and DRAGSCROLL_LOCK
-// specially; everything else falls through to tap_code16.
+static bool pd_mode_set_lock_state(uint8_t mode, bool locked) {
+    if (locked) {
+        bool changed = false;
+
+        for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+            uint8_t other_mode = pd_modes[i].mode_flag;
+            if (other_mode != mode && pd_mode_locked(other_mode)) {
+                pd_mode_unlock(other_mode);
+                changed = true;
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+                if (other_mode == PD_MODE_DRAGSCROLL && get_auto_mouse_toggle()) {
+                    auto_mouse_toggle();
+                }
+#endif
+            }
+        }
+
+        if (!pd_mode_locked(mode)) {
+            pd_mode_lock(mode);
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+            if (mode == PD_MODE_DRAGSCROLL && !get_auto_mouse_toggle()) {
+                auto_mouse_toggle();
+            }
+#endif
+            changed = true;
+        }
+        return changed;
+    }
+
+    if (!pd_mode_locked(mode)) return false;
+
+    pd_mode_unlock(mode);
+
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    if (mode == PD_MODE_DRAGSCROLL && get_auto_mouse_toggle()) {
+        auto_mouse_toggle();
+    }
+#endif
+
+    return true;
+}
+
+static void pd_mode_toggle_lock(uint8_t mode) {
+    if (pd_mode_set_lock_state(mode, !pd_mode_locked(mode))) {
+        pd_state_sync();
+    }
+}
+
+static void pd_mode_unlock_other_locks(uint8_t keep_mode) {
+    bool changed = false;
+
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        uint8_t mode = pd_modes[i].mode_flag;
+        if (mode != keep_mode) {
+            changed |= pd_mode_set_lock_state(mode, false);
+        }
+    }
+
+    if (changed) {
+        pd_state_sync();
+    }
+}
+
+// Dispatch an action keycode. Handles layer-lock actions and generic
+// LOCK_PD_MODE(...) actions specially; everything else falls through to tap_code16.
 static void dispatch_action(uint16_t action) {
     if (is_layer_lock_action(action)) {
         uint8_t layer = action - LAYER_LOCK_BASE;
@@ -191,13 +263,9 @@ static void dispatch_action(uint16_t action) {
         }
         return;
     }
-    if (action == DRAGSCROLL_LOCK) {
-        bool new_state = !charybdis_get_pointer_dragscroll_enabled();
-        pd_mode_update(PD_MODE_DRAGSCROLL, new_state);
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-        if ((bool)get_auto_mouse_toggle() != new_state) auto_mouse_toggle();
-#endif
-        pd_state_sync();
+    if (is_pd_mode_lock_action(action)) {
+        const pd_mode_def_t *def = pd_mode_lock_action_lookup(action);
+        if (def) pd_mode_toggle_lock(def->mode_flag);
         return;
     }
     tap_code16(action);
@@ -340,31 +408,30 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // hold activates the pointing-device mode, and key_behaviors[]
     // can add multi-tap behavior.
     //
-    // DRAGSCROLL behavior:
-    //   tap         — base-layer key (or multi-tap deferral)
-    //   double-tap  — DRAGSCROLL_LOCK toggle (lock on / unlock)
-    //   hold        — momentary dragscroll while held
-    //   hold while locked — unlock (same as double-tap toggle)
+    // Lockable pd modes:
+    //   tap                    — base-layer key (or multi-tap deferral)
+    //   double-tap             — optional LOCK_PD_MODE(...) action from key_behaviors[]
+    //   hold                   — momentary mode while held
+    //   tap while already locked  — unlock
+    //   hold while already locked — unlock on release after CUSTOM_TAP_HOLD_TERM
+    //   pressing a different pd mode key clears any existing lock first
     //
-    // dragscroll_hold_active tracks whether THIS press activated dragscroll via
-    // hold, so the release handler only deactivates what it activated.
-    // This prevents a hold-while-locked or a multi-tap press from
-    // incorrectly deactivating a lock set by DRAGSCROLL_LOCK.
+    // pd_mode_press_* tracks whether the current press activated the mode
+    // momentarily or found it already locked, so release can distinguish
+    // "turn off the momentary hold" from "leave/toggle the lock alone".
     {
         uint8_t mode = pd_mode_for_keycode(keycode);
         if (mode) {
-            static bool dragscroll_was_locked  = false;
-            static bool dragscroll_hold_active = false;
             key_behavior_view_t behavior = key_behavior_lookup(keycode);
 
             if (record->event.pressed) {
-                if (mode == PD_MODE_DRAGSCROLL) {
-                    dragscroll_was_locked  = charybdis_get_pointer_dragscroll_enabled();
-                    dragscroll_hold_active = false;
-                }
+                pd_mode_unlock_other_locks(mode);
 
                 // Multi-tap detection: same key pressed again while pending.
                 if (multi_tap_active(&multi_tap) && multi_tap.keycode == keycode && behavior.has_multi_tap) {
+                    pd_mode_press_mode       = mode;
+                    pd_mode_press_was_locked = pd_mode_locked(mode);
+                    pd_mode_press_activated  = false;
                     uint16_t action = multi_tap_advance(&multi_tap, keycode, key_behavior_step_lookup,
                                                         key_behavior_has_more_taps);
                     if (action != KC_NO) dispatch_action(action);
@@ -375,30 +442,25 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
                 pd_mode_timer         = timer_read();
                 pd_mode_timer_keycode = keycode;
+                pd_mode_press_mode       = mode;
+                pd_mode_press_was_locked = pd_mode_locked(mode);
+                pd_mode_press_activated  = !pd_mode_press_was_locked;
                 pd_mode_update(mode, true);
-                // Only mark hold active when dragscroll was NOT already locked;
-                // when locked, pd_mode_update is a no-op and we must not deactivate on release.
-                if (mode == PD_MODE_DRAGSCROLL && !dragscroll_was_locked) {
-                    dragscroll_hold_active = true;
-                }
             } else {
-                // Deactivate on release — for DRAGSCROLL, only if this press activated it.
-                if (mode != PD_MODE_DRAGSCROLL) {
+                bool     pressed_this_key = pd_mode_timer_keycode == keycode;
+                uint16_t elapsed          = pressed_this_key ? timer_elapsed(pd_mode_timer) : 0;
+                bool     locked_press =
+                    pd_mode_press_mode == mode && pd_mode_press_was_locked && pd_mode_is_lockable(mode) && pressed_this_key;
+
+                // Deactivate on release only if this press activated the momentary mode.
+                if (pd_mode_press_mode == mode && pd_mode_press_activated) {
                     pd_mode_update(mode, false);
-                } else if (dragscroll_hold_active) {
-                    // Normal momentary hold: deactivate.
-                    dragscroll_hold_active = false;
-                    pd_mode_update(PD_MODE_DRAGSCROLL, false);
-                } else if (dragscroll_was_locked &&
-                           pd_mode_timer_keycode == keycode &&
-                           timer_elapsed(pd_mode_timer) >= CUSTOM_TAP_HOLD_TERM) {
-                    // Hold while locked → unlock.
-                    pd_mode_update(PD_MODE_DRAGSCROLL, false);
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-                    if (get_auto_mouse_toggle()) auto_mouse_toggle();
-#    endif
                 }
-                if (pd_mode_timer_keycode == keycode && timer_elapsed(pd_mode_timer) < CUSTOM_TAP_HOLD_TERM) {
+
+                if (locked_press) {
+                    // Tap or hold on the locked mode key toggles the lock off.
+                    pd_mode_toggle_lock(mode);
+                } else if (pressed_this_key && elapsed < CUSTOM_TAP_HOLD_TERM) {
                     // Tap — check for multi-tap deferral first.
                     uint16_t tap_key = pd_mode_single_tap_action(record, behavior);
                     if (behavior.has_multi_tap) {
@@ -407,6 +469,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         dispatch_action(tap_key);
                     }
                 }
+                pd_mode_press_reset();
             }
             pd_state_sync();
             return false;
@@ -707,15 +770,19 @@ layer_state_t layer_state_set_user(layer_state_t state) {
     charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    if (pd_any_mode_locked() && !layer_state_cmp(state, LAYER_RAISE)) {
+        state |= (layer_state_t)1 << LAYER_POINTER;
+    }
+
     if (layer_state_cmp(state, LAYER_POINTER) && layer_state_cmp(state, LAYER_RAISE)) {
         state &= ~((layer_state_t)1 << LAYER_POINTER);
     } else if (layer_state_cmp(state, LAYER_POINTER)) {
         // Drop POINTER if another user layer is active and nothing is anchoring auto-mouse
-        // (no toggle, no tracked key, no dragscroll lock).  When POINTER is the only active
-        // layer the auto-mouse timer is still running and should expire on its own.
+        // (no toggle, no tracked key, no locked pd mode).  Locked pd modes also force
+        // POINTER back on above so the auto-mouse timeout cannot clear it underneath them.
         bool other_layer_active  = (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0;
         bool auto_mouse_anchored = get_auto_mouse_toggle() || get_auto_mouse_key_tracker() != 0
-                                   || charybdis_get_pointer_dragscroll_enabled();
+                                   || pd_any_mode_locked();
         if (other_layer_active && !auto_mouse_anchored) {
             state &= ~((layer_state_t)1 << LAYER_POINTER);
         }

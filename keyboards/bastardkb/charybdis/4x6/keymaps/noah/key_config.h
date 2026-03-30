@@ -39,7 +39,9 @@ enum charybdis_keymap_layers {
 // device modes while held.
 // DRAGSCROLL: tap = base-layer key, double-tap = lock dragscroll, hold = momentary.
 // The hold path is handled by the pd_mode key system (section 2 in process_record_user).
-// The double-tap dispatches DRAGSCROLL_LOCK via the key_behaviors[] multi-tap system.
+// Pointing-device modes can dispatch LOCK_PD_MODE(mode_keycode) via the
+// key_behaviors[] multi-tap system.
+// PD_MODE_LOCK_BASE reserves one lock/toggle action per pd-mode keycode.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
 // actions authored in key_behaviors[].  Use the LOCK_LAYER(n) macro there.
 
@@ -65,10 +67,12 @@ enum custom_keycodes {
     ARROW_MODE,
     ZOOM_MODE,
     DRAGSCROLL,
-    DRAGSCROLL_LOCK, // dispatched by double-tap DRAGSCROLL; handled in dispatch_action
-    LAYER_LOCK_BASE, // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
+    PD_MODE_LOCK_BASE, // reserves one lock/toggle action per pd-mode keycode — use LOCK_PD_MODE(mode_keycode)
+    LAYER_LOCK_BASE = PD_MODE_LOCK_BASE + (DRAGSCROLL - VOLUME_MODE + 1), // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
+
+#define LOCK_PD_MODE(mode_keycode_) (PD_MODE_LOCK_BASE + ((mode_keycode_) - VOLUME_MODE))
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
@@ -242,9 +246,10 @@ static const key_behavior_t
             // Single tap defaults to the base-layer key at that position unless [0]
             // overrides it here.
             {.keycode = VOLUME_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(KC_MUTE)}}},
+            {.keycode = ARROW_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
 
             // Dragscroll: tap = base-layer key, double-tap = lock, hold = momentary (via pd_mode).
-            {.keycode = DRAGSCROLL, .tap_counts = {[1] = {.tap = TAP_SENDS(DRAGSCROLL_LOCK)}}},
+            {.keycode = DRAGSCROLL, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(DRAGSCROLL))}}},
 };
 
 static const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);

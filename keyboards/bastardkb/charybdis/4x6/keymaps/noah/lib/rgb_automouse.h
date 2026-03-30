@@ -66,6 +66,10 @@ static bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, 
         elapsed = pd_sync_remote.elapsed;
     }
 
+    if (pd_any_mode_locked()) {
+        elapsed = 0;
+    }
+
     if (elapsed > AUTO_MOUSE_TIME) {
         elapsed = AUTO_MOUSE_TIME;
     }

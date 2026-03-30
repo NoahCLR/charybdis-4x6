@@ -14,8 +14,8 @@
 // elapsed stays at 0, so no RPCs fire.  RPCs only happen during the
 // countdown after the user stops moving.
 //
-// Both the auto-mouse elapsed time and the pointing device mode flags
-// are bundled into a single 3-byte packet to avoid the overhead of
+// Both the auto-mouse elapsed time and the pointing device mode state
+// are bundled into a single 4-byte packet to avoid the overhead of
 // multiple RPC transactions.
 //
 // NOTE: The elapsed time comes from auto_mouse_get_time_elapsed(), a
@@ -40,10 +40,11 @@
 #        define PD_SYNC_ELAPSED_STEP 50
 #    endif
 
-// 3-byte packet sent from master → slave.
+// 4-byte packet sent from master → slave.
 typedef struct __attribute__((packed)) {
-    uint16_t elapsed;       // auto-mouse time elapsed, quantized to PD_SYNC_ELAPSED_STEP
-    uint8_t  pd_mode_flags; // bitfield of active pointing device modes
+    uint16_t elapsed;              // auto-mouse time elapsed, quantized to PD_SYNC_ELAPSED_STEP
+    uint8_t  pd_mode_flags;        // bitfield of active pointing device modes
+    uint8_t  pd_mode_locked_flags; // bitfield of locked pointing device modes
 } pd_sync_packet_t;
 
 // pd_sync_remote:    latest packet received on the slave side.
@@ -70,8 +71,8 @@ static void pd_sync_broadcast(const pd_sync_packet_t *pkt) {
 }
 
 // RPC handler that runs on the slave when it receives a packet.
-// Updates pd_sync_remote (for RGB rendering) and pd_mode_flags (for mode
-// overlay colors).
+// Updates pd_sync_remote (for RGB rendering) and the pd-mode state flags
+// used by mode overlays and lock-aware logic on the slave.
 static inline void pd_sync_slave_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
     (void)target2initiator_buffer_size;
     (void)target2initiator_buffer;
@@ -79,7 +80,8 @@ static inline void pd_sync_slave_rpc(uint8_t initiator2target_buffer_size, const
         return;
     }
     memcpy(&pd_sync_remote, initiator2target_buffer, sizeof(pd_sync_packet_t));
-    pd_mode_flags = pd_sync_remote.pd_mode_flags;
+    pd_mode_flags        = pd_sync_remote.pd_mode_flags;
+    pd_mode_locked_flags = pd_sync_remote.pd_mode_locked_flags;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -102,8 +104,9 @@ static inline void split_sync_init(void) {
 static void pd_state_sync_elapsed(uint16_t raw_elapsed) {
     if (!is_keyboard_master()) return;
     pd_sync_packet_t pkt = {
-        .elapsed       = pd_sync_quantize(raw_elapsed),
-        .pd_mode_flags = pd_mode_flags,
+        .elapsed              = pd_any_mode_locked() ? 0 : pd_sync_quantize(raw_elapsed),
+        .pd_mode_flags        = pd_mode_flags,
+        .pd_mode_locked_flags = pd_mode_locked_flags,
     };
     pd_sync_broadcast(&pkt);
 }

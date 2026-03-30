@@ -59,6 +59,7 @@ typedef void (*pd_mode_reset_t)(void);
 typedef struct {
     uint8_t           mode_flag;
     uint16_t          keycode;   // keycode that activates this mode (KC_NO = none)
+    uint16_t          lock_action; // KC_NO = not lockable; otherwise toggles persistent mode lock
     pd_mode_handler_t handler;   // NULL = trackball handled externally (e.g. dragscroll)
     pd_mode_key_handler_t key_handler; // optional key-event interception while mode is active
     pd_mode_reset_t   reset;     // called on deactivation (NULL = no-op)
@@ -68,6 +69,7 @@ typedef struct {
 // Single translation unit (keymap.c includes this header) — static is safe.
 // If this were included from multiple .c files, each would get its own copy.
 static uint8_t pd_mode_flags = 0;
+static uint8_t pd_mode_locked_flags = 0;
 
 static inline void pd_mode_set(uint8_t mode) {
     pd_mode_flags |= mode;
@@ -75,8 +77,20 @@ static inline void pd_mode_set(uint8_t mode) {
 static inline void pd_mode_clear(uint8_t mode) {
     pd_mode_flags &= ~mode;
 }
+static inline void pd_mode_set_locked(uint8_t mode) {
+    pd_mode_locked_flags |= mode;
+}
+static inline void pd_mode_clear_locked(uint8_t mode) {
+    pd_mode_locked_flags &= ~mode;
+}
 static inline bool pd_mode_active(uint8_t mode) {
     return (pd_mode_flags & mode) != 0;
+}
+static inline bool pd_mode_locked(uint8_t mode) {
+    return (pd_mode_locked_flags & mode) != 0;
+}
+static inline bool pd_any_mode_locked(void) {
+    return pd_mode_locked_flags != 0;
 }
 
 // ─── Handler implementations ─────────────────────────────────────────────
@@ -101,16 +115,69 @@ static inline bool pd_mode_active(uint8_t mode) {
 // Defined after the handler functions so the function pointers resolve.
 // NULL handler means the mode is handled externally (dragscroll by firmware).
 
-// mode_flag            keycode          handler                  key_handler             reset
+// mode_flag            keycode          lock_action                     handler                  key_handler             reset
 static const pd_mode_def_t pd_modes[] = {
-    {PD_MODE_DRAGSCROLL, DRAGSCROLL, NULL, NULL, NULL},                                                   //
-    {PD_MODE_VOLUME, VOLUME_MODE, handle_volume_mode, NULL, reset_volume_mode},                          //
-    {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, NULL, reset_brightness_mode},          //
-    {PD_MODE_ZOOM, ZOOM_MODE, handle_zoom_mode, NULL, reset_zoom_mode},                                  //
-    {PD_MODE_ARROW, ARROW_MODE, handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode},             //
+    {PD_MODE_DRAGSCROLL, DRAGSCROLL, LOCK_PD_MODE(DRAGSCROLL), NULL, NULL, NULL},                                     //
+    {PD_MODE_VOLUME, VOLUME_MODE, LOCK_PD_MODE(VOLUME_MODE), handle_volume_mode, NULL, reset_volume_mode},            //
+    {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, LOCK_PD_MODE(BRIGHTNESS_MODE), handle_brightness_mode, NULL, reset_brightness_mode}, //
+    {PD_MODE_ZOOM, ZOOM_MODE, LOCK_PD_MODE(ZOOM_MODE), handle_zoom_mode, NULL, reset_zoom_mode},                      //
+    {PD_MODE_ARROW, ARROW_MODE, LOCK_PD_MODE(ARROW_MODE), handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode}, //
 };
 
 #define PD_MODE_COUNT (sizeof(pd_modes) / sizeof(pd_modes[0]))
+
+static inline const pd_mode_def_t *pd_mode_lookup(uint8_t mode) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_modes[i].mode_flag == mode) return &pd_modes[i];
+    }
+    return NULL;
+}
+
+static inline const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_modes[i].lock_action != KC_NO && pd_modes[i].lock_action == action) return &pd_modes[i];
+    }
+    return NULL;
+}
+
+static inline bool is_pd_mode_lock_action(uint16_t action) {
+    return pd_mode_lock_action_lookup(action) != NULL;
+}
+
+static inline bool pd_mode_is_lockable(uint8_t mode) {
+    const pd_mode_def_t *def = pd_mode_lookup(mode);
+    return def && def->lock_action != KC_NO;
+}
+
+static inline void pd_mode_activate(uint8_t mode) {
+    pd_mode_set(mode);
+    if (mode == PD_MODE_DRAGSCROLL) {
+        charybdis_set_pointer_dragscroll_enabled(true);
+    }
+}
+
+static inline void pd_mode_deactivate(uint8_t mode) {
+    pd_mode_clear(mode);
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_modes[i].mode_flag == mode && pd_modes[i].reset) {
+            pd_modes[i].reset();
+            break;
+        }
+    }
+    if (mode == PD_MODE_DRAGSCROLL) {
+        charybdis_set_pointer_dragscroll_enabled(false);
+    }
+}
+
+static inline void pd_mode_lock(uint8_t mode) {
+    pd_mode_set_locked(mode);
+    pd_mode_activate(mode);
+}
+
+static inline void pd_mode_unlock(uint8_t mode) {
+    pd_mode_clear_locked(mode);
+    pd_mode_deactivate(mode);
+}
 
 // Convenience: set or clear a mode based on a boolean, resetting the
 // handler's accumulators on deactivation so stale state doesn't carry
@@ -121,18 +188,9 @@ static const pd_mode_def_t pd_modes[] = {
 // We keep it in sync here so callers don't need to manage two states.
 static inline void pd_mode_update(uint8_t mode, bool active) {
     if (active) {
-        pd_mode_set(mode);
-    } else {
-        pd_mode_clear(mode);
-        for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-            if (pd_modes[i].mode_flag == mode && pd_modes[i].reset) {
-                pd_modes[i].reset();
-                break;
-            }
-        }
-    }
-    if (mode == PD_MODE_DRAGSCROLL) {
-        charybdis_set_pointer_dragscroll_enabled(active);
+        pd_mode_activate(mode);
+    } else if (!pd_mode_locked(mode)) {
+        pd_mode_deactivate(mode);
     }
 }
 
