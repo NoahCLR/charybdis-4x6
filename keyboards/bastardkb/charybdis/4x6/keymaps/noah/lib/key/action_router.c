@@ -44,5 +44,9 @@ void action_router_dispatch(uint16_t action) {
         return;
     }
 
+    if (macro_dispatch(action)) {
+        return;
+    }
+
     tap_code16(action);
 }

@@ -126,7 +126,7 @@ const key_behavior_t
                 .keycode = PINCH_MODE,
                 .tap_counts =
                     {
-                        [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
+                        [1] = {.tap = TAP_SENDS(MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
                     },
             },
 
@@ -157,6 +157,9 @@ bool macro_dispatch(uint16_t keycode) {
             return true;
         case MACRO_5: // Emoji picker (macOS): Ctrl + GUI + Space
             SEND_STRING(SS_LCTL(SS_LGUI(SS_TAP(X_SPACE))));
+            return true;
+        case MACRO_6: // MacOS Zoom: Alt + GUI + 8
+            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_8))));
             return true;
         default:
             return false;
