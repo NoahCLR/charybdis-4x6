@@ -4,6 +4,8 @@ Use this guide when adding a new trackball / pointing-device mode to the `noah` 
 
 This keymap already has a generic pd-mode runtime. Most new modes are incremental changes, but there are a few invariants that must stay in sync or the lock actions, split sync, and VIA conversion will drift.
 
+Unless stated otherwise, the code snippets below use `EXAMPLE_MODE` / `PD_MODE_EXAMPLE` as placeholders, not as names of real modes in the current firmware.
+
 ## What Counts As A Pd Mode
 
 A pd mode is a custom keycode that:
@@ -14,7 +16,7 @@ A pd mode is a custom keycode that:
 - can optionally intercept key events while active
 - participates in split sync and RGB overlays
 
-Current examples are `VOLUME_MODE`, `BRIGHTNESS_MODE`, `ARROW_MODE`, `ZOOM_MODE`, and `DRAGSCROLL`.
+Current examples are `VOLUME_MODE`, `BRIGHTNESS_MODE`, `ARROW_MODE`, `ZOOM_MODE`, `DRAGSCROLL`, and `PINCH_MODE`.
 
 ## Hard Constraints
 
@@ -35,7 +37,7 @@ These are the parts most likely to break if they are not updated together.
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`
 - `via layouts/via_to_qmk_layout.py`
-- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/VERIFICATION.md`
+- `docs/VERIFICATION.md`
 
 ## Normal Add-Mode Procedure
 
@@ -51,11 +53,12 @@ Example:
     ARROW_MODE,
     ZOOM_MODE,
     DRAGSCROLL,
-    SCRUB_MODE,
+    PINCH_MODE,
+    EXAMPLE_MODE,
     PD_MODE_LOCK_BASE,
 ```
 
-Then update the enum math that currently uses the last pd-mode keycode. If `DRAGSCROLL` is no longer the last pd-mode keycode, replace that expression accordingly.
+Then update the enum math that currently uses the last pd-mode keycode. If `PINCH_MODE` is no longer the last pd-mode keycode, replace that expression accordingly.
 
 ### 2. Add The Mode Flag
 
@@ -73,8 +76,9 @@ Example:
 #define PD_MODE_DRAGSCROLL  (1 << 2)
 #define PD_MODE_BRIGHTNESS  (1 << 3)
 #define PD_MODE_ZOOM        (1 << 4)
-#define PD_MODE_SCRUB       (1 << 5)
-#define PD_MODE_COUNT 6
+#define PD_MODE_PINCH       (1 << 5)
+#define PD_MODE_EXAMPLE     (1 << 6)
+#define PD_MODE_COUNT 7
 ```
 
 ### 3. Add The Handler API
@@ -105,7 +109,7 @@ Use a key handler only if the mode needs to reinterpret keyboard or mouse-button
 In `pointing_device_modes.c`, add a row to `pd_modes[]`:
 
 ```c
-{PD_MODE_SCRUB, SCRUB_MODE, LOCK_PD_MODE(SCRUB_MODE), handle_scrub_mode, NULL, reset_scrub_mode},
+{PD_MODE_EXAMPLE, EXAMPLE_MODE, LOCK_PD_MODE(EXAMPLE_MODE), handle_example_mode, NULL, reset_example_mode},
 ```
 
 Fields are:
@@ -138,10 +142,26 @@ If you want the standard pd-mode behavior:
 add a `key_behaviors[]` row similar to the existing mode keys:
 
 ```c
-{.keycode = SCRUB_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(SCRUB_MODE))}}},
+{.keycode = EXAMPLE_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(EXAMPLE_MODE))}}},
 ```
 
-Then place `SCRUB_MODE` on `LAYER_POINTER`, `LAYER_NAV`, or wherever it belongs physically.
+Then place `EXAMPLE_MODE` on `LAYER_POINTER`, `LAYER_NAV`, or wherever it belongs physically.
+
+If you want a multi-tap hold to enter a different pd mode, copy the `PINCH_MODE` pattern instead of the standard lock pattern.
+
+Example:
+
+```c
+{
+    .keycode = EXAMPLE_MODE,
+    .tap_counts =
+        {
+            [1] = {.tap = TAP_SENDS(MACRO_6), .hold = TAP_AT_HOLD_THRESHOLD(ZOOM_MODE)},
+        },
+},
+```
+
+The pd-mode runtime treats that second-tap hold as an alternate mode path when the hold action resolves to another pd-mode keycode.
 
 ### 8. Add RGB Color
 
@@ -199,9 +219,9 @@ If you hand this task to an AI, give it these requirements:
 3. Update `PD_MODE_COUNT`, the `PD_MODE_*` bit flags, and the `pd_modes[]` table.
 4. Add handler and reset functions in `pointing_device_mode_handlers.c/.h`.
 5. Add the key to the desired layer in `keymap.c` and give it double-tap lock behavior via `LOCK_PD_MODE(...)`.
-6. Add an RGB overlay color in `rgb_config.h`.
-7. Update `via layouts/via_to_qmk_layout.py` so VIA exports render the new symbolic keycode.
-8. Extend `VERIFICATION.md` with lock, unlock, overlap, and auto-mouse checks.
-9. Compile with `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
-10. Do not break the existing pd-mode invariants or the 8-mode flag limit.
-
+6. If the gesture should do something more specific than "double tap locks", document the alternate multi-tap behavior explicitly and wire it in `key_behaviors[]`.
+7. Add an RGB overlay color in `rgb_config.h`.
+8. Update `via layouts/via_to_qmk_layout.py` so VIA exports render the new symbolic keycode.
+9. Extend `VERIFICATION.md` with lock, unlock, overlap, and auto-mouse checks.
+10. Compile with `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+11. Do not break the existing pd-mode invariants or the 8-mode flag limit.
