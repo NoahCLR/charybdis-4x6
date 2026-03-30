@@ -113,7 +113,6 @@ bool is_keyboard_master_impl(void) {
 static uint16_t pd_mode_timer;
 static uint16_t pd_mode_timer_keycode = KC_NO;
 
-
 static inline uint16_t key_behavior_single_tap_action(key_behavior_view_t behavior, keyrecord_t *record) {
     if (behavior.single.tap.present) return behavior.single.tap.action;
     if (behavior.is_layer_tap)       return QK_LAYER_TAP_GET_TAP_KEYCODE(behavior.keycode);
@@ -314,10 +313,11 @@ static rgb_t pd_mode_led_group_rgb[PD_MODE_LED_GROUP_COUNT];
 //
 // The logic is organized in stages:
 //   1) Flush pending multi-tap on any different key press
-//   2) Pointing device mode keys (press + release)
-//   3) Normalized key behavior (press + release)
-//   4) Early return for releases (everything below is press-only)
-//   5) Macros (press-only)
+//   2) Active pointing-device mode key interception
+//   3) Pointing device mode keys (press + release)
+//   4) Normalized key behavior (press + release)
+//   5) Early return for releases (everything below is press-only)
+//   6) Macros (press-only)
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed && key_active != KC_NO && keycode != key_active && is_layer_key(key_active)) {
@@ -329,7 +329,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         multi_tap_flush(&multi_tap, key_behavior_step_lookup, dispatch_action);
     }
 
-    // --- 2) Pointing device mode keys (react on both press and release) ---
+    // --- 2) Active pointing-device mode key interception ---
+    if (pd_mode_handle_key_event(keycode, record)) {
+        return false;
+    }
+
+    // --- 3) Pointing device mode keys (react on both press and release) ---
     //
     // Generic mode keys: tap sends the base-layer key (or override),
     // hold activates the pointing-device mode, and key_behaviors[]
@@ -408,7 +413,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    // --- 3) Key behavior view (react on both press and release) ---
+    // --- 4) Key behavior view (react on both press and release) ---
     //
     // key_behavior_lookup() exposes the authored key_behaviors[] row plus
     // runtime facts such as "is this a handled MO() or configured LT() key?".
@@ -585,12 +590,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    // --- 4) Everything below is press-only — let releases pass through. ---
+    // --- 5) Everything below is press-only — let releases pass through. ---
     if (!record->event.pressed) {
         return true;
     }
 
-    // --- 5) Macros (fire once on key-down, defined in key_config.h) ---
+    // --- 6) Macros (fire once on key-down, defined in key_config.h) ---
     if (macro_dispatch(keycode)) return false;
     return true;
 }

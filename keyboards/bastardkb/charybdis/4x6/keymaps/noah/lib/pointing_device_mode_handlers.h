@@ -156,14 +156,30 @@ static int32_t arrow_acc_y      = 0;    // accumulated Y motion
 static int8_t  arrow_last_x_dir = 0;    // last X direction (+1 or -1)
 static int8_t  arrow_last_y_dir = 0;    // last Y direction (+1 or -1)
 static bool    arrow_axis_is_x  = true; // true = X dominant, false = Y dominant
+static uint8_t arrow_shift_buttons = 0; // bitmask of mouse buttons currently repurposed as Shift
 
-// Send an arrow key, adding Shift if it's currently held.
-// This enables text selection in arrow mode by holding Shift.
+static inline void arrow_shift_sync(void) {
+    if (arrow_shift_buttons) {
+        add_weak_mods(MOD_BIT(KC_LSFT));
+    } else {
+        del_weak_mods(MOD_BIT(KC_LSFT));
+    }
+    send_keyboard_report();
+}
+
+static inline void arrow_send_shortcut(uint16_t shortcut) {
+    del_weak_mods(MOD_BIT(KC_LSFT));
+    send_keyboard_report();
+    tap_code16(shortcut);
+    arrow_shift_sync();
+}
+
+// Send an arrow key. If real or weak Shift is already held (for example via
+// MS_BTN1 in arrow mode), that modifier naturally applies to the tap. Do not
+// wrap the arrow in S(...), because tap_code16(S(...)) would clear the held
+// weak Shift bit on key-up and break continuous selection.
 static inline void arrow_send_key(uint16_t keycode) {
-    if (get_mods() & MOD_MASK_SHIFT)
-        tap_code16(S(keycode));
-    else
-        tap_code(keycode);
+    tap_code(keycode);
 }
 
 // Emit as many arrow presses as the accumulated delta allows.
@@ -232,12 +248,48 @@ static report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
     return freeze_mouse();
 }
 
+// In arrow mode, mouse buttons are repurposed into keyboard helpers instead of
+// actual clicks:
+//   MS_BTN1 — hold Shift for selection
+//   MS_BTN2 — copy
+//   MS_BTN3 — paste
+static inline bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
+    if (!IS_MOUSEKEY_BUTTON(keycode)) return false;
+
+    switch (keycode) {
+        case MS_BTN1: {
+            uint8_t button_mask = (uint8_t)(1u << (keycode - QK_MOUSE_BUTTON_1));
+            if (record->event.pressed) {
+                arrow_shift_buttons |= button_mask;
+            } else {
+                arrow_shift_buttons &= (uint8_t)~button_mask;
+            }
+            arrow_shift_sync();
+            return true;
+        }
+        case MS_BTN2:
+            if (record->event.pressed) {
+                arrow_send_shortcut(G(KC_C));
+            }
+            return true;
+        case MS_BTN3:
+            if (record->event.pressed) {
+                arrow_send_shortcut(G(KC_V));
+            }
+            return true;
+        default:
+            return true;
+    }
+}
+
 static inline void reset_arrow_mode(void) {
     arrow_acc_x      = 0;
     arrow_acc_y      = 0;
     arrow_last_x_dir = 0;
     arrow_last_y_dir = 0;
     arrow_axis_is_x  = true;
+    arrow_shift_buttons = 0;
+    arrow_shift_sync();
 }
 
 #else  // POINTING_DEVICE_ENABLE not defined: provide empty stubs so keymap.c compiles.
@@ -252,6 +304,11 @@ static inline report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
 }
 static inline report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
     return mouse_report;
+}
+static inline bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return false;
 }
 static inline void reset_volume_mode(void) {}
 static inline void reset_brightness_mode(void) {}

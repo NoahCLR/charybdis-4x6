@@ -41,22 +41,26 @@
 // NULL means the mode is handled externally (e.g. dragscroll by charybdis firmware).
 #if defined(POINTING_DEVICE_ENABLE)
 typedef report_mouse_t (*pd_mode_handler_t)(report_mouse_t);
+typedef bool (*pd_mode_key_handler_t)(uint16_t, keyrecord_t *);
 #else
 typedef void *pd_mode_handler_t; // unused stub — lets the struct compile
+typedef void *pd_mode_key_handler_t;
 #endif
 
 // Reset callback: called when a mode deactivates to clear accumulated state.
 typedef void (*pd_mode_reset_t)(void);
 
 // ─── Mode definition struct ─────────────────────────────────────────────
-// Each mode has a flag, an optional custom keycode, and a handler function.
-// Array order = priority order — first active mode wins for both handler
-// dispatch and RGB overlay.
+// Each mode has a flag, an optional custom keycode, and optional handlers for
+// trackball motion and key events while the mode is active.
+// Array order = priority order — first active mode wins for motion dispatch,
+// key interception, and RGB overlay.
 
 typedef struct {
     uint8_t           mode_flag;
     uint16_t          keycode;   // keycode that activates this mode (KC_NO = none)
     pd_mode_handler_t handler;   // NULL = trackball handled externally (e.g. dragscroll)
+    pd_mode_key_handler_t key_handler; // optional key-event interception while mode is active
     pd_mode_reset_t   reset;     // called on deactivation (NULL = no-op)
 } pd_mode_def_t;
 
@@ -97,13 +101,13 @@ static inline bool pd_mode_active(uint8_t mode) {
 // Defined after the handler functions so the function pointers resolve.
 // NULL handler means the mode is handled externally (dragscroll by firmware).
 
-// mode_flag            keycode          handler                          reset
+// mode_flag            keycode          handler                  key_handler             reset
 static const pd_mode_def_t pd_modes[] = {
-    {PD_MODE_DRAGSCROLL, DRAGSCROLL, NULL, NULL},                                          //
-    {PD_MODE_VOLUME, VOLUME_MODE, handle_volume_mode, reset_volume_mode},                //
-    {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, reset_brightness_mode}, //
-    {PD_MODE_ZOOM, ZOOM_MODE, handle_zoom_mode, reset_zoom_mode},                        //
-    {PD_MODE_ARROW, ARROW_MODE, handle_arrow_mode, reset_arrow_mode},                    //
+    {PD_MODE_DRAGSCROLL, DRAGSCROLL, NULL, NULL, NULL},                                                   //
+    {PD_MODE_VOLUME, VOLUME_MODE, handle_volume_mode, NULL, reset_volume_mode},                          //
+    {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, NULL, reset_brightness_mode},          //
+    {PD_MODE_ZOOM, ZOOM_MODE, handle_zoom_mode, NULL, reset_zoom_mode},                                  //
+    {PD_MODE_ARROW, ARROW_MODE, handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode},             //
 };
 
 #define PD_MODE_COUNT (sizeof(pd_modes) / sizeof(pd_modes[0]))
@@ -130,6 +134,18 @@ static inline void pd_mode_update(uint8_t mode, bool active) {
     if (mode == PD_MODE_DRAGSCROLL) {
         charybdis_set_pointer_dragscroll_enabled(active);
     }
+}
+
+// Give active modes first shot at key events using the same priority order as
+// trackball-motion dispatch. A handler returns true when it consumed the event.
+static inline bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_mode_active(pd_modes[i].mode_flag) && pd_modes[i].key_handler &&
+            pd_modes[i].key_handler(keycode, record)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Look up which mode flag a keycode activates.  Returns 0 if not found.
