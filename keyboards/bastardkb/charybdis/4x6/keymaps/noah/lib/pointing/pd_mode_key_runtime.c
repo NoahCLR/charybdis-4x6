@@ -25,7 +25,7 @@ static inline void pd_mode_press_reset(void) {
     pd_mode_press = (pd_mode_press_state_t)PD_MODE_PRESS_STATE_INIT;
 }
 
-bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t mode, bool multi_tap_repress, const pd_mode_key_runtime_hooks_t *hooks) {
+bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t mode, uint16_t tap_hold_term, bool multi_tap_repress, const pd_mode_key_runtime_hooks_t *hooks) {
     if (!mode) return false;
 
     bool state_changed = false;
@@ -79,7 +79,7 @@ bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t 
             if (pd_mode_toggle_lock_state(mode)) {
                 state_changed = true;
             }
-        } else if (pressed_this_key && elapsed < CUSTOM_TAP_HOLD_TERM) {
+        } else if (pressed_this_key && elapsed < tap_hold_term) {
             hooks->dispatch_tap_or_begin_multi_tap(hooks->context, keycode, record);
         }
 
@@ -94,10 +94,11 @@ bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t 
 
 #else
 
-bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t mode, bool multi_tap_repress, const pd_mode_key_runtime_hooks_t *hooks) {
+bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t mode, uint16_t tap_hold_term, bool multi_tap_repress, const pd_mode_key_runtime_hooks_t *hooks) {
     (void)keycode;
     (void)record;
     (void)mode;
+    (void)tap_hold_term;
     (void)multi_tap_repress;
     (void)hooks;
     return false;

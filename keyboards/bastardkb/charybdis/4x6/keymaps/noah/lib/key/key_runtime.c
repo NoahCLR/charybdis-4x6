@@ -210,7 +210,7 @@ static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_k
         .dispatch_action                 = pd_mode_key_runtime_dispatch_action,
     };
 
-    return pd_mode_key_runtime_process(keycode, record, key.pd_mode, handled_key_multi_tap_repress(key, keycode), &hooks);
+    return pd_mode_key_runtime_process(keycode, record, key.pd_mode, key.behavior.tap_hold_term, handled_key_multi_tap_repress(key, keycode), &hooks);
 }
 
 static bool process_key_behavior_press(uint16_t keycode, keyrecord_t *record, handled_key_view_t key) {

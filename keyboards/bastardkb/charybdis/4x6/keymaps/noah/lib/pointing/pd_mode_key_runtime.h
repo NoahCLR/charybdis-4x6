@@ -20,4 +20,4 @@ typedef struct {
     pd_mode_key_runtime_dispatch_action_t                  dispatch_action;
 } pd_mode_key_runtime_hooks_t;
 
-bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t mode, bool multi_tap_repress, const pd_mode_key_runtime_hooks_t *hooks);
+bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t mode, uint16_t tap_hold_term, bool multi_tap_repress, const pd_mode_key_runtime_hooks_t *hooks);
