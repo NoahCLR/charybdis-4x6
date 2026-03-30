@@ -110,9 +110,9 @@ typedef struct {
 #define TAP_ON_RELEASE_AFTER_HOLD(action_) \
     { .present = true, .action = (action_), .mode = HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD }
 
-// key_config.h defines these with internal linkage.
-static const key_behavior_t key_behaviors[];
-static const uint8_t        key_behavior_count;
+// key_config.h defines these once when KEY_CONFIG_DEFINE_BEHAVIORS is set.
+extern const key_behavior_t key_behaviors[];
+extern const uint8_t        key_behavior_count;
 
 typedef struct {
     const key_behavior_t *config;

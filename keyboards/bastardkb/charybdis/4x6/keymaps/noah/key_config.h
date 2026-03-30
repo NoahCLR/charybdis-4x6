@@ -4,10 +4,10 @@
 //
 // This file holds all the behavioral data for the keymap: the unified
 // key_behaviors[] table, combos, macro definitions, and LAYOUT arrays.
-// The processing logic that uses this data lives in keymap.c.
+// The processing logic that uses this data lives in runtime modules under lib/.
 //
 // Want to change what a key does?  Edit this file.
-// Want to change how keys are processed?  Edit keymap.c.
+// Want to change how keys are processed?  Edit the runtime modules under lib/.
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
@@ -73,6 +73,10 @@ enum custom_keycodes {
 };
 
 #define LOCK_PD_MODE(mode_keycode_) (PD_MODE_LOCK_BASE + ((mode_keycode_) - VOLUME_MODE))
+#define LOCK_LAYER(layer_)          (LAYER_LOCK_BASE + (layer_))
+
+bool macro_dispatch(uint16_t keycode);
+extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
@@ -171,8 +175,10 @@ enum custom_keycodes {
 //     PRESS_AND_HOLD_UNTIL_RELEASE + TAP_AT_HOLD_THRESHOLD         — key A registered; at longer_hold_term: unregister A, fire B immediately
 //     PRESS_AND_HOLD_UNTIL_RELEASE + PRESS_AND_HOLD_UNTIL_RELEASE  — key A registered; at longer_hold_term: unregister A, register B until release
 
+#ifdef KEY_CONFIG_DEFINE_BEHAVIORS
+
 // keycode                single / double / triple / N behavior
-static const key_behavior_t
+const key_behavior_t
     key_behaviors[] =
         {
             // Number row — shifted symbols on hold, media on double-tap
@@ -252,27 +258,9 @@ static const key_behavior_t
             {.keycode = DRAGSCROLL, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(DRAGSCROLL))}}},
 };
 
-static const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);
+const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);
 
-// ─── Combos ─────────────────────────────────────────────────────────────────
-//
-// Press multiple keys simultaneously to trigger a different action.
-// Each combo can use 2 or more trigger keys — there is no hard limit.
-// COMBO_TERM (in config.h) controls the max time window for keys to
-// register as a combo.
-//
-// To add a combo:
-//   1. Define a PROGMEM key array ending with COMBO_END.
-//   2. Add a COMBO() entry to key_combos[] in the same order.
-//
-// Important: trigger keys must match the exact keycode in the layout,
-// including any LT() or MT() wrappers (e.g. LT(LAYER_RAISE, KC_F), not KC_F).
-
-const uint16_t PROGMEM combo_keys_1[] = {KC_D, LT(LAYER_RAISE, KC_F), COMBO_END};
-
-combo_t key_combos[] = {
-    COMBO(combo_keys_1, KC_TAB), // D + F → Tab
-};
+#endif // KEY_CONFIG_DEFINE_BEHAVIORS
 
 // ─── Macros ─────────────────────────────────────────────────────────────────
 //
@@ -282,7 +270,9 @@ combo_t key_combos[] = {
 // To add a macro: add a case below, and make sure the keycode exists in the
 // custom_keycodes enum above.
 
-static inline bool macro_dispatch(uint16_t keycode) {
+#ifdef KEY_CONFIG_DEFINE_MACROS
+
+bool macro_dispatch(uint16_t keycode) {
     switch (keycode) {
         case MACRO_0: // Spotlight search (macOS): GUI + Space
             SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
@@ -307,96 +297,8 @@ static inline bool macro_dispatch(uint16_t keycode) {
     }
 }
 
-// ─── Keymap Layouts ─────────────────────────────────────────────────────────
-//
-// QMK key prefixes quick reference:
-//   KC_     = plain keycode              MT() = mod on hold, key on tap
-//   LT(l,k) = layer l on hold, k on tap  MO() = momentary layer while held
-//   G()     = GUI + key                   A()  = Alt + key
-//   S()     = Shift + key                 LCAG() = Ctrl+Alt+GUI + key
-//   LSG()   = Left Shift+GUI + key        LAG()  = Left Alt+GUI + key
-//
-//   - XXXXXXX = key does nothing on this layer.
-//     _______ = transparent, falls through to the layer below.
-//
-// The number row (KC_1–KC_0) and punctuation keys use the key behavior
-// tables defined above — they are NOT using QMK's built-in mod-tap.
-// See process_record_user() in keymap.c for details.
-const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-    // clang-format off
-    [LAYER_BASE] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                   KC_ESC,              KC_1,              KC_2,              KC_3,              KC_4,              KC_5,                 KC_6,              KC_7,              KC_8,              KC_9,              KC_0,           KC_MINS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                   KC_TAB,              KC_Q,              KC_W,              KC_E,              KC_R,              KC_T,                 KC_Y,              KC_U,              KC_I,              KC_O,              KC_P,           KC_BSLS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-         MT(MOD_LSFT,KC_CAPS),             KC_A,             KC_S,             KC_D,       LT(3,KC_F),              KC_G,                 KC_H,        LT(2,KC_J),              KC_K,              KC_L,           KC_SCLN,           KC_QUOT,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-             KC_LEFT_CTRL,        LT(2,KC_Z),              KC_X,              KC_C,              KC_V,              KC_B,                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(3,KC_SLSH),      KC_RIGHT_ALT,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,             MO(2),                MO(3),            KC_ENT,
-                                                                                               KC_DEL,           KC_BSPC,              KC_BSPC
-  //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
-    ),
+#endif // KEY_CONFIG_DEFINE_MACROS
 
-    [LAYER_NUM] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P7,             KC_P8,             KC_P9,           XXXXXXX,           KC_PPLS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,             MO(3),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           _______,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,           _______,              _______,             KC_P0,
-                                                                                               KC_DEL,           KC_BSPC,              KC_BSPC
-  //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
-    ),
-
-    [LAYER_LOWER] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                   KC_ESC,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LPRN,           KC_RPRN,           KC_QUOT,           KC_PPLS,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-            KC_LEFT_SHIFT,           XXXXXXX,           XXXXXXX,           XXXXXXX,            KC_ESC,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,           KC_DQUO,           KC_PEQL,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-             KC_LEFT_CTRL,           _______,        LCAG(KC_X),        LCAG(KC_C),         LSG(KC_V),           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LCBR,           KC_RCBR,           _______,      KC_RIGHT_ALT,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,           _______,              _______,            KC_ENT,
-                                                                                               KC_DEL,           KC_BSPC,              KC_BSPC
-  //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
-    ),
-
-    [LAYER_RAISE] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-              LAG(KC_ESC),           XXXXXXX,           XXXXXXX,        LCAG(KC_V),           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-         MT(MOD_LSFT,KC_CAPS),        LSG(KC_Z),          XXXXXXX,          G(KC_C),          XXXXXXX,           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        ARROW_MODE,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,           _______,              _______,            KC_ENT,
-                                                                                               KC_DEL,           KC_BSPC,              KC_BSPC
-  //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
-    ),
-
-    [LAYER_POINTER] = LAYOUT(
-  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-            KC_LEFT_SHIFT,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,         ZOOM_MODE,           MS_BTN3,        ARROW_MODE,           XXXXXXX,      KC_RIGHT_GUI,
-  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        ARROW_MODE,
-  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,      LT(1,KC_SPC),           _______,              _______,            KC_ENT,
-                                                                                               KC_DEL,           KC_BSPC,              KC_BSPC
-  //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
-    ),
-    // clang-format on
-};
+// Combo definitions and physical keymap layouts live in keymap.c so that the
+// file users open actually shows the board layout, and because QMK's keymap
+// introspection expects combo definitions in that translation unit.

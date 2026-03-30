@@ -6,7 +6,7 @@
 // highlights, and auto-mouse gradient endpoints.
 //
 // Want to change a color?  Edit this file.
-// Want to change the rendering logic?  Edit keymap.c.
+// Want to change the rendering logic?  Edit lib/rgb_runtime.c.
 // For the split-safe LED helper functions, see rgb_helpers.h.
 //
 // ────────────────────────────────────────────────────────────────────────────
