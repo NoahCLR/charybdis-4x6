@@ -20,7 +20,11 @@
 #    define AUTOMOUSE_RGB_ACTIVE_SPAN (AUTO_MOUSE_TIME - AUTOMOUSE_RGB_DEAD_TIME)
 
 #    ifndef AUTOMOUSE_RGB_SYNC_STEP
-#        define AUTOMOUSE_RGB_SYNC_STEP 50
+#        ifdef RGB_MATRIX_LED_FLUSH_LIMIT
+#            define AUTOMOUSE_RGB_SYNC_STEP RGB_MATRIX_LED_FLUSH_LIMIT
+#        else
+#            define AUTOMOUSE_RGB_SYNC_STEP 50
+#        endif
 #    endif
 
 _Static_assert(AUTOMOUSE_RGB_SYNC_STEP > 0, "AUTOMOUSE_RGB_SYNC_STEP must be greater than zero");
