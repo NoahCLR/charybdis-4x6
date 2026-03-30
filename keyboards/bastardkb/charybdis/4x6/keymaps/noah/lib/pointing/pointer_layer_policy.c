@@ -58,13 +58,13 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     bool auto_mouse_anchored = pointer_layer_policy_auto_mouse_anchored();
 
     // Keep LAYER_POINTER alive while anchored. Active pd modes must survive
-    // even if QMK drops POINTER underneath an LT-held RAISE key.
-    if (pd_mode_running || (auto_mouse_anchored && !layer_state_cmp(state, LAYER_RAISE))) {
+    // even if QMK drops POINTER underneath an LT-held NAV key.
+    if (pd_mode_running || (auto_mouse_anchored && !layer_state_cmp(state, LAYER_NAV))) {
         state |= (layer_state_t)1 << LAYER_POINTER;
     }
 
-    if (layer_state_cmp(state, LAYER_POINTER) && layer_state_cmp(state, LAYER_RAISE)) {
-        // RAISE takes over from POINTER, but not while a pd mode is running.
+    if (layer_state_cmp(state, LAYER_POINTER) && layer_state_cmp(state, LAYER_NAV)) {
+        // NAV takes over from POINTER, but not while a pd mode is running.
         if (!auto_mouse_anchored) {
             state &= ~((layer_state_t)1 << LAYER_POINTER);
         }

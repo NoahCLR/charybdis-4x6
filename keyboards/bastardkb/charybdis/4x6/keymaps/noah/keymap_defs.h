@@ -19,8 +19,8 @@
 enum charybdis_keymap_layers {
     LAYER_BASE = 0, // Default QWERTY typing layer
     LAYER_NUM,      // Numpad on the right half
-    LAYER_LOWER,    // Symbols and DPI controls
-    LAYER_RAISE,    // Navigation, media, and mouse buttons (sniping enabled)
+    LAYER_SYM,      // Symbols, brackets, and DPI controls
+    LAYER_NAV,      // Navigation, media, macros, and mouse buttons (sniping enabled)
     LAYER_POINTER,  // Auto-mouse layer: activates on trackball movement, deactivates after timeout
     LAYER_COUNT,
 };

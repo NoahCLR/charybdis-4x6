@@ -16,28 +16,28 @@ This keymap's highest-risk behavior lives in `process_record_user()`, `matrix_sc
 
 - [ ] Tap `KC_1` once on the base layer => `1`.
 - [ ] Hold `KC_1` past `CUSTOM_TAP_HOLD_TERM` => `!` repeats while held and stops on release.
-- [ ] Switch to `LAYER_RAISE` and tap `KC_LEFT` => one Left Arrow.
-- [ ] On `LAYER_RAISE`, hold `KC_LEFT` past `CUSTOM_TAP_HOLD_TERM` but release before `CUSTOM_LONGER_HOLD_TERM` => one `Option+Left` on release.
-- [ ] On `LAYER_RAISE`, hold `KC_LEFT` past `CUSTOM_LONGER_HOLD_TERM` => one `Command+Left` at the long-hold threshold and no extra `Option+Left` on release.
+- [ ] Switch to `LAYER_NAV` and tap `KC_LEFT` => one Left Arrow.
+- [ ] On `LAYER_NAV`, hold `KC_LEFT` past `CUSTOM_TAP_HOLD_TERM` but release before `CUSTOM_LONGER_HOLD_TERM` => one `Option+Left` on release.
+- [ ] On `LAYER_NAV`, hold `KC_LEFT` past `CUSTOM_LONGER_HOLD_TERM` => one `Command+Left` at the long-hold threshold and no extra `Option+Left` on release.
 - [ ] Repeat the previous two checks with `KC_RIGHT` => `Option+Right` and `Command+Right`.
 
 ## Multi-Tap And Interruption
 
-- [ ] Tap `MO(LAYER_LOWER)` once and wait for resolution => `LAYER_LOWER` locks.
-- [ ] Tap `MO(LAYER_LOWER)` once, then immediately tap `KC_K` => the pending tap flushes first and `[` is emitted, not `k`.
-- [ ] Double tap `MO(LAYER_LOWER)` and release quickly => `KC_MPLY`.
-- [ ] Double tap `MO(LAYER_LOWER)`, hold the second tap past `CUSTOM_TAP_HOLD_TERM`, then release => `LAYER_NUM` locks.
-- [ ] Tap `MO(LAYER_LOWER)` again while `LAYER_LOWER` is locked => unlocks back to the previous layer state.
+- [ ] Tap `MO(LAYER_SYM)` once and wait for resolution => `LAYER_SYM` locks.
+- [ ] Tap `MO(LAYER_SYM)` once, then immediately tap `KC_K` => the pending tap flushes first and `[` is emitted, not `k`.
+- [ ] Double tap `MO(LAYER_SYM)` and release quickly => `KC_MPLY`.
+- [ ] Double tap `MO(LAYER_SYM)`, hold the second tap past `CUSTOM_TAP_HOLD_TERM`, then release => `LAYER_NUM` locks.
+- [ ] Tap `MO(LAYER_SYM)` again while `LAYER_SYM` is locked => unlocks back to the previous layer state.
 - [ ] Double tap `ARROW_MODE` => arrow mode locks.
 - [ ] Tap any unrelated key while a single tap on `ARROW_MODE` is still pending => the pending tap resolves instead of keeping the mode key in limbo.
 
 ## Layer Lock And Momentary Overlap
 
-- [ ] Lock `LAYER_LOWER` with a single tap on `MO(LAYER_LOWER)`, then hold `MO(LAYER_RAISE)` => raise mappings win while held.
-- [ ] Release `MO(LAYER_RAISE)` from the previous step => returns to locked `LAYER_LOWER`.
-- [ ] While `LAYER_RAISE` is locked or momentary-active, use `KC_LEFT` or `KC_RIGHT` hold behavior => the custom hold logic still works on the raised layer.
-- [ ] Double tap and hold `LT(LAYER_RAISE, KC_SLSH)` past `TAPPING_TERM` => `LAYER_RAISE` locks.
-- [ ] Tap `LT(LAYER_RAISE, KC_SLSH)` normally => `/` with no change in tap feel.
+- [ ] Lock `LAYER_SYM` with a single tap on `MO(LAYER_SYM)`, then hold `MO(LAYER_NAV)` => nav mappings win while held.
+- [ ] Release `MO(LAYER_NAV)` from the previous step => returns to locked `LAYER_SYM`.
+- [ ] While `LAYER_NAV` is locked or momentary-active, use `KC_LEFT` or `KC_RIGHT` hold behavior => the custom hold logic still works on the nav layer.
+- [ ] Double tap and hold `LT(LAYER_NAV, KC_SLSH)` past `TAPPING_TERM` => `LAYER_NAV` locks.
+- [ ] Tap `LT(LAYER_NAV, KC_SLSH)` normally => `/` with no change in tap feel.
 
 ## Pointing-Device Mode Overlap
 
@@ -51,11 +51,11 @@ This keymap's highest-risk behavior lives in `process_record_user()`, `matrix_sc
 - [ ] In arrow mode, hold `MS_BTN1`, move the ball to select text, and switch layers while still holding `MS_BTN1` => selection shift stays correct throughout the layer change.
 - [ ] In arrow mode, use `MS_BTN2` and `MS_BTN3` => copy/paste shortcuts fire without inheriting stray held modifiers.
 
-## Auto-Mouse, Pointer Layer, Raise/Lower
+## Auto-Mouse, Pointer Layer, Nav/Sym
 
 - [ ] Move the trackball from `LAYER_BASE` => `LAYER_POINTER` auto-activates and the RGB timeout gradient starts.
-- [ ] With auto-pointer active but no pointing-device mode running, hold `MO(LAYER_RAISE)` => raise mappings win and pointer-only bindings do not leak through.
-- [ ] While a pointing-device mode is held or locked, hold a layer key such as `MO(LAYER_RAISE)` or `LT(LAYER_RAISE, KC_SLSH)` => the pointing mode stays alive and the pointer layer is not dropped underneath it.
+- [ ] With auto-pointer active but no pointing-device mode running, hold `MO(LAYER_NAV)` => nav mappings win and pointer-only bindings do not leak through.
+- [ ] While a pointing-device mode is held or locked, hold a layer key such as `MO(LAYER_NAV)` or `LT(LAYER_NAV, KC_SLSH)` => the pointing mode stays alive and the pointer layer is not dropped underneath it.
 - [ ] Release all layer keys and stop moving the trackball => `LAYER_POINTER` clears after `AUTO_MOUSE_TIME`.
 - [ ] Lock dragscroll, stop moving the trackball, and wait longer than `AUTO_MOUSE_TIME` => dragscroll lock keeps the pointer behavior alive until it is explicitly unlocked.
 

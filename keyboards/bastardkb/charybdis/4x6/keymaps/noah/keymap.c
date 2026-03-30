@@ -86,10 +86,10 @@ const key_behavior_t
 
             // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
             {
-                .keycode = MO(LAYER_LOWER),
+                .keycode = MO(LAYER_SYM),
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_LOWER))},
+                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_SYM))},
                         [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
@@ -97,23 +97,23 @@ const key_behavior_t
             },
 
             {
-                .keycode = MO(LAYER_RAISE),
+                .keycode = MO(LAYER_NAV),
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_RAISE))},
+                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV))},
                         [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
                     },
             },
 
-            // Home-row layer-tap key — double-tap locks LAYER_RAISE.
+            // Home-row layer-tap key — double-tap locks LAYER_NAV.
             // tap_hold_term inherits the LT() default (TAPPING_TERM) so typing feel is unchanged.
             {
-                .keycode = LT(LAYER_RAISE, KC_SLSH),
+                .keycode = LT(LAYER_NAV, KC_SLSH),
                 .tap_counts =
                     {
-                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_RAISE))},
+                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))},
                     },
             },
 
@@ -158,7 +158,7 @@ bool macro_dispatch(uint16_t keycode) {
 
 // ─── Combos ─────────────────────────────────────────────────────────────────
 
-const uint16_t PROGMEM combo_keys_1[] = {KC_D, LT(LAYER_RAISE, KC_F), COMBO_END};
+const uint16_t PROGMEM combo_keys_1[] = {KC_D, LT(LAYER_NAV, KC_F), COMBO_END};
 
 combo_t key_combos[] = {
     COMBO(combo_keys_1, KC_TAB), // D + F → Tab
@@ -187,11 +187,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                    KC_TAB,              KC_Q,              KC_W,              KC_E,              KC_R,              KC_T,                 KC_Y,              KC_U,              KC_I,              KC_O,              KC_P,           KC_BSLS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-         MT(MOD_LSFT,KC_CAPS),             KC_A,             KC_S,             KC_D,       LT(3,KC_F),              KC_G,                 KC_H,        LT(2,KC_J),              KC_K,              KC_L,           KC_SCLN,           KC_QUOT,
+         MT(MOD_LSFT,KC_CAPS),            KC_A,            KC_S,             KC_D,  LT(LAYER_NAV,KC_F),             KC_G,                KC_H,  LT(LAYER_SYM,KC_J),             KC_K,              KC_L,           KC_SCLN,           KC_QUOT,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-             KC_LEFT_CTRL,        LT(2,KC_Z),              KC_X,              KC_C,              KC_V,              KC_B,                 KC_N,              KC_M,           KC_COMM,            KC_DOT,     LT(3,KC_SLSH),      KC_RIGHT_ALT,
+            KC_LEFT_CTRL,  LT(LAYER_SYM,KC_Z),             KC_X,              KC_C,              KC_V,              KC_B,                KC_N,             KC_M,          KC_COMM,           KC_DOT,  LT(LAYER_NAV,KC_SLSH),     KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,             MO(2),                MO(3),            KC_ENT,
+                                                                       KC_LEFT_GUI,            KC_SPC,     MO(LAYER_SYM),        MO(LAYER_NAV),            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
   //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
     ),
@@ -202,7 +202,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P7,             KC_P8,             KC_P9,           XXXXXXX,           KC_PPLS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,             MO(3),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
+                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,     MO(LAYER_NAV),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   XXXXXXX,           _______,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -211,7 +211,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
     ),
 
-    [LAYER_LOWER] = LAYOUT(
+    [LAYER_SYM] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
                    KC_ESC,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -226,7 +226,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
     ),
 
-    [LAYER_RAISE] = LAYOUT(
+    [LAYER_NAV] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
               LAG(KC_ESC),           XXXXXXX,           XXXXXXX,        LCAG(KC_V),           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -251,7 +251,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        ARROW_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,      LT(1,KC_SPC),           _______,              _______,            KC_ENT,
+                                                                     KC_LEFT_GUI,  LT(LAYER_NUM,KC_SPC),         _______,              _______,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
   //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
     ),

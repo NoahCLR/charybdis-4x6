@@ -29,9 +29,34 @@ MODE = "write"
 LAYER_NAMES = [
     "LAYER_BASE",
     "LAYER_NUM",
-    "LAYER_LOWER",
-    "LAYER_RAISE",
+    "LAYER_SYM",
+    "LAYER_NAV",
     "LAYER_POINTER",
+]
+
+MACRO_COUNT = 16
+VIA_CUSTOM_BASE = 64
+
+# Upstream Charybdis keyboard keycodes, defined in `charybdis.h` at QK_KB_0..7.
+# These are separate from this repo's `keymap_defs.h` SAFE_RANGE enum.
+CHARYBDIS_UPSTREAM_KEYCODES = [
+    "DPI_MOD",
+    "DPI_RMOD",
+    "S_D_MOD",
+    "S_D_RMOD",
+    "SNIPING",
+    "SNP_TOG",
+    "DRGSCRL",
+    "DRG_TOG",
+]
+
+# Current custom_keycodes enum entries that can appear directly on VIA layers.
+PD_MODE_KEYCODES = [
+    "VOLUME_MODE",
+    "BRIGHTNESS_MODE",
+    "ARROW_MODE",
+    "ZOOM_MODE",
+    "DRAGSCROLL",
 ]
 
 # Token normalisation: VIA JSON format → QMK keymap style.
@@ -82,39 +107,26 @@ REPLACEMENTS = {
     "S(KC_QUOT)": "KC_DQUO",
     "S(KC_RBRC)": "KC_RCBR",
     "S(KC_LBRC)": "KC_LCBR",
-
-    # Charybdis firmware keycodes (VIA CUSTOM 0–7)
-    "CUSTOM(0)": "DPI_MOD",
-    "CUSTOM(1)": "DPI_RMOD",
-    "CUSTOM(2)": "S_D_MOD",
-    "CUSTOM(3)": "S_D_RMOD",
-    "CUSTOM(4)": "SNIPING",
-    "CUSTOM(5)": "SNP_TOG",
-    "CUSTOM(6)": "DRGSCRL",
-    "CUSTOM(7)": "DRG_TOG",
-
-    # Custom keycodes (VIA CUSTOM 80+)
-    # VIA assigns CUSTOM(64 + n) where n is the keycode's position in
-    # keymap_defs.h's custom_keycodes enum (0-indexed from SAFE_RANGE).
-    # MACRO_0–15 are positions 0–15 → CUSTOM(64)–CUSTOM(79) (generated below).
-    # The keycodes after MACRO_15 start at position 16 → CUSTOM(80).
-    # → Adding a new custom keycode?  Append it to the enum in keymap_defs.h,
-    #   then add a CUSTOM(64 + position) → NAME entry here.
-    "CUSTOM(80)": "VOLUME_MODE",      # enum position 16
-    "CUSTOM(81)": "BRIGHTNESS_MODE",  # enum position 17
-    "CUSTOM(82)": "ARROW_MODE",       # enum position 18
-    "CUSTOM(83)": "ZOOM_MODE",        # enum position 19
-    "CUSTOM(84)": "DRAGSCROLL",        # enum position 20
-    # CUSTOM(85) = DRAGSCROLL_LOCK (position 21) — internal, dispatched by double-tap, not placed on layers
-    # CUSTOM(86+) = LAYER_LOCK_BASE + n (positions 22–26) — internal, not placed on layers
-
 }
+
+# VIA encodes upstream Charybdis keyboard-level keycodes as CUSTOM(0)..CUSTOM(7).
+for i, keycode in enumerate(CHARYBDIS_UPSTREAM_KEYCODES):
+    REPLACEMENTS[f"CUSTOM({i})"] = keycode
 
 # VIA represents macros as both MACRO(n) and CUSTOM(64+n) depending on
 # firmware version.  Generate both mappings → MACRO_n.
-for i in range(16):
+for i in range(MACRO_COUNT):
     REPLACEMENTS[f"MACRO({i})"] = f"MACRO_{i}"
-    REPLACEMENTS[f"CUSTOM({64 + i})"] = f"MACRO_{i}"
+    REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = f"MACRO_{i}"
+
+# VIA assigns CUSTOM(64 + n) where n is the keycode's position in
+# keymap_defs.h's custom_keycodes enum (0-indexed from SAFE_RANGE).
+# MACRO_0–15 are positions 0–15 → CUSTOM(64)–CUSTOM(79).
+# The pointing-device mode keys follow at positions 16–20 → CUSTOM(80)–CUSTOM(84).
+# CUSTOM(85)–CUSTOM(89) are reserved for LOCK_PD_MODE(...).
+# CUSTOM(90)–CUSTOM(94) are reserved for LOCK_LAYER(...).
+for i, keycode in enumerate(PD_MODE_KEYCODES, start=MACRO_COUNT):
+    REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
 
 # ─── Layout structure ─────────────────────────────────────────────────────────
 # These control the physical key layout and output formatting.
@@ -166,8 +178,27 @@ INDENT_THUMB2 = " " * 84
 # If one slips through, it's likely a new keycode that was added in VIA
 # but not mapped here yet.
 _WARN_PATTERNS = re.compile(r"^(CUSTOM|MACRO)\(\d+\)$")
+_ONE_ARG_LAYER_PATTERNS = re.compile(r"^(MO|TO|TG|TT|OSL|DF)\((\d+)\)$")
+_TWO_ARG_LAYER_PATTERNS = re.compile(r"^(LT|LM)\((\d+),(.*)\)$")
+
+def layer_name_for_index(idx: int) -> str:
+    return LAYER_NAMES[idx] if idx < len(LAYER_NAMES) else f"LAYER_{idx}"
+
+def rewrite_layer_token(token: str) -> str:
+    match = _ONE_ARG_LAYER_PATTERNS.match(token)
+    if match:
+        wrapper, layer_idx = match.groups()
+        return f"{wrapper}({layer_name_for_index(int(layer_idx))})"
+
+    match = _TWO_ARG_LAYER_PATTERNS.match(token)
+    if match:
+        wrapper, layer_idx, rest = match.groups()
+        return f"{wrapper}({layer_name_for_index(int(layer_idx))},{rest})"
+
+    return token
 
 def apply_replacements(token: str) -> str:
+    token = rewrite_layer_token(token)
     if token in REPLACEMENTS:
         return REPLACEMENTS[token]
     if _WARN_PATTERNS.match(token):
@@ -272,7 +303,7 @@ def render_all_layers(indent="  "):
 
     blocks = []
     for idx, tokens in enumerate(all_tokens):
-        name = LAYER_NAMES[idx] if idx < len(LAYER_NAMES) else f"LAYER_{idx}"
+        name = layer_name_for_index(idx)
         blocks.append(render_layer(name, tokens, indent))
     return "\n\n".join(blocks)
 

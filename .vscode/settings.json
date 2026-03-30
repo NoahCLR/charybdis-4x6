@@ -20,5 +20,8 @@
         "keyboards/.keep": true,
         "keyboards/bastardkb/charybdis/4x6/keymaps/vendor/": true,
         "compile_commands.json": true,
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
     }
 }

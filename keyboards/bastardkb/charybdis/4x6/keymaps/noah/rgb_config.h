@@ -27,8 +27,8 @@
 static const hsv_t layer_colors[LAYER_COUNT] = {
     [LAYER_BASE]    = {0, 0, 0},                                 // no override
     [LAYER_NUM]     = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},  // green
-    [LAYER_LOWER]   = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, // blue
-    [LAYER_RAISE]   = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, // purple
+    [LAYER_SYM]     = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, // blue
+    [LAYER_NAV]     = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, // purple
     [LAYER_POINTER] = {0, 0, 0},                                 // no override (gradient)
 };
 
@@ -60,25 +60,23 @@ static const pd_mode_color_t pd_mode_colors[] = {
 // ├────────────────────────┤                 ├────────────────────────┤
 //    3   4  11  12  19  23                     52  48  41  40  33  32
 // ╰────────────────────────╯                 ╰────────────────────────╯
-//                       26  27  28     53  54  XX
-//                           25  24     55  XX
-//                     ╰────────────╯ ╰────────────╯
+//                       26  27  28     53  54
+//                           25  24     55     (56)
+//                     ╰────────────╯ ╰────────╯
 
 // Reserved example groups. Activate them by uncommenting the table entries below.
-static const uint8_t raise_highlight_leds[]  = {33, 18};
-static const uint8_t lower_highlight_leds[]  = {4, 47};
-static const uint8_t volume_highlight_leds[] = {52};
+static const uint8_t nav_highlight_leds[] = {33, 18};
+static const uint8_t sym_highlight_leds[] = {4, 47};
+static const uint8_t left_thumb_leds[]    = {26, 27, 28, 25, 24};
+static const uint8_t right_thumb_leds[]   = {53, 54, 55};
 
+static const uint8_t trackball_led[] = {56}; // Custom trackball led soldered on the right half, not part of the standard RGB matrix.
 // Highlight specific LEDs when a keyboard layer is active.
 //
-// {L(LAYER_RAISE), ...}                          // only on raise
-// {L(LAYER_RAISE) | L(LAYER_LOWER), ...}         // on raise or lower
-// {LAYER_ALL, ...}                                // always on
-//
-// layers                          {hue, sat, val}                            leds                  count
+// layer                           {hue, sat, val}                            leds                  count
 static const layer_led_group_t layer_led_groups[] = {
-    //    {L(LAYER_RAISE), {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, raise_highlight_leds, sizeof(raise_highlight_leds)},  // red
-    //    {L(LAYER_LOWER), {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, lower_highlight_leds, sizeof(lower_highlight_leds)},  // yellow
+    //    {LAYER_NAV, {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, nav_highlight_leds, sizeof(nav_highlight_leds)},  // red
+    //    {LAYER_SYM, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, sym_highlight_leds, sizeof(sym_highlight_leds)},  // yellow
 };
 
 // Same as above, but keyed on pointing device mode instead of layers.
@@ -86,7 +84,7 @@ static const layer_led_group_t layer_led_groups[] = {
 //
 // mode_flag            {hue, sat, val}                            leds                  count
 static const pd_mode_led_group_t pd_mode_led_groups[] = {
-    // {PD_MODE_VOLUME, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, volume_highlight_leds, sizeof(volume_highlight_leds)},
+    //    {PD_MODE_VOLUME, {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, trackball_led, sizeof(trackball_led)},
 };
 
 // ─── Auto-mouse gradient ────────────────────────────────────────────────────

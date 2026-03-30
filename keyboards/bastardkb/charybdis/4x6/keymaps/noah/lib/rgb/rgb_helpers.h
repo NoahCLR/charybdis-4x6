@@ -95,11 +95,8 @@ typedef struct {
     hsv_t   color;
 } pd_mode_color_t;
 
-#    define L(layer) (1 << (layer))
-#    define LAYER_ALL 0xFF
-
 typedef struct {
-    uint8_t        layers; // bitmask: L(LAYER_BASE) | L(LAYER_RAISE), or LAYER_ALL
+    uint8_t        layer;
     hsv_t          color;
     const uint8_t *leds;
     uint8_t        count;

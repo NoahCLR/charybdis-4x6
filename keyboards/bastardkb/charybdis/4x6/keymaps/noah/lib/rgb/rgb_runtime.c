@@ -66,7 +66,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 #    endif
 
     for (uint8_t g = 0; g < LAYER_LED_GROUP_COUNT; g++) {
-        if (layer_led_groups[g].layers & layer_state) {
+        if (layer_state_cmp(layer_state, layer_led_groups[g].layer)) {
             rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max, led_group_rgb[g]);
         }
     }
