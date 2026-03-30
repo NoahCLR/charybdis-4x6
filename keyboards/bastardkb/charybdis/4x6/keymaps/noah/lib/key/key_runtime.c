@@ -139,6 +139,19 @@ static void pd_mode_key_runtime_dispatch_action(void *context, uint16_t action) 
     action_router_dispatch(action);
 }
 
+static bool pd_mode_key_runtime_capture_pending_multi_tap_hold(void *context, uint16_t *tap_action, uint16_t *hold_action) {
+    (void)context;
+
+    if (!multi_tap_pending_hold(&multi_tap)) {
+        return false;
+    }
+
+    *tap_action  = multi_tap.tap_action;
+    *hold_action = multi_tap.hold.action;
+    multi_tap_reset(&multi_tap);
+    return true;
+}
+
 static uint16_t select_release_hold_action(uint16_t elapsed, uint16_t hold_action, hold_behavior_t long_hold, uint16_t longer_hold_term) {
     if (hold_sends_on_release(long_hold) && elapsed >= longer_hold_term) {
         return long_hold.action;
@@ -208,6 +221,7 @@ static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_k
         .advance_multi_tap               = pd_mode_key_runtime_advance_multi_tap,
         .dispatch_tap_or_begin_multi_tap = pd_mode_key_runtime_dispatch_tap_or_begin_multi_tap,
         .dispatch_action                 = pd_mode_key_runtime_dispatch_action,
+        .capture_pending_multi_tap_hold  = pd_mode_key_runtime_capture_pending_multi_tap_hold,
     };
 
     return pd_mode_key_runtime_process(keycode, record, key.pd_mode, key.behavior.tap_hold_term, handled_key_multi_tap_repress(key, keycode), &hooks);
@@ -369,6 +383,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 void matrix_scan_user(void) {
+    pd_mode_key_runtime_scan();
+
     if (active_key.keycode != KC_NO && !active_key.hold_fired) {
         uint16_t elapsed = timer_elapsed(active_key.timer);
         if (hold_fires_at_threshold(active_key.long_hold) && elapsed >= active_key.longer_hold_term) {

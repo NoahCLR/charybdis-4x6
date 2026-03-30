@@ -42,8 +42,9 @@ static const pd_mode_color_t pd_mode_colors[] = {
     {PD_MODE_DRAGSCROLL, {21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // orange
     {PD_MODE_VOLUME, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},      // yellow
     {PD_MODE_BRIGHTNESS, {213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}}, // magenta
-    {PD_MODE_ZOOM, {64, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},        // chartreuse
     {PD_MODE_ARROW, {127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},      // cyan
+    {PD_MODE_PINCH, {55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},       // lime
+    {PD_MODE_ZOOM, {70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},        // light green
 };
 
 // ─── Per-layer LED group highlights ─────────────────────────────────────────

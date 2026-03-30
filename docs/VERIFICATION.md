@@ -29,6 +29,8 @@ This keymap's highest-risk behavior lives in `process_record_user()`, `matrix_sc
 - [ ] Double tap `MO(LAYER_SYM)`, hold the second tap past `CUSTOM_TAP_HOLD_TERM`, then release => `LAYER_NUM` locks.
 - [ ] Tap `MO(LAYER_SYM)` again while `LAYER_SYM` is locked => unlocks back to the previous layer state.
 - [ ] Double tap `ARROW_MODE` => arrow mode locks.
+- [ ] Double tap `PINCH_MODE` and release quickly => pinch mode locks.
+- [ ] Double tap and hold `PINCH_MODE` past `CUSTOM_TAP_HOLD_TERM`, then move the trackball => zoom mode is active instead of pinch mode.
 - [ ] Tap any unrelated key while a single tap on `ARROW_MODE` is still pending => the pending tap resolves instead of keeping the mode key in limbo.
 
 ## Layer Lock And Momentary Overlap
@@ -42,11 +44,14 @@ This keymap's highest-risk behavior lives in `process_record_user()`, `matrix_sc
 ## Pointing-Device Mode Overlap
 
 - [ ] On `LAYER_POINTER`, hold `DRAGSCROLL` and move the trackball => scrolling only, no cursor motion.
+- [ ] On `LAYER_POINTER`, hold `PINCH_MODE` and move the trackball => scrolling only, no cursor motion, with Command held for pinch-like zoom behavior.
 - [ ] While still holding `DRAGSCROLL`, press and hold `ARROW_MODE` => arrow mode takes over immediately and dragscroll stops.
 - [ ] Release `ARROW_MODE` after the previous step => no pointing mode remains active, because the earlier unlocked mode was canceled.
 - [ ] Double tap `ARROW_MODE` => arrow mode locks.
 - [ ] Tap `ARROW_MODE` once while it is locked => arrow mode unlocks.
 - [ ] Double tap `DRAGSCROLL` => dragscroll locks and stays active after release.
+- [ ] Double tap `PINCH_MODE` => pinch mode locks and keeps dragscroll + Command active after release.
+- [ ] With pinch mode active, double tap and hold `PINCH_MODE` => zoom mode takes over while held, then releases back to no active mode unless pinch was explicitly re-locked.
 - [ ] With dragscroll locked, double tap `ARROW_MODE` => dragscroll unlocks and arrow mode becomes the only active lock.
 - [ ] In arrow mode, hold `MS_BTN1`, move the ball to select text, and switch layers while still holding `MS_BTN1` => selection shift stays correct throughout the layer change.
 - [ ] In arrow mode, use `MS_BTN2` and `MS_BTN3` => copy/paste shortcuts fire without inheriting stray held modifiers.

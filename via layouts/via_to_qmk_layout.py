@@ -57,6 +57,7 @@ PD_MODE_KEYCODES = [
     "ARROW_MODE",
     "ZOOM_MODE",
     "DRAGSCROLL",
+    "PINCH_MODE",
 ]
 
 # Token normalisation: VIA JSON format → QMK keymap style.
@@ -122,9 +123,9 @@ for i in range(MACRO_COUNT):
 # VIA assigns CUSTOM(64 + n) where n is the keycode's position in
 # keymap_defs.h's custom_keycodes enum (0-indexed from SAFE_RANGE).
 # MACRO_0–15 are positions 0–15 → CUSTOM(64)–CUSTOM(79).
-# The pointing-device mode keys follow at positions 16–20 → CUSTOM(80)–CUSTOM(84).
-# CUSTOM(85)–CUSTOM(89) are reserved for LOCK_PD_MODE(...).
-# CUSTOM(90)–CUSTOM(94) are reserved for LOCK_LAYER(...).
+# The pointing-device mode keys follow at positions 16–21 → CUSTOM(80)–CUSTOM(85).
+# CUSTOM(86)–CUSTOM(91) are reserved for LOCK_PD_MODE(...).
+# CUSTOM(92)–CUSTOM(96) are reserved for LOCK_LAYER(...).
 for i, keycode in enumerate(PD_MODE_KEYCODES, start=MACRO_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
 

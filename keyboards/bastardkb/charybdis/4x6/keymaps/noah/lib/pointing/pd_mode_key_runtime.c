@@ -13,7 +13,11 @@
 typedef struct {
     uint16_t timer;
     uint16_t keycode;
+    uint16_t tap_action;
+    uint16_t tap_hold_term;
     uint8_t  mode;
+    uint8_t  active_mode;
+    uint8_t  alternate_mode;
     bool     was_locked;
 } pd_mode_press_state_t;
 
@@ -46,36 +50,65 @@ bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t 
         }
 
         if (multi_tap_repress) {
-            pd_mode_press.mode       = mode;
-            pd_mode_press.was_locked = pd_mode_locked(mode);
-
             uint16_t action = hooks->advance_multi_tap(hooks->context, keycode);
             if (action != KC_NO) {
                 hooks->dispatch_action(hooks->context, action);
+                pd_mode_press.keycode = KC_NO;
+                pd_state_sync();
+                return true;
+            }
+
+            if (hooks->capture_pending_multi_tap_hold) {
+                uint16_t tap_action  = KC_NO;
+                uint16_t hold_action = KC_NO;
+
+                if (hooks->capture_pending_multi_tap_hold(hooks->context, &tap_action, &hold_action)) {
+                    uint8_t alternate_mode = pd_mode_for_keycode(hold_action);
+
+                    if (alternate_mode) {
+                        pd_mode_press.timer          = timer_read();
+                        pd_mode_press.keycode        = keycode;
+                        pd_mode_press.tap_action     = tap_action;
+                        pd_mode_press.tap_hold_term  = tap_hold_term;
+                        pd_mode_press.mode           = mode;
+                        pd_mode_press.active_mode    = 0;
+                        pd_mode_press.alternate_mode = alternate_mode;
+                        pd_mode_press.was_locked     = false;
+                        return true;
+                    }
+                }
             }
 
             pd_mode_press.keycode = KC_NO;
-            pd_state_sync();
             return true;
         }
 
-        pd_mode_press.timer      = timer_read();
-        pd_mode_press.keycode    = keycode;
-        pd_mode_press.mode       = mode;
-        pd_mode_press.was_locked = pd_mode_locked(mode);
+        pd_mode_press.timer          = timer_read();
+        pd_mode_press.keycode        = keycode;
+        pd_mode_press.tap_action     = KC_NO;
+        pd_mode_press.tap_hold_term  = tap_hold_term;
+        pd_mode_press.mode           = mode;
+        pd_mode_press.active_mode    = mode;
+        pd_mode_press.alternate_mode = 0;
+        pd_mode_press.was_locked     = pd_mode_locked(mode);
         pd_mode_update(mode, true);
         state_changed = true;
     } else {
         bool     pressed_this_key = pd_mode_press.keycode == keycode;
         uint16_t elapsed          = pressed_this_key ? timer_elapsed(pd_mode_press.timer) : 0;
-        bool     locked_press     = pd_mode_press.mode == mode && pd_mode_press.was_locked && pd_mode_is_lockable(mode) && pressed_this_key;
+        bool     alternate_press  = pd_mode_press.alternate_mode != 0;
+        bool     locked_press     = !alternate_press && pd_mode_press.mode == mode && pd_mode_press.was_locked && pd_mode_is_lockable(mode) && pressed_this_key;
 
-        if (pd_mode_active(mode) && !pd_mode_locked(mode)) {
-            pd_mode_update(mode, false);
+        if (pd_mode_press.active_mode && pd_mode_active(pd_mode_press.active_mode) && !pd_mode_locked(pd_mode_press.active_mode)) {
+            pd_mode_update(pd_mode_press.active_mode, false);
             state_changed = true;
         }
 
-        if (locked_press) {
+        if (alternate_press) {
+            if (pressed_this_key && elapsed < pd_mode_press.tap_hold_term && pd_mode_press.tap_action != KC_NO) {
+                hooks->dispatch_action(hooks->context, pd_mode_press.tap_action);
+            }
+        } else if (locked_press) {
             if (pd_mode_toggle_lock_state(mode)) {
                 state_changed = true;
             }
@@ -92,6 +125,28 @@ bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t 
     return true;
 }
 
+void pd_mode_key_runtime_scan(void) {
+    if (pd_mode_press.keycode == KC_NO || pd_mode_press.alternate_mode == 0 || pd_mode_press.active_mode != 0) {
+        return;
+    }
+
+    if (timer_elapsed(pd_mode_press.timer) < pd_mode_press.tap_hold_term) {
+        return;
+    }
+
+    bool state_changed = false;
+
+    state_changed |= pd_mode_unlock_other_locks(pd_mode_press.alternate_mode);
+    state_changed |= pd_mode_deactivate_other_unlocked(pd_mode_press.alternate_mode);
+    pd_mode_update(pd_mode_press.alternate_mode, true);
+    pd_mode_press.active_mode = pd_mode_press.alternate_mode;
+    state_changed             = true;
+
+    if (state_changed) {
+        pd_state_sync();
+    }
+}
+
 #else
 
 bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t mode, uint16_t tap_hold_term, bool multi_tap_repress, const pd_mode_key_runtime_hooks_t *hooks) {
@@ -103,5 +158,7 @@ bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t 
     (void)hooks;
     return false;
 }
+
+void pd_mode_key_runtime_scan(void) {}
 
 #endif // POINTING_DEVICE_ENABLE

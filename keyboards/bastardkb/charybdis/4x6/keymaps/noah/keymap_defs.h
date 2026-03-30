@@ -35,8 +35,8 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAM
 // collide with any built-in QMK or Charybdis keycodes.
 //
 // MACRO_0–15 are generic macro slots (some used, rest reserved for VIA).
-// VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE activate pointing
-// device modes while held.
+// VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE / PINCH_MODE
+// activate pointing-device modes while held.
 // DRAGSCROLL: tap = base-layer key, double-tap = lock dragscroll, hold = momentary.
 // The hold path is handled by the pointing-device mode key runtime.
 // Pointing-device modes can dispatch LOCK_PD_MODE(mode_keycode) via the
@@ -67,8 +67,9 @@ enum custom_keycodes {
     ARROW_MODE,
     ZOOM_MODE,
     DRAGSCROLL,
+    PINCH_MODE,
     PD_MODE_LOCK_BASE,                                                        // reserves one lock/toggle action per pd-mode keycode — use LOCK_PD_MODE(mode_keycode)
-    LAYER_LOCK_BASE     = PD_MODE_LOCK_BASE + (DRAGSCROLL - VOLUME_MODE + 1), // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
+    LAYER_LOCK_BASE     = PD_MODE_LOCK_BASE + (PINCH_MODE - VOLUME_MODE + 1), // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
 

@@ -33,9 +33,10 @@ typedef struct {
 #define PD_MODE_DRAGSCROLL (1 << 2)
 #define PD_MODE_BRIGHTNESS (1 << 3)
 #define PD_MODE_ZOOM (1 << 4)
-#define PD_MODE_COUNT 5
+#define PD_MODE_PINCH (1 << 5)
+#define PD_MODE_COUNT 6
 
-_Static_assert(DRAGSCROLL - VOLUME_MODE + 1 == PD_MODE_COUNT, "pd-mode keycode count in custom_keycodes enum doesn't match PD_MODE_COUNT — update both together");
+_Static_assert(PINCH_MODE - VOLUME_MODE + 1 == PD_MODE_COUNT, "pd-mode keycode count in custom_keycodes enum doesn't match PD_MODE_COUNT — update both together");
 
 extern uint8_t             pd_mode_flags;
 extern uint8_t             pd_mode_locked_flags;
