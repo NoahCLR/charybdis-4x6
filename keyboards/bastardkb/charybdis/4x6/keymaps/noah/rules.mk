@@ -13,6 +13,7 @@ SRC += lib/key/key_runtime.c
 SRC += lib/key/action_router.c
 SRC += lib/key/multi_tap_engine.c
 SRC += lib/pointing/pointing_device_runtime.c
+SRC += lib/pointing/pd_mode_key_runtime.c
 SRC += lib/pointing/pointer_layer_policy.c
 SRC += lib/rgb/rgb_runtime.c
 SRC += lib/pointing/pointing_device_modes.c
