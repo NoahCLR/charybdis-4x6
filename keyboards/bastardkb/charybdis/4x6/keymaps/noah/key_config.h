@@ -156,12 +156,16 @@ enum custom_keycodes {
 //
 //   hold + long_hold pairs:
 //     TAP_ON_RELEASE_AFTER_HOLD + TAP_ON_RELEASE_AFTER_HOLD    — both resolve on release; elapsed time picks which
-//     TAP_ON_RELEASE_AFTER_HOLD + PRESS_AND_HOLD_UNTIL_RELEASE — escalating: one-shot on short hold, registered on long hold
-//     TAP_ON_RELEASE_AFTER_HOLD + TAP_AT_HOLD_THRESHOLD        — soft then immediate: short hold waits, long hold fires at threshold
-//     TAP_AT_HOLD_THRESHOLD     + TAP_AT_HOLD_THRESHOLD        — two sequential one-shots: first at tap_hold_term, second at longer_hold_term
-//     TAP_AT_HOLD_THRESHOLD     + TAP_ON_RELEASE_AFTER_HOLD    — one-shot at threshold, then if held longer fires again on release
-//     TAP_AT_HOLD_THRESHOLD     + PRESS_AND_HOLD_UNTIL_RELEASE — one-shot at threshold, then if held longer registers key until release
-//     PRESS_AND_HOLD_UNTIL_RELEASE + (anything)                ❌ hold registers briefly then long_hold interrupts or is unreachable
+//     TAP_ON_RELEASE_AFTER_HOLD + PRESS_AND_HOLD_UNTIL_RELEASE — release one-shot on short hold, registered key on long hold
+//     TAP_ON_RELEASE_AFTER_HOLD + TAP_AT_HOLD_THRESHOLD        — release one-shot on short hold, immediate one-shot at longer threshold
+//
+//     TAP_AT_HOLD_THRESHOLD     + TAP_ON_RELEASE_AFTER_HOLD    — immediate one-shot at threshold, release one-shot if held longer
+//     TAP_AT_HOLD_THRESHOLD     + TAP_AT_HOLD_THRESHOLD        — immediate one-shot at tap_hold_term, second one-shot at longer_hold_term
+//     TAP_AT_HOLD_THRESHOLD     + PRESS_AND_HOLD_UNTIL_RELEASE — immediate one-shot at threshold, registered key if held longer
+//
+//     PRESS_AND_HOLD_UNTIL_RELEASE + TAP_ON_RELEASE_AFTER_HOLD    — key A registered while held; on release: unregister A then send B at release
+//     PRESS_AND_HOLD_UNTIL_RELEASE + TAP_AT_HOLD_THRESHOLD         — key A registered; at longer_hold_term: unregister A, fire B immediately
+//     PRESS_AND_HOLD_UNTIL_RELEASE + PRESS_AND_HOLD_UNTIL_RELEASE  — key A registered; at longer_hold_term: unregister A, register B until release
 
 // keycode                single / double / triple / N behavior
 static const key_behavior_t
@@ -338,7 +342,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,             MO(3),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
+                  XXXXXXX,           _______,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                        KC_LEFT_GUI,            KC_SPC,           _______,              _______,             KC_P0,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
@@ -353,7 +357,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
             KC_LEFT_SHIFT,           XXXXXXX,           XXXXXXX,           XXXXXXX,            KC_ESC,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,           KC_DQUO,           KC_PEQL,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-             KC_LEFT_CTRL,           XXXXXXX,        LCAG(KC_X),        LCAG(KC_C),         LSG(KC_V),           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LCBR,           KC_RCBR,           XXXXXXX,      KC_RIGHT_ALT,
+             KC_LEFT_CTRL,           _______,        LCAG(KC_X),        LCAG(KC_C),         LSG(KC_V),           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LCBR,           KC_RCBR,           _______,      KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                        KC_LEFT_GUI,            KC_SPC,           _______,              _______,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
@@ -368,7 +372,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
          MT(MOD_LSFT,KC_CAPS),        LSG(KC_Z),          XXXXXXX,          G(KC_C),          XXXXXXX,           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           XXXXXXX,        ARROW_MODE,
+                  MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        ARROW_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                        KC_LEFT_GUI,            KC_SPC,           _______,              _______,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC

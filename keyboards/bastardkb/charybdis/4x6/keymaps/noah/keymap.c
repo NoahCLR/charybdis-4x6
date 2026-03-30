@@ -154,7 +154,8 @@ static bool     key_hold_fired          = false;
 static uint16_t active_tap_action       = KC_NO;
 static uint16_t active_tap_hold_term    = CUSTOM_TAP_HOLD_TERM;
 static uint16_t active_longer_hold_term = CUSTOM_LONGER_HOLD_TERM;
-static uint16_t active_multi_tap_term   = CUSTOM_MULTI_TAP_TERM;
+static uint16_t active_multi_tap_term       = CUSTOM_MULTI_TAP_TERM;
+static bool     active_hold_one_shot_fired  = false; // set when TAP_AT_HOLD fires with long_hold still pending
 
 // Cached lookups for the currently active key (populated on press, cleared on release).
 static hold_behavior_t active_hold;
@@ -206,8 +207,8 @@ static void dispatch_action(uint16_t action) {
 // multi-tap holds.  If a long-hold exists and the key stayed down long
 // enough, prefer it; otherwise keep the base hold action.
 static uint16_t select_release_hold_action(uint16_t elapsed, uint16_t hold_action,
-                                           hold_behavior_t long_hold) {
-    if (hold_sends_on_release(long_hold) && elapsed >= active_longer_hold_term) {
+                                           hold_behavior_t long_hold, uint16_t longer_hold_term) {
+    if (hold_sends_on_release(long_hold) && elapsed >= longer_hold_term) {
         return long_hold.action;
     }
     return hold_action;
@@ -223,13 +224,23 @@ static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_ho
             held_action_keycode = KC_NO;
         }
         dispatch_action(hold.action);
-        key_hold_fired = !hold_fires_at_threshold(long_hold);
+        // If a long_hold tier exists, keep key_hold_fired false so matrix_scan
+        // keeps watching and can fire or promote into the long_hold tier.
+        // Track that a one-shot already fired so the release path won't also send tap.
+        if (long_hold.present) {
+            key_hold_fired             = false;
+            active_hold_one_shot_fired = true;
+        } else {
+            key_hold_fired             = true;
+            active_hold_one_shot_fired = false;
+        }
         return;
     }
 
     register_code16(hold.action);
-    held_action_keycode = hold.action;
-    key_hold_fired      = !hold_fires_at_threshold(long_hold);
+    held_action_keycode        = hold.action;
+    key_hold_fired             = !long_hold.present;
+    active_hold_one_shot_fired = false;
 }
 
 // Promote the currently active hold into the long-hold tier.
@@ -273,13 +284,14 @@ static void flush_active_key(void) {
     // MO-only or multi-tap-only without hold behavior: layer_off
     // happens on release (independent of key_active), so no action needed.
 
-    key_active              = KC_NO;
-    active_tap_action       = KC_NO;
-    active_hold             = hold_behavior_none();
-    active_long_hold        = hold_behavior_none();
-    active_tap_hold_term    = CUSTOM_TAP_HOLD_TERM;
-    active_longer_hold_term = CUSTOM_LONGER_HOLD_TERM;
-    active_multi_tap_term   = CUSTOM_MULTI_TAP_TERM;
+    key_active                 = KC_NO;
+    active_tap_action          = KC_NO;
+    active_hold                = hold_behavior_none();
+    active_long_hold           = hold_behavior_none();
+    active_tap_hold_term       = CUSTOM_TAP_HOLD_TERM;
+    active_longer_hold_term    = CUSTOM_LONGER_HOLD_TERM;
+    active_multi_tap_term      = CUSTOM_MULTI_TAP_TERM;
+    active_hold_one_shot_fired = false;
 }
 
 // ─── RGB Color Cache ─────────────────────────────────────────────────────────
@@ -416,16 +428,17 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     // first release (line 471) before this re-press arrives, so there is
                     // nothing pending for a different key that could be silently dropped.
                     if (multi_tap_pending_hold(&multi_tap) || behavior.is_momentary_layer) {
-                        key_active              = keycode;
-                        key_timer               = timer_read();
+                        key_active                 = keycode;
+                        key_timer                  = timer_read();
                         // If pending_hold, keep key_hold_fired false so release runs.
-                        key_hold_fired          = !multi_tap_pending_hold(&multi_tap);
-                        active_tap_action       = KC_NO;
-                        active_hold             = hold_behavior_none();
-                        active_long_hold        = hold_behavior_none();
-                        active_tap_hold_term    = behavior.tap_hold_term;
-                        active_longer_hold_term = behavior.longer_hold_term;
-                        active_multi_tap_term   = behavior.multi_tap_term;
+                        key_hold_fired             = !multi_tap_pending_hold(&multi_tap);
+                        active_tap_action          = KC_NO;
+                        active_hold                = hold_behavior_none();
+                        active_long_hold           = hold_behavior_none();
+                        active_tap_hold_term       = behavior.tap_hold_term;
+                        active_longer_hold_term    = behavior.longer_hold_term;
+                        active_multi_tap_term      = behavior.multi_tap_term;
+                        active_hold_one_shot_fired = false;
                     }
                     return false;
                 }
@@ -440,15 +453,16 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 flush_active_key();
 
                 // Normal press — start tracking + cache lookups.
-                key_timer               = timer_read();
-                key_active              = keycode;
-                key_hold_fired          = false;
-                active_tap_action       = key_behavior_single_tap_action(behavior, record);
-                active_hold             = behavior.single.hold;
-                active_long_hold        = behavior.single.long_hold;
-                active_tap_hold_term    = behavior.tap_hold_term;
-                active_longer_hold_term = behavior.longer_hold_term;
-                active_multi_tap_term   = behavior.multi_tap_term;
+                key_timer                  = timer_read();
+                key_active                 = keycode;
+                key_hold_fired             = false;
+                active_tap_action          = key_behavior_single_tap_action(behavior, record);
+                active_hold                = behavior.single.hold;
+                active_long_hold           = behavior.single.long_hold;
+                active_tap_hold_term       = behavior.tap_hold_term;
+                active_longer_hold_term    = behavior.longer_hold_term;
+                active_multi_tap_term      = behavior.multi_tap_term;
+                active_hold_one_shot_fired = false;
             } else {
                 // Release — resolve pending hold-after-multi-tap first.
                 if (multi_tap_pending_hold(&multi_tap) && multi_tap.keycode == keycode) {
@@ -463,7 +477,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         // key_timer and mt->timer are set at the same moment (the press event),
                         // so key_timer is a valid proxy for the hold duration here.
                         action = select_release_hold_action(timer_elapsed(key_timer), cached_hold.action,
-                                                            cached_long_hold);
+                                                            cached_long_hold, active_longer_hold_term);
                     }
                     for (uint8_t i = 0; i < repeat_count; i++) {
                         if (action != KC_NO) dispatch_action(action);
@@ -473,13 +487,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         uint8_t layer = behavior_get_layer(keycode);
                         if (locked_layer != layer) layer_off(layer);
                     }
-                    key_active              = KC_NO;
-                    active_tap_action       = KC_NO;
-                    active_hold             = hold_behavior_none();
-                    active_long_hold        = hold_behavior_none();
-                    active_tap_hold_term    = CUSTOM_TAP_HOLD_TERM;
-                    active_longer_hold_term = CUSTOM_LONGER_HOLD_TERM;
-                    active_multi_tap_term   = CUSTOM_MULTI_TAP_TERM;
+                    key_active                 = KC_NO;
+                    active_tap_action          = KC_NO;
+                    active_hold                = hold_behavior_none();
+                    active_long_hold           = hold_behavior_none();
+                    active_tap_hold_term       = CUSTOM_TAP_HOLD_TERM;
+                    active_longer_hold_term    = CUSTOM_LONGER_HOLD_TERM;
+                    active_multi_tap_term      = CUSTOM_MULTI_TAP_TERM;
+                    active_hold_one_shot_fired = false;
                     return false;
                 }
 
@@ -493,27 +508,37 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 if (key_active != keycode) return false;
 
                 // Snapshot cached lookups before clearing.
-                uint16_t        rel_tap_action       = active_tap_action;
-                uint16_t        rel_tap_hold_term     = active_tap_hold_term;
-                uint16_t        rel_multi_tap_term    = active_multi_tap_term;
-                hold_behavior_t rel_hold              = active_hold;
-                hold_behavior_t rel_long_hold         = active_long_hold;
+                uint16_t        rel_tap_action        = active_tap_action;
+                uint16_t        rel_tap_hold_term      = active_tap_hold_term;
+                uint16_t        rel_longer_hold_term   = active_longer_hold_term;
+                uint16_t        rel_multi_tap_term     = active_multi_tap_term;
+                bool            rel_one_shot_fired     = active_hold_one_shot_fired;
+                hold_behavior_t rel_hold               = active_hold;
+                hold_behavior_t rel_long_hold          = active_long_hold;
 
-                key_active              = KC_NO;
-                active_tap_action       = KC_NO;
-                active_hold             = hold_behavior_none();
-                active_long_hold        = hold_behavior_none();
-                active_tap_hold_term    = CUSTOM_TAP_HOLD_TERM;
-                active_longer_hold_term = CUSTOM_LONGER_HOLD_TERM;
-                active_multi_tap_term   = CUSTOM_MULTI_TAP_TERM;
+                key_active                 = KC_NO;
+                active_tap_action          = KC_NO;
+                active_hold                = hold_behavior_none();
+                active_long_hold           = hold_behavior_none();
+                active_tap_hold_term       = CUSTOM_TAP_HOLD_TERM;
+                active_longer_hold_term    = CUSTOM_LONGER_HOLD_TERM;
+                active_multi_tap_term      = CUSTOM_MULTI_TAP_TERM;
+                active_hold_one_shot_fired = false;
 
-                // If any keycode is registered (immediate hold, multi-tap hold,
-                // or long-hold), unregister it and we're done.
+                // If any keycode is registered (PRESS_AND_HOLD or promoted long_hold),
+                // unregister it. For PRESS_AND_HOLD + TAP_ON_RELEASE long_hold, also
+                // check if we should fire the long_hold action on release.
                 if (key_hold_fired || held_action_keycode != KC_NO) {
+                    uint16_t elapsed = timer_elapsed(key_timer);
                     key_hold_fired = false;
                     if (held_action_keycode != KC_NO) {
                         unregister_code16(held_action_keycode);
                         held_action_keycode = KC_NO;
+                    }
+                    // PRESS_AND_HOLD or TAP_AT_HOLD as hold + TAP_ON_RELEASE as long_hold:
+                    // long_hold was unreachable via matrix_scan, so resolve it here on release.
+                    if (hold_sends_on_release(rel_long_hold) && elapsed >= rel_longer_hold_term) {
+                        dispatch_action(rel_long_hold.action);
                     }
                     return false;
                 }
@@ -534,12 +559,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     // MO()-only with no multi-tap: tap does nothing (layer already toggled).
                 } else {
                     if (hold_sends_on_release(rel_hold)) {
-                        dispatch_action(select_release_hold_action(elapsed, rel_hold.action, rel_long_hold));
-                    } else if (hold_sends_on_release(rel_long_hold) && elapsed >= active_longer_hold_term) {
+                        dispatch_action(select_release_hold_action(elapsed, rel_hold.action, rel_long_hold, rel_longer_hold_term));
+                    } else if (hold_sends_on_release(rel_long_hold) && elapsed >= rel_longer_hold_term) {
                         dispatch_action(rel_long_hold.action);
-                    } else if (!behavior.is_momentary_layer && rel_tap_action != KC_NO) {
-                        // No hold tier was configured, so press duration does not
-                        // change the result for regular keys.
+                    } else if (!rel_one_shot_fired && !behavior.is_momentary_layer && rel_tap_action != KC_NO) {
+                        // No release-based hold tier resolved — send tap unless a one-shot
+                        // already fired (TAP_AT_HOLD with long_hold pending in the intermediate window).
                         dispatch_action(rel_tap_action);
                     }
                     // MO()-only held: layer was already active, nothing extra to send.
