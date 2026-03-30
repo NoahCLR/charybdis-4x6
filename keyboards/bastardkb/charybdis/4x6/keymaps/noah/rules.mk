@@ -7,9 +7,8 @@ COMBO_ENABLE = yes
 # Link-time optimization: reduces binary size.
 LTO_ENABLE = yes
 
-# Build authored data and runtime as real modules instead of keeping the full
-# implementation inside keymap.c.
-SRC += lib/key_data.c
+# Build runtime as real modules instead of keeping the full implementation
+# inside keymap.c.
 SRC += lib/userspace_runtime.c
 SRC += lib/key_runtime.c
 SRC += lib/pointing_device_runtime.c

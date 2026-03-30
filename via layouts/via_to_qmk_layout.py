@@ -3,7 +3,7 @@
 #
 # Usage:
 #   python via_to_qmk_layout.py           Use default MODE (set below)
-#   python via_to_qmk_layout.py --write   Update key_config.h in-place
+#   python via_to_qmk_layout.py --write   Update keymap.c in-place
 #   python via_to_qmk_layout.py --print   Print keymaps block to stdout
 #
 # Reads charybdis.layout.json from the same directory.
@@ -14,7 +14,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 VIA_JSON = SCRIPT_DIR / "charybdis.layout.json"
-KEYMAP_C = SCRIPT_DIR.parent / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "key_config.h"
+KEYMAP_FILE = SCRIPT_DIR.parent / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "keymap.c"
 
 # Default mode: "write" updates keymap.c in-place, "print" prints to stdout.
 # Can be overridden with --write or --print on the command line.
@@ -23,7 +23,7 @@ MODE = "write"
 # ─── Configuration ────────────────────────────────────────────────────────────
 # These are the only things you should need to edit when your keymap changes.
 
-# Must match the layer enum order in key_config.h.
+# Must match the layer enum order in keymap_defs.h.
 # → Adding or renaming a layer?  Update this list to match.
 #   Extra VIA layers beyond this list get named LAYER_0, LAYER_1, etc.
 LAYER_NAMES = [
@@ -36,7 +36,7 @@ LAYER_NAMES = [
 
 # Token normalisation: VIA JSON format → QMK keymap style.
 # VIA exports keycodes in its own format (CUSTOM(), MACRO(), S(), etc.)
-# that don't match what we use in key_config.h.  This dict translates them.
+# that don't match what we use in the QMK keymap sources. This dict translates them.
 REPLACEMENTS = {
     # Transparent / no key
     "KC_NO": "XXXXXXX",
@@ -95,10 +95,10 @@ REPLACEMENTS = {
 
     # Custom keycodes (VIA CUSTOM 80+)
     # VIA assigns CUSTOM(64 + n) where n is the keycode's position in
-    # key_config.h's custom_keycodes enum (0-indexed from SAFE_RANGE).
+    # keymap_defs.h's custom_keycodes enum (0-indexed from SAFE_RANGE).
     # MACRO_0–15 are positions 0–15 → CUSTOM(64)–CUSTOM(79) (generated below).
     # The keycodes after MACRO_15 start at position 16 → CUSTOM(80).
-    # → Adding a new custom keycode?  Append it to the enum in key_config.h,
+    # → Adding a new custom keycode?  Append it to the enum in keymap_defs.h,
     #   then add a CUSTOM(64 + position) → NAME entry here.
     "CUSTOM(80)": "VOLUME_MODE",      # enum position 16
     "CUSTOM(81)": "BRIGHTNESS_MODE",  # enum position 17
@@ -291,15 +291,15 @@ def render_keymaps_block():
     )
 
 def write_to_keymap():
-    """Replace the entire keymaps array in key_config.h."""
-    if not KEYMAP_C.exists():
-        print(f"ERROR: key_config.h not found: {KEYMAP_C}", file=sys.stderr)
+    """Replace the entire keymaps array in keymap.c."""
+    if not KEYMAP_FILE.exists():
+        print(f"ERROR: keymap.c not found: {KEYMAP_FILE}", file=sys.stderr)
         sys.exit(1)
-    text = KEYMAP_C.read_text()
+    text = KEYMAP_FILE.read_text()
 
     start = text.find(_KEYMAPS_DECL)
     if start == -1:
-        print("ERROR: could not find keymaps declaration in key_config.h", file=sys.stderr)
+        print("ERROR: could not find keymaps declaration in keymap.c", file=sys.stderr)
         sys.exit(1)
 
     # Find the closing "};" after the opening declaration.
@@ -311,8 +311,8 @@ def write_to_keymap():
 
     new_text = text[:start] + render_keymaps_block() + "\n" + text[end:]
 
-    KEYMAP_C.write_text(new_text)
-    print(f"Updated {KEYMAP_C}")
+    KEYMAP_FILE.write_text(new_text)
+    print(f"Updated {KEYMAP_FILE}")
 
 def main():
     mode = MODE

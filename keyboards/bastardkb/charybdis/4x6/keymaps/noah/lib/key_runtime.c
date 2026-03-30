@@ -7,7 +7,7 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "../key_config.h"
+#include "../keymap_defs.h"
 #include "key_behavior.h"
 #include "multi_tap.h"
 #include "pointing_device_modes.h"

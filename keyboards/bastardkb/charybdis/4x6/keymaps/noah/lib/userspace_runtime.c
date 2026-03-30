@@ -8,7 +8,7 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "../key_config.h"
+#include "../keymap_defs.h"
 
 #ifdef VIA_ENABLE
 _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");

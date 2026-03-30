@@ -2,15 +2,138 @@
 // Noah's Charybdis 4x6 keymap data
 // ────────────────────────────────────────────────────────────────────────────
 //
-// This translation unit owns the physical key layout and combo definitions:
+// This translation unit owns the authored keymap data:
+//   - key_behaviors[]
+//   - macro_dispatch()
 //   - keymaps[][]
 //   - key_combos[]
 //
-// Other authored data lives in lib/key_data.c.
+// Shared layer and custom-keycode declarations live in keymap_defs.h.
 // Runtime processing lives in the runtime modules under lib/.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_config.h"
+#include "keymap_defs.h"
+#include "lib/key_behavior.h"
+
+// ─── Key Behavior Tables ────────────────────────────────────────────────────
+//
+// key_behaviors[] is the single authored behavior table for keys handled by
+// the custom state machine. One row describes one physical key.
+//
+// tap_counts[0] = single press
+// tap_counts[1] = double tap
+// tap_counts[2] = triple tap
+//
+// omit .tap to keep the key's normal tap behavior for that step
+// .hold / .long_hold use the helper DSL from lib/key_behavior.h
+// timing thresholds come from config.h unless overridden per key
+
+const key_behavior_t key_behaviors[] = {
+    // Number row — shifted symbols on hold, media on double-tap
+    {.keycode = KC_1, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)}}},
+    {.keycode = KC_2, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_AT)}}},
+    {.keycode = KC_3, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_HASH)}}},
+    {.keycode = KC_4, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_DLR)}}},
+    {.keycode = KC_5, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_PERC)}}},
+    {.keycode = KC_6, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_CIRC)}, [1] = {.tap = TAP_SENDS(KC_MPLY)}}},
+    {.keycode = KC_7, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_AMPR)}, [1] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)}}},
+    {.keycode = KC_8, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR)}, [1] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)}}},
+    {.keycode = KC_9, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LPRN)}}},
+    {.keycode = KC_0, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RPRN)}}},
+
+    // Punctuation → shifted variants
+    {.keycode = KC_MINS, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)}}},
+    {.keycode = KC_EQL, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_PLUS)}}},
+    {.keycode = KC_LBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)}}},
+    {.keycode = KC_RBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)}}},
+    {.keycode = KC_BSLS, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_PIPE)}}},
+    {.keycode = KC_GRV, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_TILD)}}},
+    {.keycode = KC_SCLN, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_COLN)}}},
+    {.keycode = KC_QUOT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)}}},
+    {.keycode = KC_COMM, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)}}},
+    {.keycode = KC_DOT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)}}},
+
+    // Escape → Force Quit on hold, tilde on double-tap
+    {.keycode = KC_ESC, .tap_counts = {[0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))}, [1] = {.tap = TAP_SENDS(S(KC_GRV))}}},
+
+    // Enter → Shift+Enter (new line without send in chat apps)
+    {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
+
+    // Arrows — release-based hold plus immediate long hold
+    {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
+    {.keycode = KC_RIGHT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))}}},
+
+    // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
+    {
+        .keycode = MO(LAYER_LOWER),
+        .tap_counts =
+            {
+                [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_LOWER))},
+                [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
+                [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
+                [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
+            },
+    },
+
+    {
+        .keycode = MO(LAYER_RAISE),
+        .tap_counts =
+            {
+                [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_RAISE))},
+                [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
+                [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
+                [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
+            },
+    },
+
+    // Home-row layer-tap key — double-tap locks LAYER_RAISE.
+    // tap_hold_term inherits the LT() default (TAPPING_TERM) so typing feel is unchanged.
+    {
+        .keycode = LT(LAYER_RAISE, KC_SLSH),
+        .tap_counts =
+            {
+                [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_RAISE))},
+            },
+    },
+
+    // Pointing device mode keys.
+    // Single tap defaults to the base-layer key at that position unless [0]
+    // overrides it here.
+    {.keycode = VOLUME_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(KC_MUTE)}}},
+    {.keycode = ARROW_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
+
+    // Dragscroll: tap = base-layer key, double-tap = lock, hold = momentary (via pd_mode).
+    {.keycode = DRAGSCROLL, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(DRAGSCROLL))}}},
+};
+
+const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);
+
+// ─── Macros ─────────────────────────────────────────────────────────────────
+
+bool macro_dispatch(uint16_t keycode) {
+    switch (keycode) {
+        case MACRO_0: // Spotlight search (macOS): GUI + Space
+            SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
+            return true;
+        case MACRO_1: // Claude: Alt + Space
+            SEND_STRING(SS_LALT(SS_TAP(X_SPACE)));
+            return true;
+        case MACRO_2: // Terminal: Alt + GUI + Space
+            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_SPACE))));
+            return true;
+        case MACRO_3: // OCR text copy (macOS): Ctrl + Alt + GUI + C
+            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("c"))));
+            return true;
+        case MACRO_4: // Screenshot (macOS): Ctrl + Alt + GUI + X
+            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("x"))));
+            return true;
+        case MACRO_5: // Emoji picker (macOS): Ctrl + GUI + Space
+            SEND_STRING(SS_LCTL(SS_LGUI(SS_TAP(X_SPACE))));
+            return true;
+        default:
+            return false;
+    }
+}
 
 // ─── Combos ─────────────────────────────────────────────────────────────────
 
@@ -33,7 +156,7 @@ combo_t key_combos[] = {
 //     _______ = transparent, falls through to the layer below.
 //
 // The number row (KC_1–KC_0) and punctuation keys use the key behavior
-// tables defined in key_config.h — they are NOT using QMK's built-in mod-tap.
+// tables defined above — they are NOT using QMK's built-in mod-tap.
 // See lib/key_runtime.c for details.
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
