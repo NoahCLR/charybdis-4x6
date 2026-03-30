@@ -211,7 +211,7 @@ static const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_LOWER))},
-                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LOCK_LAYER(LAYER_NUM))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
                     },
@@ -222,7 +222,7 @@ static const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_RAISE))},
-                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LOCK_LAYER(LAYER_NUM))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
                     },
@@ -234,7 +234,7 @@ static const key_behavior_t
                 .keycode = LT(LAYER_RAISE, KC_SLSH),
                 .tap_counts =
                     {
-                        [1] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_RAISE))},
+                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_RAISE))},
                     },
             },
 
