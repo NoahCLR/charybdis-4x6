@@ -156,6 +156,7 @@ static uint16_t active_tap_hold_term    = CUSTOM_TAP_HOLD_TERM;
 static uint16_t active_longer_hold_term = CUSTOM_LONGER_HOLD_TERM;
 static uint16_t active_multi_tap_term       = CUSTOM_MULTI_TAP_TERM;
 static bool     active_hold_one_shot_fired  = false; // set when TAP_AT_HOLD fires with long_hold still pending
+static bool     active_layer_interrupted    = false; // another key was pressed while a tracked MO/LT was held
 
 // Cached lookups for the currently active key (populated on press, cleared on release).
 static hold_behavior_t active_hold;
@@ -276,7 +277,7 @@ static void flush_active_key(void) {
             unregister_code16(held_action_keycode);
             held_action_keycode = KC_NO;
         }
-    } else if (!IS_QK_MOMENTARY(key_active) && active_tap_action != KC_NO) {
+    } else if (!is_layer_key(key_active) && active_tap_action != KC_NO) {
         // Still in tap window for a regular key — resolve using the
         // authored single-tap action rather than assuming keycode == tap.
         dispatch_action(active_tap_action);
@@ -292,6 +293,7 @@ static void flush_active_key(void) {
     active_longer_hold_term    = CUSTOM_LONGER_HOLD_TERM;
     active_multi_tap_term      = CUSTOM_MULTI_TAP_TERM;
     active_hold_one_shot_fired = false;
+    active_layer_interrupted   = false;
 }
 
 // ─── RGB Color Cache ─────────────────────────────────────────────────────────
@@ -318,6 +320,10 @@ static rgb_t pd_mode_led_group_rgb[PD_MODE_LED_GROUP_COUNT];
 //   5) Macros (press-only)
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (record->event.pressed && key_active != KC_NO && keycode != key_active && is_layer_key(key_active)) {
+        active_layer_interrupted = true;
+    }
+
     // --- 1) Flush pending multi-tap if a different key is pressed ---
     if (multi_tap_active(&multi_tap) && record->event.pressed && keycode != multi_tap.keycode) {
         multi_tap_flush(&multi_tap, key_behavior_step_lookup, dispatch_action);
@@ -405,11 +411,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     // --- 3) Key behavior view (react on both press and release) ---
     //
     // key_behavior_lookup() exposes the authored key_behaviors[] row plus
-    // runtime facts such as "is this an MO() or LT() key?".
+    // runtime facts such as "is this a handled MO() or configured LT() key?".
     //
-    // MO() and LT() keycodes that appear in the behavior view are intercepted
-    // here so we can add multi-tap behavior.  We handle layer_on/layer_off
-    // ourselves and return false to prevent QMK from doing it twice.
+    // MO() keys and LT() keys with an authored key_behaviors[] row are
+    // intercepted here so we can add multi-tap behavior. Plain LT() keys fall
+    // through to QMK's native tapping engine.
     {
         key_behavior_view_t behavior = key_behavior_lookup(keycode);
 
@@ -439,6 +445,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         active_longer_hold_term    = behavior.longer_hold_term;
                         active_multi_tap_term      = behavior.multi_tap_term;
                         active_hold_one_shot_fired = false;
+                        active_layer_interrupted   = false;
                     }
                     return false;
                 }
@@ -463,6 +470,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 active_longer_hold_term    = behavior.longer_hold_term;
                 active_multi_tap_term      = behavior.multi_tap_term;
                 active_hold_one_shot_fired = false;
+                active_layer_interrupted   = false;
             } else {
                 // Release — resolve pending hold-after-multi-tap first.
                 if (multi_tap_pending_hold(&multi_tap) && multi_tap.keycode == keycode) {
@@ -495,6 +503,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     active_longer_hold_term    = CUSTOM_LONGER_HOLD_TERM;
                     active_multi_tap_term      = CUSTOM_MULTI_TAP_TERM;
                     active_hold_one_shot_fired = false;
+                    active_layer_interrupted   = false;
                     return false;
                 }
 
@@ -513,6 +522,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 uint16_t        rel_longer_hold_term   = active_longer_hold_term;
                 uint16_t        rel_multi_tap_term     = active_multi_tap_term;
                 bool            rel_one_shot_fired     = active_hold_one_shot_fired;
+                bool            rel_layer_interrupted  = active_layer_interrupted;
                 hold_behavior_t rel_hold               = active_hold;
                 hold_behavior_t rel_long_hold          = active_long_hold;
 
@@ -524,6 +534,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 active_longer_hold_term    = CUSTOM_LONGER_HOLD_TERM;
                 active_multi_tap_term      = CUSTOM_MULTI_TAP_TERM;
                 active_hold_one_shot_fired = false;
+                active_layer_interrupted   = false;
 
                 // If any keycode is registered (PRESS_AND_HOLD or promoted long_hold),
                 // unregister it. For PRESS_AND_HOLD + TAP_ON_RELEASE long_hold, also
@@ -546,7 +557,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 // Determine action based on elapsed time.
                 uint16_t elapsed = timer_elapsed(key_timer);
 
-                if (elapsed < rel_tap_hold_term) {
+                if (elapsed < rel_tap_hold_term && !(behavior.is_momentary_layer && rel_layer_interrupted)) {
                     // TAP while any layer is locked → unlock immediately.
                     if (behavior.is_momentary_layer && locked_layer) {
                         layer_off(locked_layer);

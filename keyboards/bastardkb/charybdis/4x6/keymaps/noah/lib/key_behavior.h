@@ -192,10 +192,11 @@ static inline key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     const key_behavior_t *config = key_behavior_config_lookup(keycode);
     bool                  is_mo  = IS_QK_MOMENTARY(keycode);
     bool                  is_lt  = IS_QK_LAYER_TAP(keycode);
+    bool                  custom_lt = is_lt && config;
 
     uint16_t tap_term    = CUSTOM_TAP_HOLD_TERM;
     if      (config && config->tap_hold_term)    tap_term    = config->tap_hold_term;
-    else if (is_lt)                              tap_term    = TAPPING_TERM;
+    else if (custom_lt)                          tap_term    = TAPPING_TERM;
 
     uint16_t longer_term = config && config->longer_hold_term ? config->longer_hold_term : CUSTOM_LONGER_HOLD_TERM;
     uint16_t multi_term  = config && config->multi_tap_term   ? config->multi_tap_term   : CUSTOM_MULTI_TAP_TERM;
@@ -203,9 +204,9 @@ static inline key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .config             = config,
         .keycode            = keycode,
-        .handled            = config || is_mo || is_lt,
-        .is_momentary_layer = is_mo || is_lt,
-        .is_layer_tap       = is_lt,
+        .handled            = config || is_mo,
+        .is_momentary_layer = is_mo || custom_lt,
+        .is_layer_tap       = custom_lt,
         .has_multi_tap      = config ? key_behavior_has_multi_tap(keycode) : false,
         .tap_hold_term      = tap_term,
         .longer_hold_term   = longer_term,
