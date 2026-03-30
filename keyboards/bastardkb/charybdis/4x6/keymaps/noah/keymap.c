@@ -182,69 +182,6 @@ static inline bool is_layer_lock_action(uint16_t action) {
     return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
 }
 
-static bool pd_mode_set_lock_state(uint8_t mode, bool locked) {
-    if (locked) {
-        bool changed = false;
-
-        for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-            uint8_t other_mode = pd_modes[i].mode_flag;
-            if (other_mode != mode && pd_mode_locked(other_mode)) {
-                pd_mode_unlock(other_mode);
-                changed = true;
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-                if (other_mode == PD_MODE_DRAGSCROLL && get_auto_mouse_toggle()) {
-                    auto_mouse_toggle();
-                }
-#endif
-            }
-        }
-
-        if (!pd_mode_locked(mode)) {
-            pd_mode_lock(mode);
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-            if (mode == PD_MODE_DRAGSCROLL && !get_auto_mouse_toggle()) {
-                auto_mouse_toggle();
-            }
-#endif
-            changed = true;
-        }
-        return changed;
-    }
-
-    if (!pd_mode_locked(mode)) return false;
-
-    pd_mode_unlock(mode);
-
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (mode == PD_MODE_DRAGSCROLL && get_auto_mouse_toggle()) {
-        auto_mouse_toggle();
-    }
-#endif
-
-    return true;
-}
-
-static void pd_mode_toggle_lock(uint8_t mode) {
-    if (pd_mode_set_lock_state(mode, !pd_mode_locked(mode))) {
-        pd_state_sync();
-    }
-}
-
-static void pd_mode_unlock_other_locks(uint8_t keep_mode) {
-    bool changed = false;
-
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        uint8_t mode = pd_modes[i].mode_flag;
-        if (mode != keep_mode) {
-            changed |= pd_mode_set_lock_state(mode, false);
-        }
-    }
-
-    if (changed) {
-        pd_state_sync();
-    }
-}
-
 // Dispatch an action keycode. Handles layer-lock actions and generic
 // LOCK_PD_MODE(...) actions specially; everything else falls through to tap_code16.
 static void dispatch_action(uint16_t action) {
@@ -262,7 +199,9 @@ static void dispatch_action(uint16_t action) {
     }
     if (is_pd_mode_lock_action(action)) {
         const pd_mode_def_t *def = pd_mode_lock_action_lookup(action);
-        if (def) pd_mode_toggle_lock(def->mode_flag);
+        if (def && pd_mode_toggle_lock_state(def->mode_flag)) {
+            pd_state_sync();
+        }
         return;
     }
     tap_code16(action);
@@ -397,7 +336,9 @@ static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_k
     if (!mode) return false;
 
     if (record->event.pressed) {
-        pd_mode_unlock_other_locks(mode);
+        if (pd_mode_unlock_other_locks(mode)) {
+            pd_state_sync();
+        }
 
         // Multi-tap detection: same key pressed again while pending.
         if (handled_key_multi_tap_repress(key, keycode)) {
@@ -430,7 +371,9 @@ static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_k
 
         if (locked_press) {
             // Tap or hold on the locked mode key toggles the lock off.
-            pd_mode_toggle_lock(mode);
+            if (pd_mode_toggle_lock_state(mode)) {
+                pd_state_sync();
+            }
         } else if (pressed_this_key && elapsed < CUSTOM_TAP_HOLD_TERM) {
             handled_key_dispatch_tap_or_begin_multi_tap(keycode, key, record);
         }

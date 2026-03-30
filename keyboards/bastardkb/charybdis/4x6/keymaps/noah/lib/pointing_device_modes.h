@@ -179,6 +179,69 @@ static inline void pd_mode_unlock(uint8_t mode) {
     pd_mode_deactivate(mode);
 }
 
+// Lock state adds a small amount of policy on top of the raw mode primitives:
+// only one pd mode may stay locked at a time, and dragscroll mirrors the
+// auto-mouse toggle so the pointer layer stays anchored while locked.
+static inline bool pd_mode_set_lock_state(uint8_t mode, bool locked) {
+    if (locked) {
+        bool changed = false;
+
+        for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+            uint8_t other_mode = pd_modes[i].mode_flag;
+            if (other_mode != mode && pd_mode_locked(other_mode)) {
+                pd_mode_unlock(other_mode);
+                changed = true;
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+                if (other_mode == PD_MODE_DRAGSCROLL && get_auto_mouse_toggle()) {
+                    auto_mouse_toggle();
+                }
+#endif
+            }
+        }
+
+        if (!pd_mode_locked(mode)) {
+            pd_mode_lock(mode);
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+            if (mode == PD_MODE_DRAGSCROLL && !get_auto_mouse_toggle()) {
+                auto_mouse_toggle();
+            }
+#endif
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    if (!pd_mode_locked(mode)) return false;
+
+    pd_mode_unlock(mode);
+
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    if (mode == PD_MODE_DRAGSCROLL && get_auto_mouse_toggle()) {
+        auto_mouse_toggle();
+    }
+#endif
+
+    return true;
+}
+
+static inline bool pd_mode_toggle_lock_state(uint8_t mode) {
+    return pd_mode_set_lock_state(mode, !pd_mode_locked(mode));
+}
+
+static inline bool pd_mode_unlock_other_locks(uint8_t keep_mode) {
+    bool changed = false;
+
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        uint8_t mode = pd_modes[i].mode_flag;
+        if (mode != keep_mode) {
+            changed |= pd_mode_set_lock_state(mode, false);
+        }
+    }
+
+    return changed;
+}
+
 // Convenience: set or clear a mode based on a boolean, resetting the
 // handler's accumulators on deactivation so stale state doesn't carry
 // into the next activation.
