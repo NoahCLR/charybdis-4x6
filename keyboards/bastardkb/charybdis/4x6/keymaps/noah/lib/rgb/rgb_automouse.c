@@ -20,9 +20,7 @@ bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t e
     uint16_t progress;
 
     if (is_keyboard_master()) {
-        uint16_t elapsed = auto_mouse_get_time_elapsed();
-        progress         = automouse_rgb_progress(elapsed);
-        pd_state_sync_elapsed(elapsed);
+        progress = automouse_rgb_progress(auto_mouse_get_time_elapsed());
     } else {
         progress = pd_sync_remote.automouse_progress;
     }

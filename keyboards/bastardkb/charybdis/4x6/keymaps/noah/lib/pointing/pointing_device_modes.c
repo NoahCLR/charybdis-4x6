@@ -70,6 +70,14 @@ bool pd_any_mode_locked(void) {
     return pd_mode_locked_flags != 0;
 }
 
+void pd_mode_apply_remote_snapshot(uint8_t active_flags, uint8_t locked_flags) {
+    // Remote sync only mirrors mode state for the non-master half's policy/UI.
+    // Do not replay local side effects such as dragscroll or auto-mouse
+    // ownership changes from this path.
+    pd_mode_locked_flags = locked_flags;
+    pd_mode_flags        = active_flags | locked_flags;
+}
+
 const pd_mode_def_t *pd_mode_lookup(uint8_t mode) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_modes[i].mode_flag == mode) return &pd_modes[i];

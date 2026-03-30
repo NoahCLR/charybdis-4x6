@@ -29,6 +29,10 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 #    endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    pd_state_sync_tick();
+#    endif
+
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_mode_active(pd_modes[i].mode_flag) && pd_modes[i].handler) {
             return pd_modes[i].handler(mouse_report);

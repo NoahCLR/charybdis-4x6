@@ -132,7 +132,7 @@
 #ifdef POINTING_DEVICE_ENABLE
 
 // Register a custom split RPC transaction for syncing pointing device
-// state (auto-mouse elapsed time + mode flags) from master to slave.
+// state (auto-mouse RGB progress + mode flags) from master to slave.
 #    ifdef SPLIT_KEYBOARD
 #        define SPLIT_TRANSACTION_IDS_USER PUT_PD_SYNC
 #    endif

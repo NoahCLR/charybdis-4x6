@@ -48,6 +48,7 @@ void pd_mode_clear_locked(uint8_t mode);
 bool pd_mode_active(uint8_t mode);
 bool pd_mode_locked(uint8_t mode);
 bool pd_any_mode_locked(void);
+void pd_mode_apply_remote_snapshot(uint8_t active_flags, uint8_t locked_flags);
 
 const pd_mode_def_t *pd_mode_lookup(uint8_t mode);
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action);
