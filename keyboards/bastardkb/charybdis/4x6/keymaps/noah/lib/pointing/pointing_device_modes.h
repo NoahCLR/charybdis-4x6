@@ -61,6 +61,7 @@ void pd_mode_unlock(uint8_t mode);
 bool pd_mode_set_lock_state(uint8_t mode, bool locked);
 bool pd_mode_toggle_lock_state(uint8_t mode);
 bool pd_mode_unlock_other_locks(uint8_t keep_mode);
+bool pd_mode_deactivate_other_unlocked(uint8_t keep_mode);
 void pd_mode_update(uint8_t mode, bool active);
 
 bool    pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record);

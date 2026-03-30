@@ -41,6 +41,7 @@ bool is_keyboard_master_impl(void) {
 // tap_counts[0] = single press
 // tap_counts[1] = double tap
 // tap_counts[2] = triple tap
+// tap_counts[3] = quadruple tap
 //
 // omit .tap to keep the key's normal tap behavior for that step
 // .hold / .long_hold use the helper DSL from lib/key/key_behavior.h

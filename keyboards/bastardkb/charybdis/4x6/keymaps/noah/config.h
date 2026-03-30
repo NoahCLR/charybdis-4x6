@@ -137,8 +137,8 @@
 #        define SPLIT_TRANSACTION_IDS_USER PUT_PD_SYNC
 #    endif
 
-// Reduce sensor polling rate from 1kHz to 500Hz to ease main-loop pressure.
-// At 800 DPI this is still very smooth and gives the serial/RGB tasks room.
+// Keep split-pointing polling at the 1 ms cadence QMK already defaults to.
+// Higher values ease transport/main-loop pressure, but trade away responsiveness.
 #    undef POINTING_DEVICE_TASK_THROTTLE_MS
 #    define POINTING_DEVICE_TASK_THROTTLE_MS 1
 
@@ -194,7 +194,7 @@
 //   A double-tap takes up to 2x the term, triple up to 3x, etc.
 //   Single taps on multi-tap keys are delayed by one window.
 //
-#define KEY_BEHAVIOR_MAX_TAP_COUNT 4 // max tap-count entries per key (single / double / triple)
+#define KEY_BEHAVIOR_MAX_TAP_COUNT 4 // max tap-count entries per key (single / double / triple / quadruple)
 #define CUSTOM_TAP_HOLD_TERM 150     // tap vs hold boundary
 #define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary
 #define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps

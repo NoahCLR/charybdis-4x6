@@ -82,6 +82,7 @@ typedef struct {
 // tap_counts[0] = single press
 // tap_counts[1] = double tap
 // tap_counts[2] = triple tap
+// tap_counts[3] = quadruple tap
 //
 // Unused entries stay zero-initialized.
 

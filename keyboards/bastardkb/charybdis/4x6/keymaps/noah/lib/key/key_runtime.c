@@ -236,6 +236,16 @@ static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_k
             pd_state_sync();
         }
 
+        if (pd_mode_press.keycode != KC_NO && pd_mode_press.keycode != keycode) {
+            pd_mode_press_reset();
+        }
+
+        // Pointing-device mode keys are exclusive while held: the latest press
+        // wins, and any earlier unlocked mode is cancelled immediately.
+        if (pd_mode_deactivate_other_unlocked(mode)) {
+            pd_state_sync();
+        }
+
         if (handled_key_multi_tap_repress(key, keycode)) {
             pd_mode_press.mode       = mode;
             pd_mode_press.was_locked = pd_mode_locked(mode);
@@ -243,6 +253,7 @@ static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_k
             uint16_t action          = handled_key_advance_multi_tap(keycode);
             if (action != KC_NO) dispatch_action(action);
             pd_mode_press.keycode = KC_NO;
+            pd_state_sync();
             return true;
         }
 
@@ -348,10 +359,7 @@ static bool process_key_behavior(uint16_t keycode, keyrecord_t *record, handled_
     uint16_t elapsed = timer_elapsed(released_key.timer);
 
     if (elapsed < released_key.tap_hold_term && !(behavior.is_momentary_layer && released_key.layer_interrupted)) {
-        if (behavior.is_momentary_layer && locked_layer) {
-            layer_off(locked_layer);
-            locked_layer = 0;
-        } else if (behavior.has_multi_tap) {
+        if (behavior.has_multi_tap) {
             multi_tap_begin(&multi_tap, keycode, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
         } else if (released_key.tap_action != KC_NO) {
             dispatch_action(released_key.tap_action);

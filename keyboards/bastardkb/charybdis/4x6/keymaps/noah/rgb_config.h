@@ -64,6 +64,7 @@ static const pd_mode_color_t pd_mode_colors[] = {
 //                           25  24     55  XX
 //                     ╰────────────╯ ╰────────────╯
 
+// Reserved example groups. Activate them by uncommenting the table entries below.
 static const uint8_t raise_highlight_leds[]  = {33, 18};
 static const uint8_t lower_highlight_leds[]  = {4, 47};
 static const uint8_t volume_highlight_leds[] = {52};
