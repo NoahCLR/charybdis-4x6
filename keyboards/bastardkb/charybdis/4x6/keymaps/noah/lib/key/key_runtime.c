@@ -27,7 +27,6 @@ typedef struct {
     uint16_t keycode;
     uint8_t  mode;
     bool     was_locked;
-    bool     activated;
 } pd_mode_press_state_t;
 
 #define PD_MODE_PRESS_STATE_INIT {.keycode = KC_NO}
@@ -249,7 +248,6 @@ static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_k
         if (handled_key_multi_tap_repress(key, keycode)) {
             pd_mode_press.mode       = mode;
             pd_mode_press.was_locked = pd_mode_locked(mode);
-            pd_mode_press.activated  = false;
             uint16_t action          = handled_key_advance_multi_tap(keycode);
             if (action != KC_NO) dispatch_action(action);
             pd_mode_press.keycode = KC_NO;
@@ -261,7 +259,6 @@ static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_k
         pd_mode_press.keycode    = keycode;
         pd_mode_press.mode       = mode;
         pd_mode_press.was_locked = pd_mode_locked(mode);
-        pd_mode_press.activated  = !pd_mode_press.was_locked;
         pd_mode_update(mode, true);
     } else {
         bool     pressed_this_key = pd_mode_press.keycode == keycode;

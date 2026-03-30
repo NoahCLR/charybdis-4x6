@@ -38,7 +38,7 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAM
 // VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE activate pointing
 // device modes while held.
 // DRAGSCROLL: tap = base-layer key, double-tap = lock dragscroll, hold = momentary.
-// The hold path is handled by the pd_mode key system (section 2 in process_record_user).
+// The hold path is handled by the pointing-device mode runtime in key_runtime.c.
 // Pointing-device modes can dispatch LOCK_PD_MODE(mode_keycode) via the
 // key_behaviors[] multi-tap system.
 // PD_MODE_LOCK_BASE reserves one lock/toggle action per pd-mode keycode.
