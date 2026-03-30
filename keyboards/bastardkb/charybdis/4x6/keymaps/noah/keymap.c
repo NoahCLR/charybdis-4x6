@@ -116,7 +116,7 @@ static uint16_t pd_mode_timer_keycode = KC_NO;
 
 static inline uint16_t key_behavior_single_tap_action(key_behavior_view_t behavior, keyrecord_t *record) {
     if (behavior.single.tap.present) return behavior.single.tap.action;
-    if (behavior.is_layer_tap)       return QK_LAYER_TAP_GET_TAP_KEY(behavior.keycode);
+    if (behavior.is_layer_tap)       return QK_LAYER_TAP_GET_TAP_KEYCODE(behavior.keycode);
     if (behavior.is_momentary_layer) return KC_NO;
     // Custom keycodes (DRAGSCROLL, VOLUME_MODE, etc.) have no intrinsic tap — fall
     // back to whatever key occupies this physical position on the base layer.
@@ -223,7 +223,7 @@ static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_ho
             held_action_keycode = KC_NO;
         }
         dispatch_action(hold.action);
-        key_hold_fired = true;
+        key_hold_fired = !hold_fires_at_threshold(long_hold);
         return;
     }
 
@@ -535,6 +535,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 } else {
                     if (hold_sends_on_release(rel_hold)) {
                         dispatch_action(select_release_hold_action(elapsed, rel_hold.action, rel_long_hold));
+                    } else if (hold_sends_on_release(rel_long_hold) && elapsed >= active_longer_hold_term) {
+                        dispatch_action(rel_long_hold.action);
                     } else if (!behavior.is_momentary_layer && rel_tap_action != KC_NO) {
                         // No hold tier was configured, so press duration does not
                         // change the result for regular keys.

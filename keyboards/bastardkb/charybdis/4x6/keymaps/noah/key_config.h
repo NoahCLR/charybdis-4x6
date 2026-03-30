@@ -125,23 +125,45 @@ enum custom_keycodes {
 //       .longer_hold_term = 500,  // optional: hold vs long-hold for this key
 //       .multi_tap_term   = 200,  // optional: max gap between consecutive taps
 //       .tap_counts = {
-//           [0] = {                                              // single tap/hold
-//               .tap       = TAP_SENDS(KC_X),                   // quick release → X
-//               .hold      = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LSFT), // held → Shift (registered while held)
-//               .long_hold = TAP_AT_HOLD_THRESHOLD(KC_CAPS),    // held longer → CapsLock once
-//           },
-//           [1] = {                                              // double tap/hold
-//               .tap  = TAP_SENDS(G(KC_X)),                     // double-tap → GUI+X
-//               .hold = TAP_ON_RELEASE_AFTER_HOLD(KC_MUTE),     // double-tap then hold → Mute on release
-//           },
-//           [2] = {                                              // triple tap/hold
-//               .tap  = TAP_SENDS(LOCK_LAYER(LAYER_LOWER)),     // triple-tap → lock LAYER_LOWER
-//               .hold = TAP_AT_HOLD_THRESHOLD(KC_MNXT),         // triple-tap then hold → Next track once
-//           },
+//           [0] = {                                                    // single tap/hold
+//               .tap       = TAP_SENDS(KC_X),                         // quick release → X
+//               .hold      = TAP_ON_RELEASE_AFTER_HOLD(KC_LSFT),      // short hold → Shift sent on release
+//               .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCTL),   // long hold → Ctrl registered while held
+//           },                                                         //   ↑ escalating commitment: one-shot → registered
+//           [1] = {                                                    // double tap/hold
+//               .tap       = TAP_SENDS(G(KC_X)),                      // double-tap → GUI+X
+//               .hold      = TAP_ON_RELEASE_AFTER_HOLD(KC_MUTE),      // double-tap then hold → Mute on release
+//               .long_hold = TAP_ON_RELEASE_AFTER_HOLD(KC_VOLD),      // held longer → Vol Down on release
+//           },                                                         //   ↑ both release-based: elapsed time picks
+//           [2] = {                                                    // triple tap/hold
+//               .tap  = TAP_SENDS(LOCK_LAYER(LAYER_LOWER)),           // triple-tap → lock LAYER_LOWER
+//               .hold = TAP_AT_HOLD_THRESHOLD(KC_MNXT),               // triple-tap then hold → Next track once
+//           },                                                         //   ↑ TAP_AT_THRESHOLD alone, no long_hold needed
 //       },
 //   },
+//
+// Hold mode combinations — all valid and invalid pairs:
+//
+//   hold only:
+//     PRESS_AND_HOLD_UNTIL_RELEASE          — registered while held, unregistered on release
+//     TAP_AT_HOLD_THRESHOLD                 — fires once at tap_hold_term, done
+//     TAP_ON_RELEASE_AFTER_HOLD             — fires on release if held past tap_hold_term
+//
+//   long_hold only (no hold):
+//     PRESS_AND_HOLD_UNTIL_RELEASE          — fires at longer_hold_term; short holds act as tap
+//     TAP_AT_HOLD_THRESHOLD                 — fires once at longer_hold_term; short holds act as tap
+//     TAP_ON_RELEASE_AFTER_HOLD             — fires on release if held past longer_hold_term; short holds act as tap
+//
+//   hold + long_hold pairs:
+//     TAP_ON_RELEASE_AFTER_HOLD + TAP_ON_RELEASE_AFTER_HOLD    — both resolve on release; elapsed time picks which
+//     TAP_ON_RELEASE_AFTER_HOLD + PRESS_AND_HOLD_UNTIL_RELEASE — escalating: one-shot on short hold, registered on long hold
+//     TAP_ON_RELEASE_AFTER_HOLD + TAP_AT_HOLD_THRESHOLD        — soft then immediate: short hold waits, long hold fires at threshold
+//     TAP_AT_HOLD_THRESHOLD     + TAP_AT_HOLD_THRESHOLD        — two sequential one-shots: first at tap_hold_term, second at longer_hold_term
+//     TAP_AT_HOLD_THRESHOLD     + TAP_ON_RELEASE_AFTER_HOLD    — one-shot at threshold, then if held longer fires again on release
+//     TAP_AT_HOLD_THRESHOLD     + PRESS_AND_HOLD_UNTIL_RELEASE — one-shot at threshold, then if held longer registers key until release
+//     PRESS_AND_HOLD_UNTIL_RELEASE + (anything)                ❌ hold registers briefly then long_hold interrupts or is unreachable
 
-// keycode                single / double / triple behavior
+// keycode                single / double / triple / N behavior
 static const key_behavior_t
     key_behaviors[] =
         {
@@ -206,9 +228,10 @@ static const key_behavior_t
             // tap_hold_term inherits the LT() default (TAPPING_TERM) so typing feel is unchanged.
             {
                 .keycode = LT(LAYER_RAISE, KC_SLSH),
-                .tap_counts = {
-                    [1] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_RAISE))},
-                },
+                .tap_counts =
+                    {
+                        [1] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_RAISE))},
+                    },
             },
 
             // Pointing device mode keys.
