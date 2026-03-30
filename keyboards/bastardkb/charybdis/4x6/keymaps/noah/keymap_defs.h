@@ -67,15 +67,15 @@ enum custom_keycodes {
     ARROW_MODE,
     ZOOM_MODE,
     DRAGSCROLL,
-    PD_MODE_LOCK_BASE, // reserves one lock/toggle action per pd-mode keycode — use LOCK_PD_MODE(mode_keycode)
-    LAYER_LOCK_BASE = PD_MODE_LOCK_BASE + (DRAGSCROLL - VOLUME_MODE + 1), // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
+    PD_MODE_LOCK_BASE,                                                        // reserves one lock/toggle action per pd-mode keycode — use LOCK_PD_MODE(mode_keycode)
+    LAYER_LOCK_BASE     = PD_MODE_LOCK_BASE + (DRAGSCROLL - VOLUME_MODE + 1), // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
 
 #define LOCK_PD_MODE(mode_keycode_) (PD_MODE_LOCK_BASE + ((mode_keycode_) - VOLUME_MODE))
-#define LOCK_LAYER(layer_)          (LAYER_LOCK_BASE + (layer_))
+#define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 
-bool macro_dispatch(uint16_t keycode);
+bool                          macro_dispatch(uint16_t keycode);
 extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
 
 // Authored key behavior data, macro implementations, combo definitions, and

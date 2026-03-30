@@ -41,21 +41,18 @@ bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t e
     }
 
     uint16_t prog = (elapsed <= AUTOMOUSE_RGB_DEAD_TIME) ? 0 : (elapsed - AUTOMOUSE_RGB_DEAD_TIME);
-    hsv_t     hsv;
+    hsv_t    hsv;
 
     if (prog == 0) {
         hsv = start;
     } else {
         uint32_t t = (uint32_t)prog * 255 / AUTOMOUSE_RGB_ACTIVE_SPAN;
-        hsv.h = start.h + (uint8_t)((int32_t)((int16_t)end.h - (int16_t)start.h) * t / 255);
-        hsv.s = start.s + (uint8_t)((int32_t)((int16_t)end.s - (int16_t)start.s) * t / 255);
-        hsv.v = start.v + (uint8_t)((int32_t)((int16_t)end.v - (int16_t)start.v) * t / 255);
+        hsv.h      = start.h + (uint8_t)((int32_t)((int16_t)end.h - (int16_t)start.h) * t / 255);
+        hsv.s      = start.s + (uint8_t)((int32_t)((int16_t)end.s - (int16_t)start.s) * t / 255);
+        hsv.v      = start.v + (uint8_t)((int32_t)((int16_t)end.v - (int16_t)start.v) * t / 255);
     }
 
-    if (!automouse_cache_valid ||
-        hsv.h != automouse_cached_hsv.h ||
-        hsv.s != automouse_cached_hsv.s ||
-        hsv.v != automouse_cached_hsv.v) {
+    if (!automouse_cache_valid || hsv.h != automouse_cached_hsv.h || hsv.s != automouse_cached_hsv.s || hsv.v != automouse_cached_hsv.v) {
         automouse_cached_hsv  = hsv;
         automouse_cached_rgb  = hsv_to_rgb(hsv);
         automouse_cache_valid = true;

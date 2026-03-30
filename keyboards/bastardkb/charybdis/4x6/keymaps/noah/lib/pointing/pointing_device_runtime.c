@@ -61,8 +61,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
         state &= ~((layer_state_t)1 << LAYER_POINTER);
     } else if (layer_state_cmp(state, LAYER_POINTER)) {
         bool other_layer_active  = (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0;
-        bool auto_mouse_anchored = get_auto_mouse_toggle() || get_auto_mouse_key_tracker() != 0
-                                   || pd_any_mode_locked();
+        bool auto_mouse_anchored = get_auto_mouse_toggle() || get_auto_mouse_key_tracker() != 0 || pd_any_mode_locked();
         if (other_layer_active && !auto_mouse_anchored) {
             state &= ~((layer_state_t)1 << LAYER_POINTER);
         }

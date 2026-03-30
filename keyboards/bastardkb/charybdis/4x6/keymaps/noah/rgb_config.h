@@ -12,7 +12,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "keymap_defs.h"               // LAYER_COUNT, LAYER_BASE, etc.
+#include "keymap_defs.h"                        // LAYER_COUNT, LAYER_BASE, etc.
 #include "lib/pointing/pointing_device_modes.h" // PD_MODE_* flags
 #include "lib/rgb/rgb_helpers.h"                // rgb_set_*, hsv_t, rgb_t, config types
 

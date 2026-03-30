@@ -17,11 +17,7 @@ uint8_t pd_mode_flags        = 0;
 uint8_t pd_mode_locked_flags = 0;
 
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
-    {PD_MODE_DRAGSCROLL, DRAGSCROLL, LOCK_PD_MODE(DRAGSCROLL), NULL, NULL, NULL},
-    {PD_MODE_VOLUME, VOLUME_MODE, LOCK_PD_MODE(VOLUME_MODE), handle_volume_mode, NULL, reset_volume_mode},
-    {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, LOCK_PD_MODE(BRIGHTNESS_MODE), handle_brightness_mode, NULL, reset_brightness_mode},
-    {PD_MODE_ZOOM, ZOOM_MODE, LOCK_PD_MODE(ZOOM_MODE), handle_zoom_mode, NULL, reset_zoom_mode},
-    {PD_MODE_ARROW, ARROW_MODE, LOCK_PD_MODE(ARROW_MODE), handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode},
+    {PD_MODE_DRAGSCROLL, DRAGSCROLL, LOCK_PD_MODE(DRAGSCROLL), NULL, NULL, NULL}, {PD_MODE_VOLUME, VOLUME_MODE, LOCK_PD_MODE(VOLUME_MODE), handle_volume_mode, NULL, reset_volume_mode}, {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, LOCK_PD_MODE(BRIGHTNESS_MODE), handle_brightness_mode, NULL, reset_brightness_mode}, {PD_MODE_ZOOM, ZOOM_MODE, LOCK_PD_MODE(ZOOM_MODE), handle_zoom_mode, NULL, reset_zoom_mode}, {PD_MODE_ARROW, ARROW_MODE, LOCK_PD_MODE(ARROW_MODE), handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode},
 };
 
 void pd_mode_set(uint8_t mode) {
@@ -177,8 +173,7 @@ void pd_mode_update(uint8_t mode, bool active) {
 
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_active(pd_modes[i].mode_flag) && pd_modes[i].key_handler &&
-            pd_modes[i].key_handler(keycode, record)) {
+        if (pd_mode_active(pd_modes[i].mode_flag) && pd_modes[i].key_handler && pd_modes[i].key_handler(keycode, record)) {
             return true;
         }
     }

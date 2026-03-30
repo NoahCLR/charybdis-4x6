@@ -98,17 +98,13 @@ typedef struct {
 // Small initializer macros for the nested tap/hold values used in
 // key_behaviors[].
 
-#define TAP_SENDS(action_) \
-    { .present = true, .action = (action_) }
+#define TAP_SENDS(action_) {.present = true, .action = (action_)}
 
-#define PRESS_AND_HOLD_UNTIL_RELEASE(action_) \
-    { .present = true, .action = (action_), .mode = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE }
+#define PRESS_AND_HOLD_UNTIL_RELEASE(action_) {.present = true, .action = (action_), .mode = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE}
 
-#define TAP_AT_HOLD_THRESHOLD(action_) \
-    { .present = true, .action = (action_), .mode = HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD }
+#define TAP_AT_HOLD_THRESHOLD(action_) {.present = true, .action = (action_), .mode = HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD}
 
-#define TAP_ON_RELEASE_AFTER_HOLD(action_) \
-    { .present = true, .action = (action_), .mode = HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD }
+#define TAP_ON_RELEASE_AFTER_HOLD(action_) {.present = true, .action = (action_), .mode = HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD}
 
 // Defined once in keymap.c.
 extern const key_behavior_t key_behaviors[];
@@ -121,9 +117,9 @@ typedef struct {
     bool                  is_momentary_layer; // MO() or LT() — engine handles layer_on/off
     bool                  is_layer_tap;       // specifically LT() — has embedded tap key
     bool                  has_multi_tap;
-    uint16_t              tap_hold_term;      // resolved: per-key → TAPPING_TERM for LT → CUSTOM_TAP_HOLD_TERM
-    uint16_t              longer_hold_term;   // resolved: per-key → CUSTOM_LONGER_HOLD_TERM
-    uint16_t              multi_tap_term;     // resolved: per-key → CUSTOM_MULTI_TAP_TERM
+    uint16_t              tap_hold_term;    // resolved: per-key → TAPPING_TERM for LT → CUSTOM_TAP_HOLD_TERM
+    uint16_t              longer_hold_term; // resolved: per-key → CUSTOM_LONGER_HOLD_TERM
+    uint16_t              multi_tap_term;   // resolved: per-key → CUSTOM_MULTI_TAP_TERM
     key_behavior_step_t   single;
 } key_behavior_view_t;
 
@@ -132,9 +128,7 @@ static inline hold_behavior_t hold_behavior_none(void) {
 }
 
 static inline bool hold_fires_at_threshold(hold_behavior_t hold) {
-    return hold.present &&
-           (hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE ||
-            hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD);
+    return hold.present && (hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD);
 }
 
 static inline bool hold_registers_while_held(hold_behavior_t hold) {
@@ -189,17 +183,19 @@ static inline bool key_behavior_has_multi_tap(uint16_t keycode) {
 }
 
 static inline key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
-    const key_behavior_t *config = key_behavior_config_lookup(keycode);
-    bool                  is_mo  = IS_QK_MOMENTARY(keycode);
-    bool                  is_lt  = IS_QK_LAYER_TAP(keycode);
+    const key_behavior_t *config    = key_behavior_config_lookup(keycode);
+    bool                  is_mo     = IS_QK_MOMENTARY(keycode);
+    bool                  is_lt     = IS_QK_LAYER_TAP(keycode);
     bool                  custom_lt = is_lt && config;
 
-    uint16_t tap_term    = CUSTOM_TAP_HOLD_TERM;
-    if      (config && config->tap_hold_term)    tap_term    = config->tap_hold_term;
-    else if (custom_lt)                          tap_term    = TAPPING_TERM;
+    uint16_t tap_term = CUSTOM_TAP_HOLD_TERM;
+    if (config && config->tap_hold_term)
+        tap_term = config->tap_hold_term;
+    else if (custom_lt)
+        tap_term = TAPPING_TERM;
 
     uint16_t longer_term = config && config->longer_hold_term ? config->longer_hold_term : CUSTOM_LONGER_HOLD_TERM;
-    uint16_t multi_term  = config && config->multi_tap_term   ? config->multi_tap_term   : CUSTOM_MULTI_TAP_TERM;
+    uint16_t multi_term  = config && config->multi_tap_term ? config->multi_tap_term : CUSTOM_MULTI_TAP_TERM;
 
     return (key_behavior_view_t){
         .config             = config,

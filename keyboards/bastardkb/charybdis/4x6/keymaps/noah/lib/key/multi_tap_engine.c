@@ -27,17 +27,14 @@ bool multi_tap_pending_hold(const multi_tap_t *mt) {
 }
 
 bool multi_tap_expired(const multi_tap_t *mt) {
-    return multi_tap_active(mt) && !mt->pending_hold &&
-           timer_elapsed(mt->timer) >= mt->multi_tap_term;
+    return multi_tap_active(mt) && !mt->pending_hold && timer_elapsed(mt->timer) >= mt->multi_tap_term;
 }
 
 bool multi_tap_hold_elapsed(const multi_tap_t *mt) {
-    return mt->pending_hold && hold_fires_at_threshold(mt->hold) &&
-           timer_elapsed(mt->timer) >= mt->tap_hold_term;
+    return mt->pending_hold && hold_fires_at_threshold(mt->hold) && timer_elapsed(mt->timer) >= mt->tap_hold_term;
 }
 
-void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action,
-                     uint16_t tap_hold_term, uint16_t multi_tap_term) {
+void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term) {
     mt->count          = 1;
     mt->timer          = timer_read();
     mt->keycode        = keycode;
@@ -50,15 +47,13 @@ void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action,
     mt->long_hold      = hold_behavior_none();
 }
 
-static void multi_tap_dispatch_repeated(uint16_t action, uint8_t count,
-                                        void (*dispatch)(uint16_t)) {
+static void multi_tap_dispatch_repeated(uint16_t action, uint8_t count, void (*dispatch)(uint16_t)) {
     if (action == KC_NO) return;
-    for (uint8_t i = 0; i < count; i++) dispatch(action);
+    for (uint8_t i = 0; i < count; i++)
+        dispatch(action);
 }
 
-void multi_tap_flush(multi_tap_t *mt,
-                     key_behavior_step_t (*lookup)(uint16_t, uint8_t),
-                     void (*dispatch)(uint16_t)) {
+void multi_tap_flush(multi_tap_t *mt, key_behavior_step_t (*lookup)(uint16_t, uint8_t), void (*dispatch)(uint16_t)) {
     if (mt->pending_hold) {
         if (mt->tap_action != KC_NO) {
             dispatch(mt->tap_action);
@@ -82,9 +77,7 @@ void multi_tap_flush(multi_tap_t *mt,
     multi_tap_reset(mt);
 }
 
-uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode,
-                           key_behavior_step_t (*lookup)(uint16_t, uint8_t),
-                           bool (*has_more)(uint16_t, uint8_t)) {
+uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode, key_behavior_step_t (*lookup)(uint16_t, uint8_t), bool (*has_more)(uint16_t, uint8_t)) {
     mt->count++;
     mt->timer = timer_read();
 
@@ -107,9 +100,7 @@ uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode,
     return KC_NO;
 }
 
-uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode,
-                                bool (*has_more)(uint16_t, uint8_t),
-                                uint8_t *repeat_count) {
+uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode, bool (*has_more)(uint16_t, uint8_t), uint8_t *repeat_count) {
     if (!mt->pending_hold) return KC_NO;
 
     uint16_t elapsed       = timer_elapsed(mt->timer);
@@ -133,7 +124,7 @@ uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode,
     }
 
     if (has_more(keycode, mt->count)) {
-        mt->timer = timer_read();
+        mt->timer     = timer_read();
         *repeat_count = 0;
         return KC_NO;
     }

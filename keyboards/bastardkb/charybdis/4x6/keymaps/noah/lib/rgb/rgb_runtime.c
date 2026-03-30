@@ -10,8 +10,8 @@
 #include "rgb_automouse.h"
 #include "rgb_helpers.h"
 
-#define PD_MODE_COLOR_COUNT     (sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]))
-#define LAYER_LED_GROUP_COUNT   (sizeof(layer_led_groups) / sizeof(layer_led_groups[0]))
+#define PD_MODE_COLOR_COUNT (sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]))
+#define LAYER_LED_GROUP_COUNT (sizeof(layer_led_groups) / sizeof(layer_led_groups[0]))
 #define PD_MODE_LED_GROUP_COUNT (sizeof(pd_mode_led_groups) / sizeof(pd_mode_led_groups[0]))
 
 #ifdef RGB_MATRIX_ENABLE

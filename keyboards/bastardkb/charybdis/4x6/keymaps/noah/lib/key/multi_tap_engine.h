@@ -53,20 +53,13 @@ typedef struct {
     hold_behavior_t long_hold;      // long-hold tier paired with hold
 } multi_tap_t;
 
-void     multi_tap_reset(multi_tap_t *mt);
-bool     multi_tap_active(const multi_tap_t *mt);
-bool     multi_tap_pending_hold(const multi_tap_t *mt);
-bool     multi_tap_expired(const multi_tap_t *mt);
-bool     multi_tap_hold_elapsed(const multi_tap_t *mt);
+void multi_tap_reset(multi_tap_t *mt);
+bool multi_tap_active(const multi_tap_t *mt);
+bool multi_tap_pending_hold(const multi_tap_t *mt);
+bool multi_tap_expired(const multi_tap_t *mt);
+bool multi_tap_hold_elapsed(const multi_tap_t *mt);
 
-void     multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action,
-                         uint16_t tap_hold_term, uint16_t multi_tap_term);
-void     multi_tap_flush(multi_tap_t *mt,
-                         key_behavior_step_t (*lookup)(uint16_t, uint8_t),
-                         void (*dispatch)(uint16_t));
-uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode,
-                           key_behavior_step_t (*lookup)(uint16_t, uint8_t),
-                           bool (*has_more)(uint16_t, uint8_t));
-uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode,
-                                bool (*has_more)(uint16_t, uint8_t),
-                                uint8_t *repeat_count);
+void     multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term);
+void     multi_tap_flush(multi_tap_t *mt, key_behavior_step_t (*lookup)(uint16_t, uint8_t), void (*dispatch)(uint16_t));
+uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode, key_behavior_step_t (*lookup)(uint16_t, uint8_t), bool (*has_more)(uint16_t, uint8_t));
+uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode, bool (*has_more)(uint16_t, uint8_t), uint8_t *repeat_count);

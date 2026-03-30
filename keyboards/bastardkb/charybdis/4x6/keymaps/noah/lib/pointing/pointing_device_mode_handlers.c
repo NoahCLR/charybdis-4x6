@@ -130,12 +130,12 @@ void reset_zoom_mode(void) {
 #        define ARROW_THRESHOLD_Y 50
 #    endif
 
-static int32_t arrow_acc_x          = 0;
-static int32_t arrow_acc_y          = 0;
-static int8_t  arrow_last_x_dir     = 0;
-static int8_t  arrow_last_y_dir     = 0;
-static bool    arrow_axis_is_x      = true;
-static uint8_t arrow_shift_buttons  = 0;
+static int32_t arrow_acc_x         = 0;
+static int32_t arrow_acc_y         = 0;
+static int8_t  arrow_last_x_dir    = 0;
+static int8_t  arrow_last_y_dir    = 0;
+static bool    arrow_axis_is_x     = true;
+static uint8_t arrow_shift_buttons = 0;
 
 static void arrow_shift_sync(void) {
     if (arrow_shift_buttons) {

@@ -15,7 +15,7 @@
 #        define PD_SYNC_ELAPSED_STEP 50
 #    endif
 
-pd_sync_packet_t pd_sync_remote = {0};
+pd_sync_packet_t        pd_sync_remote    = {0};
 static pd_sync_packet_t pd_sync_last_sent = {0};
 
 static uint16_t pd_sync_quantize(uint16_t raw) {
@@ -31,8 +31,7 @@ static void pd_sync_broadcast(const pd_sync_packet_t *pkt) {
     pd_sync_last_sent = *pkt;
 }
 
-static void pd_sync_slave_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer,
-                              uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
+static void pd_sync_slave_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
     (void)target2initiator_buffer_size;
     (void)target2initiator_buffer;
 
