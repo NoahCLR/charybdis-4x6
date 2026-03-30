@@ -136,21 +136,36 @@ static int8_t  arrow_last_x_dir    = 0;
 static int8_t  arrow_last_y_dir    = 0;
 static bool    arrow_axis_is_x     = true;
 static uint8_t arrow_shift_buttons = 0;
+static bool    arrow_shift_held    = false;
+
+#    define ARROW_SELECTION_SHIFT_MOD MOD_BIT(KC_RSFT)
 
 static void arrow_shift_sync(void) {
-    if (arrow_shift_buttons) {
-        add_weak_mods(MOD_BIT(KC_LSFT));
-    } else {
-        del_weak_mods(MOD_BIT(KC_LSFT));
+    bool should_hold_shift = arrow_shift_buttons != 0;
+
+    if (should_hold_shift && !arrow_shift_held) {
+        register_mods(ARROW_SELECTION_SHIFT_MOD);
+        arrow_shift_held = true;
+    } else if (!should_hold_shift && arrow_shift_held) {
+        unregister_mods(ARROW_SELECTION_SHIFT_MOD);
+        arrow_shift_held = false;
     }
-    send_keyboard_report();
 }
 
 static void arrow_send_shortcut(uint16_t shortcut) {
-    del_weak_mods(MOD_BIT(KC_LSFT));
-    send_keyboard_report();
+    bool restore_selection_shift = arrow_shift_held;
+
+    if (restore_selection_shift) {
+        unregister_mods(ARROW_SELECTION_SHIFT_MOD);
+        arrow_shift_held = false;
+    }
+
     tap_code16(shortcut);
-    arrow_shift_sync();
+
+    if (restore_selection_shift && arrow_shift_buttons) {
+        register_mods(ARROW_SELECTION_SHIFT_MOD);
+        arrow_shift_held = true;
+    }
 }
 
 static inline void arrow_send_key(uint16_t keycode) {
