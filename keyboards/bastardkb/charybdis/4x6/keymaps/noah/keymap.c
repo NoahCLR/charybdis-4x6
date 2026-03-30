@@ -15,6 +15,24 @@
 #include "keymap_defs.h"
 #include "lib/key_behavior.h"
 
+// Split-role override hook.
+// Needed when both halves have their own USB connection so they do not both
+// detect USB and fight over who is master.
+#if defined(FORCE_SLAVE)
+#    include "usb_util.h" // QMK
+#endif
+
+#if defined(FORCE_MASTER)
+bool is_keyboard_master_impl(void) {
+    return true;
+}
+#elif defined(FORCE_SLAVE)
+bool is_keyboard_master_impl(void) {
+    usb_disconnect();
+    return false;
+}
+#endif
+
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
 // key_behaviors[] is the single authored behavior table for keys handled by

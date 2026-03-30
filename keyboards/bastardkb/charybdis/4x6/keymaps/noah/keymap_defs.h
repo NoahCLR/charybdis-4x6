@@ -25,6 +25,10 @@ enum charybdis_keymap_layers {
     LAYER_COUNT,
 };
 
+#ifdef VIA_ENABLE
+_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
+#endif
+
 // ─── Custom Keycodes ────────────────────────────────────────────────────────
 //
 // Custom keycodes are assigned values starting from SAFE_RANGE so they don't
