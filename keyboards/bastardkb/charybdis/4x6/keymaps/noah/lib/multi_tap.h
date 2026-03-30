@@ -60,6 +60,7 @@ typedef struct {
     bool     pending_hold;   // true = waiting to see if final tap is held
     uint16_t tap_action;     // action to fire on quick release during pending_hold
     uint16_t tap_hold_term;  // resolved tap-vs-hold threshold for this key
+    uint16_t multi_tap_term; // max gap between consecutive taps
     hold_behavior_t hold;    // hold tier for the current tap count
     hold_behavior_t long_hold; // long-hold tier paired with hold
 } multi_tap_t;
@@ -73,6 +74,7 @@ static inline void multi_tap_reset(multi_tap_t *mt) {
     mt->pending_hold  = false;
     mt->tap_action    = KC_NO;
     mt->tap_hold_term = CUSTOM_TAP_HOLD_TERM;
+    mt->multi_tap_term = CUSTOM_MULTI_TAP_TERM;
     mt->hold          = hold_behavior_none();
     mt->long_hold     = hold_behavior_none();
 }
@@ -87,7 +89,7 @@ static inline bool multi_tap_pending_hold(const multi_tap_t *mt) {
 
 static inline bool multi_tap_expired(const multi_tap_t *mt) {
     return multi_tap_active(mt) && !mt->pending_hold &&
-           timer_elapsed(mt->timer) >= CUSTOM_MULTI_TAP_TERM;
+           timer_elapsed(mt->timer) >= mt->multi_tap_term;
 }
 
 // Has the hold threshold been reached during pending_hold?
@@ -102,16 +104,18 @@ static inline bool multi_tap_hold_elapsed(const multi_tap_t *mt) {
 
 // Start tracking a new multi-tap sequence (call on tap release).
 // single_action is the normal single-tap action for this key (KC_NO = nothing).
-static inline void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action, uint16_t tap_hold_term) {
-    mt->count         = 1;
-    mt->timer         = timer_read();
-    mt->keycode       = keycode;
-    mt->single_action = single_action;
-    mt->pending_hold  = false;
-    mt->tap_action    = KC_NO;
-    mt->tap_hold_term = tap_hold_term;
-    mt->hold          = hold_behavior_none();
-    mt->long_hold     = hold_behavior_none();
+static inline void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action,
+                                   uint16_t tap_hold_term, uint16_t multi_tap_term) {
+    mt->count          = 1;
+    mt->timer          = timer_read();
+    mt->keycode        = keycode;
+    mt->single_action  = single_action;
+    mt->pending_hold   = false;
+    mt->tap_action     = KC_NO;
+    mt->tap_hold_term  = tap_hold_term;
+    mt->multi_tap_term = multi_tap_term;
+    mt->hold           = hold_behavior_none();
+    mt->long_hold      = hold_behavior_none();
 }
 
 static inline void multi_tap_dispatch_repeated(uint16_t action, uint8_t count,

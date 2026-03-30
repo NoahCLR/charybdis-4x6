@@ -97,6 +97,12 @@ enum custom_keycodes {
 //   CUSTOM_MULTI_TAP_TERM   — max gap between consecutive taps (150ms)
 //   COMBO_TERM              — max gap between keys for combos (50ms)
 //
+// Per-key timing overrides (all optional — omit to inherit the global default):
+//   .tap_hold_term   = <ms>  — overrides CUSTOM_TAP_HOLD_TERM for this key
+//                              LT() keys default to TAPPING_TERM (200ms) instead
+//   .longer_hold_term = <ms> — overrides CUSTOM_LONGER_HOLD_TERM for this key
+//   .multi_tap_term  = <ms>  — overrides CUSTOM_MULTI_TAP_TERM for this key
+//
 // Authoring terms:
 //   .tap = TAP_SENDS(x)   = tapping sends x
 //   omit .tap             = tapping keeps the key's normal tap behavior
@@ -110,6 +116,30 @@ enum custom_keycodes {
 //
 // The small authoring DSL used below also lives in lib/key_behavior.h, so this
 // file stays focused on configuration data.
+//
+// Full example — every field populated to show the complete surface area:
+//
+//   {
+//       .keycode          = KC_X,
+//       .tap_hold_term    = 180,  // optional: tap vs hold for this key
+//       .longer_hold_term = 500,  // optional: hold vs long-hold for this key
+//       .multi_tap_term   = 200,  // optional: max gap between consecutive taps
+//       .tap_counts = {
+//           [0] = {                                              // single tap/hold
+//               .tap       = TAP_SENDS(KC_X),                   // quick release → X
+//               .hold      = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LSFT), // held → Shift (registered while held)
+//               .long_hold = TAP_AT_HOLD_THRESHOLD(KC_CAPS),    // held longer → CapsLock once
+//           },
+//           [1] = {                                              // double tap/hold
+//               .tap  = TAP_SENDS(G(KC_X)),                     // double-tap → GUI+X
+//               .hold = TAP_ON_RELEASE_AFTER_HOLD(KC_MUTE),     // double-tap then hold → Mute on release
+//           },
+//           [2] = {                                              // triple tap/hold
+//               .tap  = TAP_SENDS(LOCK_LAYER(LAYER_LOWER)),     // triple-tap → lock LAYER_LOWER
+//               .hold = TAP_AT_HOLD_THRESHOLD(KC_MNXT),         // triple-tap then hold → Next track once
+//           },
+//       },
+//   },
 
 // keycode                single / double / triple behavior
 static const key_behavior_t

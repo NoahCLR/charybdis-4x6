@@ -87,7 +87,9 @@ typedef struct {
 
 typedef struct {
     uint16_t            keycode;
-    uint16_t            tap_hold_term;  // 0 = use default for key type (TAPPING_TERM for LT, CUSTOM_TAP_HOLD_TERM otherwise)
+    uint16_t            tap_hold_term;    // 0 = TAPPING_TERM for LT(), CUSTOM_TAP_HOLD_TERM otherwise
+    uint16_t            longer_hold_term; // 0 = CUSTOM_LONGER_HOLD_TERM
+    uint16_t            multi_tap_term;   // 0 = CUSTOM_MULTI_TAP_TERM
     key_behavior_step_t tap_counts[KEY_BEHAVIOR_MAX_TAP_COUNT];
 } key_behavior_t;
 
@@ -119,7 +121,9 @@ typedef struct {
     bool                  is_momentary_layer; // MO() or LT() — engine handles layer_on/off
     bool                  is_layer_tap;       // specifically LT() — has embedded tap key
     bool                  has_multi_tap;
-    uint16_t              tap_hold_term;      // resolved: per-key if set, else TAPPING_TERM for LT, else CUSTOM_TAP_HOLD_TERM
+    uint16_t              tap_hold_term;      // resolved: per-key → TAPPING_TERM for LT → CUSTOM_TAP_HOLD_TERM
+    uint16_t              longer_hold_term;   // resolved: per-key → CUSTOM_LONGER_HOLD_TERM
+    uint16_t              multi_tap_term;     // resolved: per-key → CUSTOM_MULTI_TAP_TERM
     key_behavior_step_t   single;
 } key_behavior_view_t;
 
@@ -189,9 +193,12 @@ static inline key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     bool                  is_mo  = IS_QK_MOMENTARY(keycode);
     bool                  is_lt  = IS_QK_LAYER_TAP(keycode);
 
-    uint16_t term = CUSTOM_TAP_HOLD_TERM;
-    if      (config && config->tap_hold_term) term = config->tap_hold_term;
-    else if (is_lt)                           term = TAPPING_TERM;
+    uint16_t tap_term    = CUSTOM_TAP_HOLD_TERM;
+    if      (config && config->tap_hold_term)    tap_term    = config->tap_hold_term;
+    else if (is_lt)                              tap_term    = TAPPING_TERM;
+
+    uint16_t longer_term = config && config->longer_hold_term ? config->longer_hold_term : CUSTOM_LONGER_HOLD_TERM;
+    uint16_t multi_term  = config && config->multi_tap_term   ? config->multi_tap_term   : CUSTOM_MULTI_TAP_TERM;
 
     return (key_behavior_view_t){
         .config             = config,
@@ -200,7 +207,9 @@ static inline key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .is_momentary_layer = is_mo || is_lt,
         .is_layer_tap       = is_lt,
         .has_multi_tap      = config ? key_behavior_has_multi_tap(keycode) : false,
-        .tap_hold_term      = term,
+        .tap_hold_term      = tap_term,
+        .longer_hold_term   = longer_term,
+        .multi_tap_term     = multi_term,
         .single             = config ? config->tap_counts[0] : key_behavior_step_none(),
     };
 }
