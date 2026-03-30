@@ -10,8 +10,10 @@ LTO_ENABLE = yes
 # Build runtime as real modules instead of keeping the full implementation
 # inside keymap.c.
 SRC += lib/key/key_runtime.c
+SRC += lib/key/action_router.c
 SRC += lib/key/multi_tap_engine.c
 SRC += lib/pointing/pointing_device_runtime.c
+SRC += lib/pointing/pointer_layer_policy.c
 SRC += lib/rgb/rgb_runtime.c
 SRC += lib/pointing/pointing_device_modes.c
 SRC += lib/pointing/pointing_device_mode_handlers.c
