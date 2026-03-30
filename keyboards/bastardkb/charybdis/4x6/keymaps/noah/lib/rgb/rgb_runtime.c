@@ -4,9 +4,9 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "../keymap_defs.h"
-#include "../rgb_config.h"
-#include "pointing_device_modes.h"
+#include "../../keymap_defs.h"
+#include "../../rgb_config.h"
+#include "../pointing/pointing_device_modes.h"
 #include "rgb_automouse.h"
 #include "rgb_helpers.h"
 

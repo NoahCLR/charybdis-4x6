@@ -7,11 +7,11 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "../keymap_defs.h"
+#include "../../keymap_defs.h"
 #include "key_behavior.h"
-#include "multi_tap.h"
-#include "pointing_device_modes.h"
-#include "split_sync.h"
+#include "multi_tap_engine.h"
+#include "../pointing/pointing_device_modes.h"
+#include "../pointing/split_sync.h"
 
 // ─── Tracked Press State ─────────────────────────────────────────────────────
 //

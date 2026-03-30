@@ -13,7 +13,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "keymap_defs.h"
-#include "lib/key_behavior.h"
+#include "lib/key/key_behavior.h"
 
 // Split-role override hook.
 // Needed when both halves have their own USB connection so they do not both
@@ -43,7 +43,7 @@ bool is_keyboard_master_impl(void) {
 // tap_counts[2] = triple tap
 //
 // omit .tap to keep the key's normal tap behavior for that step
-// .hold / .long_hold use the helper DSL from lib/key_behavior.h
+// .hold / .long_hold use the helper DSL from lib/key/key_behavior.h
 // timing thresholds come from config.h unless overridden per key
 
 const key_behavior_t key_behaviors[] = {
@@ -175,7 +175,7 @@ combo_t key_combos[] = {
 //
 // The number row (KC_1–KC_0) and punctuation keys use the key behavior
 // tables defined above — they are NOT using QMK's built-in mod-tap.
-// See lib/key_runtime.c for details.
+// See lib/key/key_runtime.c for details.
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
     [LAYER_BASE] = LAYOUT(

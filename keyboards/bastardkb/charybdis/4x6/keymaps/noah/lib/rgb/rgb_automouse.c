@@ -7,10 +7,10 @@
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 
 #    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
-#    include "pointing_device_modes.h"
+#    include "../pointing/pointing_device_modes.h"
 #    include "rgb_automouse.h"
 #    include "rgb_helpers.h"
-#    include "split_sync.h"
+#    include "../pointing/split_sync.h"
 
 #    ifndef AUTOMOUSE_RGB_DEAD_TIME
 #        define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3)
