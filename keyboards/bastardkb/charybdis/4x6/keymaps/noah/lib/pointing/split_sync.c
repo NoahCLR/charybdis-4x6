@@ -8,20 +8,12 @@
 
 #    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
 #    include "pointing_device_modes.h"
+#    include "../rgb/rgb_automouse.h"
 #    include "split_sync.h"
 #    include "transactions.h" // QMK
 
-#    ifndef PD_SYNC_ELAPSED_STEP
-#        define PD_SYNC_ELAPSED_STEP 50
-#    endif
-
 pd_sync_packet_t        pd_sync_remote    = {0};
 static pd_sync_packet_t pd_sync_last_sent = {0};
-
-static uint16_t pd_sync_quantize(uint16_t raw) {
-    if (raw > AUTO_MOUSE_TIME) raw = AUTO_MOUSE_TIME;
-    return raw / PD_SYNC_ELAPSED_STEP * PD_SYNC_ELAPSED_STEP;
-}
 
 static void pd_sync_broadcast(const pd_sync_packet_t *pkt) {
     if (memcmp(&pd_sync_last_sent, pkt, sizeof(pd_sync_packet_t)) == 0) {
@@ -58,7 +50,7 @@ void pd_state_sync_elapsed(uint16_t raw_elapsed) {
     if (!is_keyboard_master()) return;
 
     pd_sync_packet_t pkt = {
-        .elapsed              = pd_any_mode_locked() ? 0 : pd_sync_quantize(raw_elapsed),
+        .automouse_progress   = pd_any_mode_locked() ? 0 : automouse_rgb_quantize_progress(raw_elapsed),
         .pd_mode_flags        = pd_mode_flags,
         .pd_mode_locked_flags = pd_mode_locked_flags,
     };

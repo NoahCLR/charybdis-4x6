@@ -12,41 +12,35 @@
 #    include "rgb_helpers.h"
 #    include "../pointing/split_sync.h"
 
-#    ifndef AUTOMOUSE_RGB_DEAD_TIME
-#        define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3)
-#    endif
-
-#    define AUTOMOUSE_RGB_ACTIVE_SPAN (AUTO_MOUSE_TIME - AUTOMOUSE_RGB_DEAD_TIME)
-
 static rgb_t automouse_cached_rgb  = {0};
 static hsv_t automouse_cached_hsv  = {0};
 static bool  automouse_cache_valid = false;
 
 bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end) {
-    uint16_t elapsed;
+    uint16_t progress;
 
     if (is_keyboard_master()) {
-        elapsed = auto_mouse_get_time_elapsed();
+        uint16_t elapsed = auto_mouse_get_time_elapsed();
+        progress         = automouse_rgb_progress(elapsed);
         pd_state_sync_elapsed(elapsed);
     } else {
-        elapsed = pd_sync_remote.elapsed;
+        progress = pd_sync_remote.automouse_progress;
     }
 
     if (pd_any_mode_locked()) {
-        elapsed = 0;
+        progress = 0;
     }
 
-    if (elapsed > AUTO_MOUSE_TIME) {
-        elapsed = AUTO_MOUSE_TIME;
+    if (progress > AUTOMOUSE_RGB_ACTIVE_SPAN) {
+        progress = AUTOMOUSE_RGB_ACTIVE_SPAN;
     }
 
-    uint16_t prog = (elapsed <= AUTOMOUSE_RGB_DEAD_TIME) ? 0 : (elapsed - AUTOMOUSE_RGB_DEAD_TIME);
     hsv_t    hsv;
 
-    if (prog == 0) {
+    if (progress == 0) {
         hsv = start;
     } else {
-        uint32_t t = (uint32_t)prog * 255 / AUTOMOUSE_RGB_ACTIVE_SPAN;
+        uint32_t t = (uint32_t)progress * 255 / AUTOMOUSE_RGB_ACTIVE_SPAN;
         hsv.h      = start.h + (uint8_t)((int32_t)((int16_t)end.h - (int16_t)start.h) * t / 255);
         hsv.s      = start.s + (uint8_t)((int32_t)((int16_t)end.s - (int16_t)start.s) * t / 255);
         hsv.v      = start.v + (uint8_t)((int32_t)((int16_t)end.v - (int16_t)start.v) * t / 255);

@@ -8,7 +8,7 @@
 #pragma once
 
 typedef struct __attribute__((packed)) {
-    uint16_t elapsed;
+    uint16_t automouse_progress;
     uint8_t  pd_mode_flags;
     uint8_t  pd_mode_locked_flags;
 } pd_sync_packet_t;

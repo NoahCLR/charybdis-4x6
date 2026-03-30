@@ -97,6 +97,14 @@ static const pd_mode_led_group_t pd_mode_led_groups[] = {
 // gradient animates only during the final 2/3 of the auto-mouse timeout.
 // See AUTO_MOUSE_TIME in config.h
 //
+// Split sync only transmits the animated portion of the gradient. Dead time
+// and locked modes collapse to a single stable value, which cuts split chatter
+// without changing the rendered look. Lower sync steps give a smoother slave-
+// half transition; higher values reduce split transactions.
+//
+// 50 ms matches the previous behavior during the animated portion.
+#    define AUTOMOUSE_RGB_SYNC_STEP 50
+//
 // White is capped at v=150 (not MAX_BRIGHTNESS) to limit current draw — all LEDs
 // lit white at full brightness exceeds the USB power budget.
 static const hsv_t automouse_color_start = {.h = 0, .s = 0, .v = 150};                             // white
