@@ -240,7 +240,7 @@ bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
             }
             return true;
         default:
-            return true;
+            return false;
     }
 }
 

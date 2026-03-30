@@ -53,15 +53,22 @@ layer_state_t layer_state_set_user(layer_state_t state) {
     charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_RAISE));
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (pd_any_mode_locked() && !layer_state_cmp(state, LAYER_RAISE)) {
+    // Anchored = auto-mouse should be kept alive: toggle on, a mouse-record key is held,
+    // or a pointing-device mode is active or locked.
+    bool auto_mouse_anchored = get_auto_mouse_toggle() || get_auto_mouse_key_tracker() != 0 || pd_mode_flags != 0 || pd_mode_locked_flags != 0;
+
+    // Keep LAYER_POINTER alive while anchored (unless RAISE is overriding).
+    if (auto_mouse_anchored && !layer_state_cmp(state, LAYER_RAISE)) {
         state |= (layer_state_t)1 << LAYER_POINTER;
     }
 
     if (layer_state_cmp(state, LAYER_POINTER) && layer_state_cmp(state, LAYER_RAISE)) {
-        state &= ~((layer_state_t)1 << LAYER_POINTER);
+        // RAISE takes over from POINTER, but not while a pd mode is running.
+        if (!auto_mouse_anchored) {
+            state &= ~((layer_state_t)1 << LAYER_POINTER);
+        }
     } else if (layer_state_cmp(state, LAYER_POINTER)) {
-        bool other_layer_active  = (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0;
-        bool auto_mouse_anchored = get_auto_mouse_toggle() || get_auto_mouse_key_tracker() != 0 || pd_any_mode_locked();
+        bool other_layer_active = (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0;
         if (other_layer_active && !auto_mouse_anchored) {
             state &= ~((layer_state_t)1 << LAYER_POINTER);
         }

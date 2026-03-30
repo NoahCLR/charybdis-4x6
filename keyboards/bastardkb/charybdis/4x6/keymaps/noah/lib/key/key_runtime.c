@@ -257,7 +257,7 @@ static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_k
         uint16_t elapsed          = pressed_this_key ? timer_elapsed(pd_mode_press.timer) : 0;
         bool     locked_press     = pd_mode_press.mode == mode && pd_mode_press.was_locked && pd_mode_is_lockable(mode) && pressed_this_key;
 
-        if (pd_mode_press.mode == mode && pd_mode_press.activated) {
+        if (pd_mode_active(mode) && !pd_mode_locked(mode)) {
             pd_mode_update(mode, false);
         }
 
