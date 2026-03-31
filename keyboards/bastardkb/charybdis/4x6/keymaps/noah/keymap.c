@@ -13,7 +13,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "noah.h"
-TODO : ADD CUSTOM KEYCODES AND CUSTOM LAYERS TO THIS FILE.
+// TODO : ADD CUSTOM KEYCODES AND CUSTOM LAYERS TO THIS FILE.
 // Split-role override hook.
 // Needed when both halves have their own USB connection so they do not both
 // detect USB and fight over who is master.
@@ -22,11 +22,11 @@ TODO : ADD CUSTOM KEYCODES AND CUSTOM LAYERS TO THIS FILE.
 #endif
 
 #if defined(FORCE_MASTER)
-       bool is_keyboard_master_impl(void) {
+bool is_keyboard_master_impl(void) {
     return true;
 }
 #elif defined(FORCE_SLAVE)
-       bool is_keyboard_master_impl(void) {
+bool is_keyboard_master_impl(void) {
     usb_disconnect();
     return false;
 }
