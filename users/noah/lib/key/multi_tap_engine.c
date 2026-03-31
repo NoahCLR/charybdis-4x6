@@ -7,16 +7,16 @@
 #include "multi_tap_engine.h"
 
 void multi_tap_reset(multi_tap_t *mt) {
-    mt->count          = 0;
-    mt->keycode        = KC_NO;
-    mt->single_action  = KC_NO;
-    mt->pending_hold   = false;
-    mt->tap_action     = KC_NO;
-    mt->tap_hold_term  = CUSTOM_TAP_HOLD_TERM;
-    mt->multi_tap_term = CUSTOM_MULTI_TAP_TERM;
-    mt->hold           = hold_behavior_none();
-    mt->long_hold      = hold_behavior_none();
-    mt->saved_mods     = 0;
+    mt->count           = 0;
+    mt->keycode         = KC_NO;
+    mt->single_action   = KC_NO;
+    mt->pending_hold    = false;
+    mt->tap_action      = KC_NO;
+    mt->tap_hold_term   = CUSTOM_TAP_HOLD_TERM;
+    mt->multi_tap_term  = CUSTOM_MULTI_TAP_TERM;
+    mt->hold            = hold_behavior_none();
+    mt->long_hold       = hold_behavior_none();
+    mt->saved_mods      = 0;
     mt->saved_weak_mods = 0;
 }
 
@@ -37,17 +37,17 @@ bool multi_tap_hold_elapsed(const multi_tap_t *mt) {
 }
 
 void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term) {
-    mt->count          = 1;
-    mt->timer          = timer_read();
-    mt->keycode        = keycode;
-    mt->single_action  = single_action;
-    mt->pending_hold   = false;
-    mt->tap_action     = KC_NO;
-    mt->tap_hold_term  = tap_hold_term;
-    mt->multi_tap_term = multi_tap_term;
-    mt->hold           = hold_behavior_none();
-    mt->long_hold      = hold_behavior_none();
-    mt->saved_mods     = get_mods();
+    mt->count           = 1;
+    mt->timer           = timer_read();
+    mt->keycode         = keycode;
+    mt->single_action   = single_action;
+    mt->pending_hold    = false;
+    mt->tap_action      = KC_NO;
+    mt->tap_hold_term   = tap_hold_term;
+    mt->multi_tap_term  = multi_tap_term;
+    mt->hold            = hold_behavior_none();
+    mt->long_hold       = hold_behavior_none();
+    mt->saved_mods      = get_mods();
     mt->saved_weak_mods = get_weak_mods();
 }
 

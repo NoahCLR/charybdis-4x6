@@ -50,13 +50,13 @@ typedef struct {
     uint8_t oneshot_locked;
 } key_runtime_saved_mods_t;
 
-#define ACTIVE_KEY_STATE_INIT                        \
-    {                                                \
-        .keycode          = KC_NO,                   \
-        .held_action_keycode = KC_NO,                \
-        .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,    \
-        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM, \
-        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,   \
+#define ACTIVE_KEY_STATE_INIT                           \
+    {                                                   \
+        .keycode             = KC_NO,                   \
+        .held_action_keycode = KC_NO,                   \
+        .tap_hold_term       = CUSTOM_TAP_HOLD_TERM,    \
+        .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM, \
+        .multi_tap_term      = CUSTOM_MULTI_TAP_TERM,   \
     }
 
 static active_key_state_t active_key = ACTIVE_KEY_STATE_INIT;
@@ -126,16 +126,16 @@ static void dispatch_multi_tap_action(uint16_t action, const multi_tap_t *mt) {
 
 static inline void active_key_track(uint16_t keycode, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired) {
     active_key = (active_key_state_t){
-        .timer            = timer_read(),
-        .keycode          = keycode,
-        .hold_fired       = hold_fired,
+        .timer               = timer_read(),
+        .keycode             = keycode,
+        .hold_fired          = hold_fired,
         .held_action_keycode = KC_NO,
-        .tap_action       = tap_action,
-        .tap_hold_term    = tap_hold_term,
-        .longer_hold_term = longer_hold_term,
-        .multi_tap_term   = multi_tap_term,
-        .hold             = hold,
-        .long_hold        = long_hold,
+        .tap_action          = tap_action,
+        .tap_hold_term       = tap_hold_term,
+        .longer_hold_term    = longer_hold_term,
+        .multi_tap_term      = multi_tap_term,
+        .hold                = hold,
+        .long_hold           = long_hold,
     };
 }
 
@@ -322,11 +322,11 @@ static bool process_key_behavior_release_pending_multi_tap_hold(uint16_t keycode
     }
 
     delayed_action_mods_t cached_mods      = delayed_action_mods_from_multi_tap(&multi_tap);
-    bool            was_release_hold = hold_sends_on_release(multi_tap.hold);
-    hold_behavior_t cached_hold      = multi_tap.hold;
-    hold_behavior_t cached_long_hold = multi_tap.long_hold;
-    uint8_t         repeat_count     = 0;
-    uint16_t        action           = multi_tap_resolve_hold(&multi_tap, keycode, key_behavior_has_more_taps, &repeat_count);
+    bool                  was_release_hold = hold_sends_on_release(multi_tap.hold);
+    hold_behavior_t       cached_hold      = multi_tap.hold;
+    hold_behavior_t       cached_long_hold = multi_tap.long_hold;
+    uint8_t               repeat_count     = 0;
+    uint16_t              action           = multi_tap_resolve_hold(&multi_tap, keycode, key_behavior_has_more_taps, &repeat_count);
 
     if (was_release_hold && cached_hold.present && repeat_count == 1 && action == cached_hold.action) {
         action = select_release_hold_action(timer_elapsed(active_key.timer), cached_hold.action, cached_long_hold, active_key.longer_hold_term);

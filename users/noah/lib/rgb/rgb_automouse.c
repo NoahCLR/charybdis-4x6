@@ -33,7 +33,7 @@ bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t e
         progress = AUTOMOUSE_RGB_ACTIVE_SPAN;
     }
 
-    hsv_t    hsv;
+    hsv_t hsv;
 
     if (progress == 0) {
         hsv = start;
