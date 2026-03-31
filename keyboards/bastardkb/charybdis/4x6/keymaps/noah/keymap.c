@@ -15,6 +15,7 @@
 #include "noah.h"
 // TODO : ADD CUSTOM KEYCODES AND CUSTOM LAYERS TO THIS FILE.
 
+// TODO: consider moving this to the user folder.
 // Split-role override hook.
 // Needed when both halves have their own USB connection so they do not both
 // detect USB and fight over who is master.
