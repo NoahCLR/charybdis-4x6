@@ -12,9 +12,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "noah.h"                               // LAYER_COUNT, LAYER_BASE, etc.
-#include "lib/pointing/pointing_device_modes.h" // PD_MODE_* flags
-#include "lib/rgb/rgb_helpers.h"                // rgb_set_*, hsv_t, rgb_t, config types
+#include "noah.h"                          // LAYER_COUNT, LAYER_BASE, etc.
+#include "lib/pointing/pd_mode_flags.h"    // PD_MODE_* flag constants
+#include "lib/rgb/rgb_helpers.h"           // rgb_set_*, hsv_t, rgb_t, config types
 
 #if defined(RGB_MATRIX_ENABLE)
 

@@ -412,6 +412,21 @@ static bool process_key_behavior(uint16_t keycode, keyrecord_t *record, handled_
     return process_key_behavior_release(keycode, key);
 }
 
+// ─── Tap/Hold Behavior ─────────────────────────────────────────────────────
+
+bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
+    (void)record;
+
+    switch (keycode) {
+        case MT(MOD_LSFT, KC_CAPS):
+            return true;
+        default:
+            return false;
+    }
+}
+
+// ─── Process Record ────────────────────────────────────────────────────────
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed && active_key.keycode != KC_NO && keycode != active_key.keycode && is_layer_key(active_key.keycode)) {
         active_key.layer_interrupted = true;

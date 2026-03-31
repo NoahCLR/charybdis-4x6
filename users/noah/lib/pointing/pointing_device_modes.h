@@ -2,12 +2,16 @@
 // Pointing Device Modes
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Public interface for the pointing-device mode system.
+// Full public interface for the pointing-device mode system.
 // Implementation lives in pointing_device_modes.c.
+//
+// Non-pointing modules that only need mode flag constants or read-only state
+// queries should include pd_mode_flags.h instead of this header.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "noah.h" // VOLUME_MODE, BRIGHTNESS_MODE, etc.
+#include "noah.h"          // VOLUME_MODE, BRIGHTNESS_MODE, etc.
+#include "pd_mode_flags.h" // PD_MODE_* constants, state queries
 
 #if defined(POINTING_DEVICE_ENABLE)
 typedef report_mouse_t (*pd_mode_handler_t)(report_mouse_t);
@@ -28,27 +32,14 @@ typedef struct {
     pd_mode_reset_t       reset;       // called on deactivation (NULL = no-op)
 } pd_mode_def_t;
 
-#define PD_MODE_VOLUME (1 << 0)
-#define PD_MODE_ARROW (1 << 1)
-#define PD_MODE_DRAGSCROLL (1 << 2)
-#define PD_MODE_BRIGHTNESS (1 << 3)
-#define PD_MODE_ZOOM (1 << 4)
-#define PD_MODE_PINCH (1 << 5)
-#define PD_MODE_COUNT 6
-
 _Static_assert(PINCH_MODE - VOLUME_MODE + 1 == PD_MODE_COUNT, "pd-mode keycode count in custom_keycodes enum doesn't match PD_MODE_COUNT — update both together");
 
-extern uint8_t             pd_mode_flags;
-extern uint8_t             pd_mode_locked_flags;
 extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];
 
 void pd_mode_set(uint8_t mode);
 void pd_mode_clear(uint8_t mode);
 void pd_mode_set_locked(uint8_t mode);
 void pd_mode_clear_locked(uint8_t mode);
-bool pd_mode_active(uint8_t mode);
-bool pd_mode_locked(uint8_t mode);
-bool pd_any_mode_locked(void);
 void pd_mode_apply_remote_snapshot(uint8_t active_flags, uint8_t locked_flags);
 
 const pd_mode_def_t *pd_mode_lookup(uint8_t mode);
