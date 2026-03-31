@@ -33,6 +33,7 @@ bool is_keyboard_master_impl(void) {
 }
 #endif
 
+// TODO: consider moving this to the user folder.
 bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     (void)record;
 
