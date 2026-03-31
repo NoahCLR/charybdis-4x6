@@ -199,3 +199,8 @@
 #define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary
 #define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps
 #define COMBO_TERM 50                // max ms between keys to register as a combo
+
+// Built-in QMK dual-role keys are still used in a few places, most notably
+// MT(MOD_LSFT, KC_CAPS). Favor the hold path for that key as soon as another
+// key is pressed so Shift chords beat the tap-side Caps Lock more reliably.
+#define HOLD_ON_OTHER_KEY_PRESS_PER_KEY

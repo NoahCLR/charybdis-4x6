@@ -38,6 +38,18 @@ typedef struct {
     hold_behavior_t long_hold;
 } active_key_state_t;
 
+typedef struct {
+    uint8_t real;
+    uint8_t weak;
+} delayed_action_mods_t;
+
+typedef struct {
+    uint8_t real;
+    uint8_t weak;
+    uint8_t oneshot;
+    uint8_t oneshot_locked;
+} key_runtime_saved_mods_t;
+
 #define ACTIVE_KEY_STATE_INIT                        \
     {                                                \
         .keycode          = KC_NO,                   \
@@ -62,6 +74,54 @@ static multi_tap_t multi_tap = {0};
 
 static inline void active_key_reset(void) {
     active_key = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
+}
+
+static inline delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
+    return (delayed_action_mods_t){
+        .real = mt->saved_mods,
+        .weak = mt->saved_weak_mods,
+    };
+}
+
+static key_runtime_saved_mods_t key_runtime_suspend_mods(void) {
+    key_runtime_saved_mods_t saved = {
+        .real           = get_mods(),
+        .weak           = get_weak_mods(),
+        .oneshot        = get_oneshot_mods(),
+        .oneshot_locked = get_oneshot_locked_mods(),
+    };
+
+    clear_mods();
+    clear_weak_mods();
+    clear_oneshot_mods();
+    clear_oneshot_locked_mods();
+    send_keyboard_report();
+
+    return saved;
+}
+
+static void key_runtime_restore_mods(key_runtime_saved_mods_t saved) {
+    set_mods(saved.real);
+    set_weak_mods(saved.weak);
+    set_oneshot_mods(saved.oneshot);
+    set_oneshot_locked_mods(saved.oneshot_locked);
+    send_keyboard_report();
+}
+
+static void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
+    key_runtime_saved_mods_t saved = key_runtime_suspend_mods();
+
+    set_mods(mods.real);
+    set_weak_mods(mods.weak);
+    send_keyboard_report();
+
+    action_router_dispatch(action);
+
+    key_runtime_restore_mods(saved);
+}
+
+static void dispatch_multi_tap_action(uint16_t action, const multi_tap_t *mt) {
+    dispatch_delayed_action(action, delayed_action_mods_from_multi_tap(mt));
 }
 
 static inline void active_key_track(uint16_t keycode, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired) {
@@ -261,6 +321,7 @@ static bool process_key_behavior_release_pending_multi_tap_hold(uint16_t keycode
         return false;
     }
 
+    delayed_action_mods_t cached_mods      = delayed_action_mods_from_multi_tap(&multi_tap);
     bool            was_release_hold = hold_sends_on_release(multi_tap.hold);
     hold_behavior_t cached_hold      = multi_tap.hold;
     hold_behavior_t cached_long_hold = multi_tap.long_hold;
@@ -273,7 +334,7 @@ static bool process_key_behavior_release_pending_multi_tap_hold(uint16_t keycode
 
     for (uint8_t i = 0; i < repeat_count; i++) {
         if (action != KC_NO) {
-            action_router_dispatch(action);
+            dispatch_delayed_action(action, cached_mods);
         }
     }
 
@@ -357,7 +418,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (multi_tap_active(&multi_tap) && record->event.pressed && keycode != multi_tap.keycode) {
-        multi_tap_flush(&multi_tap, key_behavior_step_lookup, action_router_dispatch);
+        multi_tap_flush(&multi_tap, key_behavior_step_lookup, dispatch_multi_tap_action);
     }
 
     if (pd_mode_handle_key_event(keycode, record)) {
@@ -404,6 +465,6 @@ void matrix_scan_user(void) {
     }
 
     if (multi_tap_expired(&multi_tap)) {
-        multi_tap_flush(&multi_tap, key_behavior_step_lookup, action_router_dispatch);
+        multi_tap_flush(&multi_tap, key_behavior_step_lookup, dispatch_multi_tap_action);
     }
 }

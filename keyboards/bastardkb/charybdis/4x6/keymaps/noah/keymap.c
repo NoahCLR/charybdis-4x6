@@ -33,6 +33,17 @@ bool is_keyboard_master_impl(void) {
 }
 #endif
 
+bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
+    (void)record;
+
+    switch (keycode) {
+        case MT(MOD_LSFT, KC_CAPS):
+            return true;
+        default:
+            return false;
+    }
+}
+
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
 // key_behaviors[] is the single authored behavior table for keys handled by

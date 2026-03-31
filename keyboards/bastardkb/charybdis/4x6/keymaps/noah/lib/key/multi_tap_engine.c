@@ -16,6 +16,8 @@ void multi_tap_reset(multi_tap_t *mt) {
     mt->multi_tap_term = CUSTOM_MULTI_TAP_TERM;
     mt->hold           = hold_behavior_none();
     mt->long_hold      = hold_behavior_none();
+    mt->saved_mods     = 0;
+    mt->saved_weak_mods = 0;
 }
 
 bool multi_tap_active(const multi_tap_t *mt) {
@@ -45,20 +47,22 @@ void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action, 
     mt->multi_tap_term = multi_tap_term;
     mt->hold           = hold_behavior_none();
     mt->long_hold      = hold_behavior_none();
+    mt->saved_mods     = get_mods();
+    mt->saved_weak_mods = get_weak_mods();
 }
 
-static void multi_tap_dispatch_repeated(uint16_t action, uint8_t count, void (*dispatch)(uint16_t)) {
+static void multi_tap_dispatch_repeated(uint16_t action, uint8_t count, const multi_tap_t *mt, void (*dispatch)(uint16_t, const multi_tap_t *)) {
     if (action == KC_NO) return;
     for (uint8_t i = 0; i < count; i++)
-        dispatch(action);
+        dispatch(action, mt);
 }
 
-void multi_tap_flush(multi_tap_t *mt, key_behavior_step_t (*lookup)(uint16_t, uint8_t), void (*dispatch)(uint16_t)) {
+void multi_tap_flush(multi_tap_t *mt, key_behavior_step_t (*lookup)(uint16_t, uint8_t), void (*dispatch)(uint16_t, const multi_tap_t *)) {
     if (mt->pending_hold) {
         if (mt->tap_action != KC_NO) {
-            dispatch(mt->tap_action);
+            dispatch(mt->tap_action, mt);
         } else {
-            multi_tap_dispatch_repeated(mt->single_action, mt->count, dispatch);
+            multi_tap_dispatch_repeated(mt->single_action, mt->count, mt, dispatch);
         }
         multi_tap_reset(mt);
         return;
@@ -67,13 +71,13 @@ void multi_tap_flush(multi_tap_t *mt, key_behavior_step_t (*lookup)(uint16_t, ui
     if (mt->count >= 2) {
         key_behavior_step_t step = lookup(mt->keycode, mt->count);
         if (step.tap.present && step.tap.action != KC_NO) {
-            dispatch(step.tap.action);
+            dispatch(step.tap.action, mt);
             multi_tap_reset(mt);
             return;
         }
     }
 
-    multi_tap_dispatch_repeated(mt->single_action, mt->count, dispatch);
+    multi_tap_dispatch_repeated(mt->single_action, mt->count, mt, dispatch);
     multi_tap_reset(mt);
 }
 
