@@ -52,11 +52,11 @@
 #ifdef POINTING_DEVICE_ENABLE
 // Auto-mouse: automatically activates LAYER_POINTER when the trackball
 // moves, and deactivates it after the timeout expires.
-#define POINTING_DEVICE_AUTO_MOUSE_ENABLE
-#define AUTO_MOUSE_TIME 1200
+#    define POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#    define AUTO_MOUSE_TIME 1200
 
 // Default pointer DPI (base value before DPI_MOD/DPI_RMOD adjustments).
-#define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
+#    define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
 #endif // POINTING_DEVICE_ENABLE
 
 // ─── RGB Matrix configuration ───────────────────────────────────────────────
