@@ -179,7 +179,14 @@
 
 #endif // POINTING_DEVICE_ENABLE
 
-// ─── Custom key behavior timing ───────────────────────────────────────────
+// ─── QMK dual-role key behavior ────────────────────────────────────────────
+//
+// Built-in QMK dual-role keys are still used in a few places, most notably
+// MT(MOD_LSFT, KC_CAPS). Favor the hold path for that key as soon as another
+// key is pressed so Shift chords beat the tap-side Caps Lock more reliably.
+#define HOLD_ON_OTHER_KEY_PRESS_PER_KEY
+
+// ─── Custom key behavior timing ─────────────────────────────────────────────
 // Used by the custom key behavior system in keymap.c.
 // These are NOT QMK's built-in TAPPING_TERM — they're checked manually
 // in process_record_user() and matrix_scan_user().
@@ -199,8 +206,3 @@
 #define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary
 #define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps
 #define COMBO_TERM 50                // max ms between keys to register as a combo
-
-// Built-in QMK dual-role keys are still used in a few places, most notably
-// MT(MOD_LSFT, KC_CAPS). Favor the hold path for that key as soon as another
-// key is pressed so Shift chords beat the tap-side Caps Lock more reliably.
-#define HOLD_ON_OTHER_KEY_PRESS_PER_KEY
