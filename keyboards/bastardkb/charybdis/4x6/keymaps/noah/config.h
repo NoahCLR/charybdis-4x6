@@ -25,7 +25,7 @@
 #ifdef TAPPING_TERM
 #    undef TAPPING_TERM
 #endif
-#define TAPPING_TERM 200
+#define TAPPING_TERM 150
 
 // Used by the custom key behavior system in the userspace runtime.
 // These are NOT QMK's built-in TAPPING_TERM — they're checked manually in
@@ -65,7 +65,6 @@
 // These settings control LED count, brightness, default effect, and timing.
 
 #ifdef RGB_MATRIX_ENABLE
-
 // Total LED count across both halves.
 // The right (pointer) half has 2 dummy LED positions, but they still count.
 #    ifdef RGB_MATRIX_LED_COUNT
