@@ -3,12 +3,18 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // QMK automatically includes users/noah/config.h before the keyboard keymap's
-// own config.h. This file now carries the split transport and low-level
-// pointing-device tuning for the current Charybdis setup, while the keymap
-// config holds typing, RGB, and pointer-layer behavior.
+// own config.h. This file now carries the split transport, low-level
+// pointing-device tuning, and shared QMK behavior overrides for the current
+// Charybdis setup, while the keymap config holds typing, RGB, and
+// pointer-layer behavior.
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
+
+// Built-in QMK dual-role keys are still used in a few places, most notably
+// MT(MOD_LSFT, KC_CAPS). Favor the hold path for that key as soon as another
+// key is pressed so Shift chords beat the tap-side Caps Lock more reliably.
+#define HOLD_ON_OTHER_KEY_PRESS_PER_KEY
 
 // ─── Split keyboard sync ───────────────────────────────────────────────────
 //

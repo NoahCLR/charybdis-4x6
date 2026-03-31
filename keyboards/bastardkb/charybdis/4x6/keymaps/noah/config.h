@@ -3,8 +3,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // This file holds the keymap-facing behavior, RGB, timing, and pointer-layer
-// policy settings. Split transport and low-level pointing-device tuning live
-// in users/noah/config.h.
+// policy settings. Split transport, low-level pointing-device tuning, and
+// shared QMK behavior overrides live in users/noah/config.h.
 //
 // The #undef-before-#define pattern is used throughout because QMK may
 // have already defined these values in parent config files.  Without
@@ -20,10 +20,12 @@
 #    define DYNAMIC_KEYMAP_LAYER_COUNT 5
 #endif
 
-// Built-in QMK dual-role keys are still used in a few places, most notably
-// MT(MOD_LSFT, KC_CAPS). Favor the hold path for that key as soon as another
-// key is pressed so Shift chords beat the tap-side Caps Lock more reliably.
-#define HOLD_ON_OTHER_KEY_PRESS_PER_KEY
+// Built-in QMK dual-role keys still use TAPPING_TERM.
+// Keep the LT()/MT() keys on the current stock QMK default explicitly.
+#ifdef TAPPING_TERM
+#    undef TAPPING_TERM
+#endif
+#define TAPPING_TERM 200
 
 // Used by the custom key behavior system in the userspace runtime.
 // These are NOT QMK's built-in TAPPING_TERM — they're checked manually in
@@ -42,8 +44,12 @@
 #define CUSTOM_TAP_HOLD_TERM 150     // tap vs hold boundary
 #define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary
 #define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps
-#define COMBO_TERM 50                // max ms between keys to register as a combo
 
+#ifdef COMBO_ENABLE
+#    define COMBO_TERM 50 // max ms between keys to register as a combo
+#endif
+
+#ifdef POINTING_DEVICE_ENABLE
 // Auto-mouse: automatically activates LAYER_POINTER when the trackball
 // moves, and deactivates it after the timeout expires.
 #define POINTING_DEVICE_AUTO_MOUSE_ENABLE
@@ -51,6 +57,7 @@
 
 // Default pointer DPI (base value before DPI_MOD/DPI_RMOD adjustments).
 #define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
+#endif // POINTING_DEVICE_ENABLE
 
 // ─── RGB Matrix configuration ───────────────────────────────────────────────
 //
