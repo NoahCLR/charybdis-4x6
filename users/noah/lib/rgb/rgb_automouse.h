@@ -9,7 +9,7 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "../../rgb_config.h"
+#include "rgb_config.h"
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 

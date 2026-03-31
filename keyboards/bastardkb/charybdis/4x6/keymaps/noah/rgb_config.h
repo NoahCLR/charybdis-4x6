@@ -6,13 +6,13 @@
 // highlights, and auto-mouse gradient endpoints.
 //
 // Want to change a color?  Edit this file.
-// Want to change the rendering logic?  Edit lib/rgb/rgb_runtime.c.
-// For the split-safe LED helper functions, see lib/rgb/rgb_helpers.h.
+// Want to change the rendering logic?  Edit users/noah/lib/rgb/rgb_runtime.c.
+// For the split-safe LED helper functions, see users/noah/lib/rgb/rgb_helpers.h.
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "keymap_defs.h"                        // LAYER_COUNT, LAYER_BASE, etc.
+#include "noah.h"                               // LAYER_COUNT, LAYER_BASE, etc.
 #include "lib/pointing/pointing_device_modes.h" // PD_MODE_* flags
 #include "lib/rgb/rgb_helpers.h"                // rgb_set_*, hsv_t, rgb_t, config types
 

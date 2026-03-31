@@ -1,9 +1,10 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Noah's Charybdis 4x6 — Configuration Overrides
+// Noah's Charybdis 4x6 — Keymap Configuration Overrides
 // ────────────────────────────────────────────────────────────────────────────
 //
-// This file overrides default QMK and Charybdis firmware settings.
-// Values here take precedence over the keyboard-level config.h.
+// This file holds the keymap-facing behavior, RGB, timing, and pointer-layer
+// policy settings. Split transport and low-level pointing-device tuning live
+// in users/noah/config.h.
 //
 // The #undef-before-#define pattern is used throughout because QMK may
 // have already defined these values in parent config files.  Without
@@ -12,52 +13,44 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-// ─── Core / feature toggles ─────────────────────────────────────────────────
-
 // VIA is a GUI tool for remapping keys without recompiling firmware.
-// We need 5 dynamic layers to match our layer count (Base, Num, Lower, Raise, Pointer).
+// We need 5 dynamic layers to match our layer count (Base, Num, Sym, Nav, Pointer).
 #ifdef VIA_ENABLE
 #    undef DYNAMIC_KEYMAP_LAYER_COUNT
 #    define DYNAMIC_KEYMAP_LAYER_COUNT 5
 #endif
 
-// ─── Split keyboard sync ───────────────────────────────────────────────────
+// Built-in QMK dual-role keys are still used in a few places, most notably
+// MT(MOD_LSFT, KC_CAPS). Favor the hold path for that key as soon as another
+// key is pressed so Shift chords beat the tap-side Caps Lock more reliably.
+#define HOLD_ON_OTHER_KEY_PRESS_PER_KEY
+
+// Used by the custom key behavior system in the userspace runtime.
+// These are NOT QMK's built-in TAPPING_TERM — they're checked manually in
+// process_record_user() and matrix_scan_user().
 //
-// The Charybdis 4x6 is a split keyboard — each half has its own MCU.
-// By default, only keystrokes are sent between halves.  These options
-// enable syncing additional state so both halves stay consistent.
+// Single key timeline:
+//   < CUSTOM_TAP_HOLD_TERM                          = tap (send plain key)
+//   CUSTOM_TAP_HOLD_TERM – CUSTOM_LONGER_HOLD_TERM  = hold (shifted variant / alt action)
+//   > CUSTOM_LONGER_HOLD_TERM                        = longer hold (third-tier action)
 //
-#ifdef SPLIT_KEYBOARD
+// Multi-tap timing:
+//   Each tap must arrive within CUSTOM_MULTI_TAP_TERM of the previous tap.
+//   A double-tap takes up to 2x the term, triple up to 3x, etc.
+//   Single taps on multi-tap keys are delayed by one window.
+#define KEY_BEHAVIOR_MAX_TAP_COUNT 4 // max tap-count entries per key (single / double / triple / quadruple)
+#define CUSTOM_TAP_HOLD_TERM 150     // tap vs hold boundary
+#define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary
+#define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps
+#define COMBO_TERM 50                // max ms between keys to register as a combo
 
-// ─── Split role override ────────────────────────────────────────────────────
-// Uncomment ONE of these to force this firmware to always be master or slave.
-// Useful when both halves have USB connected.  Leave both commented for
-// default USB-detect behavior.  Not to be confused with handedness
-// (left/right), which is set by MASTER_RIGHT in the keyboard-level config in the qmk repo.
-// #define FORCE_MASTER
-// #define FORCE_SLAVE
+// Auto-mouse: automatically activates LAYER_POINTER when the trackball
+// moves, and deactivates it after the timeout expires.
+#define POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#define AUTO_MOUSE_TIME 1200
 
-// The default split serial timeout is far too long for a keyboard with a
-// trackball — a single failed transaction blocks the main loop for the
-// full timeout, causing the sensor to accumulate motion into a cursor jump.
-#    undef SERIAL_USART_TIMEOUT
-#    define SERIAL_USART_TIMEOUT 5
-
-// Sync the active layer set to the slave half so it can show the correct
-// RGB layer indicator colors.
-#    ifdef SPLIT_LAYER_STATE_ENABLE
-#        undef SPLIT_LAYER_STATE_ENABLE
-#    endif
-#    define SPLIT_LAYER_STATE_ENABLE
-
-// Sync user activity timestamps so the RGB timeout (sleep) triggers at
-// the same time on both halves.
-#    ifdef SPLIT_ACTIVITY_ENABLE
-#        undef SPLIT_ACTIVITY_ENABLE
-#    endif
-#    define SPLIT_ACTIVITY_ENABLE
-
-#endif // SPLIT_KEYBOARD
+// Default pointer DPI (base value before DPI_MOD/DPI_RMOD adjustments).
+#define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
 
 // ─── RGB Matrix configuration ───────────────────────────────────────────────
 //
@@ -108,7 +101,7 @@
 #    endif
 #    define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
 
-// Minimum ms between RGB matrix updates.  Higher = less CPU load but
+// Minimum ms between RGB matrix updates. Higher = less CPU load but
 // choppier animations.
 #    ifdef RGB_MATRIX_LED_FLUSH_LIMIT
 #        undef RGB_MATRIX_LED_FLUSH_LIMIT
@@ -123,86 +116,3 @@
 #    define RGB_MATRIX_TIMEOUT 900000
 
 #endif // RGB_MATRIX_ENABLE
-
-// ─── Pointing device (trackball) ────────────────────────────────────────────
-//
-// The Charybdis has a trackball on the right half.
-// These settings configure auto-mouse behavior, DPI, and scroll tuning.
-
-#ifdef POINTING_DEVICE_ENABLE
-
-// Register a custom split RPC transaction for syncing pointing device
-// state (auto-mouse RGB progress + mode flags) from master to slave.
-#    ifdef SPLIT_KEYBOARD
-#        define SPLIT_TRANSACTION_IDS_USER PUT_PD_SYNC
-#    endif
-
-// Keep split-pointing polling at the 1 ms cadence QMK already defaults to.
-// Higher values ease transport/main-loop pressure, but trade away responsiveness.
-#    undef POINTING_DEVICE_TASK_THROTTLE_MS
-#    define POINTING_DEVICE_TASK_THROTTLE_MS 1
-
-// Liftoff distance — how high the ball can be lifted before tracking stops.
-// Default is 0x02; higher = tracks further from the surface.
-#    define PMW33XX_LIFTOFF_DISTANCE 0x03
-
-// Enable 16-bit motion reports for higher precision at high DPI.
-#    define MOUSE_EXTENDED_REPORT
-#    define WHEEL_EXTENDED_REPORT
-
-#    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
-#    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
-
-// ─── Drag-scroll tuning ────────────────────────────────────────────────────
-// Drag-scroll converts trackball motion into scroll events.
-// With hi-res scrolling, each scroll unit = 1/120th of a notch.
-//
-//   Speed     = DPI / STEP_DIVISOR   (lower = slower, more precise)
-//   Smoothness = RATE_LIMIT_MS       (lower = more frequent updates)
-//   Snap feel  = SNAP_RATIO          (higher = stricter axis lock)
-
-#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y       // "push forward = scroll up"
-#    define CHARYBDIS_DRAGSCROLL_DPI 100         // Sensor CPI while scrolling (lower = finer control)
-#    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0   // Dead zone in sensor counts (0 = immediate response)
-#    define CHARYBDIS_SCROLL_STEP_DIVISOR 8      // Sensor counts per hi-res scroll unit (higher = slower)
-#    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8     // Min ms between scroll events (8 ≈ 125 Hz)
-#    define CHARYBDIS_SCROLL_SNAP_RATIO 3        // Axis lock: dominant axis must be Nx the other to snap
-#    define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 80 // Discard buffered motion after this many ms idle
-
-// Auto-mouse: automatically activates LAYER_POINTER when the trackball
-// moves, and deactivates it after the timeout expires.
-#    define POINTING_DEVICE_AUTO_MOUSE_ENABLE
-#    define AUTO_MOUSE_TIME 1200 // ms of no trackball movement before the pointer layer deactivates
-
-// Default pointer DPI (base value before DPI_MOD/DPI_RMOD adjustments).
-#    define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
-
-#endif // POINTING_DEVICE_ENABLE
-
-// ─── QMK dual-role key behavior ────────────────────────────────────────────
-//
-// Built-in QMK dual-role keys are still used in a few places, most notably
-// MT(MOD_LSFT, KC_CAPS). Favor the hold path for that key as soon as another
-// key is pressed so Shift chords beat the tap-side Caps Lock more reliably.
-#define HOLD_ON_OTHER_KEY_PRESS_PER_KEY
-
-// ─── Custom key behavior timing ─────────────────────────────────────────────
-// Used by the custom key behavior system in keymap.c.
-// These are NOT QMK's built-in TAPPING_TERM — they're checked manually
-// in process_record_user() and matrix_scan_user().
-//
-// Single key timeline:
-//   < CUSTOM_TAP_HOLD_TERM                          = tap (send plain key)
-//   CUSTOM_TAP_HOLD_TERM – CUSTOM_LONGER_HOLD_TERM  = hold (shifted variant / alt action)
-//   > CUSTOM_LONGER_HOLD_TERM                        = longer hold (third-tier action)
-//
-// Multi-tap timing:
-//   Each tap must arrive within CUSTOM_MULTI_TAP_TERM of the previous tap.
-//   A double-tap takes up to 2x the term, triple up to 3x, etc.
-//   Single taps on multi-tap keys are delayed by one window.
-//
-#define KEY_BEHAVIOR_MAX_TAP_COUNT 4 // max tap-count entries per key (single / double / triple / quadruple)
-#define CUSTOM_TAP_HOLD_TERM 150     // tap vs hold boundary
-#define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary
-#define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps
-#define COMBO_TERM 50                // max ms between keys to register as a combo

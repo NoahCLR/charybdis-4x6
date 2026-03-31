@@ -15,7 +15,6 @@
         "qmk.json": true,
         ".gitignore": true,
         "layouts/": true,
-        "users/": true,
         "memory/": true,
         "keyboards/.keep": true,
         "keyboards/bastardkb/charybdis/4x6/keymaps/vendor/": true,

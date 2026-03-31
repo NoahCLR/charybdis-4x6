@@ -1,21 +1,23 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Shared Keymap Declarations
+// Noah Userspace Header
 // ────────────────────────────────────────────────────────────────────────────
 //
-// This header exposes the shared layer and custom-keycode definitions used by
-// the keymap data and runtime modules.
+// Shared layer and custom-keycode definitions used by the keymap data and
+// userspace runtime modules.
 //
 // Authored behavior tables, macro implementations, combos, and physical
-// layouts live in keymap.c.
+// layouts still live in the keyboard keymap.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include "quantum_keycodes.h"
 #include QMK_KEYBOARD_H // QMK
+#include "lib/key/key_behavior.h"
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
 //
-// If you add or remove a layer, also update DYNAMIC_KEYMAP_LAYER_COUNT in config.h.
+// If you add or remove a layer, also update DYNAMIC_KEYMAP_LAYER_COUNT in the
+// active keymap's config.h.
 enum charybdis_keymap_layers {
     LAYER_BASE = 0, // Default QWERTY typing layer
     LAYER_NUM,      // Numpad on the right half
@@ -26,7 +28,7 @@ enum charybdis_keymap_layers {
 };
 
 #ifdef VIA_ENABLE
-_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update config.h");
+_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update the keymap config.h");
 #endif
 
 // ─── Custom Keycodes ────────────────────────────────────────────────────────
@@ -79,6 +81,5 @@ enum custom_keycodes {
 bool                          macro_dispatch(uint16_t keycode);
 extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
 
-// Authored key behavior data, macro implementations, combo definitions, and
-// physical keymap layouts live in keymap.c so the main QMK entrypoint shows
-// the actual authored keymap.
+// Authored macros and physical keymap layouts live in the keyboard keymap so
+// the main QMK entrypoint still shows the actual authored layout.

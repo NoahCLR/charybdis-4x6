@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "../../keymap_defs.h"
+#include "noah.h"
 #include "../pointing/pointing_device_modes.h"
 #include "../pointing/split_sync.h"
 #include "action_router.h"

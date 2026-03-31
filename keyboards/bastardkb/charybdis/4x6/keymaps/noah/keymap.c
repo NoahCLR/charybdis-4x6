@@ -8,12 +8,11 @@
 //   - keymaps[][]
 //   - key_combos[]
 //
-// Shared layer and custom-keycode declarations live in keymap_defs.h.
-// Runtime processing lives in the runtime modules under lib/.
+// Shared layer and custom-keycode declarations live in users/noah/noah.h.
+// Runtime processing lives in the userspace runtime modules under users/noah/lib/.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "keymap_defs.h"
-#include "lib/key/key_behavior.h"
+#include "noah.h"
 
 // Split-role override hook.
 // Needed when both halves have their own USB connection so they do not both
@@ -55,7 +54,7 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 // tap_counts[3] = quadruple tap
 //
 // omit .tap to keep the key's normal tap behavior for that step
-// .hold / .long_hold use the helper DSL from lib/key/key_behavior.h
+// .hold / .long_hold use the helper DSL from users/noah/lib/key/key_behavior.h
 // timing thresholds come from config.h unless overridden per key
 
 const key_behavior_t
@@ -199,7 +198,7 @@ combo_t key_combos[] = {
 //
 // The number row (KC_1–KC_0) and punctuation keys use the key behavior
 // tables defined above — they are NOT using QMK's built-in mod-tap.
-// See lib/key/key_runtime.c for details.
+// See users/noah/lib/key/key_runtime.c for details.
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
     [LAYER_BASE] = LAYOUT(

@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "../../keymap_defs.h" // custom keycodes and layer enums
+#include "noah.h" // custom keycodes and layer enums
 #include "pointing_device_mode_handlers.h"
 
 #if defined(POINTING_DEVICE_ENABLE)

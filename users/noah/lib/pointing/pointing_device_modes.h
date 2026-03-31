@@ -7,7 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "../../keymap_defs.h" // VOLUME_MODE, BRIGHTNESS_MODE, etc.
+#include "noah.h" // VOLUME_MODE, BRIGHTNESS_MODE, etc.
 
 #if defined(POINTING_DEVICE_ENABLE)
 typedef report_mouse_t (*pd_mode_handler_t)(report_mouse_t);

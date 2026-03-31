@@ -7,7 +7,7 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "../../keymap_defs.h"
+#include "noah.h"
 #include "action_router.h"
 #include "key_behavior.h"
 #include "multi_tap_engine.h"
