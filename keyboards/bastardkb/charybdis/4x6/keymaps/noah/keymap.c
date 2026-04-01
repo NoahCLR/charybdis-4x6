@@ -102,6 +102,7 @@ combo_t key_combos[] = {
 // tap_counts[1] = double tap
 // tap_counts[2] = triple tap
 // tap_counts[3] = quadruple tap
+// tap_counts[4] = quintuple tap
 //
 // timing defaults currently set in config.h:
 //   - TAPPING_TERM = 200 ms
