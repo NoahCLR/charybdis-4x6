@@ -32,7 +32,7 @@
 //     TAP_ON_RELEASE_AFTER_HOLD -> does not fire at threshold; resolved
 //       entirely on release.
 //
-// This interface is consumed by key_runtime.c.
+// This interface is consumed by the split key runtime modules.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

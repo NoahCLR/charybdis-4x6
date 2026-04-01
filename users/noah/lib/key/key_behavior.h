@@ -1,14 +1,12 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Key Behavior Schema + Lookup Helpers
+// Key Behavior Schema
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Shared schema for key behavior config plus small lookup helpers.
+// Shared schema for key behavior config and authoring helpers.
 //
 // keymap.c authors key behavior through a single key_behaviors[] table and
-// also defines key_behavior_count. This header provides the types, forward
-// declarations for that data, and runtime helpers that fold in non-table facts
-// such as "is this key an MO() key?".
-//
+// also defines key_behavior_count. Runtime interpretation helpers live in
+// key_behavior_lookup.h / key_behavior_lookup.c.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -112,19 +110,6 @@ typedef struct {
 extern const key_behavior_t key_behaviors[];
 extern const uint8_t        key_behavior_count;
 
-typedef struct {
-    const key_behavior_t *config;
-    uint16_t              keycode;
-    bool                  handled;
-    bool                  is_momentary_layer; // MO() or LT() — engine handles layer_on/off
-    bool                  is_layer_tap;       // specifically LT() — has embedded tap key
-    bool                  has_multi_tap;
-    uint16_t              tap_hold_term;    // resolved: per-key → TAPPING_TERM for LT → CUSTOM_TAP_HOLD_TERM
-    uint16_t              longer_hold_term; // resolved: per-key → CUSTOM_LONGER_HOLD_TERM
-    uint16_t              multi_tap_term;   // resolved: per-key → CUSTOM_MULTI_TAP_TERM
-    key_behavior_step_t   single;
-} key_behavior_view_t;
-
 static inline hold_behavior_t hold_behavior_none(void) {
     return (hold_behavior_t){0};
 }
@@ -151,72 +136,4 @@ static inline key_behavior_step_t key_behavior_step_none(void) {
 
 static inline bool key_behavior_step_present(key_behavior_step_t step) {
     return step.tap.present || step.hold.present || step.long_hold.present;
-}
-
-static inline const key_behavior_t *key_behavior_config_lookup(uint16_t keycode) {
-    for (uint8_t i = 0; i < key_behavior_count; i++)
-        if (key_behaviors[i].keycode == keycode) return &key_behaviors[i];
-    return NULL;
-}
-
-static inline key_behavior_step_t key_behavior_step_lookup_in_config(const key_behavior_t *config, uint8_t tap_count) {
-    if (!config || tap_count == 0 || tap_count > KEY_BEHAVIOR_MAX_TAP_COUNT) {
-        return key_behavior_step_none();
-    }
-
-    return config->tap_counts[tap_count - 1];
-}
-
-static inline key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
-    return key_behavior_step_lookup_in_config(key_behavior_config_lookup(keycode), tap_count);
-}
-
-static inline bool key_behavior_has_more_taps_in_config(const key_behavior_t *config, uint8_t count) {
-    if (!config || count >= KEY_BEHAVIOR_MAX_TAP_COUNT) return false;
-
-    for (uint8_t i = count; i < KEY_BEHAVIOR_MAX_TAP_COUNT; i++)
-        if (key_behavior_step_present(config->tap_counts[i])) return true;
-
-    return false;
-}
-
-static inline bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
-    return key_behavior_has_more_taps_in_config(key_behavior_config_lookup(keycode), count);
-}
-
-static inline bool key_behavior_has_multi_tap_in_config(const key_behavior_t *config) {
-    return key_behavior_has_more_taps_in_config(config, 1);
-}
-
-static inline bool key_behavior_has_multi_tap(uint16_t keycode) {
-    return key_behavior_has_more_taps(keycode, 1);
-}
-
-static inline key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
-    const key_behavior_t *config    = key_behavior_config_lookup(keycode);
-    bool                  is_mo     = IS_QK_MOMENTARY(keycode);
-    bool                  is_lt     = IS_QK_LAYER_TAP(keycode);
-    bool                  custom_lt = is_lt && config;
-
-    uint16_t tap_term = CUSTOM_TAP_HOLD_TERM;
-    if (config && config->tap_hold_term)
-        tap_term = config->tap_hold_term;
-    else if (custom_lt)
-        tap_term = TAPPING_TERM;
-
-    uint16_t longer_term = config && config->longer_hold_term ? config->longer_hold_term : CUSTOM_LONGER_HOLD_TERM;
-    uint16_t multi_term  = config && config->multi_tap_term ? config->multi_tap_term : CUSTOM_MULTI_TAP_TERM;
-
-    return (key_behavior_view_t){
-        .config             = config,
-        .keycode            = keycode,
-        .handled            = config || is_mo,
-        .is_momentary_layer = is_mo || custom_lt,
-        .is_layer_tap       = custom_lt,
-        .has_multi_tap      = key_behavior_has_multi_tap_in_config(config),
-        .tap_hold_term      = tap_term,
-        .longer_hold_term   = longer_term,
-        .multi_tap_term     = multi_term,
-        .single             = config ? config->tap_counts[0] : key_behavior_step_none(),
-    };
 }

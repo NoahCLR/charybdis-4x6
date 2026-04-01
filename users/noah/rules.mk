@@ -15,11 +15,15 @@ LTO_ENABLE = yes
 
 SRC += noah.c
 SRC += lib/split_role.c
+SRC += lib/key/key_behavior_lookup.c
 SRC += lib/key/key_runtime.c
+SRC += lib/key/key_runtime_process.c
+SRC += lib/key/key_runtime_scan.c
 SRC += lib/key/delayed_action.c
 SRC += lib/key/held_action.c
 SRC += lib/action/action_dispatch.c
 SRC += lib/key/multi_tap_engine.c
+SRC += lib/state/keyboard_mod_state.c
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
     SRC += lib/pointing/pointing_device_runtime.c
