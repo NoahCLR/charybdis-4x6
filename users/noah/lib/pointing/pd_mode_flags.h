@@ -24,6 +24,8 @@
 #define PD_MODE_PINCH (1 << 5)
 #define PD_MODE_COUNT 6
 
+_Static_assert(PD_MODE_COUNT <= 8, "PD_MODE_COUNT exceeds 8-bit pd-mode storage; widen pd-mode flags and split-sync packet state before adding more modes");
+
 // ─── Read-only state queries ────────────────────────────────────────────────
 
 uint8_t pd_mode_active_snapshot(void);

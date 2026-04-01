@@ -115,7 +115,7 @@ combo_t key_combos[] = {
 //     default longer-hold threshold
 //   - CUSTOM_MULTI_TAP_TERM = 150 ms
 //     max gap allowed between taps in a multi-tap sequence
-//   - KEY_BEHAVIOR_MAX_TAP_COUNT = 4
+//   - KEY_BEHAVIOR_MAX_TAP_COUNT = 5
 //     current runtime limit for tap_counts[] entries
 //
 // per-key timing overrides:

@@ -49,7 +49,7 @@ That contrast is part of the value of this userspace:
 | Mode | What It Does | How You Reach It | RGB |
 | --- | --- | --- | --- |
 | `DRAGSCROLL` | converts ball movement to scrolling | hold `DRAGSCROLL`; quick double tap to lock | orange |
-| `PINCH_MODE` | dragscroll with `Cmd` held for command-scroll pinch emulation | first press hold = `PINCH_MODE`; double tap release = `MACRO_6`; double-tap hold = `ZOOM_MODE` | lime |
+| `PINCH_MODE` | dragscroll with `Cmd` held for [BetterMouse](https://better-mouse.com/)-backed pinch emulation on macOS | first press hold = `PINCH_MODE`; double tap release = Accessibility Zoom toggle; double-tap hold = `ZOOM_MODE` | lime |
 | `ZOOM_MODE` | vertical ball movement sends `Cmd+-` / `Cmd+=` | reached through `PINCH_MODE` double-tap hold | light green |
 | `ARROW_MODE` | ball movement emits arrow keys instead of moving the cursor | hold `ARROW_MODE`; quick double tap to lock | cyan |
 | `VOLUME_MODE` | vertical ball movement changes volume | hold `VOLUME_MODE`; quick double tap mutes | yellow |
@@ -86,7 +86,8 @@ While held:
 - `Cmd` is held as a weak modifier
 - the cursor stays frozen
 
-In practice this is meant to feel like pinch-style zoom in apps that respond to command-scroll.
+In practice this relies on [BetterMouse](https://better-mouse.com/) on macOS
+to turn that command-scroll path into the intended pinch-style zoom behavior.
 
 ## Real Pinch-Key Examples
 
@@ -104,7 +105,8 @@ What happens:
 - left `Cmd` is held
 - the ball is effectively sending command-scroll input while the key is held
 
-This is the path to use in apps that already understand `Cmd + scroll` as zoom.
+This is the path to use with [BetterMouse](https://better-mouse.com/) on macOS
+when command-scroll is being used as the pinch/zoom gesture.
 
 ### Example 2: macOS Accessibility Zoom Toggle
 
@@ -117,7 +119,7 @@ What happens:
 - `MACRO_6` runs
 - `MACRO_6` sends `Alt+Cmd+8`
 
-On macOS, that is commonly used to toggle Accessibility Zoom.
+On macOS, that toggles Accessibility Zoom.
 
 ### Example 3: Explicit Keyboard Zoom Mode
 
@@ -133,9 +135,12 @@ What happens:
 - downward movement sends `Cmd+-`
 - releasing the key exits `ZOOM_MODE`
 
-This is the path to use when an app does not respond well to command-scroll, or when you want deterministic zoom steps instead of scroll-based zoom.
+This is the path to use when
+[BetterMouse](https://better-mouse.com/)-backed command-scroll is not the right
+fit for the current app, or when you want deterministic zoom steps instead of
+scroll-based zoom.
 
-`MACRO_6` currently sends macOS `Alt+Cmd+8`, which is commonly used to toggle Accessibility Zoom.
+`MACRO_6` currently sends macOS `Alt+Cmd+8`, which toggles Accessibility Zoom.
 
 ## ZOOM_MODE
 

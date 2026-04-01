@@ -34,7 +34,7 @@ typedef struct {
     pd_mode_reset_t       reset;       // called on deactivation (NULL = no-op)
 } pd_mode_def_t;
 
-_Static_assert(PINCH_MODE - VOLUME_MODE + 1 == PD_MODE_COUNT, "pd-mode keycode count in custom_keycodes enum doesn't match PD_MODE_COUNT — update both together");
+_Static_assert(PD_MODE_KEYCODE_COUNT == PD_MODE_COUNT, "pd-mode keycode count in custom_keycodes enum doesn't match PD_MODE_COUNT — keep the pd-mode keycode block dense and update both together");
 
 extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];
 
@@ -61,3 +61,4 @@ void pd_mode_update(uint8_t mode, bool active);
 
 bool    pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record);
 uint8_t pd_mode_for_keycode(uint16_t keycode);
+uint8_t pd_mode_first_active_index(void);

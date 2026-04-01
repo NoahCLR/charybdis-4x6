@@ -4,6 +4,9 @@
 //
 // Dispatches authored key actions, including custom layer-lock and
 // pointing-device lock actions.
+//
+// Actions are keycode-like values. Extending key_behaviors[] with a new action
+// value is not sufficient when the semantics are not already handled here.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

@@ -67,10 +67,11 @@ enum custom_keycodes {
     DRAGSCROLL,
     PINCH_MODE,
     PD_MODE_LOCK_BASE,                                                        // reserves one lock/toggle action per pd-mode keycode — use LOCK_PD_MODE(mode_keycode)
-    LAYER_LOCK_BASE     = PD_MODE_LOCK_BASE + (PINCH_MODE - VOLUME_MODE + 1), // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
+    LAYER_LOCK_BASE     = PD_MODE_LOCK_BASE + (PD_MODE_LOCK_BASE - VOLUME_MODE), // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
 
+#define PD_MODE_KEYCODE_COUNT (PD_MODE_LOCK_BASE - VOLUME_MODE)
 #define LOCK_PD_MODE(mode_keycode_) (PD_MODE_LOCK_BASE + ((mode_keycode_) - VOLUME_MODE))
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 

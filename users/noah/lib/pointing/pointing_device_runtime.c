@@ -41,11 +41,11 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
     pd_shared_state_sync_tick();
 #    endif
 
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_active(pd_modes[i].mode_flag) && pd_modes[i].handler) {
-            return pd_modes[i].handler(mouse_report);
-        }
+    uint8_t active_mode = pd_mode_first_active_index();
+    if (active_mode < PD_MODE_COUNT && pd_modes[active_mode].handler) {
+        return pd_modes[active_mode].handler(mouse_report);
     }
+
     return mouse_report;
 #else
     return mouse_report;

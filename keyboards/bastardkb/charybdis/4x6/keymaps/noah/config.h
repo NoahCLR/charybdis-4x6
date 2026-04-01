@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // This file holds the keymap-facing behavior, RGB, timing, and pointer-layer
-// policy settings. Split transport, low-level pointing-device tuning, and
+// policy settings. Split transport, low-level pointing-device plumbing, and
 // shared QMK behavior overrides live in users/noah/config.h.
 //
 // The #undef-before-#define pattern is used throughout because QMK may
@@ -57,6 +57,22 @@
 
 // Default pointer DPI (base value before DPI_MOD/DPI_RMOD adjustments).
 #    define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
+
+// Drag-scroll and hi-res scroll tuning.
+// With hi-res scrolling, each scroll unit = 1/120th of a notch.
+//
+//   Speed      = DPI / STEP_DIVISOR   (lower = slower, more precise)
+//   Smoothness = RATE_LIMIT_MS        (lower = more frequent updates)
+//   Snap feel  = SNAP_RATIO           (higher = stricter axis lock)
+#    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
+#    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
+#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y
+#    define CHARYBDIS_DRAGSCROLL_DPI 100
+#    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0
+#    define CHARYBDIS_SCROLL_STEP_DIVISOR 8
+#    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8
+#    define CHARYBDIS_SCROLL_SNAP_RATIO 3
+#    define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 80
 #endif // POINTING_DEVICE_ENABLE
 
 // ─── RGB Matrix configuration ───────────────────────────────────────────────

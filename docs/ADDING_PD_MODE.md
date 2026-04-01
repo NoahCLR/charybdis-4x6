@@ -357,8 +357,8 @@ Only do this if the product behavior really calls for it.
 
 This is the actual control path for pd modes:
 
-1. `users/noah/lib/key/key_runtime.c` sees that a keycode maps to a pd mode via `pd_mode_for_keycode(...)`.
-2. `users/noah/lib/pointing/pd_mode_key_runtime.c` handles hold, release, tap, double-tap, lock toggling, and alternate-mode entry.
+1. `users/noah/lib/key/key_runtime_process.c` routes custom key events, and uses helpers from `users/noah/lib/key/key_runtime.c` to recognize that a keycode maps to a pd mode via `pd_mode_for_keycode(...)`.
+2. `users/noah/lib/pointing/pd_mode_key_runtime.c` handles hold, release, tap, double-tap, lock toggling, and alternate-mode entry for pd-mode keys.
 3. `users/noah/lib/pointing/pointing_device_runtime.c` calls the first active handler in `pd_modes[]`.
 4. `users/noah/lib/pointing/pointer_layer_policy.c` keeps the pointer layer alive while modes are active or locked.
 5. `users/noah/lib/state/pd_shared_state.c` mirrors active and locked flags to the other half.

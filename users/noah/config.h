@@ -3,10 +3,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // QMK automatically includes users/noah/config.h before the keyboard keymap's
-// own config.h. This file now carries the split transport, low-level
-// pointing-device tuning, and shared QMK behavior overrides for the current
-// Charybdis setup, while the keymap config holds typing, RGB, and
-// pointer-layer behavior.
+// own config.h. This file now carries split transport settings, low-level
+// pointing-device plumbing, and shared QMK behavior overrides for the current
+// Charybdis setup, while the keymap config holds typing, RGB, and pointer
+// behavior.
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
@@ -68,22 +68,5 @@
 // Enable 16-bit motion reports for higher precision at high DPI.
 #    define MOUSE_EXTENDED_REPORT
 #    define WHEEL_EXTENDED_REPORT
-
-#    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
-#    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
-
-// Drag-scroll converts trackball motion into scroll events.
-// With hi-res scrolling, each scroll unit = 1/120th of a notch.
-//
-//   Speed      = DPI / STEP_DIVISOR   (lower = slower, more precise)
-//   Smoothness = RATE_LIMIT_MS        (lower = more frequent updates)
-//   Snap feel  = SNAP_RATIO           (higher = stricter axis lock)
-#    define CHARYBDIS_DRAGSCROLL_REVERSE_Y
-#    define CHARYBDIS_DRAGSCROLL_DPI 100
-#    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0
-#    define CHARYBDIS_SCROLL_STEP_DIVISOR 8
-#    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8
-#    define CHARYBDIS_SCROLL_SNAP_RATIO 3
-#    define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 80
 
 #endif // POINTING_DEVICE_ENABLE

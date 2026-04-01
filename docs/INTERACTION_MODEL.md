@@ -234,7 +234,9 @@ Examples:
 - `ARROW_MODE`: hold for momentary arrow mode, quick double tap to lock
 - `DRAGSCROLL`: hold for momentary scrolling, quick double tap to lock
 - `VOLUME_MODE`: hold for volume control, quick double tap to mute
-- `PINCH_MODE`: first hold for pinch-style command-scroll, second quick tap for `MACRO_6`, second hold for `ZOOM_MODE`
+- `PINCH_MODE`: first hold for
+  [BetterMouse](https://better-mouse.com/)-backed command-scroll pinch on
+  macOS, second quick tap for Accessibility Zoom, second hold for `ZOOM_MODE`
 
 `PINCH_MODE` matters because it shows that the system can also branch into a completely different second-press path when needed.
 

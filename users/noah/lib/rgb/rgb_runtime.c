@@ -71,11 +71,9 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
         }
     }
 
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_active(pd_modes[i].mode_flag)) {
-            rgb_set_right_half(pd_mode_rgb[i], led_min, led_max);
-            break;
-        }
+    uint8_t active_mode = pd_mode_first_active_index();
+    if (active_mode < PD_MODE_COUNT) {
+        rgb_set_right_half(pd_mode_rgb[active_mode], led_min, led_max);
     }
 
     for (uint8_t g = 0; g < PD_MODE_LED_GROUP_COUNT; g++) {

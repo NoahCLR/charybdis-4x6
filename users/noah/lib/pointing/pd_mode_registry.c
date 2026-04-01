@@ -155,3 +155,11 @@ uint8_t pd_mode_for_keycode(uint16_t keycode) {
     }
     return 0;
 }
+
+uint8_t pd_mode_first_active_index(void) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_mode_active(pd_modes[i].mode_flag)) return i;
+    }
+
+    return PD_MODE_COUNT;
+}
