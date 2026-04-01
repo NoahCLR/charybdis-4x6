@@ -15,8 +15,8 @@ without having to rework the runtime.
 > against my `qmk-latest` firmware branch rather than the older
 > `bkb-master`-based setup.
 
-This repo also sits on top of [BastardKB](https://bastardkb.com/), designed by
-Quentin. His work, and the community built around this board, have given me
+This repo is built around the Charybdis from [BastardKB](https://bastardkb.com/),
+designed by Quentin. His work, and the community built around this board, have given me
 hundreds of hours of fun optimizing both the hardware and the firmware, and I
 am very thankful for that. If you are considering buying the hardware, buy it
 from him rather than from a knockoff seller.
