@@ -21,7 +21,7 @@ static rgb_t led_group_rgb[LAYER_LED_GROUP_COUNT];
 static rgb_t pd_mode_led_group_rgb[PD_MODE_LED_GROUP_COUNT];
 #endif
 
-void keyboard_post_init_user(void) {
+void noah_keyboard_post_init_user(void) {
 #ifdef RGB_MATRIX_ENABLE
     for (uint8_t i = 0; i < LAYER_COUNT; i++) {
         layer_rgb[i] = hsv_to_rgb(layer_colors[i]);
@@ -47,7 +47,7 @@ void keyboard_post_init_user(void) {
 }
 
 #ifdef RGB_MATRIX_ENABLE
-bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     bool layer_painted = false;
 
     for (int8_t i = LAYER_COUNT - 1; i > 0; i--) {
@@ -85,5 +85,11 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     }
 
     return layer_painted;
+}
+#else
+bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+    (void)led_min;
+    (void)led_max;
+    return true;
 }
 #endif // RGB_MATRIX_ENABLE

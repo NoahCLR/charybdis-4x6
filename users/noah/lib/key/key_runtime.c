@@ -414,7 +414,7 @@ static bool process_key_behavior(uint16_t keycode, keyrecord_t *record, handled_
 
 // ─── Tap/Hold Behavior ─────────────────────────────────────────────────────
 
-bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
+bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     (void)record;
 
     switch (keycode) {
@@ -427,7 +427,7 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 
 // ─── Process Record ────────────────────────────────────────────────────────
 
-bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed && active_key.keycode != KC_NO && keycode != active_key.keycode && is_layer_key(active_key.keycode)) {
         active_key.layer_interrupted = true;
     }
@@ -458,7 +458,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     return true;
 }
 
-void matrix_scan_user(void) {
+void noah_matrix_scan_user(void) {
     pd_mode_key_runtime_scan();
 
     if (active_key.keycode != KC_NO && !active_key.hold_fired) {

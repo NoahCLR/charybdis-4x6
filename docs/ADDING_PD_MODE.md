@@ -1,49 +1,109 @@
 # Adding A Pointing-Device Mode
 
-Use this guide when adding a new trackball / pointing-device mode to the `noah` keymap.
+Use this guide when adding a new pointing-device mode to the `noah` userspace.
 
-This keymap already has a generic pd-mode runtime. Most new modes are incremental changes, but there are a few invariants that must stay in sync or the lock actions, split sync, and VIA conversion will drift.
+This repo already has a generic pd-mode runtime. Most new modes should fit into
+that runtime without changing the engine. The main risk is breaking one of the
+shared invariants, so this guide is optimized around:
 
-Unless stated otherwise, the code snippets below use `EXAMPLE_MODE` / `PD_MODE_EXAMPLE` as placeholders, not as names of real modes in the current firmware.
+- exact files to edit
+- the minimum safe change set
+- cases where you do need extra runtime work
+- a final compile and manual verification checklist
+
+If you have not read them yet, also see:
+
+- [INTERACTION_MODEL.md](./INTERACTION_MODEL.md)
+- [POINTER_MODES.md](./POINTER_MODES.md)
+
+## Agent Contract
+
+If you hand this task to an agent, give it this exact job:
+
+1. Add a new custom keycode in `users/noah/noah.h`.
+2. Keep the pd-mode keycodes as one dense contiguous range from `VOLUME_MODE`
+   through the last pd-mode keycode immediately before `PD_MODE_LOCK_BASE`.
+3. Update the mode flag list and `PD_MODE_COUNT` in `users/noah/lib/pointing/pd_mode_flags.h`.
+4. Register the mode in `users/noah/lib/pointing/pointing_device_modes.c`.
+5. Add handler/reset declarations in `users/noah/lib/pointing/pointing_device_mode_handlers.h` and implementations in `users/noah/lib/pointing/pointing_device_mode_handlers.c`, if the mode needs them.
+6. Add authored key behavior and physical placement in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`.
+7. Add an RGB color in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`.
+8. Update `via layouts/via_to_qmk_layout.py` if the keycode can appear in VIA exports.
+9. Update user-facing docs if the mode changes real behavior in a meaningful way.
+10. Compile with `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+
+Do not rewrite the generic runtime unless the new mode truly needs runtime
+behavior that existing modes do not cover.
 
 ## What Counts As A Pd Mode
 
 A pd mode is a custom keycode that:
 
-- can be held momentarily
+- is activated by holding a key
 - can optionally be locked with `LOCK_PD_MODE(...)`
-- can transform trackball motion in `pointing_device_task_user()`
+- can transform trackball motion in the pointing-device pipeline
 - can optionally intercept key events while active
 - participates in split sync and RGB overlays
 
-Current examples are `VOLUME_MODE`, `BRIGHTNESS_MODE`, `ARROW_MODE`, `ZOOM_MODE`, `DRAGSCROLL`, and `PINCH_MODE`.
+Current examples:
 
-## Hard Constraints
+- `VOLUME_MODE`
+- `BRIGHTNESS_MODE`
+- `ARROW_MODE`
+- `ZOOM_MODE`
+- `DRAGSCROLL`
+- `PINCH_MODE`
 
-These are the parts most likely to break if they are not updated together.
+## Hard Invariants
 
-1. The pd-mode keycodes in `keymap_defs.h` must remain a dense contiguous range ending immediately before `PD_MODE_LOCK_BASE`.
-2. `LOCK_PD_MODE(mode_keycode_)` assumes that dense range and computes offsets from `VOLUME_MODE`.
-3. `PD_MODE_COUNT` must match the number of bit flags and the number of rows in `pd_modes[]`.
-4. Pd-mode flags are stored in `uint8_t`, so the current architecture supports at most 8 modes without widening the flag types and split-sync packet.
+These are the rules most likely to break the system if you miss one.
 
-## Files To Touch
+1. The pd-mode keycodes in `users/noah/noah.h` must stay contiguous:
+   `VOLUME_MODE ... <last mode> ... PD_MODE_LOCK_BASE`.
+2. `LOCK_PD_MODE(mode_keycode_)` computes offsets from `VOLUME_MODE`, so gaps in
+   that keycode range will break lock actions.
+3. `PD_MODE_COUNT` in `users/noah/lib/pointing/pd_mode_flags.h` must match:
+   the number of mode flags, the number of rows in `pd_modes[]`, and the
+   `_Static_assert` in `users/noah/lib/pointing/pointing_device_modes.h`.
+4. Mode flags are currently stored in `uint8_t` values:
+   `users/noah/lib/pointing/pd_mode_flags.h` and `users/noah/lib/pointing/split_sync.h`.
+   That means the current design supports at most 8 modes.
 
-- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap_defs.h`
-- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/lib/pointing/pointing_device_modes.h`
-- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/lib/pointing/pointing_device_modes.c`
-- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/lib/pointing/pointing_device_mode_handlers.h`
-- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/lib/pointing/pointing_device_mode_handlers.c`
+If you add a 9th mode, you must widen the flag storage and the split-sync packet
+before the new mode is safe.
+
+## Files You Usually Touch
+
+Normal add-mode work lives in these files:
+
+- `users/noah/noah.h`
+- `users/noah/lib/pointing/pd_mode_flags.h`
+- `users/noah/lib/pointing/pointing_device_modes.h`
+- `users/noah/lib/pointing/pointing_device_modes.c`
+- `users/noah/lib/pointing/pointing_device_mode_handlers.h`
+- `users/noah/lib/pointing/pointing_device_mode_handlers.c`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`
 - `via layouts/via_to_qmk_layout.py`
-- `docs/VERIFICATION.md`
 
-## Normal Add-Mode Procedure
+Files you usually do not need to touch:
 
-### 1. Add The Keycode
+- `users/noah/lib/pointing/pd_mode_key_runtime.c`
+- `users/noah/lib/pointing/pointing_device_runtime.c`
+- `users/noah/lib/pointing/pointer_layer_policy.c`
+- `users/noah/lib/pointing/split_sync.c`
+- `users/noah/lib/rgb/rgb_runtime.c`
 
-In `keymap_defs.h`, add the new mode keycode inside the pd-mode block, before `PD_MODE_LOCK_BASE`.
+## Fastest Safe Path
+
+Use this when the new mode behaves like a normal pd mode.
+
+### 1. Add The Custom Keycode
+
+Edit `users/noah/noah.h`.
+
+Add the new mode keycode inside the existing pd-mode block, immediately before
+`PD_MODE_LOCK_BASE`.
 
 Example:
 
@@ -56,172 +116,309 @@ Example:
     PINCH_MODE,
     EXAMPLE_MODE,
     PD_MODE_LOCK_BASE,
+    LAYER_LOCK_BASE = PD_MODE_LOCK_BASE + (EXAMPLE_MODE - VOLUME_MODE + 1),
 ```
 
-Then update the enum math that currently uses the last pd-mode keycode. If `PINCH_MODE` is no longer the last pd-mode keycode, replace that expression accordingly.
+Do not leave the enum math pointing at the old last mode.
 
 ### 2. Add The Mode Flag
 
-In `lib/pointing/pointing_device_modes.h`:
+Edit `users/noah/lib/pointing/pd_mode_flags.h`.
 
 - add a new `PD_MODE_*` bit
 - bump `PD_MODE_COUNT`
-- update the `_Static_assert(...)` if the final pd-mode keycode changed
 
 Example:
 
 ```c
-#define PD_MODE_VOLUME      (1 << 0)
-#define PD_MODE_ARROW       (1 << 1)
-#define PD_MODE_DRAGSCROLL  (1 << 2)
-#define PD_MODE_BRIGHTNESS  (1 << 3)
-#define PD_MODE_ZOOM        (1 << 4)
-#define PD_MODE_PINCH       (1 << 5)
-#define PD_MODE_EXAMPLE     (1 << 6)
+#define PD_MODE_VOLUME (1 << 0)
+#define PD_MODE_ARROW (1 << 1)
+#define PD_MODE_DRAGSCROLL (1 << 2)
+#define PD_MODE_BRIGHTNESS (1 << 3)
+#define PD_MODE_ZOOM (1 << 4)
+#define PD_MODE_PINCH (1 << 5)
+#define PD_MODE_EXAMPLE (1 << 6)
 #define PD_MODE_COUNT 7
 ```
 
-### 3. Add The Handler API
+### 3. Update The Static Assert
 
-In `pointing_device_mode_handlers.h`, declare:
+Edit `users/noah/lib/pointing/pointing_device_modes.h`.
 
-- `handle_<mode>_mode(...)`
-- `reset_<mode>_mode(...)`
-- optionally `handle_<mode>_mode_key(...)`
+If the last pd-mode keycode changed, update the `_Static_assert(...)` so it
+still checks the right final keycode against `PD_MODE_COUNT`.
 
-If the mode only transforms mouse reports, you usually need just the first two.
+### 4. Add Handler Declarations If Needed
 
-### 4. Implement The Handler
+Edit `users/noah/lib/pointing/pointing_device_mode_handlers.h`.
 
-In `pointing_device_mode_handlers.c`, implement the behavior.
+Most motion-transforming modes need:
+
+- `handle_<name>_mode(...)`
+- `reset_<name>_mode(void)`
+
+Only add `handle_<name>_mode_key(...)` if the mode needs to intercept key
+events while active, like `ARROW_MODE`.
+
+### 5. Implement The Handler
+
+Edit `users/noah/lib/pointing/pointing_device_mode_handlers.c`.
 
 Typical pattern:
 
-- keep per-mode accumulators as `static` file state
-- translate trackball deltas into key taps or other actions
+- keep per-mode state as `static` file-local variables
+- accumulate `mouse_report.x` and/or `mouse_report.y`
+- emit taps when the accumulated value crosses a threshold
 - return a zeroed `report_mouse_t` if the cursor should freeze while active
-- clear all mode-local state in the reset function
+- fully clear the mode-local state in the reset function
 
-Use a key handler only if the mode needs to reinterpret keyboard or mouse-button presses while active, like `ARROW_MODE`.
+Minimal skeleton:
 
-### 5. Register The Mode
+```c
+static int32_t example_acc_y    = 0;
+static int8_t  example_last_dir = 0;
 
-In `pointing_device_modes.c`, add a row to `pd_modes[]`:
+report_mouse_t handle_example_mode(report_mouse_t mouse_report) {
+    int16_t dy = mouse_report.y;
+
+    if (dy != 0) {
+        int8_t dir = (dy > 0) ? 1 : -1;
+        if (example_last_dir != 0 && dir != example_last_dir) {
+            example_acc_y = 0;
+        }
+        example_last_dir = dir;
+
+        example_acc_y += dy;
+        while (example_acc_y >= EXAMPLE_THRESHOLD) {
+            tap_code16(KC_WHATEVER);
+            example_acc_y -= EXAMPLE_THRESHOLD;
+        }
+        while (example_acc_y <= -EXAMPLE_THRESHOLD) {
+            tap_code16(KC_WHATEVER_ELSE);
+            example_acc_y += EXAMPLE_THRESHOLD;
+        }
+    }
+
+    return (report_mouse_t){0};
+}
+
+void reset_example_mode(void) {
+    example_acc_y    = 0;
+    example_last_dir = 0;
+}
+```
+
+### 6. Register The Mode
+
+Edit `users/noah/lib/pointing/pointing_device_modes.c`.
+
+Add a row to `pd_modes[]`:
 
 ```c
 {PD_MODE_EXAMPLE, EXAMPLE_MODE, LOCK_PD_MODE(EXAMPLE_MODE), handle_example_mode, NULL, reset_example_mode},
 ```
 
-Fields are:
+Field meaning:
 
-- `mode_flag`: the bitmask used internally
-- `keycode`: the custom keycode that activates the mode
-- `lock_action`: usually `LOCK_PD_MODE(...)`
-- `handler`: trackball-motion handler, or `NULL` if handled elsewhere
-- `key_handler`: optional event interceptor
-- `reset`: cleanup on deactivation
+- `mode_flag`: internal bit flag
+- `keycode`: custom keycode that activates the mode
+- `lock_action`: usually `LOCK_PD_MODE(...)`, or `KC_NO` if not lockable
+- `handler`: trackball-motion handler, or `NULL`
+- `key_handler`: optional key-event interceptor
+- `reset`: cleanup callback, or `NULL`
 
-### 6. Add Special Side Effects If Needed
+### 7. Add Authored Key Behavior
 
-Most modes do not need this.
+Edit `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`.
 
-If the mode toggles some firmware feature outside the normal handler path, add hardcoded side effects in `pointing_device_modes.c`. `DRAGSCROLL` is the example to copy: it enables and disables Charybdis dragscroll in `pd_mode_activate()`, `pd_mode_deactivate()`, `pd_mode_lock()`, and `pd_mode_unlock()`.
+There are two separate jobs here:
 
-If your new mode behaves like volume, brightness, zoom, or arrow, you likely do not need extra branches there.
+- add a `key_behaviors[]` row if the key needs custom tap / double-tap behavior
+- place the physical keycode on the desired layer
 
-### 7. Put The Key On A Layer
+Important: the generic pd-mode runtime already gives you momentary hold
+activation. Double-tap behavior is not automatic. If you want lock, mute, or a
+second-tap alternate mode, you must author that explicitly in `key_behaviors[]`.
 
-Add the new keycode to a layer in `keymap.c`.
+The standard pd-mode pattern is:
 
-If you want the standard pd-mode behavior:
+- hold: momentary mode
+- first quick tap: base-layer key at that physical position
+- quick double tap: lock the mode
 
-- hold = momentary mode
-- tap = base-layer key at that position
-- double tap = lock
-
-add a `key_behaviors[]` row similar to the existing mode keys:
+Example:
 
 ```c
 {.keycode = EXAMPLE_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(EXAMPLE_MODE))}}},
 ```
 
-Then place `EXAMPLE_MODE` on `LAYER_POINTER`, `LAYER_NAV`, or wherever it belongs physically.
+Then place `EXAMPLE_MODE` on `LAYER_POINTER`, `LAYER_NAV`, or another layer in
+the physical `keymaps[][]` block.
 
-If you want a multi-tap hold to enter a different pd mode, copy the `PINCH_MODE` pattern instead of the standard lock pattern.
+Current examples in this repo:
 
-Example:
+- `ARROW_MODE`: double tap locks
+- `DRAGSCROLL`: double tap locks
+- `VOLUME_MODE`: double tap mutes instead of locking
+- `PINCH_MODE`: second tap is custom and can branch into `ZOOM_MODE`
+- `BRIGHTNESS_MODE`: no authored double-tap behavior right now
+
+### 8. Add RGB Color
+
+Edit `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`.
+
+Add a new row to `pd_mode_colors[]`:
+
+```c
+{PD_MODE_EXAMPLE, {120, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},
+```
+
+Optional: add a matching `pd_mode_led_groups[]` entry if the mode wants a
+specific LED subset highlighted.
+
+### 9. Update VIA Conversion
+
+Edit `via layouts/via_to_qmk_layout.py`.
+
+If the new keycode can appear in VIA exports, append it to `PD_MODE_KEYCODES`
+in the same order as the enum in `users/noah/noah.h`.
+
+If you skip this, regenerated layouts may emit stale `CUSTOM(n)` tokens or map
+the wrong symbolic keycode.
+
+### 10. Update User Docs If The Mode Is Real
+
+If the new mode is meant to be used, not just prototyped, also update:
+
+- `docs/POINTER_MODES.md` for user-facing behavior
+- `docs/INTERACTION_MODEL.md` if the mode introduces a new interaction pattern
+
+## When You Need Extra Work
+
+Most new modes only need the fast path above. Use the sections below only if
+the behavior matches.
+
+### Mode Needs Side Effects On Activate / Deactivate
+
+Examples:
+
+- enable a firmware feature while the mode is active
+- hold a modifier while the mode is active
+- keep auto-mouse alive while the mode is locked
+
+Edit `users/noah/lib/pointing/pointing_device_modes.c`.
+
+Current examples to copy:
+
+- `DRAGSCROLL` toggles Charybdis dragscroll
+- `PINCH_MODE` toggles dragscroll and also registers / unregisters a weak `GUI` mod
+- locked scroll-like modes use the auto-mouse ownership helpers
+
+If your mode behaves like `VOLUME_MODE`, `BRIGHTNESS_MODE`, or `ZOOM_MODE`, you
+probably do not need extra branches here.
+
+### Mode Needs Key Interception
+
+If the mode repurposes keyboard or mouse-button events while active, add a
+`key_handler` in `users/noah/lib/pointing/pointing_device_mode_handlers.c` and register it in `pd_modes[]`.
+
+Copy `ARROW_MODE` if you need a template.
+
+### Second-Tap Hold Should Enter Another Pd Mode
+
+The runtime already supports this pattern.
+
+Example from the current keymap:
 
 ```c
 {
-    .keycode = EXAMPLE_MODE,
+    .keycode = PINCH_MODE,
     .tap_counts =
         {
-            [1] = {.tap = TAP_SENDS(MACRO_6), .hold = TAP_AT_HOLD_THRESHOLD(ZOOM_MODE)},
+            [1] = {.tap = TAP_SENDS(MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
         },
 },
 ```
 
-The pd-mode runtime treats that second-tap hold as an alternate mode path when the hold action resolves to another pd-mode keycode.
+The important rule is that the hold action on that second press must resolve to
+another pd-mode keycode. The generic pd-mode key runtime will detect that and
+switch to the alternate mode.
 
-### 8. Add RGB Color
+You do not need to edit `users/noah/lib/pointing/pd_mode_key_runtime.c` unless you are inventing a new runtime behavior that existing modes do not cover.
 
-In `rgb_config.h`, add a row to `pd_mode_colors[]` so the right half gets a distinct overlay while the mode is active.
+### Mode Is Not Lockable
 
-Optional: add a `pd_mode_led_groups[]` entry if you want a specific LED subset highlighted.
+Set the `lock_action` field in `pd_modes[]` to `KC_NO`, and do not add a
+double-tap lock action in `key_behaviors[]`.
 
-### 9. Update VIA Conversion
+Only do this if the product behavior really calls for it.
 
-If the mode can appear in your VIA export, update `via layouts/via_to_qmk_layout.py`.
+## Runtime Flow
 
-For this repo, that usually means appending the new keycode name to `PD_MODE_KEYCODES` in the same order as the enum in `keymap_defs.h`.
+This is the actual control path for pd modes:
 
-If you forget this, the converter may emit stale `CUSTOM(...)` tokens or misname the new mode.
+1. `users/noah/lib/key/key_runtime.c` sees that a keycode maps to a pd mode via `pd_mode_for_keycode(...)`.
+2. `users/noah/lib/pointing/pd_mode_key_runtime.c` handles hold, release, tap, double-tap, lock toggling, and alternate-mode entry.
+3. `users/noah/lib/pointing/pointing_device_runtime.c` calls the first active handler in `pd_modes[]`.
+4. `users/noah/lib/pointing/pointer_layer_policy.c` keeps the pointer layer alive while modes are active or locked.
+5. `users/noah/lib/pointing/split_sync.c` mirrors active and locked flags to the other half.
+6. `users/noah/lib/rgb/rgb_runtime.c` renders the mode overlay on the right half.
 
-### 10. Update Verification
-
-Add checks to `VERIFICATION.md` for:
-
-- hold behavior
-- double-tap lock and unlock
-- interaction with other locked and unlocked pd modes
-- interaction with auto-mouse if relevant
-- any special key interception behavior
-
-## How The Runtime Works
-
-The important flow is:
-
-1. `key_runtime.c` detects that a pressed keycode is a pd-mode key via `pd_mode_for_keycode(...)`.
-2. `pd_mode_key_runtime.c` handles press, release, tap-vs-hold, and lock toggling.
-3. `pointing_device_runtime.c` calls the first active mode handler in `pd_modes[]`.
-4. `pointer_layer_policy.c` keeps the pointer layer alive while pd modes are active or locked.
-5. `split_sync.c` mirrors pd-mode active and locked flags to the other half.
-6. `rgb_runtime.c` renders the pd-mode overlay color.
-
-This means most new modes fit the system without changing the generic runtime.
+That is why most new modes are mostly a data-registration job, not a runtime rewrite.
 
 ## Common Mistakes
 
-- Adding the keycode outside the contiguous pd-mode enum range.
+- Adding the keycode outside the contiguous pd-mode range in `custom_keycodes`.
+- Forgetting to update `LAYER_LOCK_BASE` math when the last pd-mode key changes.
 - Forgetting to bump `PD_MODE_COUNT`.
-- Forgetting to add the new row to `pd_modes[]`.
+- Forgetting to update the `_Static_assert(...)`.
+- Adding the new flag but forgetting the `pd_modes[]` row.
 - Forgetting the reset function, which leaves stale accumulators or modifiers behind.
-- Forgetting `via_to_qmk_layout.py`, so regenerated layouts emit the wrong symbolic name.
-- Adding a 9th mode without widening `uint8_t` flag storage and split sync.
-- Creating a mode with special firmware side effects but not mirroring the dragscroll-style activation and cleanup hooks.
+- Adding side effects in activate / deactivate but forgetting the locked path.
+- Forgetting the VIA mapping, so converted layouts emit bad `CUSTOM(...)` tokens.
+- Adding a 9th mode without widening the `uint8_t` flag storage and split-sync packet.
 
-## Quick AI Prompt Packet
+## Definition Of Done
 
-If you hand this task to an AI, give it these requirements:
+A new mode is done when all of the following are true:
 
-1. Add a new pd mode named `<NAME>_MODE`.
-2. Keep the pd-mode custom keycodes contiguous in `keymap_defs.h`.
-3. Update `PD_MODE_COUNT`, the `PD_MODE_*` bit flags, and the `pd_modes[]` table.
-4. Add handler and reset functions in `pointing_device_mode_handlers.c/.h`.
-5. Add the key to the desired layer in `keymap.c` and give it double-tap lock behavior via `LOCK_PD_MODE(...)`.
-6. If the gesture should do something more specific than "double tap locks", document the alternate multi-tap behavior explicitly and wire it in `key_behaviors[]`.
-7. Add an RGB overlay color in `rgb_config.h`.
-8. Update `via layouts/via_to_qmk_layout.py` so VIA exports render the new symbolic keycode.
-9. Extend `VERIFICATION.md` with lock, unlock, overlap, and auto-mouse checks.
-10. Compile with `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
-11. Do not break the existing pd-mode invariants or the 8-mode flag limit.
+- The keycode exists in `users/noah/noah.h` and the pd-mode range is still dense.
+- `PD_MODE_COUNT`, the flag list, and the static assert all match.
+- The mode exists in `pd_modes[]`.
+- Any needed handler, key handler, and reset function exist.
+- The key is physically placed in `keymaps[][]`.
+- The authored tap / lock behavior in `key_behaviors[]` matches the intended UX.
+- The mode has an RGB overlay color.
+- VIA conversion is updated if relevant.
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
+
+## Manual Verification
+
+After compiling, verify the real behavior on hardware:
+
+1. Hold the key and confirm the momentary mode works.
+2. Release the key and confirm the mode fully clears.
+3. If lockable, quick double tap to lock and repeat to unlock.
+4. Confirm locking this mode clears other locked pd modes if that is intended.
+5. Confirm holding this mode cancels earlier unlocked modes if that is intended.
+6. Confirm any side effects activate and clean up correctly.
+7. Confirm RGB shows the expected color while active or locked.
+8. Confirm the slave half mirrors lock state and overlay state.
+9. If the mode changes key handling, test every intercepted key path.
+10. If the mode can appear in VIA, export and reconvert a layout once.
+
+## Quick Diff Checklist
+
+For a normal new mode, the minimum expected diff usually includes:
+
+- `users/noah/noah.h`
+- `users/noah/lib/pointing/pd_mode_flags.h`
+- `users/noah/lib/pointing/pointing_device_modes.h`
+- `users/noah/lib/pointing/pointing_device_modes.c`
+- `users/noah/lib/pointing/pointing_device_mode_handlers.h`
+- `users/noah/lib/pointing/pointing_device_mode_handlers.c`
+- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
+- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`
+- `via layouts/via_to_qmk_layout.py`, if relevant
+
+If your diff reaches into the generic runtime, stop and justify why.
