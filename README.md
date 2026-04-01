@@ -242,6 +242,8 @@ These docs are the next place to look:
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
 
+## A Little Show-Off Of My Build
+
 <p align="center">
 <video src="https://github.com/user-attachments/assets/fb5749e2-6f30-44de-99d7-9bd47f94659a" controls></video>
 </p>
