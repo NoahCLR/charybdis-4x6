@@ -77,12 +77,13 @@ typedef struct {
 
 // ─── Key Behavior Config ────────────────────────────────────────────────────
 //
-// A single authored behavior row for one physical keycode.
+// A single authored behavior row for one keycode.
 //
 // tap_counts[0] = single press
 // tap_counts[1] = double tap
 // tap_counts[2] = triple tap
 // tap_counts[3] = quadruple tap
+// tap_counts[4] = quintuple tap
 //
 // Unused entries stay zero-initialized.
 
