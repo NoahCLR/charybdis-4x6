@@ -14,6 +14,75 @@
 
 #include "noah.h"
 
+// ─── Macros ─────────────────────────────────────────────────────────────────
+// macro_dispatch() handles custom macro keycodes used by key behaviors.
+// Available macro slots are MACRO_0 through MACRO_15.
+// Add or edit cases here to define what those macros send.
+// If you need more slots than MACRO_15, extend enum custom_keycodes in users/noah/noah.h.
+
+bool macro_dispatch(uint16_t keycode) {
+    switch (keycode) {
+        case MACRO_0: // Spotlight search (macOS): GUI + Space
+            SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
+            return true;
+        case MACRO_1: // Claude: Alt + Space
+            SEND_STRING(SS_LALT(SS_TAP(X_SPACE)));
+            return true;
+        case MACRO_2: // Terminal: Alt + GUI + Space
+            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_SPACE))));
+            return true;
+        case MACRO_3: // OCR text copy (macOS): Ctrl + Alt + GUI + C
+            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("c"))));
+            return true;
+        case MACRO_4: // Screenshot (macOS): Ctrl + Alt + GUI + X
+            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("x"))));
+            return true;
+        case MACRO_5: // Emoji picker (macOS): Ctrl + GUI + Space
+            SEND_STRING(SS_LCTL(SS_LGUI(SS_TAP(X_SPACE))));
+            return true;
+        case MACRO_6: // MacOS Zoom: Alt + GUI + 8
+            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_8))));
+            return true;
+        // case MACRO_7:
+        //     SEND_STRING("...");
+        //     return true;
+        // case MACRO_8:
+        //     SEND_STRING("...");
+        //     return true;
+        // case MACRO_9:
+        //     SEND_STRING("...");
+        //     return true;
+        // case MACRO_10:
+        //     SEND_STRING("...");
+        //     return true;
+        // case MACRO_11:
+        //     SEND_STRING("...");
+        //     return true;
+        // case MACRO_12:
+        //     SEND_STRING("...");
+        //     return true;
+        // case MACRO_13:
+        //     SEND_STRING("...");
+        //     return true;
+        // case MACRO_14:
+        //     SEND_STRING("...");
+        //     return true;
+        // case MACRO_15:
+        //     SEND_STRING("...");
+        //     return true;
+        default:
+            return false;
+    }
+}
+
+// ─── Combos ─────────────────────────────────────────────────────────────────
+
+const uint16_t PROGMEM combo_keys_1[] = {KC_D, LT(LAYER_NAV, KC_F), COMBO_END};
+
+combo_t key_combos[] = {
+    COMBO(combo_keys_1, KC_TAB), // D + F → Tab
+};
+
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
 // key_behaviors[] is the single authored behavior table for keys handled by
@@ -24,9 +93,94 @@
 // tap_counts[2] = triple tap
 // tap_counts[3] = quadruple tap
 //
+// timing defaults currently set in config.h:
+//   - TAPPING_TERM = 200
+//     used by built-in QMK LT()/MT() keys and by LT() rows here when
+//     .tap_hold_term is omitted
+//   - CUSTOM_TAP_HOLD_TERM = 150
+//     default first hold threshold for custom key_behavior rows
+//   - CUSTOM_LONGER_HOLD_TERM = 400
+//     default longer-hold threshold
+//   - CUSTOM_MULTI_TAP_TERM = 150
+//     max gap allowed between taps in a multi-tap sequence
+//   - KEY_BEHAVIOR_MAX_TAP_COUNT = 4
+//     current runtime limit for tap_counts[] entries
+//
+// per-key timing overrides:
+//   - .tap_hold_term overrides the first hold threshold for that row
+//   - .longer_hold_term overrides the longer-hold threshold
+//   - .multi_tap_term overrides the max gap between taps
+//   - omit them (or leave them 0) to use the defaults above
+//   - for LT() rows, omitted .tap_hold_term falls back to TAPPING_TERM;
+//     all other rows fall back to CUSTOM_TAP_HOLD_TERM
+//
+// multi-tap behavior:
+//   - if a key has higher tap_counts[] entries, lower tap counts wait one
+//     multi-tap window before firing so the engine can see whether more taps
+//     follow
+//   - this means single taps on multi-tap keys are delayed by .multi_tap_term
+//
 // omit .tap to keep the key's normal tap behavior for that step
-// .hold / .long_hold use the helper DSL from users/noah/lib/key/key_behavior.h
-// timing thresholds come from config.h unless overridden per key
+// .hold and .long_hold are independent: define either one by itself, or use
+// both together for a two-stage hold
+//
+// action can be a plain keycode, a modded keycode, a macro, a layer lock,
+// or a pointer-mode lock
+//   - Use LOCK_LAYER(layer) to toggle a layer lock.
+//     Locking the same layer again turns it off; locking a different layer
+//     switches the lock to that layer.
+//   - Use LOCK_PD_MODE(mode_keycode) to toggle a pointer-mode lock.
+//     Activating the same mode again unlocks it; pressing, holding or locking
+//     any other pointer-mode key also clears the previous lock.
+//   - Define macros in macro_dispatch(), then use MACRO_n as the action in
+//     any helper: TAP_SENDS(MACRO_n), TAP_AT_HOLD_THRESHOLD(MACRO_n),
+//     TAP_ON_RELEASE_AFTER_HOLD(MACRO_n), or PRESS_AND_HOLD_UNTIL_RELEASE(MACRO_n).
+//   - Modded keycodes like G(KC_RIGHT), A(KC_LEFT), or S(KC_1) let one action
+//     send GUI, Alt, Shift, and similar variants without adding separate keys.
+//
+// tap accepts one helper:
+//   TAP_SENDS(action)
+//     send action on a quick release instead of the key's normal tap
+//     use this for alternate tap output, media keys, macros, layer locks,
+//     and pointer-mode locks
+//
+// hold and long_hold accept the same three helpers:
+//   PRESS_AND_HOLD_UNTIL_RELEASE(action)
+//     cross .tap_hold_term -> press/register action
+//     release the key -> unregister action
+//     use this for modifiers or keys you want to stay down while held
+//
+//   TAP_AT_HOLD_THRESHOLD(action)
+//     cross .tap_hold_term -> send action once immediately
+//     use this for one-shot actions such as layer lock, pointer lock,
+//     media controls, or macros
+//
+//   TAP_ON_RELEASE_AFTER_HOLD(action)
+//     cross .tap_hold_term -> qualify the hold, but do nothing yet
+//     release the key -> send action once
+//     use this when the key should stay quiet while held, or when a longer
+//     hold should still be able to replace the shorter hold action
+//     with .long_hold configured, this creates a clean middle tier:
+//       release after .tap_hold_term but before .longer_hold_term = .hold action
+//       keep holding past .longer_hold_term = .long_hold action instead
+//
+// illustrative example row with custom timings and mixed tap/hold combinations:
+// {
+//     .keycode = KC_EXAMPLE,
+//     .tap_hold_term = 150,
+//     .longer_hold_term = 400,
+//     .multi_tap_term = 150,
+//     .tap_counts =
+//         {
+//             [0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_EXAMPLE))}, // normal tap, exclusive long hold
+//             [1] = {.tap = TAP_SENDS(S(KC_EXAMPLE))}, // alternate tap output
+//             [2] = {.tap = TAP_SENDS(KC_EXAMPLE), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXAMPLE)}, // tap once, or keep held
+//             [3] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_EXAMPLE))}, // normal tap, shifted hold
+//             [4] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_EXAMPLE)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_EXAMPLE))}, // middle hold on release, longer hold upgrades
+//             [5] = {.tap = TAP_SENDS(MACRO_n), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_EXAMPLE))}, // macro on tap, layer lock on hold
+//             [6] = {.tap = TAP_SENDS(LOCK_PD_MODE(PD_MODE_EXAMPLE))}, // pointer-mode lock on tap
+//         },
+// }
 
 const key_behavior_t
     key_behaviors[] =
@@ -116,44 +270,6 @@ const key_behavior_t
 };
 
 const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);
-
-// ─── Macros ─────────────────────────────────────────────────────────────────
-
-bool macro_dispatch(uint16_t keycode) {
-    switch (keycode) {
-        case MACRO_0: // Spotlight search (macOS): GUI + Space
-            SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
-            return true;
-        case MACRO_1: // Claude: Alt + Space
-            SEND_STRING(SS_LALT(SS_TAP(X_SPACE)));
-            return true;
-        case MACRO_2: // Terminal: Alt + GUI + Space
-            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_SPACE))));
-            return true;
-        case MACRO_3: // OCR text copy (macOS): Ctrl + Alt + GUI + C
-            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("c"))));
-            return true;
-        case MACRO_4: // Screenshot (macOS): Ctrl + Alt + GUI + X
-            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("x"))));
-            return true;
-        case MACRO_5: // Emoji picker (macOS): Ctrl + GUI + Space
-            SEND_STRING(SS_LCTL(SS_LGUI(SS_TAP(X_SPACE))));
-            return true;
-        case MACRO_6: // MacOS Zoom: Alt + GUI + 8
-            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_8))));
-            return true;
-        default:
-            return false;
-    }
-}
-
-// ─── Combos ─────────────────────────────────────────────────────────────────
-
-const uint16_t PROGMEM combo_keys_1[] = {KC_D, LT(LAYER_NAV, KC_F), COMBO_END};
-
-combo_t key_combos[] = {
-    COMBO(combo_keys_1, KC_TAB), // D + F → Tab
-};
 
 // ─── Keymap Layouts ─────────────────────────────────────────────────────────
 
