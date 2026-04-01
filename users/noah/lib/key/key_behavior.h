@@ -158,9 +158,7 @@ static inline const key_behavior_t *key_behavior_config_lookup(uint16_t keycode)
     return NULL;
 }
 
-static inline key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
-    const key_behavior_t *config = key_behavior_config_lookup(keycode);
-
+static inline key_behavior_step_t key_behavior_step_lookup_in_config(const key_behavior_t *config, uint8_t tap_count) {
     if (!config || tap_count == 0 || tap_count > KEY_BEHAVIOR_MAX_TAP_COUNT) {
         return key_behavior_step_none();
     }
@@ -168,15 +166,25 @@ static inline key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uin
     return config->tap_counts[tap_count - 1];
 }
 
-static inline bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
-    const key_behavior_t *config = key_behavior_config_lookup(keycode);
+static inline key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
+    return key_behavior_step_lookup_in_config(key_behavior_config_lookup(keycode), tap_count);
+}
 
+static inline bool key_behavior_has_more_taps_in_config(const key_behavior_t *config, uint8_t count) {
     if (!config || count >= KEY_BEHAVIOR_MAX_TAP_COUNT) return false;
 
     for (uint8_t i = count; i < KEY_BEHAVIOR_MAX_TAP_COUNT; i++)
         if (key_behavior_step_present(config->tap_counts[i])) return true;
 
     return false;
+}
+
+static inline bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
+    return key_behavior_has_more_taps_in_config(key_behavior_config_lookup(keycode), count);
+}
+
+static inline bool key_behavior_has_multi_tap_in_config(const key_behavior_t *config) {
+    return key_behavior_has_more_taps_in_config(config, 1);
 }
 
 static inline bool key_behavior_has_multi_tap(uint16_t keycode) {
@@ -204,7 +212,7 @@ static inline key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .handled            = config || is_mo,
         .is_momentary_layer = is_mo || custom_lt,
         .is_layer_tap       = custom_lt,
-        .has_multi_tap      = config ? key_behavior_has_multi_tap(keycode) : false,
+        .has_multi_tap      = key_behavior_has_multi_tap_in_config(config),
         .tap_hold_term      = tap_term,
         .longer_hold_term   = longer_term,
         .multi_tap_term     = multi_term,

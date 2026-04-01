@@ -40,7 +40,7 @@
 //   Each tap must arrive within CUSTOM_MULTI_TAP_TERM of the previous tap.
 //   A double-tap takes up to 2x the term, triple up to 3x, etc.
 //   Single taps on multi-tap keys are delayed by one window.
-#define KEY_BEHAVIOR_MAX_TAP_COUNT 4 // max tap-count entries per key (single / double / triple / quadruple)
+#define KEY_BEHAVIOR_MAX_TAP_COUNT 5 // max tap-count entries per key (single / double / triple / quadruple)
 #define CUSTOM_TAP_HOLD_TERM 150     // tap vs hold boundary
 #define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary
 #define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps

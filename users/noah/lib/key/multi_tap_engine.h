@@ -53,6 +53,8 @@ typedef struct {
     hold_behavior_t long_hold;      // long-hold tier paired with hold
     uint8_t         saved_mods;     // real mods active when the tap sequence began resolving
     uint8_t         saved_weak_mods;
+    uint8_t         saved_oneshot_mods;
+    uint8_t         saved_oneshot_locked_mods;
 } multi_tap_t;
 
 void multi_tap_reset(multi_tap_t *mt);

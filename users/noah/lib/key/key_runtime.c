@@ -42,6 +42,8 @@ typedef struct {
 typedef struct {
     uint8_t real;
     uint8_t weak;
+    uint8_t oneshot;
+    uint8_t oneshot_locked;
 } delayed_action_mods_t;
 
 typedef struct {
@@ -155,7 +157,7 @@ static void held_modifier_remove_slot(uint8_t slot) {
 
     held_modifier_refcounts[index]--;
     if (held_modifier_refcounts[index] == 0) {
-        del_weak_mods(MOD_BIT(action));
+        del_mods(MOD_BIT(action));
         send_keyboard_report();
     }
 }
@@ -187,7 +189,7 @@ static void held_modifier_register(keypos_t key_pos, uint16_t action) {
     };
 
     if (held_modifier_refcounts[index]++ == 0) {
-        add_weak_mods(MOD_BIT(action));
+        add_mods(MOD_BIT(action));
         send_keyboard_report();
     }
 }
@@ -212,8 +214,10 @@ static inline void active_key_reset(void) {
 
 static inline delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
     return (delayed_action_mods_t){
-        .real = mt->saved_mods,
-        .weak = mt->saved_weak_mods,
+        .real           = mt->saved_mods,
+        .weak           = mt->saved_weak_mods,
+        .oneshot        = mt->saved_oneshot_mods,
+        .oneshot_locked = mt->saved_oneshot_locked_mods,
     };
 }
 
@@ -247,6 +251,8 @@ static void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods)
 
     set_mods(mods.real);
     set_weak_mods(mods.weak);
+    set_oneshot_mods(mods.oneshot);
+    set_oneshot_locked_mods(mods.oneshot_locked);
     send_keyboard_report();
 
     action_router_dispatch(action);
@@ -414,6 +420,12 @@ static void promote_to_long_hold(hold_behavior_t long_hold) {
     register_held_action(active_key.key_pos, long_hold.action);
     active_key.held_action_keycode = long_hold.action;
     active_key.hold_fired          = true;
+}
+
+static inline void deactivate_pending_multi_tap_layer_before_lock(uint16_t action) {
+    if (is_layer_key(active_key.keycode) && action_router_is_layer_lock_action(action)) {
+        layer_off(behavior_get_layer(active_key.keycode));
+    }
 }
 
 static void flush_active_key(void) {
@@ -630,13 +642,20 @@ void noah_matrix_scan_user(void) {
         }
     }
 
-    if (multi_tap_hold_elapsed(&multi_tap)) {
-        if (is_layer_key(active_key.keycode) && action_router_is_layer_lock_action(multi_tap.hold.action)) {
-            layer_off(behavior_get_layer(active_key.keycode));
+    if (multi_tap_pending_hold(&multi_tap) && active_key.keycode != KC_NO) {
+        uint16_t elapsed = timer_elapsed(multi_tap.timer);
+
+        if (hold_fires_at_threshold(multi_tap.long_hold) && elapsed >= active_key.longer_hold_term) {
+            deactivate_pending_multi_tap_layer_before_lock(multi_tap.long_hold.action);
+            active_key.long_hold = multi_tap.long_hold;
+            promote_to_long_hold(active_key.long_hold);
+            multi_tap_reset(&multi_tap);
+        } else if (multi_tap_hold_elapsed(&multi_tap)) {
+            deactivate_pending_multi_tap_layer_before_lock(multi_tap.hold.action);
+            active_key.long_hold = multi_tap.long_hold;
+            fire_hold_at_threshold(multi_tap.hold, active_key.long_hold);
+            multi_tap_reset(&multi_tap);
         }
-        active_key.long_hold = multi_tap.long_hold;
-        fire_hold_at_threshold(multi_tap.hold, active_key.long_hold);
-        multi_tap_reset(&multi_tap);
     }
 
     if (multi_tap_expired(&multi_tap)) {

@@ -18,6 +18,8 @@ void multi_tap_reset(multi_tap_t *mt) {
     mt->long_hold       = hold_behavior_none();
     mt->saved_mods      = 0;
     mt->saved_weak_mods = 0;
+    mt->saved_oneshot_mods = 0;
+    mt->saved_oneshot_locked_mods = 0;
 }
 
 bool multi_tap_active(const multi_tap_t *mt) {
@@ -49,6 +51,8 @@ void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action, 
     mt->long_hold       = hold_behavior_none();
     mt->saved_mods      = get_mods();
     mt->saved_weak_mods = get_weak_mods();
+    mt->saved_oneshot_mods = get_oneshot_mods();
+    mt->saved_oneshot_locked_mods = get_oneshot_locked_mods();
 }
 
 static void multi_tap_dispatch_repeated(uint16_t action, uint8_t count, const multi_tap_t *mt, void (*dispatch)(uint16_t, const multi_tap_t *)) {
