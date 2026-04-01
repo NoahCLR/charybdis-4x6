@@ -3,8 +3,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Owns the auto-mouse / pointer-layer arbitration rules that decide when
-// QMK should keep LAYER_POINTER alive and which keycodes count as mouse
-// records for anchoring purposes.
+// QMK should keep the configured auto-mouse target layer alive and which
+// keycodes count as mouse records for anchoring purposes.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

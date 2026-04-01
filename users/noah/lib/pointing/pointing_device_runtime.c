@@ -15,7 +15,7 @@
 
 #if defined(POINTING_DEVICE_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 void noah_pointing_device_init_user(void) {
-    set_auto_mouse_layer(LAYER_POINTER);
+    set_auto_mouse_layer(AUTO_MOUSE_DEFAULT_LAYER);
     set_auto_mouse_enable(true);
     pd_shared_state_init();
 }
@@ -54,7 +54,11 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 
 layer_state_t noah_layer_state_set_user(layer_state_t state) {
 #ifdef POINTING_DEVICE_ENABLE
-    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, LAYER_NAV));
+#    if defined(CHARYBDIS_AUTO_SNIPING_ENABLE)
+    charybdis_set_pointer_sniping_enabled(layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER));
+#    else
+    charybdis_set_pointer_sniping_enabled(false);
+#    endif
     return pointer_layer_policy_apply(state);
 #else
     return state;

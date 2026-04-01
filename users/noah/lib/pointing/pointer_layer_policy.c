@@ -54,24 +54,31 @@ bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
 }
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
-    bool pd_mode_running     = pointer_layer_policy_pd_mode_running();
-    bool auto_mouse_anchored = pointer_layer_policy_auto_mouse_anchored();
+    bool          pd_mode_running     = pointer_layer_policy_pd_mode_running();
+    bool          auto_mouse_anchored = pointer_layer_policy_auto_mouse_anchored();
+    uint8_t       auto_mouse_layer    = get_auto_mouse_layer();
+    layer_state_t auto_mouse_mask     = (layer_state_t)1 << auto_mouse_layer;
+    bool          auto_mouse_active   = layer_state_cmp(state, auto_mouse_layer);
+    bool          nav_active          = layer_state_cmp(state, LAYER_NAV);
 
-    // Keep LAYER_POINTER alive while anchored. Active pd modes must survive
-    // even if QMK drops POINTER underneath an LT-held NAV key.
-    if (pd_mode_running || (auto_mouse_anchored && !layer_state_cmp(state, LAYER_NAV))) {
-        state |= (layer_state_t)1 << LAYER_POINTER;
+    // Keep the configured auto-mouse layer alive while anchored. Active pd
+    // modes must survive even if QMK drops that layer underneath an LT-held
+    // NAV key.
+    if (pd_mode_running || (auto_mouse_anchored && (auto_mouse_layer == LAYER_NAV || !nav_active))) {
+        state |= auto_mouse_mask;
+        auto_mouse_active = true;
     }
 
-    if (layer_state_cmp(state, LAYER_POINTER) && layer_state_cmp(state, LAYER_NAV)) {
-        // NAV takes over from POINTER, but not while a pd mode is running.
+    if (auto_mouse_layer != LAYER_NAV && auto_mouse_active && nav_active) {
+        // NAV takes over from the configured auto-mouse layer, but not while a
+        // pd mode is running.
         if (!auto_mouse_anchored) {
-            state &= ~((layer_state_t)1 << LAYER_POINTER);
+            state &= ~auto_mouse_mask;
         }
-    } else if (layer_state_cmp(state, LAYER_POINTER)) {
-        bool other_layer_active = (state & ~((layer_state_t)1 << LAYER_POINTER)) != 0;
+    } else if (auto_mouse_active) {
+        bool other_layer_active = (state & ~auto_mouse_mask) != 0;
         if (other_layer_active && !auto_mouse_anchored) {
-            state &= ~((layer_state_t)1 << LAYER_POINTER);
+            state &= ~auto_mouse_mask;
         }
     }
 

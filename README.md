@@ -1,9 +1,5 @@
 # Noah Charybdis Userspace
 
-> **Firmware note:** This userspace is updated for QMK `0.32.5` and builds
-> against my `qmk-latest` firmware branch rather than the older
-> `bkb-master`-based setup.
-
 This is the shared userspace for my `noah` Charybdis 4x6 keymaps.
 
 It is intentionally Charybdis-specific. The trackball behavior, split sync,
@@ -14,6 +10,16 @@ This is still a personal configuration, but it is not meant to be a pile of
 one-off hacks. The point is to keep the behavior I use every day centralized
 and editable, so someone changing `keymap.c` or `config.h` can adjust the board
 without having to rework the runtime.
+
+> **Firmware note:** This userspace is updated for QMK `0.32.5` and builds
+> against my `qmk-latest` firmware branch rather than the older
+> `bkb-master`-based setup.
+
+This repo also sits on top of [BastardKB](https://bastardkb.com/), designed by
+Quentin. His work, and the community built around this board, have given me
+hundreds of hours of fun optimizing both the hardware and the firmware, and I
+am very thankful for that. If you are considering buying the hardware, buy it
+from him rather than from a knockoff seller.
 
 ## What This Userspace Is For
 
@@ -34,15 +40,56 @@ If you want to adapt this layout, these are the main files to touch first:
 | File | What You Change There |
 | --- | --- |
 | `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c` | physical layout, combos, macros, and the authored `key_behaviors[]` table |
-| `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h` | tap/hold timing, multi-tap timing, auto-mouse timeout, dragscroll feel, and other keymap-facing behavior |
 | `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h` | layer colors, pointer-mode colors, LED groups, and the auto-mouse gradient |
-| `users/noah/config.h` | split transport settings, pointing-device polling, sensor/report settings, and low-level QMK overrides |
+| `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h` | tap/hold timing, multi-tap timing, auto-mouse target layer and timeout, auto-sniping, dragscroll feel, and other keymap-facing behavior |
+| `users/noah/config.h` | split transport settings, RGB geometry, pointing-device polling, sensor/report settings, and low-level QMK overrides |
 
 In other words:
 
 - if you want to change what a key does, start in `keymap.c`
+- if you want to change how the board looks, start in `rgb_config.h`
 - if you want to change how the keyboard feels, start in the keymap `config.h`
 - if you want to change board plumbing, start in `users/noah/config.h`
+
+## Layers And VIA
+
+The current keymap uses five layers, in this order:
+
+- `0 = LAYER_BASE`: default typing layer
+- `1 = LAYER_NUM`: numpad layer
+- `2 = LAYER_SYM`: symbols, brackets, and pointer/DPI-adjacent shortcuts
+- `3 = LAYER_NAV`: navigation, media, macros, mouse buttons, and the current auto-sniping layer
+- `4 = LAYER_POINTER`: dedicated pointer layout and the default auto-mouse target layer
+
+That layer order matters in a few places:
+
+- VIA is configured for 5 dynamic layers
+- `AUTO_MOUSE_DEFAULT_LAYER` in the keymap `config.h` uses the numeric layer index QMK expects
+- the authored layer names in `keymap.c` and the VIA conversion script need to stay in sync
+
+If you change the layout in VIA and want to bring it back into source, use
+[`via_to_qmk_layout.py`](./via%20layouts/via_to_qmk_layout.py) in
+[`via layouts`](./via%20layouts). It reads
+[`charybdis.layout.json`](./via%20layouts/charybdis.layout.json), maps VIA's
+layer indices and custom keycodes back to this keymap, and can either print
+formatted `LAYOUT()` blocks or write them back into `keymap.c`.
+
+## Combos
+
+Combos are authored directly in `keymap.c`. They are separate from the custom
+key-behavior engine: a combo is just a simultaneous chord that emits one
+keycode or action.
+
+The current combo timing is configured in the keymap `config.h` through
+`COMBO_TERM`. If a combo emits a keycode that also appears in
+`key_behaviors[]`, the emitted key can still reuse the same custom behavior
+handling after the combo resolves.
+
+So the current split is:
+
+- use combos for simultaneous chords
+- use `key_behaviors[]` for tap / hold / longer-hold / multi-tap behavior
+  attached to an authored keycode
 
 ## Key Behavior
 
@@ -62,7 +109,8 @@ This is what makes the current layout possible:
 - pointer keys that can do more than one thing without inventing their own
   timing rules
 
-Default timing lives in `keymaps/noah/config.h`:
+Default timing lives in the keymap `config.h`
+(`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`):
 
 - `TAPPING_TERM = 200`
 - `CUSTOM_TAP_HOLD_TERM = 150`
@@ -122,17 +170,26 @@ Current modes:
 - `VOLUME_MODE`: converts vertical movement into volume control
 - `BRIGHTNESS_MODE`: converts vertical movement into display brightness control
 
+The current keymap also enables Charybdis sniping automatically while
+`LAYER_NAV` is active. That is configured in the keymap `config.h` through
+`CHARYBDIS_AUTO_SNIPING_ENABLE` and `CHARYBDIS_AUTO_SNIPING_LAYER`, so the
+sniping layer is easy to change. The same file also exposes both pointer DPI
+ladders: `CHARYBDIS_MINIMUM_DEFAULT_DPI` and
+`CHARYBDIS_DEFAULT_DPI_CONFIG_STEP` for normal cursor movement, plus
+`CHARYBDIS_MINIMUM_SNIPING_DPI` and `CHARYBDIS_SNIPING_DPI_CONFIG_STEP` for
+sniping mode.
+
 These modes are not all entered the same way from the physical keys. That is
 because the physical mode keys are authored through `key_behaviors[]` in
 `keymap.c`, not hard-wired to one fixed gesture. These entry patterns are fully
 customizable.
 
 - `ARROW_MODE` and `DRAGSCROLL` use a simple pattern: hold for momentary mode,
-  second press to lock
-- `VOLUME_MODE` uses the second press for mute
+  quick second tap to lock
+- `VOLUME_MODE` uses the quick second tap for mute
 - `BRIGHTNESS_MODE` is just a straight mode key
 - the physical `PINCH_MODE` key is the custom exception: first hold enters
-  `PINCH_MODE`, a second quick press triggers Accessibility Zoom, and a second
+  `PINCH_MODE`, a second quick tap triggers Accessibility Zoom, and a quick second
   hold enters `ZOOM_MODE`
 
 For the user-facing pointer behavior, see
@@ -140,18 +197,22 @@ For the user-facing pointer behavior, see
 
 ## Auto-Mouse And RGB
 
-`LAYER_POINTER` is an auto-mouse layer. Moving the trackball brings it up
-automatically, and it clears after `AUTO_MOUSE_TIME` unless pointer activity or
-an active mode keeps it alive.
+`LAYER_POINTER` is the default auto-mouse layer in this keymap. Moving the
+trackball brings the configured auto-mouse layer up automatically, and it
+clears after `AUTO_MOUSE_TIME` unless pointer activity or an active mode keeps
+it alive. That behavior is configured in the keymap `config.h` through
+`POINTING_DEVICE_AUTO_MOUSE_ENABLE`, `AUTO_MOUSE_DEFAULT_LAYER`, and
+`AUTO_MOUSE_TIME`.
 
 RGB is used as feedback, not decoration:
 
 - active layers can render layer colors
 - active pointer modes can render a mode color
-- the pointer layer uses a white-to-red timeout gradient instead of a fixed
-  solid color
+- the configured auto-mouse layer uses a white-to-red timeout gradient instead
+  of a fixed solid color
 
-Those colors and LED groups live in `keymaps/noah/rgb_config.h`.
+Those colors and LED groups live in the keymap `rgb_config.h`
+(`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`).
 
 ## If You Want To Go Deeper
 

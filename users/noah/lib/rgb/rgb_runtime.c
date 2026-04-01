@@ -52,6 +52,9 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 
     for (int8_t i = LAYER_COUNT - 1; i > 0; i--) {
         if (!layer_state_cmp(layer_state, i)) continue;
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+        if (i == (int8_t)get_auto_mouse_layer()) continue;
+#    endif
         if (layer_colors[i].s == 0 && layer_colors[i].v == 0) continue;
         rgb_set_both_halves(layer_rgb[i], led_min, led_max);
         layer_painted = true;

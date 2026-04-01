@@ -6,14 +6,16 @@ If you have not read it yet, start with [INTERACTION_MODEL.md](./INTERACTION_MOD
 
 ## Pointer Layer
 
-`LAYER_POINTER` is not a normal layer you camp on. It is an auto-mouse layer.
+`LAYER_POINTER` is the default auto-mouse layer in this keymap. It is not a
+normal layer you camp on.
 
-- Move the trackball and it appears automatically.
+- Move the trackball and the configured auto-mouse layer appears automatically.
 - Stop moving for about `AUTO_MOUSE_TIME` (`1200 ms`) and it clears.
 - If a pointing-device mode is active or locked, the pointer behavior stays alive.
 - While the layer is active, `Space` can still be held for `NUM`.
 
-The pointer layer uses a white-to-red timeout gradient instead of a fixed color.
+The configured auto-mouse layer uses a white-to-red timeout gradient instead of
+a fixed color.
 
 ## Where The Keys Live
 
@@ -25,7 +27,8 @@ The most important pointer keys are grouped on the right half:
 | pointer bottom row | `VOLUME_MODE`, `MS_BTN1`, `MS_BTN2`, `DRAGSCROLL` |
 | nav layer fallback | `MS_BTN1`, `MS_BTN2`, `DRAGSCROLL`, `ARROW_MODE` |
 
-That means the full pointer workflow is available either from the auto pointer layer or, in a more limited form, directly from `NAV`.
+That means the full pointer workflow is available either from the configured
+auto-mouse layer or, in a more limited form, directly from `NAV`.
 
 ## Common Mode Rules
 
@@ -95,7 +98,8 @@ These are the real press sequences the current firmware implements.
 
 ### Example 1: App Zoom Via Command-Scroll
 
-1. Move the trackball so `LAYER_POINTER` comes up.
+1. Move the trackball so the configured auto-mouse layer comes up
+   (currently `LAYER_POINTER`).
 2. Press and hold `PINCH_MODE`.
 3. Roll the trackball.
 

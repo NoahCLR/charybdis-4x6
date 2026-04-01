@@ -3,10 +3,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // QMK automatically includes users/noah/config.h before the keyboard keymap's
-// own config.h. This file now carries split transport settings, low-level
-// pointing-device plumbing, and shared QMK behavior overrides for the current
-// Charybdis setup, while the keymap config holds typing, RGB, and pointer
-// behavior.
+// own config.h. This file now carries split transport settings, hardware-level
+// board assumptions, low-level pointing-device plumbing, and shared QMK
+// behavior overrides for the current Charybdis setup, while the keymap config
+// holds typing, RGB behavior, and pointer policy.
 //
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
@@ -45,6 +45,25 @@
 #    define SPLIT_ACTIVITY_ENABLE
 
 #endif // SPLIT_KEYBOARD
+
+// ─── RGB hardware geometry ──────────────────────────────────────────────────
+
+#ifdef RGB_MATRIX_ENABLE
+
+// Total LED count across both halves.
+// The right (pointer) half has 2 dummy LED positions, but they still count.
+#    ifdef RGB_MATRIX_LED_COUNT
+#        undef RGB_MATRIX_LED_COUNT
+#    endif
+#    define RGB_MATRIX_LED_COUNT 58
+
+// How the LEDs are split between halves: 29 left, 29 right.
+#    ifdef RGB_MATRIX_SPLIT
+#        undef RGB_MATRIX_SPLIT
+#    endif
+#    define RGB_MATRIX_SPLIT {29, 29}
+
+#endif // RGB_MATRIX_ENABLE
 
 // ─── Pointing device (trackball) ────────────────────────────────────────────
 
