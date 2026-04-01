@@ -244,6 +244,6 @@ These docs are the next place to look:
 
 ## A Little Show-Off Of My Build
 
-<p align="center">
+<div align="center">
 <video src="https://github.com/user-attachments/assets/fb5749e2-6f30-44de-99d7-9bd47f94659a" controls></video>
-</p>
+</div>
