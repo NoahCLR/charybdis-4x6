@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "noah.h"
+#include "noah_keymap.h"
 #include "pointing_device_modes.h"
 #include "pointer_layer_policy.h"
 
@@ -16,7 +16,7 @@ static inline bool pointer_layer_policy_is_layer_hold_key(uint16_t keycode) {
 }
 
 static inline bool pointer_layer_policy_pd_mode_running(void) {
-    return pd_mode_flags != 0 || pd_mode_locked_flags != 0;
+    return pd_any_mode_active();
 }
 
 static bool pointer_layer_policy_is_pd_mode_key(uint16_t keycode) {

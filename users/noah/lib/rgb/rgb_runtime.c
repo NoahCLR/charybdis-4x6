@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "noah.h"
+#include "noah_keymap.h"
 #include "rgb_config.h"
 #include "../pointing/pointing_device_modes.h"
 #include "rgb_automouse.h"

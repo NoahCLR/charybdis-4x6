@@ -1,25 +1,15 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Split-Role Override
+// Held Action Ownership
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Needed when both halves have their own USB connection so they do not both
-// detect USB and fight over who is master.  Build with FORCE_MASTER=yes or
-// FORCE_SLAVE=yes in rules.mk to activate.
+// Tracks held pure modifiers separately from the tap/hold FSM so those mods
+// stay pressed until the owning physical switch is released.
 // ────────────────────────────────────────────────────────────────────────────
+#pragma once
 
 #include QMK_KEYBOARD_H // QMK
 
-#if defined(FORCE_SLAVE)
-#    include "usb_util.h" // QMK
-#endif
-
-#if defined(FORCE_MASTER)
-bool is_keyboard_master_impl(void) {
-    return true;
-}
-#elif defined(FORCE_SLAVE)
-bool is_keyboard_master_impl(void) {
-    usb_disconnect();
-    return false;
-}
-#endif
+void held_action_register(keypos_t key_pos, uint16_t action);
+void held_action_unregister(keypos_t key_pos, uint16_t action);
+bool held_action_survives_flush(uint16_t action);
+bool held_modifier_release_owned_by_key(keypos_t key_pos);

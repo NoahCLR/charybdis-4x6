@@ -20,11 +20,11 @@ If you have not read them yet, also see:
 
 If you hand this task to an agent, give it this exact job:
 
-1. Add a new custom keycode in `users/noah/noah.h`.
+1. Add a new custom keycode in `users/noah/noah_keymap.h`.
 2. Keep the pd-mode keycodes as one dense contiguous range from `VOLUME_MODE`
    through the last pd-mode keycode immediately before `PD_MODE_LOCK_BASE`.
 3. Update the mode flag list and `PD_MODE_COUNT` in `users/noah/lib/pointing/pd_mode_flags.h`.
-4. Register the mode in `users/noah/lib/pointing/pointing_device_modes.c`.
+4. Register the mode in `users/noah/lib/pointing/pd_mode_registry.c`.
 5. Add handler/reset declarations in `users/noah/lib/pointing/pointing_device_mode_handlers.h` and implementations in `users/noah/lib/pointing/pointing_device_mode_handlers.c`, if the mode needs them.
 6. Add authored key behavior and physical placement in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`.
 7. Add an RGB color in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`.
@@ -58,7 +58,7 @@ Current examples:
 
 These are the rules most likely to break the system if you miss one.
 
-1. The pd-mode keycodes in `users/noah/noah.h` must stay contiguous:
+1. The pd-mode keycodes in `users/noah/noah_keymap.h` must stay contiguous:
    `VOLUME_MODE ... <last mode> ... PD_MODE_LOCK_BASE`.
 2. `LOCK_PD_MODE(mode_keycode_)` computes offsets from `VOLUME_MODE`, so gaps in
    that keycode range will break lock actions.
@@ -66,7 +66,7 @@ These are the rules most likely to break the system if you miss one.
    the number of mode flags, the number of rows in `pd_modes[]`, and the
    `_Static_assert` in `users/noah/lib/pointing/pointing_device_modes.h`.
 4. Mode flags are currently stored in `uint8_t` values:
-   `users/noah/lib/pointing/pd_mode_flags.h` and `users/noah/lib/pointing/split_sync.h`.
+   `users/noah/lib/pointing/pd_mode_flags.h` and `users/noah/lib/state/pd_shared_state.h`.
    That means the current design supports at most 8 modes.
 
 If you add a 9th mode, you must widen the flag storage and the split-sync packet
@@ -76,10 +76,10 @@ before the new mode is safe.
 
 Normal add-mode work lives in these files:
 
-- `users/noah/noah.h`
+- `users/noah/noah_keymap.h`
 - `users/noah/lib/pointing/pd_mode_flags.h`
 - `users/noah/lib/pointing/pointing_device_modes.h`
-- `users/noah/lib/pointing/pointing_device_modes.c`
+- `users/noah/lib/pointing/pd_mode_registry.c`
 - `users/noah/lib/pointing/pointing_device_mode_handlers.h`
 - `users/noah/lib/pointing/pointing_device_mode_handlers.c`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
@@ -91,7 +91,7 @@ Files you usually do not need to touch:
 - `users/noah/lib/pointing/pd_mode_key_runtime.c`
 - `users/noah/lib/pointing/pointing_device_runtime.c`
 - `users/noah/lib/pointing/pointer_layer_policy.c`
-- `users/noah/lib/pointing/split_sync.c`
+- `users/noah/lib/state/pd_shared_state.c`
 - `users/noah/lib/rgb/rgb_runtime.c`
 
 ## Fastest Safe Path
@@ -100,7 +100,7 @@ Use this when the new mode behaves like a normal pd mode.
 
 ### 1. Add The Custom Keycode
 
-Edit `users/noah/noah.h`.
+Edit `users/noah/noah_keymap.h`.
 
 Add the new mode keycode inside the existing pd-mode block, immediately before
 `PD_MODE_LOCK_BASE`.
@@ -210,7 +210,7 @@ void reset_example_mode(void) {
 
 ### 6. Register The Mode
 
-Edit `users/noah/lib/pointing/pointing_device_modes.c`.
+Edit `users/noah/lib/pointing/pd_mode_registry.c`.
 
 Add a row to `pd_modes[]`:
 
@@ -281,7 +281,7 @@ specific LED subset highlighted.
 Edit `via layouts/via_to_qmk_layout.py`.
 
 If the new keycode can appear in VIA exports, append it to `PD_MODE_KEYCODES`
-in the same order as the enum in `users/noah/noah.h`.
+in the same order as the enum in `users/noah/noah_keymap.h`.
 
 If you skip this, regenerated layouts may emit stale `CUSTOM(n)` tokens or map
 the wrong symbolic keycode.
@@ -306,7 +306,7 @@ Examples:
 - hold a modifier while the mode is active
 - keep auto-mouse alive while the mode is locked
 
-Edit `users/noah/lib/pointing/pointing_device_modes.c`.
+Edit `users/noah/lib/pointing/pd_mode_registry.c`.
 
 Current examples to copy:
 
@@ -361,7 +361,7 @@ This is the actual control path for pd modes:
 2. `users/noah/lib/pointing/pd_mode_key_runtime.c` handles hold, release, tap, double-tap, lock toggling, and alternate-mode entry.
 3. `users/noah/lib/pointing/pointing_device_runtime.c` calls the first active handler in `pd_modes[]`.
 4. `users/noah/lib/pointing/pointer_layer_policy.c` keeps the pointer layer alive while modes are active or locked.
-5. `users/noah/lib/pointing/split_sync.c` mirrors active and locked flags to the other half.
+5. `users/noah/lib/state/pd_shared_state.c` mirrors active and locked flags to the other half.
 6. `users/noah/lib/rgb/rgb_runtime.c` renders the mode overlay on the right half.
 
 That is why most new modes are mostly a data-registration job, not a runtime rewrite.
@@ -382,7 +382,7 @@ That is why most new modes are mostly a data-registration job, not a runtime rew
 
 A new mode is done when all of the following are true:
 
-- The keycode exists in `users/noah/noah.h` and the pd-mode range is still dense.
+- The keycode exists in `users/noah/noah_keymap.h` and the pd-mode range is still dense.
 - `PD_MODE_COUNT`, the flag list, and the static assert all match.
 - The mode exists in `pd_modes[]`.
 - Any needed handler, key handler, and reset function exist.
@@ -411,10 +411,10 @@ After compiling, verify the real behavior on hardware:
 
 For a normal new mode, the minimum expected diff usually includes:
 
-- `users/noah/noah.h`
+- `users/noah/noah_keymap.h`
 - `users/noah/lib/pointing/pd_mode_flags.h`
 - `users/noah/lib/pointing/pointing_device_modes.h`
-- `users/noah/lib/pointing/pointing_device_modes.c`
+- `users/noah/lib/pointing/pd_mode_registry.c`
 - `users/noah/lib/pointing/pointing_device_mode_handlers.h`
 - `users/noah/lib/pointing/pointing_device_mode_handlers.c`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`

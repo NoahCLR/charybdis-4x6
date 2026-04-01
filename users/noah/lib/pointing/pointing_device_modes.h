@@ -3,14 +3,16 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Full public interface for the pointing-device mode system.
-// Implementation lives in pointing_device_modes.c.
+// Implementations are split across pd_mode_registry.c and pd_mode_state.c.
 //
 // Non-pointing modules that only need mode flag constants or read-only state
 // queries should include pd_mode_flags.h instead of this header.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "noah.h"          // VOLUME_MODE, BRIGHTNESS_MODE, etc.
+#include QMK_KEYBOARD_H // QMK
+
+#include "noah_keymap.h"   // VOLUME_MODE, BRIGHTNESS_MODE, etc.
 #include "pd_mode_flags.h" // PD_MODE_* constants, state queries
 
 #if defined(POINTING_DEVICE_ENABLE)

@@ -4,9 +4,9 @@
 
 #include QMK_KEYBOARD_H // QMK
 
+#include "../state/pd_shared_state.h"
 #include "pd_mode_key_runtime.h"
 #include "pointing_device_modes.h"
-#include "split_sync.h"
 
 #if defined(POINTING_DEVICE_ENABLE)
 
@@ -54,7 +54,7 @@ bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t 
             if (action != KC_NO) {
                 hooks->dispatch_action(hooks->context, action);
                 pd_mode_press.keycode = KC_NO;
-                pd_state_sync();
+                pd_shared_state_sync();
                 return true;
             }
 
@@ -120,7 +120,7 @@ bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t 
     }
 
     if (state_changed) {
-        pd_state_sync();
+        pd_shared_state_sync();
     }
     return true;
 }
@@ -143,7 +143,7 @@ void pd_mode_key_runtime_scan(void) {
     state_changed             = true;
 
     if (state_changed) {
-        pd_state_sync();
+        pd_shared_state_sync();
     }
 }
 

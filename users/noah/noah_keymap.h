@@ -1,18 +1,14 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Noah Userspace Header
+// Noah Keymap IDs
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Shared layer and custom-keycode definitions used by the keymap data and
-// userspace runtime modules.
-//
-// Authored behavior tables, macro implementations, combos, and physical
-// layouts still live in the keyboard keymap.
+// Shared layer and custom-keycode declarations used by the keymap-authored
+// data tables and by runtime modules that need to interpret those IDs.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include "quantum_keycodes.h"
 #include QMK_KEYBOARD_H // QMK
-#include "lib/key/key_behavior.h"
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
 //
@@ -45,7 +41,7 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAM
 // key_behaviors[] multi-tap system.
 // PD_MODE_LOCK_BASE reserves one lock/toggle action per pd-mode keycode.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
-// actions authored in key_behaviors[].  Use the LOCK_LAYER(n) macro there.
+// actions authored in key_behaviors[]. Use the LOCK_LAYER(n) macro there.
 
 enum custom_keycodes {
     MACRO_0 = SAFE_RANGE,
@@ -80,19 +76,3 @@ enum custom_keycodes {
 
 bool                          macro_dispatch(uint16_t keycode);
 extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
-
-// Shared userspace hook implementations. users/noah/noah.c exposes the QMK
-// *_user hooks and forwards to these helpers before the optional weak
-// *_keymap delegates in keymap.c.
-bool           noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
-bool           noah_process_record_user(uint16_t keycode, keyrecord_t *record);
-void           noah_matrix_scan_user(void);
-void           noah_keyboard_post_init_user(void);
-layer_state_t  noah_layer_state_set_user(layer_state_t state);
-report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report);
-void           noah_pointing_device_init_user(void);
-bool           noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record);
-bool           noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max);
-
-// Authored macros and physical keymap layouts live in the keyboard keymap so
-// the main QMK entrypoint still shows the actual authored layout.

@@ -8,17 +8,18 @@
 //   - keymaps[][]
 //   - key_combos[]
 //
-// Shared layer and custom-keycode declarations live in users/noah/noah.h.
+// Shared layer and custom-keycode declarations live in users/noah/noah_keymap.h.
 // Runtime processing lives in the userspace runtime modules under users/noah/lib/.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "noah.h"
+#include "noah_keymap.h"
+#include "lib/key/key_behavior.h"
 
 // ─── Macros ─────────────────────────────────────────────────────────────────
 // macro_dispatch() handles custom macro keycodes used by key behaviors.
 // Available macro slots are MACRO_0 through MACRO_15.
 // Add or edit cases here to define what those macros send.
-// If you need more slots than MACRO_15, extend enum custom_keycodes in users/noah/noah.h.
+// If you need more slots than MACRO_15, extend enum custom_keycodes in users/noah/noah_keymap.h.
 
 bool macro_dispatch(uint16_t keycode) {
     switch (keycode) {

@@ -1,6 +1,6 @@
 #include QMK_KEYBOARD_H // QMK
 
-#include "noah.h"
+#include "noah_runtime.h"
 
 __attribute__((weak)) bool get_hold_on_other_key_press_keymap(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;

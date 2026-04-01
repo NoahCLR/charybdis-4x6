@@ -16,16 +16,19 @@ LTO_ENABLE = yes
 SRC += noah.c
 SRC += lib/split_role.c
 SRC += lib/key/key_runtime.c
-SRC += lib/key/action_router.c
+SRC += lib/key/delayed_action.c
+SRC += lib/key/held_action.c
+SRC += lib/action/action_dispatch.c
 SRC += lib/key/multi_tap_engine.c
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
     SRC += lib/pointing/pointing_device_runtime.c
     SRC += lib/pointing/pd_mode_key_runtime.c
+    SRC += lib/pointing/pd_mode_state.c
+    SRC += lib/pointing/pd_mode_registry.c
     SRC += lib/pointing/pointer_layer_policy.c
-    SRC += lib/pointing/pointing_device_modes.c
     SRC += lib/pointing/pointing_device_mode_handlers.c
-    SRC += lib/pointing/split_sync.c
+    SRC += lib/state/pd_shared_state.c
 endif
 
 ifeq ($(strip $(RGB_MATRIX_ENABLE)), yes)

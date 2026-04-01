@@ -4,10 +4,10 @@
 
 #include QMK_KEYBOARD_H // QMK
 
-#include "noah.h"
+#include "noah_keymap.h"
+#include "../state/pd_shared_state.h"
 #include "pointing_device_modes.h"
 #include "pointer_layer_policy.h"
-#include "split_sync.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
@@ -17,7 +17,7 @@
 void noah_pointing_device_init_user(void) {
     set_auto_mouse_layer(LAYER_POINTER);
     set_auto_mouse_enable(true);
-    split_sync_init();
+    pd_shared_state_init();
 }
 
 bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -38,7 +38,7 @@ bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 #ifdef POINTING_DEVICE_ENABLE
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    pd_state_sync_tick();
+    pd_shared_state_sync_tick();
 #    endif
 
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {

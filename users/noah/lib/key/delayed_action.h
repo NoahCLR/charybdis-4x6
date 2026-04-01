@@ -1,25 +1,23 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Split-Role Override
+// Delayed Action Dispatch
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Needed when both halves have their own USB connection so they do not both
-// detect USB and fight over who is master.  Build with FORCE_MASTER=yes or
-// FORCE_SLAVE=yes in rules.mk to activate.
+// Replays authored actions using the modifier state captured when a multi-tap
+// sequence started resolving.
 // ────────────────────────────────────────────────────────────────────────────
+#pragma once
 
 #include QMK_KEYBOARD_H // QMK
 
-#if defined(FORCE_SLAVE)
-#    include "usb_util.h" // QMK
-#endif
+#include "multi_tap_engine.h"
 
-#if defined(FORCE_MASTER)
-bool is_keyboard_master_impl(void) {
-    return true;
-}
-#elif defined(FORCE_SLAVE)
-bool is_keyboard_master_impl(void) {
-    usb_disconnect();
-    return false;
-}
-#endif
+typedef struct {
+    uint8_t real;
+    uint8_t weak;
+    uint8_t oneshot;
+    uint8_t oneshot_locked;
+} delayed_action_mods_t;
+
+delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt);
+void                  dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods);
+void                  dispatch_multi_tap_action(uint16_t action, const multi_tap_t *mt);

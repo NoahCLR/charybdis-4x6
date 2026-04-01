@@ -26,9 +26,10 @@
 
 // ─── Read-only state queries ────────────────────────────────────────────────
 
-extern uint8_t pd_mode_flags;
-extern uint8_t pd_mode_locked_flags;
+uint8_t pd_mode_active_snapshot(void);
+uint8_t pd_mode_locked_snapshot(void);
 
 bool pd_mode_active(uint8_t mode);
 bool pd_mode_locked(uint8_t mode);
+bool pd_any_mode_active(void);
 bool pd_any_mode_locked(void);
