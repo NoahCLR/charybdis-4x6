@@ -19,6 +19,13 @@ If you want to change how RGB is rendered, look at:
 - `users/noah/lib/rgb/rgb_automouse.c`
 - `users/noah/lib/rgb/rgb_helpers.h`
 
+## HSV Quick Reference
+
+The color values in `rgb_config.h` are authored as `hsv_t` structs. Use this
+quick reference when picking hue values:
+
+![HSV quick reference](./media/hsv_colors.jpg)
+
 ## What `rgb_config.h` Controls
 
 ### `layer_colors[]`

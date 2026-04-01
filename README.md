@@ -241,3 +241,5 @@ These docs are the next place to look:
   auto-mouse gradient configuration
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
+
+<video src="./docs/media/charybdis.mp4" controls muted playsinline preload="metadata"></video>
