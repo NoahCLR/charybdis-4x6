@@ -242,4 +242,4 @@ These docs are the next place to look:
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
 
-<video src="./docs/media/charybdis.mp4" controls muted playsinline preload="metadata"></video>
+https://github.com/NoahCLR/charybdis-4x6/raw/refs/heads/refactor/userspace-modularity/docs/media/charybdis.mp4
