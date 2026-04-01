@@ -76,6 +76,16 @@ bool macro_dispatch(uint16_t keycode) {
 }
 
 // ─── Combos ─────────────────────────────────────────────────────────────────
+//
+// key_combos[] maps simultaneous key chords to a single output keycode.
+// Each combo_keys_* array lists the keys that must be pressed together;
+// combos can use two or more keys and must end with COMBO_END.
+//
+// If a combo emits a keycode that also has a row in key_behaviors[],
+// that emitted key can reuse the same custom behavior handling.
+//
+// Combo timing is tuned in config.h via COMBO_TERM.
+// Current default: COMBO_TERM = 50 ms.
 
 const uint16_t PROGMEM combo_keys_1[] = {KC_D, LT(LAYER_NAV, KC_F), COMBO_END};
 
@@ -94,14 +104,14 @@ combo_t key_combos[] = {
 // tap_counts[3] = quadruple tap
 //
 // timing defaults currently set in config.h:
-//   - TAPPING_TERM = 200
+//   - TAPPING_TERM = 200 ms
 //     used by built-in QMK LT()/MT() keys and by LT() rows here when
 //     .tap_hold_term is omitted
-//   - CUSTOM_TAP_HOLD_TERM = 150
+//   - CUSTOM_TAP_HOLD_TERM = 150 ms
 //     default first hold threshold for custom key_behavior rows
-//   - CUSTOM_LONGER_HOLD_TERM = 400
+//   - CUSTOM_LONGER_HOLD_TERM = 400 ms
 //     default longer-hold threshold
-//   - CUSTOM_MULTI_TAP_TERM = 150
+//   - CUSTOM_MULTI_TAP_TERM = 150 ms
 //     max gap allowed between taps in a multi-tap sequence
 //   - KEY_BEHAVIOR_MAX_TAP_COUNT = 4
 //     current runtime limit for tap_counts[] entries
@@ -167,9 +177,9 @@ combo_t key_combos[] = {
 // illustrative example row with custom timings and mixed tap/hold combinations:
 // {
 //     .keycode = KC_EXAMPLE,
-//     .tap_hold_term = 150,
-//     .longer_hold_term = 400,
-//     .multi_tap_term = 150,
+//     .tap_hold_term = 150, // overrides the default tap-vs-hold threshold for this key
+//     .longer_hold_term = 400, // overrides the default longer hold threshold for this key
+//     .multi_tap_term = 150, // overrides the default multi-tap threshold for this key
 //     .tap_counts =
 //         {
 //             [0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_EXAMPLE))}, // normal tap, exclusive long hold
