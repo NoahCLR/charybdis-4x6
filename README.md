@@ -243,5 +243,5 @@ These docs are the next place to look:
   pointing-device mode safely
 
 <p align="center">
-<video src="https://github.com/user-attachments/assets/fb5749e2-6f30-44de-99d7-9bd47f94659a" width="80%" controls></video>
+<video src="https://github.com/user-attachments/assets/fb5749e2-6f30-44de-99d7-9bd47f94659a" controls></video>
 </p>
