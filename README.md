@@ -243,5 +243,5 @@ These docs are the next place to look:
   pointing-device mode safely
 
 <p align="center" width="100%">
-<video src="https://github.com/NoahCLR/charybdis-4x6/raw/refs/heads/refactor/userspace-modularity/docs/media/charybdis.mp4" width="80%" controls></video>
+<video src="https://github.com/user-attachments/assets/fb5749e2-6f30-44de-99d7-9bd47f94659a" width="80%" controls></video>
 </p>
