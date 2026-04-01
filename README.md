@@ -242,4 +242,6 @@ These docs are the next place to look:
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
 
-https://github.com/NoahCLR/charybdis-4x6/raw/refs/heads/refactor/userspace-modularity/docs/media/charybdis.mp4
+<p align="center" width="100%">
+<video src="https://github.com/user-attachments/assets/563d36e5-1c92-49e6-aa88-c873a20ddf1d" width="80%" controls></video>
+</p>
