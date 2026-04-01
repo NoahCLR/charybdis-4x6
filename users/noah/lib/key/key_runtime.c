@@ -26,6 +26,7 @@
 typedef struct {
     uint16_t        timer;
     uint16_t        keycode;
+    keypos_t        key_pos;
     bool            hold_fired;
     uint16_t        held_action_keycode;
     uint16_t        tap_action;
@@ -50,6 +51,14 @@ typedef struct {
     uint8_t oneshot_locked;
 } key_runtime_saved_mods_t;
 
+// A held pure modifier is owned by the physical switch that started it, not by
+// whichever custom key the tap/hold FSM is currently resolving.
+typedef struct {
+    bool     active;
+    keypos_t key_pos;
+    uint16_t action;
+} held_modifier_binding_t;
+
 #define ACTIVE_KEY_STATE_INIT                           \
     {                                                   \
         .keycode             = KC_NO,                   \
@@ -60,6 +69,9 @@ typedef struct {
     }
 
 static active_key_state_t active_key = ACTIVE_KEY_STATE_INIT;
+// Pure modifiers must stay held even after the tap/hold FSM moves on to another custom key.
+static held_modifier_binding_t held_modifiers[8] = {0};
+static uint8_t                 held_modifier_refcounts[8] = {0};
 
 static inline uint8_t behavior_get_layer(uint16_t keycode) {
     return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
@@ -67,6 +79,128 @@ static inline uint8_t behavior_get_layer(uint16_t keycode) {
 
 static inline bool is_layer_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
+}
+
+static inline bool keypos_equal(keypos_t lhs, keypos_t rhs) {
+    return lhs.row == rhs.row && lhs.col == rhs.col;
+}
+
+static inline bool active_key_matches(uint16_t keycode, keypos_t key_pos) {
+    return active_key.keycode == keycode && keypos_equal(active_key.key_pos, key_pos);
+}
+
+static bool action_is_pure_modifier_keycode(uint16_t action) {
+    switch (action) {
+        case KC_LEFT_CTRL:
+        case KC_LEFT_SHIFT:
+        case KC_LEFT_ALT:
+        case KC_LEFT_GUI:
+        case KC_RIGHT_CTRL:
+        case KC_RIGHT_SHIFT:
+        case KC_RIGHT_ALT:
+        case KC_RIGHT_GUI:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static int8_t held_modifier_index_for_action(uint16_t action) {
+    switch (action) {
+        case KC_LEFT_CTRL:
+            return 0;
+        case KC_LEFT_SHIFT:
+            return 1;
+        case KC_LEFT_ALT:
+            return 2;
+        case KC_LEFT_GUI:
+            return 3;
+        case KC_RIGHT_CTRL:
+            return 4;
+        case KC_RIGHT_SHIFT:
+            return 5;
+        case KC_RIGHT_ALT:
+            return 6;
+        case KC_RIGHT_GUI:
+            return 7;
+        default:
+            return -1;
+    }
+}
+
+static int8_t held_modifier_find_slot_for_key(keypos_t key_pos) {
+    for (uint8_t i = 0; i < ARRAY_SIZE(held_modifiers); i++)
+        if (held_modifiers[i].active && keypos_equal(held_modifiers[i].key_pos, key_pos)) return (int8_t)i;
+
+    return -1;
+}
+
+static int8_t held_modifier_find_free_slot(void) {
+    for (uint8_t i = 0; i < ARRAY_SIZE(held_modifiers); i++)
+        if (!held_modifiers[i].active) return (int8_t)i;
+
+    return -1;
+}
+
+static void held_modifier_remove_slot(uint8_t slot) {
+    uint16_t action = held_modifiers[slot].action;
+    int8_t   index  = held_modifier_index_for_action(action);
+
+    held_modifiers[slot].active = false;
+    held_modifiers[slot].action = KC_NO;
+
+    if (index < 0 || held_modifier_refcounts[index] == 0) {
+        return;
+    }
+
+    held_modifier_refcounts[index]--;
+    if (held_modifier_refcounts[index] == 0) {
+        del_weak_mods(MOD_BIT(action));
+        send_keyboard_report();
+    }
+}
+
+static void held_modifier_register(keypos_t key_pos, uint16_t action) {
+    int8_t slot  = held_modifier_find_slot_for_key(key_pos);
+    int8_t index = held_modifier_index_for_action(action);
+
+    if (index < 0) {
+        return;
+    }
+
+    if (slot >= 0) {
+        if (held_modifiers[slot].action == action) {
+            return;
+        }
+        held_modifier_remove_slot((uint8_t)slot);
+    } else {
+        slot = held_modifier_find_free_slot();
+        if (slot < 0) {
+            return;
+        }
+    }
+
+    held_modifiers[slot] = (held_modifier_binding_t){
+        .active  = true,
+        .key_pos = key_pos,
+        .action  = action,
+    };
+
+    if (held_modifier_refcounts[index]++ == 0) {
+        add_weak_mods(MOD_BIT(action));
+        send_keyboard_report();
+    }
+}
+
+static bool held_modifier_unregister(keypos_t key_pos) {
+    int8_t slot = held_modifier_find_slot_for_key(key_pos);
+
+    if (slot < 0) {
+        return false;
+    }
+
+    held_modifier_remove_slot((uint8_t)slot);
+    return true;
 }
 
 // ─── Key Behavior State ──────────────────────────────────────────────────────
@@ -124,10 +258,33 @@ static void dispatch_multi_tap_action(uint16_t action, const multi_tap_t *mt) {
     dispatch_delayed_action(action, delayed_action_mods_from_multi_tap(mt));
 }
 
-static inline void active_key_track(uint16_t keycode, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired) {
+static inline void register_held_action(keypos_t key_pos, uint16_t action) {
+    if (action_is_pure_modifier_keycode(action)) {
+        held_modifier_register(key_pos, action);
+        return;
+    }
+
+    register_code16(action);
+}
+
+static inline void unregister_held_action(keypos_t key_pos, uint16_t action) {
+    if (action_is_pure_modifier_keycode(action)) {
+        held_modifier_unregister(key_pos);
+        return;
+    }
+
+    unregister_code16(action);
+}
+
+static inline bool held_action_survives_flush(uint16_t action) {
+    return action_is_pure_modifier_keycode(action);
+}
+
+static inline void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired) {
     active_key = (active_key_state_t){
         .timer               = timer_read(),
         .keycode             = keycode,
+        .key_pos             = key_pos,
         .hold_fired          = hold_fired,
         .held_action_keycode = KC_NO,
         .tap_action          = tap_action,
@@ -222,7 +379,7 @@ static uint16_t select_release_hold_action(uint16_t elapsed, uint16_t hold_actio
 static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_hold) {
     if (action_router_is_layer_lock_action(hold.action) || !hold_registers_while_held(hold)) {
         if (active_key.held_action_keycode != KC_NO) {
-            unregister_code16(active_key.held_action_keycode);
+            unregister_held_action(active_key.key_pos, active_key.held_action_keycode);
             active_key.held_action_keycode = KC_NO;
         }
         action_router_dispatch(hold.action);
@@ -236,7 +393,7 @@ static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_ho
         return;
     }
 
-    register_code16(hold.action);
+    register_held_action(active_key.key_pos, hold.action);
     active_key.held_action_keycode = hold.action;
     active_key.hold_fired          = !long_hold.present;
     active_key.hold_one_shot_fired = false;
@@ -244,7 +401,7 @@ static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_ho
 
 static void promote_to_long_hold(hold_behavior_t long_hold) {
     if (active_key.held_action_keycode != KC_NO) {
-        unregister_code16(active_key.held_action_keycode);
+        unregister_held_action(active_key.key_pos, active_key.held_action_keycode);
         active_key.held_action_keycode = KC_NO;
     }
 
@@ -254,7 +411,7 @@ static void promote_to_long_hold(hold_behavior_t long_hold) {
         return;
     }
 
-    register_code16(long_hold.action);
+    register_held_action(active_key.key_pos, long_hold.action);
     active_key.held_action_keycode = long_hold.action;
     active_key.hold_fired          = true;
 }
@@ -264,8 +421,8 @@ static void flush_active_key(void) {
 
     if (active_key.hold_fired || active_key.held_action_keycode != KC_NO) {
         active_key.hold_fired = false;
-        if (active_key.held_action_keycode != KC_NO) {
-            unregister_code16(active_key.held_action_keycode);
+        if (active_key.held_action_keycode != KC_NO && !held_action_survives_flush(active_key.held_action_keycode)) {
+            unregister_held_action(active_key.key_pos, active_key.held_action_keycode);
             active_key.held_action_keycode = KC_NO;
         }
     } else if (!is_layer_key(active_key.keycode) && active_key.tap_action != KC_NO) {
@@ -302,7 +459,7 @@ static bool process_key_behavior_press(uint16_t keycode, keyrecord_t *record, ha
 
         bool pending_hold = multi_tap_pending_hold(&multi_tap);
         if (pending_hold || behavior.is_momentary_layer) {
-            active_key_track(keycode, KC_NO, hold_behavior_none(), hold_behavior_none(), behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, !pending_hold);
+            active_key_track(keycode, record->event.key, KC_NO, hold_behavior_none(), hold_behavior_none(), behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, !pending_hold);
         }
         return true;
     }
@@ -312,7 +469,7 @@ static bool process_key_behavior_press(uint16_t keycode, keyrecord_t *record, ha
     }
 
     flush_active_key();
-    active_key_track(keycode, handled_key_tap_action(key, record), behavior.single.hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false);
+    active_key_track(keycode, record->event.key, handled_key_tap_action(key, record), behavior.single.hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false);
     return true;
 }
 
@@ -345,12 +502,15 @@ static bool process_key_behavior_release_pending_multi_tap_hold(uint16_t keycode
     return true;
 }
 
-static bool process_key_behavior_release_active_key(uint16_t keycode, key_behavior_view_t behavior) {
+static bool process_key_behavior_release_active_key(uint16_t keycode, keyrecord_t *record, key_behavior_view_t behavior) {
     if (behavior.is_momentary_layer) {
         deactivate_momentary_layer_if_unlocked(keycode);
     }
 
-    if (active_key.keycode != keycode) {
+    if (!active_key_matches(keycode, record->event.key)) {
+        // active_key may already belong to a newer custom press; release any
+        // pure modifier still owned by this physical key.
+        held_modifier_unregister(record->event.key);
         return true;
     }
 
@@ -361,7 +521,7 @@ static bool process_key_behavior_release_active_key(uint16_t keycode, key_behavi
         uint16_t elapsed = timer_elapsed(released_key.timer);
 
         if (released_key.held_action_keycode != KC_NO) {
-            unregister_code16(released_key.held_action_keycode);
+            unregister_held_action(released_key.key_pos, released_key.held_action_keycode);
         }
 
         if (hold_sends_on_release(released_key.long_hold) && elapsed >= released_key.longer_hold_term) {
@@ -392,12 +552,12 @@ static bool process_key_behavior_release_active_key(uint16_t keycode, key_behavi
     return true;
 }
 
-static bool process_key_behavior_release(uint16_t keycode, handled_key_view_t key) {
+static bool process_key_behavior_release(uint16_t keycode, keyrecord_t *record, handled_key_view_t key) {
     if (process_key_behavior_release_pending_multi_tap_hold(keycode, key.behavior)) {
         return true;
     }
 
-    return process_key_behavior_release_active_key(keycode, key.behavior);
+    return process_key_behavior_release_active_key(keycode, record, key.behavior);
 }
 
 static bool process_key_behavior(uint16_t keycode, keyrecord_t *record, handled_key_view_t key) {
@@ -409,7 +569,7 @@ static bool process_key_behavior(uint16_t keycode, keyrecord_t *record, handled_
         return process_key_behavior_press(keycode, record, key);
     }
 
-    return process_key_behavior_release(keycode, key);
+    return process_key_behavior_release(keycode, record, key);
 }
 
 // ─── Tap/Hold Behavior ─────────────────────────────────────────────────────
@@ -428,7 +588,7 @@ bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 // ─── Process Record ────────────────────────────────────────────────────────
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (record->event.pressed && active_key.keycode != KC_NO && keycode != active_key.keycode && is_layer_key(active_key.keycode)) {
+    if (record->event.pressed && active_key.keycode != KC_NO && !active_key_matches(keycode, record->event.key) && is_layer_key(active_key.keycode)) {
         active_key.layer_interrupted = true;
     }
 
