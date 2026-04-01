@@ -25,7 +25,7 @@
 #ifdef TAPPING_TERM
 #    undef TAPPING_TERM
 #endif
-#define TAPPING_TERM 150
+#define TAPPING_TERM 200
 
 // Used by the custom key behavior system in the userspace runtime.
 // These are NOT QMK's built-in TAPPING_TERM — they're checked manually in
