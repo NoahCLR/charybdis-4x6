@@ -1,4 +1,4 @@
-# Noah Charybdis Userspace
+# Noah's Charybdis Userspace
 
 This is the shared userspace for my `noah` Charybdis 4x6 keymaps.
 
@@ -93,8 +93,11 @@ So the current split is:
 
 ## Key Behavior
 
-Only keys with rows in `key_behaviors[]` use the custom key-behavior engine.
-Those keys can distinguish between:
+The richer custom tap / hold / multi-tap behavior is authored in
+`key_behaviors[]`. Plain keys without a row keep their normal QMK behavior,
+while momentary layer keys still keep their normal layer handling.
+
+Keys with authored behavior rows can distinguish between:
 
 - tap
 - hold
@@ -121,6 +124,9 @@ There is one important nuance: built-in QMK dual-role keys like `LT()` and
 `MT()` still use `TAPPING_TERM`. Inside `key_behaviors[]`, an omitted
 `.tap_hold_term` also falls back to `TAPPING_TERM` for `LT()` rows, but to
 `CUSTOM_TAP_HOLD_TERM` for other custom rows.
+That split is intentional for typing feel: I want the built-in dual-role keys
+to stay comfortable during fast typing, while the fully custom rows can still
+use a shorter threshold where that helps.
 
 Timing can also be customized per key. A `key_behaviors[]` row may set:
 
@@ -184,12 +190,16 @@ because the physical mode keys are authored through `key_behaviors[]` in
 `keymap.c`, not hard-wired to one fixed gesture. These entry patterns are fully
 customizable.
 
+Unless a `[0]` tap override is authored, a quick single tap still falls through
+to the base-layer key at that physical position. The patterns below describe
+the extra hold and second-press behavior.
+
 - `ARROW_MODE` and `DRAGSCROLL` use a simple pattern: hold for momentary mode,
   quick second tap to lock
 - `VOLUME_MODE` uses the quick second tap for mute
-- `BRIGHTNESS_MODE` is just a straight mode key
+- `BRIGHTNESS_MODE` currently has no authored second-press behavior
 - the physical `PINCH_MODE` key is the custom exception: first hold enters
-  `PINCH_MODE`, a second quick tap triggers Accessibility Zoom, and a quick second
+  `PINCH_MODE`, a second quick tap triggers Accessibility Zoom, and a second
   hold enters `ZOOM_MODE`
 
 For the user-facing pointer behavior, see
@@ -213,6 +223,8 @@ RGB is used as feedback, not decoration:
 
 Those colors and LED groups live in the keymap `rgb_config.h`
 (`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`).
+For the RGB authoring model and render order, see
+[`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md).
 
 ## If You Want To Go Deeper
 
@@ -225,5 +237,7 @@ These docs are the next place to look:
   hold, and multi-tap behavior
 - [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md): pointer-layer and
   trackball mode behavior
+- [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB colors, LED groups, and
+  auto-mouse gradient configuration
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely

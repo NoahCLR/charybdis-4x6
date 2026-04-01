@@ -2,18 +2,20 @@
 
 This userspace has a custom key-behavior engine.
 
-The point of that engine is simple: one physical key can do more than one thing, and the rules are consistent enough that the board stays usable.
+The point of that engine is simple: one authored keycode can do more than one
+thing, and the rules are consistent enough that the board stays usable.
 
-This document is not a slogan. It is a description of what the keys actually do and why those behaviors are useful.
+This document is a description of what the keys actually do and why those behaviors are useful.
 
 ## What The Engine Adds
 
-For the keys that opt into the custom behavior table, the firmware can distinguish between:
+For keys with authored `key_behaviors[]` rows, the firmware can distinguish
+between:
 
 - tap
 - hold
 - longer hold
-- single tap, double tap, triple tap, and quadruple tap
+- single tap through quintuple tap
 - hold styles that fire at different times
 
 That is what makes these behaviors possible:
@@ -25,11 +27,22 @@ That is what makes these behaviors possible:
 
 ## Default Timing
 
-The default timing values come from `config.h`:
+The default timing values come from the active keymap `config.h`:
 
 - `CUSTOM_TAP_HOLD_TERM = 150`
 - `CUSTOM_LONGER_HOLD_TERM = 400`
 - `CUSTOM_MULTI_TAP_TERM = 150`
+- `TAPPING_TERM = 200` for built-in QMK dual-role keys such as `LT()` and `MT()`
+
+Those are only the global defaults. Individual `key_behaviors[]` rows can
+override them with:
+
+- `.tap_hold_term`
+- `.longer_hold_term`
+- `.multi_tap_term`
+
+If one of those fields is omitted, C zero-initializes it. A value of `0` means
+"use the default timing for this row."
 
 In plain terms:
 
@@ -39,6 +52,10 @@ In plain terms:
 - repeated taps must stay within `150 ms` of each other to remain part of the same sequence
 
 One practical consequence: a single tap on a multi-tap key is delayed by one multi-tap window so the firmware can tell whether you meant one tap or more.
+
+One important nuance: inside `key_behaviors[]`, omitted `.tap_hold_term`
+inherits `TAPPING_TERM` for `LT()` rows, but `CUSTOM_TAP_HOLD_TERM` for other
+custom rows.
 
 ## The Three Hold Modes
 
@@ -76,12 +93,12 @@ The alternate action fires once as soon as the threshold is crossed.
 
 Actual examples:
 
-- double-tap-hold `MO(LAYER_SYM)` -> lock `NUM`
-- double-tap-hold `MO(LAYER_NAV)` -> lock `NUM`
-- double-tap-hold `/` -> lock `NAV`
+- double-tap-hold `MO(LAYER_SYM)` -> lock `LAYER_NUM`
+- double-tap-hold `MO(LAYER_NAV)` -> lock `LAYER_NUM`
+- double-tap-hold `/` -> lock `LAYER_NAV`
 - long hold `Esc` -> `Alt+Cmd+Esc`
-- long hold `Left Arrow` on `NAV` -> `Cmd+Left`
-- long hold `Right Arrow` on `NAV` -> `Cmd+Right`
+- long hold `Left Arrow` on `LAYER_NAV` -> `Cmd+Left`
+- long hold `Right Arrow` on `LAYER_NAV` -> `Cmd+Right`
 
 Why it is useful:
 
@@ -92,11 +109,13 @@ Why it is useful:
 ### `TAP_ON_RELEASE_AFTER_HOLD`
 
 Nothing fires at the hold threshold. The action is sent when you release the key.
+If a longer-hold tier takes over before release, this release-based hold does
+not fire.
 
 Actual examples:
 
-- medium hold `Left Arrow` on `NAV` -> `Option+Left` on release
-- medium hold `Right Arrow` on `NAV` -> `Option+Right` on release
+- medium hold `Left Arrow` on `LAYER_NAV` -> `Option+Left` on release
+- medium hold `Right Arrow` on `LAYER_NAV` -> `Option+Right` on release
 
 This is one of the most useful details in the repo.
 
@@ -114,22 +133,20 @@ The release-based middle tier matters because it avoids an early jump while you 
 
 Multi-tap is built into the same engine. It is not a side feature.
 
-The board can resolve:
+The board can currently resolve:
 
-- single tap
-- double tap
-- double-tap hold
-- triple tap
-- triple-tap hold
-- quadruple tap
-- quadruple-tap hold
+- single tap / hold / longer hold
+- double tap / double-tap hold / double-tap longer hold
+- triple tap / triple-tap hold / triple-tap longer hold
+- quadruple tap / quadruple-tap hold / quadruple-tap longer hold
+- quintuple tap / quintuple-tap hold / quintuple-tap longer hold
 
 That is why the thumb layer keys can do all of this without extra physical keys:
 
 - hold for the layer
 - single tap to lock the layer
 - double tap for play/pause
-- double-tap hold to lock `NUM`
+- double-tap hold to lock `LAYER_NUM`
 - triple tap for next track
 - triple-tap hold to keep `KC_MNXT` held
 - quadruple tap for previous track
@@ -143,13 +160,13 @@ Again, the held media behavior may act like repeated skip or scan depending on t
 
 `KC_LEFT` and `KC_RIGHT` on `LAYER_NAV` are a good example of the engine being worth the complexity.
 
-`Left Arrow` on `NAV`:
+`Left Arrow` on `LAYER_NAV`:
 
 - tap -> `Left`
 - hold past `150 ms`, release before `400 ms` -> `Option+Left`
 - hold past `400 ms` -> `Cmd+Left`
 
-`Right Arrow` on `NAV`:
+`Right Arrow` on `LAYER_NAV`:
 
 - tap -> `Right`
 - hold past `150 ms`, release before `400 ms` -> `Option+Right`
@@ -192,7 +209,7 @@ They currently do this:
 - hold -> momentary layer
 - single tap -> lock that layer
 - double tap -> play/pause
-- double-tap hold -> lock `NUM`
+- double-tap hold -> lock `LAYER_NUM`
 - triple tap -> next track
 - triple-tap hold -> keep next-track held
 - quadruple tap -> previous track
@@ -202,7 +219,7 @@ User-facing value:
 
 - the most important layers live on strong thumb keys
 - layer lock does not need a dedicated key
-- `NUM` lock is reachable from either thumb
+- `LAYER_NUM` lock is reachable from either thumb
 - media control is available without moving away from the thumb cluster
 
 ### Slash / Nav Key
@@ -210,10 +227,16 @@ User-facing value:
 `LT(LAYER_NAV, KC_SLSH)` does three useful things:
 
 - tap -> `/`
-- hold -> `NAV`
-- double-tap hold -> lock `NAV`
+- hold -> `LAYER_NAV`
+- double-tap hold -> lock `LAYER_NAV`
 
-One important implementation detail: this key keeps the normal `LT()` tap timing instead of using the global custom threshold, so the slash key still types like a normal slash key.
+In the current keymap, `LAYER_NAV` also enables Charybdis sniping, so this key
+is part of the precise-cursor workflow as well as the navigation layer
+workflow.
+
+One important implementation detail: this key keeps the normal `LT()` tap
+timing instead of using the global custom threshold, so the slash key still
+types like a normal slash key.
 
 ### Escape
 
@@ -228,6 +251,10 @@ That gives you normal escape, tilde, and force quit on the same key without maki
 ### Pointer-Mode Keys
 
 The pointer keys use the same timing model instead of inventing their own rules.
+
+Unless a `[0]` tap override is authored, a quick single tap on a pd-mode key
+still sends the base-layer key at that physical position. The examples below
+focus on the extra hold and second-press behavior.
 
 Examples:
 

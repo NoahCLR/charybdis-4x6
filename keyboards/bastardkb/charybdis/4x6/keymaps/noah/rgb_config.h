@@ -92,11 +92,11 @@ static const pd_mode_led_group_t pd_mode_led_groups[] = {
 
 // ─── Auto-mouse gradient ────────────────────────────────────────────────────
 //
-// Countdown gradient endpoints.  When the auto-mouse layer
-// activates, the first 1/3 of AUTO_MOUSE_TIME is "dead time" — LEDs stay
-// at the start color so active trackball use doesn't cause flicker.  The
-// gradient animates only during the final 2/3 of the auto-mouse timeout.
-// See AUTO_MOUSE_TIME in config.h
+// Countdown gradient endpoints. When the auto-mouse layer activates, the first
+// AUTOMOUSE_RGB_DEAD_TIME ms are "dead time" — LEDs stay at the start color so
+// active trackball use doesn't cause flicker. The gradient animates only
+// during the remaining portion of the auto-mouse timeout after that dead time.
+// See AUTO_MOUSE_TIME and AUTOMOUSE_RGB_DEAD_TIME in config.h.
 //
 // Split sync only transmits the animated portion of the gradient. Dead time
 // and locked modes collapse to a single stable value, which cuts split chatter

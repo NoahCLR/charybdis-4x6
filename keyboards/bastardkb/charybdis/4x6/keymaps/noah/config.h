@@ -91,9 +91,13 @@
 #    ifdef AUTO_MOUSE_TIME
 #        undef AUTO_MOUSE_TIME
 #    endif
+#    ifdef AUTOMOUSE_RGB_DEAD_TIME
+#        undef AUTOMOUSE_RGB_DEAD_TIME
+#    endif
 #    define POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #    define AUTO_MOUSE_DEFAULT_LAYER 4 // QMK expects a numeric layer index here; 4 = LAYER_POINTER in noah_keymap.h.
 #    define AUTO_MOUSE_TIME 1200
+#    define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3) // initial RGB dead time before the timeout gradient starts animating
 
 // Auto-sniping: enable Charybdis sniping automatically while a layer is active.
 // The current keymap uses NAV for precise cursor work and pointer-adjacent

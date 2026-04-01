@@ -25,6 +25,9 @@
 #        endif
 #    endif
 
+_Static_assert(AUTO_MOUSE_TIME > 0, "AUTO_MOUSE_TIME must be greater than zero");
+_Static_assert(AUTOMOUSE_RGB_DEAD_TIME < AUTO_MOUSE_TIME, "AUTOMOUSE_RGB_DEAD_TIME must be less than AUTO_MOUSE_TIME");
+_Static_assert(AUTOMOUSE_RGB_ACTIVE_SPAN > 0, "AUTOMOUSE_RGB_ACTIVE_SPAN must be greater than zero");
 _Static_assert(AUTOMOUSE_RGB_SYNC_STEP > 0, "AUTOMOUSE_RGB_SYNC_STEP must be greater than zero");
 
 static inline uint16_t automouse_rgb_progress(uint16_t raw_elapsed) {

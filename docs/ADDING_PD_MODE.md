@@ -64,7 +64,8 @@ These are the rules most likely to break the system if you miss one.
    that keycode range will break lock actions.
 3. `PD_MODE_COUNT` in `users/noah/lib/pointing/pd_mode_flags.h` must match:
    the number of mode flags, the number of rows in `pd_modes[]`, and the
-   `_Static_assert` in `users/noah/lib/pointing/pointing_device_modes.h`.
+   dense-keycode `_Static_assert` in
+   `users/noah/lib/pointing/pointing_device_modes.h`.
 4. Mode flags are currently stored in `uint8_t` values:
    `users/noah/lib/pointing/pd_mode_flags.h` and `users/noah/lib/state/pd_shared_state.h`.
    That means the current design supports at most 8 modes.
@@ -116,10 +117,11 @@ Example:
     PINCH_MODE,
     EXAMPLE_MODE,
     PD_MODE_LOCK_BASE,
-    LAYER_LOCK_BASE = PD_MODE_LOCK_BASE + (EXAMPLE_MODE - VOLUME_MODE + 1),
+    LAYER_LOCK_BASE     = PD_MODE_LOCK_BASE + (PD_MODE_LOCK_BASE - VOLUME_MODE),
 ```
 
-Do not leave the enum math pointing at the old last mode.
+Do not break the dense pd-mode keycode block between `VOLUME_MODE` and
+`PD_MODE_LOCK_BASE`.
 
 ### 2. Add The Mode Flag
 
@@ -141,12 +143,12 @@ Example:
 #define PD_MODE_COUNT 7
 ```
 
-### 3. Update The Static Assert
+### 3. Verify The Static Assert
 
 Edit `users/noah/lib/pointing/pointing_device_modes.h`.
 
-If the last pd-mode keycode changed, update the `_Static_assert(...)` so it
-still checks the right final keycode against `PD_MODE_COUNT`.
+The `_Static_assert(...)` in that header should continue to pass once the
+keycode block and `PD_MODE_COUNT` are both updated.
 
 ### 4. Add Handler Declarations If Needed
 
@@ -357,10 +359,13 @@ Only do this if the product behavior really calls for it.
 
 This is the actual control path for pd modes:
 
-1. `users/noah/lib/key/key_runtime_process.c` routes custom key events, and uses helpers from `users/noah/lib/key/key_runtime.c` to recognize that a keycode maps to a pd mode via `pd_mode_for_keycode(...)`.
+1. `users/noah/lib/key/key_runtime_process.c` routes custom key events. It
+   calls `handled_key_lookup(...)` from `users/noah/lib/key/key_runtime.c`,
+   which bundles both `key_behavior_lookup(...)` and `pd_mode_for_keycode(...)`
+   for the current keycode.
 2. `users/noah/lib/pointing/pd_mode_key_runtime.c` handles hold, release, tap, double-tap, lock toggling, and alternate-mode entry for pd-mode keys.
 3. `users/noah/lib/pointing/pointing_device_runtime.c` calls the first active handler in `pd_modes[]`.
-4. `users/noah/lib/pointing/pointer_layer_policy.c` keeps the pointer layer alive while modes are active or locked.
+4. `users/noah/lib/pointing/pointer_layer_policy.c` keeps the configured auto-mouse target layer alive while modes are active or locked.
 5. `users/noah/lib/state/pd_shared_state.c` mirrors active and locked flags to the other half.
 6. `users/noah/lib/rgb/rgb_runtime.c` renders the mode overlay on the right half.
 
@@ -369,9 +374,9 @@ That is why most new modes are mostly a data-registration job, not a runtime rew
 ## Common Mistakes
 
 - Adding the keycode outside the contiguous pd-mode range in `custom_keycodes`.
-- Forgetting to update `LAYER_LOCK_BASE` math when the last pd-mode key changes.
 - Forgetting to bump `PD_MODE_COUNT`.
-- Forgetting to update the `_Static_assert(...)`.
+- Forgetting to keep the dense keycode block and `PD_MODE_COUNT` aligned, so
+  the `_Static_assert(...)` fails.
 - Adding the new flag but forgetting the `pd_modes[]` row.
 - Forgetting the reset function, which leaves stale accumulators or modifiers behind.
 - Adding side effects in activate / deactivate but forgetting the locked path.
