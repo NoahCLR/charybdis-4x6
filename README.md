@@ -48,6 +48,13 @@ If you want to understand what makes this userspace special, start with
 file shows the physical layout, the authored `key_behaviors[]` table, combos,
 macros, and how the pointer-mode keys are configured.
 
+There is also a small VIA bridge in
+[`via layouts/via_to_qmk_layout.py`](./via%20layouts/via_to_qmk_layout.py).
+That script is useful when you want to experiment quickly in VIA without
+giving up a readable, source-controlled `keymap.c`: it converts VIA's exported
+layer data and custom keycodes back into the formatted `LAYOUT()` blocks this
+repo uses.
+
 ## Where To Change Things
 
 If you want to adapt this layout, these are the main files to touch first:

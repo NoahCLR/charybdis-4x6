@@ -23,7 +23,7 @@ MODE = "write"
 # ─── Configuration ────────────────────────────────────────────────────────────
 # These are the only things you should need to edit when your keymap changes.
 
-# Must match the layer enum order in keymap_defs.h.
+# Must match the layer enum order in users/noah/noah_keymap.h.
 # → Adding or renaming a layer?  Update this list to match.
 #   Extra VIA layers beyond this list get named LAYER_0, LAYER_1, etc.
 LAYER_NAMES = [
@@ -37,8 +37,9 @@ LAYER_NAMES = [
 MACRO_COUNT = 16
 VIA_CUSTOM_BASE = 64
 
-# Upstream Charybdis keyboard keycodes, defined in `charybdis.h` at QK_KB_0..7.
-# These are separate from this repo's `keymap_defs.h` SAFE_RANGE enum.
+# Upstream Charybdis keyboard keycodes, defined by the keyboard in the
+# QK_KB_0..7 range. These are separate from this repo's
+# users/noah/noah_keymap.h SAFE_RANGE enum.
 CHARYBDIS_UPSTREAM_KEYCODES = [
     "DPI_MOD",
     "DPI_RMOD",
@@ -121,11 +122,13 @@ for i in range(MACRO_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = f"MACRO_{i}"
 
 # VIA assigns CUSTOM(64 + n) where n is the keycode's position in
-# keymap_defs.h's custom_keycodes enum (0-indexed from SAFE_RANGE).
+# users/noah/noah_keymap.h's custom_keycodes enum (0-indexed from SAFE_RANGE).
 # MACRO_0–15 are positions 0–15 → CUSTOM(64)–CUSTOM(79).
 # The pointing-device mode keys follow at positions 16–21 → CUSTOM(80)–CUSTOM(85).
-# CUSTOM(86)–CUSTOM(91) are reserved for LOCK_PD_MODE(...).
-# CUSTOM(92)–CUSTOM(96) are reserved for LOCK_LAYER(...).
+# PD-mode and layer-lock action keycodes live above that range in
+# noah_keymap.h, but this script does not map them because VIA exports the
+# direct layout keycodes that appear on layers, not the derived lock actions
+# authored through key_behaviors[].
 for i, keycode in enumerate(PD_MODE_KEYCODES, start=MACRO_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
 
