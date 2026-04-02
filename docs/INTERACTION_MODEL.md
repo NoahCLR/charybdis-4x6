@@ -267,29 +267,6 @@ Examples:
 
 `PINCH_MODE` matters because it shows that the system can also branch into a completely different second-press path when needed.
 
-## What Is Actually Valuable Here
-
-The value of this userspace is not "many features".
-
-The value is that the behaviors are concentrated where they help:
-
-- nav arrows reduce friction in text movement
-- thumb layer keys reduce friction in layer access and media control
-- number and punctuation holds reduce symbol-layer churn
-- pointer keys follow the same timing rules as the rest of the board
-
-The end result is fewer dedicated keys and less travel, but the more important result is that related actions stay grouped under the same fingers.
-
-## What To Learn First
-
-If you want to feel the benefit quickly, start here:
-
-1. Learn the nav arrows as char / word / line movement.
-2. Learn the thumb layer keys as hold / tap-lock / num-lock / media keys.
-3. Learn the number row holds and the `7` / `8` media behavior.
-4. Learn `DRAGSCROLL` and `ARROW_MODE` as the standard pointer-mode pattern.
-5. Learn `PINCH_MODE` as the custom exception.
-
 ## Next Doc
 
 - Read [POINTER_MODES.md](./POINTER_MODES.md) for the trackball-specific side of the same interaction model.
