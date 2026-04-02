@@ -23,15 +23,30 @@ from him rather than from a knockoff seller.
 
 ## What This Userspace Is For
 
-This userspace tries to make the board feel consistent in a few areas:
+This userspace is built around a small set of systems that make the board easy
+to understand and easy to change:
 
-- keys can use the same tap / hold / longer-hold / multi-tap language
-- pointer-mode keys follow the same timing model as the rest of the board
-- the pointer layer appears automatically when the trackball is in use
-- RGB reflects layers, pointer modes, and auto-mouse timeout
+- [`key_behaviors[]`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
+  in [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
+  is the main customization table: one authored row can give a key different
+  tap, hold, and longer-hold actions at each tap count, plus per-key tap-hold,
+  longer-hold, and multi-tap timing overrides
+- pointer modes are a core part of what makes this userspace different: the
+  trackball can become dragscroll, pinch, zoom, arrows, volume, or brightness,
+  and those mode keys use the same authored tap, hold, and lock model as the
+  rest of the board
+- `AUTO_MOUSE` brings up the pointer layer when the trackball moves and clears
+  it again after the configured timeout
+- RGB is functional feedback: it shows layers, pointer modes, and the
+  auto-mouse timeout as a white-to-red countdown
+- [`rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h)
+  is where the layer colors, pointer-mode colors, LED groups, and auto-mouse
+  countdown gradient are configured
 
-The value is not that it adds a lot of unrelated features. The value is that
-common actions stay grouped together and behave predictably.
+If you want to understand what makes this userspace special, start with
+[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). That
+file shows the physical layout, the authored `key_behaviors[]` table, combos,
+macros, and how the pointer-mode keys are configured.
 
 ## Where To Change Things
 
