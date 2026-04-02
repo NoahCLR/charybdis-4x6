@@ -122,13 +122,3 @@ While active:
 - the other dims
 - motion is accumulated and emitted in discrete steps
 
-## What This File Does Not Cover
-
-This file intentionally does not document:
-
-- which physical key enters a mode
-- whether a mode key locks, mutes, or branches on a second press
-- which layer currently exposes a mode
-- the current auto-mouse layer configuration
-
-Those are keymap and policy choices, not raw mode semantics.
