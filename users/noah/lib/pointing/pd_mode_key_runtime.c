@@ -95,7 +95,13 @@ bool pd_mode_key_runtime_process(uint16_t keycode, keyrecord_t *record, uint8_t 
         state_changed = true;
     } else {
         bool     pressed_this_key = pd_mode_press.keycode == keycode;
-        uint16_t elapsed          = pressed_this_key ? timer_elapsed(pd_mode_press.timer) : 0;
+        if (!pressed_this_key) {
+            // Ignore stale releases from an older pd-mode key press. The
+            // tracked active mode belongs only to pd_mode_press.keycode.
+            return true;
+        }
+
+        uint16_t elapsed          = timer_elapsed(pd_mode_press.timer);
         bool     alternate_press  = pd_mode_press.alternate_mode != 0;
         bool     locked_press     = !alternate_press && pd_mode_press.mode == mode && pd_mode_press.was_locked && pd_mode_is_lockable(mode) && pressed_this_key;
 
