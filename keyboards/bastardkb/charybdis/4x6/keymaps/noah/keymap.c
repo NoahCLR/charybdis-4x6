@@ -3,96 +3,117 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // This translation unit owns the authored keymap data:
+//   - VIA_MACROS(MACRO)
+//   - HARDCODED_MACROS(MACRO)
+//   - COMBOS(COMBO)
 //   - key_behaviors[]
-//   - macro_dispatch()
 //   - keymaps[][]
-//   - key_combos[]
 //
 // Shared layer and custom-keycode declarations live in users/noah/noah_keymap.h.
 // Runtime processing lives in the userspace runtime modules under users/noah/lib/.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "noah_keymap.h"
-#include "lib/key/key_behavior.h"
 
-// ─── Macros ─────────────────────────────────────────────────────────────────
-// macro_dispatch() handles custom macro keycodes used by key behaviors.
-// Available macro slots are MACRO_0 through MACRO_15.
-// Add or edit cases here to define what those macros send.
-// If you need more slots than MACRO_15, extend enum custom_keycodes in users/noah/noah_keymap.h.
+// ─── VIA Macros ─────────────────────────────────────────────────────────────
+// VIA_MACRO_0–15 are the authored aliases for VIA's dynamic macro slots.
+// All 16 slots are listed here so the slot limit stays visible in keymap.c.
+// Use an empty string for an unused slot. The converter script can update this
+// block from a VIA export, and the firmware seeds VIA's dynamic macro EEPROM
+// defaults from it on init/reset.
+// Workflow:
+//   - author defaults here -> compile/flash -> reset EEPROM to re-seed them
+//   - or run via_to_qmk_layout.py --write -> import the selected VIA export,
+//     rewrite this block and keymaps[][], then compile/flash -> reset EEPROM
+//     to re-seed those defaults
+//
+// If you do not run the converter, the firmware compiles exactly from the
+// values authored here.
+// Syntax:
+//   - text {hello} sends "hello" one key at a time
+//   - {KC_A} tap one key, {KC_LGUI,KC_SPC} tap a chord
+//   - {+KC_LGUI} key down, {-KC_LGUI} key up
+//   - {250} wait 250 ms before the next macro step
+//     e.g. {KC_A}{250}{KC_B} pauses between A and B; other keys pressed
+//     during the delay are queued
+#define VIA_MACROS(MACRO) \
+    MACRO(VIA_MACRO_0, "{KC_LGUI,KC_SPC}") \
+    MACRO(VIA_MACRO_1, "{KC_LALT,KC_SPC}") \
+    MACRO(VIA_MACRO_2, "{KC_LALT,KC_LGUI,KC_SPC}") \
+    MACRO(VIA_MACRO_3, "{KC_LCTL,KC_LALT,KC_LGUI,KC_C}") \
+    MACRO(VIA_MACRO_4, "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}") \
+    MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}") \
+    MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}") \
+    MACRO(VIA_MACRO_7, "") \
+    MACRO(VIA_MACRO_8, "") \
+    MACRO(VIA_MACRO_9, "") \
+    MACRO(VIA_MACRO_10, "") \
+    MACRO(VIA_MACRO_11, "") \
+    MACRO(VIA_MACRO_12, "") \
+    MACRO(VIA_MACRO_13, "") \
+    MACRO(VIA_MACRO_14, "") \
+    MACRO(VIA_MACRO_15, "")
 
-bool macro_dispatch(uint16_t keycode) {
-    switch (keycode) {
-        case MACRO_0: // Spotlight search (macOS): GUI + Space
-            SEND_STRING(SS_LGUI(SS_TAP(X_SPACE)));
-            return true;
-        case MACRO_1: // Claude: Alt + Space
-            SEND_STRING(SS_LALT(SS_TAP(X_SPACE)));
-            return true;
-        case MACRO_2: // Terminal: Alt + GUI + Space
-            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_SPACE))));
-            return true;
-        case MACRO_3: // OCR text copy (macOS): Ctrl + Alt + GUI + C
-            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("c"))));
-            return true;
-        case MACRO_4: // Screenshot (macOS): Ctrl + Alt + GUI + X
-            SEND_STRING(SS_LCTL(SS_LALT(SS_LGUI("x"))));
-            return true;
-        case MACRO_5: // Emoji picker (macOS): Ctrl + GUI + Space
-            SEND_STRING(SS_LCTL(SS_LGUI(SS_TAP(X_SPACE))));
-            return true;
-        case MACRO_6: // MacOS Zoom: Alt + GUI + 8
-            SEND_STRING(SS_LALT(SS_LGUI(SS_TAP(X_8))));
-            return true;
-        // case MACRO_7:
-        //     SEND_STRING("...");
-        //     return true;
-        // case MACRO_8:
-        //     SEND_STRING("...");
-        //     return true;
-        // case MACRO_9:
-        //     SEND_STRING("...");
-        //     return true;
-        // case MACRO_10:
-        //     SEND_STRING("...");
-        //     return true;
-        // case MACRO_11:
-        //     SEND_STRING("...");
-        //     return true;
-        // case MACRO_12:
-        //     SEND_STRING("...");
-        //     return true;
-        // case MACRO_13:
-        //     SEND_STRING("...");
-        //     return true;
-        // case MACRO_14:
-        //     SEND_STRING("...");
-        //     return true;
-        // case MACRO_15:
-        //     SEND_STRING("...");
-        //     return true;
-        default:
-            return false;
-    }
-}
+// ─── Hardcoded Macros ───────────────────────────────────────────────────────
+// HARDCODED_MACROS(MACRO) is the authored table for hardcoded custom macro
+// keycodes used by key_behaviors[] and authored layers.
+// All 16 slots are listed here so the slot limit stays visible in keymap.c.
+// Use an empty string for an unused slot.
+// VIA's dynamic macro payloads live in VIA_MACROS(MACRO) above.
+// Use VIA_MACRO_n when you want a QMK/VIA dynamic macro keycode instead of
+// one of these hardcoded custom macros.
+// In the VIA export JSON, these hardcoded custom macros remain CUSTOM(64+n),
+// while VIA's dynamic macro keycodes appear as MACRO(n).
+// Hardcoded macros use the same "{...}" payload language as VIA macros, but
+// they stay native to the firmware side and are interpreted at runtime by
+// users/noah/lib/macro/macro_payload.c.
+//
+// The via_to_qmk_layout.py converter never rewrites this block; it only knows the MACRO_n names
+// when converting VIA layout tokens.
+// If you need more hardcoded slots than MACRO_15, extend enum custom_keycodes
+// in users/noah/noah_keymap.h.
+#define HARDCODED_MACROS(MACRO) \
+    MACRO(MACRO_0, "")          \
+    MACRO(MACRO_1, "")          \
+    MACRO(MACRO_2, "")          \
+    MACRO(MACRO_3, "")          \
+    MACRO(MACRO_4, "")          \
+    MACRO(MACRO_5, "")          \
+    MACRO(MACRO_6, "")          \
+    MACRO(MACRO_7, "")          \
+    MACRO(MACRO_8, "")          \
+    MACRO(MACRO_9, "")          \
+    MACRO(MACRO_10, "")         \
+    MACRO(MACRO_11, "")         \
+    MACRO(MACRO_12, "")         \
+    MACRO(MACRO_13, "")         \
+    MACRO(MACRO_14, "")         \
+    MACRO(MACRO_15, "")
 
 // ─── Combos ─────────────────────────────────────────────────────────────────
 //
-// key_combos[] maps simultaneous key chords to a single output keycode.
-// Each combo_keys_* array lists the keys that must be pressed together;
-// combos can use two or more keys and must end with COMBO_END.
+// COMBOS(COMBO) is the authored combo table.
+// Each row is:
+//   COMBO(output_keycode, (key_1, key_2, ...))
+// Group the key list in parentheses so 2-key and 3+-key combos read the same way.
+//
+// Valid combo outputs include plain keycodes, hardcoded macros (MACRO_n),
+// VIA macros (VIA_MACRO_n), LOCK_LAYER(...), LOCK_PD_MODE(...), and keycodes
+// that also have rows in key_behaviors[].
 //
 // If a combo emits a keycode that also has a row in key_behaviors[],
 // that emitted key can reuse the same custom behavior handling.
 //
 // Combo timing is tuned in config.h via COMBO_TERM.
 // Current default: COMBO_TERM = 50 ms.
-
-const uint16_t PROGMEM combo_keys_1[] = {KC_D, LT(LAYER_NAV, KC_F), COMBO_END};
-
-combo_t key_combos[] = {
-    COMBO(combo_keys_1, KC_TAB), // D + F → Tab
-};
+#define COMBOS(COMBO)                                      \
+    COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))             \
+    /* COMBO(MACRO_0, (KC_Q, KC_W)) */                     \
+    /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */                 \
+    /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */       \
+    /* COMBO(LOCK_PD_MODE(ARROW_MODE), (KC_M, KC_COMM)) */ \
+    /* COMBO(..., (...)) */                                \
+    /* ... */
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
@@ -144,9 +165,12 @@ combo_t key_combos[] = {
 //   - Use LOCK_PD_MODE(mode_keycode) to toggle a pointer-mode lock.
 //     Activating the same mode again unlocks it; pressing, holding or locking
 //     any other pointer-mode key also clears the previous lock.
-//   - Define macros in macro_dispatch(), then use MACRO_n as the action in
-//     any helper: TAP_SENDS(MACRO_n), TAP_AT_HOLD_THRESHOLD(MACRO_n),
-//     TAP_ON_RELEASE_AFTER_HOLD(MACRO_n), or PRESS_AND_HOLD_UNTIL_RELEASE(MACRO_n).
+//   - Add hardcoded custom macros to HARDCODED_MACROS(MACRO) above, then use
+//     MACRO_n as the action in any helper: TAP_SENDS(MACRO_n),
+//     TAP_AT_HOLD_THRESHOLD(MACRO_n), TAP_ON_RELEASE_AFTER_HOLD(MACRO_n), or
+//     PRESS_AND_HOLD_UNTIL_RELEASE(MACRO_n).
+//   - Use VIA_MACRO_n for a QMK/VIA dynamic macro keycode whose default
+//     contents come from VIA_MACROS(MACRO) above.
 //   - Modded keycodes like G(KC_RIGHT), A(KC_LEFT), or S(KC_1) let one action
 //     send GUI, Alt, Shift, and similar variants without adding separate keys.
 //
@@ -158,9 +182,14 @@ combo_t key_combos[] = {
 //
 // hold and long_hold accept the same three helpers:
 //   PRESS_AND_HOLD_UNTIL_RELEASE(action)
-//     cross .tap_hold_term -> press/register action
-//     release the key -> unregister action
-//     use this for modifiers or keys you want to stay down while held
+//     normal keys/modifiers:
+//       cross .tap_hold_term -> press/register action
+//       release the key -> unregister action
+//     macros:
+//       cross .tap_hold_term -> send action once immediately
+//       release the key -> do nothing
+//     use this for modifiers or keys you want to stay down while held;
+//     macros use the same helper for a held-triggered one-shot
 //
 //   TAP_AT_HOLD_THRESHOLD(action)
 //     cross .tap_hold_term -> send action once immediately
@@ -254,7 +283,7 @@ const key_behavior_t
                     },
             },
 
-            // Home-row layer-tap key — double-tap locks LAYER_NAV.
+            // layer-tap key — double-tap hold locks LAYER_NAV.
             // tap_hold_term inherits the LT() default (TAPPING_TERM) so typing feel is unchanged.
             {
                 .keycode = LT(LAYER_NAV, KC_SLSH),
@@ -273,15 +302,13 @@ const key_behavior_t
                 .keycode = PINCH_MODE,
                 .tap_counts =
                     {
-                        [1] = {.tap = TAP_SENDS(MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
+                        [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
                     },
             },
 
             // Dragscroll: tap = base-layer key, double-tap = lock, hold = momentary (via pd_mode).
             {.keycode = DRAGSCROLL, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(DRAGSCROLL))}}},
 };
-
-const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0]);
 
 // ─── Keymap Layouts ─────────────────────────────────────────────────────────
 
@@ -349,11 +376,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
               LAG(KC_ESC),           XXXXXXX,           XXXXXXX,        LCAG(KC_V),           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,              MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
+                  XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,          VIA_MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-         MT(MOD_LSFT,KC_CAPS),        LSG(KC_Z),          XXXXXXX,          G(KC_C),          XXXXXXX,           XXXXXXX,              MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
+         MT(MOD_LSFT,KC_CAPS),        LSG(KC_Z),          XXXXXXX,          G(KC_C),          XXXXXXX,           XXXXXXX,          VIA_MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,              MACRO_0,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        ARROW_MODE,
+              VIA_MACRO_5,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,          VIA_MACRO_0,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        ARROW_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                        KC_LEFT_GUI,            KC_SPC,           _______,              _______,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
@@ -366,7 +393,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-            KC_LEFT_SHIFT,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,        PINCH_MODE,           MS_BTN3,        ARROW_MODE,           XXXXXXX,      KC_RIGHT_GUI,
+            KC_LEFT_SHIFT,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,        PINCH_MODE,           MS_BTN3,        ARROW_MODE,           _______,      KC_RIGHT_GUI,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        ARROW_MODE,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -376,3 +403,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     ),
     // clang-format on
 };
+
+// Expand the authored macro tables, combo table, and derived counts above
+// into the runtime symbols expected by the userspace runtime and QMK.
+MATERIALIZE_KEYMAP_DATA();

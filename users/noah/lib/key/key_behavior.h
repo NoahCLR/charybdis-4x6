@@ -5,7 +5,8 @@
 // Shared schema for key behavior config and authoring helpers.
 //
 // keymap.c authors key behavior through a single key_behaviors[] table and
-// also defines key_behavior_count. Runtime interpretation helpers live in
+// materializes key_behavior_count alongside the other derived keymap symbols.
+// Runtime interpretation helpers live in
 // key_behavior_lookup.h / key_behavior_lookup.c.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once

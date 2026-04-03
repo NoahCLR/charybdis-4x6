@@ -27,12 +27,40 @@ enum charybdis_keymap_layers {
 _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update the keymap config.h");
 #endif
 
+#define VIA_MACRO_SLOT_COUNT 16
+#ifdef VIA_ENABLE
+_Static_assert(VIA_MACRO_SLOT_COUNT == DYNAMIC_KEYMAP_MACRO_COUNT, "VIA_MACRO_SLOT_COUNT and DYNAMIC_KEYMAP_MACRO_COUNT are out of sync");
+#endif
+
+// VIA_MACRO_0–15 are authored aliases for VIA's dynamic macro slots.
+// The QMK-specific base keycodes stay here so keymap.c can stay declarative.
+enum {
+    VIA_MACRO_0  = QK_MACRO_0,
+    VIA_MACRO_1  = QK_MACRO_0 + 1,
+    VIA_MACRO_2  = QK_MACRO_0 + 2,
+    VIA_MACRO_3  = QK_MACRO_0 + 3,
+    VIA_MACRO_4  = QK_MACRO_0 + 4,
+    VIA_MACRO_5  = QK_MACRO_0 + 5,
+    VIA_MACRO_6  = QK_MACRO_0 + 6,
+    VIA_MACRO_7  = QK_MACRO_0 + 7,
+    VIA_MACRO_8  = QK_MACRO_0 + 8,
+    VIA_MACRO_9  = QK_MACRO_0 + 9,
+    VIA_MACRO_10 = QK_MACRO_0 + 10,
+    VIA_MACRO_11 = QK_MACRO_0 + 11,
+    VIA_MACRO_12 = QK_MACRO_0 + 12,
+    VIA_MACRO_13 = QK_MACRO_0 + 13,
+    VIA_MACRO_14 = QK_MACRO_0 + 14,
+    VIA_MACRO_15 = QK_MACRO_0 + 15,
+};
+
 // ─── Custom Keycodes ────────────────────────────────────────────────────────
 //
 // Custom keycodes are assigned values starting from SAFE_RANGE so they don't
 // collide with any built-in QMK or Charybdis keycodes.
 //
-// MACRO_0–15 are generic macro slots (some used, rest reserved for VIA).
+// MACRO_0–15 are hardcoded custom macro slots used by key_behaviors[] and
+// dispatched by macro_dispatch().
+// VIA macros use the VIA_MACRO_0–15 aliases.
 // VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE / PINCH_MODE
 // activate pointing-device modes while held.
 // DRAGSCROLL: tap = base-layer key, double-tap = lock dragscroll, hold = momentary.
@@ -50,16 +78,16 @@ enum custom_keycodes {
     MACRO_3,
     MACRO_4,
     MACRO_5,
-    MACRO_6,  // reserved for VIA
-    MACRO_7,  // reserved for VIA
-    MACRO_8,  // reserved for VIA
-    MACRO_9,  // reserved for VIA
-    MACRO_10, // reserved for VIA
-    MACRO_11, // reserved for VIA
-    MACRO_12, // reserved for VIA
-    MACRO_13, // reserved for VIA
-    MACRO_14, // reserved for VIA
-    MACRO_15, // reserved for VIA
+    MACRO_6,
+    MACRO_7,
+    MACRO_8,
+    MACRO_9,
+    MACRO_10,
+    MACRO_11,
+    MACRO_12,
+    MACRO_13,
+    MACRO_14,
+    MACRO_15,
     VOLUME_MODE,
     BRIGHTNESS_MODE,
     ARROW_MODE,
@@ -72,8 +100,16 @@ enum custom_keycodes {
 };
 
 #define PD_MODE_KEYCODE_COUNT (PD_MODE_LOCK_BASE - VOLUME_MODE)
+#define HARDCODED_MACRO_SLOT_COUNT ((MACRO_15 - MACRO_0) + 1)
 #define LOCK_PD_MODE(mode_keycode_) (PD_MODE_LOCK_BASE + ((mode_keycode_) - VOLUME_MODE))
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 
 bool                          macro_dispatch(uint16_t keycode);
+extern const char *const      via_macro_payloads[VIA_MACRO_SLOT_COUNT];
+extern const char *const      hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT];
 extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
+
+// keymap.c also uses this header as its authored keymap surface, so re-export
+// the authoring schema and keymap materializer here.
+#include "lib/key/key_behavior.h"
+#include "lib/keymap_materialize.h"

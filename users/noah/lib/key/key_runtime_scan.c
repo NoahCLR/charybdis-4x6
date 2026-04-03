@@ -7,8 +7,12 @@
 
 #include "key_runtime_internal.h"
 
+static bool hold_uses_one_shot_dispatch(hold_behavior_t hold) {
+    return action_dispatch_is_layer_lock(hold.action) || action_dispatch_is_macro(hold.action) || !hold_registers_while_held(hold);
+}
+
 static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_hold) {
-    if (action_dispatch_is_layer_lock(hold.action) || !hold_registers_while_held(hold)) {
+    if (hold_uses_one_shot_dispatch(hold)) {
         if (active_key.held_action_keycode != KC_NO) {
             held_action_unregister(active_key.key_pos, active_key.held_action_keycode);
             active_key.held_action_keycode = KC_NO;
@@ -36,7 +40,7 @@ static void promote_to_long_hold(hold_behavior_t long_hold) {
         active_key.held_action_keycode = KC_NO;
     }
 
-    if (action_dispatch_is_layer_lock(long_hold.action) || !hold_registers_while_held(long_hold)) {
+    if (hold_uses_one_shot_dispatch(long_hold)) {
         action_dispatch(long_hold.action);
         active_key.hold_fired = true;
         return;

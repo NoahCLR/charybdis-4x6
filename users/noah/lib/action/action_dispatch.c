@@ -4,6 +4,10 @@
 
 #include QMK_KEYBOARD_H // QMK
 
+#ifdef VIA_ENABLE
+#    include "dynamic_keymap.h"
+#endif
+
 #include "noah_keymap.h"
 #include "../pointing/pointing_device_modes.h"
 #include "../state/pd_shared_state.h"
@@ -13,6 +17,10 @@ static uint8_t locked_layer = 0;
 
 bool action_dispatch_is_layer_lock(uint16_t action) {
     return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
+}
+
+bool action_dispatch_is_macro(uint16_t action) {
+    return (action >= MACRO_0 && action <= MACRO_15) || IS_QK_MACRO(action);
 }
 
 bool action_dispatch_layer_is_locked(uint8_t layer) {
@@ -43,6 +51,13 @@ void action_dispatch(uint16_t action) {
         }
         return;
     }
+
+#ifdef VIA_ENABLE
+    if (IS_QK_MACRO(action)) {
+        dynamic_keymap_macro_send((uint8_t)(action - QK_MACRO));
+        return;
+    }
+#endif
 
     if (macro_dispatch(action)) {
         return;

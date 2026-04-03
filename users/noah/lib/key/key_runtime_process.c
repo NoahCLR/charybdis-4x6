@@ -205,6 +205,18 @@ static bool process_key_behavior(uint16_t keycode, keyrecord_t *record, handled_
     return process_key_behavior_release(keycode, record, key);
 }
 
+static bool process_direct_action_key(uint16_t keycode, keyrecord_t *record) {
+    if (!(action_dispatch_is_layer_lock(keycode) || is_pd_mode_lock_action(keycode))) {
+        return false;
+    }
+
+    if (record->event.pressed) {
+        action_dispatch(keycode);
+    }
+
+    return true;
+}
+
 bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     (void)record;
 
@@ -236,6 +248,10 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (process_key_behavior(keycode, record, key)) {
+        return false;
+    }
+
+    if (process_direct_action_key(keycode, record)) {
         return false;
     }
 

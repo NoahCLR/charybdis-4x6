@@ -48,15 +48,16 @@ to understand and easy to change:
 If you want to understand what makes this userspace special, start with
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). That
 file shows the physical layout, the authored `key_behaviors[]` table, combos,
-macros, and how the pointer-mode keys are configured.
+the VIA macro defaults, the hardcoded macro table, and how the pointer-mode
+keys are configured.
 
 There is also a small VIA bridge in
 [`via layouts/via_to_qmk_layout.py`](./via%20layouts/via_to_qmk_layout.py).
 That script is useful when you want to experiment quickly in VIA without
 giving up a readable, source-controlled
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c): it
-converts VIA's exported layer data and custom keycodes back into the formatted
-`LAYOUT()` blocks this repo uses.
+converts VIA's exported layer data, macro slots, and custom keycodes back into
+the authored `keymap.c` tables this repo uses.
 
 ## Where To Change Things
 
@@ -64,7 +65,7 @@ If you want to adapt this layout, these are the main files to touch first:
 
 | File | What You Change There |
 | --- | --- |
-| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | physical layout, combos, macros, and the authored `key_behaviors[]` table |
+| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | physical layout, combos, `VIA_MACROS(MACRO)`, `HARDCODED_MACROS(MACRO)`, and the authored `key_behaviors[]` table |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h) | layer colors, pointer-mode colors, LED groups, and the auto-mouse gradient |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, auto-mouse target layer and timeout, auto-sniping, dragscroll feel, and other keymap-facing behavior |
 | [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, sensor/report settings, and low-level QMK overrides |
@@ -94,11 +95,28 @@ That layer order matters in a few places:
 
 If you change the layout in VIA and want to bring it back into source, use
 [`via_to_qmk_layout.py`](./via%20layouts/via_to_qmk_layout.py) in
-[`via layouts`](./via%20layouts). It reads
-[`charybdis.layout.json`](./via%20layouts/charybdis.layout.json), maps VIA's
-layer indices and custom keycodes back to this keymap, and can either print
-formatted `LAYOUT()` blocks or write them back into
-[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+[`via layouts`](./via%20layouts). It reads a VIA export, maps VIA's layer
+indices and custom keycodes back to this keymap, and can print or rewrite both
+`keymaps[][]` and `VIA_MACROS(MACRO)` in
+[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). The
+separate `HARDCODED_MACROS(MACRO)` block stays authored in source.
+
+## Macros
+
+This keymap uses two macro surfaces on purpose:
+
+- `VIA_MACRO_n` is the VIA/QMK dynamic macro keycode range. Defaults for those
+  slots are authored in `VIA_MACROS(MACRO)` in
+  [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), and
+  the VIA conversion script can sync them from an exported `macros[]` block.
+- `MACRO_n` is the repo's hardcoded custom macro range. Those payloads live in
+  `HARDCODED_MACROS(MACRO)` in
+  [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) and
+  do not come from VIA exports.
+
+That split keeps VIA-editable defaults and firmware-owned macros separate while
+still letting both kinds of macro keycodes appear in layers, combos, and
+`key_behaviors[]`.
 
 ## Combos
 
