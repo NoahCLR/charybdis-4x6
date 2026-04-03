@@ -12,6 +12,16 @@
             "problemMatcher": []
         },
         {
+            "label": "Build QMK with Compilation Database",
+            "type": "shell",
+            "command": "qmk compile --compiledb -kb bastardkb/charybdis/4x6 -km noah",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Run VIA to QMK Layout Sync",
             "type": "process",
             "command": "python3",
