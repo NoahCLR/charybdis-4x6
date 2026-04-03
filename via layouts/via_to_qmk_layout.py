@@ -79,7 +79,7 @@ PD_MODE_KEYCODES = [
     "PINCH_MODE",
 ]
 
-# Token normalisation: VIA JSON format → QMK keymap style.
+# Token normalization: VIA JSON format → QMK keymap style.
 # VIA exports keycodes in its own format (CUSTOM(), MACRO(), S(), etc.)
 # that don't match what we use in the QMK keymap sources. This dict translates them.
 REPLACEMENTS = {
