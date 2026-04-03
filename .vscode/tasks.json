@@ -1,0 +1,24 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build QMK",
+            "type": "shell",
+            "command": "zsh -i -c 'qmk-build'",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run VIA to QMK Layout Sync",
+            "type": "process",
+            "command": "python3",
+            "args": [
+                "${workspaceFolder}/via layouts/via_to_qmk_layout.py"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}

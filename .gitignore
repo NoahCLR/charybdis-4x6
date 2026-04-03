@@ -14,4 +14,3 @@ compile_commands.json
 
 # Claude Code
 .claude/
-.vscode/tasks.json
