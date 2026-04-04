@@ -7,7 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 void held_action_register(keypos_t key_pos, uint16_t action);
 void held_action_unregister(keypos_t key_pos, uint16_t action);

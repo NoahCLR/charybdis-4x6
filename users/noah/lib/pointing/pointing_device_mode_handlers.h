@@ -7,7 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 report_mouse_t handle_volume_mode(report_mouse_t mouse_report);
 report_mouse_t handle_brightness_mode(report_mouse_t mouse_report);

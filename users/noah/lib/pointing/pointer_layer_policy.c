@@ -2,7 +2,7 @@
 // Pointer Layer Policy
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "noah_keymap.h"
 #include "pointing_device_modes.h"

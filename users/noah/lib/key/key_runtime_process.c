@@ -6,6 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_internal.h"
+#include "synthetic_record.h"
 
 static inline void deactivate_momentary_layer_if_unlocked(uint16_t keycode) {
     uint8_t layer = behavior_get_layer(keycode);
@@ -229,6 +230,13 @@ bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // Synthetic records are dispatched by the key_behavior action system to
+    // route keymap-local custom keycodes back through process_record_user().
+    // Skip the physical key runtime so the keymap-local handler can run.
+    if (noah_synthetic_record_active()) {
+        return true;
+    }
+
     if (record->event.pressed && active_key.keycode != KC_NO && !active_key_matches(keycode, record->event.key) && is_layer_key(active_key.keycode)) {
         active_key.layer_interrupted = true;
     }

@@ -10,7 +10,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "noah_keymap.h"   // VOLUME_MODE, BRIGHTNESS_MODE, etc.
 #include "pd_mode_flags.h" // PD_MODE_* constants, state queries

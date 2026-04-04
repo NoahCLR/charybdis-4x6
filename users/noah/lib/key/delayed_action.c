@@ -2,7 +2,7 @@
 // Delayed Action Dispatch
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "../action/action_dispatch.h"
 #include "delayed_action.h"

@@ -2,7 +2,7 @@
 // Multi-Tap Engine
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "multi_tap_engine.h"
 

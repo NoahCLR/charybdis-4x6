@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 bool          pointer_layer_policy_is_mouse_record(uint16_t keycode);
 layer_state_t pointer_layer_policy_apply(layer_state_t state);

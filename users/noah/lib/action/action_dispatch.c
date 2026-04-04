@@ -2,13 +2,14 @@
 // Action Dispatch
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #ifdef VIA_ENABLE
 #    include "dynamic_keymap.h"
 #endif
 
 #include "noah_keymap.h"
+#include "synthetic_record.h"
 #include "../pointing/pointing_device_modes.h"
 #include "../state/pd_shared_state.h"
 #include "action_dispatch.h"
@@ -60,6 +61,11 @@ void action_dispatch(uint16_t action) {
 #endif
 
     if (macro_dispatch(action)) {
+        return;
+    }
+
+    if (action >= NOAH_KEYMAP_SAFE_RANGE) {
+        noah_dispatch_synthetic_tap(action);
         return;
     }
 

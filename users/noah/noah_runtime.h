@@ -2,14 +2,16 @@
 // Noah Runtime Entry Points
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Shared userspace hook implementations. users/noah/noah.c exposes the QMK
-// *_user hooks and forwards to these helpers before the optional weak
-// *_keymap delegates in keymap.c.
+// Shared userspace helpers for the noah keymaps' standard QMK hooks.
+// users/noah/hooks.c provides weak default *_user implementations that call
+// these helpers, and any keymap-local override can call back into them to keep
+// the shared userspace behavior.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
+void           noah_eeconfig_init_user(void);
 bool           noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
 bool           noah_process_record_user(uint16_t keycode, keyrecord_t *record);
 void           noah_matrix_scan_user(void);

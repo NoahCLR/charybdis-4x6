@@ -1,4 +1,4 @@
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "noah_keymap.h"
 #include "../macro/macro_payload.h"

@@ -72,6 +72,7 @@ PD_MODE_KEYCODES = [
     "DRAGSCROLL",
     "PINCH_MODE",
 ]
+NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT = MACRO_COUNT + (2 * len(PD_MODE_KEYCODES)) + len(LAYER_NAMES)
 
 # Token normalization: VIA JSON format → QMK keymap style.
 # VIA exports keycodes in its own format (CUSTOM(), MACRO(), S(), etc.)
@@ -123,6 +124,14 @@ REPLACEMENTS = {
     "S(KC_LBRC)": "KC_LCBR",
 }
 
+_KEYMAP_CUSTOM_KEYCODES_PATTERN = re.compile(
+    r"enum\s+keymap_custom_keycodes\s*\{(?P<body>.*?)\};",
+    re.DOTALL,
+)
+_LINE_COMMENT_PATTERN = re.compile(r"//.*?$", re.MULTILINE)
+_BLOCK_COMMENT_PATTERN = re.compile(r"/\*.*?\*/", re.DOTALL)
+_ENUM_ENTRY_PATTERN = re.compile(r"^([A-Z_][A-Z0-9_]*)(?:\s*=\s*(.+))?$")
+
 # VIA encodes upstream Charybdis keyboard-level keycodes as CUSTOM(0)..CUSTOM(7).
 for i, keycode in enumerate(CHARYBDIS_UPSTREAM_KEYCODES):
     REPLACEMENTS[f"CUSTOM({i})"] = keycode
@@ -147,6 +156,49 @@ for i in range(MACRO_COUNT):
 # authored through key_behaviors[].
 for i, keycode in enumerate(PD_MODE_KEYCODES, start=MACRO_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
+
+
+def load_keymap_local_custom_keycodes() -> list[str]:
+    if not KEYMAP_FILE.exists():
+        die(f"keymap.c not found: {KEYMAP_FILE}")
+
+    keymap_text = KEYMAP_FILE.read_text()
+    match = _KEYMAP_CUSTOM_KEYCODES_PATTERN.search(keymap_text)
+    if not match:
+        return []
+
+    body = _BLOCK_COMMENT_PATTERN.sub("", match.group("body"))
+    body = _LINE_COMMENT_PATTERN.sub("", body)
+
+    keycodes: list[str] = []
+
+    for raw_entry in body.split(","):
+        entry = raw_entry.strip()
+        if not entry:
+            continue
+
+        match = _ENUM_ENTRY_PATTERN.fullmatch(entry)
+        if not match:
+            die(f"could not parse enum keymap_custom_keycodes entry: {entry!r}")
+
+        name, value = match.groups()
+        if name == "KEYMAP_CUSTOM_KEYCODE_SENTINEL":
+            if value is None or value.strip() != "NOAH_KEYMAP_SAFE_RANGE - 1":
+                die("KEYMAP_CUSTOM_KEYCODE_SENTINEL must be assigned to NOAH_KEYMAP_SAFE_RANGE - 1")
+            continue
+
+        if value is not None:
+            normalized_value = value.strip()
+            if keycodes or normalized_value != "NOAH_KEYMAP_SAFE_RANGE":
+                die(
+                    "only the first real keymap-local custom keycode may have an explicit assignment, "
+                    "and it must be NOAH_KEYMAP_SAFE_RANGE"
+                )
+
+        keycodes.append(name)
+
+    return keycodes
+
 
 # ─── Layout structure ─────────────────────────────────────────────────────────
 # These control the physical key layout and output formatting.
@@ -267,6 +319,10 @@ def die(message: str) -> NoReturn:
     sys.exit(1)
 
 
+for i, keycode in enumerate(load_keymap_local_custom_keycodes(), start=NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT):
+    REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
+
+
 def layer_name_for_index(idx: int) -> str:
     return LAYER_NAMES[idx] if idx < len(LAYER_NAMES) else f"LAYER_{idx}"
 
@@ -290,7 +346,10 @@ def apply_replacements(token: str) -> str:
     if token in REPLACEMENTS:
         return REPLACEMENTS[token]
     if _WARN_PATTERNS.match(token):
-        print(f"WARNING: unmapped token '{token}' — add it to REPLACEMENTS", file=sys.stderr)
+        print(
+            f"WARNING: unmapped token '{token}' — add it to REPLACEMENTS or keymap_custom_keycodes",
+            file=sys.stderr,
+        )
     return token
 
 

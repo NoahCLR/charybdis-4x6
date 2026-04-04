@@ -2,9 +2,11 @@
 // Held Action Ownership
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "noah_keymap.h"
 #include "held_action.h"
+#include "synthetic_record.h"
 
 // A held pure modifier is owned by the physical switch that started it, not by
 // whichever custom key the tap/hold FSM is currently resolving.
@@ -143,12 +145,22 @@ void held_action_register(keypos_t key_pos, uint16_t action) {
         return;
     }
 
+    if (action >= NOAH_KEYMAP_SAFE_RANGE) {
+        noah_dispatch_synthetic_record(action, true);
+        return;
+    }
+
     register_code16(action);
 }
 
 void held_action_unregister(keypos_t key_pos, uint16_t action) {
     if (held_action_is_pure_modifier(action)) {
         held_modifier_release_owned_by_key(key_pos);
+        return;
+    }
+
+    if (action >= NOAH_KEYMAP_SAFE_RANGE) {
+        noah_dispatch_synthetic_record(action, false);
         return;
     }
 

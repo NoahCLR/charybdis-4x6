@@ -2,9 +2,8 @@
 // RGB Runtime
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
-
 #include "noah_keymap.h"
+#include "rgb_runtime.h"
 #include "rgb_config.h"
 #include "../pointing/pointing_device_modes.h"
 #include "rgb_automouse.h"
@@ -21,7 +20,7 @@ static rgb_t led_group_rgb[LAYER_LED_GROUP_COUNT];
 static rgb_t pd_mode_led_group_rgb[PD_MODE_LED_GROUP_COUNT];
 #endif
 
-void noah_keyboard_post_init_user(void) {
+void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
     for (uint8_t i = 0; i < LAYER_COUNT; i++) {
         layer_rgb[i] = hsv_to_rgb(layer_colors[i]);

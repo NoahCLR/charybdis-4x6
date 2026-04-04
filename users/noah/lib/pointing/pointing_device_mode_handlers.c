@@ -2,7 +2,7 @@
 // Pointing Device Mode Handlers
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "../state/keyboard_mod_state.h"
 #include "pointing_device_mode_handlers.h"

@@ -8,7 +8,7 @@
 #pragma once
 
 #include "quantum_keycodes.h"
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
 //
@@ -70,6 +70,18 @@ enum {
 // PD_MODE_LOCK_BASE reserves one lock/toggle action per pd-mode keycode.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
 // actions authored in key_behaviors[]. Use the LOCK_LAYER(n) macro there.
+// Keymap-local custom keycodes are declared in keymap.c's
+// enum keymap_custom_keycodes. Keep the sentinel there, then add real
+// keycodes below it so the first one lands on NOAH_KEYMAP_SAFE_RANGE.
+// Those keycodes can be handled in process_record_user() and used directly in
+// key_behaviors[] actions such as TAP_SENDS(...).
+//
+// Example in keymap.c:
+//   enum keymap_custom_keycodes {
+//       KEYMAP_CUSTOM_KEYCODE_SENTINEL = NOAH_KEYMAP_SAFE_RANGE - 1,
+//       MY_CUSTOM_KEY,
+//       MY_OTHER_KEY,
+//   };
 
 enum custom_keycodes {
     MACRO_0 = SAFE_RANGE,
@@ -103,13 +115,15 @@ enum custom_keycodes {
 #define HARDCODED_MACRO_SLOT_COUNT ((MACRO_15 - MACRO_0) + 1)
 #define LOCK_PD_MODE(mode_keycode_) (PD_MODE_LOCK_BASE + ((mode_keycode_) - VOLUME_MODE))
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
+#define NOAH_KEYMAP_SAFE_RANGE CUSTOM_KEYCODES_END
 
 bool                          macro_dispatch(uint16_t keycode);
 extern const char *const      via_macro_payloads[VIA_MACRO_SLOT_COUNT];
 extern const char *const      hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT];
 extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
 
-// keymap.c also uses this header as its authored keymap surface, so re-export
-// the authoring schema and keymap materializer here.
-#include "lib/key/key_behavior.h"
-#include "lib/keymap_materialize.h"
+// keymap.c uses this header as its authored keymap surface, so re-export the
+// shared runtime helpers, authoring schema, and keymap table helpers here.
+#include "noah_runtime.h" // IWYU pragma: export
+#include "lib/key/key_behavior.h"   // IWYU pragma: export
+#include "lib/keymap_materialize.h" // IWYU pragma: export

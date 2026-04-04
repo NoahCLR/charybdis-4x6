@@ -9,11 +9,30 @@
 //   - key_behaviors[]
 //   - keymaps[][]
 //
-// Shared layer and custom-keycode declarations live in users/noah/noah_keymap.h.
-// Runtime processing lives in the userspace runtime modules under users/noah/lib/.
+// Shared layer declarations and userspace-owned keycodes live in
+// users/noah/noah_keymap.h. Keymap-local custom keycodes live below.
+// Default standard QMK hooks live in users/noah/hooks.c; shared runtime
+// processing lives in the userspace runtime modules under users/noah/lib/.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "noah_keymap.h"
+
+// ─── Keymap-Local Custom Keycodes ──────────────────────────────────────────
+//
+// Add keymap-local custom keycodes here. The VIA -> QMK converter reads this
+// enum and maps later CUSTOM(n) tokens back to these symbolic names.
+//
+// Keep the sentinel, then add real keycodes below it. The first real keycode
+// will naturally start at NOAH_KEYMAP_SAFE_RANGE. Those keycodes can be
+// handled in process_record_user() and used inside key_behaviors[] actions
+// such as TAP_SENDS(...), TAP_AT_HOLD_THRESHOLD(...), or
+// PRESS_AND_HOLD_UNTIL_RELEASE(...).
+//
+enum keymap_custom_keycodes {
+    KEYMAP_CUSTOM_KEYCODE_SENTINEL = NOAH_KEYMAP_SAFE_RANGE - 1,
+    // MY_CUSTOM_KEY,
+    // MY_OTHER_KEY,
+};
 
 // ─── VIA Macros ─────────────────────────────────────────────────────────────
 // VIA_MACRO_0–15 are the authored aliases for VIA's dynamic macro slots.

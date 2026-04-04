@@ -2,7 +2,7 @@
 // Pointing Device Mode State
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "pointing_device_modes.h"
 

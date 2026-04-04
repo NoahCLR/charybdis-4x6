@@ -13,7 +13,9 @@ COMBO_ENABLE = yes
 # Link-time optimization: reduces binary size.
 LTO_ENABLE = yes
 
-SRC += noah.c
+SRC += runtime_init.c
+SRC += hooks.c
+SRC += synthetic_record.c
 SRC += lib/split_role.c
 SRC += lib/key/key_behavior_lookup.c
 SRC += lib/key/key_runtime.c

@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "noah_keymap.h"
 #include "../action/action_dispatch.h"
@@ -51,6 +51,8 @@ typedef struct {
 
 extern active_key_state_t active_key;
 extern multi_tap_t        multi_tap;
+
+void noah_key_runtime_scan(void);
 
 uint8_t behavior_get_layer(uint16_t keycode);
 bool    is_layer_key(uint16_t keycode);

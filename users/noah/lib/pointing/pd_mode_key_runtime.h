@@ -7,7 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 typedef uint16_t (*pd_mode_key_runtime_advance_multi_tap_t)(void *context, uint16_t keycode);
 typedef void (*pd_mode_key_runtime_dispatch_tap_or_begin_multi_tap_t)(void *context, uint16_t keycode, keyrecord_t *record);

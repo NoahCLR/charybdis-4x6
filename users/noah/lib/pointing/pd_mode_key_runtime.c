@@ -2,7 +2,7 @@
 // Pointing-Device Mode Key Runtime
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "../state/pd_shared_state.h"
 #include "pd_mode_key_runtime.h"

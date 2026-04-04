@@ -7,7 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "../state/keyboard_mod_state.h"
 #include "multi_tap_engine.h"

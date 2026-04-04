@@ -57,7 +57,7 @@ static inline void deactivate_pending_multi_tap_layer_before_lock(uint16_t actio
     }
 }
 
-void noah_matrix_scan_user(void) {
+void noah_key_runtime_scan(void) {
     pd_mode_key_runtime_scan();
 
     if (active_key.keycode != KC_NO && !active_key.hold_fired) {

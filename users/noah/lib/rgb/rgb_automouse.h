@@ -7,7 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 
