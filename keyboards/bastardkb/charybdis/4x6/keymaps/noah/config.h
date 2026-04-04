@@ -205,6 +205,18 @@
 #    ifdef RGB_MATRIX_TIMEOUT
 #        undef RGB_MATRIX_TIMEOUT
 #    endif
+// Key-behavior RGB overlay. Comment this out to disable the multi-tap /
+// hold-threshold feedback colors entirely.
+#    define RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+// Half-period for flashing hold colors on actions that stay registered while
+// held, such as PRESS_AND_HOLD_UNTIL_RELEASE modifiers or repeatable keys.
+#    define RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS 200
+#    if RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS <= 0
+#        error "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS must be greater than zero"
+#    endif
+// Auto-mouse timeout gradient. Comment this out to disable the white-to-red
+// auto-mouse layer countdown overlay.
+#    define RGB_AUTOMOUSE_GRADIENT_ENABLE
 
 // Cap brightness to protect LEDs from drawing too much current.
 // 200/255 ≈ 78% brightness.
@@ -213,7 +225,7 @@
 // Start with a solid color effect (no animation) — layer indicators
 // override this when a non-base layer is active.
 #    define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_SOLID_COLOR
-#    define RGB_MATRIX_DEFAULT_HUE 0 // Red hue
+#    define RGB_MATRIX_DEFAULT_HUE 0   // Red hue
 #    define RGB_MATRIX_DEFAULT_SAT 255 // Full saturation
 #    define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
 

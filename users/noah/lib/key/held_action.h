@@ -11,5 +11,6 @@
 
 void held_action_register(keypos_t key_pos, uint16_t action);
 void held_action_unregister(keypos_t key_pos, uint16_t action);
-bool held_action_survives_flush(uint16_t action);
+bool held_action_survives_flush(keypos_t key_pos, uint16_t action);
+bool held_action_release_owned_by_key(keypos_t key_pos);
 bool held_modifier_release_owned_by_key(keypos_t key_pos);

@@ -166,7 +166,7 @@ This pattern applies to:
 | `pointing_device_task_user()` | `noah_pointing_device_task_user()` | pointer-mode mouse-report transforms |
 | `pointing_device_init_user()` | `noah_pointing_device_init_user()` | auto-mouse and shared pointer-state init |
 | `is_mouse_record_user()` | `noah_is_mouse_record_user()` | pointer-layer mouse-key classification |
-| `rgb_matrix_indicators_advanced_user()` | `noah_rgb_matrix_indicators_advanced_user()` | shared layer and pointer-mode RGB rendering |
+| `rgb_matrix_indicators_advanced_user()` | `noah_rgb_matrix_indicators_advanced_user()` | shared layer, auto-mouse, key-feedback, and pointer-mode RGB rendering |
 
 ## Custom Keycodes
 

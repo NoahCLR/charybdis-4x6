@@ -44,6 +44,10 @@
 #    endif
 #    define SPLIT_ACTIVITY_ENABLE
 
+// Register a custom split RPC transaction for syncing shared runtime state
+// such as pd-mode flags, auto-mouse RGB progress, and key-feedback flags.
+#    define SPLIT_TRANSACTION_IDS_USER PUT_RUNTIME_SHARED_SYNC
+
 #endif // SPLIT_KEYBOARD
 
 // ─── RGB hardware geometry ──────────────────────────────────────────────────
@@ -68,12 +72,6 @@
 // ─── Pointing device (trackball) ────────────────────────────────────────────
 
 #ifdef POINTING_DEVICE_ENABLE
-
-// Register a custom split RPC transaction for syncing pointing device
-// state (auto-mouse RGB progress + mode flags) from master to slave.
-#    ifdef SPLIT_KEYBOARD
-#        define SPLIT_TRANSACTION_IDS_USER PUT_PD_SYNC
-#    endif
 
 // Keep split-pointing polling at the 1 ms cadence QMK already defaults to.
 // Higher values ease transport/main-loop pressure, but trade away responsiveness.

@@ -64,6 +64,14 @@ CHARYBDIS_UPSTREAM_KEYCODES = [
 ]
 
 # Current custom_keycodes enum entries that can appear directly on VIA layers.
+# These are userspace-owned SAFE_RANGE keycodes from users/noah/noah_keymap.h.
+# If you add a new shared userspace keycode that VIA can emit directly, update
+# this list so the script can map its CUSTOM(n) token back to the symbolic
+# name.
+#
+# Keymap-local custom keycodes such as RIGHT_THUMB / LEFT_THUMB are handled
+# separately below by parsing enum keymap_custom_keycodes in keymap.c, so they
+# do not need hardcoded entries here.
 PD_MODE_KEYCODES = [
     "VOLUME_MODE",
     "BRIGHTNESS_MODE",
@@ -72,6 +80,14 @@ PD_MODE_KEYCODES = [
     "DRAGSCROLL",
     "PINCH_MODE",
 ]
+# Size of the shared userspace-owned custom-keycode range that sits below
+# NOAH_KEYMAP_SAFE_RANGE:
+#   - MACRO_0..15
+#   - PD mode keycodes
+#   - PD mode lock actions (one derived action per PD mode keycode)
+#   - layer lock actions (one derived action per layer)
+#
+# Keymap-local custom keycodes begin immediately after this range.
 NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT = MACRO_COUNT + (2 * len(PD_MODE_KEYCODES)) + len(LAYER_NAMES)
 
 # Token normalization: VIA JSON format → QMK keymap style.
@@ -159,6 +175,17 @@ for i, keycode in enumerate(PD_MODE_KEYCODES, start=MACRO_COUNT):
 
 
 def load_keymap_local_custom_keycodes() -> list[str]:
+    # keymap.c owns the tail of the custom SAFE_RANGE block. Keycodes that are
+    # specific to this keymap, such as RIGHT_THUMB / LEFT_THUMB, belong there
+    # instead of in users/noah/noah_keymap.h.
+    #
+    # Keeping this dynamic means most keymap-local additions do not require any
+    # script edits: add the enum entry in keymap.c and the converter will map
+    # the later CUSTOM(n) token automatically.
+    #
+    # If the shared userspace custom-keycode range changes instead, update the
+    # configuration section above so NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT stays
+    # aligned with users/noah/noah_keymap.h.
     if not KEYMAP_FILE.exists():
         die(f"keymap.c not found: {KEYMAP_FILE}")
 
@@ -319,6 +346,9 @@ def die(message: str) -> NoReturn:
     sys.exit(1)
 
 
+# Keymap-local custom keycodes start immediately after the shared userspace
+# range. This is why RIGHT_THUMB / LEFT_THUMB do not need hardcoded
+# REPLACEMENTS entries: their CUSTOM(n) indices are derived from keymap.c.
 for i, keycode in enumerate(load_keymap_local_custom_keycodes(), start=NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
 
@@ -347,7 +377,9 @@ def apply_replacements(token: str) -> str:
         return REPLACEMENTS[token]
     if _WARN_PATTERNS.match(token):
         print(
-            f"WARNING: unmapped token '{token}' — add it to REPLACEMENTS or keymap_custom_keycodes",
+            "WARNING: unmapped token "
+            f"'{token}' — add a shared userspace keycode to the config section above, "
+            "or add a keymap-local keycode to enum keymap_custom_keycodes in keymap.c",
             file=sys.stderr,
         )
     return token

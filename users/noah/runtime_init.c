@@ -13,6 +13,7 @@
 
 #include "lib/key/key_runtime_internal.h" // IWYU pragma: keep
 #include "lib/rgb/rgb_runtime.h"
+#include "lib/state/runtime_shared_state.h"
 
 #ifdef VIA_ENABLE
 #    include "dynamic_keymap.h"
@@ -123,6 +124,7 @@ void noah_matrix_scan_user(void) {
 #endif
 
     noah_key_runtime_scan();
+    runtime_shared_state_sync_tick();
 }
 
 void noah_keyboard_post_init_user(void) {
@@ -134,6 +136,7 @@ void noah_keyboard_post_init_user(void) {
 #endif
 
     noah_rgb_runtime_post_init();
+    runtime_shared_state_init();
 }
 
 #ifdef VIA_ENABLE

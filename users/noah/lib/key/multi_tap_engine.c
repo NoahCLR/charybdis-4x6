@@ -91,7 +91,7 @@ uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode, key_behavior_step_
 
     key_behavior_step_t step = lookup(keycode, mt->count);
 
-    if (key_behavior_step_present(step) && step.hold.present) {
+    if (key_behavior_step_present(step) && (step.hold.present || step.long_hold.present)) {
         mt->pending_hold = true;
         mt->tap_action   = step.tap.action;
         mt->hold         = step.hold;
@@ -117,6 +117,7 @@ uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode, bool (*has_mo
     uint16_t cached_single = mt->single_action;
     uint8_t  cached_count  = mt->count;
     uint16_t cached_term   = mt->tap_hold_term;
+    bool     cached_has_hold = mt->hold.present;
 
     *repeat_count = 1;
 
@@ -125,13 +126,13 @@ uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode, bool (*has_mo
     mt->hold         = hold_behavior_none();
     mt->long_hold    = hold_behavior_none();
 
-    if (elapsed >= cached_term) {
+    if (cached_has_hold && elapsed >= cached_term) {
         uint16_t action = cached_hold;
         multi_tap_reset(mt);
         return action;
     }
 
-    if (has_more(keycode, mt->count)) {
+    if (elapsed < cached_term && has_more(keycode, mt->count)) {
         mt->timer     = timer_read();
         *repeat_count = 0;
         return KC_NO;

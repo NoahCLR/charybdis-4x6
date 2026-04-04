@@ -30,6 +30,8 @@
 //
 enum keymap_custom_keycodes {
     KEYMAP_CUSTOM_KEYCODE_SENTINEL = NOAH_KEYMAP_SAFE_RANGE - 1,
+    RIGHT_THUMB,
+    LEFT_THUMB
     // MY_CUSTOM_KEY,
     // MY_OTHER_KEY,
 };
@@ -55,22 +57,22 @@ enum keymap_custom_keycodes {
 //   - {250} wait 250 ms before the next macro step
 //     e.g. {KC_A}{250}{KC_B} pauses between A and B; other keys pressed
 //     during the delay are queued
-#define VIA_MACROS(MACRO) \
-    MACRO(VIA_MACRO_0, "{KC_LGUI,KC_SPC}") \
-    MACRO(VIA_MACRO_1, "{KC_LALT,KC_SPC}") \
-    MACRO(VIA_MACRO_2, "{KC_LALT,KC_LGUI,KC_SPC}") \
+#define VIA_MACROS(MACRO)                                \
+    MACRO(VIA_MACRO_0, "{KC_LGUI,KC_SPC}")               \
+    MACRO(VIA_MACRO_1, "{KC_LALT,KC_SPC}")               \
+    MACRO(VIA_MACRO_2, "{KC_LALT,KC_LGUI,KC_SPC}")       \
     MACRO(VIA_MACRO_3, "{KC_LCTL,KC_LALT,KC_LGUI,KC_C}") \
     MACRO(VIA_MACRO_4, "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}") \
-    MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}") \
-    MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}") \
-    MACRO(VIA_MACRO_7, "") \
-    MACRO(VIA_MACRO_8, "") \
-    MACRO(VIA_MACRO_9, "") \
-    MACRO(VIA_MACRO_10, "") \
-    MACRO(VIA_MACRO_11, "") \
-    MACRO(VIA_MACRO_12, "") \
-    MACRO(VIA_MACRO_13, "") \
-    MACRO(VIA_MACRO_14, "") \
+    MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}")       \
+    MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}")         \
+    MACRO(VIA_MACRO_7, "")                               \
+    MACRO(VIA_MACRO_8, "")                               \
+    MACRO(VIA_MACRO_9, "")                               \
+    MACRO(VIA_MACRO_10, "")                              \
+    MACRO(VIA_MACRO_11, "")                              \
+    MACRO(VIA_MACRO_12, "")                              \
+    MACRO(VIA_MACRO_13, "")                              \
+    MACRO(VIA_MACRO_14, "")                              \
     MACRO(VIA_MACRO_15, "")
 
 // ─── Hardcoded Macros ───────────────────────────────────────────────────────
@@ -177,7 +179,8 @@ enum keymap_custom_keycodes {
 // both together for a two-stage hold
 //
 // action can be a plain keycode, a modded keycode, a macro, a layer lock,
-// or a pointer-mode lock
+// a pointer-mode lock, or a QMK behavior keycode such as TG()/TO()/TT()/OSL()
+// and LT()/MT() when you want their tap or hold semantics explicitly
 //   - Use LOCK_LAYER(layer) to toggle a layer lock.
 //     Locking the same layer again turns it off; locking a different layer
 //     switches the lock to that layer.
@@ -281,22 +284,22 @@ const key_behavior_t
 
             // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
             {
-                .keycode = MO(LAYER_SYM),
+                .keycode = LEFT_THUMB,
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_SYM))},
-                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
+                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_SYM)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
                     },
             },
 
             {
-                .keycode = MO(LAYER_NAV),
+                .keycode = RIGHT_THUMB,
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV))},
-                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
+                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
                     },
@@ -356,7 +359,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
             KC_LEFT_CTRL,  LT(LAYER_SYM,KC_Z),             KC_X,              KC_C,              KC_V,              KC_B,                KC_N,             KC_M,          KC_COMM,           KC_DOT,  LT(LAYER_NAV,KC_SLSH),     KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,     MO(LAYER_SYM),        MO(LAYER_NAV),            KC_ENT,
+                                                                       KC_LEFT_GUI,            KC_SPC,     LEFT_THUMB,        RIGHT_THUMB,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
   //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
     ),

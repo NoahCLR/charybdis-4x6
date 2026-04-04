@@ -105,7 +105,32 @@ static const pd_mode_led_group_t pd_mode_led_groups[] = {
 //
 // White is capped at v=150 (not MAX_BRIGHTNESS) to limit current draw — all LEDs
 // lit white at full brightness exceeds the USB power budget.
+#ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
 static const hsv_t automouse_color_start = {.h = 0, .s = 0, .v = 150};                             // white
 static const hsv_t automouse_color_end   = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // red
+#endif
+
+// ─── Key behavior feedback ──────────────────────────────────────────────────
+//
+// Visual feedback for the custom key behavior engine state.
+//
+// Uses a neutral pending color for open multi-tap windows, a hold-tier color
+// for hold pending / hold trigger / active held non-layer actions, and a
+// longer-hold-tier color for longer-hold trigger / active longer-hold states.
+//
+// These paint both halves on top of the current layer color, before
+// the pd-mode overlay — so the right half still shows pd-mode colors
+// when a trackball mode is active.
+
+#ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+// Multi-tap pending: neutral white while the tap window is still open.
+static const hsv_t feedback_multi_tap_pending_color = {.h = 0, .s = 0, .v = 120};
+
+// Hold-tier feedback: warm amber for pending/triggered hold states.
+static const hsv_t feedback_hold_active_color = {.h = 28, .s = 255, .v = 150};
+
+// Longer-hold-tier feedback: deeper orange for longer-hold states.
+static const hsv_t feedback_long_hold_active_color = {.h = 14, .s = 255, .v = 150};
+#endif
 
 #endif // RGB_MATRIX_ENABLE

@@ -39,11 +39,11 @@ to understand and easy to change:
   rest of the board
 - `AUTO_MOUSE` brings up the pointer layer when the trackball moves and clears
   it again after the configured timeout
-- RGB is functional feedback: it shows layers, pointer modes, and the
-  auto-mouse timeout as a white-to-red countdown
+- RGB is functional feedback: it shows layers, pointer modes, the key-behavior
+  engine state, and the auto-mouse timeout as a white-to-red countdown
 - [`rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h)
-  is where the layer colors, pointer-mode colors, LED groups, and auto-mouse
-  countdown gradient are configured
+  is where the layer colors, pointer-mode colors, LED groups, auto-mouse
+  countdown gradient, and key-behavior feedback colors are configured
 
 If you want to understand what makes this userspace special, start with
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). That
@@ -66,8 +66,8 @@ If you want to adapt this layout, these are the main files to touch first:
 | File | What You Change There |
 | --- | --- |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | physical layout, combos, `VIA_MACROS(MACRO)`, `HARDCODED_MACROS(MACRO)`, and the authored `key_behaviors[]` table |
-| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h) | layer colors, pointer-mode colors, LED groups, and the auto-mouse gradient |
-| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, auto-mouse target layer and timeout, auto-sniping, dragscroll feel, and other keymap-facing behavior |
+| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h) | layer colors, pointer-mode colors, LED groups, the auto-mouse gradient, and key-behavior feedback colors |
+| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, key-behavior RGB toggles, auto-mouse target layer and timeout, auto-sniping, dragscroll feel, and other keymap-facing behavior |
 | [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, sensor/report settings, and low-level QMK overrides |
 
 In other words:
@@ -266,11 +266,18 @@ RGB is used as feedback, not decoration:
 
 - active layers can render layer colors
 - active pointer modes can render a mode color
+- the key-behavior engine can render multi-tap pending, hold pending,
+  trigger pulses, and active held non-layer feedback on both halves
 - the configured auto-mouse layer uses a white-to-red timeout gradient instead
   of a fixed solid color
+- held layer-switch actions use a short activation pulse rather than a
+  persistent flashing overlay; the active layer color is the feedback after
+  that
 
 Those colors and LED groups live in the keymap
 [`rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h).
+The on/off toggles for the key-behavior overlay and auto-mouse gradient live in
+the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 For the RGB authoring model and render order, see
 [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md).
 
@@ -285,8 +292,8 @@ These docs are the next place to look:
   hold, and multi-tap behavior
 - [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md): pointer-layer and
   trackball mode behavior
-- [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB colors, LED groups, and
-  auto-mouse gradient configuration
+- [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB colors, key-behavior
+  feedback, LED groups, and auto-mouse gradient configuration
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
 

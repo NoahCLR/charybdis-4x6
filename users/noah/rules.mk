@@ -27,7 +27,9 @@ SRC += lib/action/action_dispatch.c
 SRC += lib/action/macro_dispatch.c
 SRC += lib/macro/macro_payload.c
 SRC += lib/key/multi_tap_engine.c
+SRC += lib/key/key_runtime_feedback.c
 SRC += lib/state/keyboard_mod_state.c
+SRC += lib/state/runtime_shared_state.c
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
     SRC += lib/pointing/pointing_device_runtime.c
@@ -36,7 +38,6 @@ ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
     SRC += lib/pointing/pd_mode_registry.c
     SRC += lib/pointing/pointer_layer_policy.c
     SRC += lib/pointing/pointing_device_mode_handlers.c
-    SRC += lib/state/pd_shared_state.c
 endif
 
 ifeq ($(strip $(RGB_MATRIX_ENABLE)), yes)

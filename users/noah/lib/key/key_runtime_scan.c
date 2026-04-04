@@ -11,6 +11,10 @@ static bool hold_uses_one_shot_dispatch(hold_behavior_t hold) {
     return action_dispatch_is_layer_lock(hold.action) || action_dispatch_is_macro(hold.action) || !hold_registers_while_held(hold);
 }
 
+static bool hold_activation_needs_pulse(hold_behavior_t hold) {
+    return action_dispatch_is_layer_action(hold.action);
+}
+
 static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_hold) {
     if (hold_uses_one_shot_dispatch(hold)) {
         if (active_key.held_action_keycode != KC_NO) {
@@ -18,6 +22,7 @@ static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_ho
             active_key.held_action_keycode = KC_NO;
         }
         action_dispatch(hold.action);
+        key_feedback_pulse_arm(false);
         if (long_hold.present) {
             active_key.hold_fired          = false;
             active_key.hold_one_shot_fired = true;
@@ -32,6 +37,9 @@ static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_ho
     active_key.held_action_keycode = hold.action;
     active_key.hold_fired          = !long_hold.present;
     active_key.hold_one_shot_fired = false;
+    if (hold_activation_needs_pulse(hold)) {
+        key_feedback_pulse_arm(false);
+    }
 }
 
 static void promote_to_long_hold(hold_behavior_t long_hold) {
@@ -42,6 +50,7 @@ static void promote_to_long_hold(hold_behavior_t long_hold) {
 
     if (hold_uses_one_shot_dispatch(long_hold)) {
         action_dispatch(long_hold.action);
+        key_feedback_pulse_arm(true);
         active_key.hold_fired = true;
         return;
     }
@@ -49,6 +58,9 @@ static void promote_to_long_hold(hold_behavior_t long_hold) {
     held_action_register(active_key.key_pos, long_hold.action);
     active_key.held_action_keycode = long_hold.action;
     active_key.hold_fired          = true;
+    if (hold_activation_needs_pulse(long_hold)) {
+        key_feedback_pulse_arm(true);
+    }
 }
 
 static inline void deactivate_pending_multi_tap_layer_before_lock(uint16_t action) {

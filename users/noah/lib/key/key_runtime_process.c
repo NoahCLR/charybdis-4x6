@@ -55,7 +55,7 @@ static void flush_active_key(void) {
 
     if (active_key.hold_fired || active_key.held_action_keycode != KC_NO) {
         active_key.hold_fired = false;
-        if (active_key.held_action_keycode != KC_NO && !held_action_survives_flush(active_key.held_action_keycode)) {
+        if (active_key.held_action_keycode != KC_NO && !held_action_survives_flush(active_key.key_pos, active_key.held_action_keycode)) {
             held_action_unregister(active_key.key_pos, active_key.held_action_keycode);
             active_key.held_action_keycode = KC_NO;
         }
@@ -112,6 +112,7 @@ static bool process_key_behavior_release_pending_multi_tap_hold(uint16_t keycode
         return false;
     }
 
+    uint16_t              elapsed          = timer_elapsed(active_key.timer);
     delayed_action_mods_t cached_mods      = delayed_action_mods_from_multi_tap(&multi_tap);
     bool                  was_release_hold = hold_sends_on_release(multi_tap.hold);
     hold_behavior_t       cached_hold      = multi_tap.hold;
@@ -119,8 +120,10 @@ static bool process_key_behavior_release_pending_multi_tap_hold(uint16_t keycode
     uint8_t               repeat_count     = 0;
     uint16_t              action           = multi_tap_resolve_hold(&multi_tap, keycode, key_behavior_has_more_taps, &repeat_count);
 
-    if (was_release_hold && cached_hold.present && repeat_count == 1 && action == cached_hold.action) {
-        action = select_release_hold_action(timer_elapsed(active_key.timer), cached_hold.action, cached_long_hold, active_key.longer_hold_term);
+    if (!cached_hold.present && hold_sends_on_release(cached_long_hold) && elapsed >= active_key.longer_hold_term) {
+        action = cached_long_hold.action;
+    } else if (was_release_hold && cached_hold.present && repeat_count == 1 && action == cached_hold.action) {
+        action = select_release_hold_action(elapsed, cached_hold.action, cached_long_hold, active_key.longer_hold_term);
     }
 
     for (uint8_t i = 0; i < repeat_count; i++) {
@@ -143,8 +146,8 @@ static bool process_key_behavior_release_active_key(uint16_t keycode, keyrecord_
 
     if (!active_key_matches(keycode, record->event.key)) {
         // active_key may already belong to a newer custom press; release any
-        // pure modifier still owned by this physical key.
-        held_modifier_release_owned_by_key(record->event.key);
+        // held action still owned by this physical key.
+        held_action_release_owned_by_key(record->event.key);
         return true;
     }
 

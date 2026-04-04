@@ -9,6 +9,7 @@ That file is for visual configuration:
 - pointing-device mode colors
 - per-layer LED highlights
 - per-mode LED highlights
+- key-behavior feedback colors
 - the auto-mouse timeout gradient
 
 If you want to change how the board looks, start there.
@@ -18,6 +19,12 @@ If you want to change how RGB is rendered, look at:
 - `users/noah/lib/rgb/rgb_runtime.c`
 - `users/noah/lib/rgb/rgb_automouse.c`
 - `users/noah/lib/rgb/rgb_helpers.h`
+
+If you want to change what the key-behavior overlay means instead of how it is
+painted, also look at:
+
+- `users/noah/lib/key/key_runtime_feedback.c`
+- `users/noah/lib/key/key_runtime_scan.c`
 
 ## HSV Quick Reference
 
@@ -101,6 +108,36 @@ span animates. In this keymap the default dead time is one third of
 `AUTO_MOUSE_TIME`, but it is configurable in the keymap `config.h`. That
 reduces flicker while the trackball is still actively being used.
 
+### `feedback_*_color`
+
+These HSV values define the key-behavior feedback overlay:
+
+- `feedback_multi_tap_pending_color`
+- `feedback_hold_active_color`
+- `feedback_long_hold_active_color`
+
+In the current runtime, those colors are used for these categories:
+
+- multi-tap pending: the engine is waiting to see whether more taps arrive
+- hold pending: a hold path exists, but the final action is not resolved yet
+- hold trigger: a hold-tier action has just fired
+- long-hold trigger: a longer-hold tier action has just fired
+- held non-layer action active: a `PRESS_AND_HOLD_UNTIL_RELEASE(...)` action is
+  still registered and should stay visibly active
+
+Held layer-switch actions are intentionally a special case: they get the short
+trigger pulse when the threshold is crossed, but they do not keep a persistent
+hold overlay after that. Once the layer is on, the layer color itself is the
+main feedback.
+
+The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the keymap
+`config.h`. Its flash cadence is controlled by
+`RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
+
+The master half computes the semantic feedback flags. On split boards, the
+slave receives those packed flags through `runtime_shared_state`, then computes
+flash phase locally.
+
 ## Render Order
 
 `rgb_runtime.c` applies RGB in a deliberate order:
@@ -109,15 +146,18 @@ reduces flicker while the trackball is still actively being used.
 2. the auto-mouse gradient on the configured auto-mouse layer, if no solid
    layer color was painted
 3. per-layer LED groups
-4. the first active pointing-device mode color on the right half
-5. per-mode LED groups
+4. the key-behavior feedback overlay on both halves
+5. the first active pointing-device mode color on the right half
+6. per-mode LED groups
 
 That order matters.
 
 Examples:
 
 - a per-layer LED group can sit on top of a solid layer color
-- a pd-mode overlay can repaint the right half after the layer pass
+- the key-behavior overlay can temporarily repaint both halves on top of the
+  current layer color
+- a pd-mode overlay can repaint the right half after the feedback pass
 - a pd-mode LED group can then repaint selected LEDs on top of the mode overlay
 
 ## The Helper Types
@@ -175,14 +215,27 @@ If you want to change the timing model instead of just the colors, look at:
 `AUTOMOUSE_RGB_DEAD_TIME` must stay below `AUTO_MOUSE_TIME`. The build now
 checks that at compile time.
 
+### Change the key-behavior feedback colors
+
+Edit the relevant `feedback_*_color` values.
+
+### Disable the key-behavior overlay
+
+Comment out `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the keymap `config.h`.
+
+### Disable the auto-mouse gradient
+
+Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the keymap `config.h`.
+
 ## What This File Does Not Do
 
 `rgb_config.h` does not decide:
 
 - which layer becomes the auto-mouse layer
 - how long auto-mouse stays active
+- which key-behavior states count as pending, active, or pulsed feedback
 - when a pointing-device mode becomes active or locked
-- how split sync transports auto-mouse state
+- how split sync transports auto-mouse or key-feedback state
 
 Those behaviors live in the keymap `config.h` and the runtime files under
 `users/noah/lib/`.

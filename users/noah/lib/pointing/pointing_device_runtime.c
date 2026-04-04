@@ -5,7 +5,6 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "noah_keymap.h"
-#include "../state/pd_shared_state.h"
 #include "pointing_device_modes.h"
 #include "pointer_layer_policy.h"
 
@@ -17,7 +16,6 @@
 void noah_pointing_device_init_user(void) {
     set_auto_mouse_layer(AUTO_MOUSE_DEFAULT_LAYER);
     set_auto_mouse_enable(true);
-    pd_shared_state_init();
 }
 
 bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -37,10 +35,6 @@ bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 
 report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 #ifdef POINTING_DEVICE_ENABLE
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    pd_shared_state_sync_tick();
-#    endif
-
     uint8_t active_mode = pd_mode_first_active_index();
     if (active_mode < PD_MODE_COUNT && pd_modes[active_mode].handler) {
         return pd_modes[active_mode].handler(mouse_report);

@@ -67,7 +67,7 @@ These are the rules most likely to break the system if you miss one.
    dense-keycode `_Static_assert` in
    `users/noah/lib/pointing/pointing_device_modes.h`.
 4. Mode flags are currently stored in `uint8_t` values:
-   `users/noah/lib/pointing/pd_mode_flags.h` and `users/noah/lib/state/pd_shared_state.h`.
+   `users/noah/lib/pointing/pd_mode_flags.h` and `users/noah/lib/state/runtime_shared_state.h`.
    That means the current design supports at most 8 modes.
 
 If you add a 9th mode, you must widen the flag storage and the split-sync packet
@@ -92,7 +92,7 @@ Files you usually do not need to touch:
 - `users/noah/lib/pointing/pd_mode_key_runtime.c`
 - `users/noah/lib/pointing/pointing_device_runtime.c`
 - `users/noah/lib/pointing/pointer_layer_policy.c`
-- `users/noah/lib/state/pd_shared_state.c`
+- `users/noah/lib/state/runtime_shared_state.c`
 - `users/noah/lib/rgb/rgb_runtime.c`
 
 ## Fastest Safe Path
@@ -366,7 +366,7 @@ This is the actual control path for pd modes:
 2. `users/noah/lib/pointing/pd_mode_key_runtime.c` handles hold, release, tap, double-tap, lock toggling, and alternate-mode entry for pd-mode keys.
 3. `users/noah/lib/pointing/pointing_device_runtime.c` calls the first active handler in `pd_modes[]`.
 4. `users/noah/lib/pointing/pointer_layer_policy.c` keeps the configured auto-mouse target layer alive while modes are active or locked.
-5. `users/noah/lib/state/pd_shared_state.c` mirrors active and locked flags to the other half.
+5. `users/noah/lib/state/runtime_shared_state.c` mirrors active and locked flags to the other half.
 6. `users/noah/lib/rgb/rgb_runtime.c` renders the mode overlay on the right half.
 
 That is why most new modes are mostly a data-registration job, not a runtime rewrite.

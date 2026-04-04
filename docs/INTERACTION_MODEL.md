@@ -129,6 +129,19 @@ That means the same left/right keys cover character, word, and line movement.
 
 The release-based middle tier matters because it avoids an early jump while you are still deciding whether you want a word move or a full line move.
 
+## RGB Feedback
+
+If `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on, the key-behavior engine can also
+project its state into the RGB overlay.
+
+Current semantics:
+
+- multi-tap pending shows a brief pending color while the engine waits for more taps
+- unresolved hold windows can show the hold color while the action is still pending
+- threshold-fired hold or longer-hold actions pulse once when they fire, then clear
+- held non-layer `PRESS_AND_HOLD_UNTIL_RELEASE(...)` actions keep flashing while the action stays registered
+- held layer-switch actions pulse when they activate, but do not keep flashing after that; the active layer color is the main feedback
+
 ## Multi-Tap Behavior
 
 Multi-tap is built into the same engine. It is not a side feature.

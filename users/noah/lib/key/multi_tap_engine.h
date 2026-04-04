@@ -17,11 +17,12 @@
 //
 // Hold-after-multi-tap:
 //
-//   When a behavior step has hold.present = true, the state machine enters a
-//   "pending hold" state instead of firing immediately. It then distinguishes
-//   between:
+//   When a behavior step has hold.present = true or long_hold.present = true,
+//   the state machine enters a "pending hold" state instead of firing
+//   immediately. It then distinguishes between:
 //     - Quick release -> fires the entry's action (tap)
-//     - Held past CUSTOM_TAP_HOLD_TERM -> fires the hold tier
+//     - Held past CUSTOM_TAP_HOLD_TERM -> fires the hold tier, if one exists
+//     - Held longer -> fires the long-hold tier, if one exists
 //   If more taps exist, a quick release resumes normal deferral so the user
 //   can still reach higher tap counts.
 //
