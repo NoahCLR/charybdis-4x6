@@ -4,7 +4,6 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "noah_keymap.h"
 #include "pointing_device_modes.h"
 #include "pointer_layer_policy.h"
 
@@ -59,17 +58,17 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     uint8_t       auto_mouse_layer    = get_auto_mouse_layer();
     layer_state_t auto_mouse_mask     = (layer_state_t)1 << auto_mouse_layer;
     bool          auto_mouse_active   = layer_state_cmp(state, auto_mouse_layer);
-    bool          nav_active          = layer_state_cmp(state, LAYER_NAV);
+    bool          nav_active          = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
 
     // Keep the configured auto-mouse layer alive while anchored. Active pd
     // modes must survive even if QMK drops that layer underneath an LT-held
     // NAV key.
-    if (pd_mode_running || (auto_mouse_anchored && (auto_mouse_layer == LAYER_NAV || !nav_active))) {
+    if (pd_mode_running || (auto_mouse_anchored && (auto_mouse_layer == CHARYBDIS_AUTO_SNIPING_LAYER || !nav_active))) {
         state |= auto_mouse_mask;
         auto_mouse_active = true;
     }
 
-    if (auto_mouse_layer != LAYER_NAV && auto_mouse_active && nav_active) {
+    if (auto_mouse_layer != CHARYBDIS_AUTO_SNIPING_LAYER && auto_mouse_active && nav_active) {
         // NAV takes over from the configured auto-mouse layer, but not while a
         // pd mode is running.
         if (!auto_mouse_anchored) {

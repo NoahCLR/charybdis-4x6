@@ -31,19 +31,28 @@ to understand and easy to change:
 - [`key_behaviors[]`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
   in [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
   is the main customization table: one authored row can give a key different
-  tap, hold, and longer-hold actions at each tap count, plus per-key tap-hold,
-  longer-hold, and multi-tap timing overrides
+  tap, hold, and longer-hold actions at each tap count, plus per-key timing
+  overrides. Actions can be plain keycodes, macros, layer locks, pointer-mode
+  locks, QMK behavior keycodes like `MO()` or `TG()`, or keymap-local custom
+  keycodes
 - pointer modes are a core part of what makes this userspace different: the
   trackball can become dragscroll, pinch, zoom, arrows, volume, or brightness,
   and those mode keys use the same authored tap, hold, and lock model as the
   rest of the board
 - `AUTO_MOUSE` brings up the pointer layer when the trackball moves and clears
   it again after the configured timeout
-- RGB is functional feedback: it shows layers, pointer modes, the key-behavior
-  engine state, and the auto-mouse timeout as a white-to-red countdown
-- [`rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h)
-  is where the layer colors, pointer-mode colors, LED groups, auto-mouse
-  countdown gradient, and key-behavior feedback colors are configured
+- RGB is functional feedback, not decoration.
+  [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
+  defines layer colors, pointer-mode colors, and LED group highlights. On top
+  of that, two optional overlays — an auto-mouse countdown gradient and
+  key-behavior engine feedback — can be independently toggled
+- the userspace hooks into QMK through weak defaults in
+  [`hooks.c`](./users/noah/hooks.c). A keymap can override any QMK hook and
+  call the matching `noah_*` helper to keep the shared behavior, or replace it
+  entirely (see [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md))
+- on split builds, `runtime_shared_state` syncs pointing-device mode flags,
+  auto-mouse progress, and key-feedback flags from master to slave so both
+  halves render consistently
 
 If you want to understand what makes this userspace special, start with
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). That
@@ -65,16 +74,19 @@ If you want to adapt this layout, these are the main files to touch first:
 
 | File | What You Change There |
 | --- | --- |
-| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | physical layout, combos, `VIA_MACROS(MACRO)`, `HARDCODED_MACROS(MACRO)`, and the authored `key_behaviors[]` table |
-| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h) | layer colors, pointer-mode colors, LED groups, the auto-mouse gradient, and key-behavior feedback colors |
-| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, key-behavior RGB toggles, auto-mouse target layer and timeout, auto-sniping, dragscroll feel, and other keymap-facing behavior |
+| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | physical layout, combos, keymap-local custom keycodes, `VIA_MACROS(MACRO)`, `HARDCODED_MACROS(MACRO)`, and the authored `key_behaviors[]` table |
+| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pointer-mode colors, LED groups, auto-mouse gradient endpoints, and key-behavior feedback colors |
+| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, RGB overlay toggles (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE`), auto-mouse target layer and timeout, auto-sniping, dragscroll feel, and other keymap-facing behavior |
+| [`users/noah/noah_keymap.h`](./users/noah/noah_keymap.h) | shared custom keycode ranges (macros, pd-mode keycodes, layer locks) and the `NOAH_KEYMAP_SAFE_RANGE` boundary for keymap-local keycodes |
 | [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, sensor/report settings, and low-level QMK overrides |
 
 In other words:
 
 - if you want to change what a key does, start in [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
-- if you want to change how the board looks, start in [`rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h)
+- if you want to change how the board looks, start in [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - if you want to change how the keyboard feels, start in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+- if you want to add a layer, update the layer enum in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h); `LAYER_COUNT` is the sentinel last value and should stay last
+- if you want to add a shared custom keycode, start in [`noah_keymap.h`](./users/noah/noah_keymap.h)
 - if you want to change board plumbing, start in [`users/noah/config.h`](./users/noah/config.h)
 
 ## Layers And VIA
@@ -140,8 +152,7 @@ So the current split is:
 ## Key Behavior
 
 The richer custom tap / hold / multi-tap behavior is authored in
-`key_behaviors[]`. Plain keys without a row keep their normal QMK behavior,
-while momentary layer keys still keep their normal layer handling.
+`key_behaviors[]`. Plain keys without a row keep their normal QMK behavior.
 
 Keys with authored behavior rows can distinguish between:
 
@@ -153,10 +164,30 @@ Keys with authored behavior rows can distinguish between:
 This is what makes the current layout possible:
 
 - number-row symbols on hold
-- thumb keys that combine layer access, locks, and media
+- thumb keys that combine momentary layer access, layer locks, and media
 - nav arrows that cover character, word, and line movement
 - pointer keys that can do more than one thing without inventing their own
   timing rules
+
+### Actions
+
+An action in a `key_behaviors[]` row can be:
+
+- a plain keycode (`KC_MPLY`, `S(KC_1)`)
+- a hardcoded or VIA macro (`MACRO_0`, `VIA_MACRO_6`)
+- a layer lock (`LOCK_LAYER(LAYER_NAV)`)
+- a pointer-mode lock (`LOCK_PD_MODE(ARROW_MODE)`)
+- a QMK behavior keycode such as `MO()`, `TG()`, `TO()`, `TT()`, `OSL()`,
+  `LT()`, or `MT()` — the engine dispatches these through QMK's
+  `process_action()` path so they work correctly as hold or tap actions
+- a keymap-local custom keycode declared in `keymap.c`
+
+That last category is how the thumb keys work: `LEFT_THUMB` and `RIGHT_THUMB`
+are keymap-local custom keycodes whose behavior is entirely defined by their
+`key_behaviors[]` rows, including `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))`
+for momentary layer access on hold.
+
+### Timing
 
 Default timing lives in the keymap
 [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
@@ -237,22 +268,23 @@ because the physical mode keys are authored through `key_behaviors[]` in
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), not
 hard-wired to one fixed gesture. These entry patterns are fully customizable.
 
-Unless a `[0]` tap override is authored, a quick single tap still falls through
-to the base-layer key at that physical position. The patterns below describe
-the extra hold and second-press behavior.
+PD-mode taps are authored explicitly. If a `[0]` tap override is omitted, a
+quick single tap sends nothing; single hold still defaults to momentary mode
+activation.
 
-- `ARROW_MODE` and `DRAGSCROLL` use a simple pattern: hold for momentary mode,
-  quick second tap to lock
-- `VOLUME_MODE` uses the quick second tap for mute
-- `BRIGHTNESS_MODE` currently has no authored second-press behavior
-- the physical `PINCH_MODE` key is the custom exception: first hold enters
-  `PINCH_MODE`, a second quick tap triggers Accessibility Zoom, and a second
-  hold enters `ZOOM_MODE`
+- `ARROW_MODE`: hold for momentary arrow mode, double-tap hold to lock
+- `DRAGSCROLL`: single tap `.`, hold for momentary scrolling, quick double tap
+  to lock
+- `VOLUME_MODE`: single tap `N`, hold for volume control, quick double tap for
+  mute
+- `BRIGHTNESS_MODE`: single tap `H`, hold for brightness control
+- `PINCH_MODE`: single tap `J`, hold for `PINCH_MODE`, second quick tap for
+  Accessibility Zoom, second hold for `ZOOM_MODE`
 
 For the user-facing pointer behavior, see
 [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md).
 
-## Auto-Mouse And RGB
+## Auto-Mouse
 
 `LAYER_POINTER` is the default auto-mouse layer in this keymap. Moving the
 trackball brings the configured auto-mouse layer up automatically, and it
@@ -262,24 +294,46 @@ it alive. That behavior is configured in the keymap
 through `POINTING_DEVICE_AUTO_MOUSE_ENABLE`, `AUTO_MOUSE_DEFAULT_LAYER`, and
 `AUTO_MOUSE_TIME`.
 
-RGB is used as feedback, not decoration:
+## RGB
 
-- active layers can render layer colors
-- active pointer modes can render a mode color
-- the key-behavior engine can render multi-tap pending, hold pending,
-  trigger pulses, and active held non-layer feedback on both halves
-- the configured auto-mouse layer uses a white-to-red timeout gradient instead
-  of a fixed solid color
-- held layer-switch actions use a short activation pulse rather than a
-  persistent flashing overlay; the active layer color is the feedback after
-  that
+RGB is used as feedback, not decoration. All visual configuration lives in
+[`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
+That file defines layer colors, pointer-mode colors, per-layer and per-mode LED
+group highlights, auto-mouse gradient endpoints, and key-behavior feedback
+colors. You can edit colors and LED groups there without touching any runtime
+code.
 
-Those colors and LED groups live in the keymap
-[`rgb_config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h).
-The on/off toggles for the key-behavior overlay and auto-mouse gradient live in
-the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
-For the RGB authoring model and render order, see
-[`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md).
+The base RGB layer is always active:
+
+- each layer can have a solid color
+- each layer can highlight specific LEDs through LED groups
+- each pointing-device mode can paint the right half a mode color
+- each pointing-device mode can highlight specific LEDs through mode LED groups
+
+On top of that, two optional overlays add dynamic feedback. Both can be
+independently toggled in the keymap
+[`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
+
+- **Auto-mouse gradient** (`RGB_AUTOMOUSE_GRADIENT_ENABLE`): the configured
+  auto-mouse layer uses a white-to-red countdown instead of a fixed solid
+  color, so you can see how much timeout remains before the pointer layer
+  clears
+- **Key-behavior feedback** (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`): the
+  key-behavior engine projects its state into the RGB overlay on both halves —
+  multi-tap pending, hold pending, trigger pulses, and active held non-layer
+  actions. Held layer-switch actions pulse once when they activate, then let
+  the layer color take over
+
+Both overlays are purely additive. With both disabled, `rgb_config.c` still
+provides full layer and pointer-mode color feedback. With both enabled, the
+render order is: layer color, auto-mouse gradient, layer LED groups,
+pointer-mode color, mode LED groups, key-behavior overlay.
+
+On split builds, the master half computes all feedback state and syncs it to
+the slave through `runtime_shared_state`, so both halves render consistently.
+
+For the full RGB authoring model, render order, and how to change feedback
+colors, see [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md).
 
 ## If You Want To Go Deeper
 
@@ -294,6 +348,8 @@ These docs are the next place to look:
   trackball mode behavior
 - [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB colors, key-behavior
   feedback, LED groups, and auto-mouse gradient configuration
+- [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md): how the weak-hook
+  model works and how to override QMK hooks in your keymap
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
 

@@ -4,6 +4,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "../state/runtime_shared_state.h"
 #include "pointing_device_modes.h"
 
 static uint8_t pd_mode_active_flags_state = 0;
@@ -121,4 +122,41 @@ void pd_mode_update(uint8_t mode, bool active) {
     } else if (!pd_mode_locked(mode)) {
         pd_mode_deactivate(mode);
     }
+}
+
+bool pd_mode_handle_keycode_press(uint16_t keycode) {
+    uint8_t mode = pd_mode_for_keycode(keycode);
+    if (!mode) {
+        return false;
+    }
+
+    bool state_changed = false;
+
+    state_changed |= pd_mode_unlock_other_locks(mode);
+    state_changed |= pd_mode_deactivate_other_unlocked(mode);
+
+    if (!pd_mode_active(mode)) {
+        pd_mode_activate(mode);
+        state_changed = true;
+    }
+
+    if (state_changed) {
+        runtime_shared_state_sync();
+    }
+
+    return true;
+}
+
+bool pd_mode_handle_keycode_release(uint16_t keycode) {
+    uint8_t mode = pd_mode_for_keycode(keycode);
+    if (!mode) {
+        return false;
+    }
+
+    if (pd_mode_active(mode) && !pd_mode_locked(mode)) {
+        pd_mode_deactivate(mode);
+        runtime_shared_state_sync();
+    }
+
+    return true;
 }

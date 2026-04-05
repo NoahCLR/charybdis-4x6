@@ -12,7 +12,6 @@
 
 #include "noah_keymap.h"
 #include "../action/action_dispatch.h"
-#include "../pointing/pd_mode_key_runtime.h"
 #include "../pointing/pointing_device_modes.h"
 #include "delayed_action.h"
 #include "key_behavior_lookup.h"
@@ -30,6 +29,8 @@ typedef struct {
     uint16_t        longer_hold_term;
     uint16_t        multi_tap_term;
     bool            hold_one_shot_fired;
+    bool            implicit_pd_mode_hold;
+    bool            pd_mode_was_locked_on_press;
     bool            layer_interrupted;
     hold_behavior_t hold;
     hold_behavior_t long_hold;
@@ -37,7 +38,6 @@ typedef struct {
 
 typedef struct {
     key_behavior_view_t behavior;
-    uint8_t             pd_mode;
 } handled_key_view_t;
 
 #define ACTIVE_KEY_STATE_INIT                           \
@@ -64,7 +64,9 @@ void active_key_reset(void);
 void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired);
 
 handled_key_view_t handled_key_lookup(uint16_t keycode);
-uint16_t           handled_key_tap_action(handled_key_view_t key, keyrecord_t *record);
+bool               handled_key_uses_implicit_pd_mode_hold(handled_key_view_t key);
+hold_behavior_t    handled_key_single_hold(handled_key_view_t key);
+uint16_t           handled_key_tap_action(handled_key_view_t key);
 bool               handled_key_multi_tap_repress(handled_key_view_t key, uint16_t keycode);
 uint16_t           handled_key_advance_multi_tap(uint16_t keycode);
-void               handled_key_dispatch_tap_or_begin_multi_tap(uint16_t keycode, handled_key_view_t key, keyrecord_t *record);
+void               handled_key_dispatch_tap_or_begin_multi_tap(uint16_t keycode, handled_key_view_t key);

@@ -6,8 +6,9 @@
 
 #include "noah_keymap.h"
 #include "../action/action_dispatch.h"
+#include "../pointing/pointing_device_modes.h"
 #include "held_action.h"
-#include "synthetic_record.h"
+#include "../action/synthetic_record.h"
 
 // A held pure modifier is owned by the physical switch that started it, not by
 // whichever custom key the tap/hold FSM is currently resolving.
@@ -165,6 +166,10 @@ static void held_modifier_register(keypos_t key_pos, uint16_t action) {
 }
 
 static void held_action_dispatch_press(uint16_t action) {
+    if (pd_mode_handle_keycode_press(action)) {
+        return;
+    }
+
     if (action_dispatch_is_qmk_behavior_keycode(action)) {
         noah_dispatch_synthetic_qmk_record(action, true, 0);
         return;
@@ -179,6 +184,10 @@ static void held_action_dispatch_press(uint16_t action) {
 }
 
 static void held_action_dispatch_release(uint16_t action) {
+    if (pd_mode_handle_keycode_release(action)) {
+        return;
+    }
+
     if (action_dispatch_is_qmk_behavior_keycode(action)) {
         noah_dispatch_synthetic_qmk_record(action, false, 0);
         return;

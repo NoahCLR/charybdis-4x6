@@ -26,6 +26,9 @@
 #define KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE  (1 << 2)
 #define KEY_FEEDBACK_FLAG_HOLD_PENDING      (1 << 3)
 #define KEY_FEEDBACK_FLAG_LEVEL_FLASH       (1 << 4)
+// Current flash phase, computed on the master and synced to the slave so both
+// halves flash in lockstep despite having independent clocks.
+#define KEY_FEEDBACK_FLAG_FLASH_PHASE       (1 << 5)
 
 static inline bool key_feedback_flags_multi_tap_pending(uint8_t flags) {
     return (flags & KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING) != 0;
@@ -45,6 +48,10 @@ static inline bool key_feedback_flags_hold_pending(uint8_t flags) {
 
 static inline bool key_feedback_flags_level_flash(uint8_t flags) {
     return (flags & KEY_FEEDBACK_FLAG_LEVEL_FLASH) != 0;
+}
+
+static inline bool key_feedback_flags_flash_phase(uint8_t flags) {
+    return (flags & KEY_FEEDBACK_FLAG_FLASH_PHASE) != 0;
 }
 
 // Compute packed flags from the master-side key engine state.

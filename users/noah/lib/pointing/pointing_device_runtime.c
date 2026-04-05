@@ -53,6 +53,9 @@ layer_state_t noah_layer_state_set_user(layer_state_t state) {
 #    else
     charybdis_set_pointer_sniping_enabled(false);
 #    endif
+    // Charybdis just called maybe_update_pointing_device_cpi(). If sniping is now
+    // off, re-apply any active mode's custom DPI (it was temporarily overridden).
+    pd_mode_apply_active_dpi();
     return pointer_layer_policy_apply(state);
 #else
     return state;

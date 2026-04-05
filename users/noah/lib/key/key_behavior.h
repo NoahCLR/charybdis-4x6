@@ -17,6 +17,10 @@
 //
 // A hold tier is an action plus its timing mode.
 //
+// PRESS_IMMEDIATELY_UNTIL_RELEASE:
+//   internal runtime mode used for implicit pd-mode momentary holds.
+//   Not exposed as a normal keymap authoring helper.
+//
 // PRESS_AND_HOLD_UNTIL_RELEASE:
 //   fire at threshold and keep registered while held.
 //
@@ -28,6 +32,7 @@
 
 typedef enum {
     HOLD_BEHAVIOR_NONE = 0,
+    HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
     HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
     HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD,
     HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD,
@@ -119,8 +124,12 @@ static inline bool hold_fires_at_threshold(hold_behavior_t hold) {
     return hold.present && (hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD);
 }
 
+static inline bool hold_registers_on_press(hold_behavior_t hold) {
+    return hold.present && hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE;
+}
+
 static inline bool hold_registers_while_held(hold_behavior_t hold) {
-    return hold.present && hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE;
+    return hold.present && (hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE || hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
 }
 
 static inline bool hold_sends_on_release(hold_behavior_t hold) {

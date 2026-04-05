@@ -49,16 +49,35 @@ void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, h
 handled_key_view_t handled_key_lookup(uint16_t keycode) {
     return (handled_key_view_t){
         .behavior = key_behavior_lookup(keycode),
-        .pd_mode  = pd_mode_for_keycode(keycode),
     };
 }
 
-uint16_t handled_key_tap_action(handled_key_view_t key, keyrecord_t *record) {
+bool handled_key_uses_implicit_pd_mode_hold(handled_key_view_t key) {
+    return !key.behavior.single.hold.present && pd_mode_for_keycode(key.behavior.keycode);
+}
+
+hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
+    if (key.behavior.single.hold.present) {
+        return key.behavior.single.hold;
+    }
+
+    if (handled_key_uses_implicit_pd_mode_hold(key)) {
+        return (hold_behavior_t){
+            .present = true,
+            .action  = key.behavior.keycode,
+            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        };
+    }
+
+    return hold_behavior_none();
+}
+
+uint16_t handled_key_tap_action(handled_key_view_t key) {
     if (key.behavior.single.tap.present) return key.behavior.single.tap.action;
-    if (key.pd_mode) return keymap_key_to_keycode(LAYER_BASE, record->event.key);
+    if (pd_mode_for_keycode(key.behavior.keycode)) return KC_NO;
     if (key.behavior.is_layer_tap) return QK_LAYER_TAP_GET_TAP_KEYCODE(key.behavior.keycode);
     if (key.behavior.is_momentary_layer) return KC_NO;
-    if (key.behavior.keycode >= SAFE_RANGE) return keymap_key_to_keycode(LAYER_BASE, record->event.key);
+    if (key.behavior.keycode >= SAFE_RANGE) return KC_NO;
     return key.behavior.keycode;
 }
 
@@ -70,8 +89,8 @@ uint16_t handled_key_advance_multi_tap(uint16_t keycode) {
     return multi_tap_advance(&multi_tap, keycode, key_behavior_step_lookup, key_behavior_has_more_taps);
 }
 
-void handled_key_dispatch_tap_or_begin_multi_tap(uint16_t keycode, handled_key_view_t key, keyrecord_t *record) {
-    uint16_t tap_action = handled_key_tap_action(key, record);
+void handled_key_dispatch_tap_or_begin_multi_tap(uint16_t keycode, handled_key_view_t key) {
+    uint16_t tap_action = handled_key_tap_action(key);
     if (key.behavior.has_multi_tap) {
         multi_tap_begin(&multi_tap, keycode, tap_action, key.behavior.tap_hold_term, key.behavior.multi_tap_term);
     } else if (tap_action != KC_NO) {

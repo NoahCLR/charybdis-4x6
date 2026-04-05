@@ -69,10 +69,24 @@ static inline void deactivate_pending_multi_tap_layer_before_lock(uint16_t actio
     }
 }
 
-void noah_key_runtime_scan(void) {
-    pd_mode_key_runtime_scan();
+static void commit_immediate_hold_threshold(void) {
+    if (!hold_registers_on_press(active_key.hold) || active_key.hold_one_shot_fired || timer_elapsed(active_key.timer) < active_key.tap_hold_term) {
+        return;
+    }
 
+    if (!active_key.implicit_pd_mode_hold) {
+        key_feedback_pulse_arm(false);
+    }
+    active_key.hold_one_shot_fired = true;
+    if (!active_key.long_hold.present) {
+        active_key.hold_fired = true;
+    }
+}
+
+void noah_key_runtime_scan(void) {
     if (active_key.keycode != KC_NO && !active_key.hold_fired) {
+        commit_immediate_hold_threshold();
+
         uint16_t elapsed = timer_elapsed(active_key.timer);
         if (hold_fires_at_threshold(active_key.long_hold) && elapsed >= active_key.longer_hold_term) {
             promote_to_long_hold(active_key.long_hold);

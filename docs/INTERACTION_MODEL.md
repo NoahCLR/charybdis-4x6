@@ -93,9 +93,9 @@ The alternate action fires once as soon as the threshold is crossed.
 
 Actual examples:
 
-- double-tap-hold `MO(LAYER_SYM)` -> lock `LAYER_NUM`
-- double-tap-hold `MO(LAYER_NAV)` -> lock `LAYER_NUM`
-- double-tap-hold `/` -> lock `LAYER_NAV`
+- double-tap long hold `LEFT_THUMB` -> lock `LAYER_NUM`
+- double-tap long hold `RIGHT_THUMB` -> lock `LAYER_NUM`
+- double-tap hold `/` -> lock `LAYER_NAV`
 - long hold `Esc` -> `Alt+Cmd+Esc`
 - long hold `Left Arrow` on `LAYER_NAV` -> `Cmd+Left`
 - long hold `Right Arrow` on `LAYER_NAV` -> `Cmd+Right`
@@ -215,14 +215,15 @@ User-facing value:
 
 ### Thumb Layer Keys
 
-`MO(LAYER_SYM)` and `MO(LAYER_NAV)` are not simple momentary layer keys.
+`LEFT_THUMB` and `RIGHT_THUMB` are keymap-local custom keycodes whose behavior
+is entirely defined by their `key_behaviors[]` rows.
 
 They currently do this:
 
-- hold -> momentary layer
+- hold -> momentary layer (`MO(LAYER_SYM)` or `MO(LAYER_NAV)`)
 - single tap -> lock that layer
 - double tap -> play/pause
-- double-tap hold -> lock `LAYER_NUM`
+- double-tap long hold -> lock `LAYER_NUM`
 - triple tap -> next track
 - triple-tap hold -> keep next-track held
 - quadruple tap -> previous track
@@ -265,16 +266,19 @@ That gives you normal escape, tilde, and force quit on the same key without maki
 
 The pointer keys use the same timing model instead of inventing their own rules.
 
-Unless a `[0]` tap override is authored, a quick single tap on a pd-mode key
-still sends the base-layer key at that physical position. The examples below
-focus on the extra hold and second-press behavior.
+PD-mode taps are always explicit. If a `[0]` tap override is omitted, a quick
+single tap sends nothing. The examples below summarize the current authored
+patterns.
 
 Examples:
 
-- `ARROW_MODE`: hold for momentary arrow mode, quick double tap to lock
-- `DRAGSCROLL`: hold for momentary scrolling, quick double tap to lock
-- `VOLUME_MODE`: hold for volume control, quick double tap to mute
-- `PINCH_MODE`: first hold for
+- `ARROW_MODE`: hold for momentary arrow mode, double-tap hold to lock
+- `DRAGSCROLL`: single tap `.`, hold for momentary scrolling, quick double tap
+  to lock
+- `VOLUME_MODE`: single tap `N`, hold for volume control, quick double tap to
+  mute
+- `BRIGHTNESS_MODE`: single tap `H`, hold for brightness control
+- `PINCH_MODE`: single tap `J`, first hold for
   [BetterMouse](https://better-mouse.com/)-backed command-scroll pinch on
   macOS, second quick tap for Accessibility Zoom, second hold for `ZOOM_MODE`
 

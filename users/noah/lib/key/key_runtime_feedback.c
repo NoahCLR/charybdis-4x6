@@ -56,16 +56,26 @@ uint8_t key_feedback_pack(void) {
     uint16_t elapsed           = timer_elapsed(active_key.timer);
     bool     long_hold_reached = active_key.long_hold.present && elapsed >= active_key.longer_hold_term;
 
+    if (active_key.implicit_pd_mode_hold) {
+        return flags;
+    }
+
     if (active_key.held_action_keycode != KC_NO) {
-        // Held layer actions do not keep a hold overlay once the layer is on;
-        // the layer switch itself is the feedback.
-        if (action_dispatch_is_layer_action(active_key.held_action_keycode)) {
+        // Held layer and pd-mode actions do not keep a hold overlay once they
+        // are active; the layer or pd-mode color itself is the feedback.
+        if (action_dispatch_is_layer_action(active_key.held_action_keycode) || pd_mode_for_keycode(active_key.held_action_keycode)) {
             return flags;
         }
 
         // PRESS_AND_HOLD_UNTIL_RELEASE stays visibly active while registered.
+        // Pack the current flash phase so both halves flash in lockstep — the
+        // slave reads this bit from the sync packet instead of computing phase
+        // from its own independent clock.
         flags |= KEY_FEEDBACK_FLAG_LEVEL_FLASH;
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
+        if (((timer_read() / RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0) {
+            flags |= KEY_FEEDBACK_FLAG_FLASH_PHASE;
+        }
         if (long_hold_reached) {
             flags |= KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE;
         }

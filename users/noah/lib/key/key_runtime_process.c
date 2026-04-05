@@ -6,41 +6,14 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_internal.h"
-#include "synthetic_record.h"
+#include "../action/synthetic_record.h"
+#include "../state/runtime_shared_state.h"
 
 static inline void deactivate_momentary_layer_if_unlocked(uint16_t keycode) {
     uint8_t layer = behavior_get_layer(keycode);
     if (!action_dispatch_layer_is_locked(layer)) {
         layer_off(layer);
     }
-}
-
-static uint16_t pd_mode_key_runtime_advance_multi_tap(void *context, uint16_t keycode) {
-    (void)context;
-    return handled_key_advance_multi_tap(keycode);
-}
-
-static void pd_mode_key_runtime_dispatch_tap_or_begin_multi_tap(void *context, uint16_t keycode, keyrecord_t *record) {
-    handled_key_view_t *key = context;
-    handled_key_dispatch_tap_or_begin_multi_tap(keycode, *key, record);
-}
-
-static void pd_mode_key_runtime_dispatch_action(void *context, uint16_t action) {
-    (void)context;
-    action_dispatch(action);
-}
-
-static bool pd_mode_key_runtime_capture_pending_multi_tap_hold(void *context, uint16_t *tap_action, uint16_t *hold_action) {
-    (void)context;
-
-    if (!multi_tap_pending_hold(&multi_tap)) {
-        return false;
-    }
-
-    *tap_action  = multi_tap.tap_action;
-    *hold_action = multi_tap.hold.action;
-    multi_tap_reset(&multi_tap);
-    return true;
 }
 
 static uint16_t select_release_hold_action(uint16_t elapsed, uint16_t hold_action, hold_behavior_t long_hold, uint16_t longer_hold_term) {
@@ -66,20 +39,48 @@ static void flush_active_key(void) {
     active_key_reset();
 }
 
-static bool process_pd_mode_key(uint16_t keycode, keyrecord_t *record, handled_key_view_t key) {
-    const pd_mode_key_runtime_hooks_t hooks = {
-        .context                         = &key,
-        .advance_multi_tap               = pd_mode_key_runtime_advance_multi_tap,
-        .dispatch_tap_or_begin_multi_tap = pd_mode_key_runtime_dispatch_tap_or_begin_multi_tap,
-        .dispatch_action                 = pd_mode_key_runtime_dispatch_action,
-        .capture_pending_multi_tap_hold  = pd_mode_key_runtime_capture_pending_multi_tap_hold,
-    };
+static void activate_immediate_hold_if_needed(keyrecord_t *record, hold_behavior_t hold) {
+    if (!hold_registers_on_press(hold)) {
+        return;
+    }
 
-    return pd_mode_key_runtime_process(keycode, record, key.pd_mode, key.behavior.tap_hold_term, handled_key_multi_tap_repress(key, keycode), &hooks);
+    held_action_register(record->event.key, hold.action);
+    active_key.held_action_keycode = hold.action;
+}
+
+static void dispatch_released_key_tap(uint16_t keycode, active_key_state_t released_key, key_behavior_view_t behavior) {
+    if (behavior.has_multi_tap) {
+        multi_tap_begin(&multi_tap, keycode, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
+    } else if (released_key.tap_action != KC_NO) {
+        action_dispatch(released_key.tap_action);
+    }
+}
+
+static bool dispatch_locked_pd_mode_tap_if_needed(uint16_t keycode, active_key_state_t released_key, uint16_t elapsed, key_behavior_view_t behavior) {
+    uint8_t mode = pd_mode_for_keycode(keycode);
+    if (!mode) {
+        return false;
+    }
+
+    if (!released_key.pd_mode_was_locked_on_press || elapsed >= released_key.tap_hold_term) {
+        return false;
+    }
+
+    if (behavior.is_momentary_layer && released_key.layer_interrupted) {
+        return false;
+    }
+
+    if (pd_mode_is_lockable(mode) && pd_mode_toggle_lock_state(mode)) {
+        runtime_shared_state_sync();
+    }
+    return true;
 }
 
 static bool process_key_behavior_press(uint16_t keycode, keyrecord_t *record, handled_key_view_t key) {
     key_behavior_view_t behavior = key.behavior;
+    hold_behavior_t     hold     = handled_key_single_hold(key);
+    bool                implicit = handled_key_uses_implicit_pd_mode_hold(key);
+    uint8_t             mode     = pd_mode_for_keycode(keycode);
 
     if (handled_key_multi_tap_repress(key, keycode)) {
         uint16_t action = handled_key_advance_multi_tap(keycode);
@@ -103,7 +104,10 @@ static bool process_key_behavior_press(uint16_t keycode, keyrecord_t *record, ha
     }
 
     flush_active_key();
-    active_key_track(keycode, record->event.key, handled_key_tap_action(key, record), behavior.single.hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false);
+    active_key_track(keycode, record->event.key, handled_key_tap_action(key), hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false);
+    active_key.implicit_pd_mode_hold = implicit;
+    active_key.pd_mode_was_locked_on_press = mode && pd_mode_locked(mode);
+    activate_immediate_hold_if_needed(record, hold);
     return true;
 }
 
@@ -154,11 +158,21 @@ static bool process_key_behavior_release_active_key(uint16_t keycode, keyrecord_
     active_key_state_t released_key = active_key;
     active_key_reset();
 
-    if (released_key.hold_fired || released_key.held_action_keycode != KC_NO) {
-        uint16_t elapsed = timer_elapsed(released_key.timer);
+    uint16_t elapsed              = timer_elapsed(released_key.timer);
+    bool     quick_immediate_hold = hold_registers_on_press(released_key.hold) && elapsed < released_key.tap_hold_term && !(behavior.is_momentary_layer && released_key.layer_interrupted);
 
+    if (released_key.hold_fired || released_key.held_action_keycode != KC_NO) {
         if (released_key.held_action_keycode != KC_NO) {
             held_action_unregister(released_key.key_pos, released_key.held_action_keycode);
+        }
+
+        if (dispatch_locked_pd_mode_tap_if_needed(keycode, released_key, elapsed, behavior)) {
+            return true;
+        }
+
+        if (quick_immediate_hold) {
+            dispatch_released_key_tap(keycode, released_key, behavior);
+            return true;
         }
 
         if (hold_sends_on_release(released_key.long_hold) && elapsed >= released_key.longer_hold_term) {
@@ -167,14 +181,11 @@ static bool process_key_behavior_release_active_key(uint16_t keycode, keyrecord_
         return true;
     }
 
-    uint16_t elapsed = timer_elapsed(released_key.timer);
-
     if (elapsed < released_key.tap_hold_term && !(behavior.is_momentary_layer && released_key.layer_interrupted)) {
-        if (behavior.has_multi_tap) {
-            multi_tap_begin(&multi_tap, keycode, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
-        } else if (released_key.tap_action != KC_NO) {
-            action_dispatch(released_key.tap_action);
+        if (dispatch_locked_pd_mode_tap_if_needed(keycode, released_key, elapsed, behavior)) {
+            return true;
         }
+        dispatch_released_key_tap(keycode, released_key, behavior);
         return true;
     }
 
@@ -253,10 +264,6 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     handled_key_view_t key = handled_key_lookup(keycode);
-
-    if (process_pd_mode_key(keycode, record, key)) {
-        return false;
-    }
 
     if (process_key_behavior(keycode, record, key)) {
         return false;

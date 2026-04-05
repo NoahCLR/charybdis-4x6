@@ -9,8 +9,8 @@
 //   - key_behaviors[]
 //   - keymaps[][]
 //
-// Shared layer declarations and userspace-owned keycodes live in
-// users/noah/noah_keymap.h. Keymap-local custom keycodes live below.
+// Userspace-owned keycodes live in users/noah/noah_keymap.h.
+// Keymap-local custom keycodes live below.
 // Default standard QMK hooks live in users/noah/hooks.c; shared runtime
 // processing lives in the userspace runtime modules under users/noah/lib/.
 // ────────────────────────────────────────────────────────────────────────────
@@ -25,8 +25,8 @@
 // Keep the sentinel, then add real keycodes below it. The first real keycode
 // will naturally start at NOAH_KEYMAP_SAFE_RANGE. Those keycodes can be
 // handled in process_record_user() and used inside key_behaviors[] actions
-// such as TAP_SENDS(...), TAP_AT_HOLD_THRESHOLD(...), or
-// PRESS_AND_HOLD_UNTIL_RELEASE(...).
+// such as TAP_SENDS(...), TAP_AT_HOLD_THRESHOLD(...),
+// TAP_ON_RELEASE_AFTER_HOLD(...), or PRESS_AND_HOLD_UNTIL_RELEASE(...).
 //
 enum keymap_custom_keycodes {
     KEYMAP_CUSTOM_KEYCODE_SENTINEL = NOAH_KEYMAP_SAFE_RANGE - 1,
@@ -189,7 +189,7 @@ enum keymap_custom_keycodes {
 //     any other pointer-mode key also clears the previous lock.
 //   - Add hardcoded custom macros to HARDCODED_MACROS(MACRO) above, then use
 //     MACRO_n as the action in any helper: TAP_SENDS(MACRO_n),
-//     TAP_AT_HOLD_THRESHOLD(MACRO_n), TAP_ON_RELEASE_AFTER_HOLD(MACRO_n), or
+//     TAP_AT_HOLD_THRESHOLD(MACRO_n), TAP_ON_RELEASE_AFTER_HOLD(MACRO_n),
 //     PRESS_AND_HOLD_UNTIL_RELEASE(MACRO_n).
 //   - Use VIA_MACRO_n for a QMK/VIA dynamic macro keycode whose default
 //     contents come from VIA_MACROS(MACRO) above.
@@ -288,7 +288,7 @@ const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_SYM)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))},
-                        [1] = {.tap = TAP_SENDS(KC_MPLY), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
                     },
@@ -299,7 +299,7 @@ const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))},
-                        [1] = {.tap = TAP_SENDS(KC_MPLY), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
                     },
@@ -315,21 +315,30 @@ const key_behavior_t
                     },
             },
 
-            // Pointing device mode keys.
-            // Single tap defaults to the base-layer key at that position unless [0]
-            // overrides it here.
-            {.keycode = VOLUME_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(KC_MUTE)}}},
-            {.keycode = ARROW_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
+            // Pointing-device mode keys.
+            // Taps are authored explicitly here; there is no implicit base-layer fallback.
+            // If [0].hold is omitted, single hold still defaults to the key's momentary pd-mode.
+            {.keycode = VOLUME_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_N)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
+            {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_H)}}},
+            {.keycode = ARROW_MODE, .tap_counts = {[1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(ARROW_MODE))}}},
             {
                 .keycode = PINCH_MODE,
                 .tap_counts =
                     {
+                        [0] = {.tap = TAP_SENDS(KC_J)},
                         [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
                     },
             },
 
-            // Dragscroll: tap = base-layer key, double-tap = lock, hold = momentary (via pd_mode).
-            {.keycode = DRAGSCROLL, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(DRAGSCROLL))}}},
+            // Dragscroll: single hold = momentary, double tap = lock.
+            {
+                .keycode = DRAGSCROLL,
+                .tap_counts =
+                    {
+                        [0] = {.tap = TAP_SENDS(KC_DOT)},
+                        [1] = {.tap = TAP_SENDS(LOCK_PD_MODE(DRAGSCROLL))},
+                    },
+            },
 };
 
 // ─── Keymap Layouts ─────────────────────────────────────────────────────────
@@ -359,7 +368,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
             KC_LEFT_CTRL,  LT(LAYER_SYM,KC_Z),             KC_X,              KC_C,              KC_V,              KC_B,                KC_N,             KC_M,          KC_COMM,           KC_DOT,  LT(LAYER_NAV,KC_SLSH),     KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,            KC_SPC,     LEFT_THUMB,        RIGHT_THUMB,            KC_ENT,
+                                                                       KC_LEFT_GUI,            KC_SPC,        LEFT_THUMB,          RIGHT_THUMB,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
   //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
     ),

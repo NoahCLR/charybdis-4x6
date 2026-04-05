@@ -15,7 +15,7 @@ LTO_ENABLE = yes
 
 SRC += runtime_init.c
 SRC += hooks.c
-SRC += synthetic_record.c
+SRC += lib/action/synthetic_record.c
 SRC += lib/split_role.c
 SRC += lib/key/key_behavior_lookup.c
 SRC += lib/key/key_runtime.c
@@ -33,7 +33,6 @@ SRC += lib/state/runtime_shared_state.c
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
     SRC += lib/pointing/pointing_device_runtime.c
-    SRC += lib/pointing/pd_mode_key_runtime.c
     SRC += lib/pointing/pd_mode_state.c
     SRC += lib/pointing/pd_mode_registry.c
     SRC += lib/pointing/pointer_layer_policy.c
@@ -43,6 +42,7 @@ endif
 ifeq ($(strip $(RGB_MATRIX_ENABLE)), yes)
     SRC += lib/rgb/rgb_runtime.c
     SRC += lib/rgb/rgb_automouse.c
+    SRC += $(KEYMAP_PATH)/rgb_config.c
 endif
 
 # Split role override: build with FORCE_MASTER=yes or FORCE_SLAVE=yes

@@ -1,7 +1,7 @@
 # RGB Configuration
 
 This keymap keeps most RGB authoring in
-`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`.
+`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`.
 
 That file is for visual configuration:
 
@@ -28,16 +28,16 @@ painted, also look at:
 
 ## HSV Quick Reference
 
-The color values in `rgb_config.h` are authored as `hsv_t` structs. Use this
+The color values in `rgb_config.c` are authored as `hsv_t` structs. Use this
 quick reference when picking hue values:
 
 ![HSV quick reference](./media/hsv_colors.jpg)
 
-## What `rgb_config.h` Controls
+## What `rgb_config.c` Controls
 
 ### `layer_colors[]`
 
-`layer_colors[]` is indexed by the layer enum from `noah_keymap.h`.
+`layer_colors[]` is indexed by the layer defines from the keymap `config.h`.
 
 Each row is an `hsv_t`:
 
@@ -81,7 +81,7 @@ This is useful for things like:
 - marking navigation modifiers
 - accenting a small part of a layer without repainting the full board
 
-The LED map comment in `rgb_config.h` is the reference for the standard matrix
+The LED map comment in `rgb_config.c` is the reference for the standard matrix
 indices on this board.
 
 ### `pd_mode_led_groups[]`
@@ -135,8 +135,8 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the keymap
 `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
 
 The master half computes the semantic feedback flags. On split boards, the
-slave receives those packed flags through `runtime_shared_state`, then computes
-flash phase locally.
+slave receives those packed flags through `runtime_shared_state`, including the
+flash-phase bit used to keep both halves in sync.
 
 ## Render Order
 
@@ -146,24 +146,23 @@ flash phase locally.
 2. the auto-mouse gradient on the configured auto-mouse layer, if no solid
    layer color was painted
 3. per-layer LED groups
-4. the key-behavior feedback overlay on both halves
-5. the first active pointing-device mode color on the right half
-6. per-mode LED groups
+4. the first active pointing-device mode color on the right half
+5. per-mode LED groups
+6. the key-behavior feedback overlay on both halves
 
 That order matters.
 
 Examples:
 
 - a per-layer LED group can sit on top of a solid layer color
-- the key-behavior overlay can temporarily repaint both halves on top of the
-  current layer color
-- a pd-mode overlay can repaint the right half after the feedback pass
+- a pd-mode overlay can repaint the right half after the layer and group pass
 - a pd-mode LED group can then repaint selected LEDs on top of the mode overlay
+- the key-behavior overlay can temporarily repaint both halves last
 
 ## The Helper Types
 
 `users/noah/lib/rgb/rgb_helpers.h` defines the small config structs used by
-`rgb_config.h`:
+`rgb_config.c`:
 
 - `pd_mode_color_t`
 - `layer_led_group_t`
@@ -229,7 +228,7 @@ Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the keymap `config.h`.
 
 ## What This File Does Not Do
 
-`rgb_config.h` does not decide:
+`rgb_config.c` does not decide:
 
 - which layer becomes the auto-mouse layer
 - how long auto-mouse stays active

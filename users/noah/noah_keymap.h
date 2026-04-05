@@ -12,16 +12,9 @@
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
 //
-// If you add or remove a layer, also update DYNAMIC_KEYMAP_LAYER_COUNT in the
-// active keymap's config.h.
-enum charybdis_keymap_layers {
-    LAYER_BASE = 0, // Default QWERTY typing layer
-    LAYER_NUM,      // Numpad on the right half
-    LAYER_SYM,      // Symbols, brackets, and DPI controls
-    LAYER_NAV,      // Navigation, media, macros, and mouse buttons (current sniping layer)
-    LAYER_POINTER,  // Dedicated pointer layout; default auto-mouse target layer in this keymap
-    LAYER_COUNT,
-};
+// Named layer indices (LAYER_BASE, LAYER_NUM, …) and LAYER_COUNT are defined
+// in the keymap's config.h as an enum. LAYER_COUNT is the sentinel last value
+// and is derived automatically — no manual count to keep in sync.
 
 #ifdef VIA_ENABLE
 _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update the keymap config.h");
@@ -61,12 +54,10 @@ enum {
 // MACRO_0–15 are hardcoded custom macro slots used by key_behaviors[] and
 // dispatched by macro_dispatch().
 // VIA macros use the VIA_MACRO_0–15 aliases.
-// VOLUME_MODE / BRIGHTNESS_MODE / ARROW_MODE / ZOOM_MODE / PINCH_MODE
-// activate pointing-device modes while held.
-// DRAGSCROLL: tap = base-layer key, double-tap = lock dragscroll, hold = momentary.
-// The hold path is handled by the pointing-device mode key runtime.
-// Pointing-device modes can dispatch LOCK_PD_MODE(mode_keycode) via the
-// key_behaviors[] multi-tap system.
+// Pointing-device mode taps are authored entirely through key_behaviors[].
+// Their single-hold behavior still defaults to momentary mode activation
+// unless key_behaviors[] overrides that hold tier explicitly.
+// Use LOCK_PD_MODE(mode_keycode) for a persistent toggle inside tap/hold rows.
 // PD_MODE_LOCK_BASE reserves one lock/toggle action per pd-mode keycode.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
 // actions authored in key_behaviors[]. Use the LOCK_LAYER(n) macro there.
@@ -125,5 +116,7 @@ extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
 // keymap.c uses this header as its authored keymap surface, so re-export the
 // shared runtime helpers, authoring schema, and keymap table helpers here.
 #include "noah_runtime.h" // IWYU pragma: export
-#include "lib/key/key_behavior.h"   // IWYU pragma: export
-#include "lib/keymap_materialize.h" // IWYU pragma: export
+#include "lib/key/key_behavior.h"           // IWYU pragma: export
+#include "lib/keymap_materialize.h"         // IWYU pragma: export
+#include "lib/pointing/pd_mode_flags.h"     // IWYU pragma: export
+#include "lib/rgb/rgb_helpers.h"            // IWYU pragma: export

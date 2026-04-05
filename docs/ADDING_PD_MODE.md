@@ -27,7 +27,7 @@ If you hand this task to an agent, give it this exact job:
 4. Register the mode in `users/noah/lib/pointing/pd_mode_registry.c`.
 5. Add handler/reset declarations in `users/noah/lib/pointing/pointing_device_mode_handlers.h` and implementations in `users/noah/lib/pointing/pointing_device_mode_handlers.c`, if the mode needs them.
 6. Add authored key behavior and physical placement in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`.
-7. Add an RGB color in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`.
+7. Add an RGB color in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`.
 8. Update `via layouts/via_to_qmk_layout.py` if the keycode can appear in VIA exports.
 9. Update user-facing docs if the mode changes real behavior in a meaningful way.
 10. Compile with `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
@@ -84,12 +84,14 @@ Normal add-mode work lives in these files:
 - `users/noah/lib/pointing/pointing_device_mode_handlers.h`
 - `users/noah/lib/pointing/pointing_device_mode_handlers.c`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
-- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`
+- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`
 - `via layouts/via_to_qmk_layout.py`
 
 Files you usually do not need to touch:
 
-- `users/noah/lib/pointing/pd_mode_key_runtime.c`
+- `users/noah/lib/key/key_runtime_process.c`
+- `users/noah/lib/key/held_action.c`
+- `users/noah/lib/pointing/pd_mode_state.c`
 - `users/noah/lib/pointing/pointing_device_runtime.c`
 - `users/noah/lib/pointing/pointer_layer_policy.c`
 - `users/noah/lib/state/runtime_shared_state.c`
@@ -239,14 +241,16 @@ There are two separate jobs here:
 - place the physical keycode on the desired layer
 
 Important: the generic pd-mode runtime already gives you momentary hold
-activation. Double-tap behavior is not automatic. If you want lock, mute, or a
-second-tap alternate mode, you must author that explicitly in `key_behaviors[]`.
+activation. Tap behavior is never implicit. If you want a single tap, double
+tap, lock, mute, or a second-tap alternate mode, you must author that
+explicitly in `key_behaviors[]`.
 
-The standard pd-mode pattern is:
+Common lockable patterns are:
 
 - hold: momentary mode
-- first quick tap: base-layer key at that physical position
-- quick double tap: lock the mode
+- optional first quick tap: an explicit `[0].tap`
+- quick double tap: lock the mode when `[1].tap = TAP_SENDS(LOCK_PD_MODE(...))`
+- double-tap hold: lock the mode when `[1].hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(...))`
 
 Example:
 
@@ -259,7 +263,7 @@ the physical `keymaps[][]` block.
 
 Current examples in this repo:
 
-- `ARROW_MODE`: double tap locks
+- `ARROW_MODE`: double-tap hold locks
 - `DRAGSCROLL`: double tap locks
 - `VOLUME_MODE`: double tap mutes instead of locking
 - `PINCH_MODE`: second tap is custom and can branch into `ZOOM_MODE`
@@ -267,7 +271,7 @@ Current examples in this repo:
 
 ### 8. Add RGB Color
 
-Edit `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`.
+Edit `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`.
 
 Add a new row to `pd_mode_colors[]`:
 
@@ -337,16 +341,17 @@ Example from the current keymap:
     .keycode = PINCH_MODE,
     .tap_counts =
         {
-            [1] = {.tap = TAP_SENDS(MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
+            [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
         },
 },
 ```
 
 The important rule is that the hold action on that second press must resolve to
-another pd-mode keycode. The generic pd-mode key runtime will detect that and
-switch to the alternate mode.
+another pd-mode keycode. The generic held-action dispatch path will treat that
+as another pd-mode key and switch to the alternate mode.
 
-You do not need to edit `users/noah/lib/pointing/pd_mode_key_runtime.c` unless you are inventing a new runtime behavior that existing modes do not cover.
+You do not need to edit the generic key-runtime or pd-mode runtime files unless
+you are inventing a new runtime behavior that existing modes do not cover.
 
 ### Mode Is Not Lockable
 
@@ -359,15 +364,23 @@ Only do this if the product behavior really calls for it.
 
 This is the actual control path for pd modes:
 
-1. `users/noah/lib/key/key_runtime_process.c` routes custom key events. It
-   calls `handled_key_lookup(...)` from `users/noah/lib/key/key_runtime.c`,
-   which bundles both `key_behavior_lookup(...)` and `pd_mode_for_keycode(...)`
-   for the current keycode.
-2. `users/noah/lib/pointing/pd_mode_key_runtime.c` handles hold, release, tap, double-tap, lock toggling, and alternate-mode entry for pd-mode keys.
-3. `users/noah/lib/pointing/pointing_device_runtime.c` calls the first active handler in `pd_modes[]`.
-4. `users/noah/lib/pointing/pointer_layer_policy.c` keeps the configured auto-mouse target layer alive while modes are active or locked.
-5. `users/noah/lib/state/runtime_shared_state.c` mirrors active and locked flags to the other half.
-6. `users/noah/lib/rgb/rgb_runtime.c` renders the mode overlay on the right half.
+1. `users/noah/lib/key/key_runtime_process.c` routes custom key events and
+   resolves authored tap and hold behavior for pd-mode keys.
+2. `users/noah/lib/key/held_action.c` dispatches held actions; pd-mode
+   keycodes go through `pd_mode_handle_keycode_press()` and
+   `pd_mode_handle_keycode_release()`.
+3. `users/noah/lib/pointing/pd_mode_state.c` owns active and locked mode state,
+   plus lock exclusivity.
+4. `users/noah/lib/pointing/pd_mode_registry.c` defines the mode table,
+   handlers, reset hooks, lock actions, and DPI behavior.
+5. `users/noah/lib/pointing/pointing_device_runtime.c` calls the first active
+   handler in `pd_modes[]`.
+6. `users/noah/lib/pointing/pointer_layer_policy.c` keeps the configured
+   auto-mouse target layer alive while modes are active or locked.
+7. `users/noah/lib/state/runtime_shared_state.c` mirrors active and locked
+   flags to the other half.
+8. `users/noah/lib/rgb/rgb_runtime.c` renders the mode overlay on the right
+   half.
 
 That is why most new modes are mostly a data-registration job, not a runtime rewrite.
 
@@ -403,7 +416,7 @@ After compiling, verify the real behavior on hardware:
 
 1. Hold the key and confirm the momentary mode works.
 2. Release the key and confirm the mode fully clears.
-3. If lockable, quick double tap to lock and repeat to unlock.
+3. If lockable, test the authored lock gesture and repeat it to unlock.
 4. Confirm locking this mode clears other locked pd modes if that is intended.
 5. Confirm holding this mode cancels earlier unlocked modes if that is intended.
 6. Confirm any side effects activate and clean up correctly.
@@ -423,7 +436,7 @@ For a normal new mode, the minimum expected diff usually includes:
 - `users/noah/lib/pointing/pointing_device_mode_handlers.h`
 - `users/noah/lib/pointing/pointing_device_mode_handlers.c`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
-- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.h`
+- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`
 - `via layouts/via_to_qmk_layout.py`, if relevant
 
 If your diff reaches into the generic runtime, stop and justify why.

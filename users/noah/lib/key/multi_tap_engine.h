@@ -27,6 +27,9 @@
 //   can still reach higher tap counts.
 //
 //   hold.mode controls when the hold fires:
+//     PRESS_IMMEDIATELY_UNTIL_RELEASE -> internal runtime mode for implicit
+//       single-press pd-mode holds; pending multi-tap hold resolution still
+//       waits for threshold.
 //     PRESS_AND_HOLD_UNTIL_RELEASE -> fires at threshold via matrix_scan,
 //       registered for auto-repeat, can transition to long hold.
 //     TAP_AT_HOLD_THRESHOLD -> fires once at threshold via matrix_scan.
