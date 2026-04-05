@@ -70,7 +70,9 @@ bool pd_mode_set_lock_state(uint8_t mode, bool locked) {
             }
         }
 
-        if (!pd_mode_locked(mode)) {
+        changed |= pd_mode_deactivate_other_unlocked(mode);
+
+        if (!pd_mode_locked(mode) || !pd_mode_active(mode)) {
             pd_mode_lock(mode);
             changed = true;
         }

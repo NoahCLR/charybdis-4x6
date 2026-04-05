@@ -4,6 +4,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "../state/keyboard_mod_ownership.h"
 #include "../state/keyboard_mod_state.h"
 #include "pointing_device_mode_handlers.h"
 
@@ -119,16 +120,16 @@ static bool                 arrow_axis_is_x     = true;
 static uint8_t              arrow_shift_buttons = 0;
 static bool                 arrow_shift_held    = false;
 
-#    define ARROW_SELECTION_SHIFT_MOD MOD_BIT(KC_RSFT)
+#    define ARROW_SELECTION_SHIFT_KEYCODE KC_RIGHT_SHIFT
 
 static void arrow_shift_sync(void) {
     bool should_hold_shift = arrow_shift_buttons != 0;
 
     if (should_hold_shift && !arrow_shift_held) {
-        register_mods(ARROW_SELECTION_SHIFT_MOD);
+        keyboard_mod_ownership_register(ARROW_SELECTION_SHIFT_KEYCODE);
         arrow_shift_held = true;
     } else if (!should_hold_shift && arrow_shift_held) {
-        unregister_mods(ARROW_SELECTION_SHIFT_MOD);
+        keyboard_mod_ownership_unregister(ARROW_SELECTION_SHIFT_KEYCODE);
         arrow_shift_held = false;
     }
 }

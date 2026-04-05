@@ -7,6 +7,7 @@
 #include "noah_keymap.h"
 #include "../action/action_dispatch.h"
 #include "../pointing/pointing_device_modes.h"
+#include "../state/keyboard_mod_ownership.h"
 #include "held_action.h"
 #include "../action/synthetic_record.h"
 
@@ -128,8 +129,7 @@ static void held_modifier_remove_slot(uint8_t slot) {
 
     held_modifier_refcounts[index]--;
     if (held_modifier_refcounts[index] == 0) {
-        del_mods(MOD_BIT(action));
-        send_keyboard_report();
+        keyboard_mod_ownership_unregister(action);
     }
 }
 
@@ -160,8 +160,7 @@ static void held_modifier_register(keypos_t key_pos, uint16_t action) {
     };
 
     if (held_modifier_refcounts[index]++ == 0) {
-        add_mods(MOD_BIT(action));
-        send_keyboard_report();
+        keyboard_mod_ownership_register(action);
     }
 }
 

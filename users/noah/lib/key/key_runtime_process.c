@@ -7,6 +7,7 @@
 
 #include "key_runtime_internal.h"
 #include "../action/synthetic_record.h"
+#include "../state/keyboard_mod_ownership.h"
 #include "../state/runtime_shared_state.h"
 
 static inline void deactivate_momentary_layer_if_unlocked(uint16_t keycode) {
@@ -249,6 +250,11 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     // Skip the physical key runtime so the keymap-local handler can run.
     if (noah_synthetic_record_active()) {
         return true;
+    }
+
+    keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
+    if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
+        return false;
     }
 
     if (record->event.pressed && active_key.keycode != KC_NO && !active_key_matches(keycode, record->event.key) && is_layer_key(active_key.keycode)) {

@@ -72,8 +72,23 @@ void noah_rgb_runtime_post_init(void) {
 }
 
 #ifdef RGB_MATRIX_ENABLE
+static bool rgb_runtime_led_range_intersects(uint8_t led_min, uint8_t led_max, uint8_t from, uint8_t to) {
+    return led_min < to && led_max > from;
+}
+
+static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count, uint8_t led_min, uint8_t led_max) {
+    for (uint8_t i = 0; i < count; i++) {
+        if (leds[i] >= led_min && leds[i] < led_max) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     bool layer_painted = false;
+    bool painted       = false;
 
     for (int8_t i = LAYER_COUNT - 1; i > 0; i--) {
         if (!layer_state_cmp(layer_state, i)) continue;
@@ -83,6 +98,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
         if (layer_colors[i].s == 0 && layer_colors[i].v == 0) continue;
         rgb_set_both_halves(layer_rgb[i], led_min, led_max);
         layer_painted = true;
+        painted       = true;
         break;
     }
 
@@ -90,6 +106,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     if (!layer_painted && layer_state_cmp(layer_state, get_auto_mouse_layer())) {
         automouse_rgb_render(led_min, led_max, automouse_color_start, automouse_color_end);
         layer_painted = true;
+        painted       = true;
     }
 #    endif
 
@@ -97,6 +114,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
         if (layer_state_cmp(layer_state, layer_led_groups[g].layer)) {
             rgb_t grp_rgb = hsv_to_rgb(layer_led_groups[g].color);
             rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max, grp_rgb);
+            painted |= rgb_runtime_led_group_intersects(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max);
         }
     }
 
@@ -107,12 +125,14 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     uint8_t active_mode = pd_mode_first_active_index();
     if (active_mode < PD_MODE_COUNT) {
         rgb_set_right_half(pd_mode_rgb[active_mode], led_min, led_max);
+        painted |= rgb_runtime_led_range_intersects(led_min, led_max, RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT);
     }
 
     for (uint8_t g = 0; g < pd_mode_led_group_count; g++) {
         if (pd_mode_active(pd_mode_led_groups[g].mode_flag)) {
             rgb_t grp_rgb = hsv_to_rgb(pd_mode_led_groups[g].color);
             rgb_set_led_group(pd_mode_led_groups[g].leds, pd_mode_led_groups[g].count, led_min, led_max, grp_rgb);
+            painted |= rgb_runtime_led_group_intersects(pd_mode_led_groups[g].leds, pd_mode_led_groups[g].count, led_min, led_max);
         }
     }
 
@@ -129,6 +149,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 
     if (key_feedback_flags_multi_tap_pending(fb)) {
         rgb_set_both_halves(feedback_multi_tap_pending_rgb, led_min, led_max);
+        painted = true;
     } else if (key_feedback_flags_hold_active(fb)) {
         if (!key_feedback_flags_level_flash(fb) || key_feedback_flags_flash_phase(fb)) {
             if (key_feedback_flags_long_hold_active(fb)) {
@@ -136,13 +157,15 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
             } else {
                 rgb_set_both_halves(feedback_hold_active_rgb, led_min, led_max);
             }
+            painted = true;
         }
     } else if (key_feedback_flags_hold_pending(fb)) {
         rgb_set_both_halves(feedback_hold_active_rgb, led_min, led_max);
+        painted = true;
     }
 #    endif
 
-    return layer_painted;
+    return painted;
 }
 #else
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {

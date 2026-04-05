@@ -29,6 +29,7 @@ SRC += lib/macro/macro_payload.c
 SRC += lib/key/multi_tap_engine.c
 SRC += lib/key/key_runtime_feedback.c
 SRC += lib/state/keyboard_mod_state.c
+SRC += lib/state/keyboard_mod_ownership.c
 SRC += lib/state/runtime_shared_state.c
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
