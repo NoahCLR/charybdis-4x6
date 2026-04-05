@@ -5,7 +5,12 @@
 // Handled-key press transitions and active-key replacement.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_internal.h"
+#include "handled_key.h"
+#include "key_runtime_process.h"
+#include "key_runtime_state.h"
+#include "../action/action_dispatch.h"
+#include "held_action.h"
+#include "../pointing/pointing_device_modes.h"
 #include "../state/layer_ownership.h"
 
 static void flush_active_key(void) {

@@ -5,7 +5,13 @@
 // Handled-key release resolution, including pending multi-tap holds.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_internal.h"
+#include "handled_key.h"
+#include "key_runtime_process.h"
+#include "key_runtime_state.h"
+#include "delayed_action.h"
+#include "held_action.h"
+#include "../action/action_dispatch.h"
+#include "../pointing/pointing_device_modes.h"
 #include "../state/layer_ownership.h"
 #include "../state/runtime_shared_state.h"
 

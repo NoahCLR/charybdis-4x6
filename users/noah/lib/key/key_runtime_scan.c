@@ -5,62 +5,94 @@
 // Matrix-scan hold promotion and multi-tap expiry handling.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_internal.h"
+#include "key_runtime_feedback.h"
+#include "key_runtime_state.h"
+#include "delayed_action.h"
+#include "key_behavior_lookup.h"
+#include "held_action.h"
+#include "../action/action_lifecycle.h"
+#include "../action/action_dispatch.h"
 #include "../state/layer_ownership.h"
 
-static bool hold_uses_one_shot_dispatch(hold_behavior_t hold) {
-    return action_dispatch_is_layer_lock(hold.action) || action_dispatch_is_macro(hold.action) || !hold_registers_while_held(hold);
+typedef enum {
+    HOLD_THRESHOLD_DISPATCH_NONE = 0,
+    HOLD_THRESHOLD_DISPATCH_TAP,
+    HOLD_THRESHOLD_DISPATCH_HELD,
+} hold_threshold_dispatch_t;
+
+static hold_threshold_dispatch_t hold_threshold_dispatch_kind(hold_behavior_t hold) {
+    if (!hold.present) {
+        return HOLD_THRESHOLD_DISPATCH_NONE;
+    }
+
+    switch (hold.mode) {
+        case HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD:
+            return HOLD_THRESHOLD_DISPATCH_TAP;
+        case HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE:
+            return noah_action_hold_kind(hold.action) == NOAH_ACTION_HOLD_KIND_PRESS_ONLY ? HOLD_THRESHOLD_DISPATCH_TAP : HOLD_THRESHOLD_DISPATCH_HELD;
+        default:
+            return HOLD_THRESHOLD_DISPATCH_NONE;
+    }
 }
 
 static bool hold_activation_needs_pulse(hold_behavior_t hold) {
     return action_dispatch_is_layer_action(hold.action);
 }
 
-static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_hold) {
-    if (hold_uses_one_shot_dispatch(hold)) {
-        if (active_key.held_action_keycode != KC_NO) {
-            held_action_unregister(active_key.key_pos, active_key.held_action_keycode);
-            active_key.held_action_keycode = KC_NO;
-        }
-        action_dispatch(hold.action);
-        key_feedback_pulse_arm(false);
-        if (long_hold.present) {
-            active_key.hold_fired          = false;
-            active_key.hold_one_shot_fired = true;
-        } else {
-            active_key.hold_fired          = true;
-            active_key.hold_one_shot_fired = false;
-        }
-        return;
-    }
-
-    held_action_register(active_key.key_pos, hold.action);
-    active_key.held_action_keycode = hold.action;
-    active_key.hold_fired          = !long_hold.present;
-    active_key.hold_one_shot_fired = false;
-    if (hold_activation_needs_pulse(hold)) {
-        key_feedback_pulse_arm(false);
-    }
-}
-
-static void promote_to_long_hold(hold_behavior_t long_hold) {
+static void clear_active_held_action(void) {
     if (active_key.held_action_keycode != KC_NO) {
         held_action_unregister(active_key.key_pos, active_key.held_action_keycode);
         active_key.held_action_keycode = KC_NO;
     }
+}
 
-    if (hold_uses_one_shot_dispatch(long_hold)) {
-        action_dispatch(long_hold.action);
-        key_feedback_pulse_arm(true);
-        active_key.hold_fired = true;
-        return;
+static void fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_hold) {
+    switch (hold_threshold_dispatch_kind(hold)) {
+        case HOLD_THRESHOLD_DISPATCH_TAP:
+            clear_active_held_action();
+            action_dispatch(hold.action);
+            key_feedback_pulse_arm(false);
+            if (long_hold.present) {
+                active_key.hold_fired          = false;
+                active_key.hold_one_shot_fired = true;
+            } else {
+                active_key.hold_fired          = true;
+                active_key.hold_one_shot_fired = false;
+            }
+            return;
+        case HOLD_THRESHOLD_DISPATCH_HELD:
+            held_action_register(active_key.key_pos, hold.action);
+            active_key.held_action_keycode = hold.action;
+            active_key.hold_fired          = !long_hold.present;
+            active_key.hold_one_shot_fired = false;
+            if (hold_activation_needs_pulse(hold)) {
+                key_feedback_pulse_arm(false);
+            }
+            return;
+        case HOLD_THRESHOLD_DISPATCH_NONE:
+            return;
     }
+}
 
-    held_action_register(active_key.key_pos, long_hold.action);
-    active_key.held_action_keycode = long_hold.action;
-    active_key.hold_fired          = true;
-    if (hold_activation_needs_pulse(long_hold)) {
-        key_feedback_pulse_arm(true);
+static void promote_to_long_hold(hold_behavior_t long_hold) {
+    clear_active_held_action();
+
+    switch (hold_threshold_dispatch_kind(long_hold)) {
+        case HOLD_THRESHOLD_DISPATCH_TAP:
+            action_dispatch(long_hold.action);
+            key_feedback_pulse_arm(true);
+            active_key.hold_fired = true;
+            return;
+        case HOLD_THRESHOLD_DISPATCH_HELD:
+            held_action_register(active_key.key_pos, long_hold.action);
+            active_key.held_action_keycode = long_hold.action;
+            active_key.hold_fired          = true;
+            if (hold_activation_needs_pulse(long_hold)) {
+                key_feedback_pulse_arm(true);
+            }
+            return;
+        case HOLD_THRESHOLD_DISPATCH_NONE:
+            return;
     }
 }
 

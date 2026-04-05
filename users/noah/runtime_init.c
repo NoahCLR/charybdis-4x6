@@ -11,7 +11,7 @@
 #include "noah_runtime.h"
 #include "noah_keymap.h"
 
-#include "lib/key/key_runtime_internal.h" // IWYU pragma: keep
+#include "lib/key/key_runtime_state.h"
 #include "lib/key/keymap_validation.h"
 #include "lib/macro/via_macro_defaults.h"
 #include "lib/rgb/rgb_runtime.h"

@@ -5,7 +5,9 @@
 // Shared state and helper functions for the split key runtime modules.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_internal.h"
+#include "handled_key.h"
+#include "key_runtime_state.h"
+#include "../pointing/pointing_device_modes.h"
 
 active_key_state_t active_key = ACTIVE_KEY_STATE_INIT;
 multi_tap_t        multi_tap  = {0};
@@ -18,12 +20,12 @@ bool is_layer_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
-bool keypos_equal(keypos_t lhs, keypos_t rhs) {
+static bool key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
 }
 
 bool active_key_matches(uint16_t keycode, keypos_t key_pos) {
-    return active_key.keycode == keycode && keypos_equal(active_key.key_pos, key_pos);
+    return active_key.keycode == keycode && key_runtime_keypos_equal(active_key.key_pos, key_pos);
 }
 
 void active_key_reset(void) {
@@ -87,13 +89,4 @@ bool handled_key_multi_tap_repress(handled_key_view_t key, uint16_t keycode) {
 
 uint16_t handled_key_advance_multi_tap(uint16_t keycode) {
     return multi_tap_advance(&multi_tap, keycode, key_behavior_step_lookup, key_behavior_has_more_taps);
-}
-
-void handled_key_dispatch_tap_or_begin_multi_tap(uint16_t keycode, handled_key_view_t key) {
-    uint16_t tap_action = handled_key_tap_action(key);
-    if (key.behavior.has_multi_tap) {
-        multi_tap_begin(&multi_tap, keycode, tap_action, key.behavior.tap_hold_term, key.behavior.multi_tap_term);
-    } else if (tap_action != KC_NO) {
-        action_dispatch(tap_action);
-    }
 }

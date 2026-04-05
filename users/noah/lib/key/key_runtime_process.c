@@ -5,7 +5,11 @@
 // Press/release handling and process_record_user integration.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_internal.h"
+#include "handled_key.h"
+#include "key_runtime_process.h"
+#include "key_runtime_state.h"
+#include "noah_keymap.h"
+#include "../pointing/pointing_device_modes.h"
 #include "../action/synthetic_record.h"
 
 bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {

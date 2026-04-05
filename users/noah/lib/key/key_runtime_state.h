@@ -1,21 +1,14 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Key Runtime Internals
+// Key Runtime State
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Private shared state and helpers for the split key runtime modules.
-// Keep this header limited to declarations shared across key_runtime*.c.
-// Engine-local helpers should stay file-local in their owning module.
+// Shared active-key and multi-tap state for the split key runtime modules.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "noah_keymap.h"
-#include "../action/action_dispatch.h"
-#include "../pointing/pointing_device_modes.h"
-#include "delayed_action.h"
-#include "key_behavior_lookup.h"
-#include "held_action.h"
+#include "key_behavior.h"
 #include "multi_tap_engine.h"
 
 typedef struct {
@@ -36,10 +29,6 @@ typedef struct {
     hold_behavior_t long_hold;
 } active_key_state_t;
 
-typedef struct {
-    key_behavior_view_t behavior;
-} handled_key_view_t;
-
 #define ACTIVE_KEY_STATE_INIT                           \
     {                                                   \
         .keycode             = KC_NO,                   \
@@ -53,24 +42,10 @@ extern active_key_state_t active_key;
 extern multi_tap_t        multi_tap;
 
 void noah_key_runtime_scan(void);
-void key_feedback_pulse_arm(bool long_hold_level);
-bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record);
-bool key_runtime_process_handled_key_press(uint16_t keycode, keyrecord_t *record, handled_key_view_t key);
-bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_view_t key);
-bool key_runtime_process_direct_action_key(uint16_t keycode, keyrecord_t *record);
 
 uint8_t behavior_get_layer(uint16_t keycode);
 bool    is_layer_key(uint16_t keycode);
-bool    keypos_equal(keypos_t lhs, keypos_t rhs);
 bool    active_key_matches(uint16_t keycode, keypos_t key_pos);
 
 void active_key_reset(void);
 void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired);
-
-handled_key_view_t handled_key_lookup(uint16_t keycode);
-bool               handled_key_uses_implicit_pd_mode_hold(handled_key_view_t key);
-hold_behavior_t    handled_key_single_hold(handled_key_view_t key);
-uint16_t           handled_key_tap_action(handled_key_view_t key);
-bool               handled_key_multi_tap_repress(handled_key_view_t key, uint16_t keycode);
-uint16_t           handled_key_advance_multi_tap(uint16_t keycode);
-void               handled_key_dispatch_tap_or_begin_multi_tap(uint16_t keycode, handled_key_view_t key);

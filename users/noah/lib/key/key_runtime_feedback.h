@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Read-only snapshot of key runtime state for RGB and other feedback modules.
-// Avoids exposing key_runtime_internal.h outside the key engine.
+// Avoids exposing the rest of the key engine's private runtime surface.
 //
 // The full snapshot is computed on the master half. For split sync, the RGB-
 // relevant semantic state is packed into a single flags byte so the slave can
@@ -56,3 +56,4 @@ static inline bool key_feedback_flags_flash_phase(uint8_t flags) {
 
 // Compute packed flags from the master-side key engine state.
 uint8_t key_feedback_pack(void);
+void    key_feedback_pulse_arm(bool long_hold_level);
