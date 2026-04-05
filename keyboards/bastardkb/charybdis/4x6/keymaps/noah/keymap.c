@@ -199,6 +199,9 @@ enum keymap_custom_keycodes {
 //     contents come from VIA_MACROS(MACRO) above.
 //   - Modded keycodes like G(KC_RIGHT), A(KC_LEFT), or S(KC_1) let one action
 //     send GUI, Alt, Shift, and similar variants without adding separate keys.
+//     Custom held actions decompose those into owned real mods plus the base
+//     key so overlap stays safe; ordinary QMK tap paths still keep stock
+//     tap_code16()/send_string semantics.
 //
 // tap accepts one helper:
 //   TAP_SENDS(action)

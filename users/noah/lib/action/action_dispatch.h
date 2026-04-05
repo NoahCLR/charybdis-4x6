@@ -11,6 +11,11 @@
 // too, because tap_code16/register_code16 only model plain key press/release.
 // Raw QMK layer actions are intentionally handled separately so they cannot
 // bypass the userspace layer ownership model.
+//
+// Scope note: this module intentionally keeps authored tap actions on normal
+// QMK tap semantics. The ownership-aware decomposition of held QK_MODS actions
+// (e.g. S(KC_1) held as a custom hold) lives in held_action.c, because that is
+// the specific overlap-sensitive surface this userspace runtime owns.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

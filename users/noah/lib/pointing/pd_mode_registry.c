@@ -6,6 +6,7 @@
 
 #include "noah_keymap.h"
 #include "pd_mode_internal.h"
+#include "../state/keyboard_mod_ownership.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
@@ -55,8 +56,10 @@ static void pinch_mode_register_command(void) {
         return;
     }
 
-    add_weak_mods(MOD_BIT(KC_LEFT_GUI));
-    send_keyboard_report();
+    // Pinch mode owns a logical GUI hold for trackpad gestures. Keep that on the
+    // same real-mod ownership path as the rest of the custom runtime instead of
+    // advertising it as a transient weak modifier.
+    keyboard_mod_ownership_register(KC_LEFT_GUI);
     pinch_command_registered = true;
 }
 
@@ -65,8 +68,7 @@ static void pinch_mode_unregister_command(void) {
         return;
     }
 
-    del_weak_mods(MOD_BIT(KC_LEFT_GUI));
-    send_keyboard_report();
+    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
     pinch_command_registered = false;
 }
 

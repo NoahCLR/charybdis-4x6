@@ -58,6 +58,48 @@ static bool held_action_is_owned_momentary_layer(uint16_t action) {
     return IS_QK_MOMENTARY(action);
 }
 
+static bool held_action_is_owned_modded_keycode(uint16_t action) {
+    return IS_QK_MODS(action);
+}
+
+static uint8_t held_action_extract_mods(uint16_t action) {
+    uint8_t mods_to_send = 0;
+
+    if (action & QK_RMODS_MIN) {
+        if (action & QK_LCTL) mods_to_send |= MOD_BIT(KC_RIGHT_CTRL);
+        if (action & QK_LSFT) mods_to_send |= MOD_BIT(KC_RIGHT_SHIFT);
+        if (action & QK_LALT) mods_to_send |= MOD_BIT(KC_RIGHT_ALT);
+        if (action & QK_LGUI) mods_to_send |= MOD_BIT(KC_RIGHT_GUI);
+    } else {
+        if (action & QK_LCTL) mods_to_send |= MOD_BIT(KC_LEFT_CTRL);
+        if (action & QK_LSFT) mods_to_send |= MOD_BIT(KC_LEFT_SHIFT);
+        if (action & QK_LALT) mods_to_send |= MOD_BIT(KC_LEFT_ALT);
+        if (action & QK_LGUI) mods_to_send |= MOD_BIT(KC_LEFT_GUI);
+    }
+
+    return mods_to_send;
+}
+
+static void held_action_register_owned_modded_keycode(uint16_t action) {
+    uint8_t mods    = held_action_extract_mods(action);
+    uint8_t keycode = QK_MODS_GET_BASIC_KEYCODE(action);
+
+    keyboard_mod_ownership_register_mods(mods);
+    if (keycode != KC_NO) {
+        register_code(keycode);
+    }
+}
+
+static void held_action_unregister_owned_modded_keycode(uint16_t action) {
+    uint8_t mods    = held_action_extract_mods(action);
+    uint8_t keycode = QK_MODS_GET_BASIC_KEYCODE(action);
+
+    if (keycode != KC_NO) {
+        unregister_code(keycode);
+    }
+    keyboard_mod_ownership_unregister_mods(mods);
+}
+
 static bool held_action_requires_per_key_dispatch(uint16_t action) {
     return held_action_is_owned_momentary_layer(action);
 }
@@ -210,6 +252,14 @@ static void held_action_dispatch_press(keypos_t key_pos, uint16_t action) {
         return;
     }
 
+    // Held QK_MODS keycodes, e.g. S(KC_1) or G(KC_C), must use owned real mods
+    // plus the underlying base key. Leaving them on register_code16() would keep
+    // the weak-mod overlap bug we are explicitly trying to avoid on held actions.
+    if (held_action_is_owned_modded_keycode(action)) {
+        held_action_register_owned_modded_keycode(action);
+        return;
+    }
+
     register_code16(action);
 }
 
@@ -235,6 +285,11 @@ static void held_action_dispatch_release(keypos_t key_pos, uint16_t action) {
 
     if (action >= NOAH_KEYMAP_SAFE_RANGE) {
         noah_dispatch_synthetic_record(action, false);
+        return;
+    }
+
+    if (held_action_is_owned_modded_keycode(action)) {
+        held_action_unregister_owned_modded_keycode(action);
         return;
     }
 

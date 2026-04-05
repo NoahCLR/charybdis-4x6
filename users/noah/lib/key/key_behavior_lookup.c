@@ -51,6 +51,10 @@ static bool key_behavior_keycode_supported(uint16_t keycode) {
 }
 
 static bool key_behavior_action_supported(uint16_t action, hold_behavior_mode_t hold_mode) {
+    // All non-layer actions stay valid authored surfaces. The runtime only
+    // rejects raw QMK layer actions here, because layer ownership is the one
+    // area where bypassing userspace is always incorrect. Held QK_MODS actions
+    // remain supported and are decomposed by held_action.c.
     if (!action_dispatch_is_raw_qmk_layer_action(action)) {
         return true;
     }
