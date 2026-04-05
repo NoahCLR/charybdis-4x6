@@ -603,6 +603,54 @@ static void test_press_flushes_previous_tap_and_registers_immediate_hold(void) {
     CHECK(test_calls[1].action == TEST_IMMEDIATE_HOLD);
 }
 
+static void test_release_pending_multi_tap_hold_registers_then_unregisters_held_action(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   record = test_record(test_keypos(6, 2), false);
+    handled_key_view_t            key    = test_handled_key(TEST_MULTI_TAP_KEY);
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .timer            = (uint16_t)(fake_time - 200),
+        .keycode          = TEST_MULTI_TAP_KEY,
+        .key_pos          = record.event.key,
+        .tap_hold_term    = 120,
+        .longer_hold_term = 240,
+    };
+
+    multi_tap = (multi_tap_t){
+        .keycode       = TEST_MULTI_TAP_KEY,
+        .timer         = (uint16_t)(fake_time - 150),
+        .count         = 2,
+        .pending_hold  = true,
+        .tap_hold_term = 120,
+        .hold          = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD),
+        .long_hold     = hold_behavior_none(),
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_release(TEST_MULTI_TAP_KEY, &record, key, &plan));
+
+    CHECK(plan.count == 2);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
+    CHECK(plan.effects[0].data.held_action.key_pos.row == record.event.key.row);
+    CHECK(plan.effects[0].data.held_action.key_pos.col == record.event.key.col);
+    CHECK(plan.effects[0].data.held_action.action == TEST_MULTI_TAP_HOLD);
+    CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER);
+    CHECK(plan.effects[1].data.held_action.key_pos.row == record.event.key.row);
+    CHECK(plan.effects[1].data.held_action.key_pos.col == record.event.key.col);
+    CHECK(plan.effects[1].data.held_action.action == TEST_MULTI_TAP_HOLD);
+    CHECK(active_key.keycode == KC_NO);
+    CHECK(multi_tap.keycode == KC_NO);
+    CHECK(multi_tap.count == 0);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(test_call_count == 2);
+    CHECK(test_calls[0].kind == TEST_CALL_HELD_REGISTER);
+    CHECK(test_calls[0].action == TEST_MULTI_TAP_HOLD);
+    CHECK(test_calls[1].kind == TEST_CALL_HELD_UNREGISTER);
+    CHECK(test_calls[1].action == TEST_MULTI_TAP_HOLD);
+}
+
 static void test_scan_promotes_pending_multi_tap_hold(void) {
     key_runtime_transition_plan_t plan;
 
@@ -780,6 +828,7 @@ int main(void) {
     test_release_hold_prefers_long_hold_after_longer_term();
     test_mismatched_release_releases_owned_held_action();
     test_press_flushes_previous_tap_and_registers_immediate_hold();
+    test_release_pending_multi_tap_hold_registers_then_unregisters_held_action();
     test_scan_promotes_pending_multi_tap_hold();
     test_scan_commits_immediate_hold_threshold_with_feedback();
     test_scan_commits_implicit_pd_mode_hold_without_feedback();

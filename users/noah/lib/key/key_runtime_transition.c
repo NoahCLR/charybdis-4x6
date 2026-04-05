@@ -59,6 +59,8 @@ typedef struct {
     hold_behavior_t                  long_hold;
 } pending_multi_tap_scan_resolution_t;
 
+static hold_threshold_dispatch_t key_runtime_transition_hold_threshold_dispatch_kind(hold_behavior_t hold);
+
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     *plan = (key_runtime_transition_plan_t){0};
 }
@@ -408,6 +410,18 @@ void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan)
     key_runtime_transition_flush_multi_tap_impl(plan);
 }
 
+static bool key_runtime_transition_pending_multi_tap_release_uses_held_lifecycle(hold_behavior_t hold, uint16_t action, uint8_t repeat_count, uint16_t elapsed) {
+    if (repeat_count != 1 || elapsed < active_key.tap_hold_term) {
+        return false;
+    }
+
+    if (hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || action != hold.action) {
+        return false;
+    }
+
+    return key_runtime_transition_hold_threshold_dispatch_kind(hold) == HOLD_THRESHOLD_DISPATCH_HELD;
+}
+
 static bool key_runtime_transition_process_pending_multi_tap_hold_release(uint16_t keycode, key_behavior_view_t behavior, key_runtime_transition_plan_t *plan) {
     if (!(multi_tap_pending_hold(&multi_tap) && multi_tap.keycode == keycode)) {
         return false;
@@ -427,7 +441,12 @@ static bool key_runtime_transition_process_pending_multi_tap_hold_release(uint16
         action = key_runtime_transition_select_release_hold_action(elapsed, cached_hold.action, cached_long_hold, active_key.longer_hold_term);
     }
 
-    key_runtime_transition_plan_delayed_action(plan, action, cached_mods, repeat_count);
+    if (key_runtime_transition_pending_multi_tap_release_uses_held_lifecycle(cached_hold, action, repeat_count, elapsed)) {
+        key_runtime_transition_plan_held_register(plan, active_key.key_pos, action);
+        key_runtime_transition_plan_held_unregister(plan, active_key.key_pos, action);
+    } else {
+        key_runtime_transition_plan_delayed_action(plan, action, cached_mods, repeat_count);
+    }
 
     if (behavior.is_momentary_layer) {
         key_runtime_transition_plan_layer_release(plan, active_key.key_pos);
