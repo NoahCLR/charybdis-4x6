@@ -341,7 +341,7 @@ const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(KC_DOT)},
-                        [1] = {.tap = TAP_SENDS(LOCK_PD_MODE(DRAGSCROLL))},
+                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))},
                     },
             },
 };

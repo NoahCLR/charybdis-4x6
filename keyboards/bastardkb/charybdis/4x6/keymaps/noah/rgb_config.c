@@ -126,12 +126,12 @@ const hsv_t automouse_color_end   = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_B
 // Multi-tap pending: neutral white while the tap window is still open.
 const hsv_t feedback_multi_tap_pending_color = {.h = 0, .s = 0, .v = 150};
 
-// Hold-tier feedback: bright yellow for strong peripheral-vision visibility.
-const hsv_t feedback_hold_active_color = {.h = 43, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};
+// Hold-tier feedback: orange for the normal hold tier.
+const hsv_t feedback_hold_active_color = {.h = 18, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};
 
-// Longer-hold-tier feedback: bright green so the escalated state reads
+// Longer-hold-tier feedback: icy cyan for the longer hold tier.
 // immediately distinct from the normal hold tier.
-const hsv_t feedback_long_hold_active_color = {.h = 85, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};
+const hsv_t feedback_long_hold_active_color = {.h = 148, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};
 #    endif
 
 #endif // RGB_MATRIX_ENABLE
