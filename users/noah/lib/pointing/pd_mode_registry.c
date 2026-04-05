@@ -5,7 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "noah_keymap.h"
-#include "pointing_device_modes.h"
+#include "pd_mode_internal.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #    include "pointing_device_auto_mouse.h" // QMK (firmware fork)

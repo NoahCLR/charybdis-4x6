@@ -179,11 +179,15 @@ enum keymap_custom_keycodes {
 // both together for a two-stage hold
 //
 // action can be a plain keycode, a modded keycode, a macro, a layer lock,
-// a pointer-mode lock, or a QMK behavior keycode such as TG()/TO()/TT()/OSL()
-// and LT()/MT() when you want their tap or hold semantics explicitly
+// a pointer-mode lock, or a supported QMK behavior keycode such as MT()/OSM()
 //   - Use LOCK_LAYER(layer) to toggle a layer lock.
 //     Locking the same layer again turns it off; locking a different layer
 //     switches the lock to that layer.
+//   - Use PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for a momentary layer hold
+//     owned by the custom runtime.
+//   - Raw TG()/TO()/TT()/OSL()/LM()/LT() actions inside key_behaviors[] are
+//     intentionally unsupported because they bypass layer ownership. LT()
+//     remains supported as the keycode of a key_behavior row itself.
 //   - Use LOCK_PD_MODE(mode_keycode) to toggle a pointer-mode lock.
 //     Activating the same mode again unlocks it; pressing, holding or locking
 //     any other pointer-mode key also clears the previous lock.

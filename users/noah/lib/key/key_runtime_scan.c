@@ -6,6 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_internal.h"
+#include "../state/layer_ownership.h"
 
 static bool hold_uses_one_shot_dispatch(hold_behavior_t hold) {
     return action_dispatch_is_layer_lock(hold.action) || action_dispatch_is_macro(hold.action) || !hold_registers_while_held(hold);
@@ -65,7 +66,7 @@ static void promote_to_long_hold(hold_behavior_t long_hold) {
 
 static inline void deactivate_pending_multi_tap_layer_before_lock(uint16_t action) {
     if (is_layer_key(active_key.keycode) && action_dispatch_is_layer_lock(action)) {
-        layer_off(behavior_get_layer(active_key.keycode));
+        layer_ownership_momentary_release(active_key.key_pos);
     }
 }
 

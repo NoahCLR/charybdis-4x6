@@ -8,14 +8,8 @@
 #include "key_runtime_internal.h"
 #include "../action/synthetic_record.h"
 #include "../state/keyboard_mod_ownership.h"
+#include "../state/layer_ownership.h"
 #include "../state/runtime_shared_state.h"
-
-static inline void deactivate_momentary_layer_if_unlocked(uint16_t keycode) {
-    uint8_t layer = behavior_get_layer(keycode);
-    if (!action_dispatch_layer_is_locked(layer)) {
-        layer_off(layer);
-    }
-}
 
 static uint16_t select_release_hold_action(uint16_t elapsed, uint16_t hold_action, hold_behavior_t long_hold, uint16_t longer_hold_term) {
     if (hold_sends_on_release(long_hold) && elapsed >= longer_hold_term) {
@@ -90,7 +84,7 @@ static bool process_key_behavior_press(uint16_t keycode, keyrecord_t *record, ha
         }
 
         if (behavior.is_momentary_layer) {
-            layer_on(behavior_get_layer(keycode));
+            layer_ownership_momentary_press(record->event.key, behavior_get_layer(keycode));
         }
 
         bool pending_hold = multi_tap_pending_hold(&multi_tap);
@@ -101,7 +95,7 @@ static bool process_key_behavior_press(uint16_t keycode, keyrecord_t *record, ha
     }
 
     if (behavior.is_momentary_layer) {
-        layer_on(behavior_get_layer(keycode));
+        layer_ownership_momentary_press(record->event.key, behavior_get_layer(keycode));
     }
 
     flush_active_key();
@@ -138,7 +132,7 @@ static bool process_key_behavior_release_pending_multi_tap_hold(uint16_t keycode
     }
 
     if (behavior.is_momentary_layer) {
-        deactivate_momentary_layer_if_unlocked(keycode);
+        layer_ownership_momentary_release(active_key.key_pos);
     }
     active_key_reset();
     return true;
@@ -146,12 +140,12 @@ static bool process_key_behavior_release_pending_multi_tap_hold(uint16_t keycode
 
 static bool process_key_behavior_release_active_key(uint16_t keycode, keyrecord_t *record, key_behavior_view_t behavior) {
     if (behavior.is_momentary_layer) {
-        deactivate_momentary_layer_if_unlocked(keycode);
+        layer_ownership_momentary_release(record->event.key);
     }
 
     if (!active_key_matches(keycode, record->event.key)) {
         // active_key may already belong to a newer custom press; release any
-        // held action still owned by this physical key.
+        // remaining held action still owned by this physical key.
         held_action_release_owned_by_key(record->event.key);
         return true;
     }

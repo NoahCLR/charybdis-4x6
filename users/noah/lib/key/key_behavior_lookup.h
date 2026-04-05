@@ -13,7 +13,7 @@ typedef struct {
     const key_behavior_t *config;
     uint16_t              keycode;
     bool                  handled;
-    bool                  is_momentary_layer; // MO() or LT() — engine handles layer_on/off
+    bool                  is_momentary_layer; // MO() or LT() — engine owns momentary layer activation
     bool                  is_layer_tap;       // specifically LT() — has embedded tap key
     bool                  has_multi_tap;
     uint16_t              tap_hold_term;    // resolved: per-key → TAPPING_TERM for LT → CUSTOM_TAP_HOLD_TERM
@@ -25,3 +25,4 @@ typedef struct {
 key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count);
 bool                key_behavior_has_more_taps(uint16_t keycode, uint8_t count);
 key_behavior_view_t key_behavior_lookup(uint16_t keycode);
+void                key_behavior_validate_all(void);

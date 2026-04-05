@@ -2,11 +2,13 @@
 // Pointing Device Modes
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Full public interface for the pointing-device mode system.
+// Public cross-module interface for the pointing-device mode system.
 // Implementations are split across pd_mode_registry.c and pd_mode_state.c.
 //
 // Non-pointing modules that only need mode flag constants or read-only state
 // queries should include pd_mode_flags.h instead of this header.
+// Low-level state mutators stay private in pd_mode_internal.h so callers
+// cannot bypass the mode-state invariants.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -39,10 +41,6 @@ _Static_assert(PD_MODE_KEYCODE_COUNT == PD_MODE_COUNT, "pd-mode keycode count in
 
 extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];
 
-void pd_mode_set(uint8_t mode);
-void pd_mode_clear(uint8_t mode);
-void pd_mode_set_locked(uint8_t mode);
-void pd_mode_clear_locked(uint8_t mode);
 void pd_mode_apply_remote_snapshot(uint8_t active_flags, uint8_t locked_flags);
 
 const pd_mode_def_t *pd_mode_lookup(uint8_t mode);
@@ -50,15 +48,8 @@ const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action);
 bool                 pd_mode_is_lockable(uint8_t mode);
 bool                 is_pd_mode_lock_action(uint16_t action);
 
-void pd_mode_activate(uint8_t mode);
-void pd_mode_deactivate(uint8_t mode);
-void pd_mode_lock(uint8_t mode);
-void pd_mode_unlock(uint8_t mode);
 bool pd_mode_set_lock_state(uint8_t mode, bool locked);
 bool pd_mode_toggle_lock_state(uint8_t mode);
-bool pd_mode_unlock_other_locks(uint8_t keep_mode);
-bool pd_mode_deactivate_other_unlocked(uint8_t keep_mode);
-void pd_mode_update(uint8_t mode, bool active);
 bool pd_mode_handle_keycode_press(uint16_t keycode);
 bool pd_mode_handle_keycode_release(uint16_t keycode);
 

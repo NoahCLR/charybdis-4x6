@@ -4,10 +4,15 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#ifdef CONSOLE_ENABLE
+#    include "print.h"
+#endif
+
 #include "noah_keymap.h"
 #include "../action/action_dispatch.h"
 #include "../pointing/pointing_device_modes.h"
 #include "../state/keyboard_mod_ownership.h"
+#include "../state/layer_ownership.h"
 #include "held_action.h"
 #include "../action/synthetic_record.h"
 
@@ -47,6 +52,22 @@ static bool held_action_is_pure_modifier(uint16_t action) {
         default:
             return false;
     }
+}
+
+static bool held_action_is_owned_momentary_layer(uint16_t action) {
+    return IS_QK_MOMENTARY(action);
+}
+
+static bool held_action_requires_per_key_dispatch(uint16_t action) {
+    return held_action_is_owned_momentary_layer(action);
+}
+
+static void held_action_log_unsupported_layer_action(uint16_t action) {
+#ifdef CONSOLE_ENABLE
+    uprintf("Unsupported held raw QMK layer action 0x%04X; use PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned layer holds\n", (unsigned int)action);
+#else
+    (void)action;
+#endif
 }
 
 static int8_t held_modifier_index_for_action(uint16_t action) {
@@ -164,8 +185,18 @@ static void held_modifier_register(keypos_t key_pos, uint16_t action) {
     }
 }
 
-static void held_action_dispatch_press(uint16_t action) {
+static void held_action_dispatch_press(keypos_t key_pos, uint16_t action) {
     if (pd_mode_handle_keycode_press(action)) {
+        return;
+    }
+
+    if (held_action_is_owned_momentary_layer(action)) {
+        layer_ownership_momentary_press(key_pos, QK_MOMENTARY_GET_LAYER(action));
+        return;
+    }
+
+    if (action_dispatch_is_raw_qmk_layer_action(action)) {
+        held_action_log_unsupported_layer_action(action);
         return;
     }
 
@@ -182,8 +213,18 @@ static void held_action_dispatch_press(uint16_t action) {
     register_code16(action);
 }
 
-static void held_action_dispatch_release(uint16_t action) {
+static void held_action_dispatch_release(keypos_t key_pos, uint16_t action) {
     if (pd_mode_handle_keycode_release(action)) {
+        return;
+    }
+
+    if (held_action_is_owned_momentary_layer(action)) {
+        layer_ownership_momentary_release(key_pos);
+        return;
+    }
+
+    if (action_dispatch_is_raw_qmk_layer_action(action)) {
+        held_action_log_unsupported_layer_action(action);
         return;
     }
 
@@ -211,8 +252,8 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
         uint16_t old_action       = held_actions[slot].action;
         held_actions[slot].active = false;
         held_actions[slot].action = KC_NO;
-        if (held_action_refcount(old_action) == 0) {
-            held_action_dispatch_release(old_action);
+        if (held_action_refcount(old_action) == 0 || held_action_requires_per_key_dispatch(old_action)) {
+            held_action_dispatch_release(key_pos, old_action);
         }
     } else {
         slot = held_action_find_free_slot();
@@ -228,8 +269,8 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
         .action  = action,
     };
 
-    if (first_binding) {
-        held_action_dispatch_press(action);
+    if (first_binding || held_action_requires_per_key_dispatch(action)) {
+        held_action_dispatch_press(key_pos, action);
     }
 
     return true;
@@ -254,8 +295,8 @@ bool held_action_release_owned_by_key(keypos_t key_pos) {
         held_actions[slot].active = false;
         held_actions[slot].action = KC_NO;
 
-        if (held_action_refcount(action) == 0) {
-            held_action_dispatch_release(action);
+        if (held_action_refcount(action) == 0 || held_action_requires_per_key_dispatch(action)) {
+            held_action_dispatch_release(key_pos, action);
         }
         return true;
     }
@@ -273,7 +314,7 @@ void held_action_register(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    held_action_dispatch_press(action);
+    held_action_dispatch_press(key_pos, action);
 }
 
 void held_action_unregister(keypos_t key_pos, uint16_t action) {
@@ -286,7 +327,7 @@ void held_action_unregister(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    held_action_dispatch_release(action);
+    held_action_dispatch_release(key_pos, action);
 }
 
 bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {

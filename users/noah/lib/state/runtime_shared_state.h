@@ -3,7 +3,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Syncs split-visible runtime state across halves so non-owning modules such
-// as RGB can render the correct remote state.
+// as RGB can render the correct remote state. The master periodically re-sends
+// the full snapshot as a heartbeat so a rebooted or rejoined half can recover
+// even if no state changed meanwhile.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

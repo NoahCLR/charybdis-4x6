@@ -5,7 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "../state/runtime_shared_state.h"
-#include "pointing_device_modes.h"
+#include "pd_mode_internal.h"
 
 static uint8_t pd_mode_active_flags_state = 0;
 static uint8_t pd_mode_locked_flags_state = 0;

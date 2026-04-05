@@ -10,6 +10,7 @@
 #include "noah_runtime.h"
 #include "noah_keymap.h"
 #include "lib/macro/macro_payload.h"
+#include "keymap_introspection.h" // QMK
 
 #ifdef CONSOLE_ENABLE
 #    include "print.h"
@@ -154,6 +155,39 @@ static void seed_via_default_macros(void) {
 }
 #endif
 
+static bool keymap_layer_action_supported(uint16_t keycode) {
+    if (!action_dispatch_is_raw_qmk_layer_action(keycode)) {
+        return true;
+    }
+
+    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
+}
+
+static void log_invalid_keymap_layer_action(uint8_t layer, uint8_t row, uint8_t col, uint16_t keycode) {
+#ifdef CONSOLE_ENABLE
+    uprintf("Unsupported keymaps[%u][%u][%u] raw layer action 0x%04X; use MO()/LT() for momentary access or LOCK_LAYER(...) for persistent layer changes\n", (unsigned int)layer, (unsigned int)row, (unsigned int)col, (unsigned int)keycode);
+#else
+    (void)layer;
+    (void)row;
+    (void)col;
+    (void)keycode;
+#endif
+}
+
+static void validate_authored_keymap_layer_actions(void) {
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+        for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+            for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+                uint16_t keycode = keycode_at_keymap_location(layer, row, col);
+
+                if (!keymap_layer_action_supported(keycode)) {
+                    log_invalid_keymap_layer_action(layer, row, col, keycode);
+                }
+            }
+        }
+    }
+}
+
 void noah_eeconfig_init_user(void) {
 #if (EECONFIG_USER_DATA_SIZE) == 0
     eeconfig_update_user(0);
@@ -179,6 +213,8 @@ void noah_matrix_scan_user(void) {
 
 void noah_keyboard_post_init_user(void) {
     macro_dispatch_validate_all();
+    key_behavior_validate_all();
+    validate_authored_keymap_layer_actions();
 
 #ifdef VIA_ENABLE
     validate_via_default_macro_payloads();
