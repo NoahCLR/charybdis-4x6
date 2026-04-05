@@ -97,7 +97,7 @@ enum custom_keycodes {
     ZOOM_MODE,
     DRAGSCROLL,
     PINCH_MODE,
-    PD_MODE_LOCK_BASE,                                                        // reserves one lock/toggle action per pd-mode keycode — use LOCK_PD_MODE(mode_keycode)
+    PD_MODE_LOCK_BASE,                                                           // reserves one lock/toggle action per pd-mode keycode — use LOCK_PD_MODE(mode_keycode)
     LAYER_LOCK_BASE     = PD_MODE_LOCK_BASE + (PD_MODE_LOCK_BASE - VOLUME_MODE), // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
@@ -115,8 +115,8 @@ extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
 
 // keymap.c uses this header as its authored keymap surface, so re-export the
 // shared runtime helpers, authoring schema, and keymap table helpers here.
-#include "noah_runtime.h" // IWYU pragma: export
-#include "lib/key/key_behavior.h"           // IWYU pragma: export
-#include "lib/keymap_materialize.h"         // IWYU pragma: export
-#include "lib/pointing/pd_mode_flags.h"     // IWYU pragma: export
-#include "lib/rgb/rgb_helpers.h"            // IWYU pragma: export
+#include "noah_runtime.h"               // IWYU pragma: export
+#include "lib/key/key_behavior.h"       // IWYU pragma: export
+#include "lib/keymap_materialize.h"     // IWYU pragma: export
+#include "lib/pointing/pd_mode_flags.h" // IWYU pragma: export
+#include "lib/rgb/rgb_helpers.h"        // IWYU pragma: export

@@ -12,15 +12,9 @@
 #define _KEYMAP_COMBO_KEYS_DEF(result_, keys_) const uint16_t PROGMEM _KEYMAP_COMBO_KEYS_NAME(__LINE__)[] = {_KEYMAP_STRIP_PARENS keys_, COMBO_END};
 #define _KEYMAP_COMBO_BIND_DEF(result_, keys_) COMBO(_KEYMAP_COMBO_KEYS_NAME(__LINE__), result_),
 
-#define MATERIALIZE_KEYMAP_DATA()                                                \
-    const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT] = {               \
-        VIA_MACROS(_KEYMAP_VIA_MACRO_PAYLOAD_ENTRY)                              \
-    };                                                                           \
-    const char *const hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT] = {   \
-        HARDCODED_MACROS(_KEYMAP_HARDCODED_MACRO_PAYLOAD_ENTRY)                  \
-    };                                                                           \
-    COMBOS(_KEYMAP_COMBO_KEYS_DEF)                                               \
-    combo_t key_combos[] = {                                                     \
-        COMBOS(_KEYMAP_COMBO_BIND_DEF)                                           \
-    };                                                                           \
+#define MATERIALIZE_KEYMAP_DATA()                                                                                                       \
+    const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT]             = {VIA_MACROS(_KEYMAP_VIA_MACRO_PAYLOAD_ENTRY)};             \
+    const char *const hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT] = {HARDCODED_MACROS(_KEYMAP_HARDCODED_MACRO_PAYLOAD_ENTRY)}; \
+    COMBOS(_KEYMAP_COMBO_KEYS_DEF)                                                                                                      \
+    combo_t       key_combos[]       = {COMBOS(_KEYMAP_COMBO_BIND_DEF)};                                                                \
     const uint8_t key_behavior_count = sizeof(key_behaviors) / sizeof(key_behaviors[0])

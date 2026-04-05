@@ -22,13 +22,13 @@
 // Consumers should use key_feedback_flags_*() helpers, not raw bits.
 
 #define KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING (1 << 0)
-#define KEY_FEEDBACK_FLAG_HOLD_ACTIVE       (1 << 1)
-#define KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE  (1 << 2)
-#define KEY_FEEDBACK_FLAG_HOLD_PENDING      (1 << 3)
-#define KEY_FEEDBACK_FLAG_LEVEL_FLASH       (1 << 4)
+#define KEY_FEEDBACK_FLAG_HOLD_ACTIVE (1 << 1)
+#define KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE (1 << 2)
+#define KEY_FEEDBACK_FLAG_HOLD_PENDING (1 << 3)
+#define KEY_FEEDBACK_FLAG_LEVEL_FLASH (1 << 4)
 // Current flash phase, computed on the master and synced to the slave so both
 // halves flash in lockstep despite having independent clocks.
-#define KEY_FEEDBACK_FLAG_FLASH_PHASE       (1 << 5)
+#define KEY_FEEDBACK_FLAG_FLASH_PHASE (1 << 5)
 
 static inline bool key_feedback_flags_multi_tap_pending(uint8_t flags) {
     return (flags & KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING) != 0;

@@ -14,13 +14,13 @@
 
 // ─── Authored keymap data (defined in rgb_config.c) ──────────────────────
 #ifdef RGB_MATRIX_ENABLE
-extern const hsv_t              layer_colors[];
-extern const pd_mode_color_t    pd_mode_colors[];
-extern const uint8_t            pd_mode_color_count;
-extern const layer_led_group_t  layer_led_groups[];
-extern const uint8_t            layer_led_group_count;
+extern const hsv_t               layer_colors[];
+extern const pd_mode_color_t     pd_mode_colors[];
+extern const uint8_t             pd_mode_color_count;
+extern const layer_led_group_t   layer_led_groups[];
+extern const uint8_t             layer_led_group_count;
 extern const pd_mode_led_group_t pd_mode_led_groups[];
-extern const uint8_t            pd_mode_led_group_count;
+extern const uint8_t             pd_mode_led_group_count;
 #    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
 extern const hsv_t automouse_color_start;
 extern const hsv_t automouse_color_end;

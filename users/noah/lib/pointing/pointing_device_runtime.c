@@ -23,8 +23,7 @@ bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
     return pointer_layer_policy_is_mouse_record(keycode);
 }
 #else
-void noah_pointing_device_init_user(void) {
-}
+void noah_pointing_device_init_user(void) {}
 
 bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;

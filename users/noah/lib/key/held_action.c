@@ -24,9 +24,9 @@ typedef struct {
     uint16_t action;
 } held_action_binding_t;
 
-static held_modifier_binding_t held_modifiers[8]         = {0};
+static held_modifier_binding_t held_modifiers[8]          = {0};
 static uint8_t                 held_modifier_refcounts[8] = {0};
-static held_action_binding_t   held_actions[8]           = {0};
+static held_action_binding_t   held_actions[8]            = {0};
 
 static inline bool keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
@@ -209,7 +209,7 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
             return true;
         }
 
-        uint16_t old_action = held_actions[slot].action;
+        uint16_t old_action       = held_actions[slot].action;
         held_actions[slot].active = false;
         held_actions[slot].action = KC_NO;
         if (held_action_refcount(old_action) == 0) {
@@ -251,7 +251,7 @@ bool held_action_release_owned_by_key(keypos_t key_pos) {
     int8_t slot = held_action_find_slot_for_key(key_pos);
 
     if (slot >= 0) {
-        uint16_t action = held_actions[slot].action;
+        uint16_t action           = held_actions[slot].action;
         held_actions[slot].active = false;
         held_actions[slot].action = KC_NO;
 

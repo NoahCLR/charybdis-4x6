@@ -105,7 +105,7 @@ static bool process_key_behavior_press(uint16_t keycode, keyrecord_t *record, ha
 
     flush_active_key();
     active_key_track(keycode, record->event.key, handled_key_tap_action(key), hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false);
-    active_key.implicit_pd_mode_hold = implicit;
+    active_key.implicit_pd_mode_hold       = implicit;
     active_key.pd_mode_was_locked_on_press = mode && pd_mode_locked(mode);
     activate_immediate_hold_if_needed(record, hold);
     return true;

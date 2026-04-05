@@ -148,11 +148,11 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
     (void)length;
 
     switch (data[0]) {
-#ifdef VIA_EEPROM_ALLOW_RESET
+#    ifdef VIA_EEPROM_ALLOW_RESET
         case id_eeprom_reset:
             via_macro_seed_scan_pending = true;
             return false;
-#endif
+#    endif
         case id_dynamic_keymap_macro_reset:
             via_macro_seed_scan_pending = true;
             return false;

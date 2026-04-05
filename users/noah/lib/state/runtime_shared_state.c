@@ -77,9 +77,9 @@ void runtime_shared_state_sync_elapsed(uint16_t raw_elapsed) {
 
     runtime_shared_state_packet_t pkt = {
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-        .automouse_progress   = pd_any_mode_locked() ? 0 : automouse_rgb_quantize_progress(raw_elapsed),
+        .automouse_progress = pd_any_mode_locked() ? 0 : automouse_rgb_quantize_progress(raw_elapsed),
 #    else
-        .automouse_progress   = 0,
+        .automouse_progress = 0,
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
         .pd_mode_flags        = pd_mode_active_snapshot(),
@@ -89,9 +89,9 @@ void runtime_shared_state_sync_elapsed(uint16_t raw_elapsed) {
         .pd_mode_locked_flags = 0,
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-        .key_feedback_flags   = key_feedback_pack(),
+        .key_feedback_flags = key_feedback_pack(),
 #    else
-        .key_feedback_flags   = 0,
+        .key_feedback_flags = 0,
 #    endif
     };
 

@@ -113,8 +113,8 @@ void reset_zoom_mode(void) {
 #        define ARROW_THRESHOLD_Y 50
 #    endif
 
-static pd_mode_axis_state_t arrow_x_axis       = {0};
-static pd_mode_axis_state_t arrow_y_axis       = {0};
+static pd_mode_axis_state_t arrow_x_axis        = {0};
+static pd_mode_axis_state_t arrow_y_axis        = {0};
 static bool                 arrow_axis_is_x     = true;
 static uint8_t              arrow_shift_buttons = 0;
 static bool                 arrow_shift_held    = false;
