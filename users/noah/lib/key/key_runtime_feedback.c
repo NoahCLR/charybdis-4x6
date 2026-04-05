@@ -7,13 +7,7 @@
 #include "../action/action_dispatch.h"
 #include "../pointing/pd_modes.h"
 
-typedef struct {
-    uint16_t timer;
-    bool     active;
-    bool     long_hold_level;
-} key_feedback_pulse_state_t;
-
-static key_feedback_pulse_state_t key_feedback_pulse = {0};
+#define key_feedback_pulse (noah_runtime_shared_state.key.feedback)
 
 static bool key_feedback_pulse_active(void) {
     if (!key_feedback_pulse.active) {
@@ -29,7 +23,7 @@ static bool key_feedback_pulse_active(void) {
 }
 
 void key_feedback_pulse_arm(bool long_hold_level) {
-    key_feedback_pulse = (key_feedback_pulse_state_t){
+    key_feedback_pulse = (key_runtime_feedback_state_t){
         .timer           = timer_read(),
         .active          = true,
         .long_hold_level = long_hold_level,
@@ -106,3 +100,5 @@ uint8_t key_feedback_pack(void) {
 
     return flags;
 }
+
+#undef key_feedback_pulse

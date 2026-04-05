@@ -32,6 +32,12 @@ typedef struct {
     hold_behavior_t long_hold;
 } active_key_state_t;
 
+typedef struct {
+    uint16_t timer;
+    bool     active;
+    bool     long_hold_level;
+} key_runtime_feedback_state_t;
+
 #define ACTIVE_KEY_STATE_INIT                           \
     {                                                   \
         .keycode             = KC_NO,                   \
@@ -42,8 +48,9 @@ typedef struct {
     }
 
 typedef struct {
-    active_key_state_t active_key;
-    multi_tap_t        multi_tap;
+    active_key_state_t          active_key;
+    multi_tap_t                 multi_tap;
+    key_runtime_feedback_state_t feedback;
 } key_runtime_shared_state_t;
 
 typedef struct {

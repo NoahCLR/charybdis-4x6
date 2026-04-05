@@ -7,13 +7,10 @@
 
 #include "handled_key.h"
 #include "key_runtime_process.h"
+#include "key_runtime_effects.h"
 #include "key_runtime_state.h"
 #include "delayed_action.h"
-#include "held_action.h"
-#include "../action/action_dispatch.h"
 #include "../pointing/pd_modes.h"
-#include "../state/layer_ownership.h"
-#include "../state/split_runtime_sync.h"
 
 static uint16_t select_release_hold_action(uint16_t elapsed, uint16_t hold_action, hold_behavior_t long_hold, uint16_t longer_hold_term) {
     if (hold_sends_on_release(long_hold) && elapsed >= longer_hold_term) {
@@ -26,7 +23,7 @@ static void dispatch_released_key_tap(uint16_t keycode, active_key_state_t relea
     if (behavior.has_multi_tap) {
         multi_tap_begin(&multi_tap, keycode, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
     } else if (released_key.tap_action != KC_NO) {
-        action_dispatch(released_key.tap_action);
+        key_runtime_effects_dispatch_action(released_key.tap_action);
     }
 }
 
@@ -45,7 +42,7 @@ static bool dispatch_locked_pd_mode_tap_if_needed(uint16_t keycode, active_key_s
     }
 
     if (pd_mode_is_lockable(mode) && pd_mode_toggle_lock_state(mode)) {
-        split_runtime_sync();
+        key_runtime_effects_sync_split_runtime();
     }
     return true;
 }
@@ -76,7 +73,7 @@ static bool process_pending_multi_tap_hold_release(uint16_t keycode, key_behavio
     }
 
     if (behavior.is_momentary_layer) {
-        layer_ownership_momentary_release(active_key.key_pos);
+        key_runtime_effects_layer_release(active_key.key_pos);
     }
     active_key_reset();
     return true;
@@ -84,13 +81,13 @@ static bool process_pending_multi_tap_hold_release(uint16_t keycode, key_behavio
 
 static bool process_active_key_release(uint16_t keycode, keyrecord_t *record, key_behavior_view_t behavior) {
     if (behavior.is_momentary_layer) {
-        layer_ownership_momentary_release(record->event.key);
+        key_runtime_effects_layer_release(record->event.key);
     }
 
     if (!active_key_matches(keycode, record->event.key)) {
         // active_key may already belong to a newer custom press; release any
         // remaining held action still owned by this physical key.
-        held_action_release_owned_by_key(record->event.key);
+        key_runtime_effects_release_held_action_owned_by_key(record->event.key);
         return true;
     }
 
@@ -102,7 +99,7 @@ static bool process_active_key_release(uint16_t keycode, keyrecord_t *record, ke
 
     if (released_key.hold_fired || released_key.held_action_keycode != KC_NO) {
         if (released_key.held_action_keycode != KC_NO) {
-            held_action_unregister(released_key.key_pos, released_key.held_action_keycode);
+            key_runtime_effects_held_action_unregister(released_key.key_pos, released_key.held_action_keycode);
         }
 
         if (dispatch_locked_pd_mode_tap_if_needed(keycode, released_key, elapsed, behavior)) {
@@ -115,7 +112,7 @@ static bool process_active_key_release(uint16_t keycode, keyrecord_t *record, ke
         }
 
         if (hold_sends_on_release(released_key.long_hold) && elapsed >= released_key.longer_hold_term) {
-            action_dispatch(released_key.long_hold.action);
+            key_runtime_effects_dispatch_action(released_key.long_hold.action);
         }
         return true;
     }
@@ -129,11 +126,11 @@ static bool process_active_key_release(uint16_t keycode, keyrecord_t *record, ke
     }
 
     if (hold_sends_on_release(released_key.hold)) {
-        action_dispatch(select_release_hold_action(elapsed, released_key.hold.action, released_key.long_hold, released_key.longer_hold_term));
+        key_runtime_effects_dispatch_action(select_release_hold_action(elapsed, released_key.hold.action, released_key.long_hold, released_key.longer_hold_term));
     } else if (hold_sends_on_release(released_key.long_hold) && elapsed >= released_key.longer_hold_term) {
-        action_dispatch(released_key.long_hold.action);
+        key_runtime_effects_dispatch_action(released_key.long_hold.action);
     } else if (!released_key.hold_one_shot_fired && !behavior.is_momentary_layer && released_key.tap_action != KC_NO) {
-        action_dispatch(released_key.tap_action);
+        key_runtime_effects_dispatch_action(released_key.tap_action);
     }
 
     return true;

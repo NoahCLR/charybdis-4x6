@@ -7,16 +7,16 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_process.h"
+#include "key_runtime_effects.h"
 #include "key_runtime_state.h"
 #include "delayed_action.h"
 #include "key_behavior_lookup.h"
 #include "../action/action_dispatch.h"
 #include "../pointing/pd_modes.h"
-#include "../state/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
-    keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
-    if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
+    key_runtime_effects_track_physical_keycode_event(keycode, record);
+    if (key_runtime_effects_should_suppress_default(keycode, record)) {
         return false;
     }
 
@@ -37,7 +37,7 @@ bool key_runtime_process_direct_action_key(uint16_t keycode, keyrecord_t *record
     }
 
     if (record->event.pressed) {
-        action_dispatch(keycode);
+        key_runtime_effects_dispatch_action(keycode);
     }
 
     return true;
