@@ -10,11 +10,13 @@
 
 #ifdef VIA_ENABLE
 #    include "dynamic_keymap.h"
+#    include "send_string.h"
 #endif
 
 #include "noah_keymap.h"
 #include "synthetic_record.h"
 #include "../pointing/pointing_device_modes.h"
+#include "../state/keyboard_mod_ownership.h"
 #include "../state/layer_ownership.h"
 #include "../state/runtime_shared_state.h"
 #include "action_dispatch.h"
@@ -51,6 +53,130 @@ static void action_dispatch_log_unsupported_layer_action(uint16_t action) {
 #endif
 }
 
+static void action_dispatch_register_keycode(uint8_t keycode) {
+    if (IS_MODIFIER_KEYCODE(keycode)) {
+        keyboard_mod_ownership_register(keycode);
+        return;
+    }
+
+    register_code(keycode);
+}
+
+static void action_dispatch_unregister_keycode(uint8_t keycode) {
+    if (IS_MODIFIER_KEYCODE(keycode)) {
+        keyboard_mod_ownership_unregister(keycode);
+        return;
+    }
+
+    unregister_code(keycode);
+}
+
+static void action_dispatch_tap_keycode(uint8_t keycode) {
+    if (IS_MODIFIER_KEYCODE(keycode)) {
+        uint16_t delay = (keycode == KC_CAPS_LOCK) ? TAP_HOLD_CAPS_DELAY : TAP_CODE_DELAY;
+
+        keyboard_mod_ownership_register(keycode);
+        wait_ms(delay);
+        keyboard_mod_ownership_unregister(keycode);
+        return;
+    }
+
+    tap_code(keycode);
+}
+
+#ifdef VIA_ENABLE
+#    ifndef DYNAMIC_KEYMAP_MACRO_DELAY
+#        define DYNAMIC_KEYMAP_MACRO_DELAY TAP_CODE_DELAY
+#    endif
+
+static uint8_t action_dispatch_via_macro_read_byte(uint16_t offset) {
+    uint8_t byte = 0;
+    dynamic_keymap_macro_get_buffer(offset, 1, &byte);
+    return byte;
+}
+
+static void action_dispatch_via_macro_send(uint8_t id) {
+    uint16_t size = dynamic_keymap_macro_get_buffer_size();
+    uint16_t offset = 0;
+
+    if (id >= dynamic_keymap_macro_get_count() || size == 0) {
+        return;
+    }
+
+    if (action_dispatch_via_macro_read_byte(size - 1) != 0) {
+        return;
+    }
+
+    while (id > 0) {
+        if (offset == size) {
+            return;
+        }
+        if (action_dispatch_via_macro_read_byte(offset) == 0) {
+            --id;
+        }
+        ++offset;
+    }
+
+    while (offset < size) {
+        uint8_t code = action_dispatch_via_macro_read_byte(offset++);
+
+        if (code == 0) {
+            break;
+        }
+
+        if (code == SS_QMK_PREFIX) {
+            if (offset >= size) {
+                break;
+            }
+
+            code = action_dispatch_via_macro_read_byte(offset++);
+
+            if (code == SS_TAP_CODE || code == SS_DOWN_CODE || code == SS_UP_CODE) {
+                if (offset >= size) {
+                    break;
+                }
+
+                uint8_t keycode = action_dispatch_via_macro_read_byte(offset++);
+
+                if (code == SS_TAP_CODE) {
+                    action_dispatch_tap_keycode(keycode);
+                } else if (code == SS_DOWN_CODE) {
+                    action_dispatch_register_keycode(keycode);
+                } else {
+                    action_dispatch_unregister_keycode(keycode);
+                }
+            } else if (code == SS_DELAY_CODE) {
+                int delay_ms = 0;
+
+                while (offset < size) {
+                    uint8_t delay_char = action_dispatch_via_macro_read_byte(offset++);
+
+                    if (delay_char < '0' || delay_char > '9') {
+                        code = delay_char;
+                        break;
+                    }
+
+                    delay_ms *= 10;
+                    delay_ms += delay_char - '0';
+                }
+
+                wait_ms(delay_ms);
+            }
+
+            wait_ms(DYNAMIC_KEYMAP_MACRO_DELAY);
+
+            if (code == 0) {
+                break;
+            }
+
+            continue;
+        }
+
+        send_char_with_delay((char)code, DYNAMIC_KEYMAP_MACRO_DELAY);
+    }
+}
+#endif
+
 void action_dispatch(uint16_t action) {
     if (action_dispatch_is_layer_lock(action)) {
         uint8_t layer = action - LAYER_LOCK_BASE;
@@ -69,7 +195,7 @@ void action_dispatch(uint16_t action) {
 
 #ifdef VIA_ENABLE
     if (IS_QK_MACRO(action)) {
-        dynamic_keymap_macro_send((uint8_t)(action - QK_MACRO));
+        action_dispatch_via_macro_send((uint8_t)(action - QK_MACRO));
         return;
     }
 #endif
