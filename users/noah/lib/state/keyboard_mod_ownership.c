@@ -4,6 +4,17 @@
 
 #include "keyboard_mod_ownership.h"
 
+static const uint8_t keyboard_mod_ownership_mod_masks[8] = {
+    MOD_BIT(KC_LEFT_CTRL),
+    MOD_BIT(KC_LEFT_SHIFT),
+    MOD_BIT(KC_LEFT_ALT),
+    MOD_BIT(KC_LEFT_GUI),
+    MOD_BIT(KC_RIGHT_CTRL),
+    MOD_BIT(KC_RIGHT_SHIFT),
+    MOD_BIT(KC_RIGHT_ALT),
+    MOD_BIT(KC_RIGHT_GUI),
+};
+
 static int8_t keyboard_mod_ownership_index_for_keycode(uint16_t keycode) {
     switch (keycode) {
         case KC_LEFT_CTRL:
@@ -28,7 +39,7 @@ static int8_t keyboard_mod_ownership_index_for_keycode(uint16_t keycode) {
 }
 
 static uint8_t keyboard_mod_ownership_physical_refcounts[8] = {0};
-static uint8_t keyboard_mod_ownership_owned_refcounts[8]    = {0};
+static uint8_t keyboard_mod_ownership_managed_refcounts[8]  = {0};
 
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     int8_t index = keyboard_mod_ownership_index_for_keycode(keycode);
@@ -53,7 +64,54 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
         return false;
     }
 
-    return keyboard_mod_ownership_owned_refcounts[index] > 0;
+    return keyboard_mod_ownership_managed_refcounts[index] > 0;
+}
+
+void keyboard_mod_ownership_register_mods(uint8_t mods) {
+    bool report_needed = false;
+
+    if (mods == 0) {
+        return;
+    }
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
+        if (!(mods & keyboard_mod_ownership_mod_masks[i])) {
+            continue;
+        }
+
+        if (keyboard_mod_ownership_managed_refcounts[i] < UINT8_MAX && keyboard_mod_ownership_managed_refcounts[i]++ == 0) {
+            add_mods(keyboard_mod_ownership_mod_masks[i]);
+            report_needed = true;
+        }
+    }
+
+    if (report_needed) {
+        send_keyboard_report();
+    }
+}
+
+void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
+    bool report_needed = false;
+
+    if (mods == 0) {
+        return;
+    }
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
+        if (!(mods & keyboard_mod_ownership_mod_masks[i]) || keyboard_mod_ownership_managed_refcounts[i] == 0) {
+            continue;
+        }
+
+        keyboard_mod_ownership_managed_refcounts[i]--;
+        if (keyboard_mod_ownership_managed_refcounts[i] == 0 && keyboard_mod_ownership_physical_refcounts[i] == 0) {
+            del_mods(keyboard_mod_ownership_mod_masks[i]);
+            report_needed = true;
+        }
+    }
+
+    if (report_needed) {
+        send_keyboard_report();
+    }
 }
 
 void keyboard_mod_ownership_register(uint16_t keycode) {
@@ -63,22 +121,23 @@ void keyboard_mod_ownership_register(uint16_t keycode) {
         return;
     }
 
-    if (keyboard_mod_ownership_owned_refcounts[index]++ == 0) {
-        add_mods(MOD_BIT(keycode));
-        send_keyboard_report();
-    }
+    keyboard_mod_ownership_register_mods(keyboard_mod_ownership_mod_masks[index]);
 }
 
 void keyboard_mod_ownership_unregister(uint16_t keycode) {
     int8_t index = keyboard_mod_ownership_index_for_keycode(keycode);
 
-    if (index < 0 || keyboard_mod_ownership_owned_refcounts[index] == 0) {
+    if (index < 0) {
         return;
     }
 
-    keyboard_mod_ownership_owned_refcounts[index]--;
-    if (keyboard_mod_ownership_owned_refcounts[index] == 0 && keyboard_mod_ownership_physical_refcounts[index] == 0) {
-        del_mods(MOD_BIT(keycode));
-        send_keyboard_report();
-    }
+    keyboard_mod_ownership_unregister_mods(keyboard_mod_ownership_mod_masks[index]);
+}
+
+void register_mods(uint8_t mods) {
+    keyboard_mod_ownership_register_mods(mods);
+}
+
+void unregister_mods(uint8_t mods) {
+    keyboard_mod_ownership_unregister_mods(mods);
 }
