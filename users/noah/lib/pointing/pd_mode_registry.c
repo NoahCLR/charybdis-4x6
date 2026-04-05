@@ -5,6 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "noah_keymap.h"
+#include "pd_mode_manifest.h"
 #include "pd_mode_internal.h"
 #include "../state/keyboard_mod_ownership.h"
 
@@ -88,11 +89,13 @@ static void pinch_mode_unregister_command(void) {
 #    define PD_MODE_ARROW_DPI 0
 #endif
 
+#define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, lock_keycode, handler, key_handler, reset, dpi) {PD_MODE_##name, keycode, lock_keycode, handler, key_handler, reset, dpi},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
-    {PD_MODE_DRAGSCROLL, DRAGSCROLL, LOCK_PD_MODE(DRAGSCROLL), NULL, NULL, NULL, 0}, {PD_MODE_VOLUME, VOLUME_MODE, LOCK_PD_MODE(VOLUME_MODE), handle_volume_mode, NULL, reset_volume_mode, PD_MODE_VOLUME_DPI}, {PD_MODE_BRIGHTNESS, BRIGHTNESS_MODE, LOCK_PD_MODE(BRIGHTNESS_MODE), handle_brightness_mode, NULL, reset_brightness_mode, PD_MODE_BRIGHTNESS_DPI}, {PD_MODE_ZOOM, ZOOM_MODE, LOCK_PD_MODE(ZOOM_MODE), handle_zoom_mode, NULL, reset_zoom_mode, PD_MODE_ZOOM_DPI}, {PD_MODE_ARROW, ARROW_MODE, LOCK_PD_MODE(ARROW_MODE), handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode, PD_MODE_ARROW_DPI}, {PD_MODE_PINCH, PINCH_MODE, LOCK_PD_MODE(PINCH_MODE), NULL, NULL, NULL, 0},
+    NOAH_PD_MODE_LIST(NOAH_PD_MODE_REGISTRY_ROW)
 };
+#undef NOAH_PD_MODE_REGISTRY_ROW
 
-const pd_mode_def_t *pd_mode_lookup(uint8_t mode) {
+const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_modes[i].mode_flag == mode) return &pd_modes[i];
     }
@@ -106,7 +109,7 @@ const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
     return NULL;
 }
 
-bool pd_mode_is_lockable(uint8_t mode) {
+bool pd_mode_is_lockable(pd_mode_mask_t mode) {
     const pd_mode_def_t *def = pd_mode_lookup(mode);
     return def && def->lock_action != KC_NO;
 }
@@ -136,7 +139,7 @@ void pd_mode_apply_active_dpi(void) {
     pointing_device_set_cpi(charybdis_get_pointer_default_dpi());
 }
 
-void pd_mode_activate(uint8_t mode) {
+void pd_mode_activate(pd_mode_mask_t mode) {
     bool was_any_mode_active = pd_any_mode_active();
 
     pd_mode_set(mode);
@@ -158,7 +161,7 @@ void pd_mode_activate(uint8_t mode) {
     }
 }
 
-void pd_mode_deactivate(uint8_t mode) {
+void pd_mode_deactivate(pd_mode_mask_t mode) {
     bool was_any_mode_active = pd_any_mode_active();
 
     pd_mode_clear(mode);
@@ -188,7 +191,7 @@ void pd_mode_deactivate(uint8_t mode) {
     }
 }
 
-void pd_mode_lock(uint8_t mode) {
+void pd_mode_lock(pd_mode_mask_t mode) {
     pd_mode_set_locked(mode);
     pd_mode_activate(mode);
 
@@ -199,7 +202,7 @@ void pd_mode_lock(uint8_t mode) {
 #endif
 }
 
-void pd_mode_unlock(uint8_t mode) {
+void pd_mode_unlock(pd_mode_mask_t mode) {
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     if (mode == PD_MODE_DRAGSCROLL || mode == PD_MODE_PINCH) {
         scroll_mode_lock_detach_auto_mouse();
@@ -219,7 +222,7 @@ bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     return false;
 }
 
-uint8_t pd_mode_for_keycode(uint16_t keycode) {
+pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode) return pd_modes[i].mode_flag;
     }

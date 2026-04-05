@@ -10,16 +10,16 @@
 
 #include "pd_modes.h"
 
-void pd_mode_set(uint8_t mode);
-void pd_mode_clear(uint8_t mode);
-void pd_mode_set_locked(uint8_t mode);
-void pd_mode_clear_locked(uint8_t mode);
+void pd_mode_set(pd_mode_mask_t mode);
+void pd_mode_clear(pd_mode_mask_t mode);
+void pd_mode_set_locked(pd_mode_mask_t mode);
+void pd_mode_clear_locked(pd_mode_mask_t mode);
 
-void pd_mode_activate(uint8_t mode);
-void pd_mode_deactivate(uint8_t mode);
-void pd_mode_lock(uint8_t mode);
-void pd_mode_unlock(uint8_t mode);
+void pd_mode_activate(pd_mode_mask_t mode);
+void pd_mode_deactivate(pd_mode_mask_t mode);
+void pd_mode_lock(pd_mode_mask_t mode);
+void pd_mode_unlock(pd_mode_mask_t mode);
 
-bool pd_mode_unlock_other_locks(uint8_t keep_mode);
-bool pd_mode_deactivate_other_unlocked(uint8_t keep_mode);
-void pd_mode_update(uint8_t mode, bool active);
+bool pd_mode_unlock_other_locks(pd_mode_mask_t keep_mode);
+bool pd_mode_deactivate_other_unlocked(pd_mode_mask_t keep_mode);
+void pd_mode_update(pd_mode_mask_t mode, bool active);

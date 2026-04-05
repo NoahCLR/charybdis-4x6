@@ -10,6 +10,8 @@
 #include "quantum_keycodes.h"
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "lib/pointing/pd_mode_manifest.h"
+
 // ─── Layers ─────────────────────────────────────────────────────────────────
 //
 // Named layer indices (LAYER_BASE, LAYER_NUM, …) and LAYER_COUNT are defined
@@ -58,7 +60,8 @@ enum {
 // Their single-hold behavior still defaults to momentary mode activation
 // unless key_behaviors[] overrides that hold tier explicitly.
 // Use LOCK_PD_MODE(mode_keycode) for a persistent toggle inside tap/hold rows.
-// PD_MODE_LOCK_BASE reserves one lock/toggle action per pd-mode keycode.
+// Each pd mode gets an explicit generated lock keycode, so mode identity no
+// longer depends on contiguous enum math.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
 // actions authored in key_behaviors[]. Use the LOCK_LAYER(n) macro there.
 // Keymap-local custom keycodes are declared in keymap.c's
@@ -91,20 +94,20 @@ enum custom_keycodes {
     MACRO_13,
     MACRO_14,
     MACRO_15,
-    VOLUME_MODE,
-    BRIGHTNESS_MODE,
-    ARROW_MODE,
-    ZOOM_MODE,
-    DRAGSCROLL,
-    PINCH_MODE,
-    PD_MODE_LOCK_BASE,                                                           // reserves one lock/toggle action per pd-mode keycode — use LOCK_PD_MODE(mode_keycode)
-    LAYER_LOCK_BASE     = PD_MODE_LOCK_BASE + (PD_MODE_LOCK_BASE - VOLUME_MODE), // reserves LAYER_COUNT keycodes — use LOCK_LAYER(n) macro
+#define NOAH_PD_MODE_KEYCODE(name, keycode, lock_keycode, handler, key_handler, reset, dpi) keycode,
+    NOAH_PD_MODE_LIST(NOAH_PD_MODE_KEYCODE)
+#undef NOAH_PD_MODE_KEYCODE
+#define NOAH_PD_MODE_LOCK_KEYCODE(name, keycode, lock_keycode, handler, key_handler, reset, dpi) lock_keycode,
+    NOAH_PD_MODE_LIST(NOAH_PD_MODE_LOCK_KEYCODE)
+#undef NOAH_PD_MODE_LOCK_KEYCODE
+    LAYER_LOCK_BASE,
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
 
-#define PD_MODE_KEYCODE_COUNT (PD_MODE_LOCK_BASE - VOLUME_MODE)
+#define PD_MODE_KEYCODE_COUNT PD_MODE_COUNT
+#define PD_MODE_LOCK_KEYCODE_COUNT PD_MODE_COUNT
 #define HARDCODED_MACRO_SLOT_COUNT ((MACRO_15 - MACRO_0) + 1)
-#define LOCK_PD_MODE(mode_keycode_) (PD_MODE_LOCK_BASE + ((mode_keycode_) - VOLUME_MODE))
+#define LOCK_PD_MODE(mode_keycode_) mode_keycode_##_LOCK
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 #define NOAH_KEYMAP_SAFE_RANGE CUSTOM_KEYCODES_END
 

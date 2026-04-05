@@ -14,24 +14,33 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "pd_mode_manifest.h"
+
 // ─── Mode flag bit constants ────────────────────────────────────────────────
 
-#define PD_MODE_VOLUME (1 << 0)
-#define PD_MODE_ARROW (1 << 1)
-#define PD_MODE_DRAGSCROLL (1 << 2)
-#define PD_MODE_BRIGHTNESS (1 << 3)
-#define PD_MODE_ZOOM (1 << 4)
-#define PD_MODE_PINCH (1 << 5)
-#define PD_MODE_COUNT 6
+typedef uint16_t pd_mode_mask_t;
 
-_Static_assert(PD_MODE_COUNT <= 8, "PD_MODE_COUNT exceeds 8-bit pd-mode storage; widen pd-mode flags and the split runtime sync packet before adding more modes");
+enum {
+#define NOAH_PD_MODE_INDEX(name, keycode, lock_keycode, handler, key_handler, reset, dpi) PD_MODE_INDEX_##name,
+    NOAH_PD_MODE_LIST(NOAH_PD_MODE_INDEX)
+#undef NOAH_PD_MODE_INDEX
+    PD_MODE_COUNT,
+};
+
+enum {
+#define NOAH_PD_MODE_FLAG(name, keycode, lock_keycode, handler, key_handler, reset, dpi) PD_MODE_##name = ((pd_mode_mask_t)1u << PD_MODE_INDEX_##name),
+    NOAH_PD_MODE_LIST(NOAH_PD_MODE_FLAG)
+#undef NOAH_PD_MODE_FLAG
+};
+
+_Static_assert(PD_MODE_COUNT <= (sizeof(pd_mode_mask_t) * 8u), "PD_MODE_COUNT exceeds pd_mode_mask_t storage; widen the flag type and the split runtime sync packet before adding more modes");
 
 // ─── Read-only state queries ────────────────────────────────────────────────
 
-uint8_t pd_mode_active_snapshot(void);
-uint8_t pd_mode_locked_snapshot(void);
+pd_mode_mask_t pd_mode_active_snapshot(void);
+pd_mode_mask_t pd_mode_locked_snapshot(void);
 
-bool pd_mode_active(uint8_t mode);
-bool pd_mode_locked(uint8_t mode);
+bool pd_mode_active(pd_mode_mask_t mode);
+bool pd_mode_locked(pd_mode_mask_t mode);
 bool pd_any_mode_active(void);
 bool pd_any_mode_locked(void);

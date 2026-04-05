@@ -28,7 +28,7 @@ typedef void *pd_mode_key_handler_t;
 typedef void (*pd_mode_reset_t)(void);
 
 typedef struct {
-    uint8_t               mode_flag;
+    pd_mode_mask_t        mode_flag;
     uint16_t              keycode;     // keycode that activates this mode (KC_NO = none)
     uint16_t              lock_action; // KC_NO = not lockable; otherwise toggles persistent mode lock
     pd_mode_handler_t     handler;     // NULL = trackball handled externally (e.g. dragscroll)
@@ -41,21 +41,21 @@ _Static_assert(PD_MODE_KEYCODE_COUNT == PD_MODE_COUNT, "pd-mode keycode count in
 
 extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];
 
-void pd_mode_apply_remote_snapshot(uint8_t active_flags, uint8_t locked_flags);
+void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags);
 
-const pd_mode_def_t *pd_mode_lookup(uint8_t mode);
+const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode);
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action);
-bool                 pd_mode_is_lockable(uint8_t mode);
+bool                 pd_mode_is_lockable(pd_mode_mask_t mode);
 bool                 is_pd_mode_lock_action(uint16_t action);
 
-bool pd_mode_set_lock_state(uint8_t mode, bool locked);
-bool pd_mode_toggle_lock_state(uint8_t mode);
+bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked);
+bool pd_mode_toggle_lock_state(pd_mode_mask_t mode);
 bool pd_mode_handle_keycode_press(uint16_t keycode);
 bool pd_mode_handle_keycode_release(uint16_t keycode);
 
-bool    pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record);
-uint8_t pd_mode_for_keycode(uint16_t keycode);
-uint8_t pd_mode_first_active_index(void);
+bool           pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record);
+pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode);
+uint8_t        pd_mode_first_active_index(void);
 
 // Apply the active mode's DPI, or restore Charybdis's normal pointer DPI if no
 // mode with a custom DPI is active. No-op when sniping or dragscroll is active

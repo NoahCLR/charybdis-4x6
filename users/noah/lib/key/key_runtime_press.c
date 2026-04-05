@@ -42,7 +42,7 @@ bool key_runtime_process_handled_key_press(uint16_t keycode, keyrecord_t *record
     key_behavior_view_t behavior = key.behavior;
     hold_behavior_t     hold     = handled_key_single_hold(key);
     bool                implicit = handled_key_uses_implicit_pd_mode_hold(key);
-    uint8_t             mode     = pd_mode_for_keycode(keycode);
+    pd_mode_mask_t      mode     = pd_mode_for_keycode(keycode);
 
     if (handled_key_multi_tap_repress(key, keycode)) {
         uint16_t action = handled_key_advance_multi_tap(keycode);

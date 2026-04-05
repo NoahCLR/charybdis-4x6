@@ -9,9 +9,6 @@
 #include "key_runtime_state.h"
 #include "../pointing/pd_modes.h"
 
-active_key_state_t active_key = ACTIVE_KEY_STATE_INIT;
-multi_tap_t        multi_tap  = {0};
-
 uint8_t behavior_get_layer(uint16_t keycode) {
     return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
 }

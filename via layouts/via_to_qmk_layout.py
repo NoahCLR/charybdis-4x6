@@ -26,6 +26,7 @@ from typing import NoReturn
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 KEYMAP_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "keymap.c"
+PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "pd_mode_manifest.h"
 
 # Default mode: "write" makes the selected VIA export authoritative for
 # keymaps[][] and VIA_MACROS(MACRO). If you do not run this script,
@@ -63,23 +64,41 @@ CHARYBDIS_UPSTREAM_KEYCODES = [
     "DRG_TOG",
 ]
 
+_PD_MODE_MANIFEST_ENTRY_PATTERN = re.compile(r"^\s*M\(\s*[A-Z_][A-Z0-9_]*\s*,\s*([A-Z_][A-Z0-9_]*)\s*,\s*[A-Z_][A-Z0-9_]*\s*,")
+
+
+def load_pd_mode_keycodes() -> list[str]:
+    # Shared pd-mode keycodes are generated from the userspace manifest. Parsing
+    # that manifest here keeps the VIA bridge aligned with the firmware without
+    # another hand-maintained list.
+    if not PD_MODE_MANIFEST_FILE.exists():
+        raise SystemExit(f"pd_mode_manifest.h not found: {PD_MODE_MANIFEST_FILE}")
+
+    keycodes: list[str] = []
+
+    for raw_line in PD_MODE_MANIFEST_FILE.read_text().splitlines():
+        line = raw_line.split("//", 1)[0].strip()
+        if not line.startswith("M("):
+            continue
+
+        match = _PD_MODE_MANIFEST_ENTRY_PATTERN.match(line)
+        if not match:
+            raise SystemExit(f"could not parse pd_mode_manifest.h row: {raw_line!r}")
+
+        keycodes.append(match.group(1))
+
+    if not keycodes:
+        raise SystemExit(f"no pd modes found in manifest: {PD_MODE_MANIFEST_FILE}")
+
+    return keycodes
+
+
 # Current custom_keycodes enum entries that can appear directly on VIA layers.
 # These are userspace-owned SAFE_RANGE keycodes from users/noah/noah_keymap.h.
-# If you add a new shared userspace keycode that VIA can emit directly, update
-# this list so the script can map its CUSTOM(n) token back to the symbolic
-# name.
-#
 # Keymap-local custom keycodes such as RIGHT_THUMB / LEFT_THUMB are handled
 # separately below by parsing enum keymap_custom_keycodes in keymap.c, so they
 # do not need hardcoded entries here.
-PD_MODE_KEYCODES = [
-    "VOLUME_MODE",
-    "BRIGHTNESS_MODE",
-    "ARROW_MODE",
-    "ZOOM_MODE",
-    "DRAGSCROLL",
-    "PINCH_MODE",
-]
+PD_MODE_KEYCODES = load_pd_mode_keycodes()
 # Size of the shared userspace-owned custom-keycode range that sits below
 # NOAH_KEYMAP_SAFE_RANGE:
 #   - MACRO_0..15

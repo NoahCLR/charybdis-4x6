@@ -11,10 +11,12 @@
 
 #include <stdint.h>
 
+#include "../pointing/pd_mode_flags.h"
+
 typedef struct __attribute__((packed)) {
     uint16_t automouse_progress;
-    uint8_t  pd_mode_flags;
-    uint8_t  pd_mode_locked_flags;
+    pd_mode_mask_t pd_mode_flags;
+    pd_mode_mask_t pd_mode_locked_flags;
     uint8_t  key_feedback_flags;
 } split_runtime_sync_packet_t;
 

@@ -19,6 +19,7 @@
 
 #if defined(RGB_MATRIX_ENABLE)
 
+#    include "../pointing/pd_mode_flags.h"
 #    include "rgb_matrix.h" // QMK
 
 // ─── Core helpers ───────────────────────────────────────────────────────────
@@ -91,8 +92,8 @@ static inline hsv_t clamp_hsv_value(hsv_t hsv, uint8_t max_value) {
 // ─── RGB config types ───────────────────────────────────────────────────────
 
 typedef struct {
-    uint8_t mode_flag;
-    hsv_t   color;
+    pd_mode_mask_t mode_flag;
+    hsv_t          color;
 } pd_mode_color_t;
 
 typedef struct {
@@ -103,7 +104,7 @@ typedef struct {
 } layer_led_group_t;
 
 typedef struct {
-    uint8_t        mode_flag;
+    pd_mode_mask_t mode_flag;
     hsv_t          color;
     const uint8_t *leds;
     uint8_t        count;

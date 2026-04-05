@@ -31,7 +31,7 @@ static void dispatch_released_key_tap(uint16_t keycode, active_key_state_t relea
 }
 
 static bool dispatch_locked_pd_mode_tap_if_needed(uint16_t keycode, active_key_state_t released_key, uint16_t elapsed, key_behavior_view_t behavior) {
-    uint8_t mode = pd_mode_for_keycode(keycode);
+    pd_mode_mask_t mode = pd_mode_for_keycode(keycode);
     if (!mode) {
         return false;
     }

@@ -19,13 +19,7 @@ static inline bool pointer_layer_policy_pd_mode_running(void) {
 }
 
 static bool pointer_layer_policy_is_pd_mode_key(uint16_t keycode) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode) {
-            return true;
-        }
-    }
-
-    return false;
+    return pd_mode_for_keycode(keycode) != 0;
 }
 
 static inline bool pointer_layer_policy_auto_mouse_anchored(void) {
