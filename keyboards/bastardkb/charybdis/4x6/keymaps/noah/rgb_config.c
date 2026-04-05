@@ -124,7 +124,7 @@ const hsv_t automouse_color_end   = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_B
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 // Multi-tap pending: neutral white while the tap window is still open.
-const hsv_t feedback_multi_tap_pending_color = {.h = 0, .s = 0, .v = 120};
+const hsv_t feedback_multi_tap_pending_color = {.h = 0, .s = 0, .v = 150};
 
 // Hold-tier feedback: bright yellow for strong peripheral-vision visibility.
 const hsv_t feedback_hold_active_color = {.h = 43, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};

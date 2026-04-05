@@ -385,6 +385,30 @@ static const macro_payload_keycode_t macro_payload_keycodes[] = {
 #undef MACRO_PAYLOAD_KEYCODE_ENTRY
 };
 
+#define MACRO_PAYLOAD_MAX_TAP_KEYS 16
+
+typedef enum {
+    MACRO_PAYLOAD_COMMAND_DELAY,
+    MACRO_PAYLOAD_COMMAND_KEY_DOWN,
+    MACRO_PAYLOAD_COMMAND_KEY_UP,
+    MACRO_PAYLOAD_COMMAND_TAP_LIST,
+} macro_payload_command_kind_t;
+
+typedef struct {
+    uint8_t keycodes[MACRO_PAYLOAD_MAX_TAP_KEYS];
+    uint8_t count;
+} macro_payload_tap_list_t;
+
+typedef struct {
+    macro_payload_command_kind_t kind;
+    uint16_t                     delay_ms;
+    uint8_t                      keycode;
+    macro_payload_tap_list_t     tap_list;
+} macro_payload_command_t;
+
+typedef bool (*macro_payload_text_visitor_t)(char c, void *context);
+typedef bool (*macro_payload_command_visitor_t)(const macro_payload_command_t *command, void *context);
+
 static bool macro_payload_is_space(char c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
@@ -477,33 +501,12 @@ static bool macro_payload_parse_tap_list(const char *start, const char *end, uin
     return true;
 }
 
-static bool macro_payload_run_tap_list(const char *start, const char *end) {
-    uint8_t keycodes[16];
-    size_t  keycode_count = 0;
-
-    if (!macro_payload_parse_tap_list(start, end, keycodes, sizeof(keycodes) / sizeof(keycodes[0]), &keycode_count)) {
-        return false;
-    }
-
-    for (size_t i = 0; i + 1 < keycode_count; i++) {
-        register_code(keycodes[i]);
-    }
-
-    tap_code(keycodes[keycode_count - 1]);
-
-    for (size_t i = keycode_count - 1; i > 0; i--) {
-        unregister_code(keycodes[i - 1]);
-    }
-
-    macro_payload_wait_interval();
-    return true;
-}
-
-static bool macro_payload_run_command(const char *start, const char *end) {
+static bool macro_payload_parse_command(const char *start, const char *end, macro_payload_command_t *command) {
     const char *trimmed_start = start;
     const char *trimmed_end   = end;
     uint8_t     keycode       = 0;
     uint16_t    delay_ms      = 0;
+    size_t      keycode_count = 0;
 
     macro_payload_trim(&trimmed_start, &trimmed_end);
     if (trimmed_start == trimmed_end) {
@@ -511,8 +514,8 @@ static bool macro_payload_run_command(const char *start, const char *end) {
     }
 
     if (macro_payload_parse_delay(trimmed_start, trimmed_end, &delay_ms)) {
-        wait_ms(delay_ms);
-        macro_payload_wait_interval();
+        command->kind     = MACRO_PAYLOAD_COMMAND_DELAY;
+        command->delay_ms = delay_ms;
         return true;
     }
 
@@ -532,16 +535,50 @@ static bool macro_payload_run_command(const char *start, const char *end) {
             return false;
         }
 
-        if (is_keydown) {
-            register_code(keycode);
-        } else {
-            unregister_code(keycode);
-        }
-        macro_payload_wait_interval();
+        command->kind    = is_keydown ? MACRO_PAYLOAD_COMMAND_KEY_DOWN : MACRO_PAYLOAD_COMMAND_KEY_UP;
+        command->keycode = keycode;
         return true;
     }
 
-    return macro_payload_run_tap_list(trimmed_start, trimmed_end);
+    if (!macro_payload_parse_tap_list(trimmed_start, trimmed_end, command->tap_list.keycodes, sizeof(command->tap_list.keycodes) / sizeof(command->tap_list.keycodes[0]), &keycode_count)) {
+        return false;
+    }
+
+    command->kind           = MACRO_PAYLOAD_COMMAND_TAP_LIST;
+    command->tap_list.count = (uint8_t)keycode_count;
+    return true;
+}
+
+static bool macro_payload_run_command(const macro_payload_command_t *command) {
+    switch (command->kind) {
+        case MACRO_PAYLOAD_COMMAND_DELAY:
+            wait_ms(command->delay_ms);
+            macro_payload_wait_interval();
+            return true;
+        case MACRO_PAYLOAD_COMMAND_KEY_DOWN:
+            register_code(command->keycode);
+            macro_payload_wait_interval();
+            return true;
+        case MACRO_PAYLOAD_COMMAND_KEY_UP:
+            unregister_code(command->keycode);
+            macro_payload_wait_interval();
+            return true;
+        case MACRO_PAYLOAD_COMMAND_TAP_LIST:
+            for (uint8_t i = 0; i + 1 < command->tap_list.count; i++) {
+                register_code(command->tap_list.keycodes[i]);
+            }
+
+            tap_code(command->tap_list.keycodes[command->tap_list.count - 1]);
+
+            for (uint8_t i = command->tap_list.count - 1; i > 0; i--) {
+                unregister_code(command->tap_list.keycodes[i - 1]);
+            }
+
+            macro_payload_wait_interval();
+            return true;
+    }
+
+    return false;
 }
 
 typedef struct {
@@ -582,77 +619,88 @@ static bool macro_payload_buffer_write_delay(macro_payload_buffer_t *state, uint
     return macro_payload_buffer_write_byte(state, (uint8_t)'|');
 }
 
-static bool macro_payload_encode_tap_list(const char *start, const char *end, macro_payload_buffer_t *state) {
-    uint8_t keycodes[16];
-    size_t  keycode_count = 0;
+static bool macro_payload_buffer_write_key_action(macro_payload_buffer_t *state, uint8_t action, uint8_t keycode) {
+    return macro_payload_buffer_write_byte(state, SS_QMK_PREFIX) && macro_payload_buffer_write_byte(state, action) && macro_payload_buffer_write_byte(state, keycode);
+}
 
-    if (!macro_payload_parse_tap_list(start, end, keycodes, sizeof(keycodes) / sizeof(keycodes[0]), &keycode_count)) {
-        return false;
+static bool macro_payload_encode_command(const macro_payload_command_t *command, macro_payload_buffer_t *state) {
+    switch (command->kind) {
+        case MACRO_PAYLOAD_COMMAND_DELAY:
+            return macro_payload_buffer_write_delay(state, command->delay_ms);
+        case MACRO_PAYLOAD_COMMAND_KEY_DOWN:
+            return macro_payload_buffer_write_key_action(state, SS_DOWN_CODE, command->keycode);
+        case MACRO_PAYLOAD_COMMAND_KEY_UP:
+            return macro_payload_buffer_write_key_action(state, SS_UP_CODE, command->keycode);
+        case MACRO_PAYLOAD_COMMAND_TAP_LIST:
+            for (uint8_t i = 0; i + 1 < command->tap_list.count; i++) {
+                if (!macro_payload_buffer_write_key_action(state, SS_DOWN_CODE, command->tap_list.keycodes[i])) {
+                    return false;
+                }
+            }
+
+            if (!macro_payload_buffer_write_key_action(state, SS_TAP_CODE, command->tap_list.keycodes[command->tap_list.count - 1])) {
+                return false;
+            }
+
+            for (uint8_t i = command->tap_list.count - 1; i > 0; i--) {
+                if (!macro_payload_buffer_write_key_action(state, SS_UP_CODE, command->tap_list.keycodes[i - 1])) {
+                    return false;
+                }
+            }
+
+            return true;
     }
 
-    for (size_t i = 0; i + 1 < keycode_count; i++) {
-        if (!macro_payload_buffer_write_byte(state, SS_QMK_PREFIX) || !macro_payload_buffer_write_byte(state, SS_DOWN_CODE) || !macro_payload_buffer_write_byte(state, keycodes[i])) {
-            return false;
-        }
-    }
+    return false;
+}
 
-    if (!macro_payload_buffer_write_byte(state, SS_QMK_PREFIX) || !macro_payload_buffer_write_byte(state, SS_TAP_CODE) || !macro_payload_buffer_write_byte(state, keycodes[keycode_count - 1])) {
-        return false;
-    }
-
-    for (size_t i = keycode_count - 1; i > 0; i--) {
-        if (!macro_payload_buffer_write_byte(state, SS_QMK_PREFIX) || !macro_payload_buffer_write_byte(state, SS_UP_CODE) || !macro_payload_buffer_write_byte(state, keycodes[i - 1])) {
-            return false;
-        }
-    }
-
+static bool macro_payload_visit_text_noop(char c, void *context) {
+    (void)c;
+    (void)context;
     return true;
 }
 
-static bool macro_payload_encode_command(const char *start, const char *end, macro_payload_buffer_t *state) {
-    const char *trimmed_start = start;
-    const char *trimmed_end   = end;
-    uint8_t     keycode       = 0;
-    uint16_t    delay_ms      = 0;
+static bool macro_payload_visit_command_noop(const macro_payload_command_t *command, void *context) {
+    (void)command;
+    (void)context;
+    return true;
+}
 
-    macro_payload_trim(&trimmed_start, &trimmed_end);
-    if (trimmed_start == trimmed_end) {
+static bool macro_payload_visit_text_send_char(char c, void *context) {
+    (void)context;
+    send_char(c);
+    return true;
+}
+
+static bool macro_payload_visit_command_run(const macro_payload_command_t *command, void *context) {
+    (void)context;
+    return macro_payload_run_command(command);
+}
+
+static bool macro_payload_visit_text_write_byte(char c, void *context) {
+    macro_payload_buffer_t *state = (macro_payload_buffer_t *)context;
+
+    return macro_payload_buffer_write_byte(state, (uint8_t)c);
+}
+
+static bool macro_payload_visit_command_encode(const macro_payload_command_t *command, void *context) {
+    macro_payload_buffer_t *state = (macro_payload_buffer_t *)context;
+
+    return macro_payload_encode_command(command, state);
+}
+
+static bool macro_payload_visit(const char *payload, macro_payload_text_visitor_t visit_text, macro_payload_command_visitor_t visit_command, void *context) {
+    const char *cursor = payload;
+
+    if (!payload || !visit_text || !visit_command) {
         return false;
     }
 
-    if (macro_payload_parse_delay(trimmed_start, trimmed_end, &delay_ms)) {
-        return macro_payload_buffer_write_delay(state, delay_ms);
-    }
-
-    if (*trimmed_start == '+' || *trimmed_start == '-') {
-        bool        is_keydown = *trimmed_start == '+';
-        const char *key_start  = trimmed_start + 1;
-        const char *key_end    = trimmed_end;
-
-        macro_payload_trim(&key_start, &key_end);
-        if (key_start == key_end) {
-            return false;
-        }
-        if (memchr(key_start, ',', (size_t)(key_end - key_start)) != NULL) {
-            return false;
-        }
-        if (!macro_payload_lookup_keycode(key_start, (size_t)(key_end - key_start), &keycode)) {
-            return false;
-        }
-
-        return macro_payload_buffer_write_byte(state, SS_QMK_PREFIX) && macro_payload_buffer_write_byte(state, is_keydown ? SS_DOWN_CODE : SS_UP_CODE) && macro_payload_buffer_write_byte(state, keycode);
-    }
-
-    return macro_payload_encode_tap_list(trimmed_start, trimmed_end, state);
-}
-
-bool macro_payload_play(const char *payload) {
-    const char *cursor = payload;
-
     while (*cursor) {
         if (*cursor == '{') {
-            const char *command_start = cursor + 1;
-            const char *command_end   = command_start;
+            const char             *command_start = cursor + 1;
+            const char             *command_end   = command_start;
+            macro_payload_command_t command       = {0};
 
             while (*command_end && *command_end != '}') {
                 command_end++;
@@ -660,7 +708,10 @@ bool macro_payload_play(const char *payload) {
             if (*command_end != '}') {
                 return false;
             }
-            if (!macro_payload_run_command(command_start, command_end)) {
+            if (!macro_payload_parse_command(command_start, command_end, &command)) {
+                return false;
+            }
+            if (!visit_command(&command, context)) {
                 return false;
             }
 
@@ -674,17 +725,26 @@ bool macro_payload_play(const char *payload) {
         if ((uint8_t)*cursor > 0x7F) {
             return false;
         }
+        if (!visit_text(*cursor, context)) {
+            return false;
+        }
 
-        send_char(*cursor);
         cursor++;
     }
 
     return true;
 }
 
+bool macro_payload_validate(const char *payload) {
+    return macro_payload_visit(payload, macro_payload_visit_text_noop, macro_payload_visit_command_noop, NULL);
+}
+
+bool macro_payload_play(const char *payload) {
+    return macro_payload_visit(payload, macro_payload_visit_text_send_char, macro_payload_visit_command_run, NULL);
+}
+
 bool macro_payload_encode(const char *payload, uint8_t *buffer, uint16_t capacity, uint16_t *written) {
-    const char            *cursor = payload;
-    macro_payload_buffer_t state  = {
+    macro_payload_buffer_t state = {
         .buffer   = buffer,
         .capacity = capacity,
         .length   = 0,
@@ -694,36 +754,8 @@ bool macro_payload_encode(const char *payload, uint8_t *buffer, uint16_t capacit
         *written = 0;
     }
 
-    while (*cursor) {
-        if (*cursor == '{') {
-            const char *command_start = cursor + 1;
-            const char *command_end   = command_start;
-
-            while (*command_end && *command_end != '}') {
-                command_end++;
-            }
-            if (*command_end != '}') {
-                return false;
-            }
-            if (!macro_payload_encode_command(command_start, command_end, &state)) {
-                return false;
-            }
-
-            cursor = command_end + 1;
-            continue;
-        }
-
-        if (*cursor == '}') {
-            return false;
-        }
-        if ((uint8_t)*cursor > 0x7F) {
-            return false;
-        }
-        if (!macro_payload_buffer_write_byte(&state, (uint8_t)*cursor)) {
-            return false;
-        }
-
-        cursor++;
+    if (!macro_payload_visit(payload, macro_payload_visit_text_write_byte, macro_payload_visit_command_encode, &state)) {
+        return false;
     }
 
     if (written) {

@@ -11,6 +11,10 @@
 #include "noah_keymap.h"
 #include "lib/macro/macro_payload.h"
 
+#ifdef CONSOLE_ENABLE
+#    include "print.h"
+#endif
+
 #include "lib/key/key_runtime_internal.h" // IWYU pragma: keep
 #include "lib/rgb/rgb_runtime.h"
 #include "lib/state/runtime_shared_state.h"
@@ -58,9 +62,51 @@
 static uint8_t via_macro_seed_buffer[DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE];
 static bool    via_macro_seed_post_init_pending = false;
 static bool    via_macro_seed_scan_pending      = false;
+static uint8_t via_macro_slot_state[VIA_MACRO_SLOT_COUNT];
 #endif
 
 #ifdef VIA_ENABLE
+typedef enum {
+    VIA_MACRO_SLOT_UNCHECKED = 0,
+    VIA_MACRO_SLOT_VALID,
+    VIA_MACRO_SLOT_INVALID,
+} via_macro_slot_state_t;
+
+static void log_invalid_via_macro_payload(uint8_t slot, const char *payload) {
+#    ifdef CONSOLE_ENABLE
+    uprintf("Invalid VIA default macro payload for VIA_MACRO_%u: %s\n", (unsigned int)slot, payload);
+#    else
+    (void)slot;
+    (void)payload;
+#    endif
+}
+
+static bool via_macro_payload_slot_is_valid(uint8_t slot) {
+    const char *payload = via_macro_payloads[slot];
+
+    if (via_macro_slot_state[slot] == VIA_MACRO_SLOT_VALID) {
+        return true;
+    }
+    if (via_macro_slot_state[slot] == VIA_MACRO_SLOT_INVALID) {
+        return false;
+    }
+
+    if (!payload || !*payload || macro_payload_validate(payload)) {
+        via_macro_slot_state[slot] = VIA_MACRO_SLOT_VALID;
+        return true;
+    }
+
+    via_macro_slot_state[slot] = VIA_MACRO_SLOT_INVALID;
+    log_invalid_via_macro_payload(slot, payload);
+    return false;
+}
+
+static void validate_via_default_macro_payloads(void) {
+    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
+        (void)via_macro_payload_slot_is_valid(slot);
+    }
+}
+
 static bool build_via_default_macro_seed_buffer(uint16_t capacity, uint16_t *written) {
     uint8_t *buffer = via_macro_seed_buffer;
     uint16_t offset = 0;
@@ -70,12 +116,16 @@ static bool build_via_default_macro_seed_buffer(uint16_t capacity, uint16_t *wri
         uint16_t    encoded = 0;
 
         if (payload && *payload) {
+            if (!via_macro_payload_slot_is_valid(slot)) {
+                goto terminate_slot;
+            }
             if (!macro_payload_encode(payload, &buffer[offset], capacity - offset, &encoded)) {
                 return false;
             }
             offset += encoded;
         }
 
+    terminate_slot:
         if (offset >= capacity) {
             return false;
         }
@@ -128,7 +178,10 @@ void noah_matrix_scan_user(void) {
 }
 
 void noah_keyboard_post_init_user(void) {
+    macro_dispatch_validate_all();
+
 #ifdef VIA_ENABLE
+    validate_via_default_macro_payloads();
     if (via_macro_seed_post_init_pending) {
         seed_via_default_macros();
         via_macro_seed_post_init_pending = false;
