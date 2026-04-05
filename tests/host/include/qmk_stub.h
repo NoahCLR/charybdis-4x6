@@ -13,8 +13,17 @@
 #define LAYER_COUNT 8
 
 #define KC_NO 0x0000u
+#define KC_LEFT_CTRL 0x00E0u
+#define KC_LEFT_SHIFT 0x00E1u
+#define KC_LEFT_ALT 0x00E2u
 #define KC_LEFT_GUI 0x00E3u
+#define KC_RIGHT_CTRL 0x00E4u
+#define KC_RIGHT_SHIFT 0x00E5u
+#define KC_RIGHT_ALT 0x00E6u
+#define KC_RIGHT_GUI 0x00E7u
 #define SAFE_RANGE 0x5F00u
+
+#define MOD_BIT(keycode_) (1u << (((keycode_) & 0x00FFu) - KC_LEFT_CTRL))
 
 #define CUSTOM_TAP_HOLD_TERM 200u
 #define CUSTOM_LONGER_HOLD_TERM 350u
@@ -51,6 +60,8 @@ typedef struct {
     keyevent_t event;
 } keyrecord_t;
 
+#define IS_NOEVENT(event_) (false)
+
 typedef struct {
     int8_t  x;
     int8_t  y;
@@ -84,6 +95,17 @@ uint8_t get_mods(void);
 uint8_t get_weak_mods(void);
 uint8_t get_oneshot_mods(void);
 uint8_t get_oneshot_locked_mods(void);
+void    set_mods(uint8_t mods);
+void    set_weak_mods(uint8_t mods);
+void    set_oneshot_mods(uint8_t mods);
+void    set_oneshot_locked_mods(uint8_t mods);
+void    clear_mods(void);
+void    clear_weak_mods(void);
+void    clear_oneshot_mods(void);
+void    clear_oneshot_locked_mods(void);
+void    add_mods(uint8_t mods);
+void    del_mods(uint8_t mods);
+void    send_keyboard_report(void);
 
 bool     charybdis_get_pointer_dragscroll_enabled(void);
 bool     charybdis_get_pointer_sniping_enabled(void);

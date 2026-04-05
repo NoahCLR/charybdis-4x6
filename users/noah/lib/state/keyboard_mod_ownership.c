@@ -79,7 +79,15 @@ void keyboard_mod_ownership_register_mods(uint8_t mods) {
             continue;
         }
 
-        if (keyboard_mod_ownership_managed_refcounts[i] < UINT8_MAX && keyboard_mod_ownership_managed_refcounts[i]++ == 0) {
+        if (keyboard_mod_ownership_managed_refcounts[i] < UINT8_MAX) {
+            keyboard_mod_ownership_managed_refcounts[i]++;
+        }
+
+        // keyboard_mod_state_suspend() intentionally clears the live report
+        // bits without touching ownership refcounts. If a nested action
+        // registers the same managed modifier while suspended, re-assert the
+        // real mod bit so the nested action still sees the modifier.
+        if ((get_mods() & keyboard_mod_ownership_mod_masks[i]) == 0 && (keyboard_mod_ownership_managed_refcounts[i] > 0 || keyboard_mod_ownership_physical_refcounts[i] > 0)) {
             add_mods(keyboard_mod_ownership_mod_masks[i]);
             report_needed = true;
         }
