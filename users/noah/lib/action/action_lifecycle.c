@@ -45,6 +45,9 @@ static uint8_t noah_action_via_macro_read_byte(uint16_t offset) {
     return byte;
 }
 
+// Forked from the current QMK/VIA dynamic macro sender on this userspace's
+// fork so macro playback can route literal key presses through owned-keycode
+// dispatch. If the VIA macro encoding changes upstream, re-validate this copy.
 static void noah_action_via_macro_send(uint8_t id) {
     uint16_t size   = dynamic_keymap_macro_get_buffer_size();
     uint16_t offset = 0;
