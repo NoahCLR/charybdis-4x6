@@ -24,6 +24,7 @@ SRC += lib/key/key_runtime_scan.c
 SRC += lib/key/delayed_action.c
 SRC += lib/key/held_action.c
 SRC += lib/action/action_dispatch.c
+SRC += lib/action/owned_keycode.c
 SRC += lib/action/macro_dispatch.c
 SRC += lib/macro/macro_payload.c
 SRC += lib/key/multi_tap_engine.c

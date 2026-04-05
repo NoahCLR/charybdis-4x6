@@ -13,9 +13,9 @@
 // bypass the userspace layer ownership model.
 //
 // Scope note: this module intentionally keeps authored tap actions on normal
-// QMK tap semantics. The ownership-aware decomposition of held QK_MODS actions
-// (e.g. S(KC_1) held as a custom hold) lives in held_action.c, because that is
-// the specific overlap-sensitive surface this userspace runtime owns.
+// QMK tap semantics. Ownership-aware literal keycode dispatch, including held
+// QK_MODS actions such as S(KC_1), lives in owned_keycode.c and is reused by
+// the overlap-sensitive synthetic paths this userspace runtime owns.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

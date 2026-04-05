@@ -14,9 +14,9 @@
 #endif
 
 #include "noah_keymap.h"
+#include "owned_keycode.h"
 #include "synthetic_record.h"
 #include "../pointing/pointing_device_modes.h"
-#include "../state/keyboard_mod_ownership.h"
 #include "../state/layer_ownership.h"
 #include "../state/runtime_shared_state.h"
 #include "action_dispatch.h"
@@ -51,37 +51,6 @@ static void action_dispatch_log_unsupported_layer_action(uint16_t action) {
 #else
     (void)action;
 #endif
-}
-
-static void action_dispatch_register_keycode(uint8_t keycode) {
-    if (IS_MODIFIER_KEYCODE(keycode)) {
-        keyboard_mod_ownership_register(keycode);
-        return;
-    }
-
-    register_code(keycode);
-}
-
-static void action_dispatch_unregister_keycode(uint8_t keycode) {
-    if (IS_MODIFIER_KEYCODE(keycode)) {
-        keyboard_mod_ownership_unregister(keycode);
-        return;
-    }
-
-    unregister_code(keycode);
-}
-
-static void action_dispatch_tap_keycode(uint8_t keycode) {
-    if (IS_MODIFIER_KEYCODE(keycode)) {
-        uint16_t delay = (keycode == KC_CAPS_LOCK) ? TAP_HOLD_CAPS_DELAY : TAP_CODE_DELAY;
-
-        keyboard_mod_ownership_register(keycode);
-        wait_ms(delay);
-        keyboard_mod_ownership_unregister(keycode);
-        return;
-    }
-
-    tap_code(keycode);
 }
 
 #ifdef VIA_ENABLE
@@ -139,11 +108,11 @@ static void action_dispatch_via_macro_send(uint8_t id) {
                 uint8_t keycode = action_dispatch_via_macro_read_byte(offset++);
 
                 if (code == SS_TAP_CODE) {
-                    action_dispatch_tap_keycode(keycode);
+                    (void)owned_keycode_tap(keycode);
                 } else if (code == SS_DOWN_CODE) {
-                    action_dispatch_register_keycode(keycode);
+                    (void)owned_keycode_register(keycode);
                 } else {
-                    action_dispatch_unregister_keycode(keycode);
+                    (void)owned_keycode_unregister(keycode);
                 }
             } else if (code == SS_DELAY_CODE) {
                 int delay_ms = 0;
