@@ -108,8 +108,6 @@ enum custom_keycodes {
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 #define NOAH_KEYMAP_SAFE_RANGE CUSTOM_KEYCODES_END
 
-bool                          macro_dispatch(uint16_t keycode);
-void                          macro_dispatch_validate_all(void);
 extern const char *const      via_macro_payloads[VIA_MACRO_SLOT_COUNT];
 extern const char *const      hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT];
 extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];

@@ -9,6 +9,7 @@
 #include "key_runtime_process.h"
 #include "key_runtime_state.h"
 #include "noah_keymap.h"
+#include "../action/macro_dispatch.h"
 #include "../pointing/pointing_device_modes.h"
 #include "../action/synthetic_record.h"
 

@@ -4,6 +4,7 @@
 #    include "print.h"
 #endif
 
+#include "macro_dispatch.h"
 #include "noah_keymap.h"
 #include "../macro/macro_payload.h"
 

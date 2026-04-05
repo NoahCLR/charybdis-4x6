@@ -16,6 +16,7 @@
 #endif
 
 #include "action_dispatch.h"
+#include "macro_dispatch.h"
 #include "owned_keycode.h"
 #include "synthetic_record.h"
 #include "../pointing/pointing_device_modes.h"

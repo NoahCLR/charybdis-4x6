@@ -4,6 +4,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "../action/owned_keycode.h"
 #include "../state/keyboard_mod_ownership.h"
 #include "../state/keyboard_mod_state.h"
 #include "pointing_device_mode_handlers.h"
@@ -22,11 +23,9 @@ typedef struct {
 } pd_mode_axis_state_t;
 
 static void pd_mode_tap_code(uint16_t keycode) {
-    tap_code(keycode);
-}
-
-static void pd_mode_tap_code16(uint16_t keycode) {
-    tap_code16(keycode);
+    if (!owned_keycode_tap(keycode)) {
+        tap_code16(keycode);
+    }
 }
 
 static void pd_mode_axis_reset(pd_mode_axis_state_t *state) {
@@ -98,7 +97,7 @@ void reset_brightness_mode(void) {
 static pd_mode_axis_state_t zoom_axis = {0};
 
 report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
-    return pd_mode_handle_vertical_threshold(mouse_report, &zoom_axis, G(KC_MINS), G(KC_EQL), ZOOM_THRESHOLD, pd_mode_tap_code16);
+    return pd_mode_handle_vertical_threshold(mouse_report, &zoom_axis, G(KC_MINS), G(KC_EQL), ZOOM_THRESHOLD, pd_mode_tap_code);
 }
 
 void reset_zoom_mode(void) {

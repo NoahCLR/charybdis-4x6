@@ -9,8 +9,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "noah_runtime.h"
-#include "noah_keymap.h"
 
+#include "lib/action/macro_dispatch.h"
 #include "lib/key/key_runtime_state.h"
 #include "lib/key/keymap_validation.h"
 #include "lib/macro/via_macro_defaults.h"
