@@ -1,0 +1,85 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#define PROGMEM
+
+#define ARRAY_SIZE(arr_) (sizeof(arr_) / sizeof((arr_)[0]))
+
+#define MATRIX_ROWS 8
+#define MATRIX_COLS 8
+#define LAYER_COUNT 8
+
+#define KC_NO 0x0000u
+#define SAFE_RANGE 0x5F00u
+
+#define CUSTOM_TAP_HOLD_TERM 200u
+#define CUSTOM_LONGER_HOLD_TERM 350u
+#define CUSTOM_MULTI_TAP_TERM 175u
+#define TAPPING_TERM 200u
+#define KEY_BEHAVIOR_MAX_TAP_COUNT 5u
+
+#define QK_MOMENTARY 0x5000u
+#define QK_LAYER_TAP 0x6000u
+
+#define MO(layer_) ((uint16_t)(QK_MOMENTARY | ((layer_) & 0x00FFu)))
+#define LT(layer_, keycode_) ((uint16_t)(QK_LAYER_TAP | (((layer_) & 0x000Fu) << 8) | ((keycode_) & 0x00FFu)))
+
+#define IS_QK_MOMENTARY(keycode_) ((((keycode_)) & 0xFF00u) == QK_MOMENTARY)
+#define IS_QK_LAYER_TAP(keycode_) ((((keycode_)) & 0xF000u) == QK_LAYER_TAP)
+#define QK_MOMENTARY_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
+#define QK_LAYER_TAP_GET_LAYER(keycode_) ((uint8_t)(((keycode_) >> 8) & 0x000Fu))
+#define QK_LAYER_TAP_GET_TAP_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
+
+#define COMBO_END 0
+#define COMBO(keys_, result_) {0}
+
+typedef struct {
+    uint8_t row;
+    uint8_t col;
+} keypos_t;
+
+typedef struct {
+    keypos_t key;
+    bool     pressed;
+} keyevent_t;
+
+typedef struct {
+    keyevent_t event;
+} keyrecord_t;
+
+typedef struct {
+    int8_t  x;
+    int8_t  y;
+    int8_t  h;
+    int8_t  v;
+    uint8_t buttons;
+} report_mouse_t;
+
+typedef uint32_t layer_state_t;
+
+typedef struct {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} rgb_t;
+
+typedef struct {
+    uint8_t h;
+    uint8_t s;
+    uint8_t v;
+} hsv_t;
+
+typedef struct {
+    uint16_t dummy;
+} combo_t;
+
+uint16_t timer_read(void);
+uint16_t timer_elapsed(uint16_t last);
+
+uint8_t get_mods(void);
+uint8_t get_weak_mods(void);
+uint8_t get_oneshot_mods(void);
+uint8_t get_oneshot_locked_mods(void);

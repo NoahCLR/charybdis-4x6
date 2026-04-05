@@ -9,8 +9,7 @@
 #include "key_runtime_process.h"
 #include "key_runtime_effects.h"
 #include "key_runtime_state.h"
-#include "delayed_action.h"
-#include "key_behavior_lookup.h"
+#include "key_runtime_transition.h"
 #include "../action/action_dispatch.h"
 #include "../pointing/pd_modes.h"
 
@@ -25,7 +24,10 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (multi_tap_active(&multi_tap) && record->event.pressed && keycode != multi_tap.keycode) {
-        multi_tap_flush(&multi_tap, key_behavior_step_lookup, dispatch_multi_tap_action);
+        key_runtime_transition_plan_t plan;
+        key_runtime_transition_plan_init(&plan);
+        key_runtime_transition_flush_multi_tap(&plan);
+        key_runtime_transition_execute_plan(&plan);
     }
 
     return true;
