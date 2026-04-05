@@ -6,6 +6,7 @@
 
 #include "send_string.h"
 
+#include "../state/keyboard_mod_ownership.h"
 #include "macro_payload.h"
 
 typedef struct {
@@ -465,6 +466,37 @@ static void macro_payload_wait_interval(void) {
     wait_ms(TAP_CODE_DELAY);
 }
 
+static void macro_payload_register_keycode(uint8_t keycode) {
+    if (IS_MODIFIER_KEYCODE(keycode)) {
+        keyboard_mod_ownership_register(keycode);
+        return;
+    }
+
+    register_code(keycode);
+}
+
+static void macro_payload_unregister_keycode(uint8_t keycode) {
+    if (IS_MODIFIER_KEYCODE(keycode)) {
+        keyboard_mod_ownership_unregister(keycode);
+        return;
+    }
+
+    unregister_code(keycode);
+}
+
+static void macro_payload_tap_keycode(uint8_t keycode) {
+    if (IS_MODIFIER_KEYCODE(keycode)) {
+        uint16_t delay = (keycode == KC_CAPS_LOCK) ? TAP_HOLD_CAPS_DELAY : TAP_CODE_DELAY;
+
+        keyboard_mod_ownership_register(keycode);
+        wait_ms(delay);
+        keyboard_mod_ownership_unregister(keycode);
+        return;
+    }
+
+    tap_code(keycode);
+}
+
 static bool macro_payload_parse_tap_list(const char *start, const char *end, uint8_t *keycodes, size_t capacity, size_t *keycode_count) {
     size_t      count      = 0;
     const char *item_start = start;
@@ -556,22 +588,22 @@ static bool macro_payload_run_command(const macro_payload_command_t *command) {
             macro_payload_wait_interval();
             return true;
         case MACRO_PAYLOAD_COMMAND_KEY_DOWN:
-            register_code(command->keycode);
+            macro_payload_register_keycode(command->keycode);
             macro_payload_wait_interval();
             return true;
         case MACRO_PAYLOAD_COMMAND_KEY_UP:
-            unregister_code(command->keycode);
+            macro_payload_unregister_keycode(command->keycode);
             macro_payload_wait_interval();
             return true;
         case MACRO_PAYLOAD_COMMAND_TAP_LIST:
             for (uint8_t i = 0; i + 1 < command->tap_list.count; i++) {
-                register_code(command->tap_list.keycodes[i]);
+                macro_payload_register_keycode(command->tap_list.keycodes[i]);
             }
 
-            tap_code(command->tap_list.keycodes[command->tap_list.count - 1]);
+            macro_payload_tap_keycode(command->tap_list.keycodes[command->tap_list.count - 1]);
 
             for (uint8_t i = command->tap_list.count - 1; i > 0; i--) {
-                unregister_code(command->tap_list.keycodes[i - 1]);
+                macro_payload_unregister_keycode(command->tap_list.keycodes[i - 1]);
             }
 
             macro_payload_wait_interval();
