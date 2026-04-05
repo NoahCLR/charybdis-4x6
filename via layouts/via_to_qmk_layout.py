@@ -35,7 +35,7 @@ MODE = "write"
 # ─── Configuration ────────────────────────────────────────────────────────────
 # These are the only things you should need to edit when your keymap changes.
 
-# Must match the layer enum order in users/noah/noah_keymap.h.
+# Must match the layer enum order in the keymap config.h.
 # → Adding or renaming a layer? Update this list to match.
 #   Extra VIA layers beyond this list get named LAYER_0, LAYER_1, etc.
 LAYER_NAMES = [

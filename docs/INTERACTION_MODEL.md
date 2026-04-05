@@ -93,8 +93,8 @@ The alternate action fires once as soon as the threshold is crossed.
 
 Actual examples:
 
-- double-tap long hold `LEFT_THUMB` -> lock `LAYER_NUM`
-- double-tap long hold `RIGHT_THUMB` -> lock `LAYER_NUM`
+- double-tap hold `LEFT_THUMB` -> lock `LAYER_NUM`
+- double-tap hold `RIGHT_THUMB` -> lock `LAYER_NUM`
 - double-tap hold `/` -> lock `LAYER_NAV`
 - long hold `Esc` -> `Alt+Cmd+Esc`
 - long hold `Left Arrow` on `LAYER_NAV` -> `Cmd+Left`
@@ -223,7 +223,7 @@ They currently do this:
 - hold -> momentary layer (`MO(LAYER_SYM)` or `MO(LAYER_NAV)`)
 - single tap -> lock that layer
 - double tap -> play/pause
-- double-tap long hold -> lock `LAYER_NUM`
+- double-tap hold -> lock `LAYER_NUM`
 - triple tap -> next track
 - triple-tap hold -> keep next-track held
 - quadruple tap -> previous track
@@ -280,7 +280,8 @@ Examples:
 - `BRIGHTNESS_MODE`: single tap `H`, hold for brightness control
 - `PINCH_MODE`: single tap `J`, first hold for
   [BetterMouse](https://better-mouse.com/)-backed command-scroll pinch on
-  macOS, second quick tap for Accessibility Zoom, second hold for `ZOOM_MODE`
+  macOS, second quick tap sends `VIA_MACRO_6` (authored by default as
+  Accessibility Zoom), second hold for `ZOOM_MODE`
 
 `PINCH_MODE` matters because it shows that the system can also branch into a completely different second-press path when needed.
 

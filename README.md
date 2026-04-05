@@ -13,9 +13,11 @@ and editable, so someone changing
 keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 can adjust the board without having to rework the runtime.
 
-> **Firmware note:** This userspace is updated for QMK `0.32.5` and builds
-> against my `qmk-latest` firmware branch rather than the older
-> `bkb-master`-based setup.
+> **Porting note:** Most board assumptions now live in the keymap
+> [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+> and [`users/noah/config.h`](./users/noah/config.h). If you move this
+> userspace to a different QMK base or Charybdis variant, start there before
+> changing the runtime modules.
 
 This repo is built around the Charybdis from [BastardKB](https://bastardkb.com/),
 designed by Quentin. His work, and the community built around this board, have given me
@@ -91,18 +93,19 @@ In other words:
 
 ## Layers And VIA
 
-The current keymap uses five layers, in this order:
+This keymap defines five layers, in this order:
 
 - `0 = LAYER_BASE`: default typing layer
 - `1 = LAYER_NUM`: numpad layer
-- `2 = LAYER_SYM`: symbols, brackets, and pointer/DPI-adjacent shortcuts
-- `3 = LAYER_NAV`: navigation, media, macros, mouse buttons, and the current auto-sniping layer
+- `2 = LAYER_SYM`: symbols, brackets, and DPI controls
+- `3 = LAYER_NAV`: navigation, media, macros, mouse buttons, and the auto-sniping layer
 - `4 = LAYER_POINTER`: dedicated pointer layout and the default auto-mouse target layer
 
 That layer order matters in a few places:
 
-- VIA is configured for 5 dynamic layers
-- `AUTO_MOUSE_DEFAULT_LAYER` in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) uses the numeric layer index QMK expects
+- when VIA is enabled, `DYNAMIC_KEYMAP_LAYER_COUNT` is derived from
+  `LAYER_COUNT` in [`users/noah/config.h`](./users/noah/config.h)
+- `AUTO_MOUSE_DEFAULT_LAYER` in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) is set to the layer enum value QMK expects (`LAYER_POINTER` here, which resolves to that layer index)
 - the authored layer names in [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) and the VIA conversion script need to stay in sync
 
 If you change the layout in VIA and want to bring it back into source, use
@@ -137,13 +140,13 @@ Combos are authored directly in
 are separate from the custom key-behavior engine: a combo is just a
 simultaneous chord that emits one keycode or action.
 
-The current combo timing is configured in the keymap
+Combo timing is configured in the keymap
 [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 through `COMBO_TERM`. If a combo emits a keycode that also appears in
 `key_behaviors[]`, the emitted key can still reuse the same custom behavior
 handling after the combo resolves.
 
-So the current split is:
+So the split is:
 
 - use combos for simultaneous chords
 - use `key_behaviors[]` for tap / hold / longer-hold / multi-tap behavior
@@ -161,7 +164,7 @@ Keys with authored behavior rows can distinguish between:
 - longer hold
 - multi-tap sequences
 
-This is what makes the current layout possible:
+This is what makes this layout possible:
 
 - number-row symbols on hold
 - thumb keys that combine momentary layer access, layer locks, and media
@@ -253,7 +256,7 @@ Current modes:
 - `VOLUME_MODE`: converts vertical movement into volume control
 - `BRIGHTNESS_MODE`: converts vertical movement into display brightness control
 
-The current keymap also enables Charybdis sniping automatically while
+This keymap also enables Charybdis sniping automatically while
 `LAYER_NAV` is active. That is configured in the keymap
 [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 through `CHARYBDIS_AUTO_SNIPING_ENABLE` and
@@ -278,15 +281,16 @@ activation.
 - `VOLUME_MODE`: single tap `N`, hold for volume control, quick double tap for
   mute
 - `BRIGHTNESS_MODE`: single tap `H`, hold for brightness control
-- `PINCH_MODE`: single tap `J`, hold for `PINCH_MODE`, second quick tap for
-  Accessibility Zoom, second hold for `ZOOM_MODE`
+- `PINCH_MODE`: single tap `J`, hold for `PINCH_MODE`, second quick tap sends
+  `VIA_MACRO_6` (authored by default as Accessibility Zoom), second hold for
+  `ZOOM_MODE`
 
 For the user-facing pointer behavior, see
 [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md).
 
 ## Auto-Mouse
 
-`LAYER_POINTER` is the default auto-mouse layer in this keymap. Moving the
+`LAYER_POINTER` is the default auto-mouse layer. Moving the
 trackball brings the configured auto-mouse layer up automatically, and it
 clears after `AUTO_MOUSE_TIME` unless pointer activity or an active mode keeps
 it alive. That behavior is configured in the keymap

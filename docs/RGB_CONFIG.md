@@ -37,7 +37,7 @@ quick reference when picking hue values:
 
 ### `layer_colors[]`
 
-`layer_colors[]` is indexed by the layer defines from the keymap `config.h`.
+`layer_colors[]` is indexed by the layer enum values from the keymap `config.h`.
 
 Each row is an `hsv_t`:
 

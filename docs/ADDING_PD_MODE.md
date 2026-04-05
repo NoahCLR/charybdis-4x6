@@ -219,7 +219,7 @@ Edit `users/noah/lib/pointing/pd_mode_registry.c`.
 Add a row to `pd_modes[]`:
 
 ```c
-{PD_MODE_EXAMPLE, EXAMPLE_MODE, LOCK_PD_MODE(EXAMPLE_MODE), handle_example_mode, NULL, reset_example_mode},
+{PD_MODE_EXAMPLE, EXAMPLE_MODE, LOCK_PD_MODE(EXAMPLE_MODE), handle_example_mode, NULL, reset_example_mode, 0},
 ```
 
 Field meaning:
@@ -230,6 +230,10 @@ Field meaning:
 - `handler`: trackball-motion handler, or `NULL`
 - `key_handler`: optional key-event interceptor
 - `reset`: cleanup callback, or `NULL`
+- `dpi`: pointer CPI override while the mode is active (`0` = keep normal pointer DPI)
+
+If the mode needs a custom DPI, thread that through from the keymap `config.h`
+the same way the existing `PD_MODE_*_DPI` values are wired.
 
 ### 7. Add Authored Key Behavior
 

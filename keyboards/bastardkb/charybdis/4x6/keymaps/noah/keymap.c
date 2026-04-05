@@ -238,10 +238,8 @@ enum keymap_custom_keycodes {
 //             [0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_EXAMPLE))}, // normal tap, exclusive long hold
 //             [1] = {.tap = TAP_SENDS(S(KC_EXAMPLE))}, // alternate tap output
 //             [2] = {.tap = TAP_SENDS(KC_EXAMPLE), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXAMPLE)}, // tap once, or keep held
-//             [3] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_EXAMPLE))}, // normal tap, shifted hold
-//             [4] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_EXAMPLE)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_EXAMPLE))}, // middle hold on release, longer hold upgrades
-//             [5] = {.tap = TAP_SENDS(MACRO_n), .hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_EXAMPLE))}, // macro on tap, layer lock on hold
-//             [6] = {.tap = TAP_SENDS(LOCK_PD_MODE(PD_MODE_EXAMPLE))}, // pointer-mode lock on tap
+//             [3] = {.tap = TAP_SENDS(LOCK_PD_MODE(PD_MODE_EXAMPLE)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_EXAMPLE))}, // pointer-mode lock on tap, shifted hold
+//             [4] = {.tap = TAP_SENDS(MACRO_n), .hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_EXAMPLE)), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_EXAMPLE))}, // macro on tap, middle hold on release, longer hold upgrades to a layer lock
 //         },
 // }
 

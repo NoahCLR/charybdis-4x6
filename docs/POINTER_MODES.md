@@ -15,7 +15,7 @@ Across the current pd-mode runtime:
 - an active mode can transform trackball motion
 - some modes also intercept key events while active
 - unlocked modes are exclusive while held: the newest active mode wins
-- locked modes are exclusive: locking one mode clears the others
+- locked modes are exclusive: activating or locking a different mode clears the previous lock
 - the first active mode in `pd_modes[]` provides the active motion handler
 - active modes can render a mode-specific RGB overlay
 
@@ -121,4 +121,3 @@ While active:
 - one vertical direction brightens
 - the other dims
 - motion is accumulated and emitted in discrete steps
-
