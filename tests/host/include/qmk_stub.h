@@ -13,6 +13,7 @@
 #define LAYER_COUNT 8
 
 #define KC_NO 0x0000u
+#define KC_LEFT_GUI 0x00E3u
 #define SAFE_RANGE 0x5F00u
 
 #define CUSTOM_TAP_HOLD_TERM 200u
@@ -83,3 +84,9 @@ uint8_t get_mods(void);
 uint8_t get_weak_mods(void);
 uint8_t get_oneshot_mods(void);
 uint8_t get_oneshot_locked_mods(void);
+
+bool     charybdis_get_pointer_dragscroll_enabled(void);
+bool     charybdis_get_pointer_sniping_enabled(void);
+uint16_t charybdis_get_pointer_default_dpi(void);
+void     charybdis_set_pointer_dragscroll_enabled(bool enabled);
+void     pointing_device_set_cpi(uint16_t cpi);
