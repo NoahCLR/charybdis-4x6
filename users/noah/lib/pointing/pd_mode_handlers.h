@@ -1,9 +1,9 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Pointing Device Mode Handlers
+// PD Mode Handlers
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Public declarations for the per-mode trackball handlers.
-// Implementation lives in pointing_device_mode_handlers.c.
+// Public declarations for the per-mode motion handlers.
+// Implementation lives in pd_mode_handlers.c.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

@@ -38,14 +38,14 @@ SRC += lib/key/key_runtime_feedback.c
 SRC += lib/state/keyboard_mod_state.c
 SRC += lib/state/keyboard_mod_ownership.c
 SRC += lib/state/layer_ownership.c
-SRC += lib/state/runtime_shared_state.c
+SRC += lib/state/split_runtime_sync.c
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
-    SRC += lib/pointing/pointing_device_runtime.c
+    SRC += lib/pointing/pd_runtime.c
     SRC += lib/pointing/pd_mode_state.c
     SRC += lib/pointing/pd_mode_registry.c
     SRC += lib/pointing/pointer_layer_policy.c
-    SRC += lib/pointing/pointing_device_mode_handlers.c
+    SRC += lib/pointing/pd_mode_handlers.c
 endif
 
 ifeq ($(strip $(RGB_MATRIX_ENABLE)), yes)

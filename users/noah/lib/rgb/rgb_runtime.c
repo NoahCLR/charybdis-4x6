@@ -3,13 +3,13 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "rgb_runtime.h"
-#include "../pointing/pointing_device_modes.h"
+#include "../pointing/pd_modes.h"
 #include "rgb_automouse.h"
 #include "rgb_helpers.h"
 
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
 #    include "../key/key_runtime_feedback.h"
-#    include "../state/runtime_shared_state.h"
+#    include "../state/split_runtime_sync.h"
 #endif
 
 // ─── Authored keymap data (defined in rgb_config.c) ──────────────────────
@@ -145,7 +145,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     // split packet, including the flash-phase bit used to keep both halves in
     // lockstep.
     // Multi-tap pending > hold feedback > nothing (priority order).
-    uint8_t fb = is_keyboard_master() ? key_feedback_pack() : runtime_shared_state_remote.key_feedback_flags;
+    uint8_t fb = is_keyboard_master() ? key_feedback_pack() : split_runtime_sync_remote.key_feedback_flags;
 
     if (key_feedback_flags_multi_tap_pending(fb)) {
         rgb_set_both_halves(feedback_multi_tap_pending_rgb, led_min, led_max);

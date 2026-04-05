@@ -8,7 +8,7 @@
 
 #    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
 #    include "../pointing/pd_mode_flags.h"
-#    include "../state/runtime_shared_state.h"
+#    include "../state/split_runtime_sync.h"
 #    include "rgb_automouse.h"
 #    include "rgb_helpers.h"
 
@@ -22,7 +22,7 @@ bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t e
     if (is_keyboard_master()) {
         progress = automouse_rgb_progress(auto_mouse_get_time_elapsed());
     } else {
-        progress = runtime_shared_state_remote.automouse_progress;
+        progress = split_runtime_sync_remote.automouse_progress;
     }
 
     if (pd_any_mode_locked()) {

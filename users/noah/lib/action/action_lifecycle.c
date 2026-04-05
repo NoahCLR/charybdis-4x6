@@ -19,9 +19,9 @@
 #include "macro_dispatch.h"
 #include "owned_keycode.h"
 #include "synthetic_record.h"
-#include "../pointing/pointing_device_modes.h"
+#include "../pointing/pd_modes.h"
 #include "../state/layer_ownership.h"
-#include "../state/runtime_shared_state.h"
+#include "../state/split_runtime_sync.h"
 
 static bool noah_action_is_owned_momentary_layer(uint16_t action) {
     return IS_QK_MOMENTARY(action);
@@ -140,7 +140,7 @@ static bool noah_action_handle_one_shot_press(uint16_t action) {
     if (is_pd_mode_lock_action(action)) {
         const pd_mode_def_t *def = pd_mode_lock_action_lookup(action);
         if (def && pd_mode_toggle_lock_state(def->mode_flag)) {
-            runtime_shared_state_sync();
+            split_runtime_sync();
         }
         return true;
     }

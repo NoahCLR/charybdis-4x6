@@ -1,11 +1,11 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Pointing Device Runtime
+// PD Runtime
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "noah_keymap.h"
-#include "pointing_device_modes.h"
+#include "pd_modes.h"
 #include "pointer_layer_policy.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE

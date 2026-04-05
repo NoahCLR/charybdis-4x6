@@ -53,7 +53,7 @@ to understand and easy to change:
   [`hooks.c`](./users/noah/hooks.c). A keymap can override any QMK hook and
   call the matching `noah_*` helper to keep the shared behavior, or replace it
   entirely (see [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md))
-- on split builds, `runtime_shared_state` syncs pointing-device mode flags,
+- on split builds, `split_runtime_sync` syncs pointing-device mode flags,
   auto-mouse progress, and key-feedback flags from master to slave so both
   halves render consistently
 
@@ -64,7 +64,7 @@ the VIA macro defaults, the hardcoded macro table, and how the pointer-mode
 keys are configured.
 
 There is also a small VIA bridge in
-[`via layouts/via_to_qmk_layout.py`](./via%20layouts/via_to_qmk_layout.py).
+[`via layouts/via_to_qmk_layout.py`](<./via layouts/via_to_qmk_layout.py>).
 That script is useful when you want to experiment quickly in VIA without
 giving up a readable, source-controlled
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c): it
@@ -110,8 +110,8 @@ That layer order matters in a few places:
 - the authored layer names in [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) and the VIA conversion script need to stay in sync
 
 If you change the layout in VIA and want to bring it back into source, use
-[`via_to_qmk_layout.py`](./via%20layouts/via_to_qmk_layout.py) in
-[`via layouts`](./via%20layouts). It reads a VIA export, maps VIA's layer
+[`via_to_qmk_layout.py`](<./via layouts/via_to_qmk_layout.py>) in
+[`via layouts`](<./via layouts>). It reads a VIA export, maps VIA's layer
 indices and custom keycodes back to this keymap, and can print or rewrite both
 `keymaps[][]` and `VIA_MACROS(MACRO)` in
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). The
@@ -342,7 +342,7 @@ render order is: layer color, auto-mouse gradient, layer LED groups,
 pointer-mode color, mode LED groups, key-behavior overlay.
 
 On split builds, the master half computes all feedback state and syncs it to
-the slave through `runtime_shared_state`, so both halves render consistently.
+the slave through `split_runtime_sync`, so both halves render consistently.
 
 For the full RGB authoring model, render order, and how to change feedback
 colors, see [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md).

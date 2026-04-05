@@ -5,7 +5,7 @@
 // Shared userspace init and scan orchestration. Owns the noah_* entry points
 // called by hooks.c and coordinates the smaller runtime modules that seed
 // defaults, validate authored data, scan the key engine, and initialize split
-// and RGB state.
+// runtime sync and RGB state.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "noah_runtime.h"
@@ -15,7 +15,7 @@
 #include "lib/key/keymap_validation.h"
 #include "lib/macro/via_macro_defaults.h"
 #include "lib/rgb/rgb_runtime.h"
-#include "lib/state/runtime_shared_state.h"
+#include "lib/state/split_runtime_sync.h"
 
 void noah_eeconfig_init_user(void) {
 #if (EECONFIG_USER_DATA_SIZE) == 0
@@ -28,7 +28,7 @@ void noah_eeconfig_init_user(void) {
 void noah_matrix_scan_user(void) {
     noah_via_macro_defaults_matrix_scan();
     noah_key_runtime_scan();
-    runtime_shared_state_sync_tick();
+    split_runtime_sync_tick();
 }
 
 void noah_keyboard_post_init_user(void) {
@@ -36,5 +36,5 @@ void noah_keyboard_post_init_user(void) {
     noah_keymap_validate();
     noah_via_macro_defaults_keyboard_post_init();
     noah_rgb_runtime_post_init();
-    runtime_shared_state_init();
+    split_runtime_sync_init();
 }

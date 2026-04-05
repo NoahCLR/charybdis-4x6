@@ -135,8 +135,9 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the keymap
 `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
 
 The master half computes the semantic feedback flags. On split boards, the
-slave receives those packed flags through `runtime_shared_state`, including the
-flash-phase bit used to keep both halves in sync.
+slave receives those packed flags through
+[`split_runtime_sync`](../users/noah/lib/state/split_runtime_sync.c), including
+the flash-phase bit used to keep both halves in sync.
 
 ## Render Order
 

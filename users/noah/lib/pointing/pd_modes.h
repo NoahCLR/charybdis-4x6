@@ -1,8 +1,8 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Pointing Device Modes
+// PD Modes
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Public cross-module interface for the pointing-device mode system.
+// Public cross-module interface for the pd-mode system.
 // Implementations are split across pd_mode_registry.c and pd_mode_state.c.
 //
 // Non-pointing modules that only need mode flag constants or read-only state

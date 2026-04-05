@@ -1,11 +1,11 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Runtime Shared State
+// Split Runtime Sync
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Syncs split-visible runtime state across halves so non-owning modules such
-// as RGB can render the correct remote state. The master periodically re-sends
-// the full snapshot as a heartbeat so a rebooted or rejoined half can recover
-// even if no state changed meanwhile.
+// Owns the custom split RPC sync for runtime-visible state such as pd modes,
+// auto-mouse progress, and key-feedback flags. The master periodically
+// re-sends the full snapshot as a heartbeat so a rebooted or rejoined half can
+// recover even if no state changed meanwhile.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -16,26 +16,26 @@ typedef struct __attribute__((packed)) {
     uint8_t  pd_mode_flags;
     uint8_t  pd_mode_locked_flags;
     uint8_t  key_feedback_flags;
-} runtime_shared_state_packet_t;
+} split_runtime_sync_packet_t;
 
 #if defined(SPLIT_TRANSACTION_IDS_USER)
 
-extern runtime_shared_state_packet_t runtime_shared_state_remote;
+extern split_runtime_sync_packet_t split_runtime_sync_remote;
 
-void runtime_shared_state_init(void);
-void runtime_shared_state_sync_tick(void);
-void runtime_shared_state_sync_elapsed(uint16_t raw_elapsed);
-void runtime_shared_state_sync(void);
+void split_runtime_sync_init(void);
+void split_runtime_sync_tick(void);
+void split_runtime_sync_elapsed(uint16_t raw_elapsed);
+void split_runtime_sync(void);
 
 #else
 
-static const runtime_shared_state_packet_t runtime_shared_state_remote = {0};
+static const split_runtime_sync_packet_t split_runtime_sync_remote = {0};
 
-static inline void runtime_shared_state_init(void) {}
-static inline void runtime_shared_state_sync_tick(void) {}
-static inline void runtime_shared_state_sync_elapsed(uint16_t raw_elapsed) {
+static inline void split_runtime_sync_init(void) {}
+static inline void split_runtime_sync_tick(void) {}
+static inline void split_runtime_sync_elapsed(uint16_t raw_elapsed) {
     (void)raw_elapsed;
 }
-static inline void runtime_shared_state_sync(void) {}
+static inline void split_runtime_sync(void) {}
 
 #endif // defined(SPLIT_TRANSACTION_IDS_USER)

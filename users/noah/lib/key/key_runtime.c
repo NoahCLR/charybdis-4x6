@@ -7,7 +7,7 @@
 
 #include "handled_key.h"
 #include "key_runtime_state.h"
-#include "../pointing/pointing_device_modes.h"
+#include "../pointing/pd_modes.h"
 
 active_key_state_t active_key = ACTIVE_KEY_STATE_INIT;
 multi_tap_t        multi_tap  = {0};

@@ -11,9 +11,9 @@
 #include "delayed_action.h"
 #include "held_action.h"
 #include "../action/action_dispatch.h"
-#include "../pointing/pointing_device_modes.h"
+#include "../pointing/pd_modes.h"
 #include "../state/layer_ownership.h"
-#include "../state/runtime_shared_state.h"
+#include "../state/split_runtime_sync.h"
 
 static uint16_t select_release_hold_action(uint16_t elapsed, uint16_t hold_action, hold_behavior_t long_hold, uint16_t longer_hold_term) {
     if (hold_sends_on_release(long_hold) && elapsed >= longer_hold_term) {
@@ -45,7 +45,7 @@ static bool dispatch_locked_pd_mode_tap_if_needed(uint16_t keycode, active_key_s
     }
 
     if (pd_mode_is_lockable(mode) && pd_mode_toggle_lock_state(mode)) {
-        runtime_shared_state_sync();
+        split_runtime_sync();
     }
     return true;
 }

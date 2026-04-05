@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Pointing Device Modes Internals
+// PD Mode Internals
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Internal state mutation and side-effectful transitions for the pd-mode
@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "pointing_device_modes.h"
+#include "pd_modes.h"
 
 void pd_mode_set(uint8_t mode);
 void pd_mode_clear(uint8_t mode);

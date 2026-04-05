@@ -11,7 +11,7 @@
 #include "delayed_action.h"
 #include "key_behavior_lookup.h"
 #include "../action/action_dispatch.h"
-#include "../pointing/pointing_device_modes.h"
+#include "../pointing/pd_modes.h"
 #include "../state/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {

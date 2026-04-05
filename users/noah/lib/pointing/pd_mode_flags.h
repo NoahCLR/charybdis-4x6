@@ -1,13 +1,13 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Pointing Device Mode Flags
+// PD Mode Flags
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Mode identity constants and read-only state queries. This header carries
 // no handler types, activation logic, or QMK pointing-device dependencies,
 // so non-pointing modules (RGB, key engine) can depend on it without pulling
-// in the full pointing-device mode API.
+// in the full pd-mode API.
 //
-// The full API lives in pointing_device_modes.h (which includes this file).
+// The full API lives in pd_modes.h (which includes this file).
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -24,7 +24,7 @@
 #define PD_MODE_PINCH (1 << 5)
 #define PD_MODE_COUNT 6
 
-_Static_assert(PD_MODE_COUNT <= 8, "PD_MODE_COUNT exceeds 8-bit pd-mode storage; widen pd-mode flags and split-sync packet state before adding more modes");
+_Static_assert(PD_MODE_COUNT <= 8, "PD_MODE_COUNT exceeds 8-bit pd-mode storage; widen pd-mode flags and the split runtime sync packet before adding more modes");
 
 // ─── Read-only state queries ────────────────────────────────────────────────
 

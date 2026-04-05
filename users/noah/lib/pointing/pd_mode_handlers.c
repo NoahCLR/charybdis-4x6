@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Pointing Device Mode Handlers
+// PD Mode Handlers
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
@@ -7,7 +7,7 @@
 #include "../action/owned_keycode.h"
 #include "../state/keyboard_mod_ownership.h"
 #include "../state/keyboard_mod_state.h"
-#include "pointing_device_mode_handlers.h"
+#include "pd_mode_handlers.h"
 
 #if defined(POINTING_DEVICE_ENABLE)
 

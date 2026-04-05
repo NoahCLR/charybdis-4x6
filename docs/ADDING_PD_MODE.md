@@ -25,10 +25,10 @@ If you hand this task to an agent, give it this exact job:
    through the last pd-mode keycode immediately before `PD_MODE_LOCK_BASE`.
 3. Update the mode flag list and `PD_MODE_COUNT` in [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h).
 4. Register the mode in [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c).
-5. Add handler/reset declarations in [`users/noah/lib/pointing/pointing_device_mode_handlers.h`](../users/noah/lib/pointing/pointing_device_mode_handlers.h) and implementations in [`users/noah/lib/pointing/pointing_device_mode_handlers.c`](../users/noah/lib/pointing/pointing_device_mode_handlers.c), if the mode needs them.
+5. Add handler/reset declarations in [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h) and implementations in [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c), if the mode needs them.
 6. Add authored key behavior and physical placement in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 7. Add an RGB color in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
-8. Update [`via layouts/via_to_qmk_layout.py`](../via%20layouts/via_to_qmk_layout.py) if the keycode can appear in VIA exports.
+8. Update [`via layouts/via_to_qmk_layout.py`](<../via layouts/via_to_qmk_layout.py>) if the keycode can appear in VIA exports.
 9. Update user-facing docs if the mode changes real behavior in a meaningful way.
 10. Compile with `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
 
@@ -65,12 +65,13 @@ These are the rules most likely to break the system if you miss one.
 3. `PD_MODE_COUNT` in [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h) must match:
    the number of mode flags, the number of rows in `pd_modes[]`, and the
    dense-keycode `_Static_assert` in
-   [`users/noah/lib/pointing/pointing_device_modes.h`](../users/noah/lib/pointing/pointing_device_modes.h).
+   [`users/noah/lib/pointing/pd_modes.h`](../users/noah/lib/pointing/pd_modes.h).
 4. Mode flags are currently stored in `uint8_t` values:
-   [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h) and [`users/noah/lib/state/runtime_shared_state.h`](../users/noah/lib/state/runtime_shared_state.h).
+   [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h) and [`users/noah/lib/state/split_runtime_sync.h`](../users/noah/lib/state/split_runtime_sync.h).
    That means the current design supports at most 8 modes.
 
-If you add a 9th mode, you must widen the flag storage and the split-sync packet
+If you add a 9th mode, you must widen the flag storage and the
+[`split_runtime_sync`](../users/noah/lib/state/split_runtime_sync.c) packet
 before the new mode is safe.
 
 ## Files You Usually Touch
@@ -79,22 +80,22 @@ Normal add-mode work lives in these files:
 
 - [`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h)
 - [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h)
-- [`users/noah/lib/pointing/pointing_device_modes.h`](../users/noah/lib/pointing/pointing_device_modes.h)
+- [`users/noah/lib/pointing/pd_modes.h`](../users/noah/lib/pointing/pd_modes.h)
 - [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c)
-- [`users/noah/lib/pointing/pointing_device_mode_handlers.h`](../users/noah/lib/pointing/pointing_device_mode_handlers.h)
-- [`users/noah/lib/pointing/pointing_device_mode_handlers.c`](../users/noah/lib/pointing/pointing_device_mode_handlers.c)
+- [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h)
+- [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c)
 - [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
-- [`via layouts/via_to_qmk_layout.py`](../via%20layouts/via_to_qmk_layout.py)
+- [`via layouts/via_to_qmk_layout.py`](<../via layouts/via_to_qmk_layout.py>)
 
 Files you usually do not need to touch:
 
 - [`users/noah/lib/key/key_runtime_process.c`](../users/noah/lib/key/key_runtime_process.c)
 - [`users/noah/lib/key/held_action.c`](../users/noah/lib/key/held_action.c)
 - [`users/noah/lib/pointing/pd_mode_state.c`](../users/noah/lib/pointing/pd_mode_state.c)
-- [`users/noah/lib/pointing/pointing_device_runtime.c`](../users/noah/lib/pointing/pointing_device_runtime.c)
+- [`users/noah/lib/pointing/pd_runtime.c`](../users/noah/lib/pointing/pd_runtime.c)
 - [`users/noah/lib/pointing/pointer_layer_policy.c`](../users/noah/lib/pointing/pointer_layer_policy.c)
-- [`users/noah/lib/state/runtime_shared_state.c`](../users/noah/lib/state/runtime_shared_state.c)
+- [`users/noah/lib/state/split_runtime_sync.c`](../users/noah/lib/state/split_runtime_sync.c)
 - [`users/noah/lib/rgb/rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c)
 
 ## Fastest Safe Path
@@ -147,14 +148,14 @@ Example:
 
 ### 3. Verify The Static Assert
 
-Edit [`users/noah/lib/pointing/pointing_device_modes.h`](../users/noah/lib/pointing/pointing_device_modes.h).
+Edit [`users/noah/lib/pointing/pd_modes.h`](../users/noah/lib/pointing/pd_modes.h).
 
 The `_Static_assert(...)` in that header should continue to pass once the
 keycode block and `PD_MODE_COUNT` are both updated.
 
 ### 4. Add Handler Declarations If Needed
 
-Edit [`users/noah/lib/pointing/pointing_device_mode_handlers.h`](../users/noah/lib/pointing/pointing_device_mode_handlers.h).
+Edit [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h).
 
 Most motion-transforming modes need:
 
@@ -166,7 +167,7 @@ events while active, like `ARROW_MODE`.
 
 ### 5. Implement The Handler
 
-Edit [`users/noah/lib/pointing/pointing_device_mode_handlers.c`](../users/noah/lib/pointing/pointing_device_mode_handlers.c).
+Edit [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c).
 
 Typical pattern:
 
@@ -289,7 +290,7 @@ specific LED subset highlighted.
 
 ### 9. Update VIA Conversion
 
-Edit [`via layouts/via_to_qmk_layout.py`](../via%20layouts/via_to_qmk_layout.py).
+Edit [`via layouts/via_to_qmk_layout.py`](<../via layouts/via_to_qmk_layout.py>).
 
 If the new keycode can appear in VIA exports, append it to `PD_MODE_KEYCODES`
 in the same order as the enum in [`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h).
@@ -331,7 +332,7 @@ probably do not need extra branches here.
 ### Mode Needs Key Interception
 
 If the mode repurposes keyboard or mouse-button events while active, add a
-`key_handler` in [`users/noah/lib/pointing/pointing_device_mode_handlers.c`](../users/noah/lib/pointing/pointing_device_mode_handlers.c) and register it in `pd_modes[]`.
+`key_handler` in [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c) and register it in `pd_modes[]`.
 
 Copy `ARROW_MODE` if you need a template.
 
@@ -381,11 +382,11 @@ This is the actual control path for pd modes:
    plus lock exclusivity.
 4. [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c) defines the mode table,
    handlers, reset hooks, lock actions, and DPI behavior.
-5. [`users/noah/lib/pointing/pointing_device_runtime.c`](../users/noah/lib/pointing/pointing_device_runtime.c) calls the first active
+5. [`users/noah/lib/pointing/pd_runtime.c`](../users/noah/lib/pointing/pd_runtime.c) calls the first active
    handler in `pd_modes[]`.
 6. [`users/noah/lib/pointing/pointer_layer_policy.c`](../users/noah/lib/pointing/pointer_layer_policy.c) keeps the configured
    auto-mouse target layer alive while modes are active or locked.
-7. [`users/noah/lib/state/runtime_shared_state.c`](../users/noah/lib/state/runtime_shared_state.c) mirrors active and locked
+7. [`users/noah/lib/state/split_runtime_sync.c`](../users/noah/lib/state/split_runtime_sync.c) mirrors active and locked
    flags to the other half.
 8. [`users/noah/lib/rgb/rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c) renders the mode overlay on the right
    half.
@@ -402,7 +403,8 @@ That is why most new modes are mostly a data-registration job, not a runtime rew
 - Forgetting the reset function, which leaves stale accumulators or modifiers behind.
 - Adding side effects in activate / deactivate but forgetting the locked path.
 - Forgetting the VIA mapping, so converted layouts emit bad `CUSTOM(...)` tokens.
-- Adding a 9th mode without widening the `uint8_t` flag storage and split-sync packet.
+- Adding a 9th mode without widening the `uint8_t` flag storage and the
+  [`split_runtime_sync`](../users/noah/lib/state/split_runtime_sync.c) packet.
 
 ## Definition Of Done
 
@@ -439,12 +441,12 @@ For a normal new mode, the minimum expected diff usually includes:
 
 - [`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h)
 - [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h)
-- [`users/noah/lib/pointing/pointing_device_modes.h`](../users/noah/lib/pointing/pointing_device_modes.h)
+- [`users/noah/lib/pointing/pd_modes.h`](../users/noah/lib/pointing/pd_modes.h)
 - [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c)
-- [`users/noah/lib/pointing/pointing_device_mode_handlers.h`](../users/noah/lib/pointing/pointing_device_mode_handlers.h)
-- [`users/noah/lib/pointing/pointing_device_mode_handlers.c`](../users/noah/lib/pointing/pointing_device_mode_handlers.c)
+- [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h)
+- [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c)
 - [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
-- [`via layouts/via_to_qmk_layout.py`](../via%20layouts/via_to_qmk_layout.py), if relevant
+- [`via layouts/via_to_qmk_layout.py`](<../via layouts/via_to_qmk_layout.py>), if relevant
 
 If your diff reaches into the generic runtime, stop and justify why.

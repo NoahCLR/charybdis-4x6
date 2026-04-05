@@ -44,9 +44,9 @@
 #    endif
 #    define SPLIT_ACTIVITY_ENABLE
 
-// Register a custom split RPC transaction for syncing shared runtime state
-// such as pd-mode flags, auto-mouse RGB progress, and key-feedback flags.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_RUNTIME_SHARED_SYNC
+// Register the custom split runtime sync RPC for pd-mode flags, auto-mouse
+// RGB progress, and key-feedback flags.
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_SYNC
 
 #endif // SPLIT_KEYBOARD
 

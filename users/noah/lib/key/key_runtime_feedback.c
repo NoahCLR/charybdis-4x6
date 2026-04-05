@@ -5,7 +5,7 @@
 #include "key_runtime_state.h"
 #include "key_runtime_feedback.h"
 #include "../action/action_dispatch.h"
-#include "../pointing/pointing_device_modes.h"
+#include "../pointing/pd_modes.h"
 
 typedef struct {
     uint16_t timer;

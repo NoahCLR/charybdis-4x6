@@ -1,10 +1,10 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Pointing Device Mode State
+// PD Mode State
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../state/runtime_shared_state.h"
+#include "../state/split_runtime_sync.h"
 #include "pd_mode_internal.h"
 
 static uint8_t pd_mode_active_flags_state = 0;
@@ -143,7 +143,7 @@ bool pd_mode_handle_keycode_press(uint16_t keycode) {
     }
 
     if (state_changed) {
-        runtime_shared_state_sync();
+        split_runtime_sync();
     }
 
     return true;
@@ -157,7 +157,7 @@ bool pd_mode_handle_keycode_release(uint16_t keycode) {
 
     if (pd_mode_active(mode) && !pd_mode_locked(mode)) {
         pd_mode_deactivate(mode);
-        runtime_shared_state_sync();
+        split_runtime_sync();
     }
 
     return true;

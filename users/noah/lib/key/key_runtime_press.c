@@ -10,7 +10,7 @@
 #include "key_runtime_state.h"
 #include "../action/action_dispatch.h"
 #include "held_action.h"
-#include "../pointing/pointing_device_modes.h"
+#include "../pointing/pd_modes.h"
 #include "../state/layer_ownership.h"
 
 static void flush_active_key(void) {

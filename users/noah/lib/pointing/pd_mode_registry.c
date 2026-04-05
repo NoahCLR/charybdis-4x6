@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Pointing Device Mode Registry
+// PD Mode Registry
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
@@ -12,7 +12,7 @@
 #    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
 #endif
 
-#include "pointing_device_mode_handlers.h"
+#include "pd_mode_handlers.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static bool scroll_mode_auto_mouse_owned = false;
