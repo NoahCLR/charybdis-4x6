@@ -31,6 +31,34 @@ typedef struct {
     pd_mode_mask_t              pd_mode_lock_tap;
 } active_key_release_resolution_t;
 
+typedef enum {
+    ACTIVE_KEY_SCAN_OUTCOME_NONE = 0,
+    ACTIVE_KEY_SCAN_OUTCOME_FIRE_HOLD,
+    ACTIVE_KEY_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
+} active_key_scan_outcome_t;
+
+typedef struct {
+    bool                    commit_immediate_hold;
+    bool                    immediate_hold_needs_feedback;
+    bool                    immediate_hold_completes_hold;
+    active_key_scan_outcome_t outcome;
+    hold_behavior_t         hold;
+    hold_behavior_t         long_hold;
+} active_key_scan_resolution_t;
+
+typedef enum {
+    PENDING_MULTI_TAP_SCAN_OUTCOME_NONE = 0,
+    PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD,
+    PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
+} pending_multi_tap_scan_outcome_t;
+
+typedef struct {
+    pending_multi_tap_scan_outcome_t outcome;
+    bool                             release_layer_before_action;
+    hold_behavior_t                  hold;
+    hold_behavior_t                  long_hold;
+} pending_multi_tap_scan_resolution_t;
+
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     *plan = (key_runtime_transition_plan_t){0};
 }
@@ -513,52 +541,117 @@ static void key_runtime_transition_promote_to_long_hold(hold_behavior_t long_hol
     }
 }
 
-static void key_runtime_transition_deactivate_pending_multi_tap_layer_before_lock(uint16_t action, key_runtime_transition_plan_t *plan) {
-    if (is_layer_key(active_key.keycode) && action_dispatch_is_layer_lock(action)) {
-        key_runtime_transition_plan_layer_release(plan, active_key.key_pos);
+static active_key_scan_resolution_t key_runtime_transition_resolve_active_key_scan(active_key_state_t active_key_state, uint16_t elapsed) {
+    active_key_scan_resolution_t resolution = {0};
+
+    if (hold_registers_on_press(active_key_state.hold) && !active_key_state.hold_one_shot_fired && elapsed >= active_key_state.tap_hold_term) {
+        resolution.commit_immediate_hold         = true;
+        resolution.immediate_hold_needs_feedback = !active_key_state.implicit_pd_mode_hold;
+        resolution.immediate_hold_completes_hold = !active_key_state.long_hold.present;
+    }
+
+    if (hold_fires_at_threshold(active_key_state.long_hold) && elapsed >= active_key_state.longer_hold_term) {
+        resolution.outcome   = ACTIVE_KEY_SCAN_OUTCOME_PROMOTE_LONG_HOLD;
+        resolution.long_hold = active_key_state.long_hold;
+        return resolution;
+    }
+
+    if (hold_fires_at_threshold(active_key_state.hold) && elapsed >= active_key_state.tap_hold_term) {
+        resolution.outcome   = ACTIVE_KEY_SCAN_OUTCOME_FIRE_HOLD;
+        resolution.hold      = active_key_state.hold;
+        resolution.long_hold = active_key_state.long_hold;
+    }
+
+    return resolution;
+}
+
+static void key_runtime_transition_apply_active_key_scan_resolution(active_key_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+    if (resolution.commit_immediate_hold) {
+        if (resolution.immediate_hold_needs_feedback) {
+            key_runtime_transition_plan_feedback_pulse(plan, false);
+        }
+        active_key.hold_one_shot_fired = true;
+        if (resolution.immediate_hold_completes_hold) {
+            active_key.hold_fired = true;
+        }
+    }
+
+    switch (resolution.outcome) {
+        case ACTIVE_KEY_SCAN_OUTCOME_FIRE_HOLD:
+            key_runtime_transition_fire_hold_at_threshold(resolution.hold, resolution.long_hold, plan);
+            return;
+        case ACTIVE_KEY_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
+            key_runtime_transition_promote_to_long_hold(resolution.long_hold, plan);
+            return;
+        case ACTIVE_KEY_SCAN_OUTCOME_NONE:
+        default:
+            return;
     }
 }
 
-static void key_runtime_transition_commit_immediate_hold_threshold(key_runtime_transition_plan_t *plan) {
-    if (!hold_registers_on_press(active_key.hold) || active_key.hold_one_shot_fired || timer_elapsed(active_key.timer) < active_key.tap_hold_term) {
-        return;
+static bool key_runtime_transition_pending_multi_tap_hold_elapsed(const multi_tap_t *multi_tap_state, uint16_t elapsed) {
+    return multi_tap_state->pending_hold && hold_fires_at_threshold(multi_tap_state->hold) && elapsed >= multi_tap_state->tap_hold_term;
+}
+
+static pending_multi_tap_scan_resolution_t key_runtime_transition_resolve_pending_multi_tap_scan(active_key_state_t active_key_state, multi_tap_t multi_tap_state, uint16_t elapsed) {
+    pending_multi_tap_scan_resolution_t resolution = {0};
+
+    if (!multi_tap_state.pending_hold || active_key_state.keycode == KC_NO) {
+        return resolution;
     }
 
-    if (!active_key.implicit_pd_mode_hold) {
-        key_runtime_transition_plan_feedback_pulse(plan, false);
+    if (hold_fires_at_threshold(multi_tap_state.long_hold) && elapsed >= active_key_state.longer_hold_term) {
+        resolution.outcome                     = PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD;
+        resolution.long_hold                   = multi_tap_state.long_hold;
+        resolution.release_layer_before_action = is_layer_key(active_key_state.keycode) && action_dispatch_is_layer_lock(multi_tap_state.long_hold.action);
+        return resolution;
     }
-    active_key.hold_one_shot_fired = true;
-    if (!active_key.long_hold.present) {
-        active_key.hold_fired = true;
+
+    if (key_runtime_transition_pending_multi_tap_hold_elapsed(&multi_tap_state, elapsed)) {
+        resolution.outcome                     = PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD;
+        resolution.hold                        = multi_tap_state.hold;
+        resolution.long_hold                   = multi_tap_state.long_hold;
+        resolution.release_layer_before_action = is_layer_key(active_key_state.keycode) && action_dispatch_is_layer_lock(multi_tap_state.hold.action);
+    }
+
+    return resolution;
+}
+
+static void key_runtime_transition_apply_pending_multi_tap_scan_resolution(pending_multi_tap_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+    if (resolution.release_layer_before_action) {
+        key_runtime_transition_plan_layer_release(plan, active_key.key_pos);
+    }
+
+    switch (resolution.outcome) {
+        case PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
+            active_key.long_hold = resolution.long_hold;
+            key_runtime_transition_promote_to_long_hold(active_key.long_hold, plan);
+            multi_tap_reset(&multi_tap);
+            return;
+        case PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD:
+            active_key.long_hold = resolution.long_hold;
+            key_runtime_transition_fire_hold_at_threshold(resolution.hold, active_key.long_hold, plan);
+            multi_tap_reset(&multi_tap);
+            return;
+        case PENDING_MULTI_TAP_SCAN_OUTCOME_NONE:
+        default:
+            return;
     }
 }
 
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
     if (active_key.keycode != KC_NO && !active_key.hold_fired) {
-        key_runtime_transition_commit_immediate_hold_threshold(plan);
+        uint16_t                     elapsed     = timer_elapsed(active_key.timer);
+        active_key_scan_resolution_t resolution = key_runtime_transition_resolve_active_key_scan(active_key, elapsed);
 
-        uint16_t elapsed = timer_elapsed(active_key.timer);
-        if (hold_fires_at_threshold(active_key.long_hold) && elapsed >= active_key.longer_hold_term) {
-            key_runtime_transition_promote_to_long_hold(active_key.long_hold, plan);
-        } else if (hold_fires_at_threshold(active_key.hold) && elapsed >= active_key.tap_hold_term) {
-            key_runtime_transition_fire_hold_at_threshold(active_key.hold, active_key.long_hold, plan);
-        }
+        key_runtime_transition_apply_active_key_scan_resolution(resolution, plan);
     }
 
     if (multi_tap_pending_hold(&multi_tap) && active_key.keycode != KC_NO) {
-        uint16_t elapsed = timer_elapsed(multi_tap.timer);
+        uint16_t                           elapsed     = timer_elapsed(multi_tap.timer);
+        pending_multi_tap_scan_resolution_t resolution = key_runtime_transition_resolve_pending_multi_tap_scan(active_key, multi_tap, elapsed);
 
-        if (hold_fires_at_threshold(multi_tap.long_hold) && elapsed >= active_key.longer_hold_term) {
-            key_runtime_transition_deactivate_pending_multi_tap_layer_before_lock(multi_tap.long_hold.action, plan);
-            active_key.long_hold = multi_tap.long_hold;
-            key_runtime_transition_promote_to_long_hold(active_key.long_hold, plan);
-            multi_tap_reset(&multi_tap);
-        } else if (multi_tap_hold_elapsed(&multi_tap)) {
-            key_runtime_transition_deactivate_pending_multi_tap_layer_before_lock(multi_tap.hold.action, plan);
-            active_key.long_hold = multi_tap.long_hold;
-            key_runtime_transition_fire_hold_at_threshold(multi_tap.hold, active_key.long_hold, plan);
-            multi_tap_reset(&multi_tap);
-        }
+        key_runtime_transition_apply_pending_multi_tap_scan_resolution(resolution, plan);
     }
 
     if (multi_tap_expired(&multi_tap)) {

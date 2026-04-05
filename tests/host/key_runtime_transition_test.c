@@ -19,6 +19,7 @@ enum {
     TEST_THRESHOLD_HOLD       = SAFE_RANGE + 0x17,
     TEST_MULTI_TAP_HOLD       = SAFE_RANGE + 0x18,
     TEST_FALLBACK_TAP_ACTION  = SAFE_RANGE + 0x19,
+    TEST_LAYER_LOCK_ACTION    = SAFE_RANGE + 0x1A,
 };
 
 typedef enum {
@@ -292,8 +293,7 @@ bool action_dispatch_is_layer_action(uint16_t action) {
 }
 
 bool action_dispatch_is_layer_lock(uint16_t action) {
-    (void)action;
-    return false;
+    return action == TEST_LAYER_LOCK_ACTION;
 }
 
 bool key_runtime_effects_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
@@ -637,6 +637,140 @@ static void test_scan_promotes_pending_multi_tap_hold(void) {
     CHECK(multi_tap.count == 0);
 }
 
+static void test_scan_commits_immediate_hold_threshold_with_feedback(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .timer               = (uint16_t)(fake_time - 170),
+        .keycode             = TEST_NEW_KEY,
+        .key_pos             = test_keypos(5, 0),
+        .held_action_keycode = TEST_IMMEDIATE_HOLD,
+        .tap_hold_term       = 120,
+        .hold                = {
+            .present = true,
+            .action  = TEST_IMMEDIATE_HOLD,
+            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        },
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 1);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
+    CHECK(!plan.effects[0].data.long_hold_level);
+    CHECK(active_key.hold_one_shot_fired);
+    CHECK(active_key.hold_fired);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(test_call_count == 1);
+    CHECK(test_calls[0].kind == TEST_CALL_FEEDBACK_PULSE);
+    CHECK(!test_calls[0].long_hold_level);
+}
+
+static void test_scan_commits_implicit_pd_mode_hold_without_feedback(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .timer                 = (uint16_t)(fake_time - 170),
+        .keycode               = TEST_PD_MODE_KEY,
+        .key_pos               = test_keypos(5, 1),
+        .held_action_keycode   = TEST_PD_MODE_KEY,
+        .tap_hold_term         = 120,
+        .implicit_pd_mode_hold = true,
+        .hold                  = {
+            .present = true,
+            .action  = TEST_PD_MODE_KEY,
+            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        },
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 0);
+    CHECK(active_key.hold_one_shot_fired);
+    CHECK(active_key.hold_fired);
+    CHECK(test_call_count == 0);
+}
+
+static void test_scan_promotes_to_long_hold_and_replaces_held_action(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .timer               = (uint16_t)(fake_time - 260),
+        .keycode             = TEST_NEW_KEY,
+        .key_pos             = test_keypos(3, 0),
+        .held_action_keycode = TEST_THRESHOLD_HOLD,
+        .tap_hold_term       = 120,
+        .longer_hold_term    = 240,
+        .hold                = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_THRESHOLD_HOLD),
+        .long_hold           = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION),
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 3);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER);
+    CHECK(plan.effects[0].data.held_action.action == TEST_THRESHOLD_HOLD);
+    CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
+    CHECK(plan.effects[1].data.action == TEST_MULTI_STEP_ACTION);
+    CHECK(plan.effects[2].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
+    CHECK(plan.effects[2].data.long_hold_level);
+    CHECK(active_key.held_action_keycode == KC_NO);
+    CHECK(active_key.hold_fired);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(test_call_count == 3);
+    CHECK(test_calls[0].kind == TEST_CALL_HELD_UNREGISTER);
+    CHECK(test_calls[1].kind == TEST_CALL_DISPATCH_ACTION);
+    CHECK(test_calls[1].action == TEST_MULTI_STEP_ACTION);
+    CHECK(test_calls[2].kind == TEST_CALL_FEEDBACK_PULSE);
+    CHECK(test_calls[2].long_hold_level);
+}
+
+static void test_scan_pending_multi_tap_long_hold_releases_layer_before_lock(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .timer            = (uint16_t)(fake_time - 260),
+        .keycode          = LT(1, TEST_FALLBACK_TAP_ACTION),
+        .key_pos          = test_keypos(6, 5),
+        .tap_hold_term    = 120,
+        .longer_hold_term = 240,
+    };
+
+    multi_tap = (multi_tap_t){
+        .keycode       = TEST_MULTI_TAP_KEY,
+        .timer         = (uint16_t)(fake_time - 250),
+        .count         = 2,
+        .pending_hold  = true,
+        .tap_hold_term = 120,
+        .hold          = hold_behavior_none(),
+        .long_hold     = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 3);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE);
+    CHECK(plan.effects[0].data.key_pos.row == active_key.key_pos.row);
+    CHECK(plan.effects[0].data.key_pos.col == active_key.key_pos.col);
+    CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
+    CHECK(plan.effects[1].data.action == TEST_LAYER_LOCK_ACTION);
+    CHECK(plan.effects[2].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
+    CHECK(plan.effects[2].data.long_hold_level);
+    CHECK(active_key.hold_fired);
+    CHECK(multi_tap.keycode == KC_NO);
+    CHECK(multi_tap.count == 0);
+}
+
 int main(void) {
     test_flush_multi_tap_replays_single_action();
     test_flush_multi_tap_prefers_exact_step_tap();
@@ -647,6 +781,10 @@ int main(void) {
     test_mismatched_release_releases_owned_held_action();
     test_press_flushes_previous_tap_and_registers_immediate_hold();
     test_scan_promotes_pending_multi_tap_hold();
+    test_scan_commits_immediate_hold_threshold_with_feedback();
+    test_scan_commits_implicit_pd_mode_hold_without_feedback();
+    test_scan_promotes_to_long_hold_and_replaces_held_action();
+    test_scan_pending_multi_tap_long_hold_releases_layer_before_lock();
 
     puts("key_runtime_transition host tests passed");
     return 0;
