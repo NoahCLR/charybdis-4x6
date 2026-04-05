@@ -31,7 +31,7 @@ layer-driven rule rather than part of any mode definition here.
 | Mode | Raw behavior | Notable side effects |
 | --- | --- | --- |
 | `DRAGSCROLL` | trackball motion becomes scrolling instead of cursor movement | enables Charybdis dragscroll while active |
-| `PINCH_MODE` | same scroll path as `DRAGSCROLL`, but with `Cmd` held as a weak modifier | enables dragscroll and holds left `Cmd` while active |
+| `PINCH_MODE` | same scroll path as `DRAGSCROLL`, but with an owned real left `Cmd` hold | enables dragscroll and holds left `Cmd` while active |
 | `ZOOM_MODE` | vertical trackball motion sends `Cmd+=` / `Cmd+-` taps | no dragscroll; explicit keyboard zoom |
 | `ARROW_MODE` | dominant trackball motion emits arrow key taps instead of moving the cursor | repurposes mouse buttons for selection/copy/paste |
 | `VOLUME_MODE` | vertical trackball motion changes system volume in steps | no extra side effects |
@@ -59,7 +59,7 @@ While active:
 
 - the cursor stays frozen
 - Charybdis dragscroll is enabled
-- left `Cmd` is held as a weak modifier
+- left `Cmd` is held through the same owned real-mod path as other runtime modifiers
 - the ball is effectively producing command-scroll input
 
 On macOS, [BetterMouse](https://better-mouse.com/) can turn that

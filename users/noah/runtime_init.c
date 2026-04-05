@@ -3,250 +3,38 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Shared userspace init and scan orchestration. Owns the noah_* entry points
-// called by hooks.c and coordinates VIA macro seeding, key runtime scanning,
-// and RGB cache initialization.
+// called by hooks.c and coordinates the smaller runtime modules that seed
+// defaults, validate authored data, scan the key engine, and initialize split
+// and RGB state.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "noah_runtime.h"
 #include "noah_keymap.h"
-#include "lib/macro/macro_payload.h"
-#include "keymap_introspection.h" // QMK
-
-#ifdef CONSOLE_ENABLE
-#    include "print.h"
-#endif
 
 #include "lib/key/key_runtime_internal.h" // IWYU pragma: keep
+#include "lib/key/keymap_validation.h"
+#include "lib/macro/via_macro_defaults.h"
 #include "lib/rgb/rgb_runtime.h"
 #include "lib/state/runtime_shared_state.h"
-
-#ifdef VIA_ENABLE
-#    include "dynamic_keymap.h"
-#    include "eeprom.h"
-#    include "nvm_eeprom_eeconfig_internal.h" // IWYU pragma: keep
-#    include "via.h"
-#    include "nvm_eeprom_via_internal.h"
-#    ifdef ENCODER_MAP_ENABLE
-#        include "encoder.h"
-#    endif
-#endif
-
-#ifdef VIA_ENABLE
-#    ifndef DYNAMIC_KEYMAP_EEPROM_MAX_ADDR
-#        define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR (TOTAL_EEPROM_BYTE_COUNT - 1)
-#    endif
-
-#    ifndef DYNAMIC_KEYMAP_EEPROM_ADDR
-#        define DYNAMIC_KEYMAP_EEPROM_ADDR (VIA_EEPROM_CONFIG_END)
-#    endif
-
-#    ifndef DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR
-#        define DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR (DYNAMIC_KEYMAP_EEPROM_ADDR + (DYNAMIC_KEYMAP_LAYER_COUNT * MATRIX_ROWS * MATRIX_COLS * 2))
-#    endif
-
-#    ifdef ENCODER_MAP_ENABLE
-#        ifndef DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR
-#            define DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR (DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR + (DYNAMIC_KEYMAP_LAYER_COUNT * NUM_ENCODERS * 2 * 2))
-#        endif
-#    else
-#        ifndef DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR
-#            define DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR (DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR)
-#        endif
-#    endif
-
-#    ifndef DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE
-#        define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE (DYNAMIC_KEYMAP_EEPROM_MAX_ADDR - DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR + 1)
-#    endif
-
-// Stage VIA macro defaults in BSS; the dynamic macro region is larger than
-// the RP2040 process stack on this build.
-static uint8_t via_macro_seed_buffer[DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE];
-static bool    via_macro_seed_post_init_pending = false;
-static bool    via_macro_seed_scan_pending      = false;
-static uint8_t via_macro_slot_state[VIA_MACRO_SLOT_COUNT];
-#endif
-
-#ifdef VIA_ENABLE
-typedef enum {
-    VIA_MACRO_SLOT_UNCHECKED = 0,
-    VIA_MACRO_SLOT_VALID,
-    VIA_MACRO_SLOT_INVALID,
-} via_macro_slot_state_t;
-
-static void log_invalid_via_macro_payload(uint8_t slot, const char *payload) {
-#    ifdef CONSOLE_ENABLE
-    uprintf("Invalid VIA default macro payload for VIA_MACRO_%u: %s\n", (unsigned int)slot, payload);
-#    else
-    (void)slot;
-    (void)payload;
-#    endif
-}
-
-static bool via_macro_payload_slot_is_valid(uint8_t slot) {
-    const char *payload = via_macro_payloads[slot];
-
-    if (via_macro_slot_state[slot] == VIA_MACRO_SLOT_VALID) {
-        return true;
-    }
-    if (via_macro_slot_state[slot] == VIA_MACRO_SLOT_INVALID) {
-        return false;
-    }
-
-    if (!payload || !*payload || macro_payload_validate(payload)) {
-        via_macro_slot_state[slot] = VIA_MACRO_SLOT_VALID;
-        return true;
-    }
-
-    via_macro_slot_state[slot] = VIA_MACRO_SLOT_INVALID;
-    log_invalid_via_macro_payload(slot, payload);
-    return false;
-}
-
-static void validate_via_default_macro_payloads(void) {
-    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
-        (void)via_macro_payload_slot_is_valid(slot);
-    }
-}
-
-static bool build_via_default_macro_seed_buffer(uint16_t capacity, uint16_t *written) {
-    uint8_t *buffer = via_macro_seed_buffer;
-    uint16_t offset = 0;
-
-    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
-        const char *payload = via_macro_payloads[slot];
-        uint16_t    encoded = 0;
-
-        if (payload && *payload) {
-            if (!via_macro_payload_slot_is_valid(slot)) {
-                goto terminate_slot;
-            }
-            if (!macro_payload_encode(payload, &buffer[offset], capacity - offset, &encoded)) {
-                return false;
-            }
-            offset += encoded;
-        }
-
-    terminate_slot:
-        if (offset >= capacity) {
-            return false;
-        }
-        buffer[offset++] = 0x00;
-    }
-
-    *written = offset;
-    return true;
-}
-
-static void seed_via_default_macros(void) {
-    uint16_t capacity = dynamic_keymap_macro_get_buffer_size();
-    uint16_t written  = 0;
-
-    if (capacity == 0 || capacity > DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE) {
-        return;
-    }
-
-    // Every call site runs after QMK has already reset the macro region to
-    // zero, so we only need to write the authored macro prefix here.
-    if (!build_via_default_macro_seed_buffer(capacity, &written) || written == 0) {
-        return;
-    }
-
-    dynamic_keymap_macro_set_buffer(0, written, via_macro_seed_buffer);
-}
-#endif
-
-static bool keymap_layer_action_supported(uint16_t keycode) {
-    if (!action_dispatch_is_raw_qmk_layer_action(keycode)) {
-        return true;
-    }
-
-    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
-}
-
-static void log_invalid_keymap_layer_action(uint8_t layer, uint8_t row, uint8_t col, uint16_t keycode) {
-#ifdef CONSOLE_ENABLE
-    uprintf("Unsupported keymaps[%u][%u][%u] raw layer action 0x%04X; use MO()/LT() for momentary access or LOCK_LAYER(...) for persistent layer changes\n", (unsigned int)layer, (unsigned int)row, (unsigned int)col, (unsigned int)keycode);
-#else
-    (void)layer;
-    (void)row;
-    (void)col;
-    (void)keycode;
-#endif
-}
-
-static void validate_authored_keymap_layer_actions(void) {
-    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
-        for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-            for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                uint16_t keycode = keycode_at_keymap_location(layer, row, col);
-
-                if (!keymap_layer_action_supported(keycode)) {
-                    log_invalid_keymap_layer_action(layer, row, col, keycode);
-                }
-            }
-        }
-    }
-}
 
 void noah_eeconfig_init_user(void) {
 #if (EECONFIG_USER_DATA_SIZE) == 0
     eeconfig_update_user(0);
 #endif
 
-#ifdef VIA_ENABLE
-    seed_via_default_macros();
-    via_macro_seed_post_init_pending = false;
-#endif
+    noah_via_macro_defaults_eeconfig_init();
 }
 
 void noah_matrix_scan_user(void) {
-#ifdef VIA_ENABLE
-    if (via_macro_seed_scan_pending) {
-        seed_via_default_macros();
-        via_macro_seed_scan_pending = false;
-    }
-#endif
-
+    noah_via_macro_defaults_matrix_scan();
     noah_key_runtime_scan();
     runtime_shared_state_sync_tick();
 }
 
 void noah_keyboard_post_init_user(void) {
     macro_dispatch_validate_all();
-    key_behavior_validate_all();
-    validate_authored_keymap_layer_actions();
-
-#ifdef VIA_ENABLE
-    validate_via_default_macro_payloads();
-    if (via_macro_seed_post_init_pending) {
-        seed_via_default_macros();
-        via_macro_seed_post_init_pending = false;
-    }
-#endif
-
+    noah_keymap_validate();
+    noah_via_macro_defaults_keyboard_post_init();
     noah_rgb_runtime_post_init();
     runtime_shared_state_init();
 }
-
-#ifdef VIA_ENABLE
-void via_init_kb(void) {
-    via_macro_seed_post_init_pending = !via_eeprom_is_valid();
-}
-
-bool via_command_kb(uint8_t *data, uint8_t length) {
-    (void)length;
-
-    switch (data[0]) {
-#    ifdef VIA_EEPROM_ALLOW_RESET
-        case id_eeprom_reset:
-            via_macro_seed_scan_pending = true;
-            return false;
-#    endif
-        case id_dynamic_keymap_macro_reset:
-            via_macro_seed_scan_pending = true;
-            return false;
-        default:
-            return false;
-    }
-}
-#endif

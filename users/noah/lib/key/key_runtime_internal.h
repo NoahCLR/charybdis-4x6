@@ -54,6 +54,10 @@ extern multi_tap_t        multi_tap;
 
 void noah_key_runtime_scan(void);
 void key_feedback_pulse_arm(bool long_hold_level);
+bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record);
+bool key_runtime_process_handled_key_press(uint16_t keycode, keyrecord_t *record, handled_key_view_t key);
+bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_view_t key);
+bool key_runtime_process_direct_action_key(uint16_t keycode, keyrecord_t *record);
 
 uint8_t behavior_get_layer(uint16_t keycode);
 bool    is_layer_key(uint16_t keycode);

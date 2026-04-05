@@ -1,0 +1,188 @@
+// ────────────────────────────────────────────────────────────────────────────
+// VIA Macro Defaults
+// ────────────────────────────────────────────────────────────────────────────
+
+#include "via_macro_defaults.h"
+
+#ifdef VIA_ENABLE
+
+#    include QMK_KEYBOARD_H // IWYU pragma: keep
+
+#    include "dynamic_keymap.h"
+#    include "eeprom.h"
+#    include "nvm_eeprom_eeconfig_internal.h" // IWYU pragma: keep
+#    include "nvm_eeprom_via_internal.h"
+#    include "via.h"
+#    ifdef ENCODER_MAP_ENABLE
+#        include "encoder.h"
+#    endif
+
+#    include "noah_keymap.h"
+#    include "macro_payload.h"
+
+#    ifdef CONSOLE_ENABLE
+#        include "print.h"
+#    endif
+
+#    ifndef DYNAMIC_KEYMAP_EEPROM_MAX_ADDR
+#        define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR (TOTAL_EEPROM_BYTE_COUNT - 1)
+#    endif
+
+#    ifndef DYNAMIC_KEYMAP_EEPROM_ADDR
+#        define DYNAMIC_KEYMAP_EEPROM_ADDR (VIA_EEPROM_CONFIG_END)
+#    endif
+
+#    ifndef DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR
+#        define DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR (DYNAMIC_KEYMAP_EEPROM_ADDR + (DYNAMIC_KEYMAP_LAYER_COUNT * MATRIX_ROWS * MATRIX_COLS * 2))
+#    endif
+
+#    ifdef ENCODER_MAP_ENABLE
+#        ifndef DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR
+#            define DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR (DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR + (DYNAMIC_KEYMAP_LAYER_COUNT * NUM_ENCODERS * 2 * 2))
+#        endif
+#    else
+#        ifndef DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR
+#            define DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR (DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR)
+#        endif
+#    endif
+
+#    ifndef DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE
+#        define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE (DYNAMIC_KEYMAP_EEPROM_MAX_ADDR - DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR + 1)
+#    endif
+
+typedef enum {
+    VIA_MACRO_SLOT_UNCHECKED = 0,
+    VIA_MACRO_SLOT_VALID,
+    VIA_MACRO_SLOT_INVALID,
+} via_macro_slot_state_t;
+
+// Stage VIA macro defaults in BSS; the dynamic macro region is larger than
+// the RP2040 process stack on this build.
+static uint8_t via_macro_seed_buffer[DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE];
+static bool    via_macro_seed_post_init_pending = false;
+static bool    via_macro_seed_scan_pending      = false;
+static uint8_t via_macro_slot_state[VIA_MACRO_SLOT_COUNT];
+
+static void log_invalid_via_macro_payload(uint8_t slot, const char *payload) {
+#    ifdef CONSOLE_ENABLE
+    uprintf("Invalid VIA default macro payload for VIA_MACRO_%u: %s\n", (unsigned int)slot, payload);
+#    else
+    (void)slot;
+    (void)payload;
+#    endif
+}
+
+static bool via_macro_payload_slot_is_valid(uint8_t slot) {
+    const char *payload = via_macro_payloads[slot];
+
+    if (via_macro_slot_state[slot] == VIA_MACRO_SLOT_VALID) {
+        return true;
+    }
+    if (via_macro_slot_state[slot] == VIA_MACRO_SLOT_INVALID) {
+        return false;
+    }
+
+    if (!payload || !*payload || macro_payload_validate(payload)) {
+        via_macro_slot_state[slot] = VIA_MACRO_SLOT_VALID;
+        return true;
+    }
+
+    via_macro_slot_state[slot] = VIA_MACRO_SLOT_INVALID;
+    log_invalid_via_macro_payload(slot, payload);
+    return false;
+}
+
+static void validate_via_default_macro_payloads(void) {
+    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
+        (void)via_macro_payload_slot_is_valid(slot);
+    }
+}
+
+static bool build_via_default_macro_seed_buffer(uint16_t capacity, uint16_t *written) {
+    uint8_t *buffer = via_macro_seed_buffer;
+    uint16_t offset = 0;
+
+    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
+        const char *payload = via_macro_payloads[slot];
+        uint16_t    encoded = 0;
+
+        if (payload && *payload) {
+            if (!via_macro_payload_slot_is_valid(slot)) {
+                goto terminate_slot;
+            }
+            if (!macro_payload_encode(payload, &buffer[offset], capacity - offset, &encoded)) {
+                return false;
+            }
+            offset += encoded;
+        }
+
+    terminate_slot:
+        if (offset >= capacity) {
+            return false;
+        }
+        buffer[offset++] = 0x00;
+    }
+
+    *written = offset;
+    return true;
+}
+
+static void seed_via_default_macros(void) {
+    uint16_t capacity = dynamic_keymap_macro_get_buffer_size();
+    uint16_t written  = 0;
+
+    if (capacity == 0 || capacity > DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE) {
+        return;
+    }
+
+    // Every call site runs after QMK has already reset the macro region to
+    // zero, so we only need to write the authored macro prefix here.
+    if (!build_via_default_macro_seed_buffer(capacity, &written) || written == 0) {
+        return;
+    }
+
+    dynamic_keymap_macro_set_buffer(0, written, via_macro_seed_buffer);
+}
+
+void noah_via_macro_defaults_eeconfig_init(void) {
+    seed_via_default_macros();
+    via_macro_seed_post_init_pending = false;
+}
+
+void noah_via_macro_defaults_matrix_scan(void) {
+    if (via_macro_seed_scan_pending) {
+        seed_via_default_macros();
+        via_macro_seed_scan_pending = false;
+    }
+}
+
+void noah_via_macro_defaults_keyboard_post_init(void) {
+    validate_via_default_macro_payloads();
+    if (via_macro_seed_post_init_pending) {
+        seed_via_default_macros();
+        via_macro_seed_post_init_pending = false;
+    }
+}
+
+void via_init_kb(void) {
+    via_macro_seed_post_init_pending = !via_eeprom_is_valid();
+}
+
+bool via_command_kb(uint8_t *data, uint8_t length) {
+    (void)length;
+
+    switch (data[0]) {
+#    ifdef VIA_EEPROM_ALLOW_RESET
+        case id_eeprom_reset:
+            via_macro_seed_scan_pending = true;
+            return false;
+#    endif
+        case id_dynamic_keymap_macro_reset:
+            via_macro_seed_scan_pending = true;
+            return false;
+        default:
+            return false;
+    }
+}
+
+#endif

@@ -8,14 +8,9 @@
 #    include "print.h"
 #endif
 
-#include "noah_keymap.h"
-#include "../action/action_dispatch.h"
-#include "../action/owned_keycode.h"
-#include "../pointing/pointing_device_modes.h"
+#include "../action/action_lifecycle.h"
 #include "../state/keyboard_mod_ownership.h"
-#include "../state/layer_ownership.h"
 #include "held_action.h"
-#include "../action/synthetic_record.h"
 
 // A held pure modifier is owned by the physical switch that started it, not by
 // whichever custom key the tap/hold FSM is currently resolving.
@@ -31,9 +26,13 @@ typedef struct {
     uint16_t action;
 } held_action_binding_t;
 
-static held_modifier_binding_t held_modifiers[8]          = {0};
-static uint8_t                 held_modifier_refcounts[8] = {0};
-static held_action_binding_t   held_actions[8]            = {0};
+#define HELD_ACTION_BINDING_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
+
+// Per-key ownership tracking needs enough room for every physical switch on
+// the board, otherwise larger chords silently degrade into raw dispatch.
+static held_modifier_binding_t held_modifiers[HELD_ACTION_BINDING_CAPACITY] = {0};
+static uint8_t                 held_modifier_refcounts[8]                   = {0};
+static held_action_binding_t   held_actions[HELD_ACTION_BINDING_CAPACITY]   = {0};
 
 static inline bool keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
@@ -55,18 +54,16 @@ static bool held_action_is_pure_modifier(uint16_t action) {
     }
 }
 
-static bool held_action_is_owned_momentary_layer(uint16_t action) {
-    return IS_QK_MOMENTARY(action);
-}
-
 static bool held_action_requires_per_key_dispatch(uint16_t action) {
-    return held_action_is_owned_momentary_layer(action);
+    return noah_action_hold_kind(action) != NOAH_ACTION_HOLD_KIND_SHARED;
 }
 
-static void held_action_log_unsupported_layer_action(uint16_t action) {
+static void held_action_log_binding_overflow(const char *kind, keypos_t key_pos, uint16_t action) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported held raw QMK layer action 0x%04X; use PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned layer holds\n", (unsigned int)action);
+    uprintf("Held %s binding table overflow at key (%u,%u) for action 0x%04X; board-sized ownership capacity was exhausted unexpectedly\n", kind, (unsigned int)key_pos.row, (unsigned int)key_pos.col, (unsigned int)action);
 #else
+    (void)kind;
+    (void)key_pos;
     (void)action;
 #endif
 }
@@ -94,42 +91,42 @@ static int8_t held_modifier_index_for_action(uint16_t action) {
     }
 }
 
-static int8_t held_modifier_find_slot_for_key(keypos_t key_pos) {
-    for (uint8_t i = 0; i < ARRAY_SIZE(held_modifiers); i++) {
-        if (held_modifiers[i].active && keypos_equal(held_modifiers[i].key_pos, key_pos)) return (int8_t)i;
+static int16_t held_modifier_find_slot_for_key(keypos_t key_pos) {
+    for (uint16_t i = 0; i < ARRAY_SIZE(held_modifiers); i++) {
+        if (held_modifiers[i].active && keypos_equal(held_modifiers[i].key_pos, key_pos)) return (int16_t)i;
     }
 
     return -1;
 }
 
-static int8_t held_modifier_find_free_slot(void) {
-    for (uint8_t i = 0; i < ARRAY_SIZE(held_modifiers); i++) {
-        if (!held_modifiers[i].active) return (int8_t)i;
+static int16_t held_modifier_find_free_slot(void) {
+    for (uint16_t i = 0; i < ARRAY_SIZE(held_modifiers); i++) {
+        if (!held_modifiers[i].active) return (int16_t)i;
     }
 
     return -1;
 }
 
-static int8_t held_action_find_slot_for_key(keypos_t key_pos) {
-    for (uint8_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
-        if (held_actions[i].active && keypos_equal(held_actions[i].key_pos, key_pos)) return (int8_t)i;
+static int16_t held_action_find_slot_for_key(keypos_t key_pos) {
+    for (uint16_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
+        if (held_actions[i].active && keypos_equal(held_actions[i].key_pos, key_pos)) return (int16_t)i;
     }
 
     return -1;
 }
 
-static int8_t held_action_find_free_slot(void) {
-    for (uint8_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
-        if (!held_actions[i].active) return (int8_t)i;
+static int16_t held_action_find_free_slot(void) {
+    for (uint16_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
+        if (!held_actions[i].active) return (int16_t)i;
     }
 
     return -1;
 }
 
-static uint8_t held_action_refcount(uint16_t action) {
-    uint8_t count = 0;
+static uint16_t held_action_refcount(uint16_t action) {
+    uint16_t count = 0;
 
-    for (uint8_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
+    for (uint16_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
         if (held_actions[i].active && held_actions[i].action == action) {
             count++;
         }
@@ -138,7 +135,7 @@ static uint8_t held_action_refcount(uint16_t action) {
     return count;
 }
 
-static void held_modifier_remove_slot(uint8_t slot) {
+static void held_modifier_remove_slot(uint16_t slot) {
     uint16_t action = held_modifiers[slot].action;
     int8_t   index  = held_modifier_index_for_action(action);
 
@@ -156,8 +153,8 @@ static void held_modifier_remove_slot(uint8_t slot) {
 }
 
 static void held_modifier_register(keypos_t key_pos, uint16_t action) {
-    int8_t slot  = held_modifier_find_slot_for_key(key_pos);
-    int8_t index = held_modifier_index_for_action(action);
+    int16_t slot  = held_modifier_find_slot_for_key(key_pos);
+    int8_t  index = held_modifier_index_for_action(action);
 
     if (index < 0) {
         return;
@@ -167,10 +164,11 @@ static void held_modifier_register(keypos_t key_pos, uint16_t action) {
         if (held_modifiers[slot].action == action) {
             return;
         }
-        held_modifier_remove_slot((uint8_t)slot);
+        held_modifier_remove_slot((uint16_t)slot);
     } else {
         slot = held_modifier_find_free_slot();
         if (slot < 0) {
+            held_action_log_binding_overflow("modifier", key_pos, action);
             return;
         }
     }
@@ -186,75 +184,8 @@ static void held_modifier_register(keypos_t key_pos, uint16_t action) {
     }
 }
 
-static void held_action_dispatch_press(keypos_t key_pos, uint16_t action) {
-    if (pd_mode_handle_keycode_press(action)) {
-        return;
-    }
-
-    if (held_action_is_owned_momentary_layer(action)) {
-        layer_ownership_momentary_press(key_pos, QK_MOMENTARY_GET_LAYER(action));
-        return;
-    }
-
-    if (action_dispatch_is_raw_qmk_layer_action(action)) {
-        held_action_log_unsupported_layer_action(action);
-        return;
-    }
-
-    if (action_dispatch_is_qmk_behavior_keycode(action)) {
-        noah_dispatch_synthetic_qmk_record(action, true, 0);
-        return;
-    }
-
-    if (action >= NOAH_KEYMAP_SAFE_RANGE) {
-        noah_dispatch_synthetic_record(action, true);
-        return;
-    }
-
-    // Route literal keycodes, including QK_MODS such as S(KC_1), through the
-    // shared owned-keycode contract so held actions and macro dispatch cannot
-    // drift apart.
-    if (owned_keycode_register(action)) {
-        return;
-    }
-
-    register_code16(action);
-}
-
-static void held_action_dispatch_release(keypos_t key_pos, uint16_t action) {
-    if (pd_mode_handle_keycode_release(action)) {
-        return;
-    }
-
-    if (held_action_is_owned_momentary_layer(action)) {
-        layer_ownership_momentary_release(key_pos);
-        return;
-    }
-
-    if (action_dispatch_is_raw_qmk_layer_action(action)) {
-        held_action_log_unsupported_layer_action(action);
-        return;
-    }
-
-    if (action_dispatch_is_qmk_behavior_keycode(action)) {
-        noah_dispatch_synthetic_qmk_record(action, false, 0);
-        return;
-    }
-
-    if (action >= NOAH_KEYMAP_SAFE_RANGE) {
-        noah_dispatch_synthetic_record(action, false);
-        return;
-    }
-
-    if (owned_keycode_unregister(action)) {
-        return;
-    }
-
-    unregister_code16(action);
-}
-
 static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
-    int8_t slot = held_action_find_slot_for_key(key_pos);
+    int16_t slot = held_action_find_slot_for_key(key_pos);
 
     if (slot >= 0) {
         if (held_actions[slot].action == action) {
@@ -265,11 +196,12 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
         held_actions[slot].active = false;
         held_actions[slot].action = KC_NO;
         if (held_action_refcount(old_action) == 0 || held_action_requires_per_key_dispatch(old_action)) {
-            held_action_dispatch_release(key_pos, old_action);
+            noah_action_release(key_pos, old_action);
         }
     } else {
         slot = held_action_find_free_slot();
         if (slot < 0) {
+            held_action_log_binding_overflow("action", key_pos, action);
             return false;
         }
     }
@@ -282,25 +214,25 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
     };
 
     if (first_binding || held_action_requires_per_key_dispatch(action)) {
-        held_action_dispatch_press(key_pos, action);
+        noah_action_press(key_pos, action);
     }
 
     return true;
 }
 
 bool held_modifier_release_owned_by_key(keypos_t key_pos) {
-    int8_t slot = held_modifier_find_slot_for_key(key_pos);
+    int16_t slot = held_modifier_find_slot_for_key(key_pos);
 
     if (slot < 0) {
         return false;
     }
 
-    held_modifier_remove_slot((uint8_t)slot);
+    held_modifier_remove_slot((uint16_t)slot);
     return true;
 }
 
 bool held_action_release_owned_by_key(keypos_t key_pos) {
-    int8_t slot = held_action_find_slot_for_key(key_pos);
+    int16_t slot = held_action_find_slot_for_key(key_pos);
 
     if (slot >= 0) {
         uint16_t action           = held_actions[slot].action;
@@ -308,7 +240,7 @@ bool held_action_release_owned_by_key(keypos_t key_pos) {
         held_actions[slot].action = KC_NO;
 
         if (held_action_refcount(action) == 0 || held_action_requires_per_key_dispatch(action)) {
-            held_action_dispatch_release(key_pos, action);
+            noah_action_release(key_pos, action);
         }
         return true;
     }
@@ -326,7 +258,7 @@ void held_action_register(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    held_action_dispatch_press(key_pos, action);
+    noah_action_press(key_pos, action);
 }
 
 void held_action_unregister(keypos_t key_pos, uint16_t action) {
@@ -339,7 +271,7 @@ void held_action_unregister(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    held_action_dispatch_release(key_pos, action);
+    noah_action_release(key_pos, action);
 }
 
 bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
@@ -347,6 +279,6 @@ bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
         return true;
     }
 
-    int8_t slot = held_action_find_slot_for_key(key_pos);
+    int16_t slot = held_action_find_slot_for_key(key_pos);
     return slot >= 0 && held_actions[slot].action == action;
 }

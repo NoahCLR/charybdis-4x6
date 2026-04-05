@@ -35,8 +35,9 @@ to understand and easy to change:
   is the main customization table: one authored row can give a key different
   tap, hold, and longer-hold actions at each tap count, plus per-key timing
   overrides. Actions can be plain keycodes, macros, layer locks, pointer-mode
-  locks, QMK behavior keycodes like `MO()` or `TG()`, or keymap-local custom
-  keycodes
+  locks, supported QMK behavior keycodes like `OSM()` or `MT()`, owned
+  momentary layer holds such as `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))`, or
+  keymap-local custom keycodes
 - pointer modes are a core part of what makes this userspace different: the
   trackball can become dragscroll, pinch, zoom, arrows, volume, or brightness,
   and those mode keys use the same authored tap, hold, and lock model as the
@@ -180,15 +181,22 @@ An action in a `key_behaviors[]` row can be:
 - a hardcoded or VIA macro (`MACRO_0`, `VIA_MACRO_6`)
 - a layer lock (`LOCK_LAYER(LAYER_NAV)`)
 - a pointer-mode lock (`LOCK_PD_MODE(ARROW_MODE)`)
-- a QMK behavior keycode such as `MO()`, `TG()`, `TO()`, `TT()`, `OSL()`,
-  `LT()`, or `MT()` — the engine dispatches these through QMK's
-  `process_action()` path so they work correctly as hold or tap actions
+- a supported QMK behavior keycode such as `OSM()` or `MT()`
+- an owned momentary layer hold such as
+  `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))`
 - a keymap-local custom keycode declared in `keymap.c`
 
 That last category is how the thumb keys work: `LEFT_THUMB` and `RIGHT_THUMB`
 are keymap-local custom keycodes whose behavior is entirely defined by their
 `key_behaviors[]` rows, including `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))`
 for momentary layer access on hold.
+
+Raw QMK layer actions such as `TG()`, `TO()`, `TT()`, `OSL()`, and `LM()` are
+intentionally rejected inside `key_behaviors[]` and by the generic authored
+action dispatcher so they cannot bypass the userspace layer-ownership model.
+Use `LOCK_LAYER(...)` for persistent layer changes, `LT()` as the authored
+physical keycode surface, and `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))` when a
+custom row needs an owned momentary hold.
 
 ### Timing
 
@@ -248,7 +256,7 @@ The trackball modes use the same timing language as the rest of the board.
 Current modes:
 
 - `DRAGSCROLL`: converts ball movement into scrolling
-- `PINCH_MODE`: dragscroll with `Cmd` held for
+- `PINCH_MODE`: dragscroll with an owned real `Cmd` hold for
   [BetterMouse](https://better-mouse.com/)-backed pinch emulation on macOS
 - `ZOOM_MODE`: converts vertical movement into `Cmd+-` and `Cmd+=`
 - `ARROW_MODE`: converts ball movement into arrow keys and repurposes mouse

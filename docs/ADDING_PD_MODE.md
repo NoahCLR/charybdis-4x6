@@ -321,7 +321,7 @@ Edit `users/noah/lib/pointing/pd_mode_registry.c`.
 Current examples to copy:
 
 - `DRAGSCROLL` toggles Charybdis dragscroll
-- `PINCH_MODE` toggles dragscroll and also registers / unregisters a weak `GUI` mod
+- `PINCH_MODE` toggles dragscroll and also registers / unregisters an owned real `GUI` mod
 - locked scroll-like modes use the auto-mouse ownership helpers
 
 If your mode behaves like `VOLUME_MODE`, `BRIGHTNESS_MODE`, or `ZOOM_MODE`, you
