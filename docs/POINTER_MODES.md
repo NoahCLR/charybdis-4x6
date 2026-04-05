@@ -4,7 +4,7 @@ This file explains the raw behavior of the pointing-device modes after a mode
 is active.
 
 It does not describe the current keymap's physical placement, tap / hold
-gestures, or double-tap actions. Those are authored separately in `keymap.c`
+gestures, or double-tap actions. Those are authored separately in [`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 and described at a higher level in [INTERACTION_MODEL.md](./INTERACTION_MODEL.md)
 and the top-level [README](../README.md).
 

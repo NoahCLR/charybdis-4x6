@@ -1,7 +1,7 @@
 # RGB Configuration
 
 This keymap keeps most RGB authoring in
-`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`.
+[`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 
 That file is for visual configuration:
 
@@ -16,19 +16,19 @@ If you want to change how the board looks, start there.
 
 If you want to change how RGB is rendered, look at:
 
-- `users/noah/lib/rgb/rgb_runtime.c`
-- `users/noah/lib/rgb/rgb_automouse.c`
-- `users/noah/lib/rgb/rgb_helpers.h`
+- [`users/noah/lib/rgb/rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c)
+- [`users/noah/lib/rgb/rgb_automouse.c`](../users/noah/lib/rgb/rgb_automouse.c)
+- [`users/noah/lib/rgb/rgb_helpers.h`](../users/noah/lib/rgb/rgb_helpers.h)
 
 If you want to change what the key-behavior overlay means instead of how it is
 painted, also look at:
 
-- `users/noah/lib/key/key_runtime_feedback.c`
-- `users/noah/lib/key/key_runtime_scan.c`
+- [`users/noah/lib/key/key_runtime_feedback.c`](../users/noah/lib/key/key_runtime_feedback.c)
+- [`users/noah/lib/key/key_runtime_scan.c`](../users/noah/lib/key/key_runtime_scan.c)
 
 ## HSV Quick Reference
 
-The color values in `rgb_config.c` are authored as `hsv_t` structs. Use this
+The color values in [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) are authored as `hsv_t` structs. Use this
 quick reference when picking hue values:
 
 ![HSV quick reference](./media/hsv_colors.jpg)
@@ -37,7 +37,7 @@ quick reference when picking hue values:
 
 ### `layer_colors[]`
 
-`layer_colors[]` is indexed by the layer enum values from the keymap `config.h`.
+`layer_colors[]` is indexed by the layer enum values from the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
 Each row is an `hsv_t`:
 
@@ -81,7 +81,7 @@ This is useful for things like:
 - marking navigation modifiers
 - accenting a small part of a layer without repainting the full board
 
-The LED map comment in `rgb_config.c` is the reference for the standard matrix
+The LED map comment in [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) is the reference for the standard matrix
 indices on this board.
 
 ### `pd_mode_led_groups[]`
@@ -105,7 +105,7 @@ In the current runtime:
 The gradient does not animate during the entire timeout. The first
 `AUTOMOUSE_RGB_DEAD_TIME` milliseconds are dead time, and only the remaining
 span animates. In this keymap the default dead time is one third of
-`AUTO_MOUSE_TIME`, but it is configurable in the keymap `config.h`. That
+`AUTO_MOUSE_TIME`, but it is configurable in the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h). That
 reduces flicker while the trackball is still actively being used.
 
 ### `feedback_*_color`
@@ -131,7 +131,7 @@ hold overlay after that. Once the layer is on, the layer color itself is the
 main feedback.
 
 The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the keymap
-`config.h`. Its flash cadence is controlled by
+[`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h). Its flash cadence is controlled by
 `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
 
 The master half computes the semantic feedback flags. On split boards, the
@@ -140,7 +140,7 @@ flash-phase bit used to keep both halves in sync.
 
 ## Render Order
 
-`rgb_runtime.c` applies RGB in a deliberate order:
+[`rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c) applies RGB in a deliberate order:
 
 1. the topmost active non-base layer with a nonzero solid color
 2. the auto-mouse gradient on the configured auto-mouse layer, if no solid
@@ -161,8 +161,8 @@ Examples:
 
 ## The Helper Types
 
-`users/noah/lib/rgb/rgb_helpers.h` defines the small config structs used by
-`rgb_config.c`:
+[`users/noah/lib/rgb/rgb_helpers.h`](../users/noah/lib/rgb/rgb_helpers.h) defines the small config structs used by
+[`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c):
 
 - `pd_mode_color_t`
 - `layer_led_group_t`
@@ -209,7 +209,7 @@ Edit `automouse_color_start` and `automouse_color_end`.
 
 If you want to change the timing model instead of just the colors, look at:
 
-- `AUTO_MOUSE_TIME` and `AUTOMOUSE_RGB_DEAD_TIME` in keymap `config.h`
+- `AUTO_MOUSE_TIME` and `AUTOMOUSE_RGB_DEAD_TIME` in keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 
 `AUTOMOUSE_RGB_DEAD_TIME` must stay below `AUTO_MOUSE_TIME`. The build now
 checks that at compile time.
@@ -220,15 +220,15 @@ Edit the relevant `feedback_*_color` values.
 
 ### Disable the key-behavior overlay
 
-Comment out `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the keymap `config.h`.
+Comment out `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
 ### Disable the auto-mouse gradient
 
-Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the keymap `config.h`.
+Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
 ## What This File Does Not Do
 
-`rgb_config.c` does not decide:
+[`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) does not decide:
 
 - which layer becomes the auto-mouse layer
 - how long auto-mouse stays active
@@ -236,5 +236,5 @@ Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the keymap `config.h`.
 - when a pointing-device mode becomes active or locked
 - how split sync transports auto-mouse or key-feedback state
 
-Those behaviors live in the keymap `config.h` and the runtime files under
+Those behaviors live in the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) and the runtime files under
 `users/noah/lib/`.

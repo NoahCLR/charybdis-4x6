@@ -27,7 +27,7 @@ That is what makes these behaviors possible:
 
 ## Default Timing
 
-The default timing values come from the active keymap `config.h`:
+The default timing values come from the active keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
 
 - `CUSTOM_TAP_HOLD_TERM = 150`
 - `CUSTOM_LONGER_HOLD_TERM = 400`

@@ -13,7 +13,7 @@ If you still want the shared `noah` userspace behavior, call the matching
 
 ## Default Model
 
-If you do nothing, the weak hooks in `users/noah/hooks.c` are used:
+If you do nothing, the weak hooks in [`users/noah/hooks.c`](../users/noah/hooks.c) are used:
 
 - `eeconfig_init_user()`
 - `get_hold_on_other_key_press()`
@@ -160,8 +160,8 @@ This pattern applies to:
 | `eeconfig_init_user()` | `noah_eeconfig_init_user()` | VIA macro seeding after EEPROM init |
 | `get_hold_on_other_key_press()` | `noah_get_hold_on_other_key_press()` | shared tap-hold exceptions |
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, macros, direct actions |
-| `matrix_scan_user()` | `noah_matrix_scan_user()` | deferred VIA reseed checks, key runtime scanning, and split shared-state sync ticks |
-| `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | deferred VIA reseed checks, RGB runtime init, and split shared-state RPC init |
+| `matrix_scan_user()` | `noah_matrix_scan_user()` | VIA macro default reseeding, key runtime scanning, and split shared-state sync ticks |
+| `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | macro and keymap validation, VIA macro default seeding, RGB runtime init, and split shared-state init |
 | `layer_state_set_user()` | `noah_layer_state_set_user()` | pointer-layer policy and sniping state |
 | `pointing_device_task_user()` | `noah_pointing_device_task_user()` | pointer-mode mouse-report transforms |
 | `pointing_device_init_user()` | `noah_pointing_device_init_user()` | auto-mouse init |
@@ -172,7 +172,7 @@ This pattern applies to:
 
 Keymap-local custom keycodes belong in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
-not in `users/noah/noah_keymap.h`:
+not in [`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h):
 
 ```c
 enum keymap_custom_keycodes {
