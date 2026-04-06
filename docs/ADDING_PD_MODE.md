@@ -35,7 +35,7 @@ behavior that existing modes do not cover.
 A pd mode is a custom keycode that:
 
 - is activated by holding a key
-- can optionally be locked with `LOCK_PD_MODE(...)`
+- gets a generated `LOCK_PD_MODE(...)` action whether or not the keymap uses it
 - can transform trackball motion in the pointing-device pipeline
 - can optionally intercept key events while active
 - participates in split sync and RGB overlays
@@ -108,14 +108,13 @@ Add the new mode as one manifest row. That single row generates:
 Example:
 
 ```c
-    M(EXAMPLE, EXAMPLE_MODE, EXAMPLE_MODE_LOCK, handle_example_mode, NULL, reset_example_mode, 0)
+    PDM(EXAMPLE, EXAMPLE_MODE, handle_example_mode, NULL, reset_example_mode, 0)
 ```
 
 Field meaning:
 
 - `EXAMPLE`: symbolic suffix used for the generated `PD_MODE_EXAMPLE` flag
 - `EXAMPLE_MODE`: shared custom keycode
-- `EXAMPLE_MODE_LOCK`: generated lock keycode used by `LOCK_PD_MODE(EXAMPLE_MODE)`
 - `handle_example_mode`: optional motion handler
 - `NULL`: optional key-event interceptor
 - `reset_example_mode`: optional cleanup hook
@@ -201,7 +200,7 @@ Field meaning:
 
 - `mode_flag`: internal bit flag
 - `keycode`: custom keycode that activates the mode
-- `lock_action`: usually `LOCK_PD_MODE(...)`, or `KC_NO` if not lockable
+- `lock_action`: generated `LOCK_PD_MODE(...)` action for that mode
 - `handler`: trackball-motion handler, or `NULL`
 - `key_handler`: optional key-event interceptor
 - `reset`: cleanup callback, or `NULL`

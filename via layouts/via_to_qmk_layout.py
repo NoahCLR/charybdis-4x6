@@ -64,7 +64,7 @@ CHARYBDIS_UPSTREAM_KEYCODES = [
     "DRG_TOG",
 ]
 
-_PD_MODE_MANIFEST_ENTRY_PATTERN = re.compile(r"^\s*M\(\s*[A-Z_][A-Z0-9_]*\s*,\s*([A-Z_][A-Z0-9_]*)\s*,\s*[A-Z_][A-Z0-9_]*\s*,")
+_PD_MODE_MANIFEST_ENTRY_PATTERN = re.compile(r"^\s*PDM\(\s*[A-Z_][A-Z0-9_]*\s*,\s*([A-Z_][A-Z0-9_]*)\s*,")
 
 
 def load_pd_mode_keycodes() -> list[str]:
@@ -78,7 +78,7 @@ def load_pd_mode_keycodes() -> list[str]:
 
     for raw_line in PD_MODE_MANIFEST_FILE.read_text().splitlines():
         line = raw_line.split("//", 1)[0].strip()
-        if not line.startswith("M("):
+        if not line.startswith("PDM("):
             continue
 
         match = _PD_MODE_MANIFEST_ENTRY_PATTERN.match(line)

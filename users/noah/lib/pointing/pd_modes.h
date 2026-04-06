@@ -30,7 +30,7 @@ typedef void (*pd_mode_reset_t)(void);
 typedef struct {
     pd_mode_mask_t        mode_flag;
     uint16_t              keycode;     // keycode that activates this mode (KC_NO = none)
-    uint16_t              lock_action; // KC_NO = not lockable; otherwise toggles persistent mode lock
+    uint16_t              lock_action; // generated as <MODE_KEYCODE>_LOCK and toggles persistent mode lock
     pd_mode_handler_t     handler;     // NULL = trackball handled externally (e.g. dragscroll)
     pd_mode_key_handler_t key_handler; // optional key-event interception while mode is active
     pd_mode_reset_t       reset;       // called on deactivation (NULL = no-op)
@@ -45,7 +45,6 @@ void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t l
 
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode);
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action);
-bool                 pd_mode_is_lockable(pd_mode_mask_t mode);
 bool                 is_pd_mode_lock_action(uint16_t action);
 
 bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked);

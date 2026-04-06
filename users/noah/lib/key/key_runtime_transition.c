@@ -183,7 +183,7 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
                 key_runtime_effects_feedback_pulse_arm(effect->data.long_hold_level);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_PD_MODE_LOCK_TAP:
-                if (pd_mode_is_lockable(effect->data.pd_mode) && pd_mode_toggle_lock_state(effect->data.pd_mode)) {
+                if (pd_mode_toggle_lock_state(effect->data.pd_mode)) {
                     key_runtime_effects_sync_split_runtime();
                 }
                 break;

@@ -71,7 +71,6 @@ static uint8_t              behavior_step_count;
 
 static pd_mode_mapping_t pd_mode_mappings[TEST_MAX_PD_MODE_MAPPINGS];
 static uint8_t           pd_mode_mapping_count;
-static pd_mode_mask_t    pd_lockable_modes;
 static pd_mode_mask_t    pd_locked_modes;
 static bool              pd_toggle_result;
 
@@ -153,7 +152,6 @@ static void test_add_behavior_step(uint16_t keycode, uint8_t tap_count, key_beha
 static void test_reset_pd_modes(void) {
     memset(pd_mode_mappings, 0, sizeof(pd_mode_mappings));
     pd_mode_mapping_count = 0;
-    pd_lockable_modes     = 0;
     pd_locked_modes       = 0;
     pd_toggle_result      = true;
 }
@@ -268,15 +266,7 @@ bool pd_mode_locked(pd_mode_mask_t mode) {
     return (pd_locked_modes & mode) != 0;
 }
 
-bool pd_mode_is_lockable(pd_mode_mask_t mode) {
-    return (pd_lockable_modes & mode) != 0;
-}
-
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
-    if (!pd_mode_is_lockable(mode)) {
-        return false;
-    }
-
     if (pd_toggle_result) {
         pd_locked_modes ^= mode;
     }
@@ -417,7 +407,6 @@ static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
 
     test_reset_stubs();
     test_add_pd_mode_mapping(TEST_PD_MODE_KEY, PD_MODE_VOLUME);
-    pd_lockable_modes = PD_MODE_VOLUME;
     pd_locked_modes   = PD_MODE_VOLUME;
 
     active_key = (active_key_state_t){

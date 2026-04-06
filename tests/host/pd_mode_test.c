@@ -187,7 +187,6 @@ static void test_registry_metadata_matches_manifest(void) {
     CHECK(volume_mode->lock_action == VOLUME_MODE_LOCK);
     CHECK(volume_mode->dpi == PD_MODE_VOLUME_DPI);
     CHECK(pd_mode_lock_action_lookup(VOLUME_MODE_LOCK) == volume_mode);
-    CHECK(pd_mode_is_lockable(PD_MODE_VOLUME));
     CHECK(is_pd_mode_lock_action(VOLUME_MODE_LOCK));
     CHECK(pd_mode_for_keycode(VOLUME_MODE) == PD_MODE_VOLUME);
 

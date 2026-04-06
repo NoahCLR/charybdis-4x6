@@ -117,7 +117,7 @@ static void pinch_mode_unregister_command(void) {
 #    define PD_MODE_ARROW_DPI 0
 #endif
 
-#define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, lock_keycode, handler, key_handler, reset, dpi) {PD_MODE_##name, keycode, lock_keycode, handler, key_handler, reset, dpi},
+#define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, handler, key_handler, reset, dpi) {PD_MODE_##name, keycode, keycode##_LOCK, handler, key_handler, reset, dpi},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
     NOAH_PD_MODE_LIST(NOAH_PD_MODE_REGISTRY_ROW)
 };
@@ -132,14 +132,9 @@ const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode) {
 
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].lock_action != KC_NO && pd_modes[i].lock_action == action) return &pd_modes[i];
+        if (pd_modes[i].lock_action == action) return &pd_modes[i];
     }
     return NULL;
-}
-
-bool pd_mode_is_lockable(pd_mode_mask_t mode) {
-    const pd_mode_def_t *def = pd_mode_lookup(mode);
-    return def && def->lock_action != KC_NO;
 }
 
 bool is_pd_mode_lock_action(uint16_t action) {
