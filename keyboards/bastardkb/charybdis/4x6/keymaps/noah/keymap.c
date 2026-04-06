@@ -15,6 +15,7 @@
 // processing lives in the userspace runtime modules under users/noah/lib/.
 // ────────────────────────────────────────────────────────────────────────────
 
+#include "lib/key/key_behavior.h"
 #include "noah_keymap.h"
 
 // ─── Keymap-Local Custom Keycodes ──────────────────────────────────────────
@@ -274,7 +275,6 @@ const key_behavior_t
             {.keycode = KC_GRV, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_TILD)}}},
             {.keycode = KC_SCLN, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_COLN)}}},
             {.keycode = KC_QUOT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)}}},
-            {.keycode = KC_COMM, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)}}},
             {.keycode = KC_DOT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)}}},
 
             // Escape → Force Quit on hold, tilde on double-tap
@@ -283,10 +283,16 @@ const key_behavior_t
             // Enter → Shift+Enter (new line without send in chat apps)
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
 
+            // Typing-layer pointer buttons to support arrowmode
+            {.keycode = KC_M, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN1)}}},
+            {.keycode = KC_COMM, .tap_counts = {[0] = {.long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN2)}}},
+            {.keycode = KC_K, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN3)}}},
+            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
+
             // Arrows — release-based hold plus immediate long hold
             {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
             {.keycode = KC_RIGHT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))}}},
-
+            kunnen we nu ge ja we kunnen nu gewoon snel ieta aanpassen typen
             // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
             {
                 .keycode = LEFT_THUMB,

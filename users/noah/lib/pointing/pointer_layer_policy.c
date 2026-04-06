@@ -18,20 +18,29 @@ static inline bool pointer_layer_policy_pd_mode_running(void) {
     return pd_any_mode_active();
 }
 
-static bool pointer_layer_policy_is_pd_mode_key(uint16_t keycode) {
-    return pd_mode_for_keycode(keycode) != 0;
+static inline bool pointer_layer_policy_arrow_mode_prefers_typing_layer(void) {
+    return pd_mode_active(PD_MODE_ARROW);
+}
+
+static inline bool pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored(void) {
+    return pointer_layer_policy_pd_mode_running() && !pointer_layer_policy_arrow_mode_prefers_typing_layer();
+}
+
+static bool pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(uint16_t keycode) {
+    pd_mode_mask_t mode = pd_mode_for_keycode(keycode);
+    return mode != 0 && mode != PD_MODE_ARROW;
 }
 
 static inline bool pointer_layer_policy_auto_mouse_anchored(void) {
-    return get_auto_mouse_toggle() || get_auto_mouse_key_tracker() != 0 || pointer_layer_policy_pd_mode_running();
+    return get_auto_mouse_toggle() || get_auto_mouse_key_tracker() != 0 || pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored();
 }
 
 bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
-    if (pointer_layer_policy_pd_mode_running() && pointer_layer_policy_is_layer_hold_key(keycode)) {
+    if (pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored() && pointer_layer_policy_is_layer_hold_key(keycode)) {
         return true;
     }
 
-    if (pointer_layer_policy_is_pd_mode_key(keycode)) {
+    if (pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(keycode)) {
         return true;
     }
 
@@ -47,17 +56,25 @@ bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
 }
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
-    bool          pd_mode_running     = pointer_layer_policy_pd_mode_running();
+    bool          arrow_mode_active   = pointer_layer_policy_arrow_mode_prefers_typing_layer();
     bool          auto_mouse_anchored = pointer_layer_policy_auto_mouse_anchored();
     uint8_t       auto_mouse_layer    = get_auto_mouse_layer();
     layer_state_t auto_mouse_mask     = (layer_state_t)1 << auto_mouse_layer;
     bool          auto_mouse_active   = layer_state_cmp(state, auto_mouse_layer);
     bool          nav_active          = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
 
+    // Arrow mode consumes trackball motion as arrows, so keep the keyboard on
+    // the current typing/nav surface instead of forcing the pointer layer back
+    // underneath it. Holding NAV can still expose the pointer-button layout.
+    if (arrow_mode_active && auto_mouse_layer != CHARYBDIS_AUTO_SNIPING_LAYER) {
+        state &= ~auto_mouse_mask;
+        return state;
+    }
+
     // Keep the configured auto-mouse layer alive while anchored. Active pd
     // modes must survive even if QMK drops that layer underneath an LT-held
     // NAV key.
-    if (pd_mode_running || (auto_mouse_anchored && (auto_mouse_layer == CHARYBDIS_AUTO_SNIPING_LAYER || !nav_active))) {
+    if (auto_mouse_anchored && (auto_mouse_layer == CHARYBDIS_AUTO_SNIPING_LAYER || !nav_active)) {
         state |= auto_mouse_mask;
         auto_mouse_active = true;
     }

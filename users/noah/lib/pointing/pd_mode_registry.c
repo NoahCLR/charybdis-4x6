@@ -18,6 +18,10 @@
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static bool scroll_mode_auto_mouse_owned = false;
 
+static inline bool pd_mode_auto_mouse_requires_anchor(pd_mode_mask_t mode) {
+    return mode != PD_MODE_ARROW;
+}
+
 static void pd_mode_auto_mouse_sync_anchor(bool should_anchor) {
     static bool pd_mode_auto_mouse_anchor_active = false;
 
@@ -29,6 +33,30 @@ static void pd_mode_auto_mouse_sync_anchor(bool should_anchor) {
     // an explicit auto-mouse anchor to behave like their physically-held form.
     auto_mouse_keyevent(should_anchor);
     pd_mode_auto_mouse_anchor_active = should_anchor;
+}
+
+static void pd_mode_auto_mouse_activate(pd_mode_mask_t mode, bool was_any_mode_active) {
+    if (mode == PD_MODE_ARROW) {
+        // Arrow mode should fall back to the typing/nav surface immediately
+        // instead of waiting for the auto-mouse timeout to drop the pointer
+        // layer.
+        auto_mouse_layer_off();
+        return;
+    }
+
+    if (!was_any_mode_active && pd_mode_auto_mouse_requires_anchor(mode)) {
+        pd_mode_auto_mouse_sync_anchor(true);
+    }
+}
+
+static void pd_mode_auto_mouse_deactivate(pd_mode_mask_t mode, bool was_any_mode_active) {
+    if (!pd_mode_auto_mouse_requires_anchor(mode)) {
+        return;
+    }
+
+    if (was_any_mode_active && !pd_any_mode_active()) {
+        pd_mode_auto_mouse_sync_anchor(false);
+    }
 }
 
 static void scroll_mode_lock_attach_auto_mouse(void) {
@@ -145,9 +173,7 @@ void pd_mode_activate(pd_mode_mask_t mode) {
     pd_mode_set(mode);
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (!was_any_mode_active) {
-        pd_mode_auto_mouse_sync_anchor(true);
-    }
+    pd_mode_auto_mouse_activate(mode, was_any_mode_active);
 #endif
 
     if (mode == PD_MODE_DRAGSCROLL || mode == PD_MODE_PINCH) {
@@ -167,9 +193,7 @@ void pd_mode_deactivate(pd_mode_mask_t mode) {
     pd_mode_clear(mode);
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (was_any_mode_active && !pd_any_mode_active()) {
-        pd_mode_auto_mouse_sync_anchor(false);
-    }
+    pd_mode_auto_mouse_deactivate(mode, was_any_mode_active);
 #endif
 
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
