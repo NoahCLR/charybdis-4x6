@@ -255,7 +255,7 @@
       "KC_DOWN",
       "KC_LEFT",
       "MACRO(1)",
-      "CUSTOM(84)",
+      "KC_RALT",
       "KC_TRNS",
       "CUSTOM(80)",
       "KC_MS_BTN2",
