@@ -3,10 +3,12 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "rgb_runtime.h"
-#include "../pointing/pd_modes.h"
 #include "rgb_automouse.h"
 #include "rgb_helpers.h"
 
+#if defined(POINTING_DEVICE_ENABLE)
+#    include "../pointing/pd_modes.h"
+#endif
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
 #    include "../key/key_runtime_feedback.h"
 #    include "../state/split_runtime_sync.h"
@@ -14,14 +16,16 @@
 
 // ─── Authored keymap data (defined in rgb_config.c) ──────────────────────
 #ifdef RGB_MATRIX_ENABLE
-extern const hsv_t               layer_colors[];
+extern const hsv_t             layer_colors[];
+extern const layer_led_group_t layer_led_groups[];
+extern const uint8_t           layer_led_group_count;
+#    ifdef POINTING_DEVICE_ENABLE
 extern const pd_mode_color_t     pd_mode_colors[];
 extern const uint8_t             pd_mode_color_count;
-extern const layer_led_group_t   layer_led_groups[];
-extern const uint8_t             layer_led_group_count;
 extern const pd_mode_led_group_t pd_mode_led_groups[];
 extern const uint8_t             pd_mode_led_group_count;
-#    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
+#    endif
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
 extern const hsv_t automouse_color_start;
 extern const hsv_t automouse_color_end;
 #    endif
@@ -40,7 +44,9 @@ extern const hsv_t feedback_long_hold_active_color;
 
 #ifdef RGB_MATRIX_ENABLE
 static rgb_t layer_rgb[LAYER_COUNT];
+#    ifdef POINTING_DEVICE_ENABLE
 static rgb_t pd_mode_rgb[PD_MODE_COUNT];
+#    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static rgb_t feedback_multi_tap_pending_rgb;
 static rgb_t feedback_hold_active_rgb;
@@ -54,6 +60,7 @@ void noah_rgb_runtime_post_init(void) {
         layer_rgb[i] = hsv_to_rgb(layer_colors[i]);
     }
 
+#    ifdef POINTING_DEVICE_ENABLE
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         for (uint8_t c = 0; c < pd_mode_color_count; c++) {
             if (pd_mode_colors[c].mode_flag == pd_modes[i].mode_flag) {
@@ -62,6 +69,7 @@ void noah_rgb_runtime_post_init(void) {
             }
         }
     }
+#    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     feedback_multi_tap_pending_rgb = hsv_to_rgb(feedback_multi_tap_pending_color);
@@ -72,9 +80,11 @@ void noah_rgb_runtime_post_init(void) {
 }
 
 #ifdef RGB_MATRIX_ENABLE
+#    ifdef POINTING_DEVICE_ENABLE
 static bool rgb_runtime_led_range_intersects(uint8_t led_min, uint8_t led_max, uint8_t from, uint8_t to) {
     return led_min < to && led_max > from;
 }
+#    endif
 
 static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count, uint8_t led_min, uint8_t led_max) {
     for (uint8_t i = 0; i < count; i++) {
@@ -87,8 +97,10 @@ static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count,
 }
 
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
     bool layer_painted = false;
-    bool painted       = false;
+#    endif
+    bool painted = false;
 
     for (int8_t i = LAYER_COUNT - 1; i > 0; i--) {
         if (!layer_state_cmp(layer_state, i)) continue;
@@ -97,8 +109,10 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 #    endif
         if (layer_colors[i].s == 0 && layer_colors[i].v == 0) continue;
         rgb_set_both_halves(layer_rgb[i], led_min, led_max);
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
         layer_painted = true;
-        painted       = true;
+#    endif
+        painted = true;
         break;
     }
 
@@ -122,6 +136,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     //
     // Paint active pointer-mode color and groups, then let interaction
     // feedback paint over that when needed.
+#    ifdef POINTING_DEVICE_ENABLE
     uint8_t active_mode = pd_mode_first_active_index();
     if (active_mode < PD_MODE_COUNT) {
         rgb_set_right_half(pd_mode_rgb[active_mode], led_min, led_max);
@@ -135,6 +150,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
             painted |= rgb_runtime_led_group_intersects(pd_mode_led_groups[g].leds, pd_mode_led_groups[g].count, led_min, led_max);
         }
     }
+#    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     // ─── Key behavior feedback ──────────────────────────────────────────

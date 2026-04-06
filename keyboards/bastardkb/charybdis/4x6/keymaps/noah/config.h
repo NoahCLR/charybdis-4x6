@@ -112,8 +112,10 @@ enum charybdis_keymap_layers {
 // Auto-mouse timeout gradient overlay.
 // Fades from white to red as the auto-mouse layer times out.
 // Comment out RGB_AUTOMOUSE_GRADIENT_ENABLE to disable.
-#    define RGB_AUTOMOUSE_GRADIENT_ENABLE
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#        define RGB_AUTOMOUSE_GRADIENT_ENABLE
 // Dead time before the gradient starts animating (first third of the timeout window).
-#    define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3)
+#        define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3)
+#    endif
 
 #endif // RGB_MATRIX_ENABLE
