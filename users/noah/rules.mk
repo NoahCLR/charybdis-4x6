@@ -26,7 +26,6 @@ SRC += lib/key/key_runtime_process.c
 SRC += lib/key/key_runtime_press.c
 SRC += lib/key/key_runtime_release.c
 SRC += lib/key/key_runtime_scan.c
-SRC += lib/key/key_runtime_effects.c
 SRC += lib/key/key_runtime_transition.c
 SRC += lib/key/delayed_action.c
 SRC += lib/key/held_action.c

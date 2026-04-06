@@ -74,7 +74,7 @@ static uint8_t           pd_mode_mapping_count;
 static pd_mode_mask_t    pd_locked_modes;
 static bool              pd_toggle_result;
 
-static bool key_runtime_effects_survives_flush;
+static bool held_action_survives_flush_result;
 
 static test_call_t test_calls[TEST_MAX_CALLS];
 static uint8_t     test_call_count;
@@ -176,7 +176,7 @@ static void test_reset_stubs(void) {
     fake_weak_mods                     = 0;
     fake_oneshot_mods                  = 0;
     fake_oneshot_locked_mods           = 0;
-    key_runtime_effects_survives_flush = false;
+    held_action_survives_flush_result = false;
 
     memset(test_calls, 0, sizeof(test_calls));
     test_call_count = 0;
@@ -292,53 +292,43 @@ bool action_dispatch_is_layer_lock(uint16_t action) {
     return action == TEST_LAYER_LOCK_ACTION;
 }
 
-bool key_runtime_effects_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
-}
-
-void key_runtime_effects_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-}
-
-void key_runtime_effects_dispatch_action(uint16_t action) {
+void action_dispatch(uint16_t action) {
     test_log_call(TEST_CALL_DISPATCH_ACTION, action, test_keypos(0, 0), 0, false, (delayed_action_mods_t){0});
 }
 
-void key_runtime_effects_held_action_register(keypos_t key_pos, uint16_t action) {
+void held_action_register(keypos_t key_pos, uint16_t action) {
     test_log_call(TEST_CALL_HELD_REGISTER, action, key_pos, 0, false, (delayed_action_mods_t){0});
 }
 
-void key_runtime_effects_held_action_unregister(keypos_t key_pos, uint16_t action) {
+void held_action_unregister(keypos_t key_pos, uint16_t action) {
     test_log_call(TEST_CALL_HELD_UNREGISTER, action, key_pos, 0, false, (delayed_action_mods_t){0});
 }
 
-bool key_runtime_effects_held_action_survives_flush(keypos_t key_pos, uint16_t action) {
+bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;
-    return key_runtime_effects_survives_flush;
+    return held_action_survives_flush_result;
 }
 
-bool key_runtime_effects_release_held_action_owned_by_key(keypos_t key_pos) {
+bool held_action_release_owned_by_key(keypos_t key_pos) {
     test_log_call(TEST_CALL_RELEASE_HELD_OWNED_BY_KEY, KC_NO, key_pos, 0, false, (delayed_action_mods_t){0});
     return true;
 }
 
-void key_runtime_effects_layer_press(keypos_t key_pos, uint8_t layer) {
+void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     test_log_call(TEST_CALL_LAYER_PRESS, KC_NO, key_pos, layer, false, (delayed_action_mods_t){0});
 }
 
-void key_runtime_effects_layer_release(keypos_t key_pos) {
+bool layer_ownership_momentary_release(keypos_t key_pos) {
     test_log_call(TEST_CALL_LAYER_RELEASE, KC_NO, key_pos, 0, false, (delayed_action_mods_t){0});
+    return true;
 }
 
-void key_runtime_effects_feedback_pulse_arm(bool long_hold_level) {
+void key_feedback_pulse_arm(bool long_hold_level) {
     test_log_call(TEST_CALL_FEEDBACK_PULSE, KC_NO, test_keypos(0, 0), 0, long_hold_level, (delayed_action_mods_t){0});
 }
 
-void key_runtime_effects_sync_split_runtime(void) {
+void split_runtime_sync(void) {
     test_log_call(TEST_CALL_SYNC_SPLIT_RUNTIME, KC_NO, test_keypos(0, 0), 0, false, (delayed_action_mods_t){0});
 }
 

@@ -9,6 +9,7 @@
 #include "key_runtime_state.h"
 #include "../action/action_dispatch.h"
 #include "../pointing/pd_modes.h"
+#include "held_action.h"
 
 uint8_t behavior_get_layer(uint16_t keycode) {
     return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
@@ -24,6 +25,17 @@ static bool key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs) {
 
 bool active_key_matches(uint16_t keycode, keypos_t key_pos) {
     return active_key.keycode == keycode && key_runtime_keypos_equal(active_key.key_pos, key_pos);
+}
+
+bool key_runtime_activate_pending_fallback_hold(void) {
+    if (!active_key.fallback_hold_pending || active_key.held_action_keycode != KC_NO || active_key.keycode == KC_NO) {
+        return false;
+    }
+
+    held_action_register(active_key.key_pos, active_key.keycode);
+    active_key.held_action_keycode = active_key.keycode;
+    active_key.hold_fired          = true;
+    return true;
 }
 
 void active_key_reset(void) {

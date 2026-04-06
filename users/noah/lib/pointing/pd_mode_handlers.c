@@ -5,7 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "../action/synthetic_record.h"
-#include "../key/key_runtime_effects.h"
+#include "../key/key_runtime_state.h"
 #include "../state/keyboard_mod_ownership.h"
 #include "../state/keyboard_mod_state.h"
 #include "pd_mode_handlers.h"
@@ -26,7 +26,7 @@ typedef struct {
 #    define ARROW_VERTICAL_MASKED_MODS (MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_RIGHT_ALT))
 
 static void pd_mode_tap_code(uint16_t keycode) {
-    key_runtime_effects_activate_pending_fallback_hold();
+    key_runtime_activate_pending_fallback_hold();
     noah_dispatch_synthetic_qmk_tap(keycode);
 }
 
@@ -39,7 +39,7 @@ static keyboard_mod_state_t keyboard_mod_state_without_mods(keyboard_mod_state_t
 }
 
 static void arrow_vertical_tap_code(uint16_t keycode) {
-    key_runtime_effects_activate_pending_fallback_hold();
+    key_runtime_activate_pending_fallback_hold();
 
     keyboard_mod_state_t saved    = keyboard_mod_state_suspend();
     keyboard_mod_state_t filtered = keyboard_mod_state_without_mods(saved, ARROW_VERTICAL_MASKED_MODS);

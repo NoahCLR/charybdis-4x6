@@ -5,7 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "delayed_action.h"
-#include "key_runtime_effects.h"
+#include "../action/action_dispatch.h"
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
     return (delayed_action_mods_t){
@@ -21,7 +21,7 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
 
     keyboard_mod_state_apply(mods);
 
-    key_runtime_effects_dispatch_action(action);
+    action_dispatch(action);
 
     keyboard_mod_state_apply(saved);
 }

@@ -8,12 +8,14 @@
 #    include "print.h"
 #endif
 
-#include "key_runtime_effects.h"
 #include "key_runtime_feedback.h"
 #include "key_runtime_state.h"
 #include "../action/action_dispatch.h"
 #include "../action/action_lifecycle.h"
 #include "../pointing/pd_modes.h"
+#include "../state/layer_ownership.h"
+#include "../state/split_runtime_sync.h"
+#include "held_action.h"
 
 typedef enum {
     HOLD_THRESHOLD_DISPATCH_NONE = 0,
@@ -191,29 +193,29 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 
         switch (effect->kind) {
             case KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION:
-                key_runtime_effects_dispatch_action(effect->data.action);
+                action_dispatch(effect->data.action);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER:
-                key_runtime_effects_held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
+                held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER:
-                key_runtime_effects_held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
+                held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_HELD_ACTION_OWNED_BY_KEY:
-                key_runtime_effects_release_held_action_owned_by_key(effect->data.key_pos);
+                held_action_release_owned_by_key(effect->data.key_pos);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_PRESS:
-                key_runtime_effects_layer_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
+                layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE:
-                key_runtime_effects_layer_release(effect->data.key_pos);
+                layer_ownership_momentary_release(effect->data.key_pos);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE:
-                key_runtime_effects_feedback_pulse_arm(effect->data.long_hold_level);
+                key_feedback_pulse_arm(effect->data.long_hold_level);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_PD_MODE_LOCK_TAP:
                 if (pd_mode_toggle_lock_state(effect->data.pd_mode)) {
-                    key_runtime_effects_sync_split_runtime();
+                    split_runtime_sync();
                 }
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION:

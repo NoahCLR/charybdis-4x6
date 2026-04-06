@@ -157,7 +157,7 @@ bool multi_tap_active(const multi_tap_t *mt) {
 }
 
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
-    plan->count = 0;
+    *plan = (key_runtime_transition_plan_t){0};
 }
 
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan) {
@@ -183,23 +183,19 @@ bool is_pd_mode_lock_action(uint16_t action) {
     return false;
 }
 
-void key_runtime_effects_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
+void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
     tracked_physical_event = true;
 }
 
-bool key_runtime_effects_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
+bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
     return suppress_default;
 }
 
-bool key_runtime_effects_activate_pending_fallback_hold(void) {
-    return false;
-}
-
-void key_runtime_effects_dispatch_action(uint16_t action) {
+void action_dispatch(uint16_t action) {
     (void)action;
 }
 
