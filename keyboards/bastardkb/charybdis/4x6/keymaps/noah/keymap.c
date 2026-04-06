@@ -284,15 +284,12 @@ const key_behavior_t
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
 
             // Typing-layer pointer buttons to support arrowmode
-            {.keycode = KC_M, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN1)}}},
-            {.keycode = KC_COMM, .tap_counts = {[0] = {.long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN2)}}},
-            {.keycode = KC_K, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN3)}}},
-            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
+            {.keycode = KC_RIGHT_ALT, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
 
             // Arrows — release-based hold plus immediate long hold
             {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
             {.keycode = KC_RIGHT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))}}},
-            kunnen we nu ge ja we kunnen nu gewoon snel ieta aanpassen typen
+
             // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
             {
                 .keycode = LEFT_THUMB,
@@ -437,7 +434,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
             KC_LEFT_SHIFT,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,        PINCH_MODE,           MS_BTN3,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        ARROW_MODE,
+                  _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,        _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                      KC_LEFT_GUI,  LT(LAYER_NUM,KC_SPC),         _______,              _______,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
