@@ -279,7 +279,7 @@ static bool key_runtime_transition_release_is_interrupted_layer_tap(active_key_s
     return behavior.is_momentary_layer && released_key.layer_interrupted;
 }
 
-static bool key_runtime_transition_release_is_passthrough_modifier_tap(active_key_state_t released_key) {
+static bool key_runtime_transition_release_is_buffered_base_tap(active_key_state_t released_key) {
     return released_key.fallback_hold_pending && released_key.tap_action == KC_NO && released_key.held_action_keycode == KC_NO;
 }
 
@@ -331,7 +331,7 @@ static active_key_release_resolution_t key_runtime_transition_resolve_active_key
         return resolution;
     }
 
-    if (key_runtime_transition_release_is_passthrough_modifier_tap(released_key)) {
+    if (key_runtime_transition_release_is_buffered_base_tap(released_key)) {
         resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_TAP;
         return resolution;
     }

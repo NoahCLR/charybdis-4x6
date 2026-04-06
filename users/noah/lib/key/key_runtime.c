@@ -68,7 +68,7 @@ static bool key_runtime_keycode_is_pure_modifier(uint16_t keycode) {
     }
 }
 
-static bool handled_key_uses_passthrough_modifier_single_step(handled_key_view_t key) {
+static bool handled_key_uses_buffered_modifier_single_step(handled_key_view_t key) {
     if (key.behavior.single.tap.present || key.behavior.single.hold.present || key.behavior.single.long_hold.present || key.behavior.is_momentary_layer) {
         return false;
     }
@@ -115,7 +115,7 @@ hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
 uint16_t handled_key_tap_action(handled_key_view_t key) {
     if (key.behavior.single.tap.present) return key.behavior.single.tap.action;
     if (pd_mode_for_keycode(key.behavior.keycode)) return KC_NO;
-    if (handled_key_uses_passthrough_modifier_single_step(key)) return KC_NO;
+    if (handled_key_uses_buffered_modifier_single_step(key)) return KC_NO;
     if (key.behavior.is_layer_tap) return QK_LAYER_TAP_GET_TAP_KEYCODE(key.behavior.keycode);
     if (key.behavior.is_momentary_layer) return KC_NO;
     if (key.behavior.keycode >= SAFE_RANGE) return KC_NO;

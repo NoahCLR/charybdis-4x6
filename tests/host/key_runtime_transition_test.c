@@ -9,6 +9,7 @@
 #include "users/noah/lib/key/key_runtime_transition.h"
 
 enum {
+    TEST_PLAIN_KEY            = 0x0004,
     TEST_MULTI_TAP_KEY        = SAFE_RANGE + 0x10,
     TEST_PD_MODE_KEY          = SAFE_RANGE + 0x11,
     TEST_PREVIOUS_KEY         = SAFE_RANGE + 0x12,
@@ -572,7 +573,37 @@ static void test_single_tap_override_long_release_does_not_dispatch_tap(void) {
     CHECK(test_call_count == 0);
 }
 
-static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
+static void test_non_modifier_single_tap_override_activates_fallback_hold_at_threshold(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   press_record = test_record(test_keypos(4, 6), true);
+    handled_key_view_t            key          = test_handled_key(TEST_PLAIN_KEY);
+
+    test_reset_stubs();
+    key.behavior.single.tap = (tap_behavior_t)TAP_SENDS(TEST_FALLBACK_TAP_ACTION);
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(TEST_PLAIN_KEY, &press_record, key, false, &plan));
+
+    CHECK(plan.count == 0);
+    CHECK(active_key.fallback_hold_pending);
+    CHECK(active_key.tap_action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(active_key.held_action_keycode == KC_NO);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 10);
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 1);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
+    CHECK(plan.effects[0].data.held_action.key_pos.row == press_record.event.key.row);
+    CHECK(plan.effects[0].data.held_action.key_pos.col == press_record.event.key.col);
+    CHECK(plan.effects[0].data.held_action.action == TEST_PLAIN_KEY);
+    CHECK(active_key.held_action_keycode == TEST_PLAIN_KEY);
+    CHECK(active_key.hold_fired);
+}
+
+    static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
     key_runtime_transition_plan_t plan;
     keyrecord_t                   press_record_1   = test_record(test_keypos(4, 4), true);
     keyrecord_t                   release_record_1 = test_record(test_keypos(4, 4), false);
@@ -951,6 +982,7 @@ int main(void) {
     test_modifier_multi_tap_first_tap_is_buffered();
     test_single_tap_override_activates_fallback_hold_at_threshold();
     test_single_tap_override_long_release_does_not_dispatch_tap();
+    test_non_modifier_single_tap_override_activates_fallback_hold_at_threshold();
     test_modifier_multi_tap_second_tap_dispatches_action();
     test_interrupted_momentary_layer_release_only_releases_layer();
     test_release_hold_prefers_long_hold_after_longer_term();
