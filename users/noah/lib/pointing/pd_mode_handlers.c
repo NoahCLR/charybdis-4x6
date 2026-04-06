@@ -23,9 +23,30 @@ typedef struct {
     int8_t  last_dir;
 } pd_mode_axis_state_t;
 
+#    define ARROW_VERTICAL_MASKED_MODS (MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_RIGHT_ALT))
+
 static void pd_mode_tap_code(uint16_t keycode) {
     key_runtime_effects_activate_pending_fallback_hold();
     noah_dispatch_synthetic_qmk_tap(keycode);
+}
+
+static keyboard_mod_state_t keyboard_mod_state_without_mods(keyboard_mod_state_t state, uint8_t mods) {
+    state.real &= (uint8_t)~mods;
+    state.weak &= (uint8_t)~mods;
+    state.oneshot &= (uint8_t)~mods;
+    state.oneshot_locked &= (uint8_t)~mods;
+    return state;
+}
+
+static void arrow_vertical_tap_code(uint16_t keycode) {
+    key_runtime_effects_activate_pending_fallback_hold();
+
+    keyboard_mod_state_t saved    = keyboard_mod_state_suspend();
+    keyboard_mod_state_t filtered = keyboard_mod_state_without_mods(saved, ARROW_VERTICAL_MASKED_MODS);
+
+    keyboard_mod_state_apply(filtered);
+    noah_dispatch_synthetic_qmk_tap(keycode);
+    keyboard_mod_state_apply(saved);
 }
 
 static void pd_mode_axis_reset(pd_mode_axis_state_t *state) {
@@ -161,7 +182,7 @@ report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
             pd_mode_axis_reset(&arrow_y_axis);
         }
     } else {
-        pd_mode_axis_emit(&arrow_y_axis, dy, KC_DOWN, KC_UP, ARROW_THRESHOLD_Y, pd_mode_tap_code);
+        pd_mode_axis_emit(&arrow_y_axis, dy, KC_DOWN, KC_UP, ARROW_THRESHOLD_Y, arrow_vertical_tap_code);
 
         if (dx != 0) {
             pd_mode_axis_reset(&arrow_x_axis);
