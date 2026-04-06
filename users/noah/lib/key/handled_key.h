@@ -15,6 +15,7 @@ typedef struct {
 
 handled_key_view_t handled_key_lookup(uint16_t keycode);
 bool               handled_key_uses_implicit_hold(handled_key_view_t key);
+bool               handled_key_uses_fallback_hold(handled_key_view_t key);
 hold_behavior_t    handled_key_single_hold(handled_key_view_t key);
 uint16_t           handled_key_tap_action(handled_key_view_t key);
 bool               handled_key_multi_tap_repress(handled_key_view_t key, uint16_t keycode);

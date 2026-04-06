@@ -26,7 +26,7 @@ typedef struct {
     uint16_t        multi_tap_term;
     bool            hold_one_shot_fired;
     bool            implicit_hold;
-    bool            passthrough_modifier_pending;
+    bool            fallback_hold_pending;
     bool            pd_mode_was_locked_on_press;
     bool            layer_interrupted;
     hold_behavior_t hold;

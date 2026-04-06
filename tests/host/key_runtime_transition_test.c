@@ -292,6 +292,11 @@ bool action_dispatch_is_layer_action(uint16_t action) {
     return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
 }
 
+bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
+    (void)action;
+    return false;
+}
+
 bool action_dispatch_is_layer_lock(uint16_t action) {
     return action == TEST_LAYER_LOCK_ACTION;
 }
@@ -498,7 +503,7 @@ static void test_modifier_multi_tap_first_tap_is_buffered(void) {
     CHECK(plan.count == 0);
     CHECK(active_key.keycode == KC_RIGHT_ALT);
     CHECK(!active_key.implicit_hold);
-    CHECK(active_key.passthrough_modifier_pending);
+    CHECK(active_key.fallback_hold_pending);
     CHECK(!active_key.hold.present);
     CHECK(active_key.tap_action == KC_NO);
 
@@ -512,6 +517,58 @@ static void test_modifier_multi_tap_first_tap_is_buffered(void) {
     CHECK(multi_tap.keycode == KC_RIGHT_ALT);
     CHECK(multi_tap.count == 1);
     CHECK(multi_tap.single_action == KC_NO);
+    CHECK(test_call_count == 0);
+}
+
+static void test_single_tap_override_activates_fallback_hold_at_threshold(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   press_record = test_record(test_keypos(4, 5), true);
+    handled_key_view_t            key          = test_handled_key(KC_RIGHT_ALT);
+
+    test_reset_stubs();
+    key.behavior.single.tap = (tap_behavior_t)TAP_SENDS(TEST_FALLBACK_TAP_ACTION);
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record, key, false, &plan));
+
+    CHECK(plan.count == 0);
+    CHECK(active_key.fallback_hold_pending);
+    CHECK(active_key.tap_action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(active_key.held_action_keycode == KC_NO);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 10);
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 1);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
+    CHECK(plan.effects[0].data.held_action.key_pos.row == press_record.event.key.row);
+    CHECK(plan.effects[0].data.held_action.key_pos.col == press_record.event.key.col);
+    CHECK(plan.effects[0].data.held_action.action == KC_RIGHT_ALT);
+    CHECK(active_key.held_action_keycode == KC_RIGHT_ALT);
+    CHECK(active_key.hold_fired);
+}
+
+static void test_single_tap_override_long_release_does_not_dispatch_tap(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   press_record   = test_record(test_keypos(4, 5), true);
+    keyrecord_t                   release_record = test_record(test_keypos(4, 5), false);
+    handled_key_view_t            key            = test_handled_key(KC_RIGHT_ALT);
+
+    test_reset_stubs();
+    key.behavior.single.tap = (tap_behavior_t)TAP_SENDS(TEST_FALLBACK_TAP_ACTION);
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record, key, false, &plan));
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 10);
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_release(KC_RIGHT_ALT, &release_record, key, &plan));
+
+    CHECK(plan.count == 0);
+    CHECK(active_key.keycode == KC_NO);
     CHECK(test_call_count == 0);
 }
 
@@ -892,6 +949,8 @@ int main(void) {
     test_quick_release_locked_pd_mode_queues_lock_tap();
     test_quick_release_immediate_hold_unregisters_then_taps();
     test_modifier_multi_tap_first_tap_is_buffered();
+    test_single_tap_override_activates_fallback_hold_at_threshold();
+    test_single_tap_override_long_release_does_not_dispatch_tap();
     test_modifier_multi_tap_second_tap_dispatches_action();
     test_interrupted_momentary_layer_release_only_releases_layer();
     test_release_hold_prefers_long_hold_after_longer_term();

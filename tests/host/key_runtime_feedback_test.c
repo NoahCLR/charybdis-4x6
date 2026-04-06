@@ -72,13 +72,13 @@ static void test_non_passthrough_held_action_flashes(void) {
     CHECK(key_feedback_flags_level_flash(flags));
 }
 
-static void test_passthrough_modifier_hold_has_no_hold_feedback(void) {
+static void test_fallback_hold_has_no_hold_feedback(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode                       = KC_RIGHT_ALT,
-        .held_action_keycode           = KC_RIGHT_ALT,
-        .passthrough_modifier_pending  = true,
+        .keycode               = KC_RIGHT_ALT,
+        .held_action_keycode   = KC_RIGHT_ALT,
+        .fallback_hold_pending = true,
     };
 
     uint8_t flags = key_feedback_pack();
@@ -87,7 +87,7 @@ static void test_passthrough_modifier_hold_has_no_hold_feedback(void) {
 
 int main(void) {
     test_non_passthrough_held_action_flashes();
-    test_passthrough_modifier_hold_has_no_hold_feedback();
+    test_fallback_hold_has_no_hold_feedback();
 
     puts("key_runtime_feedback host tests passed");
     return 0;

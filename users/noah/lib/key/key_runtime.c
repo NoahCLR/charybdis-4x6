@@ -7,6 +7,7 @@
 
 #include "handled_key.h"
 #include "key_runtime_state.h"
+#include "../action/action_dispatch.h"
 #include "../pointing/pd_modes.h"
 
 uint8_t behavior_get_layer(uint16_t keycode) {
@@ -77,6 +78,22 @@ static bool handled_key_uses_passthrough_modifier_single_step(handled_key_view_t
 
 bool handled_key_uses_implicit_hold(handled_key_view_t key) {
     return pd_mode_for_keycode(key.behavior.keycode) != 0;
+}
+
+bool handled_key_uses_fallback_hold(handled_key_view_t key) {
+    if (key.behavior.is_momentary_layer || key.behavior.keycode >= SAFE_RANGE) {
+        return false;
+    }
+
+    if (action_dispatch_is_qmk_behavior_keycode(key.behavior.keycode)) {
+        return false;
+    }
+
+    if (key.behavior.single.hold.present || key.behavior.single.long_hold.present) {
+        return false;
+    }
+
+    return key.behavior.single.tap.present || key.behavior.has_multi_tap;
 }
 
 hold_behavior_t handled_key_single_hold(handled_key_view_t key) {

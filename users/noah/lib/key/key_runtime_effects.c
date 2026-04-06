@@ -20,13 +20,14 @@ void key_runtime_effects_track_physical_keycode_event(uint16_t keycode, keyrecor
     keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
 }
 
-bool key_runtime_effects_activate_pending_passthrough_modifier(void) {
-    if (!active_key.passthrough_modifier_pending || active_key.held_action_keycode != KC_NO || active_key.keycode == KC_NO) {
+bool key_runtime_effects_activate_pending_fallback_hold(void) {
+    if (!active_key.fallback_hold_pending || active_key.held_action_keycode != KC_NO || active_key.keycode == KC_NO) {
         return false;
     }
 
     held_action_register(active_key.key_pos, active_key.keycode);
     active_key.held_action_keycode = active_key.keycode;
+    active_key.hold_fired          = true;
     return true;
 }
 

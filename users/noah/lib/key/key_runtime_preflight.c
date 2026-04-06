@@ -27,7 +27,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.pressed && active_key.keycode != KC_NO && !active_key_matches(keycode, record->event.key)) {
-        key_runtime_effects_activate_pending_passthrough_modifier();
+        key_runtime_effects_activate_pending_fallback_hold();
 
         if (is_layer_key(active_key.keycode)) {
             active_key.layer_interrupted = true;

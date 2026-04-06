@@ -16,7 +16,7 @@
 
 bool key_runtime_effects_should_suppress_default(uint16_t keycode, keyrecord_t *record);
 void key_runtime_effects_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record);
-bool key_runtime_effects_activate_pending_passthrough_modifier(void);
+bool key_runtime_effects_activate_pending_fallback_hold(void);
 
 void key_runtime_effects_dispatch_action(uint16_t action);
 

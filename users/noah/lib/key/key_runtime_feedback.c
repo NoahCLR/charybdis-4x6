@@ -56,9 +56,9 @@ uint8_t key_feedback_pack(void) {
         return flags;
     }
 
-    // Buffered modifier passthrough is an internal runtime convenience, not an
-    // authored hold surface. Do not advertise it as a flashing hold action.
-    if (active_key.passthrough_modifier_pending) {
+    // Fallback base holds are internal runtime glue for "tap override, normal
+    // hold" semantics. They are not authored hold surfaces, so keep RGB quiet.
+    if (active_key.fallback_hold_pending) {
         return flags;
     }
 

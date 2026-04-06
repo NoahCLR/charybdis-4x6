@@ -66,6 +66,8 @@ typedef struct {
 // tap:
 //   What happens on a quick release.
 //   If omitted, the key keeps its normal tap behavior for that step.
+//   If present but hold/long_hold are both omitted, holding past the tap
+//   threshold falls back to the key's normal held behavior.
 //
 // hold:
 //   What happens after the first hold threshold.

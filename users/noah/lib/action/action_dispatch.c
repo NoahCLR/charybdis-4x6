@@ -35,6 +35,6 @@ bool action_dispatch_layer_is_locked(uint8_t layer) {
 }
 
 void action_dispatch(uint16_t action) {
-    key_runtime_effects_activate_pending_passthrough_modifier();
+    key_runtime_effects_activate_pending_fallback_hold();
     noah_action_tap(action);
 }

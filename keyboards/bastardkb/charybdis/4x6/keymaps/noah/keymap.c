@@ -176,6 +176,8 @@ enum keymap_custom_keycodes {
 //   - this means single taps on multi-tap keys are delayed by .multi_tap_term
 //
 // omit .tap to keep the key's normal tap behavior for that step
+// if .tap is set but hold/long_hold are omitted, holding past tap_hold_term
+// falls back to the key's normal held behavior
 // .hold and .long_hold are independent: define either one by itself, or use
 // both together for a two-stage hold
 //

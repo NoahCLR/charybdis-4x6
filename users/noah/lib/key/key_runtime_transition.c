@@ -41,6 +41,7 @@ typedef struct {
     bool                    commit_immediate_hold;
     bool                    immediate_hold_needs_feedback;
     bool                    immediate_hold_completes_hold;
+    bool                    activate_fallback_hold;
     active_key_scan_outcome_t outcome;
     hold_behavior_t         hold;
     hold_behavior_t         long_hold;
@@ -253,7 +254,7 @@ bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *rec
     key_runtime_transition_flush_active_key(active_held_action_survives_flush, plan);
     active_key_track(keycode, record->event.key, handled_key_tap_action(key), hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false);
     active_key.implicit_hold = implicit;
-    active_key.passthrough_modifier_pending = !implicit && handled_key_tap_action(key) == KC_NO && behavior.has_multi_tap && keycode < SAFE_RANGE && hold.action == KC_NO;
+    active_key.fallback_hold_pending = !implicit && handled_key_uses_fallback_hold(key);
     active_key.pd_mode_was_locked_on_press = mode && pd_mode_locked(mode);
     key_runtime_transition_activate_immediate_hold_if_needed(record, hold, plan);
     return true;
@@ -279,7 +280,7 @@ static bool key_runtime_transition_release_is_interrupted_layer_tap(active_key_s
 }
 
 static bool key_runtime_transition_release_is_passthrough_modifier_tap(active_key_state_t released_key) {
-    return released_key.passthrough_modifier_pending && released_key.held_action_keycode == KC_NO;
+    return released_key.fallback_hold_pending && released_key.tap_action == KC_NO && released_key.held_action_keycode == KC_NO;
 }
 
 static bool key_runtime_transition_release_is_quick_tap(active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed) {
@@ -343,6 +344,10 @@ static active_key_release_resolution_t key_runtime_transition_resolve_active_key
         }
 
         resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_TAP;
+        return resolution;
+    }
+
+    if (released_key.fallback_hold_pending) {
         return resolution;
     }
 
@@ -579,6 +584,11 @@ static active_key_scan_resolution_t key_runtime_transition_resolve_active_key_sc
         resolution.immediate_hold_completes_hold = !active_key_state.long_hold.present;
     }
 
+    if (active_key_state.fallback_hold_pending && active_key_state.held_action_keycode == KC_NO && elapsed >= active_key_state.tap_hold_term) {
+        resolution.activate_fallback_hold = true;
+        return resolution;
+    }
+
     if (hold_fires_at_threshold(active_key_state.long_hold) && elapsed >= active_key_state.longer_hold_term) {
         resolution.outcome   = ACTIVE_KEY_SCAN_OUTCOME_PROMOTE_LONG_HOLD;
         resolution.long_hold = active_key_state.long_hold;
@@ -603,6 +613,13 @@ static void key_runtime_transition_apply_active_key_scan_resolution(active_key_s
         if (resolution.immediate_hold_completes_hold) {
             active_key.hold_fired = true;
         }
+    }
+
+    if (resolution.activate_fallback_hold) {
+        key_runtime_transition_plan_held_register(plan, active_key.key_pos, active_key.keycode);
+        active_key.held_action_keycode = active_key.keycode;
+        active_key.hold_fired          = true;
+        return;
     }
 
     switch (resolution.outcome) {
