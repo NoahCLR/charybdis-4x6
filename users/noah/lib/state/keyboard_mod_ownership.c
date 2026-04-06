@@ -2,6 +2,10 @@
 // Keyboard Modifier Ownership
 // ────────────────────────────────────────────────────────────────────────────
 
+#ifdef CONSOLE_ENABLE
+#    include "print.h"
+#endif
+
 #include "keyboard_mod_ownership.h"
 
 static const uint8_t keyboard_mod_ownership_mod_masks[8] = {
@@ -41,6 +45,49 @@ static int8_t keyboard_mod_ownership_index_for_keycode(uint16_t keycode) {
 static uint8_t keyboard_mod_ownership_physical_refcounts[8] = {0};
 static uint8_t keyboard_mod_ownership_managed_refcounts[8]  = {0};
 
+#ifndef KEYBOARD_MOD_OWNERSHIP_MANAGED_DRIFT_WARN_THRESHOLD
+#    define KEYBOARD_MOD_OWNERSHIP_MANAGED_DRIFT_WARN_THRESHOLD 8u
+#endif
+
+static void keyboard_mod_ownership_validate_state(const char *context) {
+#ifdef CONSOLE_ENABLE
+    static uint8_t keyboard_mod_ownership_warned_state[8] = {0};
+
+    enum {
+        KEYBOARD_MOD_OWNERSHIP_WARNING_NONE      = 0,
+        KEYBOARD_MOD_OWNERSHIP_WARNING_DRIFT     = 1u << 0,
+        KEYBOARD_MOD_OWNERSHIP_WARNING_STUCK_BIT = 1u << 1,
+    };
+
+    uint8_t report_mods = get_mods();
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
+        uint8_t warnings = KEYBOARD_MOD_OWNERSHIP_WARNING_NONE;
+
+        if (keyboard_mod_ownership_managed_refcounts[i] > keyboard_mod_ownership_physical_refcounts[i] + KEYBOARD_MOD_OWNERSHIP_MANAGED_DRIFT_WARN_THRESHOLD) {
+            warnings |= KEYBOARD_MOD_OWNERSHIP_WARNING_DRIFT;
+        }
+
+        if (keyboard_mod_ownership_managed_refcounts[i] == 0 && keyboard_mod_ownership_physical_refcounts[i] == 0 && (report_mods & keyboard_mod_ownership_mod_masks[i]) != 0) {
+            warnings |= KEYBOARD_MOD_OWNERSHIP_WARNING_STUCK_BIT;
+        }
+
+        if (warnings == keyboard_mod_ownership_warned_state[i]) {
+            continue;
+        }
+
+        keyboard_mod_ownership_warned_state[i] = warnings;
+        if (warnings == KEYBOARD_MOD_OWNERSHIP_WARNING_NONE) {
+            continue;
+        }
+
+        uprintf("Keyboard mod ownership warning after %s: index=%u mask=0x%02X physical=%u managed=%u report=0x%02X flags=0x%02X\n", context, (unsigned int)i, (unsigned int)keyboard_mod_ownership_mod_masks[i], (unsigned int)keyboard_mod_ownership_physical_refcounts[i], (unsigned int)keyboard_mod_ownership_managed_refcounts[i], (unsigned int)report_mods, (unsigned int)warnings);
+    }
+#else
+    (void)context;
+#endif
+}
+
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     int8_t index = keyboard_mod_ownership_index_for_keycode(keycode);
 
@@ -55,6 +102,8 @@ void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyre
     } else if (keyboard_mod_ownership_physical_refcounts[index] > 0) {
         keyboard_mod_ownership_physical_refcounts[index]--;
     }
+
+    keyboard_mod_ownership_validate_state("track_physical_keycode_event");
 }
 
 bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
@@ -64,6 +113,7 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
         return false;
     }
 
+    keyboard_mod_ownership_validate_state("should_suppress_default");
     return keyboard_mod_ownership_managed_refcounts[index] > 0;
 }
 
@@ -96,6 +146,8 @@ void keyboard_mod_ownership_register_mods(uint8_t mods) {
     if (report_needed) {
         send_keyboard_report();
     }
+
+    keyboard_mod_ownership_validate_state("register_mods");
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
@@ -120,6 +172,8 @@ void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
     if (report_needed) {
         send_keyboard_report();
     }
+
+    keyboard_mod_ownership_validate_state("unregister_mods");
 }
 
 void keyboard_mod_ownership_register(uint16_t keycode) {

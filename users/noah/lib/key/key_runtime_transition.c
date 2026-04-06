@@ -4,6 +4,10 @@
 
 #include "key_runtime_transition.h"
 
+#ifdef CONSOLE_ENABLE
+#    include "print.h"
+#endif
+
 #include "key_runtime_effects.h"
 #include "key_runtime_feedback.h"
 #include "key_runtime_state.h"
@@ -66,9 +70,24 @@ void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     *plan = (key_runtime_transition_plan_t){0};
 }
 
+static void key_runtime_transition_log_plan_overflow(key_runtime_transition_effect_kind_t kind, uint8_t capacity) {
+#ifdef CONSOLE_ENABLE
+    uprintf("Key runtime transition plan overflow dropping effect kind %u after %u queued effects\n", (unsigned int)kind, (unsigned int)capacity);
+#else
+    (void)kind;
+    (void)capacity;
+#endif
+}
+
 static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan, key_runtime_transition_effect_t effect) {
     if (plan->count < ARRAY_SIZE(plan->effects)) {
         plan->effects[plan->count++] = effect;
+        return;
+    }
+
+    if (!plan->overflowed) {
+        plan->overflowed = true;
+        key_runtime_transition_log_plan_overflow(effect.kind, ARRAY_SIZE(plan->effects));
     }
 }
 
@@ -154,6 +173,16 @@ static void key_runtime_transition_plan_delayed_action(key_runtime_transition_pl
                                                     .repeat_count = repeat_count,
                                                 },
                                         });
+}
+
+static void key_runtime_transition_activate_pending_fallback_hold(key_runtime_transition_plan_t *plan) {
+    if (!active_key.fallback_hold_pending || active_key.held_action_keycode != KC_NO || active_key.keycode == KC_NO) {
+        return;
+    }
+
+    key_runtime_transition_plan_held_register(plan, active_key.key_pos, active_key.keycode);
+    active_key.held_action_keycode = active_key.keycode;
+    active_key.hold_fired          = true;
 }
 
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan) {
@@ -425,6 +454,18 @@ void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan)
     key_runtime_transition_flush_multi_tap_impl(plan);
 }
 
+void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_transition_plan_t *plan) {
+    if (active_key.keycode == KC_NO) {
+        return;
+    }
+
+    key_runtime_transition_activate_pending_fallback_hold(plan);
+
+    if (is_layer_key(active_key.keycode)) {
+        active_key.layer_interrupted = true;
+    }
+}
+
 static bool key_runtime_transition_pending_multi_tap_release_uses_held_lifecycle(hold_behavior_t hold, uint16_t action, uint8_t repeat_count, uint16_t elapsed) {
     if (repeat_count != 1 || elapsed < active_key.tap_hold_term) {
         return false;
@@ -616,9 +657,7 @@ static void key_runtime_transition_apply_active_key_scan_resolution(active_key_s
     }
 
     if (resolution.activate_fallback_hold) {
-        key_runtime_transition_plan_held_register(plan, active_key.key_pos, active_key.keycode);
-        active_key.held_action_keycode = active_key.keycode;
-        active_key.hold_fired          = true;
+        key_runtime_transition_activate_pending_fallback_hold(plan);
         return;
     }
 

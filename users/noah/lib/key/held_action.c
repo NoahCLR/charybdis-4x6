@@ -26,10 +26,15 @@ typedef struct {
     uint16_t action;
 } held_action_binding_t;
 
-#define HELD_ACTION_BINDING_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
+#ifndef HELD_ACTION_BINDING_MAX_CAPACITY
+#    define HELD_ACTION_BINDING_MAX_CAPACITY 16u
+#endif
 
-// Per-key ownership tracking needs enough room for every physical switch on
-// the board, otherwise larger chords silently degrade into raw dispatch.
+#define HELD_ACTION_BINDING_CAPACITY ((uint16_t)(((MATRIX_ROWS * MATRIX_COLS) < HELD_ACTION_BINDING_MAX_CAPACITY) ? (MATRIX_ROWS * MATRIX_COLS) : HELD_ACTION_BINDING_MAX_CAPACITY))
+
+// Real key-rollover on this board never approaches total matrix size. Keep a
+// bounded ownership table and fall back to raw dispatch with a console warning
+// if an unusually large chord exhausts it.
 static held_modifier_binding_t held_modifiers[HELD_ACTION_BINDING_CAPACITY] = {0};
 static uint8_t                 held_modifier_refcounts[8]                   = {0};
 static held_action_binding_t   held_actions[HELD_ACTION_BINDING_CAPACITY]   = {0};

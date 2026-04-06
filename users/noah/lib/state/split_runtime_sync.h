@@ -20,6 +20,8 @@ typedef struct __attribute__((packed)) {
     uint8_t  key_feedback_flags;
 } split_runtime_sync_packet_t;
 
+_Static_assert(sizeof(split_runtime_sync_packet_t) <= UINT8_MAX, "split_runtime_sync_packet_t must fit in the QMK RPC length field");
+
 #if defined(SPLIT_TRANSACTION_IDS_USER)
 
 extern split_runtime_sync_packet_t split_runtime_sync_remote;

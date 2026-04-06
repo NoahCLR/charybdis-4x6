@@ -2,6 +2,10 @@
 // Layer Ownership
 // ────────────────────────────────────────────────────────────────────────────
 
+#ifdef CONSOLE_ENABLE
+#    include "print.h"
+#endif
+
 #include "layer_ownership.h"
 
 #include "noah_keymap.h"
@@ -12,12 +16,27 @@ typedef struct {
     uint8_t  layer;
 } layer_momentary_binding_t;
 
-static layer_momentary_binding_t layer_momentary_bindings[MATRIX_ROWS * MATRIX_COLS] = {0};
-static uint8_t                   layer_momentary_refcounts[LAYER_COUNT]               = {0};
-static uint8_t                   layer_locked_state                                    = UINT8_MAX;
+#ifndef LAYER_OWNERSHIP_BINDING_MAX_CAPACITY
+#    define LAYER_OWNERSHIP_BINDING_MAX_CAPACITY 16u
+#endif
+
+#define LAYER_OWNERSHIP_BINDING_CAPACITY ((uint16_t)(((MATRIX_ROWS * MATRIX_COLS) < LAYER_OWNERSHIP_BINDING_MAX_CAPACITY) ? (MATRIX_ROWS * MATRIX_COLS) : LAYER_OWNERSHIP_BINDING_MAX_CAPACITY))
+
+static layer_momentary_binding_t layer_momentary_bindings[LAYER_OWNERSHIP_BINDING_CAPACITY] = {0};
+static uint8_t                   layer_momentary_refcounts[LAYER_COUNT]                      = {0};
+static uint8_t                   layer_locked_state                                           = UINT8_MAX;
 
 static inline bool layer_ownership_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
+}
+
+static void layer_ownership_log_binding_overflow(keypos_t key_pos, uint8_t layer) {
+#ifdef CONSOLE_ENABLE
+    uprintf("Layer ownership table overflow at key (%u,%u) for layer %u; bounded capacity was exhausted unexpectedly\n", (unsigned int)key_pos.row, (unsigned int)key_pos.col, (unsigned int)layer);
+#else
+    (void)key_pos;
+    (void)layer;
+#endif
 }
 
 static int16_t layer_ownership_find_slot_for_key(keypos_t key_pos) {
@@ -138,6 +157,7 @@ void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     } else {
         slot = layer_ownership_find_free_slot();
         if (slot < 0) {
+            layer_ownership_log_binding_overflow(key_pos, layer);
             return;
         }
     }

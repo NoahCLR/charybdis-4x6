@@ -6,6 +6,9 @@
 
 #if defined(SPLIT_TRANSACTION_IDS_USER)
 
+#    ifdef CONSOLE_ENABLE
+#        include "print.h"
+#    endif
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #        include "pointing_device_auto_mouse.h" // QMK (firmware fork)
 #    endif
@@ -30,6 +33,14 @@ static uint32_t                    split_runtime_sync_last_send   = 0;
 #    ifndef SPLIT_RUNTIME_SYNC_HEARTBEAT_MS
 #        define SPLIT_RUNTIME_SYNC_HEARTBEAT_MS 250
 #    endif
+
+static void split_runtime_sync_log_packet_size_mismatch(uint8_t size) {
+#    ifdef CONSOLE_ENABLE
+    uprintf("Split runtime sync packet size mismatch: received %u bytes, expected %u bytes\n", (unsigned int)size, (unsigned int)sizeof(split_runtime_sync_packet_t));
+#    else
+    (void)size;
+#    endif
+}
 
 static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_elapsed) {
     return (split_runtime_sync_packet_t){
@@ -76,7 +87,12 @@ static void split_runtime_sync_slave_rpc(uint8_t initiator2target_buffer_size, c
     (void)target2initiator_buffer;
 
     if (initiator2target_buffer_size < sizeof(split_runtime_sync_packet_t)) {
+        split_runtime_sync_log_packet_size_mismatch(initiator2target_buffer_size);
         return;
+    }
+
+    if (initiator2target_buffer_size != sizeof(split_runtime_sync_packet_t)) {
+        split_runtime_sync_log_packet_size_mismatch(initiator2target_buffer_size);
     }
 
     memcpy(&split_runtime_sync_remote, initiator2target_buffer, sizeof(split_runtime_sync_packet_t));

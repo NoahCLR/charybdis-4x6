@@ -31,11 +31,10 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.pressed && active_key.keycode != KC_NO && !active_key_matches(keycode, record->event.key)) {
-        key_runtime_effects_activate_pending_fallback_hold();
-
-        if (is_layer_key(active_key.keycode)) {
-            active_key.layer_interrupted = true;
-        }
+        key_runtime_transition_plan_t plan;
+        key_runtime_transition_plan_init(&plan);
+        key_runtime_transition_interrupt_active_key_on_other_press(&plan);
+        key_runtime_transition_execute_plan(&plan);
     }
 
     if (multi_tap_active(&multi_tap) && record->event.pressed && keycode != multi_tap.keycode) {

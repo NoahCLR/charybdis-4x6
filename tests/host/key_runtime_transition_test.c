@@ -592,7 +592,50 @@ static void test_non_modifier_single_tap_override_activates_fallback_hold_at_thr
     CHECK(active_key.hold_fired);
 }
 
-    static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
+static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .keycode               = TEST_PLAIN_KEY,
+        .key_pos               = test_keypos(2, 2),
+        .fallback_hold_pending = true,
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_interrupt_active_key_on_other_press(&plan);
+
+    CHECK(plan.count == 1);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
+    CHECK(plan.effects[0].data.held_action.key_pos.row == active_key.key_pos.row);
+    CHECK(plan.effects[0].data.held_action.key_pos.col == active_key.key_pos.col);
+    CHECK(plan.effects[0].data.held_action.action == TEST_PLAIN_KEY);
+    CHECK(active_key.held_action_keycode == TEST_PLAIN_KEY);
+    CHECK(active_key.hold_fired);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(test_call_count == 1);
+    CHECK(test_calls[0].kind == TEST_CALL_HELD_REGISTER);
+    CHECK(test_calls[0].action == TEST_PLAIN_KEY);
+}
+
+static void test_interrupt_other_press_marks_layer_interrupted(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .keycode = LT(2, TEST_FALLBACK_TAP_ACTION),
+        .key_pos = test_keypos(2, 5),
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_interrupt_active_key_on_other_press(&plan);
+
+    CHECK(plan.count == 0);
+    CHECK(active_key.layer_interrupted);
+}
+
+static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
     key_runtime_transition_plan_t plan;
     keyrecord_t                   press_record_1   = test_record(test_keypos(4, 4), true);
     keyrecord_t                   release_record_1 = test_record(test_keypos(4, 4), false);
@@ -972,6 +1015,8 @@ int main(void) {
     test_single_tap_override_activates_fallback_hold_at_threshold();
     test_single_tap_override_long_release_does_not_dispatch_tap();
     test_non_modifier_single_tap_override_activates_fallback_hold_at_threshold();
+    test_interrupt_other_press_queues_pending_fallback_hold();
+    test_interrupt_other_press_marks_layer_interrupted();
     test_modifier_multi_tap_second_tap_dispatches_action();
     test_interrupted_momentary_layer_release_only_releases_layer();
     test_release_hold_prefers_long_hold_after_longer_term();

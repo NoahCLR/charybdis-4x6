@@ -10,6 +10,8 @@
 static bool suppress_default;
 static bool tracked_physical_event;
 static bool handled_key_is_handled;
+static bool interrupted_active_key;
+static uint8_t executed_transition_plan_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -47,6 +49,8 @@ static void test_reset_state(void) {
     suppress_default          = false;
     tracked_physical_event    = false;
     handled_key_is_handled    = false;
+    interrupted_active_key    = false;
+    executed_transition_plan_count = 0;
 }
 
 uint16_t timer_read(void) {
@@ -157,11 +161,16 @@ void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
 }
 
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan) {
-    (void)plan;
+    executed_transition_plan_count = plan->count;
 }
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {
     (void)plan;
+}
+
+void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_transition_plan_t *plan) {
+    interrupted_active_key = true;
+    plan->count++;
 }
 
 bool action_dispatch_is_layer_lock(uint16_t keycode) {
@@ -252,10 +261,25 @@ static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
     CHECK(tracked_physical_event);
 }
 
+static void test_other_press_interrupts_active_key_through_transition_plan(void) {
+    keyrecord_t record = test_record(test_keypos(2, 4), true);
+
+    test_reset_state();
+    active_key.keycode               = KC_RIGHT_ALT;
+    active_key.key_pos               = test_keypos(2, 3);
+    active_key.fallback_hold_pending = true;
+
+    CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
+    CHECK(tracked_physical_event);
+    CHECK(interrupted_active_key);
+    CHECK(executed_transition_plan_count == 1);
+}
+
 int main(void) {
     test_active_handled_release_bypasses_modifier_suppression();
     test_unrelated_release_stays_suppressed();
     test_inactive_handled_release_bypasses_modifier_suppression();
+    test_other_press_interrupts_active_key_through_transition_plan();
 
     puts("key_runtime_preflight host tests passed");
     return 0;

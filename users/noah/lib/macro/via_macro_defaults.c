@@ -56,9 +56,17 @@ typedef enum {
     VIA_MACRO_SLOT_INVALID,
 } via_macro_slot_state_t;
 
-// Stage VIA macro defaults in BSS; the dynamic macro region is larger than
-// the RP2040 process stack on this build.
-static uint8_t via_macro_seed_buffer[DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE];
+#    ifndef VIA_MACRO_SEED_CHUNK_SIZE
+#        define VIA_MACRO_SEED_CHUNK_SIZE 64u
+#    endif
+
+typedef struct {
+    uint16_t capacity;
+    uint16_t offset;
+    uint16_t buffered;
+    uint8_t  chunk[VIA_MACRO_SEED_CHUNK_SIZE];
+} via_macro_seed_writer_t;
+
 static bool    via_macro_seed_post_init_pending = false;
 static bool    via_macro_seed_scan_pending      = false;
 static uint8_t via_macro_slot_state[VIA_MACRO_SLOT_COUNT];
@@ -98,36 +106,68 @@ static void validate_via_default_macro_payloads(void) {
     }
 }
 
-static bool build_via_default_macro_seed_buffer(uint16_t capacity, uint16_t *written) {
-    uint8_t *buffer = via_macro_seed_buffer;
-    uint16_t offset = 0;
+static bool via_macro_seed_writer_flush(via_macro_seed_writer_t *writer) {
+    uint16_t start_offset;
+
+    if (!writer || writer->buffered == 0) {
+        return true;
+    }
+
+    start_offset = (uint16_t)(writer->offset - writer->buffered);
+    dynamic_keymap_macro_set_buffer(start_offset, writer->buffered, writer->chunk);
+    writer->buffered = 0;
+    return true;
+}
+
+static bool via_macro_seed_writer_write_byte(uint8_t byte, void *context) {
+    via_macro_seed_writer_t *writer = (via_macro_seed_writer_t *)context;
+
+    if (!writer || writer->offset >= writer->capacity) {
+        return false;
+    }
+
+    writer->chunk[writer->buffered++] = byte;
+    writer->offset++;
+
+    if (writer->buffered == ARRAY_SIZE(writer->chunk)) {
+        return via_macro_seed_writer_flush(writer);
+    }
+
+    return true;
+}
+
+static bool seed_via_default_macros(uint16_t capacity, uint16_t *written) {
+    via_macro_seed_writer_t writer = {
+        .capacity = capacity,
+    };
 
     for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
         const char *payload = via_macro_payloads[slot];
-        uint16_t    encoded = 0;
 
         if (payload && *payload) {
             if (!via_macro_payload_slot_is_valid(slot)) {
                 goto terminate_slot;
             }
-            if (!macro_payload_encode(payload, &buffer[offset], capacity - offset, &encoded)) {
+            if (!macro_payload_encode_write(payload, via_macro_seed_writer_write_byte, &writer, NULL)) {
                 return false;
             }
-            offset += encoded;
         }
 
     terminate_slot:
-        if (offset >= capacity) {
+        if (!via_macro_seed_writer_write_byte(0x00, &writer)) {
             return false;
         }
-        buffer[offset++] = 0x00;
     }
 
-    *written = offset;
+    if (!via_macro_seed_writer_flush(&writer)) {
+        return false;
+    }
+
+    *written = writer.offset;
     return true;
 }
 
-static void seed_via_default_macros(void) {
+static void apply_via_default_macros(void) {
     uint16_t capacity = dynamic_keymap_macro_get_buffer_size();
     uint16_t written  = 0;
 
@@ -137,21 +177,19 @@ static void seed_via_default_macros(void) {
 
     // Every call site runs after QMK has already reset the macro region to
     // zero, so we only need to write the authored macro prefix here.
-    if (!build_via_default_macro_seed_buffer(capacity, &written) || written == 0) {
+    if (!seed_via_default_macros(capacity, &written) || written == 0) {
         return;
     }
-
-    dynamic_keymap_macro_set_buffer(0, written, via_macro_seed_buffer);
 }
 
 void noah_via_macro_defaults_eeconfig_init(void) {
-    seed_via_default_macros();
+    apply_via_default_macros();
     via_macro_seed_post_init_pending = false;
 }
 
 void noah_via_macro_defaults_matrix_scan(void) {
     if (via_macro_seed_scan_pending) {
-        seed_via_default_macros();
+        apply_via_default_macros();
         via_macro_seed_scan_pending = false;
     }
 }
@@ -159,7 +197,7 @@ void noah_via_macro_defaults_matrix_scan(void) {
 void noah_via_macro_defaults_keyboard_post_init(void) {
     validate_via_default_macro_payloads();
     if (via_macro_seed_post_init_pending) {
-        seed_via_default_macros();
+        apply_via_default_macros();
         via_macro_seed_post_init_pending = false;
     }
 }
