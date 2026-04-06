@@ -21,6 +21,18 @@
 #define KC_RIGHT_SHIFT 0x00E5u
 #define KC_RIGHT_ALT 0x00E6u
 #define KC_RIGHT_GUI 0x00E7u
+#define KC_LEFT 0x0050u
+#define KC_RIGHT 0x004Fu
+#define KC_DOWN 0x0051u
+#define KC_UP 0x0052u
+#define KC_C 0x0006u
+#define KC_V 0x0019u
+#define KC_MINS 0x002Du
+#define KC_EQL 0x002Eu
+#define KC_AUDIO_VOL_DOWN 0x00A9u
+#define KC_AUDIO_VOL_UP 0x00AAu
+#define KC_BRID 0x006Fu
+#define KC_BRIU 0x0070u
 #define SAFE_RANGE 0x5F00u
 
 #define MOD_BIT(keycode_) (1u << (((keycode_) & 0x00FFu) - KC_LEFT_CTRL))
@@ -33,12 +45,21 @@
 
 #define QK_MOMENTARY 0x5000u
 #define QK_LAYER_TAP 0x6000u
+#define QK_MODS 0x0100u
+#define QK_MOUSE_BUTTON_1 0x7000u
+
+#define G(keycode_) ((uint16_t)(QK_MODS | ((keycode_) & 0x00FFu)))
+
+#define MS_BTN1 ((uint16_t)(QK_MOUSE_BUTTON_1 + 0))
+#define MS_BTN2 ((uint16_t)(QK_MOUSE_BUTTON_1 + 1))
+#define MS_BTN3 ((uint16_t)(QK_MOUSE_BUTTON_1 + 2))
 
 #define MO(layer_) ((uint16_t)(QK_MOMENTARY | ((layer_) & 0x00FFu)))
 #define LT(layer_, keycode_) ((uint16_t)(QK_LAYER_TAP | (((layer_) & 0x000Fu) << 8) | ((keycode_) & 0x00FFu)))
 
 #define IS_QK_MOMENTARY(keycode_) ((((keycode_)) & 0xFF00u) == QK_MOMENTARY)
 #define IS_QK_LAYER_TAP(keycode_) ((((keycode_)) & 0xF000u) == QK_LAYER_TAP)
+#define IS_MOUSEKEY_BUTTON(keycode_) ((keycode_) >= QK_MOUSE_BUTTON_1 && (keycode_) < (QK_MOUSE_BUTTON_1 + 8))
 #define QK_MOMENTARY_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
 #define QK_LAYER_TAP_GET_LAYER(keycode_) ((uint8_t)(((keycode_) >> 8) & 0x000Fu))
 #define QK_LAYER_TAP_GET_TAP_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
@@ -106,6 +127,7 @@ void    clear_oneshot_locked_mods(void);
 void    add_mods(uint8_t mods);
 void    del_mods(uint8_t mods);
 void    send_keyboard_report(void);
+void    tap_code16(uint16_t keycode);
 
 bool     charybdis_get_pointer_dragscroll_enabled(void);
 bool     charybdis_get_pointer_sniping_enabled(void);
