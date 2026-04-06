@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../action/owned_keycode.h"
+#include "../action/synthetic_record.h"
 #include "../key/key_runtime_effects.h"
 #include "../state/keyboard_mod_ownership.h"
 #include "../state/keyboard_mod_state.h"
@@ -25,9 +25,7 @@ typedef struct {
 
 static void pd_mode_tap_code(uint16_t keycode) {
     key_runtime_effects_activate_pending_fallback_hold();
-    if (!owned_keycode_tap(keycode)) {
-        tap_code16(keycode);
-    }
+    noah_dispatch_synthetic_qmk_tap(keycode);
 }
 
 static void pd_mode_axis_reset(pd_mode_axis_state_t *state) {

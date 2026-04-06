@@ -14,14 +14,9 @@
 #include "../action/synthetic_record.h"
 
 bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
     (void)record;
-
-    switch (keycode) {
-        case MT(MOD_LSFT, KC_CAPS):
-            return true;
-        default:
-            return false;
-    }
+    return false;
 }
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
