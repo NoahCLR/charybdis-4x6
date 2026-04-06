@@ -5,9 +5,13 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 sh "$ROOT/run_key_behavior_lookup_tests.sh"
+sh "$ROOT/run_action_lifecycle_tests.sh"
 sh "$ROOT/run_keyboard_mod_ownership_tests.sh"
+sh "$ROOT/run_held_action_tests.sh"
+sh "$ROOT/run_layer_ownership_tests.sh"
 sh "$ROOT/run_key_runtime_feedback_tests.sh"
 sh "$ROOT/run_key_runtime_preflight_tests.sh"
 sh "$ROOT/run_key_runtime_transition_tests.sh"
+sh "$ROOT/run_owned_keycode_tests.sh"
 sh "$ROOT/run_pd_mode_tests.sh"
 sh "$ROOT/run_pd_mode_handlers_tests.sh"

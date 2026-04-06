@@ -21,6 +21,7 @@
 #define KC_RIGHT_SHIFT 0x00E5u
 #define KC_RIGHT_ALT 0x00E6u
 #define KC_RIGHT_GUI 0x00E7u
+#define KC_CAPS_LOCK 0x0039u
 #define KC_LEFT 0x0050u
 #define KC_RIGHT 0x004Fu
 #define KC_DOWN 0x0051u
@@ -42,13 +43,20 @@
 #define CUSTOM_MULTI_TAP_TERM 175u
 #define TAPPING_TERM 200u
 #define KEY_BEHAVIOR_MAX_TAP_COUNT 5u
+#define TAP_CODE_DELAY 10u
+#define TAP_HOLD_CAPS_DELAY 80u
 
 #define QK_MOMENTARY 0x5000u
 #define QK_LAYER_TAP 0x6000u
-#define QK_MODS 0x0100u
+#define QK_MODS 0x1F00u
 #define QK_MOUSE_BUTTON_1 0x7000u
+#define QK_LCTL 0x0100u
+#define QK_LSFT 0x0200u
+#define QK_LALT 0x0400u
+#define QK_LGUI 0x0800u
+#define QK_RMODS_MIN 0x1000u
 
-#define G(keycode_) ((uint16_t)(QK_MODS | ((keycode_) & 0x00FFu)))
+#define G(keycode_) ((uint16_t)(QK_LGUI | ((keycode_) & 0x00FFu)))
 
 #define MS_BTN1 ((uint16_t)(QK_MOUSE_BUTTON_1 + 0))
 #define MS_BTN2 ((uint16_t)(QK_MOUSE_BUTTON_1 + 1))
@@ -59,7 +67,10 @@
 
 #define IS_QK_MOMENTARY(keycode_) ((((keycode_)) & 0xFF00u) == QK_MOMENTARY)
 #define IS_QK_LAYER_TAP(keycode_) ((((keycode_)) & 0xF000u) == QK_LAYER_TAP)
+#define IS_QK_MODS(keycode_) ((((keycode_) & QK_MODS) != 0) && (((keycode_) & 0xE000u) == 0))
 #define IS_MOUSEKEY_BUTTON(keycode_) ((keycode_) >= QK_MOUSE_BUTTON_1 && (keycode_) < (QK_MOUSE_BUTTON_1 + 8))
+#define IS_MODIFIER_KEYCODE(keycode_) (((keycode_) & 0xFFF8u) == KC_LEFT_CTRL)
+#define QK_MODS_GET_BASIC_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
 #define QK_MOMENTARY_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
 #define QK_LAYER_TAP_GET_LAYER(keycode_) ((uint8_t)(((keycode_) >> 8) & 0x000Fu))
 #define QK_LAYER_TAP_GET_TAP_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
@@ -112,6 +123,11 @@ typedef struct {
 uint16_t timer_read(void);
 uint16_t timer_elapsed(uint16_t last);
 
+extern layer_state_t layer_state;
+bool                 layer_state_cmp(layer_state_t state, uint8_t layer);
+void                 layer_on(uint8_t layer);
+void                 layer_off(uint8_t layer);
+
 uint8_t get_mods(void);
 uint8_t get_weak_mods(void);
 uint8_t get_oneshot_mods(void);
@@ -128,6 +144,11 @@ void    add_mods(uint8_t mods);
 void    del_mods(uint8_t mods);
 void    send_keyboard_report(void);
 void    tap_code16(uint16_t keycode);
+void    register_code(uint8_t keycode);
+void    unregister_code(uint8_t keycode);
+void    register_code16(uint16_t keycode);
+void    unregister_code16(uint16_t keycode);
+void    wait_ms(uint16_t ms);
 
 bool     charybdis_get_pointer_dragscroll_enabled(void);
 bool     charybdis_get_pointer_sniping_enabled(void);
