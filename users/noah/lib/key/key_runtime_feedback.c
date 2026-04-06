@@ -9,12 +9,18 @@
 
 #define key_feedback_pulse (noah_runtime_shared_state.key.feedback)
 
+#ifdef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
+#    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
+#else
+#    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS 200
+#endif
+
 static bool key_feedback_pulse_active(void) {
     if (!key_feedback_pulse.active) {
         return false;
     }
 
-    if (timer_elapsed(key_feedback_pulse.timer) < RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS) {
+    if (timer_elapsed(key_feedback_pulse.timer) < KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) {
         return true;
     }
 
@@ -75,7 +81,7 @@ uint8_t key_feedback_pack(void) {
         // from its own independent clock.
         flags |= KEY_FEEDBACK_FLAG_LEVEL_FLASH;
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
-        if (((timer_read() / RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0) {
+        if (((timer_read() / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0) {
             flags |= KEY_FEEDBACK_FLAG_FLASH_PHASE;
         }
         if (long_hold_reached) {
@@ -108,3 +114,4 @@ uint8_t key_feedback_pack(void) {
 }
 
 #undef key_feedback_pulse
+#undef KEY_FEEDBACK_FLASH_HALF_PERIOD_MS

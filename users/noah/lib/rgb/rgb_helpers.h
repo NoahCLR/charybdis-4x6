@@ -17,9 +17,32 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include "../pointing/pd_mode_flags.h"
+#include "color.h" // QMK
+
+// ─── RGB config types ───────────────────────────────────────────────────────
+
+typedef struct {
+    pd_mode_mask_t mode_flag;
+    hsv_t          color;
+} pd_mode_color_t;
+
+typedef struct {
+    uint8_t        layer;
+    hsv_t          color;
+    const uint8_t *leds;
+    uint8_t        count;
+} layer_led_group_t;
+
+typedef struct {
+    pd_mode_mask_t mode_flag;
+    hsv_t          color;
+    const uint8_t *leds;
+    uint8_t        count;
+} pd_mode_led_group_t;
+
 #if defined(RGB_MATRIX_ENABLE)
 
-#    include "../pointing/pd_mode_flags.h"
 #    include "rgb_matrix.h" // QMK
 
 // ─── Core helpers ───────────────────────────────────────────────────────────
@@ -88,27 +111,6 @@ static inline hsv_t clamp_hsv_value(hsv_t hsv, uint8_t max_value) {
     }
     return hsv;
 }
-
-// ─── RGB config types ───────────────────────────────────────────────────────
-
-typedef struct {
-    pd_mode_mask_t mode_flag;
-    hsv_t          color;
-} pd_mode_color_t;
-
-typedef struct {
-    uint8_t        layer;
-    hsv_t          color;
-    const uint8_t *leds;
-    uint8_t        count;
-} layer_led_group_t;
-
-typedef struct {
-    pd_mode_mask_t mode_flag;
-    hsv_t          color;
-    const uint8_t *leds;
-    uint8_t        count;
-} pd_mode_led_group_t;
 
 #else  // RGB_MATRIX_ENABLE not defined: provide empty stubs so files compile.
 static inline void  rgb_set_led(uint8_t index, uint8_t led_min, uint8_t led_max, uint8_t r, uint8_t g, uint8_t b) {}
