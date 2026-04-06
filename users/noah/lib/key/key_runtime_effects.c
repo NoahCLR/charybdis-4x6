@@ -10,6 +10,7 @@
 #include "../state/split_runtime_sync.h"
 #include "held_action.h"
 #include "key_runtime_feedback.h"
+#include "key_runtime_state.h"
 
 bool key_runtime_effects_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
     return keyboard_mod_ownership_should_suppress_default(keycode, record);
@@ -17,6 +18,16 @@ bool key_runtime_effects_should_suppress_default(uint16_t keycode, keyrecord_t *
 
 void key_runtime_effects_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
+}
+
+bool key_runtime_effects_activate_pending_passthrough_modifier(void) {
+    if (!active_key.passthrough_modifier_pending || active_key.held_action_keycode != KC_NO || active_key.keycode == KC_NO) {
+        return false;
+    }
+
+    held_action_register(active_key.key_pos, active_key.keycode);
+    active_key.held_action_keycode = active_key.keycode;
+    return true;
 }
 
 void key_runtime_effects_dispatch_action(uint16_t action) {

@@ -283,7 +283,7 @@ const key_behavior_t
             // Enter → Shift+Enter (new line without send in chat apps)
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
 
-            // Typing-layer pointer buttons to support arrowmode
+            // Typing-layer pointer buttons to support arrow mode
             {.keycode = KC_RIGHT_ALT, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
 
             // Arrows — release-based hold plus immediate long hold

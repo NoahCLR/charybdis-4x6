@@ -51,8 +51,32 @@ handled_key_view_t handled_key_lookup(uint16_t keycode) {
     };
 }
 
-bool handled_key_uses_implicit_pd_mode_hold(handled_key_view_t key) {
-    return !key.behavior.single.hold.present && pd_mode_for_keycode(key.behavior.keycode);
+static bool key_runtime_keycode_is_pure_modifier(uint16_t keycode) {
+    switch (keycode) {
+        case KC_LEFT_CTRL:
+        case KC_LEFT_SHIFT:
+        case KC_LEFT_ALT:
+        case KC_LEFT_GUI:
+        case KC_RIGHT_CTRL:
+        case KC_RIGHT_SHIFT:
+        case KC_RIGHT_ALT:
+        case KC_RIGHT_GUI:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool handled_key_uses_passthrough_modifier_single_step(handled_key_view_t key) {
+    if (key.behavior.single.tap.present || key.behavior.single.hold.present || key.behavior.single.long_hold.present || key.behavior.is_momentary_layer) {
+        return false;
+    }
+
+    return key.behavior.has_multi_tap && key.behavior.keycode < SAFE_RANGE && key_runtime_keycode_is_pure_modifier(key.behavior.keycode);
+}
+
+bool handled_key_uses_implicit_hold(handled_key_view_t key) {
+    return pd_mode_for_keycode(key.behavior.keycode) != 0;
 }
 
 hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
@@ -60,7 +84,7 @@ hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
         return key.behavior.single.hold;
     }
 
-    if (handled_key_uses_implicit_pd_mode_hold(key)) {
+    if (pd_mode_for_keycode(key.behavior.keycode)) {
         return (hold_behavior_t){
             .present = true,
             .action  = key.behavior.keycode,
@@ -74,6 +98,7 @@ hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
 uint16_t handled_key_tap_action(handled_key_view_t key) {
     if (key.behavior.single.tap.present) return key.behavior.single.tap.action;
     if (pd_mode_for_keycode(key.behavior.keycode)) return KC_NO;
+    if (handled_key_uses_passthrough_modifier_single_step(key)) return KC_NO;
     if (key.behavior.is_layer_tap) return QK_LAYER_TAP_GET_TAP_KEYCODE(key.behavior.keycode);
     if (key.behavior.is_momentary_layer) return KC_NO;
     if (key.behavior.keycode >= SAFE_RANGE) return KC_NO;

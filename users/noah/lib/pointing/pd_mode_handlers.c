@@ -5,6 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "../action/owned_keycode.h"
+#include "../key/key_runtime_effects.h"
 #include "../state/keyboard_mod_ownership.h"
 #include "../state/keyboard_mod_state.h"
 #include "pd_mode_handlers.h"
@@ -23,6 +24,7 @@ typedef struct {
 } pd_mode_axis_state_t;
 
 static void pd_mode_tap_code(uint16_t keycode) {
+    key_runtime_effects_activate_pending_passthrough_modifier();
     if (!owned_keycode_tap(keycode)) {
         tap_code16(keycode);
     }

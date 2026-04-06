@@ -16,11 +16,22 @@
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     key_runtime_effects_track_physical_keycode_event(keycode, record);
     if (key_runtime_effects_should_suppress_default(keycode, record)) {
-        return false;
+        // Managed modifier releases normally suppress the raw QMK path, but a
+        // handled key still needs its own release event so the custom runtime
+        // can unregister the held action and clear feedback.
+        if (!record->event.pressed && active_key_matches(keycode, record->event.key)) {
+            // Let the handled-key release path run.
+        } else {
+            return false;
+        }
     }
 
-    if (record->event.pressed && active_key.keycode != KC_NO && !active_key_matches(keycode, record->event.key) && is_layer_key(active_key.keycode)) {
-        active_key.layer_interrupted = true;
+    if (record->event.pressed && active_key.keycode != KC_NO && !active_key_matches(keycode, record->event.key)) {
+        key_runtime_effects_activate_pending_passthrough_modifier();
+
+        if (is_layer_key(active_key.keycode)) {
+            active_key.layer_interrupted = true;
+        }
     }
 
     if (multi_tap_active(&multi_tap) && record->event.pressed && keycode != multi_tap.keycode) {

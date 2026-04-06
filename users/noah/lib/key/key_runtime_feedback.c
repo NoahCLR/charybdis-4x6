@@ -52,7 +52,7 @@ uint8_t key_feedback_pack(void) {
     uint16_t elapsed           = timer_elapsed(active_key.timer);
     bool     long_hold_reached = active_key.long_hold.present && elapsed >= active_key.longer_hold_term;
 
-    if (active_key.implicit_pd_mode_hold) {
+    if (active_key.implicit_hold) {
         return flags;
     }
 

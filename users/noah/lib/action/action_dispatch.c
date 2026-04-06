@@ -6,6 +6,7 @@
 
 #include "noah_keymap.h"
 #include "action_lifecycle.h"
+#include "../key/key_runtime_effects.h"
 #include "../state/layer_ownership.h"
 #include "action_dispatch.h"
 
@@ -34,5 +35,6 @@ bool action_dispatch_layer_is_locked(uint8_t layer) {
 }
 
 void action_dispatch(uint16_t action) {
+    key_runtime_effects_activate_pending_passthrough_modifier();
     noah_action_tap(action);
 }

@@ -483,6 +483,73 @@ static void test_quick_release_immediate_hold_unregisters_then_taps(void) {
     CHECK(test_calls[1].action == TEST_FALLBACK_TAP_ACTION);
 }
 
+static void test_modifier_multi_tap_first_tap_is_buffered(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   press_record   = test_record(test_keypos(4, 4), true);
+    keyrecord_t                   release_record = test_record(test_keypos(4, 4), false);
+    handled_key_view_t            key            = test_handled_key(KC_RIGHT_ALT);
+
+    test_reset_stubs();
+    key.behavior.has_multi_tap = true;
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record, key, false, &plan));
+
+    CHECK(plan.count == 0);
+    CHECK(active_key.keycode == KC_RIGHT_ALT);
+    CHECK(!active_key.implicit_hold);
+    CHECK(active_key.passthrough_modifier_pending);
+    CHECK(!active_key.hold.present);
+    CHECK(active_key.tap_action == KC_NO);
+
+    fake_time = (uint16_t)(fake_time + 50);
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_release(KC_RIGHT_ALT, &release_record, key, &plan));
+
+    CHECK(plan.count == 0);
+    CHECK(active_key.keycode == KC_NO);
+    CHECK(multi_tap.keycode == KC_RIGHT_ALT);
+    CHECK(multi_tap.count == 1);
+    CHECK(multi_tap.single_action == KC_NO);
+    CHECK(test_call_count == 0);
+}
+
+static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   press_record_1   = test_record(test_keypos(4, 4), true);
+    keyrecord_t                   release_record_1 = test_record(test_keypos(4, 4), false);
+    keyrecord_t                   press_record_2   = test_record(test_keypos(4, 4), true);
+    handled_key_view_t            key              = test_handled_key(KC_RIGHT_ALT);
+
+    test_reset_stubs();
+    key.behavior.has_multi_tap = true;
+    test_add_behavior_step(KC_RIGHT_ALT, 2, (key_behavior_step_t){
+                                                .tap = TAP_SENDS(TEST_MULTI_STEP_ACTION),
+                                            });
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record_1, key, false, &plan));
+    CHECK(plan.count == 0);
+
+    fake_time = (uint16_t)(fake_time + 50);
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_release(KC_RIGHT_ALT, &release_record_1, key, &plan));
+    CHECK(plan.count == 0);
+    CHECK(multi_tap.keycode == KC_RIGHT_ALT);
+    CHECK(multi_tap.count == 1);
+
+    fake_time = (uint16_t)(fake_time + 50);
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record_2, key, false, &plan));
+
+    CHECK(plan.count == 1);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
+    CHECK(plan.effects[0].data.action == TEST_MULTI_STEP_ACTION);
+    CHECK(multi_tap.keycode == KC_NO);
+    CHECK(active_key.keycode == KC_NO);
+}
+
 static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
     key_runtime_transition_plan_t plan;
     keyrecord_t                   record = test_record(test_keypos(1, 5), false);
@@ -717,18 +784,18 @@ static void test_scan_commits_immediate_hold_threshold_with_feedback(void) {
     CHECK(!test_calls[0].long_hold_level);
 }
 
-static void test_scan_commits_implicit_pd_mode_hold_without_feedback(void) {
+static void test_scan_commits_implicit_hold_without_feedback(void) {
     key_runtime_transition_plan_t plan;
 
     test_reset_stubs();
     active_key = (active_key_state_t){
-        .timer                 = (uint16_t)(fake_time - 170),
-        .keycode               = TEST_PD_MODE_KEY,
-        .key_pos               = test_keypos(5, 1),
-        .held_action_keycode   = TEST_PD_MODE_KEY,
-        .tap_hold_term         = 120,
-        .implicit_pd_mode_hold = true,
-        .hold                  = {
+        .timer               = (uint16_t)(fake_time - 170),
+        .keycode             = TEST_PD_MODE_KEY,
+        .key_pos             = test_keypos(5, 1),
+        .held_action_keycode = TEST_PD_MODE_KEY,
+        .tap_hold_term       = 120,
+        .implicit_hold       = true,
+        .hold                = {
             .present = true,
             .action  = TEST_PD_MODE_KEY,
             .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
@@ -824,6 +891,8 @@ int main(void) {
     test_flush_multi_tap_prefers_exact_step_tap();
     test_quick_release_locked_pd_mode_queues_lock_tap();
     test_quick_release_immediate_hold_unregisters_then_taps();
+    test_modifier_multi_tap_first_tap_is_buffered();
+    test_modifier_multi_tap_second_tap_dispatches_action();
     test_interrupted_momentary_layer_release_only_releases_layer();
     test_release_hold_prefers_long_hold_after_longer_term();
     test_mismatched_release_releases_owned_held_action();
@@ -831,7 +900,7 @@ int main(void) {
     test_release_pending_multi_tap_hold_registers_then_unregisters_held_action();
     test_scan_promotes_pending_multi_tap_hold();
     test_scan_commits_immediate_hold_threshold_with_feedback();
-    test_scan_commits_implicit_pd_mode_hold_without_feedback();
+    test_scan_commits_implicit_hold_without_feedback();
     test_scan_promotes_to_long_hold_and_replaces_held_action();
     test_scan_pending_multi_tap_long_hold_releases_layer_before_lock();
 

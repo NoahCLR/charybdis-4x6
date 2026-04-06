@@ -226,7 +226,7 @@ static void key_runtime_transition_activate_immediate_hold_if_needed(keyrecord_t
 bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *record, handled_key_view_t key, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
     key_behavior_view_t behavior = key.behavior;
     hold_behavior_t     hold     = handled_key_single_hold(key);
-    bool                implicit = handled_key_uses_implicit_pd_mode_hold(key);
+    bool                implicit = handled_key_uses_implicit_hold(key);
     pd_mode_mask_t      mode     = pd_mode_for_keycode(keycode);
 
     if (handled_key_multi_tap_repress(key, keycode)) {
@@ -252,7 +252,8 @@ bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *rec
 
     key_runtime_transition_flush_active_key(active_held_action_survives_flush, plan);
     active_key_track(keycode, record->event.key, handled_key_tap_action(key), hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false);
-    active_key.implicit_pd_mode_hold       = implicit;
+    active_key.implicit_hold = implicit;
+    active_key.passthrough_modifier_pending = !implicit && handled_key_tap_action(key) == KC_NO && behavior.has_multi_tap && keycode < SAFE_RANGE && hold.action == KC_NO;
     active_key.pd_mode_was_locked_on_press = mode && pd_mode_locked(mode);
     key_runtime_transition_activate_immediate_hold_if_needed(record, hold, plan);
     return true;
@@ -275,6 +276,10 @@ static void key_runtime_transition_dispatch_released_key_tap(uint16_t keycode, a
 
 static bool key_runtime_transition_release_is_interrupted_layer_tap(active_key_state_t released_key, key_behavior_view_t behavior) {
     return behavior.is_momentary_layer && released_key.layer_interrupted;
+}
+
+static bool key_runtime_transition_release_is_passthrough_modifier_tap(active_key_state_t released_key) {
+    return released_key.passthrough_modifier_pending && released_key.held_action_keycode == KC_NO;
 }
 
 static bool key_runtime_transition_release_is_quick_tap(active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed) {
@@ -322,6 +327,11 @@ static active_key_release_resolution_t key_runtime_transition_resolve_active_key
             resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_ACTION;
             resolution.action  = released_key.long_hold.action;
         }
+        return resolution;
+    }
+
+    if (key_runtime_transition_release_is_passthrough_modifier_tap(released_key)) {
+        resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_TAP;
         return resolution;
     }
 
@@ -565,7 +575,7 @@ static active_key_scan_resolution_t key_runtime_transition_resolve_active_key_sc
 
     if (hold_registers_on_press(active_key_state.hold) && !active_key_state.hold_one_shot_fired && elapsed >= active_key_state.tap_hold_term) {
         resolution.commit_immediate_hold         = true;
-        resolution.immediate_hold_needs_feedback = !active_key_state.implicit_pd_mode_hold;
+        resolution.immediate_hold_needs_feedback = !active_key_state.implicit_hold;
         resolution.immediate_hold_completes_hold = !active_key_state.long_hold.present;
     }
 
