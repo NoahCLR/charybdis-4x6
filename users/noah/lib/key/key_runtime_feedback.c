@@ -56,6 +56,12 @@ uint8_t key_feedback_pack(void) {
         return flags;
     }
 
+    // Buffered modifier passthrough is an internal runtime convenience, not an
+    // authored hold surface. Do not advertise it as a flashing hold action.
+    if (active_key.passthrough_modifier_pending) {
+        return flags;
+    }
+
     if (active_key.held_action_keycode != KC_NO) {
         // Held layer and pd-mode actions do not keep a hold overlay once they
         // are active; the layer or pd-mode color itself is the feedback.
