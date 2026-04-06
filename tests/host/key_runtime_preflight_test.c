@@ -9,6 +9,7 @@
 
 static bool suppress_default;
 static bool tracked_physical_event;
+static bool handled_key_is_handled;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -45,6 +46,7 @@ static void test_reset_state(void) {
     noah_runtime_shared_state = (runtime_shared_state_t){0};
     suppress_default          = false;
     tracked_physical_event    = false;
+    handled_key_is_handled    = false;
 }
 
 uint16_t timer_read(void) {
@@ -198,6 +200,16 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     };
 }
 
+handled_key_view_t handled_key_lookup(uint16_t keycode) {
+    return (handled_key_view_t){
+        .behavior =
+            {
+                .keycode  = keycode,
+                .handled  = handled_key_is_handled,
+            },
+    };
+}
+
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
@@ -227,9 +239,23 @@ static void test_unrelated_release_stays_suppressed(void) {
     CHECK(tracked_physical_event);
 }
 
+static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
+    keyrecord_t record = test_record(test_keypos(1, 2), false);
+
+    test_reset_state();
+    suppress_default       = true;
+    handled_key_is_handled = true;
+    active_key.keycode     = KC_LEFT_CTRL;
+    active_key.key_pos     = test_keypos(4, 4);
+
+    CHECK(key_runtime_preflight_record(KC_RIGHT_ALT, &record));
+    CHECK(tracked_physical_event);
+}
+
 int main(void) {
     test_active_handled_release_bypasses_modifier_suppression();
     test_unrelated_release_stays_suppressed();
+    test_inactive_handled_release_bypasses_modifier_suppression();
 
     puts("key_runtime_preflight host tests passed");
     return 0;

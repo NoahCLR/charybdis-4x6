@@ -7,6 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_process.h"
+#include "handled_key.h"
 #include "key_runtime_effects.h"
 #include "key_runtime_state.h"
 #include "key_runtime_transition.h"
@@ -18,8 +19,11 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     if (key_runtime_effects_should_suppress_default(keycode, record)) {
         // Managed modifier releases normally suppress the raw QMK path, but a
         // handled key still needs its own release event so the custom runtime
-        // can unregister the held action and clear feedback.
-        if (!record->event.pressed && active_key_matches(keycode, record->event.key)) {
+        // can unregister the held action and clear feedback. That remains true
+        // even after another handled key flushes active_key, because the older
+        // key's owned held action is still released by physical key position.
+        handled_key_view_t handled_key = handled_key_lookup(keycode);
+        if (!record->event.pressed && (active_key_matches(keycode, record->event.key) || handled_key.behavior.handled)) {
             // Let the handled-key release path run.
         } else {
             return false;
