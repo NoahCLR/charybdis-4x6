@@ -145,7 +145,7 @@
       "KC_BSPC"
     ],
     [
-      "KC_ESC",
+      "KC_NO",
       "KC_NO",
       "CUSTOM(0)",
       "CUSTOM(1)",
@@ -157,7 +157,7 @@
       "KC_NO",
       "KC_NO",
       "KC_NO",
-      "KC_LSFT",
+      "KC_NO",
       "KC_NO",
       "KC_NO",
       "KC_NO",
@@ -207,7 +207,7 @@
       "KC_BSPC"
     ],
     [
-      "LAG(KC_ESC)",
+      "KC_NO",
       "KC_NO",
       "KC_NO",
       "LCAG(KC_V)",
@@ -219,7 +219,7 @@
       "G(KC_A)",
       "KC_NO",
       "KC_NO",
-      "KC_LSFT",
+      "KC_NO",
       "LSG(KC_Z)",
       "KC_NO",
       "G(KC_C)",
@@ -281,7 +281,7 @@
       "KC_TRNS",
       "KC_TRNS",
       "KC_TRNS",
-      "KC_LSFT",
+      "KC_TRNS",
       "KC_TRNS",
       "KC_TRNS",
       "KC_TRNS",
