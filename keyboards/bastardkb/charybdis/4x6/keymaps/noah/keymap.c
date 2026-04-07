@@ -57,22 +57,22 @@ enum keymap_custom_keycodes {
 //   - {250} wait 250 ms before the next macro step
 //     e.g. {KC_A}{250}{KC_B} pauses between A and B; other keys pressed
 //     during the delay are queued
-#define VIA_MACROS(MACRO)                                \
-    MACRO(VIA_MACRO_0, "{KC_LGUI,KC_SPC}")               \
-    MACRO(VIA_MACRO_1, "{KC_LALT,KC_SPC}")               \
-    MACRO(VIA_MACRO_2, "{KC_LALT,KC_LGUI,KC_SPC}")       \
+#define VIA_MACROS(MACRO) \
+    MACRO(VIA_MACRO_0, "{KC_LGUI,KC_SPC}") \
+    MACRO(VIA_MACRO_1, "{KC_LALT,KC_SPC}") \
+    MACRO(VIA_MACRO_2, "{KC_LALT,KC_LGUI,KC_SPC}") \
     MACRO(VIA_MACRO_3, "{KC_LCTL,KC_LALT,KC_LGUI,KC_C}") \
     MACRO(VIA_MACRO_4, "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}") \
-    MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}")       \
-    MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}")         \
-    MACRO(VIA_MACRO_7, "")                               \
-    MACRO(VIA_MACRO_8, "")                               \
-    MACRO(VIA_MACRO_9, "")                               \
-    MACRO(VIA_MACRO_10, "")                              \
-    MACRO(VIA_MACRO_11, "")                              \
-    MACRO(VIA_MACRO_12, "")                              \
-    MACRO(VIA_MACRO_13, "")                              \
-    MACRO(VIA_MACRO_14, "")                              \
+    MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}") \
+    MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}") \
+    MACRO(VIA_MACRO_7, "") \
+    MACRO(VIA_MACRO_8, "") \
+    MACRO(VIA_MACRO_9, "") \
+    MACRO(VIA_MACRO_10, "") \
+    MACRO(VIA_MACRO_11, "") \
+    MACRO(VIA_MACRO_12, "") \
+    MACRO(VIA_MACRO_13, "") \
+    MACRO(VIA_MACRO_14, "") \
     MACRO(VIA_MACRO_15, "")
 
 // ─── Hardcoded Macros ───────────────────────────────────────────────────────
@@ -389,13 +389,13 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [LAYER_NUM] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
+                   KC_ESC,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P7,             KC_P8,             KC_P9,           XXXXXXX,           KC_PPLS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,     MO(LAYER_NAV),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
+            KC_LEFT_SHIFT,           XXXXXXX,           XXXXXXX,           XXXXXXX,     MO(LAYER_NAV),           XXXXXXX,              XXXXXXX,             KC_P4,             KC_P5,             KC_P6,           XXXXXXX,           KC_PEQL,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           _______,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
+             KC_RIGHT_ALT,           _______,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,             KC_P1,             KC_P2,             KC_P3,           KC_COMM,            KC_DOT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                        KC_LEFT_GUI,            KC_SPC,           _______,              _______,             KC_P0,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
@@ -404,11 +404,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [LAYER_SYM] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  XXXXXXX,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
+                   KC_ESC,           XXXXXXX,           DPI_MOD,          DPI_RMOD,           S_D_MOD,          S_D_RMOD,              XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           KC_MINS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LPRN,           KC_RPRN,           KC_QUOT,           KC_PPLS,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,           XXXXXXX,            KC_ESC,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,           KC_DQUO,           KC_PEQL,
+            KC_LEFT_SHIFT,           XXXXXXX,           XXXXXXX,           XXXXXXX,            KC_ESC,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,           KC_DQUO,           KC_PEQL,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
               VIA_MACRO_5,           _______,        LCAG(KC_X),        LCAG(KC_C),         LSG(KC_V),         LSG(KC_P),              XXXXXXX,           XXXXXXX,           KC_LCBR,           KC_RCBR,           _______,      KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -423,7 +423,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,          VIA_MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  XXXXXXX,         LSG(KC_Z),           XXXXXXX,           G(KC_C),           XXXXXXX,           XXXXXXX,          VIA_MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
+            KC_LEFT_SHIFT,         LSG(KC_Z),           XXXXXXX,           G(KC_C),           XXXXXXX,           XXXXXXX,          VIA_MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,            KC_ESC,           XXXXXXX,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
               KC_LEFT_ALT,           G(KC_Z),           G(KC_X),           G(KC_V),           XXXXXXX,           XXXXXXX,          VIA_MACRO_0,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,      KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
