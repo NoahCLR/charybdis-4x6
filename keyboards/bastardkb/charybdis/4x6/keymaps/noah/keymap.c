@@ -15,7 +15,6 @@
 // processing lives in the userspace runtime modules under users/noah/lib/.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "lib/key/key_behavior.h"
 #include "noah_keymap.h"
 
 // ─── Keymap-Local Custom Keycodes ──────────────────────────────────────────
@@ -58,22 +57,22 @@ enum keymap_custom_keycodes {
 //   - {250} wait 250 ms before the next macro step
 //     e.g. {KC_A}{250}{KC_B} pauses between A and B; other keys pressed
 //     during the delay are queued
-#define VIA_MACROS(MACRO) \
-    MACRO(VIA_MACRO_0, "{KC_LGUI,KC_SPC}") \
-    MACRO(VIA_MACRO_1, "{KC_LALT,KC_SPC}") \
-    MACRO(VIA_MACRO_2, "{KC_LALT,KC_LGUI,KC_SPC}") \
+#define VIA_MACROS(MACRO)                                \
+    MACRO(VIA_MACRO_0, "{KC_LGUI,KC_SPC}")               \
+    MACRO(VIA_MACRO_1, "{KC_LALT,KC_SPC}")               \
+    MACRO(VIA_MACRO_2, "{KC_LALT,KC_LGUI,KC_SPC}")       \
     MACRO(VIA_MACRO_3, "{KC_LCTL,KC_LALT,KC_LGUI,KC_C}") \
     MACRO(VIA_MACRO_4, "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}") \
-    MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}") \
-    MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}") \
-    MACRO(VIA_MACRO_7, "") \
-    MACRO(VIA_MACRO_8, "") \
-    MACRO(VIA_MACRO_9, "") \
-    MACRO(VIA_MACRO_10, "") \
-    MACRO(VIA_MACRO_11, "") \
-    MACRO(VIA_MACRO_12, "") \
-    MACRO(VIA_MACRO_13, "") \
-    MACRO(VIA_MACRO_14, "") \
+    MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}")       \
+    MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}")         \
+    MACRO(VIA_MACRO_7, "")                               \
+    MACRO(VIA_MACRO_8, "")                               \
+    MACRO(VIA_MACRO_9, "")                               \
+    MACRO(VIA_MACRO_10, "")                              \
+    MACRO(VIA_MACRO_11, "")                              \
+    MACRO(VIA_MACRO_12, "")                              \
+    MACRO(VIA_MACRO_13, "")                              \
+    MACRO(VIA_MACRO_14, "")                              \
     MACRO(VIA_MACRO_15, "")
 
 // ─── Hardcoded Macros ───────────────────────────────────────────────────────
