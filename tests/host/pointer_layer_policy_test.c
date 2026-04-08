@@ -116,6 +116,16 @@ static void test_anchored_pd_mode_restores_auto_mouse_layer_when_dropped(void) {
     CHECK((next & ((layer_state_t)1u << 4)) != 0);
 }
 
+static void test_auto_mouse_toggle_restores_auto_mouse_layer_when_dropped(void) {
+    test_reset_stubs();
+    fake_auto_mouse_toggle = true;
+    fake_auto_mouse_layer  = 4;
+
+    layer_state_t next = pointer_layer_policy_apply((layer_state_t)1u << 0);
+
+    CHECK((next & ((layer_state_t)1u << 4)) != 0);
+}
+
 static void test_nav_layer_takes_over_when_auto_mouse_is_not_anchored(void) {
     test_reset_stubs();
     fake_auto_mouse_layer = 4;
@@ -138,14 +148,28 @@ static void test_nav_layer_does_not_steal_from_anchored_pd_mode(void) {
     CHECK((next & ((layer_state_t)1u << 4)) != 0);
 }
 
+static void test_auto_mouse_key_tracker_keeps_auto_mouse_layer_anchored_against_nav(void) {
+    test_reset_stubs();
+    fake_auto_mouse_key_tracker = 1;
+    fake_auto_mouse_layer       = 4;
+
+    layer_state_t state = ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER) | ((layer_state_t)1u << 4);
+    layer_state_t next  = pointer_layer_policy_apply(state);
+
+    CHECK((next & ((layer_state_t)1u << 4)) != 0);
+    CHECK((next & ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER)) != 0);
+}
+
 int main(void) {
     test_non_arrow_pd_mode_marks_layer_holds_as_mouse_records();
     test_arrow_mode_does_not_anchor_layer_hold_keys();
     test_non_arrow_pd_mode_keys_and_dpi_keys_count_as_mouse_records();
     test_arrow_mode_prefers_typing_layer_over_auto_mouse_layer();
     test_anchored_pd_mode_restores_auto_mouse_layer_when_dropped();
+    test_auto_mouse_toggle_restores_auto_mouse_layer_when_dropped();
     test_nav_layer_takes_over_when_auto_mouse_is_not_anchored();
     test_nav_layer_does_not_steal_from_anchored_pd_mode();
+    test_auto_mouse_key_tracker_keeps_auto_mouse_layer_anchored_against_nav();
 
     puts("pointer_layer_policy host tests passed");
     return 0;

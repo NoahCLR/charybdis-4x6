@@ -37,9 +37,10 @@
 #define KC_AUDIO_VOL_UP 0x00AAu
 #define KC_BRID 0x006Fu
 #define KC_BRIU 0x0070u
-#define SAFE_RANGE 0x5F00u
+#define QK_USER 0x7E40u
+#define SAFE_RANGE QK_USER
 
-#define MOD_BIT(keycode_) (1u << (((keycode_) & 0x00FFu) - KC_LEFT_CTRL))
+#define MOD_BIT(keycode_) (1u << ((keycode_) & 0x07u))
 
 #define CUSTOM_TAP_HOLD_TERM 200u
 #define CUSTOM_LONGER_HOLD_TERM 350u
@@ -51,10 +52,14 @@
 #define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
 #define DYNAMIC_KEYMAP_MACRO_COUNT 16u
 
-#define QK_MOMENTARY 0x5000u
-#define QK_LAYER_TAP 0x6000u
-#define QK_MODS 0x1F00u
-#define QK_MOUSE_BUTTON_1 0x7000u
+#define QK_MODS 0x0100u
+#define QK_MODS_MAX 0x1FFFu
+#define QK_LAYER_TAP 0x4000u
+#define QK_LAYER_TAP_MAX 0x4FFFu
+#define QK_MOMENTARY 0x5220u
+#define QK_MOMENTARY_MAX 0x523Fu
+#define QK_MOUSE_BUTTON_1 0x00D1u
+#define QK_MOUSE_BUTTON_8 0x00D8u
 #define QK_LCTL 0x0100u
 #define QK_LSFT 0x0200u
 #define QK_LALT 0x0400u
@@ -67,17 +72,17 @@
 #define MS_BTN2 ((uint16_t)(QK_MOUSE_BUTTON_1 + 1))
 #define MS_BTN3 ((uint16_t)(QK_MOUSE_BUTTON_1 + 2))
 
-#define MO(layer_) ((uint16_t)(QK_MOMENTARY | ((layer_) & 0x00FFu)))
+#define MO(layer_) ((uint16_t)(QK_MOMENTARY | ((layer_) & 0x001Fu)))
 #define LT(layer_, keycode_) ((uint16_t)(QK_LAYER_TAP | (((layer_) & 0x000Fu) << 8) | ((keycode_) & 0x00FFu)))
 
-#define IS_QK_MOMENTARY(keycode_) ((((keycode_)) & 0xFF00u) == QK_MOMENTARY)
-#define IS_QK_LAYER_TAP(keycode_) ((((keycode_)) & 0xF000u) == QK_LAYER_TAP)
-#define IS_QK_MODS(keycode_) ((((keycode_) & QK_MODS) != 0) && (((keycode_) & 0xE000u) == 0))
+#define IS_QK_MOMENTARY(keycode_) ((keycode_) >= QK_MOMENTARY && (keycode_) <= QK_MOMENTARY_MAX)
+#define IS_QK_LAYER_TAP(keycode_) ((keycode_) >= QK_LAYER_TAP && (keycode_) <= QK_LAYER_TAP_MAX)
+#define IS_QK_MODS(keycode_) ((keycode_) >= QK_MODS && (keycode_) <= QK_MODS_MAX)
 #define IS_QK_MACRO(keycode_) ((keycode_) >= QK_MACRO_0 && (keycode_) < (QK_MACRO_0 + DYNAMIC_KEYMAP_MACRO_COUNT))
-#define IS_MOUSEKEY_BUTTON(keycode_) ((keycode_) >= QK_MOUSE_BUTTON_1 && (keycode_) < (QK_MOUSE_BUTTON_1 + 8))
+#define IS_MOUSEKEY_BUTTON(keycode_) ((keycode_) >= QK_MOUSE_BUTTON_1 && (keycode_) <= QK_MOUSE_BUTTON_8)
 #define IS_MODIFIER_KEYCODE(keycode_) (((keycode_) & 0xFFF8u) == KC_LEFT_CTRL)
 #define QK_MODS_GET_BASIC_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
-#define QK_MOMENTARY_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
+#define QK_MOMENTARY_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x001Fu))
 #define QK_LAYER_TAP_GET_LAYER(keycode_) ((uint8_t)(((keycode_) >> 8) & 0x000Fu))
 #define QK_LAYER_TAP_GET_TAP_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
 

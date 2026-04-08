@@ -27,6 +27,7 @@ typedef struct {
 #define TEST_MACRO_BUFFER_SIZE 64
 
 static uint8_t     macro_buffer[TEST_MACRO_BUFFER_SIZE];
+static uint16_t    fake_macro_buffer_size;
 static test_call_t test_calls[TEST_MAX_CALLS];
 static uint8_t     test_call_count;
 
@@ -54,6 +55,7 @@ static void test_log_call(test_call_kind_t kind, uint16_t value, uint8_t interva
 static void test_reset_state(void) {
     memset(macro_buffer, 0, sizeof(macro_buffer));
     memset(test_calls, 0, sizeof(test_calls));
+    fake_macro_buffer_size = sizeof(macro_buffer);
     test_call_count = 0;
 }
 
@@ -62,7 +64,7 @@ uint8_t dynamic_keymap_macro_get_count(void) {
 }
 
 uint16_t dynamic_keymap_macro_get_buffer_size(void) {
-    return sizeof(macro_buffer);
+    return fake_macro_buffer_size;
 }
 
 void dynamic_keymap_macro_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
@@ -289,12 +291,63 @@ static void test_macro_slot_lookup_skips_null_terminated_entries(void) {
     CHECK(test_calls[1].value == TAP_CODE_DELAY);
 }
 
+static void test_out_of_range_macro_slot_is_ignored(void) {
+    test_reset_state();
+    macro_buffer[0] = 'A';
+    macro_buffer[1] = 0;
+
+    noah_action_tap(QK_MACRO_0 + 2);
+
+    CHECK(test_call_count == 0);
+}
+
+static void test_zero_sized_macro_buffer_is_ignored(void) {
+    test_reset_state();
+    fake_macro_buffer_size = 0;
+
+    noah_action_tap(QK_MACRO_0);
+
+    CHECK(test_call_count == 0);
+}
+
+static void test_non_terminated_macro_buffer_is_ignored(void) {
+    test_reset_state();
+    macro_buffer[0]                         = 'A';
+    macro_buffer[TEST_MACRO_BUFFER_SIZE - 1] = 'Z';
+
+    noah_action_tap(QK_MACRO_0);
+
+    CHECK(test_call_count == 0);
+}
+
+static void test_unterminated_delay_command_matches_current_via_behavior(void) {
+    test_reset_state();
+    fake_macro_buffer_size = 5;
+    macro_buffer[0]        = SS_QMK_PREFIX;
+    macro_buffer[1]        = SS_DELAY_CODE;
+    macro_buffer[2]        = '2';
+    macro_buffer[3]        = '5';
+    macro_buffer[4]        = 0;
+
+    noah_action_tap(QK_MACRO_0);
+
+    CHECK(test_call_count == 2);
+    CHECK(test_calls[0].kind == TEST_CALL_WAIT);
+    CHECK(test_calls[0].value == 25);
+    CHECK(test_calls[1].kind == TEST_CALL_WAIT);
+    CHECK(test_calls[1].value == TAP_CODE_DELAY);
+}
+
 int main(void) {
     test_qmk_tap_command_uses_owned_tap();
     test_qmk_down_and_up_commands_use_owned_register_and_unregister();
     test_delay_command_matches_upstream_parsing();
     test_plain_text_uses_send_char_with_delay();
     test_macro_slot_lookup_skips_null_terminated_entries();
+    test_out_of_range_macro_slot_is_ignored();
+    test_zero_sized_macro_buffer_is_ignored();
+    test_non_terminated_macro_buffer_is_ignored();
+    test_unterminated_delay_command_matches_current_via_behavior();
 
     puts("via macro action_lifecycle host tests passed");
     return 0;

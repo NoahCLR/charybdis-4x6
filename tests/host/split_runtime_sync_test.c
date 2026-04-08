@@ -64,19 +64,6 @@ static void test_reset_stubs(void) {
     remote_snapshot_locked      = 0;
 }
 
-static uint16_t test_expected_quantized_progress(uint16_t raw_elapsed) {
-    if (raw_elapsed > AUTO_MOUSE_TIME) {
-        raw_elapsed = AUTO_MOUSE_TIME;
-    }
-
-    if (raw_elapsed <= AUTOMOUSE_RGB_DEAD_TIME) {
-        return 0;
-    }
-
-    uint16_t progress = raw_elapsed - AUTOMOUSE_RGB_DEAD_TIME;
-    return (uint16_t)(progress / AUTOMOUSE_RGB_SYNC_STEP * AUTOMOUSE_RGB_SYNC_STEP);
-}
-
 uint32_t timer_read32(void) {
     return fake_time32;
 }
@@ -143,7 +130,7 @@ static void test_init_registers_rpc_and_sends_initial_packet_on_master(void) {
     CHECK(rpc_registered_id == PUT_SPLIT_RUNTIME_SYNC);
     CHECK(rpc_registered_callback != NULL);
     CHECK(rpc_send_count == 1);
-    CHECK(rpc_last_packet.automouse_progress == test_expected_quantized_progress(fake_auto_mouse_elapsed));
+    CHECK(rpc_last_packet.automouse_progress == 60u);
     CHECK(rpc_last_packet.pd_mode_flags == fake_pd_active_flags);
     CHECK(rpc_last_packet.pd_mode_locked_flags == fake_pd_locked_flags);
     CHECK(rpc_last_packet.key_feedback_flags == fake_key_feedback_flags);
@@ -211,7 +198,39 @@ static void test_tick_uses_auto_mouse_elapsed_when_packet_changes(void) {
     split_runtime_sync_tick();
 
     CHECK(rpc_send_count == 1);
-    CHECK(rpc_last_packet.automouse_progress == test_expected_quantized_progress(91u));
+    CHECK(rpc_last_packet.automouse_progress == 70u);
+}
+
+static void test_automouse_progress_quantizes_concrete_boundaries(void) {
+    test_reset_stubs();
+    fake_auto_mouse_elapsed = 0u;
+    split_runtime_sync_init();
+    CHECK(rpc_last_packet.automouse_progress == 0u);
+
+    test_reset_stubs();
+    fake_auto_mouse_elapsed = 20u;
+    split_runtime_sync_init();
+    CHECK(rpc_last_packet.automouse_progress == 0u);
+
+    test_reset_stubs();
+    fake_auto_mouse_elapsed = 21u;
+    split_runtime_sync_init();
+    CHECK(rpc_last_packet.automouse_progress == 0u);
+
+    test_reset_stubs();
+    fake_auto_mouse_elapsed = 30u;
+    split_runtime_sync_init();
+    CHECK(rpc_last_packet.automouse_progress == 10u);
+
+    test_reset_stubs();
+    fake_auto_mouse_elapsed = 120u;
+    split_runtime_sync_init();
+    CHECK(rpc_last_packet.automouse_progress == 100u);
+
+    test_reset_stubs();
+    fake_auto_mouse_elapsed = 250u;
+    split_runtime_sync_init();
+    CHECK(rpc_last_packet.automouse_progress == 100u);
 }
 
 static void test_slave_rpc_applies_exact_packet_and_snapshot(void) {
@@ -267,6 +286,7 @@ int main(void) {
     test_force_sync_sends_even_when_packet_is_unchanged();
     test_locked_pd_mode_zeroes_automouse_progress();
     test_tick_uses_auto_mouse_elapsed_when_packet_changes();
+    test_automouse_progress_quantizes_concrete_boundaries();
     test_slave_rpc_applies_exact_packet_and_snapshot();
     test_slave_rpc_ignores_short_packets();
 
