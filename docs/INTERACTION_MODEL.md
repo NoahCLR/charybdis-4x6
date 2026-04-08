@@ -94,7 +94,7 @@ In practice, the common families look like this:
 - keycodes without a default held path, such as most custom keycodes, do not
   invent one just because a tap override exists
 
-## The Three Hold Modes
+## The Four Hold Modes
 
 Not every hold behaves the same way.
 
@@ -110,6 +110,20 @@ is held, such as:
 - a media or navigation action that should stay registered while held
 - a momentary layer hold
 - a momentary pointing-device mode hold
+
+### `REPEAT_WHILE_HELD`
+
+The alternate action fires once at the hold threshold, then keeps firing at the
+authored repeat rate until you let go.
+
+Use this when the action should behave like repeated taps rather than one held
+registration, such as:
+
+- repeated left click or other mouse-button spam
+- repeated navigation taps
+- repeated media or macro triggers that should stop immediately on release
+
+Authored repeat rates are currently limited to `1..100 Hz`.
 
 ### `TAP_AT_HOLD_THRESHOLD`
 

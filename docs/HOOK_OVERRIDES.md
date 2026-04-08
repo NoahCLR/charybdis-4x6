@@ -187,4 +187,5 @@ enum keymap_custom_keycodes {
 
 Those keycodes can be handled in `process_record_user()` and also used in
 `key_behaviors[]` actions such as `TAP_SENDS(...)`,
-`TAP_AT_HOLD_THRESHOLD(...)`, and `PRESS_AND_HOLD_UNTIL_RELEASE(...)`.
+`TAP_AT_HOLD_THRESHOLD(...)`, `REPEAT_WHILE_HELD(...)`, and
+`PRESS_AND_HOLD_UNTIL_RELEASE(...)`.

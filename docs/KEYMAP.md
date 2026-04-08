@@ -61,6 +61,7 @@ There are also current per-key exceptions:
 
 - `RIGHT_THUMB` uses `.tap_hold_term = 100`
 - `LT(LAYER_NAV, KC_SLSH)` uses `.tap_hold_term = 100`
+- `CLICK_SPAM` uses `.tap_hold_term = 1`
 
 ## Base Layer Highlights
 
@@ -79,8 +80,10 @@ lot of the profile's structure:
 The current combo set is intentionally small:
 
 - `KC_D` + `LT(LAYER_NAV, KC_F)` -> `KC_TAB`
+- `MS_BTN1` + `MS_BTN2` -> `CLICK_SPAM`
 
-That keeps the layout readable while still giving one easy chorded `Tab`.
+That keeps the layout readable while still giving one easy chorded `Tab` and a
+single pointer-specific utility chord.
 
 ## Signature Behaviors
 
@@ -196,6 +199,20 @@ line movement onto two keys:
 
 That gives the current profile character, word, and line movement on the same
 two switches.
+
+### Click Spam
+
+`CLICK_SPAM` is a keymap-local custom keycode used only as a combo output. It
+does not appear directly in `keymaps[][]`.
+
+The current authored path is:
+
+- `MS_BTN1` + `MS_BTN2` combo -> `CLICK_SPAM`
+- `CLICK_SPAM` hold -> `REPEAT_WHILE_HELD(MS_BTN1, 25)`
+
+So pressing both primary mouse buttons together on `LAYER_NAV` or
+`LAYER_POINTER` turns into a held repeat action that taps left click at `25 Hz`
+until release.
 
 ## Layer Walkthrough
 

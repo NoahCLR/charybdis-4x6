@@ -41,8 +41,9 @@ to understand and easy to change:
   tap, hold, and longer-hold actions at each tap count, plus per-key timing
   overrides. Actions can be plain keycodes, macros, layer locks, pointer-mode
   locks, supported QMK behavior keycodes like `OSM()` or `MT()`, owned
-  momentary layer holds such as `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))`, or
-  keymap-local custom keycodes
+  momentary layer holds such as `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))`,
+  repeat holds such as `REPEAT_WHILE_HELD(KC_LEFT, 25)`, or keymap-local
+  custom keycodes
 - pointer modes are a core part of what makes this userspace different: the
   trackball can become dragscroll, pinch, zoom, arrows, volume, or brightness,
   with plain mode keycodes working as default momentary holds and
@@ -256,11 +257,16 @@ If one of those fields is omitted, C zero-initializes it. A value of `0` means
 
 ### Hold Tiers
 
-The custom keys support three different hold styles:
+The custom keys support four different hold styles:
 
 - `PRESS_AND_HOLD_UNTIL_RELEASE(...)`: activate at threshold and keep held
+- `REPEAT_WHILE_HELD(action, hz)`: fire once at threshold, then keep tapping at
+  the authored cadence while held
 - `TAP_AT_HOLD_THRESHOLD(...)`: fire once immediately at threshold
 - `TAP_ON_RELEASE_AFTER_HOLD(...)`: qualify the hold, then fire once on release
+
+`REPEAT_WHILE_HELD(...)` currently supports authored frequencies in the range
+`1..100 Hz`.
 
 That is what lets one key behave differently in different contexts without
 inventing a separate timing system for each feature.
