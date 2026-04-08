@@ -22,7 +22,8 @@ typedef enum {
     KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION,
     KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER,
     KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER,
-    KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_HELD_ACTION_OWNED_BY_KEY,
+    KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+    KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START,
     KEY_RUNTIME_TRANSITION_EFFECT_LAYER_PRESS,
     KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE,
     KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE,
@@ -39,6 +40,11 @@ typedef struct {
             uint16_t  action;
         } held_action;
         keypos_t key_pos;
+        struct {
+            keypos_t  key_pos;
+            uint16_t  action;
+            uint16_t  repeat_hz;
+        } repeat;
         struct {
             keypos_t key_pos;
             uint8_t  layer;

@@ -20,6 +20,7 @@ typedef struct {
     keypos_t        key_pos;
     bool            hold_fired;
     uint16_t        held_action_keycode;
+    bool            repeat_binding_active;
     uint16_t        tap_action;
     uint16_t        tap_hold_term;
     uint16_t        longer_hold_term;

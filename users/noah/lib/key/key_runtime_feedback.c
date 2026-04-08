@@ -118,6 +118,18 @@ uint8_t key_feedback_pack(void) {
         return flags;
     }
 
+    if (active_key.repeat_binding_active) {
+        flags |= KEY_FEEDBACK_FLAG_LEVEL_FLASH;
+        flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
+        if (((timer_read() / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0) {
+            flags |= KEY_FEEDBACK_FLAG_FLASH_PHASE;
+        }
+        if (long_hold_reached) {
+            flags |= KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE;
+        }
+        return flags;
+    }
+
     if (long_hold_reached && hold_sends_on_release(active_key.long_hold)) {
         // TAP_ON_RELEASE_AFTER_HOLD keeps feedback visible because the action
         // is still pending until release.

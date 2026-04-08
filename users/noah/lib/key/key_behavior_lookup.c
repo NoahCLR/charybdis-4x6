@@ -84,6 +84,16 @@ static void key_behavior_log_invalid_action(uint8_t index, uint8_t tap_count, co
 #endif
 }
 
+static void key_behavior_log_invalid_repeat_rate(uint8_t index, uint8_t tap_count, const char *field) {
+#ifdef CONSOLE_ENABLE
+    uprintf("Invalid key_behaviors[%u].tap_counts[%u].%s REPEAT_WHILE_HELD frequency; use a value greater than 0 Hz\n", (unsigned int)index, (unsigned int)tap_count, field);
+#else
+    (void)index;
+    (void)tap_count;
+    (void)field;
+#endif
+}
+
 key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
     return key_behavior_step_lookup_in_config(key_behavior_config_lookup(keycode), tap_count);
 }
@@ -141,9 +151,15 @@ void key_behavior_validate_all(void) {
             if (step.hold.present && !key_behavior_action_supported(step.hold.action, step.hold.mode)) {
                 key_behavior_log_invalid_action(i, tap_index, "hold", step.hold.action, step.hold.mode);
             }
+            if (step.hold.present && step.hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && step.hold.repeat_hz == 0) {
+                key_behavior_log_invalid_repeat_rate(i, tap_index, "hold");
+            }
 
             if (step.long_hold.present && !key_behavior_action_supported(step.long_hold.action, step.long_hold.mode)) {
                 key_behavior_log_invalid_action(i, tap_index, "long_hold", step.long_hold.action, step.long_hold.mode);
+            }
+            if (step.long_hold.present && step.long_hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && step.long_hold.repeat_hz == 0) {
+                key_behavior_log_invalid_repeat_rate(i, tap_index, "long_hold");
             }
         }
     }

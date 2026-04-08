@@ -5,17 +5,13 @@
 
 #define _KEYMAP_CONCAT_INNER(a_, b_) a_##b_
 #define _KEYMAP_CONCAT(a_, b_) _KEYMAP_CONCAT_INNER(a_, b_)
-#define _KEYMAP_COMBO_KEYS_NAME(line_) _KEYMAP_CONCAT(combo_keys_, line_)
 #define _KEYMAP_VIA_MACRO_PAYLOAD_ENTRY(keycode_, payload_) [((keycode_) - VIA_MACRO_0)] = (payload_),
 #define _KEYMAP_HARDCODED_MACRO_PAYLOAD_ENTRY(keycode_, payload_) [((keycode_) - MACRO_0)] = (payload_),
 #define _KEYMAP_STRIP_PARENS(...) __VA_ARGS__
-#define _KEYMAP_COMBO_KEYS_DEF(result_, keys_) const uint16_t PROGMEM _KEYMAP_COMBO_KEYS_NAME(__LINE__)[] = {_KEYMAP_STRIP_PARENS keys_, COMBO_END};
-#define _KEYMAP_COMBO_BIND_DEF(result_, keys_) COMBO(_KEYMAP_COMBO_KEYS_NAME(__LINE__), result_),
+#define _KEYMAP_COMBO_BIND_DEF(result_, keys_) COMBO(((const uint16_t[]){_KEYMAP_STRIP_PARENS keys_, COMBO_END}), result_),
 
 #ifdef COMBO_ENABLE
-#    define _KEYMAP_COMBO_DATA()                          \
-        COMBOS(_KEYMAP_COMBO_KEYS_DEF)                    \
-        combo_t key_combos[] = {COMBOS(_KEYMAP_COMBO_BIND_DEF)};
+#    define _KEYMAP_COMBO_DATA() combo_t key_combos[] = {COMBOS(_KEYMAP_COMBO_BIND_DEF)};
 #else
 #    define _KEYMAP_COMBO_DATA()
 #endif

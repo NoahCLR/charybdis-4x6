@@ -33,6 +33,8 @@
 //     PRESS_AND_HOLD_UNTIL_RELEASE -> fires at threshold via matrix_scan,
 //       registered for auto-repeat, can transition to long hold.
 //     TAP_AT_HOLD_THRESHOLD -> fires once at threshold via matrix_scan.
+//     REPEAT_WHILE_HELD -> fires once at threshold via matrix_scan, then keeps
+//       tapping at the authored cadence until release.
 //     TAP_ON_RELEASE_AFTER_HOLD -> does not fire at threshold; resolved
 //       entirely on release.
 //

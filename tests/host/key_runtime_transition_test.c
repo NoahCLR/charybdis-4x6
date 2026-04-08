@@ -28,7 +28,8 @@ typedef enum {
     TEST_CALL_DISPATCH_ACTION,
     TEST_CALL_HELD_REGISTER,
     TEST_CALL_HELD_UNREGISTER,
-    TEST_CALL_RELEASE_HELD_OWNED_BY_KEY,
+    TEST_CALL_RELEASE_OWNED_BY_KEY,
+    TEST_CALL_REPEAT_START,
     TEST_CALL_LAYER_PRESS,
     TEST_CALL_LAYER_RELEASE,
     TEST_CALL_FEEDBACK_PULSE,
@@ -311,8 +312,13 @@ bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
 }
 
 bool held_action_release_owned_by_key(keypos_t key_pos) {
-    test_log_call(TEST_CALL_RELEASE_HELD_OWNED_BY_KEY, KC_NO, key_pos, 0, false, (delayed_action_mods_t){0});
+    test_log_call(TEST_CALL_RELEASE_OWNED_BY_KEY, KC_NO, key_pos, 0, false, (delayed_action_mods_t){0});
     return true;
+}
+
+void held_action_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
+    (void)repeat_hz;
+    test_log_call(TEST_CALL_REPEAT_START, action, key_pos, 0, false, (delayed_action_mods_t){0});
 }
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
@@ -417,15 +423,16 @@ static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
     CHECK(key_runtime_transition_handled_key_release(TEST_PD_MODE_KEY, &record, key, &plan));
 
     CHECK(plan.count == 2);
-    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER);
-    CHECK(plan.effects[0].data.held_action.action == TEST_PD_MODE_KEY);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK(plan.effects[0].data.key_pos.row == record.event.key.row);
+    CHECK(plan.effects[0].data.key_pos.col == record.event.key.col);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_PD_MODE_LOCK_TAP);
     CHECK(plan.effects[1].data.pd_mode == PD_MODE_VOLUME);
     CHECK(active_key.keycode == KC_NO);
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 2);
-    CHECK(test_calls[0].kind == TEST_CALL_HELD_UNREGISTER);
+    CHECK(test_calls[0].kind == TEST_CALL_RELEASE_OWNED_BY_KEY);
     CHECK(test_calls[1].kind == TEST_CALL_SYNC_SPLIT_RUNTIME);
     CHECK((pd_locked_modes & PD_MODE_VOLUME) == 0);
 }
@@ -454,16 +461,16 @@ static void test_quick_release_immediate_hold_unregisters_then_taps(void) {
     CHECK(key_runtime_transition_handled_key_release(TEST_NEW_KEY, &record, key, &plan));
 
     CHECK(plan.count == 2);
-    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER);
-    CHECK(plan.effects[0].data.held_action.action == TEST_IMMEDIATE_HOLD);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK(plan.effects[0].data.key_pos.row == record.event.key.row);
+    CHECK(plan.effects[0].data.key_pos.col == record.event.key.col);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
     CHECK(plan.effects[1].data.action == TEST_FALLBACK_TAP_ACTION);
     CHECK(active_key.keycode == KC_NO);
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 2);
-    CHECK(test_calls[0].kind == TEST_CALL_HELD_UNREGISTER);
-    CHECK(test_calls[0].action == TEST_IMMEDIATE_HOLD);
+    CHECK(test_calls[0].kind == TEST_CALL_RELEASE_OWNED_BY_KEY);
     CHECK(test_calls[1].kind == TEST_CALL_DISPATCH_ACTION);
     CHECK(test_calls[1].action == TEST_FALLBACK_TAP_ACTION);
 }
@@ -719,6 +726,35 @@ static void test_release_hold_prefers_long_hold_after_longer_term(void) {
     CHECK(plan.effects[0].data.action == TEST_MULTI_STEP_ACTION);
 }
 
+static void test_release_repeat_hold_releases_owned_state(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   record = test_record(test_keypos(2, 2), false);
+    handled_key_view_t            key    = test_handled_key(TEST_NEW_KEY);
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .timer                 = (uint16_t)(fake_time - 160),
+        .keycode               = TEST_NEW_KEY,
+        .key_pos               = record.event.key,
+        .tap_hold_term         = 120,
+        .hold_fired            = true,
+        .repeat_binding_active = true,
+        .hold                  = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_release(TEST_NEW_KEY, &record, key, &plan));
+
+    CHECK(plan.count == 1);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK(plan.effects[0].data.key_pos.row == record.event.key.row);
+    CHECK(plan.effects[0].data.key_pos.col == record.event.key.col);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(test_call_count == 1);
+    CHECK(test_calls[0].kind == TEST_CALL_RELEASE_OWNED_BY_KEY);
+}
+
 static void test_mismatched_release_releases_owned_held_action(void) {
     key_runtime_transition_plan_t plan;
     keyrecord_t                   record = test_record(test_keypos(7, 7), false);
@@ -734,13 +770,13 @@ static void test_mismatched_release_releases_owned_held_action(void) {
     CHECK(key_runtime_transition_handled_key_release(TEST_NEW_KEY, &record, key, &plan));
 
     CHECK(plan.count == 1);
-    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_HELD_ACTION_OWNED_BY_KEY);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
     CHECK(plan.effects[0].data.key_pos.row == record.event.key.row);
     CHECK(plan.effects[0].data.key_pos.col == record.event.key.col);
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 1);
-    CHECK(test_calls[0].kind == TEST_CALL_RELEASE_HELD_OWNED_BY_KEY);
+    CHECK(test_calls[0].kind == TEST_CALL_RELEASE_OWNED_BY_KEY);
     CHECK(test_calls[0].key_pos.row == record.event.key.row);
     CHECK(test_calls[0].key_pos.col == record.event.key.col);
 }
@@ -862,6 +898,39 @@ static void test_scan_promotes_pending_multi_tap_hold(void) {
     CHECK(multi_tap.count == 0);
 }
 
+static void test_scan_starts_repeat_hold_at_threshold(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .timer         = (uint16_t)(fake_time - 170),
+        .keycode       = TEST_NEW_KEY,
+        .key_pos       = test_keypos(6, 3),
+        .tap_hold_term = 120,
+        .hold          = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 2);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START);
+    CHECK(plan.effects[0].data.repeat.key_pos.row == active_key.key_pos.row);
+    CHECK(plan.effects[0].data.repeat.key_pos.col == active_key.key_pos.col);
+    CHECK(plan.effects[0].data.repeat.action == TEST_THRESHOLD_HOLD);
+    CHECK(plan.effects[0].data.repeat.repeat_hz == 25);
+    CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
+    CHECK(!plan.effects[1].data.long_hold_level);
+    CHECK(active_key.repeat_binding_active);
+    CHECK(active_key.hold_fired);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(test_call_count == 2);
+    CHECK(test_calls[0].kind == TEST_CALL_REPEAT_START);
+    CHECK(test_calls[0].action == TEST_THRESHOLD_HOLD);
+    CHECK(test_calls[1].kind == TEST_CALL_FEEDBACK_PULSE);
+}
+
 static void test_scan_commits_immediate_hold_threshold_with_feedback(void) {
     key_runtime_transition_plan_t plan;
 
@@ -940,8 +1009,9 @@ static void test_scan_promotes_to_long_hold_and_replaces_held_action(void) {
     key_runtime_transition_scan(&plan);
 
     CHECK(plan.count == 3);
-    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER);
-    CHECK(plan.effects[0].data.held_action.action == TEST_THRESHOLD_HOLD);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK(plan.effects[0].data.key_pos.row == active_key.key_pos.row);
+    CHECK(plan.effects[0].data.key_pos.col == active_key.key_pos.col);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
     CHECK(plan.effects[1].data.action == TEST_MULTI_STEP_ACTION);
     CHECK(plan.effects[2].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
@@ -951,7 +1021,45 @@ static void test_scan_promotes_to_long_hold_and_replaces_held_action(void) {
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 3);
-    CHECK(test_calls[0].kind == TEST_CALL_HELD_UNREGISTER);
+    CHECK(test_calls[0].kind == TEST_CALL_RELEASE_OWNED_BY_KEY);
+    CHECK(test_calls[1].kind == TEST_CALL_DISPATCH_ACTION);
+    CHECK(test_calls[1].action == TEST_MULTI_STEP_ACTION);
+    CHECK(test_calls[2].kind == TEST_CALL_FEEDBACK_PULSE);
+    CHECK(test_calls[2].long_hold_level);
+}
+
+static void test_scan_promotes_repeat_hold_to_long_hold(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .timer                 = (uint16_t)(fake_time - 260),
+        .keycode               = TEST_NEW_KEY,
+        .key_pos               = test_keypos(3, 1),
+        .tap_hold_term         = 120,
+        .longer_hold_term      = 240,
+        .repeat_binding_active = true,
+        .hold                  = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
+        .long_hold             = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION),
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 3);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK(plan.effects[0].data.key_pos.row == active_key.key_pos.row);
+    CHECK(plan.effects[0].data.key_pos.col == active_key.key_pos.col);
+    CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
+    CHECK(plan.effects[1].data.action == TEST_MULTI_STEP_ACTION);
+    CHECK(plan.effects[2].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
+    CHECK(plan.effects[2].data.long_hold_level);
+    CHECK(!active_key.repeat_binding_active);
+    CHECK(active_key.hold_fired);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(test_call_count == 3);
+    CHECK(test_calls[0].kind == TEST_CALL_RELEASE_OWNED_BY_KEY);
     CHECK(test_calls[1].kind == TEST_CALL_DISPATCH_ACTION);
     CHECK(test_calls[1].action == TEST_MULTI_STEP_ACTION);
     CHECK(test_calls[2].kind == TEST_CALL_FEEDBACK_PULSE);
@@ -1010,13 +1118,16 @@ int main(void) {
     test_modifier_multi_tap_second_tap_dispatches_action();
     test_interrupted_momentary_layer_release_only_releases_layer();
     test_release_hold_prefers_long_hold_after_longer_term();
+    test_release_repeat_hold_releases_owned_state();
     test_mismatched_release_releases_owned_held_action();
     test_press_flushes_previous_tap_and_registers_immediate_hold();
     test_release_pending_multi_tap_hold_registers_then_unregisters_held_action();
     test_scan_promotes_pending_multi_tap_hold();
+    test_scan_starts_repeat_hold_at_threshold();
     test_scan_commits_immediate_hold_threshold_with_feedback();
     test_scan_commits_implicit_hold_without_feedback();
     test_scan_promotes_to_long_hold_and_replaces_held_action();
+    test_scan_promotes_repeat_hold_to_long_hold();
     test_scan_pending_multi_tap_long_hold_releases_layer_before_lock();
 
     puts("key_runtime_transition host tests passed");

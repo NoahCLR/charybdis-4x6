@@ -21,6 +21,7 @@ typedef enum {
     HOLD_THRESHOLD_DISPATCH_NONE = 0,
     HOLD_THRESHOLD_DISPATCH_TAP,
     HOLD_THRESHOLD_DISPATCH_HELD,
+    HOLD_THRESHOLD_DISPATCH_REPEAT,
 } hold_threshold_dispatch_t;
 
 typedef enum {
@@ -31,7 +32,7 @@ typedef enum {
 } active_key_release_outcome_t;
 
 typedef struct {
-    bool                        unregister_held_action;
+    bool                        release_owned_state;
     active_key_release_outcome_t outcome;
     uint16_t                    action;
     pd_mode_mask_t              pd_mode_lock_tap;
@@ -122,10 +123,22 @@ static void key_runtime_transition_plan_held_unregister(key_runtime_transition_p
                                         });
 }
 
-static void key_runtime_transition_plan_release_held_owned_by_key(key_runtime_transition_plan_t *plan, keypos_t key_pos) {
+static void key_runtime_transition_plan_release_owned_state_by_key(key_runtime_transition_plan_t *plan, keypos_t key_pos) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind         = KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_HELD_ACTION_OWNED_BY_KEY,
+                                            .kind         = KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
                                             .data.key_pos = key_pos,
+                                        });
+}
+
+static void key_runtime_transition_plan_repeat_start(key_runtime_transition_plan_t *plan, keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
+    key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
+                                            .kind = KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START,
+                                            .data.repeat =
+                                                {
+                                                    .key_pos   = key_pos,
+                                                    .action    = action,
+                                                    .repeat_hz = repeat_hz,
+                                                },
                                         });
 }
 
@@ -201,8 +214,11 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
             case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER:
                 held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_HELD_ACTION_OWNED_BY_KEY:
+            case KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
                 held_action_release_owned_by_key(effect->data.key_pos);
+                break;
+            case KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START:
+                held_action_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_PRESS:
                 layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
@@ -233,12 +249,13 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 static void key_runtime_transition_flush_active_key(bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
     if (active_key.keycode == KC_NO) return;
 
-    if (active_key.hold_fired || active_key.held_action_keycode != KC_NO) {
+    if (active_key.hold_fired || active_key.held_action_keycode != KC_NO || active_key.repeat_binding_active) {
         active_key.hold_fired = false;
         if (active_key.held_action_keycode != KC_NO && !active_held_action_survives_flush) {
             key_runtime_transition_plan_held_unregister(plan, active_key.key_pos, active_key.held_action_keycode);
             active_key.held_action_keycode = KC_NO;
         }
+        active_key.repeat_binding_active = false;
     } else if (!is_layer_key(active_key.keycode) && active_key.tap_action != KC_NO) {
         key_runtime_transition_plan_dispatch_action(plan, active_key.tap_action);
     }
@@ -340,10 +357,10 @@ static active_key_release_resolution_t key_runtime_transition_resolve_active_key
     bool                  quick_immediate_hold = hold_registers_on_press(released_key.hold) && quick_tap;
     pd_mode_mask_t        lock_tap_mode        = key_runtime_transition_locked_pd_mode_tap_mode(keycode, released_key, elapsed, behavior);
     active_key_release_resolution_t resolution = {
-        .unregister_held_action = released_key.held_action_keycode != KC_NO,
+        .release_owned_state = released_key.held_action_keycode != KC_NO || released_key.repeat_binding_active,
     };
 
-    if (released_key.hold_fired || released_key.held_action_keycode != KC_NO) {
+    if (released_key.hold_fired || released_key.held_action_keycode != KC_NO || released_key.repeat_binding_active) {
         if (lock_tap_mode) {
             resolution.outcome          = ACTIVE_KEY_RELEASE_OUTCOME_PD_MODE_LOCK_TAP;
             resolution.pd_mode_lock_tap = lock_tap_mode;
@@ -402,8 +419,8 @@ static active_key_release_resolution_t key_runtime_transition_resolve_active_key
 }
 
 static void key_runtime_transition_apply_active_key_release_resolution(uint16_t keycode, active_key_state_t released_key, key_behavior_view_t behavior, active_key_release_resolution_t resolution, key_runtime_transition_plan_t *plan) {
-    if (resolution.unregister_held_action) {
-        key_runtime_transition_plan_held_unregister(plan, released_key.key_pos, released_key.held_action_keycode);
+    if (resolution.release_owned_state) {
+        key_runtime_transition_plan_release_owned_state_by_key(plan, released_key.key_pos);
     }
 
     switch (resolution.outcome) {
@@ -519,7 +536,7 @@ static bool key_runtime_transition_process_active_key_release(uint16_t keycode, 
     }
 
     if (!active_key_matches(keycode, record->event.key)) {
-        key_runtime_transition_plan_release_held_owned_by_key(plan, record->event.key);
+        key_runtime_transition_plan_release_owned_state_by_key(plan, record->event.key);
         return true;
     }
 
@@ -552,6 +569,8 @@ static hold_threshold_dispatch_t key_runtime_transition_hold_threshold_dispatch_
             return HOLD_THRESHOLD_DISPATCH_TAP;
         case HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE:
             return noah_action_hold_kind(hold.action) == NOAH_ACTION_HOLD_KIND_PRESS_ONLY ? HOLD_THRESHOLD_DISPATCH_TAP : HOLD_THRESHOLD_DISPATCH_HELD;
+        case HOLD_BEHAVIOR_REPEAT_WHILE_HELD:
+            return HOLD_THRESHOLD_DISPATCH_REPEAT;
         default:
             return HOLD_THRESHOLD_DISPATCH_NONE;
     }
@@ -571,17 +590,18 @@ static bool key_runtime_transition_hold_activation_needs_pulse(hold_behavior_t h
     return false;
 }
 
-static void key_runtime_transition_clear_active_held_action(key_runtime_transition_plan_t *plan) {
-    if (active_key.held_action_keycode != KC_NO) {
-        key_runtime_transition_plan_held_unregister(plan, active_key.key_pos, active_key.held_action_keycode);
-        active_key.held_action_keycode = KC_NO;
+static void key_runtime_transition_clear_active_owned_hold(key_runtime_transition_plan_t *plan) {
+    if (active_key.held_action_keycode != KC_NO || active_key.repeat_binding_active) {
+        key_runtime_transition_plan_release_owned_state_by_key(plan, active_key.key_pos);
+        active_key.held_action_keycode   = KC_NO;
+        active_key.repeat_binding_active = false;
     }
 }
 
 static void key_runtime_transition_fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_hold, bool pulse_momentary_layer_action, key_runtime_transition_plan_t *plan) {
     switch (key_runtime_transition_hold_threshold_dispatch_kind(hold)) {
         case HOLD_THRESHOLD_DISPATCH_TAP:
-            key_runtime_transition_clear_active_held_action(plan);
+            key_runtime_transition_clear_active_owned_hold(plan);
             key_runtime_transition_plan_dispatch_action(plan, hold.action);
             key_runtime_transition_plan_feedback_pulse(plan, false);
             if (long_hold.present) {
@@ -601,13 +621,21 @@ static void key_runtime_transition_fire_hold_at_threshold(hold_behavior_t hold, 
                 key_runtime_transition_plan_feedback_pulse(plan, false);
             }
             return;
+        case HOLD_THRESHOLD_DISPATCH_REPEAT:
+            key_runtime_transition_clear_active_owned_hold(plan);
+            key_runtime_transition_plan_repeat_start(plan, active_key.key_pos, hold.action, hold.repeat_hz);
+            key_runtime_transition_plan_feedback_pulse(plan, false);
+            active_key.repeat_binding_active = true;
+            active_key.hold_fired            = !long_hold.present;
+            active_key.hold_one_shot_fired   = false;
+            return;
         case HOLD_THRESHOLD_DISPATCH_NONE:
             return;
     }
 }
 
 static void key_runtime_transition_promote_to_long_hold(hold_behavior_t long_hold, bool pulse_momentary_layer_action, key_runtime_transition_plan_t *plan) {
-    key_runtime_transition_clear_active_held_action(plan);
+    key_runtime_transition_clear_active_owned_hold(plan);
 
     switch (key_runtime_transition_hold_threshold_dispatch_kind(long_hold)) {
         case HOLD_THRESHOLD_DISPATCH_TAP:
@@ -622,6 +650,12 @@ static void key_runtime_transition_promote_to_long_hold(hold_behavior_t long_hol
             if (key_runtime_transition_hold_activation_needs_pulse(long_hold, pulse_momentary_layer_action)) {
                 key_runtime_transition_plan_feedback_pulse(plan, true);
             }
+            return;
+        case HOLD_THRESHOLD_DISPATCH_REPEAT:
+            key_runtime_transition_plan_repeat_start(plan, active_key.key_pos, long_hold.action, long_hold.repeat_hz);
+            key_runtime_transition_plan_feedback_pulse(plan, true);
+            active_key.repeat_binding_active = true;
+            active_key.hold_fired            = true;
             return;
         case HOLD_THRESHOLD_DISPATCH_NONE:
             return;

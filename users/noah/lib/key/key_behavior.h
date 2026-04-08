@@ -27,6 +27,10 @@
 // TAP_AT_HOLD_THRESHOLD:
 //   fire once at threshold.
 //
+// REPEAT_WHILE_HELD:
+//   fire once at threshold, then keep tapping at the authored cadence while
+//   the key remains held.
+//
 // TAP_ON_RELEASE_AFTER_HOLD:
 //   wait until release, then fire once.
 
@@ -35,12 +39,14 @@ typedef enum {
     HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
     HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
     HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD,
+    HOLD_BEHAVIOR_REPEAT_WHILE_HELD,
     HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD,
 } hold_behavior_mode_t;
 
 typedef struct {
     bool                 present;
     uint16_t             action;
+    uint16_t             repeat_hz;
     hold_behavior_mode_t mode;
 } hold_behavior_t;
 
@@ -113,6 +119,8 @@ typedef struct {
 
 #define TAP_AT_HOLD_THRESHOLD(action_) {.present = true, .action = (action_), .mode = HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD}
 
+#define REPEAT_WHILE_HELD(action_, hz_) {.present = true, .action = (action_), .repeat_hz = (hz_), .mode = HOLD_BEHAVIOR_REPEAT_WHILE_HELD}
+
 #define TAP_ON_RELEASE_AFTER_HOLD(action_) {.present = true, .action = (action_), .mode = HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD}
 
 // Defined once in keymap.c.
@@ -124,7 +132,7 @@ static inline hold_behavior_t hold_behavior_none(void) {
 }
 
 static inline bool hold_fires_at_threshold(hold_behavior_t hold) {
-    return hold.present && (hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD);
+    return hold.present && (hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD || hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD);
 }
 
 static inline bool hold_registers_on_press(hold_behavior_t hold) {
@@ -133,6 +141,10 @@ static inline bool hold_registers_on_press(hold_behavior_t hold) {
 
 static inline bool hold_registers_while_held(hold_behavior_t hold) {
     return hold.present && (hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE || hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+}
+
+static inline bool hold_repeats_while_held(hold_behavior_t hold) {
+    return hold.present && hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD;
 }
 
 static inline bool hold_sends_on_release(hold_behavior_t hold) {

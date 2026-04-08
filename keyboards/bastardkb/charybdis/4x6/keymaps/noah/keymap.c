@@ -26,12 +26,14 @@
 // will naturally start at NOAH_KEYMAP_SAFE_RANGE. Those keycodes can be
 // handled in process_record_user() and used inside key_behaviors[] actions
 // such as TAP_SENDS(...), TAP_AT_HOLD_THRESHOLD(...),
-// TAP_ON_RELEASE_AFTER_HOLD(...), or PRESS_AND_HOLD_UNTIL_RELEASE(...).
+// TAP_ON_RELEASE_AFTER_HOLD(...), REPEAT_WHILE_HELD(...),
+// or PRESS_AND_HOLD_UNTIL_RELEASE(...).
 //
 enum keymap_custom_keycodes {
     KEYMAP_CUSTOM_KEYCODE_SENTINEL = NOAH_KEYMAP_SAFE_RANGE - 1,
     RIGHT_THUMB,
-    LEFT_THUMB
+    LEFT_THUMB,
+    CLICK_SPAM,
     // MY_CUSTOM_KEY,
     // MY_OTHER_KEY,
 };
@@ -129,6 +131,7 @@ enum keymap_custom_keycodes {
 // Current default: COMBO_TERM = 50 ms.
 #define COMBOS(COMBO)                                      \
     COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))             \
+    COMBO(CLICK_SPAM, (MS_BTN1, MS_BTN2))                  \
     /* COMBO(MACRO_0, (KC_Q, KC_W)) */                     \
     /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */                 \
     /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */       \
@@ -237,6 +240,13 @@ enum keymap_custom_keycodes {
 //     use this for modifiers or keys you want to stay down while held;
 //     macros use the same helper for a held-triggered one-shot
 //
+//   REPEAT_WHILE_HELD(action, hz)
+//     cross .tap_hold_term -> send action once immediately
+//     keep holding -> keep sending action at the authored frequency
+//     release the key -> stop repeating immediately
+//     use this for click spam, repeated navigation, or other rapid tap
+//     actions that should stay declarative inside key_behaviors[]
+//
 //   TAP_AT_HOLD_THRESHOLD(action)
 //     cross .tap_hold_term -> send action once immediately
 //     use this for one-shot actions such as layer lock, pointer lock,
@@ -331,6 +341,15 @@ const key_behavior_t
                         [1] = {.tap = TAP_SENDS(KC_MPLY), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
+                    },
+            },
+
+            {
+                .keycode       = CLICK_SPAM,
+                .tap_hold_term = 1,
+                .tap_counts =
+                    {
+                        [0] = {.hold = REPEAT_WHILE_HELD(MS_BTN1, 25)},
                     },
             },
 

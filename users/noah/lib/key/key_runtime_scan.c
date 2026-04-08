@@ -2,10 +2,11 @@
 // Key Runtime Scan Flow
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Matrix-scan hold promotion and multi-tap expiry handling.
+// Matrix-scan hold promotion, repeat dispatch, and multi-tap expiry handling.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_feedback.h"
+#include "held_action.h"
 #include "key_runtime_transition.h"
 
 void noah_key_runtime_scan(void) {
@@ -14,4 +15,5 @@ void noah_key_runtime_scan(void) {
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
     key_runtime_transition_execute_plan(&plan);
+    held_action_repeat_tick();
 }

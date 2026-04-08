@@ -72,6 +72,19 @@ static void test_non_passthrough_held_action_flashes(void) {
     CHECK(key_feedback_flags_level_flash(flags));
 }
 
+static void test_repeat_hold_flashes_while_active(void) {
+    test_reset_state();
+
+    active_key = (active_key_state_t){
+        .keycode                = KC_RIGHT_ALT,
+        .repeat_binding_active  = true,
+    };
+
+    uint8_t flags = key_feedback_pack();
+    CHECK(key_feedback_flags_hold_active(flags));
+    CHECK(key_feedback_flags_level_flash(flags));
+}
+
 static void test_fallback_hold_has_no_hold_feedback(void) {
     test_reset_state();
 
@@ -127,6 +140,7 @@ static void test_non_layer_held_action_has_no_preview_layer(void) {
 
 int main(void) {
     test_non_passthrough_held_action_flashes();
+    test_repeat_hold_flashes_while_active();
     test_fallback_hold_has_no_hold_feedback();
     test_momentary_hold_preview_layer_is_exposed_before_threshold();
     test_momentary_hold_preview_layer_stays_visible_while_held();
