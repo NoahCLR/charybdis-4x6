@@ -557,8 +557,18 @@ static hold_threshold_dispatch_t key_runtime_transition_hold_threshold_dispatch_
     }
 }
 
-static bool key_runtime_transition_hold_activation_needs_pulse(hold_behavior_t hold) {
-    return action_dispatch_is_layer_action(hold.action);
+static bool key_runtime_transition_hold_activation_needs_pulse(hold_behavior_t hold, bool pulse_momentary_layer_action) {
+    if (action_dispatch_is_layer_lock(hold.action)) {
+        return true;
+    }
+
+    // Keep base momentary layer access quiet; alternate multi-tap layer
+    // branches can opt in to a confirmation pulse.
+    if (IS_QK_MOMENTARY(hold.action)) {
+        return pulse_momentary_layer_action;
+    }
+
+    return false;
 }
 
 static void key_runtime_transition_clear_active_held_action(key_runtime_transition_plan_t *plan) {
@@ -568,7 +578,7 @@ static void key_runtime_transition_clear_active_held_action(key_runtime_transiti
     }
 }
 
-static void key_runtime_transition_fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_hold, key_runtime_transition_plan_t *plan) {
+static void key_runtime_transition_fire_hold_at_threshold(hold_behavior_t hold, hold_behavior_t long_hold, bool pulse_momentary_layer_action, key_runtime_transition_plan_t *plan) {
     switch (key_runtime_transition_hold_threshold_dispatch_kind(hold)) {
         case HOLD_THRESHOLD_DISPATCH_TAP:
             key_runtime_transition_clear_active_held_action(plan);
@@ -587,7 +597,7 @@ static void key_runtime_transition_fire_hold_at_threshold(hold_behavior_t hold, 
             active_key.held_action_keycode = hold.action;
             active_key.hold_fired          = !long_hold.present;
             active_key.hold_one_shot_fired = false;
-            if (key_runtime_transition_hold_activation_needs_pulse(hold)) {
+            if (key_runtime_transition_hold_activation_needs_pulse(hold, pulse_momentary_layer_action)) {
                 key_runtime_transition_plan_feedback_pulse(plan, false);
             }
             return;
@@ -596,7 +606,7 @@ static void key_runtime_transition_fire_hold_at_threshold(hold_behavior_t hold, 
     }
 }
 
-static void key_runtime_transition_promote_to_long_hold(hold_behavior_t long_hold, key_runtime_transition_plan_t *plan) {
+static void key_runtime_transition_promote_to_long_hold(hold_behavior_t long_hold, bool pulse_momentary_layer_action, key_runtime_transition_plan_t *plan) {
     key_runtime_transition_clear_active_held_action(plan);
 
     switch (key_runtime_transition_hold_threshold_dispatch_kind(long_hold)) {
@@ -609,7 +619,7 @@ static void key_runtime_transition_promote_to_long_hold(hold_behavior_t long_hol
             key_runtime_transition_plan_held_register(plan, active_key.key_pos, long_hold.action);
             active_key.held_action_keycode = long_hold.action;
             active_key.hold_fired          = true;
-            if (key_runtime_transition_hold_activation_needs_pulse(long_hold)) {
+            if (key_runtime_transition_hold_activation_needs_pulse(long_hold, pulse_momentary_layer_action)) {
                 key_runtime_transition_plan_feedback_pulse(plan, true);
             }
             return;
@@ -665,10 +675,10 @@ static void key_runtime_transition_apply_active_key_scan_resolution(active_key_s
 
     switch (resolution.outcome) {
         case ACTIVE_KEY_SCAN_OUTCOME_FIRE_HOLD:
-            key_runtime_transition_fire_hold_at_threshold(resolution.hold, resolution.long_hold, plan);
+            key_runtime_transition_fire_hold_at_threshold(resolution.hold, resolution.long_hold, false, plan);
             return;
         case ACTIVE_KEY_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
-            key_runtime_transition_promote_to_long_hold(resolution.long_hold, plan);
+            key_runtime_transition_promote_to_long_hold(resolution.long_hold, false, plan);
             return;
         case ACTIVE_KEY_SCAN_OUTCOME_NONE:
         default:
@@ -712,12 +722,12 @@ static void key_runtime_transition_apply_pending_multi_tap_scan_resolution(pendi
     switch (resolution.outcome) {
         case PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
             active_key.long_hold = resolution.long_hold;
-            key_runtime_transition_promote_to_long_hold(active_key.long_hold, plan);
+            key_runtime_transition_promote_to_long_hold(active_key.long_hold, true, plan);
             multi_tap_reset(&multi_tap);
             return;
         case PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD:
             active_key.long_hold = resolution.long_hold;
-            key_runtime_transition_fire_hold_at_threshold(resolution.hold, active_key.long_hold, plan);
+            key_runtime_transition_fire_hold_at_threshold(resolution.hold, active_key.long_hold, true, plan);
             multi_tap_reset(&multi_tap);
             return;
         case PENDING_MULTI_TAP_SCAN_OUTCOME_NONE:
