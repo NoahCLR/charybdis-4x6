@@ -123,7 +123,8 @@ registration, such as:
 - repeated navigation taps
 - repeated media or macro triggers that should stop immediately on release
 
-Authored repeat rates are currently limited to `1..100 Hz`.
+Authored repeat rates are currently limited to `1..100 Hz`, with a maximum of
+`100` repeats per second.
 
 ### `TAP_AT_HOLD_THRESHOLD`
 

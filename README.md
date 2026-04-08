@@ -42,7 +42,7 @@ to understand and easy to change:
   overrides. Actions can be plain keycodes, macros, layer locks, pointer-mode
   locks, supported QMK behavior keycodes like `OSM()` or `MT()`, owned
   momentary layer holds such as `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))`,
-  repeat holds such as `REPEAT_WHILE_HELD(KC_LEFT, 25)`, or keymap-local
+  repeat holds such as `REPEAT_WHILE_HELD(KC_LEFT, 100)`, or keymap-local
   custom keycodes
 - pointer modes are a core part of what makes this userspace different: the
   trackball can become dragscroll, pinch, zoom, arrows, volume, or brightness,
@@ -266,7 +266,7 @@ The custom keys support four different hold styles:
 - `TAP_ON_RELEASE_AFTER_HOLD(...)`: qualify the hold, then fire once on release
 
 `REPEAT_WHILE_HELD(...)` currently supports authored frequencies in the range
-`1..100 Hz`.
+`1..100 Hz`. The current maximum is `100` repeats per second.
 
 That is what lets one key behave differently in different contexts without
 inventing a separate timing system for each feature.

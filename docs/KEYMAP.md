@@ -208,11 +208,14 @@ does not appear directly in `keymaps[][]`.
 The current authored path is:
 
 - `MS_BTN1` + `MS_BTN2` combo -> `CLICK_SPAM`
-- `CLICK_SPAM` hold -> `REPEAT_WHILE_HELD(MS_BTN1, 25)`
+- `CLICK_SPAM` hold -> `REPEAT_WHILE_HELD(MS_BTN1, 100)`
 
 So pressing both primary mouse buttons together on `LAYER_NAV` or
-`LAYER_POINTER` turns into a held repeat action that taps left click at `25 Hz`
+`LAYER_POINTER` turns into a held repeat action that taps left click at `100 Hz`
 until release.
+
+That `100 Hz` setting is also the current authored maximum: `100` repeats per
+second.
 
 ## Layer Walkthrough
 
