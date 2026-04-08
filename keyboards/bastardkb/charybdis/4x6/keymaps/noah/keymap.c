@@ -334,7 +334,6 @@ const key_behavior_t
             },
 
             // layer-tap key — double-tap hold locks LAYER_NAV.
-            // tap_hold_term inherits the LT() default (TAPPING_TERM) so typing feel is unchanged.
             {
                 .keycode       = LT(LAYER_NAV, KC_SLSH),
                 .tap_hold_term = 100,
