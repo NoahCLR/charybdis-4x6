@@ -113,6 +113,10 @@ typedef struct {
 // Small initializer macros for the nested tap/hold values used in
 // key_behaviors[].
 
+#ifndef KEY_BEHAVIOR_REPEAT_MAX_HZ
+#    define KEY_BEHAVIOR_REPEAT_MAX_HZ 100u
+#endif
+
 #define TAP_SENDS(action_) {.present = true, .action = (action_)}
 
 #define PRESS_AND_HOLD_UNTIL_RELEASE(action_) {.present = true, .action = (action_), .mode = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE}
@@ -145,6 +149,10 @@ static inline bool hold_registers_while_held(hold_behavior_t hold) {
 
 static inline bool hold_repeats_while_held(hold_behavior_t hold) {
     return hold.present && hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD;
+}
+
+static inline bool hold_repeat_rate_valid(uint16_t repeat_hz) {
+    return repeat_hz > 0 && repeat_hz <= KEY_BEHAVIOR_REPEAT_MAX_HZ;
 }
 
 static inline bool hold_sends_on_release(hold_behavior_t hold) {

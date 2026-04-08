@@ -244,6 +244,7 @@ enum keymap_custom_keycodes {
 //     cross .tap_hold_term -> send action once immediately
 //     keep holding -> keep sending action at the authored frequency
 //     release the key -> stop repeating immediately
+//     supported authored range: 1..100 Hz
 //     use this for click spam, repeated navigation, or other rapid tap
 //     actions that should stay declarative inside key_behaviors[]
 //
@@ -349,7 +350,7 @@ const key_behavior_t
                 .tap_hold_term = 1,
                 .tap_counts =
                     {
-                        [0] = {.hold = REPEAT_WHILE_HELD(MS_BTN1, 25)},
+                        [0] = {.hold = REPEAT_WHILE_HELD(MS_BTN1, 100)},
                     },
             },
 

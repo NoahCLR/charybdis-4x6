@@ -86,11 +86,19 @@ static void test_plain_pd_mode_key_is_handled_without_authored_behavior(void) {
     CHECK(!behavior.single.long_hold.present);
 }
 
+static void test_repeat_rate_validation_helper_enforces_supported_range(void) {
+    CHECK(!hold_repeat_rate_valid(0));
+    CHECK(hold_repeat_rate_valid(1));
+    CHECK(hold_repeat_rate_valid(KEY_BEHAVIOR_REPEAT_MAX_HZ));
+    CHECK(!hold_repeat_rate_valid((uint16_t)(KEY_BEHAVIOR_REPEAT_MAX_HZ + 1u)));
+}
+
 int main(void) {
     test_bare_lt_falls_back_to_qmk();
     test_authored_lt_uses_custom_runtime();
     test_momentary_layer_stays_handled();
     test_plain_pd_mode_key_is_handled_without_authored_behavior();
+    test_repeat_rate_validation_helper_enforces_supported_range();
 
     puts("key_behavior_lookup host tests passed");
     return 0;

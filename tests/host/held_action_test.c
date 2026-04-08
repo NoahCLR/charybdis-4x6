@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/key/key_behavior.h"
 #include "users/noah/lib/key/held_action.h"
 
 enum {
@@ -276,6 +277,18 @@ static void test_repeat_binding_catches_up_after_scan_gap(void) {
     CHECK(tap_calls[3].action == TEST_SECOND_ACTION);
 }
 
+static void test_repeat_binding_rejects_rates_above_supported_range(void) {
+    keypos_t key_pos = test_keypos(7, 0);
+
+    test_reset_stubs();
+
+    held_action_repeat_start(key_pos, TEST_SHARED_ACTION, (uint16_t)(KEY_BEHAVIOR_REPEAT_MAX_HZ + 1u));
+
+    CHECK(tap_call_count == 0);
+    CHECK(pointer_action_call_count == 0);
+    CHECK(!held_action_release_owned_by_key(key_pos));
+}
+
 int main(void) {
     test_shared_action_refcounts_press_and_release();
     test_per_key_action_dispatches_for_each_owner();
@@ -284,6 +297,7 @@ int main(void) {
     test_release_owned_by_key_reports_missing_bindings();
     test_repeat_binding_taps_immediately_and_on_tick_until_release();
     test_repeat_binding_catches_up_after_scan_gap();
+    test_repeat_binding_rejects_rates_above_supported_range();
 
     puts("held_action host tests passed");
     return 0;

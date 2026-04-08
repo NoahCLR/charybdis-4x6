@@ -86,7 +86,7 @@ static void key_behavior_log_invalid_action(uint8_t index, uint8_t tap_count, co
 
 static void key_behavior_log_invalid_repeat_rate(uint8_t index, uint8_t tap_count, const char *field) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behaviors[%u].tap_counts[%u].%s REPEAT_WHILE_HELD frequency; use a value greater than 0 Hz\n", (unsigned int)index, (unsigned int)tap_count, field);
+    uprintf("Invalid key_behaviors[%u].tap_counts[%u].%s REPEAT_WHILE_HELD frequency; use a value between 1 and %u Hz\n", (unsigned int)index, (unsigned int)tap_count, field, (unsigned int)KEY_BEHAVIOR_REPEAT_MAX_HZ);
 #else
     (void)index;
     (void)tap_count;
@@ -151,14 +151,14 @@ void key_behavior_validate_all(void) {
             if (step.hold.present && !key_behavior_action_supported(step.hold.action, step.hold.mode)) {
                 key_behavior_log_invalid_action(i, tap_index, "hold", step.hold.action, step.hold.mode);
             }
-            if (step.hold.present && step.hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && step.hold.repeat_hz == 0) {
+            if (step.hold.present && step.hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && !hold_repeat_rate_valid(step.hold.repeat_hz)) {
                 key_behavior_log_invalid_repeat_rate(i, tap_index, "hold");
             }
 
             if (step.long_hold.present && !key_behavior_action_supported(step.long_hold.action, step.long_hold.mode)) {
                 key_behavior_log_invalid_action(i, tap_index, "long_hold", step.long_hold.action, step.long_hold.mode);
             }
-            if (step.long_hold.present && step.long_hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && step.long_hold.repeat_hz == 0) {
+            if (step.long_hold.present && step.long_hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && !hold_repeat_rate_valid(step.long_hold.repeat_hz)) {
                 key_behavior_log_invalid_repeat_rate(i, tap_index, "long_hold");
             }
         }

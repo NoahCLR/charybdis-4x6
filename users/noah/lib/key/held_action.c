@@ -12,6 +12,7 @@
 #include "../action/action_lifecycle.h"
 #include "../pointing/pointer_layer_policy.h"
 #include "../state/keyboard_mod_ownership.h"
+#include "key_behavior.h"
 #include "held_action.h"
 
 // A held pure modifier is owned by the physical switch that started it, not by
@@ -189,7 +190,7 @@ static void held_repeat_remove_slot(uint16_t slot) {
 }
 
 static uint16_t held_repeat_interval_from_hz(uint16_t repeat_hz) {
-    if (repeat_hz == 0) {
+    if (!hold_repeat_rate_valid(repeat_hz)) {
         return 0;
     }
 
@@ -199,7 +200,7 @@ static uint16_t held_repeat_interval_from_hz(uint16_t repeat_hz) {
 
 static void held_repeat_log_invalid_rate(keypos_t key_pos, uint16_t action) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Invalid repeat binding at key (%u,%u) for action 0x%04X; repeat frequency must be greater than 0 Hz\n", (unsigned int)key_pos.row, (unsigned int)key_pos.col, (unsigned int)action);
+    uprintf("Invalid repeat binding at key (%u,%u) for action 0x%04X; repeat frequency must be between 1 and %u Hz\n", (unsigned int)key_pos.row, (unsigned int)key_pos.col, (unsigned int)action, (unsigned int)KEY_BEHAVIOR_REPEAT_MAX_HZ);
 #else
     (void)key_pos;
     (void)action;
