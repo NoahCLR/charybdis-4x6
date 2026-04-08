@@ -21,9 +21,17 @@
 // One byte encodes the feedback state the RGB renderer needs.
 // Consumers should use key_feedback_flags_*() helpers, not raw bits.
 
+// Sequence pending: a multi-tap window is still resolving the winning tap
+// index.
 #define KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING (1 << 0)
+// Hold-tier or long-hold-tier feedback is currently active.
 #define KEY_FEEDBACK_FLAG_HOLD_ACTIVE (1 << 1)
+// The active feedback state belongs to the long-hold tier rather than the
+// normal hold tier.
 #define KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE (1 << 2)
+// An authored hold tier exists on the current tap index and is pending
+// resolution; long-hold-only surfaces stay quiet until the long-hold tier
+// commits.
 #define KEY_FEEDBACK_FLAG_HOLD_PENDING (1 << 3)
 #define KEY_FEEDBACK_FLAG_LEVEL_FLASH (1 << 4)
 // Current flash phase, computed on the master and synced to the slave so both

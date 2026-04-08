@@ -141,11 +141,11 @@ enum keymap_custom_keycodes {
 // key_behaviors[] is the single authored behavior table for keys handled by
 // the custom state machine. One row describes one physical key.
 //
-// tap_counts[0] = single press
-// tap_counts[1] = double tap
-// tap_counts[2] = triple tap
-// tap_counts[3] = quadruple tap
-// tap_counts[4] = quintuple tap
+// tap_counts[0] = tap index 0 (single press)
+// tap_counts[1] = tap index 1 (double press)
+// tap_counts[2] = tap index 2 (triple press)
+// tap_counts[3] = tap index 3 (quadruple press)
+// tap_counts[4] = tap index 4 (quintuple press)
 //
 // timing defaults currently set in config.h:
 //   - TAPPING_TERM = 200 ms
@@ -174,11 +174,25 @@ enum keymap_custom_keycodes {
 //     follow
 //   - this means single taps on multi-tap keys are delayed by .multi_tap_term
 //
-// omit .tap to keep the key's normal tap behavior for that step
+// within one tap index:
+//   - .tap is the tap tier
+//   - .hold is the normal hold tier
+//   - .long_hold is the longer-hold tier
+// omit .tap to keep the key's normal tap behavior for that tap index
 // if .tap is set but hold/long_hold are omitted, holding past tap_hold_term
 // falls back to the key's normal held behavior
 // .hold and .long_hold are independent: define either one by itself, or use
 // both together for a two-stage hold
+//
+// RGB feedback follows authored tiers on the current tap index:
+//   - multi-tap windows show a neutral pending color while the engine is still
+//     resolving which tap index wins
+//   - an authored .hold tier can show hold-tier feedback while pending/active
+//   - an authored .long_hold tier can show longer-hold-tier feedback when it
+//     commits or stays active
+//   - a missing .hold tier stays visually quiet even if .long_hold exists
+//   - primary momentary layer access uses the layer color itself rather than a
+//     separate hold pulse
 //
 // action can be a plain keycode, a modded keycode, a macro, a layer lock,
 // a pointer-mode lock, or a supported QMK behavior keycode such as MT()/OSM()
@@ -205,13 +219,13 @@ enum keymap_custom_keycodes {
 //     key so overlap stays safe; ordinary QMK tap paths still keep stock
 //     tap_code16()/send_string semantics.
 //
-// tap accepts one helper:
+// tap-tier actions accept one helper:
 //   TAP_SENDS(action)
 //     send action on a quick release instead of the key's normal tap
 //     use this for alternate tap output, media keys, macros, layer locks,
 //     and pointer-mode locks
 //
-// hold and long_hold accept the same three helpers:
+// hold-tier and long-hold-tier actions accept the same three helpers:
 //   PRESS_AND_HOLD_UNTIL_RELEASE(action)
 //     normal keys/modifiers:
 //       cross .tap_hold_term -> press/register action
@@ -236,7 +250,7 @@ enum keymap_custom_keycodes {
 //       release after .tap_hold_term but before .longer_hold_term = .hold action
 //       keep holding past .longer_hold_term = .long_hold action instead
 //
-// illustrative example row with custom timings and mixed tap/hold combinations:
+// illustrative example row with custom timings and mixed tap indexes:
 // {
 //     .keycode = KC_EXAMPLE,
 //     .tap_hold_term = 150, // overrides the default tap-vs-hold threshold for this key
@@ -244,11 +258,11 @@ enum keymap_custom_keycodes {
 //     .multi_tap_term = 150, // overrides the default multi-tap threshold for this key
 //     .tap_counts =
 //         {
-//             [0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_EXAMPLE))}, // normal tap, exclusive long hold
-//             [1] = {.tap = TAP_SENDS(S(KC_EXAMPLE))}, // alternate tap output
-//             [2] = {.tap = TAP_SENDS(KC_EXAMPLE), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXAMPLE)}, // tap once, or keep held
-//             [3] = {.tap = TAP_SENDS(LOCK_PD_MODE(PD_MODE_EXAMPLE)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_EXAMPLE))}, // pointer-mode lock on tap, shifted hold
-//             [4] = {.tap = TAP_SENDS(MACRO_n), .hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_EXAMPLE)), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_EXAMPLE))}, // macro on tap, middle hold on release, longer hold upgrades to a layer lock
+//             [0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_EXAMPLE))}, // tap index 0: normal tap, long-hold threshold action only
+//             [1] = {.tap = TAP_SENDS(S(KC_EXAMPLE))}, // tap index 1: alternate tap output
+//             [2] = {.tap = TAP_SENDS(KC_EXAMPLE), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXAMPLE)}, // tap index 2: tap once, or keep a held action active
+//             [3] = {.tap = TAP_SENDS(LOCK_PD_MODE(PD_MODE_EXAMPLE)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_EXAMPLE))}, // tap index 3: pointer-mode lock on tap, shifted held action
+//             [4] = {.tap = TAP_SENDS(MACRO_n), .hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_EXAMPLE)), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_EXAMPLE))}, // tap index 4: macro on tap, release action on hold, layer-lock threshold action on long hold
 //         },
 // }
 

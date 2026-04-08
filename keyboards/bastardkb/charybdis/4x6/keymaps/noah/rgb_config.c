@@ -114,23 +114,34 @@ const hsv_t automouse_color_end   = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_B
 //
 // Visual feedback for the custom key behavior engine state.
 //
-// Uses a neutral pending color for open multi-tap windows, a hold-tier color
-// for hold pending / hold trigger / active held non-layer actions, and a
-// longer-hold-tier color for longer-hold trigger / active longer-hold states.
+// Terms used below:
+//   - tap index = tap_counts[n] branch (single press, double press, ...)
+//   - hold tier = .hold on the winning tap index
+//   - long-hold tier = .long_hold on the winning tap index
+//
+// Feedback rule:
+//   - white = multi-tap sequence still resolving which tap index wins
+//   - orange = authored hold-tier feedback or hold-tier commit
+//   - cyan = authored long-hold-tier feedback or long-hold-tier commit
+//   - missing tiers stay quiet; e.g. a long-hold-only surface does not show
+//     orange before the long-hold tier commits
+//   - primary momentary layer access uses the ambient layer color itself
 //
 // These paint both halves last, on top of the current layer and any pd-mode
-// overlay, so active threshold / hold feedback stays visible even on the
-// trackball half while a mode color is active.
+// overlay, so authored tier feedback stays visible even on the trackball half
+// while a mode color is active.
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-// Multi-tap pending: neutral white while the tap window is still open.
+// Sequence pending: neutral white while the engine is still resolving the
+// active tap index.
 const hsv_t feedback_multi_tap_pending_color = {.h = 0, .s = 0, .v = 150};
 
-// Hold-tier feedback: orange for the normal hold tier.
+// Hold-tier feedback: orange for authored hold-tier pending / active states
+// and hold-tier commit pulses.
 const hsv_t feedback_hold_active_color = {.h = 18, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};
 
-// Longer-hold-tier feedback: icy cyan for the longer hold tier.
-// immediately distinct from the normal hold tier.
+// Long-hold-tier feedback: icy cyan for authored long-hold-tier active states
+// and long-hold-tier commit pulses; immediately distinct from the hold tier.
 const hsv_t feedback_long_hold_active_color = {.h = 148, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS};
 #    endif
 

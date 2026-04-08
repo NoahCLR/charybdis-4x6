@@ -104,9 +104,10 @@ uint8_t key_feedback_pack(void) {
     }
 
     // One-shot threshold actions are complete as soon as they fire, so they do
-    // not keep a hold color latched after the threshold. Only unresolved
-    // between-threshold states keep the pending color.
-    if (!active_key.hold_fired && !active_key.hold_one_shot_fired && elapsed >= active_key.tap_hold_term && (active_key.hold.present || active_key.long_hold.present)) {
+    // not keep a hold color latched after the threshold. Only an authored
+    // normal hold tier keeps the pending hold color before it resolves;
+    // long-hold-only surfaces stay quiet until the long-hold tier commits.
+    if (!active_key.hold_fired && !active_key.hold_one_shot_fired && elapsed >= active_key.tap_hold_term && active_key.hold.present) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
     }
 
