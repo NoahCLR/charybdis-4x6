@@ -56,9 +56,9 @@ enum {
 // MACRO_0–15 are hardcoded custom macro slots used by key_behaviors[] and
 // dispatched by macro_dispatch().
 // VIA macros use the VIA_MACRO_0–15 aliases.
-// Pointing-device mode taps are authored entirely through key_behaviors[].
-// Their single-hold behavior still defaults to momentary mode activation
-// unless key_behaviors[] overrides that hold tier explicitly.
+// Plain pointing-device mode keycodes work as default momentary holds.
+// Add a key_behaviors[] row when you want those keys to grow explicit tap,
+// hold, longer-hold, or multi-tap behavior on top of that default.
 // Use LOCK_PD_MODE(mode_keycode) for a persistent toggle inside tap/hold rows.
 // Each pd mode gets an explicit generated lock keycode, so mode identity no
 // longer depends on contiguous enum math.

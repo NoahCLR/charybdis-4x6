@@ -10,6 +10,7 @@
 #endif
 
 #include "../action/action_dispatch.h"
+#include "../pointing/pd_modes.h"
 #include "key_behavior_lookup.h"
 
 static const key_behavior_t *key_behavior_config_lookup(uint16_t keycode) {
@@ -95,6 +96,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     const key_behavior_t *config    = key_behavior_config_lookup(keycode);
     bool                  is_mo     = IS_QK_MOMENTARY(keycode);
     bool                  is_lt     = IS_QK_LAYER_TAP(keycode);
+    bool                  is_pd_mode = pd_mode_for_keycode(keycode) != 0;
     bool                  custom_lt = is_lt && config;
 
     uint16_t tap_term = CUSTOM_TAP_HOLD_TERM;
@@ -110,7 +112,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .config             = config,
         .keycode            = keycode,
-        .handled            = config || is_mo,
+        .handled            = config || is_mo || is_pd_mode,
         .is_momentary_layer = is_mo || custom_lt,
         .is_layer_tap       = custom_lt,
         .has_multi_tap      = key_behavior_has_multi_tap_in_config(config),

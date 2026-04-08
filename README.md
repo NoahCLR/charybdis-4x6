@@ -13,11 +13,9 @@ and editable, so someone changing
 keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 can adjust the board without having to rework the runtime.
 
-> **Porting note:** Most board assumptions now live in the keymap
-> [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
-> and [`users/noah/config.h`](./users/noah/config.h). If you move this
-> userspace to a different QMK base or Charybdis variant, start there before
-> changing the runtime modules.
+> **Firmware note:** This userspace is updated for QMK `0.32.5` and builds
+> against my [`qmk-latest` firmware branch](https://github.com/NoahCLR/bastardkb-qmk/tree/qmk-latest)
+> rather than the older `bkb-master`-based setup.
 
 This repo is built around the Charybdis from [BastardKB](https://bastardkb.com/),
 designed by Quentin. His work, and the community built around this board, have given me
@@ -40,8 +38,9 @@ to understand and easy to change:
   keymap-local custom keycodes
 - pointer modes are a core part of what makes this userspace different: the
   trackball can become dragscroll, pinch, zoom, arrows, volume, or brightness,
-  and those mode keys use the same authored tap, hold, and lock model as the
-  rest of the board
+  with plain mode keycodes working as default momentary holds and
+  `key_behaviors[]` able to layer richer tap, hold, multi-tap, or lock
+  behavior on top
 - `AUTO_MOUSE` brings up the pointer layer when the trackball moves and clears
   it again after the configured timeout
 - RGB is functional feedback, not decoration.
@@ -53,27 +52,27 @@ to understand and easy to change:
   [`hooks.c`](./users/noah/hooks.c). A keymap can override any QMK hook and
   call the matching `noah_*` helper to keep the shared behavior, or replace it
   entirely (see [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md))
-- on split builds, `split_runtime_sync` syncs pointing-device mode flags,
-  auto-mouse progress, and key-feedback flags from master to slave so both
-  halves render consistently
+- `split_runtime_sync` syncs pointing-device mode flags, auto-mouse progress,
+  and key-feedback flags from master to slave so both halves render
+  consistently
 
-If you want to understand what makes this userspace special, start with
+The README is intentionally capability-focused. It explains what the shared
+runtime supports and how the pieces fit together. If you want one concrete
+authored profile built on top of those systems, start with
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). That
-file shows the physical layout, the authored `key_behaviors[]` table, combos,
-the VIA macro defaults, the hardcoded macro table, and how the pointer-mode
-keys are configured.
+file shows one real configuration of layers, combos, `key_behaviors[]`, VIA
+macro defaults, hardcoded macros, and pointing-mode entry gestures.
 
 There is also a small VIA bridge in
 [`via layouts/via_to_qmk_layout.py`](<./via layouts/via_to_qmk_layout.py>).
 That script is useful when you want to experiment quickly in VIA without
 giving up a readable, source-controlled
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c): it
-converts VIA's exported layer data, macro slots, and custom keycodes back into
-the authored `keymap.c` tables this repo uses.
+converts VIA exports back into the authored tables this repo uses.
 
 ## Where To Change Things
 
-If you want to adapt this layout, these are the main files to touch first:
+If you want to adapt this userspace, these are the main files to touch first:
 
 | File | What You Change There |
 | --- | --- |
@@ -92,34 +91,33 @@ In other words:
 - if you want to add a shared custom keycode, start in [`noah_keymap.h`](./users/noah/noah_keymap.h)
 - if you want to change board plumbing, start in [`users/noah/config.h`](./users/noah/config.h)
 
-## Layers And VIA
+## Layer Model And VIA
 
-This keymap defines five layers, in this order:
+This userspace does not require one fixed layer stack, but it does expect the
+keymap to own a normal layer enum in the keymap
+[`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), with
+`LAYER_COUNT` as the last sentinel.
 
-- `0 = LAYER_BASE`: default typing layer
-- `1 = LAYER_NUM`: numpad layer
-- `2 = LAYER_SYM`: symbols, brackets, and DPI controls
-- `3 = LAYER_NAV`: navigation, media, macros, mouse buttons, and the auto-sniping layer
-- `4 = LAYER_POINTER`: dedicated pointer layout and the default auto-mouse target layer
+That enum is the source of truth for several runtime-owned systems:
 
-That layer order matters in a few places:
+- layer locks
+- authored momentary-layer holds through `key_behaviors[]`
+- RGB layer colors and layer LED groups
+- the configured auto-mouse target layer
+- VIA dynamic layer count
 
-- when VIA is enabled, `DYNAMIC_KEYMAP_LAYER_COUNT` is derived from
-  `LAYER_COUNT` in [`users/noah/config.h`](./users/noah/config.h)
-- `AUTO_MOUSE_DEFAULT_LAYER` in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) is set to the layer enum value QMK expects (`LAYER_POINTER` here, which resolves to that layer index)
-- the authored layer names in [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) and the VIA conversion script need to stay in sync
+In other words, the runtime is layer-aware, but the keymap decides which layers
+exist and what they are for.
 
 If you change the layout in VIA and want to bring it back into source, use
 [`via_to_qmk_layout.py`](<./via layouts/via_to_qmk_layout.py>) in
-[`via layouts`](<./via layouts>). It reads a VIA export, maps VIA's layer
-indices and custom keycodes back to this keymap, and can print or rewrite both
-`keymaps[][]` and `VIA_MACROS(MACRO)` in
-[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). The
-separate `HARDCODED_MACROS(MACRO)` block stays authored in source.
+[`via layouts`](<./via layouts>). It round-trips VIA layer data, macro slots,
+and supported custom keycodes back into the authored tables in
+[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 
 ## Macros
 
-This keymap uses two macro surfaces on purpose:
+This userspace uses two macro surfaces on purpose:
 
 - `VIA_MACRO_n` is the VIA/QMK dynamic macro keycode range. Defaults for those
   slots are authored in `VIA_MACROS(MACRO)` in
@@ -133,6 +131,17 @@ This keymap uses two macro surfaces on purpose:
 That split keeps VIA-editable defaults and firmware-owned macros separate while
 still letting both kinds of macro keycodes appear in layers, combos, and
 `key_behaviors[]`.
+
+The hardcoded macro payload surface is richer than plain text. It can express:
+
+- literal text
+- tap chords such as `{KC_LGUI,KC_SPC}`
+- explicit key down / key up events
+- delays between steps
+
+The same payload language is used for source-authored defaults, and the repo
+can seed VIA's macro EEPROM defaults from those authored values on first init
+and supported reset paths.
 
 ## Combos
 
@@ -158,20 +167,30 @@ So the split is:
 The richer custom tap / hold / multi-tap behavior is authored in
 `key_behaviors[]`. Plain keys without a row keep their normal QMK behavior.
 
-Keys with authored behavior rows can distinguish between:
+Keys with authored behavior rows are resolved per tap index. In other words, a
+single press, double press, triple press, and so on can each have their own
+independent behavior branch.
 
-- tap
-- hold
-- longer hold
-- multi-tap sequences
+Each tap-count branch can define:
 
-This is what makes this layout possible:
+- its own tap action
+- its own hold tier
+- its own longer-hold tier
+- its own hold style
+
+So the engine can distinguish between:
+
+- single tap through quintuple tap
+- tap, hold, and longer-hold outcomes within each tap index
+- hold styles that fire at different times
+
+This is what makes patterns like these possible:
 
 - number-row symbols on hold
-- thumb keys that combine momentary layer access, layer locks, and media
-- nav arrows that cover character, word, and line movement
-- pointer keys that can do more than one thing without inventing their own
-  timing rules
+- keys that combine momentary layer access, layer locks, and higher-tap media
+- navigation keys that cover character, word, and line movement on one surface
+- pointer-mode keys that can lock, mute, or branch into another mode
+- custom authored keycodes whose entire behavior comes from one row
 
 ### Actions
 
@@ -179,17 +198,12 @@ An action in a `key_behaviors[]` row can be:
 
 - a plain keycode (`KC_MPLY`, `S(KC_1)`)
 - a hardcoded or VIA macro (`MACRO_0`, `VIA_MACRO_6`)
-- a layer lock (`LOCK_LAYER(LAYER_NAV)`)
-- a pointer-mode lock (`LOCK_PD_MODE(ARROW_MODE)`)
+- a layer lock (`LOCK_LAYER(layer)`)
+- a pointer-mode lock (`LOCK_PD_MODE(mode_keycode)`)
 - a supported QMK behavior keycode such as `OSM()` or `MT()`
 - an owned momentary layer hold such as
-  `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))`
+  `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))`
 - a keymap-local custom keycode declared in `keymap.c`
-
-That last category is how the thumb keys work: `LEFT_THUMB` and `RIGHT_THUMB`
-are keymap-local custom keycodes whose behavior is entirely defined by their
-`key_behaviors[]` rows, including `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))`
-for momentary layer access on hold.
 
 Raw QMK layer actions such as `TG()`, `TO()`, `TT()`, `OSL()`, and `LM()` are
 intentionally rejected inside `key_behaviors[]` and by the generic authored
@@ -203,18 +217,14 @@ custom row needs an owned momentary hold.
 Default timing lives in the keymap
 [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
 
-- `TAPPING_TERM = 200`
-- `CUSTOM_TAP_HOLD_TERM = 150`
-- `CUSTOM_LONGER_HOLD_TERM = 400`
-- `CUSTOM_MULTI_TAP_TERM = 150`
+- built-in QMK dual-role timing through `TAPPING_TERM`
+- custom key-behavior defaults through `CUSTOM_TAP_HOLD_TERM`,
+  `CUSTOM_LONGER_HOLD_TERM`, and `CUSTOM_MULTI_TAP_TERM`
 
 There is one important nuance: built-in QMK dual-role keys like `LT()` and
 `MT()` still use `TAPPING_TERM`. Inside `key_behaviors[]`, an omitted
 `.tap_hold_term` also falls back to `TAPPING_TERM` for `LT()` rows, but to
 `CUSTOM_TAP_HOLD_TERM` for other custom rows.
-That split is intentional for typing feel: I want the built-in dual-role keys
-to stay comfortable during fast typing, while the fully custom rows can still
-use a shorter threshold where that helps.
 
 Timing can also be customized per key. A `key_behaviors[]` row may set:
 
@@ -229,31 +239,34 @@ If one of those fields is omitted, C zero-initializes it. A value of `0` means
 
 The custom keys support three different hold styles:
 
-- hold-and-keep-held
-- fire-on-threshold
-- fire-on-release-after-hold
+- `PRESS_AND_HOLD_UNTIL_RELEASE(...)`: activate at threshold and keep held
+- `TAP_AT_HOLD_THRESHOLD(...)`: fire once immediately at threshold
+- `TAP_ON_RELEASE_AFTER_HOLD(...)`: qualify the hold, then fire once on release
 
-That is what lets one key behave differently in different contexts. For
-example, the nav arrows can cover character movement on tap, word movement on a
-medium hold, and line movement on a longer hold.
+That is what lets one key behave differently in different contexts without
+inventing a separate timing system for each feature.
 
 ### Multi-Tap
 
 Multi-tap is part of the same model, not a separate feature. A key can define
 different behavior for the first tap, second tap, third tap, and so on.
 
-That is why the thumb keys and some pointer keys can keep their normal role on
-hold while still exposing locks, media, or alternate actions on additional
-presses.
+That is why a key can keep its normal hold role while still exposing locks,
+media, alternate taps, or branch actions on higher tap counts.
 
-For the full interaction model, see
-[`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md).
+For the full interaction model, including concrete authored examples from the
+current profile, see [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md).
 
 ## Pointing-Device Modes
 
-The trackball modes use the same timing language as the rest of the board.
+Pointing-device modes have a simple default surface and can also plug into the
+same authored key-behavior engine as the rest of the board.
 
-Current modes:
+A plain pd-mode keycode in the keymap works as a default momentary mode key. If
+that same keycode is given a `key_behaviors[]` row, it can also gain authored
+tap, hold, longer-hold, and multi-tap behavior.
+
+The current runtime supports these mode families:
 
 - `DRAGSCROLL`: converts ball movement into scrolling
 - `PINCH_MODE`: dragscroll with an owned real `Cmd` hold for
@@ -264,47 +277,37 @@ Current modes:
 - `VOLUME_MODE`: converts vertical movement into volume control
 - `BRIGHTNESS_MODE`: converts vertical movement into display brightness control
 
-This keymap also enables Charybdis sniping automatically while
-`LAYER_NAV` is active. That is configured in the keymap
-[`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
-through `CHARYBDIS_AUTO_SNIPING_ENABLE` and
-`CHARYBDIS_AUTO_SNIPING_LAYER`, so the sniping layer is easy to change. The
-same file also exposes both pointer DPI ladders: `CHARYBDIS_MINIMUM_DEFAULT_DPI` and
-`CHARYBDIS_DEFAULT_DPI_CONFIG_STEP` for normal cursor movement, plus
-`CHARYBDIS_MINIMUM_SNIPING_DPI` and `CHARYBDIS_SNIPING_DPI_CONFIG_STEP` for
-sniping mode.
+Those modes are runtime capabilities. The keymap chooses where they live, which
+ones stay as simple default momentary keys, which ones get richer authored
+behavior, and which gestures or taps branch into other actions.
 
-These modes are not all entered the same way from the physical keys. That is
-because the physical mode keys are authored through `key_behaviors[]` in
-[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), not
-hard-wired to one fixed gesture. These entry patterns are fully customizable.
+Shared pd-mode rules in the current runtime:
 
-PD-mode taps are authored explicitly. If a `[0]` tap override is omitted, a
-quick single tap sends nothing; single hold still defaults to momentary mode
-activation.
+- unlocked modes are exclusive while held; the newest active mode wins
+- locked modes are exclusive; locking another mode clears the previous lock
+- arrow mode repurposes mouse buttons for selection, copy, and paste
+- per-mode pointer DPI overrides are optional and keymap-configured
+- keymaps can combine momentary use, locked use, alternate taps, and
+  higher-tap branches on the same mode key
 
-- `ARROW_MODE`: hold for momentary arrow mode, double-tap hold to lock
-- `DRAGSCROLL`: single tap `.`, hold for momentary scrolling, quick double tap
-  to lock
-- `VOLUME_MODE`: single tap `N`, hold for volume control, quick double tap for
-  mute
-- `BRIGHTNESS_MODE`: single tap `H`, hold for brightness control
-- `PINCH_MODE`: single tap `J`, hold for `PINCH_MODE`, second quick tap sends
-  `VIA_MACRO_6` (authored by default as Accessibility Zoom), second hold for
-  `ZOOM_MODE`
-
-For the user-facing pointer behavior, see
+For the raw mode behavior and pointer-layer policy, see
 [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md).
 
 ## Auto-Mouse
 
-`LAYER_POINTER` is the default auto-mouse layer. Moving the
-trackball brings the configured auto-mouse layer up automatically, and it
-clears after `AUTO_MOUSE_TIME` unless pointer activity or an active mode keeps
-it alive. That behavior is configured in the keymap
-[`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
-through `POINTING_DEVICE_AUTO_MOUSE_ENABLE`, `AUTO_MOUSE_DEFAULT_LAYER`, and
-`AUTO_MOUSE_TIME`.
+Auto-mouse can bring up a configured layer when the trackball moves and clear
+it again after a configured timeout. The keymap chooses the target layer,
+timeout, and any related pointer or navigation layers through the keymap
+[`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+
+In this runtime, auto-mouse also cooperates with pointing-device modes and
+layer-hold keys:
+
+- non-arrow modes can keep the configured pointer layer anchored while active
+- arrow mode prefers staying on the current typing or nav surface rather than
+  forcing the pointer layer back underneath it
+- split runtime sync mirrors the feedback state both halves need to render that
+  behavior consistently
 
 ## RGB
 
@@ -315,7 +318,7 @@ group highlights, auto-mouse gradient endpoints, and key-behavior feedback
 colors. You can edit colors and LED groups there without touching any runtime
 code.
 
-The base RGB layer is always active:
+The runtime supports:
 
 - each layer can have a solid color
 - each layer can highlight specific LEDs through LED groups
@@ -341,8 +344,8 @@ provides full layer and pointer-mode color feedback. With both enabled, the
 render order is: layer color, auto-mouse gradient, layer LED groups,
 pointer-mode color, mode LED groups, key-behavior overlay.
 
-On split builds, the master half computes all feedback state and syncs it to
-the slave through `split_runtime_sync`, so both halves render consistently.
+The master half computes the feedback state and syncs what the slave needs
+through `split_runtime_sync`, so both halves render consistently.
 
 For the full RGB authoring model, render order, and how to change feedback
 colors, see [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md).
@@ -354,10 +357,10 @@ customization does not need low-level changes.
 
 These docs are the next place to look:
 
-- [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md): detailed tap,
-  hold, and multi-tap behavior
-- [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md): pointer-layer and
-  trackball mode behavior
+- [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md): tap, hold, and
+  multi-tap engine semantics plus concrete authored examples
+- [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md): pointer-layer policy and
+  raw trackball mode behavior
 - [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB colors, key-behavior
   feedback, LED groups, and auto-mouse gradient configuration
 - [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md): how the weak-hook
