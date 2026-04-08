@@ -384,7 +384,9 @@ A new mode is done when all of the following are true:
 - The manifest row exists in [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h).
 - The generated keycode, flag, and registry row all exist.
 - Any needed handler, key handler, and reset function exist.
-- The key is physically placed in `keymaps[][]`.
+- The mode is reachable from at least one physical path, either directly in
+  `keymaps[][]` or indirectly as an action emitted from another key behavior or
+  combo.
 - The authored tap / lock behavior in `key_behaviors[]` matches the intended UX.
 - The mode has an RGB overlay color.
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
