@@ -10,6 +10,7 @@
 
 #include "../action/action_dispatch.h"
 #include "../action/action_lifecycle.h"
+#include "../pointing/pointer_layer_policy.h"
 #include "../state/keyboard_mod_ownership.h"
 #include "held_action.h"
 
@@ -183,6 +184,7 @@ static void held_modifier_remove_slot(uint16_t slot) {
 }
 
 static void held_repeat_remove_slot(uint16_t slot) {
+    pointer_layer_policy_note_action(held_repeats[slot].action, false);
     held_repeats[slot] = (held_repeat_binding_t){0};
 }
 
@@ -349,6 +351,7 @@ void held_action_unregister(keypos_t key_pos, uint16_t action) {
 
 void held_action_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     uint16_t interval_ms = held_repeat_interval_from_hz(repeat_hz);
+    bool     anchor_needs_refresh = true;
 
     if (interval_ms == 0) {
         held_repeat_log_invalid_rate(key_pos, action);
@@ -364,8 +367,15 @@ void held_action_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat
             held_action_log_binding_overflow("repeat", key_pos, action);
             return;
         }
+    } else if (held_repeats[slot].action == action) {
+        anchor_needs_refresh = false;
+    } else if (held_repeats[slot].action != action) {
+        pointer_layer_policy_note_action(held_repeats[slot].action, false);
     }
 
+    if (anchor_needs_refresh) {
+        pointer_layer_policy_note_action(action, true);
+    }
     held_repeats[slot] = (held_repeat_binding_t){
         .active         = true,
         .key_pos        = key_pos,

@@ -173,6 +173,11 @@ void action_dispatch(uint16_t action) {
     (void)action;
 }
 
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    (void)action;
+    (void)pressed;
+}
+
 bool macro_dispatch(uint16_t action) {
     (void)action;
     return false;

@@ -4,6 +4,7 @@
 
 #include "owned_keycode.h"
 
+#include "../pointing/pointer_layer_policy.h"
 #include "../state/keyboard_mod_ownership.h"
 
 static bool owned_keycode_is_modded(uint16_t keycode) {
@@ -38,6 +39,7 @@ bool owned_keycode_register(uint16_t keycode) {
 
         keyboard_mod_ownership_register_mods(owned_keycode_extract_mods(keycode));
         if (basic != KC_NO) {
+            pointer_layer_policy_note_action(basic, true);
             register_code(basic);
         }
         return true;
@@ -50,6 +52,7 @@ bool owned_keycode_register(uint16_t keycode) {
     if (IS_MODIFIER_KEYCODE(keycode)) {
         keyboard_mod_ownership_register(keycode);
     } else {
+        pointer_layer_policy_note_action(keycode, true);
         register_code((uint8_t)keycode);
     }
 
@@ -62,6 +65,7 @@ bool owned_keycode_unregister(uint16_t keycode) {
 
         if (basic != KC_NO) {
             unregister_code(basic);
+            pointer_layer_policy_note_action(basic, false);
         }
         keyboard_mod_ownership_unregister_mods(owned_keycode_extract_mods(keycode));
         return true;
@@ -75,6 +79,7 @@ bool owned_keycode_unregister(uint16_t keycode) {
         keyboard_mod_ownership_unregister(keycode);
     } else {
         unregister_code((uint8_t)keycode);
+        pointer_layer_policy_note_action(keycode, false);
     }
 
     return true;

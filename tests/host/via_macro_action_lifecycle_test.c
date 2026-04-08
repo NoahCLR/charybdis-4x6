@@ -199,6 +199,11 @@ void unregister_code16(uint16_t keycode) {
     CHECK(false);
 }
 
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    (void)action;
+    (void)pressed;
+}
+
 static void test_qmk_tap_command_uses_owned_tap(void) {
     test_reset_state();
     macro_buffer[0] = SS_QMK_PREFIX;

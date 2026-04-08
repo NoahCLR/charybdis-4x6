@@ -20,6 +20,7 @@
 #include "owned_keycode.h"
 #include "synthetic_record.h"
 #include "../pointing/pd_modes.h"
+#include "../pointing/pointer_layer_policy.h"
 #include "../state/layer_ownership.h"
 #include "../state/split_runtime_sync.h"
 
@@ -187,7 +188,9 @@ void noah_action_tap(uint16_t action) {
         return;
     }
 
+    pointer_layer_policy_note_action(action, true);
     tap_code16(action);
+    pointer_layer_policy_note_action(action, false);
 }
 
 void noah_action_press(keypos_t key_pos, uint16_t action) {

@@ -19,6 +19,9 @@ static uint8_t  register_mods_count;
 static uint8_t  unregister_mods_count;
 static uint16_t wait_calls[16];
 static uint8_t  wait_call_count;
+static uint16_t pointer_action_calls[16];
+static bool     pointer_action_pressed[16];
+static uint8_t  pointer_action_call_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -40,6 +43,7 @@ static void test_reset_stubs(void) {
     register_mods_count   = 0;
     unregister_mods_count = 0;
     wait_call_count       = 0;
+    pointer_action_call_count = 0;
 }
 
 void keyboard_mod_ownership_register(uint16_t keycode) {
@@ -75,6 +79,13 @@ void unregister_code(uint8_t keycode) {
 void wait_ms(uint16_t ms) {
     CHECK(wait_call_count < ARRAY_SIZE(wait_calls));
     wait_calls[wait_call_count++] = ms;
+}
+
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    CHECK(pointer_action_call_count < ARRAY_SIZE(pointer_action_calls));
+    pointer_action_calls[pointer_action_call_count]   = action;
+    pointer_action_pressed[pointer_action_call_count] = pressed;
+    pointer_action_call_count++;
 }
 
 static void test_plain_key_registers_and_unregisters_directly(void) {
@@ -172,6 +183,20 @@ static void test_tap_uses_standard_and_caps_delays(void) {
     CHECK(wait_calls[0] == TAP_HOLD_CAPS_DELAY);
 }
 
+static void test_mouse_buttons_notify_pointer_policy(void) {
+    test_reset_stubs();
+
+    CHECK(owned_keycode_register(MS_BTN1));
+    CHECK(pointer_action_call_count == 1);
+    CHECK(pointer_action_calls[0] == MS_BTN1);
+    CHECK(pointer_action_pressed[0]);
+
+    CHECK(owned_keycode_unregister(MS_BTN1));
+    CHECK(pointer_action_call_count == 2);
+    CHECK(pointer_action_calls[1] == MS_BTN1);
+    CHECK(!pointer_action_pressed[1]);
+}
+
 int main(void) {
     test_plain_key_registers_and_unregisters_directly();
     test_plain_modifier_uses_mod_ownership();
@@ -179,6 +204,7 @@ int main(void) {
     test_right_modded_key_uses_right_side_modifier_mask();
     test_non_8bit_non_modded_keycodes_are_rejected();
     test_tap_uses_standard_and_caps_delays();
+    test_mouse_buttons_notify_pointer_policy();
 
     puts("owned_keycode host tests passed");
     return 0;

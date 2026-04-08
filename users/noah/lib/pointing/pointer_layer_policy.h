@@ -10,5 +10,10 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+// Physical key records and synthetic dispatched actions use separate QMK
+// entry points for auto-mouse. Keep both classifications in one policy module
+// so pointer anchoring rules stay coherent.
 bool          pointer_layer_policy_is_mouse_record(uint16_t keycode);
+bool          pointer_layer_policy_is_mouse_action(uint16_t action);
+void          pointer_layer_policy_note_action(uint16_t action, bool pressed);
 layer_state_t pointer_layer_policy_apply(layer_state_t state);

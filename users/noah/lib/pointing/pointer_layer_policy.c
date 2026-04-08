@@ -14,6 +14,10 @@ static inline bool pointer_layer_policy_is_layer_hold_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
+static inline bool pointer_layer_policy_is_mouse_button_action(uint16_t action) {
+    return IS_MOUSEKEY_BUTTON(action);
+}
+
 static inline bool pointer_layer_policy_pd_mode_running(void) {
     return pd_any_mode_active();
 }
@@ -53,6 +57,18 @@ bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
     }
 
     return false;
+}
+
+bool pointer_layer_policy_is_mouse_action(uint16_t action) {
+    return pointer_layer_policy_is_mouse_button_action(action);
+}
+
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    if (!pointer_layer_policy_is_mouse_action(action)) {
+        return;
+    }
+
+    auto_mouse_keyevent(pressed);
 }
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
@@ -100,6 +116,16 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
 bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
     (void)keycode;
     return false;
+}
+
+bool pointer_layer_policy_is_mouse_action(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    (void)action;
+    (void)pressed;
 }
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {

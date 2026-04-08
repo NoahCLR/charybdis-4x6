@@ -32,6 +32,9 @@ static test_call_t register_code16_call;
 static test_call_t unregister_code16_call;
 static test_call_t owned_register_call;
 static test_call_t owned_unregister_call;
+static test_call_t pointer_action_call_1;
+static test_call_t pointer_action_call_2;
+static uint8_t     pointer_action_call_count;
 
 static uint8_t macro_dispatch_calls;
 static uint8_t pd_toggle_calls;
@@ -84,6 +87,9 @@ static void test_reset_stubs(void) {
     unregister_code16_call    = (test_call_t){0};
     owned_register_call       = (test_call_t){0};
     owned_unregister_call     = (test_call_t){0};
+    pointer_action_call_1     = (test_call_t){0};
+    pointer_action_call_2     = (test_call_t){0};
+    pointer_action_call_count = 0;
     macro_dispatch_calls      = 0;
     pd_toggle_calls           = 0;
     pd_press_calls            = 0;
@@ -200,6 +206,13 @@ void tap_code16(uint16_t keycode) {
     tap_code16_call.keycode = keycode;
 }
 
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    test_call_t *call = pointer_action_call_count == 0 ? &pointer_action_call_1 : &pointer_action_call_2;
+    call->keycode     = action;
+    call->pressed     = pressed;
+    pointer_action_call_count++;
+}
+
 void register_code16(uint16_t keycode) {
     register_code16_call.keycode = keycode;
 }
@@ -269,6 +282,17 @@ static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
     noah_action_tap(KC_C);
     CHECK(macro_dispatch_calls == 1);
     CHECK(tap_code16_call.keycode == KC_C);
+
+    test_reset_stubs();
+
+    noah_action_tap(MS_BTN1);
+    CHECK(macro_dispatch_calls == 1);
+    CHECK(tap_code16_call.keycode == MS_BTN1);
+    CHECK(pointer_action_call_count == 2);
+    CHECK(pointer_action_call_1.keycode == MS_BTN1);
+    CHECK(pointer_action_call_1.pressed);
+    CHECK(pointer_action_call_2.keycode == MS_BTN1);
+    CHECK(!pointer_action_call_2.pressed);
 }
 
 static void test_tap_ignores_raw_layer_actions(void) {

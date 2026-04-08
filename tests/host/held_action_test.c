@@ -22,12 +22,19 @@ typedef struct {
     uint16_t action;
 } tap_call_t;
 
+typedef struct {
+    uint16_t action;
+    bool     pressed;
+} pointer_action_call_t;
+
 static action_call_t press_calls[16];
 static action_call_t release_calls[16];
 static tap_call_t    tap_calls[32];
+static pointer_action_call_t pointer_action_calls[16];
 static uint8_t       press_call_count;
 static uint8_t       release_call_count;
 static uint8_t       tap_call_count;
+static uint8_t       pointer_action_call_count;
 static uint16_t      mod_register_calls[16];
 static uint16_t      mod_unregister_calls[16];
 static uint8_t       mod_register_count;
@@ -57,6 +64,7 @@ static void test_reset_stubs(void) {
     press_call_count    = 0;
     release_call_count  = 0;
     tap_call_count      = 0;
+    pointer_action_call_count = 0;
     mod_register_count  = 0;
     mod_unregister_count = 0;
     fake_time           = 1000;
@@ -101,6 +109,14 @@ void action_dispatch(uint16_t action) {
     CHECK(tap_call_count < ARRAY_SIZE(tap_calls));
     tap_calls[tap_call_count++] = (tap_call_t){
         .action = action,
+    };
+}
+
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    CHECK(pointer_action_call_count < ARRAY_SIZE(pointer_action_calls));
+    pointer_action_calls[pointer_action_call_count++] = (pointer_action_call_t){
+        .action  = action,
+        .pressed = pressed,
     };
 }
 
@@ -220,6 +236,9 @@ static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void)
 
     CHECK(tap_call_count == 1);
     CHECK(tap_calls[0].action == TEST_SHARED_ACTION);
+    CHECK(pointer_action_call_count == 1);
+    CHECK(pointer_action_calls[0].action == TEST_SHARED_ACTION);
+    CHECK(pointer_action_calls[0].pressed);
 
     fake_time = (uint16_t)(fake_time + 39);
     held_action_repeat_tick();
@@ -231,6 +250,9 @@ static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void)
     CHECK(tap_calls[1].action == TEST_SHARED_ACTION);
 
     CHECK(held_action_release_owned_by_key(key_pos));
+    CHECK(pointer_action_call_count == 2);
+    CHECK(pointer_action_calls[1].action == TEST_SHARED_ACTION);
+    CHECK(!pointer_action_calls[1].pressed);
 
     fake_time = (uint16_t)(fake_time + 80);
     held_action_repeat_tick();

@@ -188,6 +188,11 @@ void wait_ms(uint16_t ms) {
     (void)ms;
 }
 
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    (void)action;
+    (void)pressed;
+}
+
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .keycode = keycode,
