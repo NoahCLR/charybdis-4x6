@@ -179,8 +179,9 @@ enum keymap_custom_keycodes {
 //   - .hold is the normal hold tier
 //   - .long_hold is the longer-hold tier
 // omit .tap to keep the key's normal tap behavior for that tap index
-// if .tap is set but hold/long_hold are omitted, holding past tap_hold_term
-// falls back to the key's normal held behavior
+// if .tap is set but hold/long_hold are omitted, keys that already have a
+// default held path keep using it; other keycodes keep the tap override and
+// send it on release
 // .hold and .long_hold are independent: define either one by itself, or use
 // both together for a two-stage hold
 //
@@ -269,7 +270,7 @@ enum keymap_custom_keycodes {
 const key_behavior_t
     key_behaviors[] =
         {
-            // Number row — shifted symbols on hold, media on double-tap
+            // Number row, shifted symbols on hold, media on double-tap
             {.keycode = KC_1, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)}}},
             {.keycode = KC_2, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_AT)}}},
             {.keycode = KC_3, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_HASH)}}},
@@ -305,11 +306,11 @@ const key_behavior_t
             // Typing-layer pointer buttons to support arrow mode
             {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
 
-            // Arrows — release-based hold plus immediate long hold
+            // Arrows, release-based hold plus immediate long hold
             {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
             {.keycode = KC_RIGHT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))}}},
 
-            // Layer keys — tap override on single tap, media on multi-tap, layer lock or repeat on hold
+            // Layer keys, tap override on single tap, media on multi-tap, layer lock or repeat on hold
             {
                 .keycode = LEFT_THUMB,
                 .tap_counts =
@@ -333,7 +334,7 @@ const key_behavior_t
                     },
             },
 
-            // layer-tap key — double-tap hold locks LAYER_NAV.
+            // layer-tap key, double-tap hold locks LAYER_NAV.
             {
                 .keycode       = LT(LAYER_NAV, KC_SLSH),
                 .tap_hold_term = 100,
@@ -344,8 +345,10 @@ const key_behavior_t
             },
 
             // Pointing-device mode keys.
-            // Taps are authored explicitly here; there is no implicit base-layer fallback.
-            // If [0].hold is omitted, single hold still defaults to the key's momentary pd-mode.
+            // Plain pd-mode keycodes already work as default momentary holds.
+            // These rows only add authored taps or higher-tap branches on top.
+            // If [0].tap is omitted, a quick single tap sends nothing.
+            // If [0].hold is omitted, single hold still uses the key's default momentary pd-mode.
             {.keycode = VOLUME_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_N)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
             {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_H)}}},
             {.keycode = ARROW_MODE, .tap_counts = {[1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(ARROW_MODE))}}},
@@ -358,7 +361,7 @@ const key_behavior_t
                     },
             },
 
-            // Dragscroll: single hold = momentary, double tap = lock.
+            // Dragscroll: single tap '.', hold = momentary, double-tap hold = lock.
             {
                 .keycode = DRAGSCROLL,
                 .tap_counts =
@@ -381,9 +384,9 @@ const key_behavior_t
 //   - XXXXXXX = key does nothing on this layer.
 //     _______ = transparent, falls through to the layer below.
 //
-// The number row (KC_1–KC_0) and punctuation keys use the key behavior
-// tables defined above — they are NOT using QMK's built-in mod-tap.
-// See users/noah/lib/key/key_runtime.c for details.
+// The number row (KC_1-KC_0) and punctuation keys use the key behavior
+// tables defined above; they are not using QMK's built-in mod-tap.
+// See the key runtime modules under users/noah/lib/key/ for details.
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
     [LAYER_BASE] = LAYOUT(

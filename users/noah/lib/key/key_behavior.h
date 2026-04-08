@@ -66,8 +66,9 @@ typedef struct {
 // tap:
 //   What happens on a quick release.
 //   If omitted, the key keeps its normal tap behavior for that step.
-//   If present but hold/long_hold are both omitted, holding past the tap
-//   threshold falls back to the key's normal held behavior.
+//   If present but hold/long_hold are both omitted, keys that already have a
+//   default held path keep using it (for example normal keys, LT()/MO(), and
+//   pd-mode keys). Other keycodes keep the tap override and send it on release.
 //
 // hold:
 //   What happens after the first hold threshold.
