@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "quantum_keycodes.h"
 
@@ -127,6 +128,9 @@ typedef struct {
 
 uint16_t timer_read(void);
 uint16_t timer_elapsed(uint16_t last);
+uint32_t timer_read32(void);
+uint32_t timer_elapsed32(uint32_t last);
+bool     is_keyboard_master(void);
 
 extern layer_state_t layer_state;
 bool                 layer_state_cmp(layer_state_t state, uint8_t layer);
