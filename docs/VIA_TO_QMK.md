@@ -1,7 +1,7 @@
 # VIA To QMK Workflow
 
 This doc explains the VIA bridge script in
-[`via layouts/via_to_qmk_layout.py`](../via%20layouts/via_to_qmk_layout.py).
+[`via layouts/via_to_qmk_layout.py`](<../via layouts/via_to_qmk_layout.py>).
 
 Use it when you want to experiment in VIA, export the result, and then bring
 the VIA-owned parts of the layout back into the source-controlled
