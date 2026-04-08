@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "quantum_keycodes.h"
+
 #define PROGMEM
 
 #define ARRAY_SIZE(arr_) (sizeof(arr_) / sizeof((arr_)[0]))
@@ -45,6 +47,8 @@
 #define KEY_BEHAVIOR_MAX_TAP_COUNT 5u
 #define TAP_CODE_DELAY 10u
 #define TAP_HOLD_CAPS_DELAY 80u
+#define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
+#define DYNAMIC_KEYMAP_MACRO_COUNT 16u
 
 #define QK_MOMENTARY 0x5000u
 #define QK_LAYER_TAP 0x6000u
@@ -68,6 +72,7 @@
 #define IS_QK_MOMENTARY(keycode_) ((((keycode_)) & 0xFF00u) == QK_MOMENTARY)
 #define IS_QK_LAYER_TAP(keycode_) ((((keycode_)) & 0xF000u) == QK_LAYER_TAP)
 #define IS_QK_MODS(keycode_) ((((keycode_) & QK_MODS) != 0) && (((keycode_) & 0xE000u) == 0))
+#define IS_QK_MACRO(keycode_) ((keycode_) >= QK_MACRO_0 && (keycode_) < (QK_MACRO_0 + DYNAMIC_KEYMAP_MACRO_COUNT))
 #define IS_MOUSEKEY_BUTTON(keycode_) ((keycode_) >= QK_MOUSE_BUTTON_1 && (keycode_) < (QK_MOUSE_BUTTON_1 + 8))
 #define IS_MODIFIER_KEYCODE(keycode_) (((keycode_) & 0xFFF8u) == KC_LEFT_CTRL)
 #define QK_MODS_GET_BASIC_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))

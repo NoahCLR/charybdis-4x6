@@ -26,15 +26,14 @@ typedef struct {
     uint16_t action;
 } held_action_binding_t;
 
-#ifndef HELD_ACTION_BINDING_MAX_CAPACITY
-#    define HELD_ACTION_BINDING_MAX_CAPACITY 16u
-#endif
+// Ownership is tracked by physical key position, so the natural upper bound is
+// the full matrix size. Using a smaller cap degrades semantics once a binding
+// overflows, which is not worth the tiny RAM saving on this board.
+#define HELD_ACTION_BINDING_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 
-#define HELD_ACTION_BINDING_CAPACITY ((uint16_t)(((MATRIX_ROWS * MATRIX_COLS) < HELD_ACTION_BINDING_MAX_CAPACITY) ? (MATRIX_ROWS * MATRIX_COLS) : HELD_ACTION_BINDING_MAX_CAPACITY))
-
-// Real key-rollover on this board never approaches total matrix size. Keep a
-// bounded ownership table and fall back to raw dispatch with a console warning
-// if an unusually large chord exhausts it.
+// Board-sized ownership tables keep per-key refcount behavior intact even on
+// unusually large chords. A free-slot miss now indicates state corruption or a
+// broken matrix definition rather than a routine rollover limit.
 static held_modifier_binding_t held_modifiers[HELD_ACTION_BINDING_CAPACITY] = {0};
 static uint8_t                 held_modifier_refcounts[8]                   = {0};
 static held_action_binding_t   held_actions[HELD_ACTION_BINDING_CAPACITY]   = {0};

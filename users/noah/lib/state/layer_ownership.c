@@ -16,11 +16,9 @@ typedef struct {
     uint8_t  layer;
 } layer_momentary_binding_t;
 
-#ifndef LAYER_OWNERSHIP_BINDING_MAX_CAPACITY
-#    define LAYER_OWNERSHIP_BINDING_MAX_CAPACITY 16u
-#endif
-
-#define LAYER_OWNERSHIP_BINDING_CAPACITY ((uint16_t)(((MATRIX_ROWS * MATRIX_COLS) < LAYER_OWNERSHIP_BINDING_MAX_CAPACITY) ? (MATRIX_ROWS * MATRIX_COLS) : LAYER_OWNERSHIP_BINDING_MAX_CAPACITY))
+// Momentary layer ownership is keyed by physical switch position, so a board-
+// sized table avoids the semantic holes caused by a smaller arbitrary cap.
+#define LAYER_OWNERSHIP_BINDING_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 
 static layer_momentary_binding_t layer_momentary_bindings[LAYER_OWNERSHIP_BINDING_CAPACITY] = {0};
 static uint8_t                   layer_momentary_refcounts[LAYER_COUNT]                      = {0};

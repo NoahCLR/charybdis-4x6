@@ -6,6 +6,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 sh "$ROOT/run_key_behavior_lookup_tests.sh"
 sh "$ROOT/run_action_lifecycle_tests.sh"
+sh "$ROOT/run_via_macro_action_lifecycle_tests.sh"
 sh "$ROOT/run_keyboard_mod_ownership_tests.sh"
 sh "$ROOT/run_held_action_tests.sh"
 sh "$ROOT/run_layer_ownership_tests.sh"
