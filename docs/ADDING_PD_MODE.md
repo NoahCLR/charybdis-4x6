@@ -22,7 +22,7 @@ If you hand this task to an agent, give it this exact job:
 
 1. Add a new manifest row in [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h).
 2. Add handler/reset declarations in [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h) and implementations in [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c), if the mode needs them.
-3. Place the mode keycode in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), and add a `key_behaviors[]` row only if the mode needs custom taps or higher-tap behavior.
+3. Expose the mode through at least one physical path in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), either directly in `keymaps[][]` or indirectly from another key behavior or combo. Add a `key_behaviors[]` row only if the mode itself needs custom taps or higher-tap behavior.
 4. Add an RGB color in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 5. Update user-facing docs if the mode changes real behavior in a meaningful way.
 6. Compile with `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
@@ -219,9 +219,9 @@ Edit [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/ba
 
 There are two separate jobs here:
 
-- place the physical keycode on the desired layer
-- add a `key_behaviors[]` row only if the key needs custom tap / double-tap /
-  higher-tap behavior
+- make the mode reachable from at least one physical path
+- add a `key_behaviors[]` row only if the mode keycode itself needs custom tap
+  / double-tap / higher-tap behavior
 
 Important: a plain pd-mode keycode already works as a default momentary hold.
 Tap behavior is never implicit. If you want a single tap, double tap, lock,
@@ -241,12 +241,16 @@ Example:
 {.keycode = EXAMPLE_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(EXAMPLE_MODE))}}},
 ```
 
-Then place `EXAMPLE_MODE` on `LAYER_POINTER`, `LAYER_NAV`, or another layer in
-the physical `keymaps[][]` block.
+That row only matters if `EXAMPLE_MODE` is reachable. You can expose it:
+
+- directly by placing `EXAMPLE_MODE` on `LAYER_POINTER`, `LAYER_NAV`, or
+  another layer in `keymaps[][]`
+- indirectly by emitting `EXAMPLE_MODE` from another key behavior or combo
 
 Current examples in this repo:
 
-- `ARROW_MODE`: double-tap hold locks
+- `ARROW_MODE`: the authored row supports double-tap hold lock, but the
+  current profile exposes arrow mode through `KC_RIGHT_ALT` tap lock
 - `DRAGSCROLL`: single tap `.`, double-tap hold locks
 - `VOLUME_MODE`: double tap mutes instead of locking
 - `PINCH_MODE`: second tap is custom and can branch into `ZOOM_MODE`

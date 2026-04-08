@@ -1,0 +1,137 @@
+# VIA To QMK Workflow
+
+This doc explains the VIA bridge script in
+[`via layouts/via_to_qmk_layout.py`](../via%20layouts/via_to_qmk_layout.py).
+
+Use it when you want to experiment in VIA, export the result, and then bring
+the VIA-owned parts of the layout back into the source-controlled
+[`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+
+## What The Script Does
+
+The script reads a VIA export JSON and renders:
+
+- `VIA_MACROS(MACRO)`
+- `keymaps[][]`
+
+In `--write` mode, it can rewrite either or both of those sections in
+[`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+
+It does not rewrite:
+
+- `HARDCODED_MACROS(MACRO)`
+- `COMBOS(COMBO)`
+- `key_behaviors[]`
+- `enum keymap_custom_keycodes`
+- comments outside the rewritten `VIA_MACROS(MACRO)` and `keymaps[][]` blocks
+
+So this is a bridge for VIA-owned layout and VIA macro defaults. It is not a
+general formatter for the rest of the keymap.
+
+## Normal Workflow
+
+Recommended path:
+
+1. Make layout or VIA macro changes in VIA.
+2. Export the VIA JSON.
+3. Preview the generated QMK output.
+4. Rewrite the parts you want back into `keymap.c`.
+5. Compile and flash.
+6. If you changed VIA default macros and want those defaults reseeded into
+   EEPROM, reset the relevant EEPROM/VIA macro state after flashing.
+
+## Commands
+
+Run from the repo root.
+
+Preview generated output:
+
+```sh
+python 'via layouts/via_to_qmk_layout.py' --print
+```
+
+Preview a specific export:
+
+```sh
+python 'via layouts/via_to_qmk_layout.py' --print --via-json /path/to/export.json
+```
+
+Write back into `keymap.c`:
+
+```sh
+python 'via layouts/via_to_qmk_layout.py' --write
+```
+
+Write from a specific export:
+
+```sh
+python 'via layouts/via_to_qmk_layout.py' --write --via-json /path/to/export.json
+```
+
+When you use `--write`, the script asks two separate questions:
+
+- update `VIA_MACROS(MACRO)` from the export `macros[]`
+- update `keymaps[][]` from the export `layers`
+
+So you can sync macros only, layers only, or both.
+
+## If You Omit `--via-json`
+
+If you do not pass `--via-json`, the script interactively asks you to choose a
+VIA export from the `via layouts/` directory.
+
+## Token Mapping
+
+The script translates VIA tokens into the symbols used by this repo.
+
+Important cases:
+
+- `MACRO(n)` in VIA export becomes `VIA_MACRO_n`
+- `CUSTOM(64 + n)` maps into this userspace custom-keycode range
+- shared pd-mode keycodes are loaded from
+  [`pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h)
+- keymap-local custom keycodes are loaded from
+  [`enum keymap_custom_keycodes`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
+
+That means most keymap-local additions do not require manual script edits. If
+you add a new keymap-local custom keycode in `keymap.c`, the script can usually
+pick it up automatically.
+
+## What It Treats As Source Of Truth
+
+If you run the script in `--write` mode and confirm a rewrite, the selected VIA
+export becomes authoritative for the rewritten section.
+
+If you do not run the script, the firmware builds exactly from what is already
+authored in [`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+
+## What To Check After A Rewrite
+
+After syncing from VIA, check these things:
+
+- the right layers were rewritten
+- `VIA_MACROS(MACRO)` matches the export you intended
+- custom keycodes still resolved to the expected symbolic names
+- no profile-specific authored behavior in `key_behaviors[]` now conflicts with
+  the new physical placement
+
+Then build:
+
+```sh
+qmk compile -kb bastardkb/charybdis/4x6 -km noah
+```
+
+## What This Script Is Good For
+
+- quick VIA experimentation without giving up a readable `keymap.c`
+- round-tripping VIA macro defaults back into source
+- restoring a VIA-edited layer layout into the repo's authored layout blocks
+
+## What This Script Is Not For
+
+- editing `key_behaviors[]`
+- documenting your current profile
+- changing the shared custom runtime
+- changing hardcoded firmware macros
+
+Those still belong in the normal source files and docs.

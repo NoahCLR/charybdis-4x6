@@ -65,9 +65,9 @@ enum keymap_custom_keycodes {
     MACRO(VIA_MACRO_4, "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}") \
     MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}")       \
     MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}")         \
-    MACRO(VIA_MACRO_7, "")                               \
-    MACRO(VIA_MACRO_8, "")                               \
-    MACRO(VIA_MACRO_9, "")                               \
+    MACRO(VIA_MACRO_7, "{KC_LCTL,KC_LALT,KC_LGUI,KC_V}") \
+    MACRO(VIA_MACRO_8, "{KC_LSFT,KC_LGUI,KC_V}")         \
+    MACRO(VIA_MACRO_9, "{KC_LSFT,KC_LGUI,KC_P}")         \
     MACRO(VIA_MACRO_10, "")                              \
     MACRO(VIA_MACRO_11, "")                              \
     MACRO(VIA_MACRO_12, "")                              \
@@ -427,7 +427,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
             KC_LEFT_SHIFT,           XXXXXXX,           XXXXXXX,           XXXXXXX,            KC_ESC,           XXXXXXX,              XXXXXXX,           XXXXXXX,           KC_LBRC,           KC_RBRC,           KC_DQUO,           KC_PEQL,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-              VIA_MACRO_5,           _______,        LCAG(KC_X),        LCAG(KC_C),         LSG(KC_V),         LSG(KC_P),              XXXXXXX,           XXXXXXX,           KC_LCBR,           KC_RCBR,           _______,      KC_RIGHT_ALT,
+              VIA_MACRO_5,           _______,         VIA_MACRO_4,         VIA_MACRO_3,         VIA_MACRO_8,         VIA_MACRO_9,              XXXXXXX,           XXXXXXX,           KC_LCBR,           KC_RCBR,           _______,      KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                        KC_LEFT_GUI,            KC_SPC,           _______,              _______,            KC_ENT,
                                                                                                KC_DEL,           KC_BSPC,              KC_BSPC
@@ -436,7 +436,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [LAYER_NAV] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  XXXXXXX,           XXXXXXX,           XXXXXXX,        LCAG(KC_V),           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
+                  XXXXXXX,           XXXXXXX,           XXXXXXX,         VIA_MACRO_7,           XXXXXXX,           XXXXXXX,              KC_MPLY,           KC_MNXT,           KC_MPRV,           KC_MUTE,           KC_VOLD,           KC_VOLU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   XXXXXXX,           G(KC_Q),           G(KC_W),           G(KC_A),           XXXXXXX,           XXXXXXX,          VIA_MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           KC_BRID,           KC_BRIU,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤

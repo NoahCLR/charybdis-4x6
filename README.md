@@ -77,6 +77,17 @@ That script is useful when you want to experiment quickly in VIA without
 giving up a readable, source-controlled
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c): it
 converts VIA exports back into the authored tables this repo uses.
+For the full round-trip workflow, see
+[`docs/VIA_TO_QMK.md`](./docs/VIA_TO_QMK.md).
+
+Practical usage:
+
+- `python via_to_qmk_layout.py --print` previews rewritten `VIA_MACROS(MACRO)`
+  and `keymaps[][]`
+- `python via_to_qmk_layout.py --write` rewrites those VIA-owned sections in
+  [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
+- `python via_to_qmk_layout.py --via-json path/to/export.json` uses a specific
+  VIA export instead of choosing one from `via layouts/`
 
 ## Where To Change Things
 
@@ -374,6 +385,8 @@ These docs are the next place to look:
   raw trackball mode behavior
 - [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB colors, key-behavior
   feedback, LED groups, and auto-mouse gradient configuration
+- [`docs/VIA_TO_QMK.md`](./docs/VIA_TO_QMK.md): how the VIA export bridge
+  rewrites `VIA_MACROS(MACRO)` and `keymaps[][]` back into `keymap.c`
 - [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md): how the weak-hook
   model works and how to override QMK hooks in your keymap
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new

@@ -9,6 +9,10 @@ userspace can do. This file shows what I currently do with it.
 
 These are current choices, not guarantees of the shared runtime.
 
+This keymap was made for my personal macOS use. Many current choices assume
+Command-based shortcuts, macOS system conventions, and a Mac-first editing and
+window-management workflow rather than a cross-platform default.
+
 ## Profile Shape
 
 The current profile keeps the base layer close to plain QWERTY, then pushes the
@@ -30,8 +34,8 @@ trackball control get packed into the right side and the thumbs.
 | --- | --- | --- |
 | `LAYER_BASE` | default typing layer | QWERTY, home-row layer access, custom thumbs, number-row symbol holds, signature `Esc`, `Enter`, `Shift`, and `Right Alt` behaviors |
 | `LAYER_NUM` | right-hand numpad layer | numpad on the right half, `MO(LAYER_NAV)` retained on the left side for fast access back into navigation |
-| `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, a few GUI-based shortcuts on the lower left |
-| `LAYER_NAV` | navigation, media, system control, mouse buttons | arrow cluster, media, volume, brightness, GUI shortcuts, mouse buttons, `DRAGSCROLL`, and current auto-sniping |
+| `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, a few macOS-oriented shortcuts on the lower left |
+| `LAYER_NAV` | navigation, media, system control, mouse buttons | arrow cluster, media, volume, brightness, direct macOS shortcuts, mouse buttons, `DRAGSCROLL`, and current auto-sniping |
 | `LAYER_POINTER` | auto-mouse pointer surface | `BRIGHTNESS_MODE`, `PINCH_MODE`, `VOLUME_MODE`, `DRAGSCROLL`, mouse buttons, and `LT(LAYER_NUM, KC_SPC)` on the thumb cluster |
 
 The current keymap config sets:
@@ -169,7 +173,9 @@ These are small profile-specific quality-of-life keys:
 - `KC_RIGHT_ALT`: tap `LOCK_PD_MODE(ARROW_MODE)`, hold normal right `Alt`
 
 `KC_RIGHT_ALT` is a good example of the profile using a plain key's default held
-path while still stealing its tap for something more specialized.
+path while still stealing its tap for something more specialized. That matters
+for `ARROW_MODE`, because the mode emits real arrow taps. Holding `Right Alt`
+while using arrow mode still gives the usual `Option+Arrow` word-jump behavior.
 
 ### Nav Arrows
 
@@ -225,7 +231,7 @@ This layer mixes symbols and board-control tools:
 - `[` `]` on the right home row
 - `{` `}` on the lower right
 - quote variants on the right edge
-- a few GUI-based shortcuts and `VIA_MACRO_5` on the lower left
+- a few macOS-oriented shortcuts and `VIA_MACRO_5` on the lower left
 
 This makes it feel like a symbols layer first, but with a small system-control
 cluster attached.
@@ -237,7 +243,7 @@ This is the densest current layer. It combines:
 - media playback
 - volume and brightness
 - an arrow cluster
-- GUI-based shortcuts
+- direct macOS shortcuts
 - `MS_BTN1` and `MS_BTN2`
 - `DRAGSCROLL`
 - three VIA macros
@@ -287,6 +293,11 @@ One important current detail:
   `ARROW_MODE` key physically placed in `keymaps[][]` right now
 - in the current profile, arrow mode is exposed through the `KC_RIGHT_ALT` tap
   lock action instead
+- because arrow mode emits real arrow taps, it can still be combined with held
+  modifiers for bigger jumps
+- the current base layout keeps those modifiers nearby: `KC_RIGHT_ALT` sits on
+  the far-right pinky key, and `KC_LEFT_GUI` stays in the thumb cluster for
+  `Cmd+Arrow` line jumps
 
 So the current pointing setup is not "every mode gets a visible physical mode
 key." It is more opinionated than that.
@@ -296,22 +307,54 @@ key." It is more opinionated than that.
 The current profile uses VIA defaults more than hardcoded firmware macros:
 
 - all `MACRO_0` through `MACRO_15` hardcoded slots are currently empty
-- `VIA_MACRO_0` through `VIA_MACRO_6` currently have defaults
+- `VIA_MACRO_0` through `VIA_MACRO_9` currently have defaults
 
-Current VIA defaults:
+But a lot of the current shortcut surface is not implemented through macro
+slots at all. Many standard macOS commands are bound directly as modded
+keycodes on the layers, especially on `LAYER_NAV`.
 
-| Slot | Current payload |
-| --- | --- |
-| `VIA_MACRO_0` | `{KC_LGUI,KC_SPC}` |
-| `VIA_MACRO_1` | `{KC_LALT,KC_SPC}` |
-| `VIA_MACRO_2` | `{KC_LALT,KC_LGUI,KC_SPC}` |
-| `VIA_MACRO_3` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` |
-| `VIA_MACRO_4` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` |
-| `VIA_MACRO_5` | `{KC_LCTL,KC_LGUI,KC_SPC}` |
-| `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` |
+In practice, the profile is set up so those shortcuts are quick to reach from
+the base layer. `LT(LAYER_NAV, KC_F)` is one of the main access points, and
+`LT(LAYER_NAV, KC_SLSH)` provides a second nav entry on the right side.
 
-The layer surfaces also use many direct modded keycodes instead of routing
-everything through macros, especially on `LAYER_NAV` and `LAYER_SYM`.
+Current direct macOS-standard shortcuts bound in layers include:
+
+| Binding | Standard macOS meaning | Current layer |
+| --- | --- | --- |
+| `G(KC_Q)` | quit the current app | `LAYER_NAV` |
+| `G(KC_W)` | close the front window | `LAYER_NAV` |
+| `G(KC_A)` | select all | `LAYER_NAV` |
+| `G(KC_X)` | cut | `LAYER_NAV` |
+| `G(KC_C)` | copy | `LAYER_NAV` |
+| `G(KC_V)` | paste | `LAYER_NAV` |
+| `G(KC_Z)` | undo | `LAYER_NAV` |
+| `LSG(KC_Z)` | redo | `LAYER_NAV` |
+
+The VIA defaults are a smaller mixed set. Some are standard macOS shortcuts,
+while others are just my current app-launcher or utility bindings:
+
+| Slot | Current payload | Current meaning |
+| --- | --- | --- |
+| `VIA_MACRO_0` | `{KC_LGUI,KC_SPC}` | standard macOS Spotlight shortcut |
+| `VIA_MACRO_1` | `{KC_LALT,KC_SPC}` | current launcher shortcut for Claude or ChatGPT |
+| `VIA_MACRO_2` | `{KC_LALT,KC_LGUI,KC_SPC}` | current launcher shortcut for [Warp Terminal](https://www.warp.dev/) |
+| `VIA_MACRO_3` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` | current OCR text-copy shortcut for [TextGrabber](https://apps.apple.com/us/app/textgrabber/id6451423640?mt=12) |
+| `VIA_MACRO_4` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | current screenshot shortcut |
+| `VIA_MACRO_5` | `{KC_LCTL,KC_LGUI,KC_SPC}` | standard macOS Character Viewer shortcut |
+| `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` | current shortcut for my macOS Accessibility Zoom setup, used as a picture-in-picture looking glass |
+| `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | current shortcut for [Maccy](https://maccy.app/), my clipboard manager |
+| `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | current shortcut for VS Code preview |
+| `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | current shortcut for the VS Code command palette |
+
+So the current profile uses both:
+
+- direct modded keycodes for many standard macOS editing and app shortcuts
+- VIA macros for a smaller set of macOS launcher/system shortcuts and
+  personal utility bindings
+
+Some other chords in the current profile, especially `LCAG(...)` bindings and
+several VIA slots, are simply personal shortcuts rather than standard macOS
+conventions.
 
 ## Related Files
 

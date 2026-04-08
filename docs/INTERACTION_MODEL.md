@@ -72,6 +72,28 @@ One important nuance: inside `key_behaviors[]`, an omitted `.tap_hold_term`
 inherits `TAPPING_TERM` for `LT()` rows, but `CUSTOM_TAP_HOLD_TERM` for other
 custom rows.
 
+## Normal Tap And Hold Fallbacks
+
+An authored row does not automatically replace everything about a key.
+
+- if `.tap` is omitted for a tap-count branch, that branch keeps the key's
+  normal tap behavior
+- if `.tap` is present but `.hold` and `.long_hold` are both omitted, keys
+  that already have a default held path keep using it for that branch
+- once `.hold` or `.long_hold` is authored for that branch, the normal held
+  fallback is no longer used for that branch
+
+In practice, the common families look like this:
+
+- ordinary keys such as `KC_A` can keep their normal held-key behavior when
+  only the tap is overridden
+- `LT()` rows keep their normal momentary layer hold when only the tap is
+  overridden
+- plain pd-mode keycodes keep their default momentary mode hold when only the
+  tap is overridden
+- keycodes without a default held path, such as most custom keycodes, do not
+  invent one just because a tap override exists
+
 ## The Three Hold Modes
 
 Not every hold behaves the same way.
