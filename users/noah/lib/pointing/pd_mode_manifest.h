@@ -42,10 +42,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#define NOAH_PD_MODE_LIST(PDM)                                                                                                             \
-    PDM(DRAGSCROLL, DRAGSCROLL, NULL, NULL, NULL, 0)                                                                                      \
-    PDM(VOLUME, VOLUME_MODE, handle_volume_mode, NULL, reset_volume_mode, PD_MODE_VOLUME_DPI)                                            \
-    PDM(BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, NULL, reset_brightness_mode, PD_MODE_BRIGHTNESS_DPI)                       \
-    PDM(ZOOM, ZOOM_MODE, handle_zoom_mode, NULL, reset_zoom_mode, PD_MODE_ZOOM_DPI)                                                     \
-    PDM(ARROW, ARROW_MODE, handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode, PD_MODE_ARROW_DPI)                               \
+#define NOAH_PD_MODE_LIST(PDM)                                                                                    \
+    PDM(DRAGSCROLL, DRAGSCROLL, NULL, NULL, NULL, 0)                                                              \
+    PDM(VOLUME, VOLUME_MODE, handle_volume_mode, NULL, reset_volume_mode, PD_MODE_VOLUME_DPI)                     \
+    PDM(BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, NULL, reset_brightness_mode, PD_MODE_BRIGHTNESS_DPI) \
+    PDM(ZOOM, ZOOM_MODE, handle_zoom_mode, NULL, reset_zoom_mode, PD_MODE_ZOOM_DPI)                               \
+    PDM(ARROW, ARROW_MODE, handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode, PD_MODE_ARROW_DPI)         \
     PDM(PINCH, PINCH_MODE, NULL, NULL, NULL, 0)

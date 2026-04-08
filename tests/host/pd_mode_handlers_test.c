@@ -291,6 +291,8 @@ static void test_arrow_mode_copy_shortcut_suspends_ambient_mods(void) {
     CHECK(fake_weak_mods == MOD_BIT(KC_RIGHT_ALT));
     CHECK(fake_oneshot_mods == MOD_BIT(KC_LEFT_GUI));
     CHECK(fake_oneshot_locked_mods == MOD_BIT(KC_RIGHT_GUI));
+    CHECK(fallback_hold_activation_count == 1);
+    CHECK(fallback_hold_active);
     CHECK(send_keyboard_report_count == 2);
 }
 

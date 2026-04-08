@@ -155,6 +155,7 @@ static void arrow_shift_sync(void) {
 }
 
 static void arrow_send_shortcut(uint16_t shortcut) {
+    key_runtime_activate_pending_fallback_hold();
     keyboard_mod_state_t saved = keyboard_mod_state_suspend();
     tap_code16(shortcut);
     keyboard_mod_state_apply(saved);
