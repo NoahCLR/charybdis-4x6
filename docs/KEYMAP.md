@@ -352,9 +352,8 @@ So the current profile uses both:
 - VIA macros for a smaller set of macOS launcher/system shortcuts and
   personal utility bindings
 
-Some other chords in the current profile, especially `LCAG(...)` bindings and
-several VIA slots, are simply personal shortcuts rather than standard macOS
-conventions.
+Some other shortcuts in the current profile, especially several VIA slots, are
+simply personal shortcuts rather than standard macOS conventions.
 
 ## Related Files
 
