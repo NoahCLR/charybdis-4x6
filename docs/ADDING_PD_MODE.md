@@ -22,7 +22,7 @@ If you hand this task to an agent, give it this exact job:
 
 1. Add a new manifest row in [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h).
 2. Add handler/reset declarations in [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h) and implementations in [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c), if the mode needs them.
-3. Add authored key behavior and physical placement in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+3. Place the mode keycode in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), and add a `key_behaviors[]` row only if the mode needs custom taps or higher-tap behavior.
 4. Add an RGB color in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 5. Update user-facing docs if the mode changes real behavior in a meaningful way.
 6. Compile with `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
@@ -35,6 +35,9 @@ behavior that existing modes do not cover.
 A pd mode is a custom keycode that:
 
 - is activated by holding a key
+- can be placed directly in the keymap for default momentary behavior
+- can optionally grow explicit tap / hold / multi-tap behavior through
+  `key_behaviors[]`
 - gets a generated `LOCK_PD_MODE(...)` action whether or not the keymap uses it
 - can transform trackball motion in the pointing-device pipeline
 - can optionally intercept key events while active
@@ -210,19 +213,20 @@ If the mode needs a custom DPI, thread that through from the keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 the same way the existing `PD_MODE_*_DPI` values are wired.
 
-### 6. Add Authored Key Behavior
+### 6. Place The Key And Add Optional Authored Behavior
 
 Edit [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 
 There are two separate jobs here:
 
-- add a `key_behaviors[]` row if the key needs custom tap / double-tap behavior
 - place the physical keycode on the desired layer
+- add a `key_behaviors[]` row only if the key needs custom tap / double-tap /
+  higher-tap behavior
 
-Important: the generic pd-mode runtime already gives you momentary hold
-activation. Tap behavior is never implicit. If you want a single tap, double
-tap, lock, mute, or a second-tap alternate mode, you must author that
-explicitly in `key_behaviors[]`.
+Important: a plain pd-mode keycode already works as a default momentary hold.
+Tap behavior is never implicit. If you want a single tap, double tap, lock,
+mute, or a second-tap alternate mode, you must author that explicitly in
+`key_behaviors[]`.
 
 Common lockable patterns are:
 
@@ -243,7 +247,7 @@ the physical `keymaps[][]` block.
 Current examples in this repo:
 
 - `ARROW_MODE`: double-tap hold locks
-- `DRAGSCROLL`: double tap locks
+- `DRAGSCROLL`: single tap `.`, double-tap hold locks
 - `VOLUME_MODE`: double tap mutes instead of locking
 - `PINCH_MODE`: second tap is custom and can branch into `ZOOM_MODE`
 - `BRIGHTNESS_MODE`: no authored double-tap behavior right now
@@ -266,7 +270,9 @@ specific LED subset highlighted.
 If the new mode is meant to be used, not just prototyped, also update:
 
 - [POINTER_MODES.md](./POINTER_MODES.md) for user-facing behavior
-- [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) if the mode introduces a new interaction pattern
+- [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) if the mode introduces a new shared interaction pattern
+- [KEYMAP.md](./KEYMAP.md) if the current profile gives that mode concrete taps,
+  gestures, or placement worth documenting
 
 ## When You Need Extra Work
 
@@ -323,12 +329,16 @@ as another pd-mode key and switch to the alternate mode.
 You do not need to edit the generic key-runtime or pd-mode runtime files unless
 you are inventing a new runtime behavior that existing modes do not cover.
 
-### Mode Is Not Lockable
+### Mode Should Not Expose A Lock Gesture
 
-Set the manifest row's lock-keycode field to `KC_NO`, and do not add a
-double-tap lock action in `key_behaviors[]`.
+Every shared pd mode still gets a generated `LOCK_PD_MODE(...)` action from the
+manifest.
 
-Only do this if the product behavior really calls for it.
+If the intended behavior should not expose locking, do not bind that action on
+a physical key and do not author a lock gesture in `key_behaviors[]`.
+
+If a mode must be impossible to lock anywhere, that is a runtime design change,
+not part of the normal add-mode path.
 
 ## Runtime Flow
 

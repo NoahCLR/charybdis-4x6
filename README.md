@@ -3,12 +3,12 @@
 This is the shared userspace for my `noah` Charybdis 4x6 keymaps.
 
 It is intentionally Charybdis-specific. The trackball behavior, split sync,
-auto-mouse layer, and RGB assumptions are built around this board and this
-layout.
+auto-mouse layer, and RGB assumptions are built around this split trackball
+board rather than stock QMK conventions.
 
 This is still a personal configuration, but it is not meant to be a pile of
-one-off hacks. The point is to keep the behavior I use every day centralized
-and editable, so someone changing
+one-off hacks. The point is to keep the shared runtime centralized and
+editable, so someone changing
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) or the
 keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 can adjust the board without having to rework the runtime.
@@ -16,6 +16,13 @@ can adjust the board without having to rework the runtime.
 > **Firmware note:** This userspace is updated for QMK `0.32.5` and builds
 > against my [`qmk-latest` firmware branch](https://github.com/NoahCLR/bastardkb-qmk/tree/qmk-latest)
 > rather than the older `bkb-master`-based setup.
+>
+> **Build note:** Use that firmware fork, point `QMK_USERSPACE` at this repo,
+> and build with:
+>
+> ```sh
+> qmk compile -kb bastardkb/charybdis/4x6 -km noah
+> ```
 
 This repo is built around the Charybdis from [BastardKB](https://bastardkb.com/),
 designed by Quentin. His work, and the community built around this board, have given me
@@ -46,8 +53,8 @@ to understand and easy to change:
 - RGB is functional feedback, not decoration.
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
   defines layer colors, pointer-mode colors, and LED group highlights. On top
-  of that, two optional overlays — an auto-mouse countdown gradient and
-  key-behavior engine feedback — can be independently toggled
+  of that, two optional overlays, an auto-mouse countdown gradient and
+  key-behavior engine feedback, can be independently toggled
 - the userspace hooks into QMK through weak defaults in
   [`hooks.c`](./users/noah/hooks.c). A keymap can override any QMK hook and
   call the matching `noah_*` helper to keep the shared behavior, or replace it
@@ -59,9 +66,10 @@ to understand and easy to change:
 The README is intentionally capability-focused. It explains what the shared
 runtime supports and how the pieces fit together. If you want one concrete
 authored profile built on top of those systems, start with
-[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). That
-file shows one real configuration of layers, combos, `key_behaviors[]`, VIA
-macro defaults, hardcoded macros, and pointing-mode entry gestures.
+[`docs/KEYMAP.md`](./docs/KEYMAP.md) and
+[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). Those
+show the current concrete configuration of layers, combos, `key_behaviors[]`,
+VIA macro defaults, hardcoded macros, and pointing-mode entry gestures.
 
 There is also a small VIA bridge in
 [`via layouts/via_to_qmk_layout.py`](<./via layouts/via_to_qmk_layout.py>).
@@ -206,11 +214,11 @@ An action in a `key_behaviors[]` row can be:
 - a keymap-local custom keycode declared in `keymap.c`
 
 Raw QMK layer actions such as `TG()`, `TO()`, `TT()`, `OSL()`, and `LM()` are
-intentionally rejected inside `key_behaviors[]` and by the generic authored
-action dispatcher so they cannot bypass the userspace layer-ownership model.
-Use `LOCK_LAYER(...)` for persistent layer changes, `LT()` as the authored
-physical keycode surface, and `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))` when a
-custom row needs an owned momentary hold.
+intentionally not supported inside `key_behaviors[]`. This keeps layer changes
+inside the userspace layer-ownership model instead of letting raw QMK actions
+bypass it. Use `LOCK_LAYER(...)` for persistent layer changes. Use `LT()` when
+the physical key itself should be a layer-tap key. If a custom behavior row
+needs a momentary layer hold, use `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))`.
 
 ### Timing
 
@@ -254,8 +262,9 @@ different behavior for the first tap, second tap, third tap, and so on.
 That is why a key can keep its normal hold role while still exposing locks,
 media, alternate taps, or branch actions on higher tap counts.
 
-For the full interaction model, including concrete authored examples from the
-current profile, see [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md).
+For the shared interaction model, see
+[`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md). For current profile
+examples, see [`docs/KEYMAP.md`](./docs/KEYMAP.md).
 
 ## Pointing-Device Modes
 
@@ -334,7 +343,7 @@ independently toggled in the keymap
   color, so you can see how much timeout remains before the pointer layer
   clears
 - **Key-behavior feedback** (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`): the
-  key-behavior engine projects its state into the RGB overlay on both halves —
+  key-behavior engine projects its state into the RGB overlay on both halves:
   multi-tap pending, hold pending, trigger pulses, and active held non-layer
   actions. Held layer-switch actions pulse once when they activate, then let
   the layer color take over
@@ -358,7 +367,9 @@ customization does not need low-level changes.
 These docs are the next place to look:
 
 - [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md): tap, hold, and
-  multi-tap engine semantics plus concrete authored examples
+  multi-tap engine semantics
+- [`docs/KEYMAP.md`](./docs/KEYMAP.md): current concrete profile choices,
+  representative keys, and timing values
 - [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md): pointer-layer policy and
   raw trackball mode behavior
 - [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB colors, key-behavior

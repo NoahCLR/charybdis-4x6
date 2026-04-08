@@ -1,12 +1,13 @@
 # Pointer Modes
 
 This file explains the raw behavior of the pointing-device modes after a mode
-is active.
+is active, regardless of how that mode was entered.
 
 It does not describe the current keymap's physical placement, tap / hold
-gestures, or double-tap actions. Those are authored separately in [`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
-and described at a higher level in [INTERACTION_MODEL.md](./INTERACTION_MODEL.md)
-and the top-level [README](../README.md).
+gestures, or profile-specific double-tap actions. For Noah's current authored
+choices, see [KEYMAP.md](./KEYMAP.md). For the shared tap / hold / multi-tap
+model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the top-level
+[README](../README.md).
 
 ## Shared Rules
 
@@ -16,15 +17,24 @@ Across the current pd-mode runtime:
 - some modes also intercept key events while active
 - unlocked modes are exclusive while held: the newest active mode wins
 - locked modes are exclusive: activating or locking a different mode clears the previous lock
-- the first active mode in `pd_modes[]` provides the active motion handler
 - active modes can render a mode-specific RGB overlay
 
 One important non-rule:
 
 - auto-sniping is not a pd mode
 
-The current keymap enables sniping from `LAYER_NAV`, but that is a separate
-layer-driven rule rather than part of any mode definition here.
+## Pointer-Layer Policy
+
+The shared pointer-layer policy is separate from the raw mode handlers, but it
+changes how the modes feel in practice.
+
+- non-arrow modes can keep the configured auto-mouse layer anchored while
+  active or locked
+- `ARROW_MODE` prefers staying on the current typing or navigation surface
+  instead of forcing the pointer layer back underneath it
+- this policy follows pd-mode state itself, so it behaves the same whether the
+  mode was entered by a plain mode key, an authored `key_behaviors[]` row, or
+  a lock action
 
 ## Mode Reference
 

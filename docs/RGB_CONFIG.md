@@ -1,9 +1,9 @@
 # RGB Configuration
 
-This keymap keeps most RGB authoring in
+This userspace keeps most RGB authoring in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 
-That file is for visual configuration:
+That file is the main visual configuration surface:
 
 - layer colors
 - pointing-device mode colors
@@ -12,7 +12,7 @@ That file is for visual configuration:
 - key-behavior feedback colors
 - the auto-mouse timeout gradient
 
-If you want to change how the board looks, start there.
+If you want to change how the current profile looks, start there.
 
 If you want to change how RGB is rendered, look at:
 
@@ -37,7 +37,8 @@ quick reference when picking hue values:
 
 ### `layer_colors[]`
 
-`layer_colors[]` is indexed by the layer enum values from the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+`layer_colors[]` is indexed by the layer enum values from the active keymap
+[`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
 Each row is an `hsv_t`:
 
@@ -96,7 +97,7 @@ the trackball LED or one side of the board.
 
 These two HSV values define the auto-mouse timeout gradient.
 
-In the current runtime:
+In the shared RGB runtime:
 
 - the configured auto-mouse layer does not use a fixed solid layer color
 - it starts at `automouse_color_start`
@@ -104,9 +105,10 @@ In the current runtime:
 
 The gradient does not animate during the entire timeout. The first
 `AUTOMOUSE_RGB_DEAD_TIME` milliseconds are dead time, and only the remaining
-span animates. In this keymap the default dead time is one third of
-`AUTO_MOUSE_TIME`, but it is configurable in the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h). That
-reduces flicker while the trackball is still actively being used.
+span animates. `AUTOMOUSE_RGB_DEAD_TIME` is configurable in the active keymap
+[`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), so a
+profile can trade off smoother animation against less flicker while the
+trackball is still actively being used.
 
 ### `feedback_*_color`
 
@@ -116,7 +118,7 @@ These HSV values define the key-behavior feedback overlay:
 - `feedback_hold_active_color`
 - `feedback_long_hold_active_color`
 
-In the current runtime, those colors are used for these categories:
+In the shared runtime, those colors are used for these categories:
 
 - multi-tap pending: the engine is waiting to see whether more taps arrive
 - hold pending: a hold path exists, but the final action is not resolved yet
@@ -130,7 +132,7 @@ trigger pulse when the threshold is crossed, but they do not keep a persistent
 hold overlay after that. Once the layer is on, the layer color itself is the
 main feedback.
 
-The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the keymap
+The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h). Its flash cadence is controlled by
 `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
 
@@ -210,7 +212,7 @@ Edit `automouse_color_start` and `automouse_color_end`.
 
 If you want to change the timing model instead of just the colors, look at:
 
-- `AUTO_MOUSE_TIME` and `AUTOMOUSE_RGB_DEAD_TIME` in keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+- `AUTO_MOUSE_TIME` and `AUTOMOUSE_RGB_DEAD_TIME` in the active keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 
 `AUTOMOUSE_RGB_DEAD_TIME` must stay below `AUTO_MOUSE_TIME`. The build now
 checks that at compile time.
@@ -221,11 +223,11 @@ Edit the relevant `feedback_*_color` values.
 
 ### Disable the key-behavior overlay
 
-Comment out `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+Comment out `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
 ### Disable the auto-mouse gradient
 
-Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the active keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
 ## What This File Does Not Do
 
@@ -237,5 +239,6 @@ Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the keymap [`config.h`](../keyboa
 - when a pointing-device mode becomes active or locked
 - how split sync transports auto-mouse or key-feedback state
 
-Those behaviors live in the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) and the runtime files under
-`users/noah/lib/`.
+Those behaviors live in the active keymap
+[`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) and
+the runtime files under `users/noah/lib/`.

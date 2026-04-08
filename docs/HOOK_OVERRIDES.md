@@ -1,5 +1,8 @@
 # Hook Overrides
 
+This is a maintainer-facing doc. It explains how a keymap can override the
+shared userspace hooks without accidentally dropping shared runtime behavior.
+
 The `noah` userspace ships weak default QMK hooks in
 [`users/noah/hooks.c`](../users/noah/hooks.c).
 That means a keymap can define the normal QMK hook names in `keymap.c`, and the
