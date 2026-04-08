@@ -86,6 +86,12 @@ static bool rgb_runtime_led_range_intersects(uint8_t led_min, uint8_t led_max, u
 }
 #    endif
 
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+static uint8_t rgb_runtime_preview_layer(void) {
+    return is_keyboard_master() ? key_feedback_preview_layer() : split_runtime_sync_remote.key_preview_layer;
+}
+#    endif
+
 static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count, uint8_t led_min, uint8_t led_max) {
     for (uint8_t i = 0; i < count; i++) {
         if (leds[i] >= led_min && leds[i] < led_max) {
@@ -102,22 +108,35 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 #    endif
     bool painted = false;
 
-    for (int8_t i = LAYER_COUNT - 1; i > 0; i--) {
-        if (!layer_state_cmp(layer_state, i)) continue;
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-        if (i == (int8_t)get_auto_mouse_layer()) continue;
+    uint8_t preview_layer = UINT8_MAX;
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+    preview_layer = rgb_runtime_preview_layer();
 #    endif
-        if (layer_colors[i].s == 0 && layer_colors[i].v == 0) continue;
-        rgb_set_both_halves(layer_rgb[i], led_min, led_max);
-#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+
+    if (preview_layer < LAYER_COUNT && !(layer_colors[preview_layer].s == 0 && layer_colors[preview_layer].v == 0)) {
+        rgb_set_both_halves(layer_rgb[preview_layer], led_min, led_max);
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
         layer_painted = true;
 #    endif
         painted = true;
-        break;
+    } else {
+        for (int8_t i = LAYER_COUNT - 1; i > 0; i--) {
+            if (!layer_state_cmp(layer_state, i)) continue;
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+            if (i == (int8_t)get_auto_mouse_layer()) continue;
+#    endif
+            if (layer_colors[i].s == 0 && layer_colors[i].v == 0) continue;
+            rgb_set_both_halves(layer_rgb[i], led_min, led_max);
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+            layer_painted = true;
+#    endif
+            painted = true;
+            break;
+        }
     }
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-    if (!layer_painted && layer_state_cmp(layer_state, get_auto_mouse_layer())) {
+    if (preview_layer >= LAYER_COUNT && !layer_painted && layer_state_cmp(layer_state, get_auto_mouse_layer())) {
         automouse_rgb_render(led_min, led_max, automouse_color_start, automouse_color_end);
         layer_painted = true;
         painted       = true;
@@ -125,7 +144,8 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 #    endif
 
     for (uint8_t g = 0; g < layer_led_group_count; g++) {
-        if (layer_state_cmp(layer_state, layer_led_groups[g].layer)) {
+        bool group_active = preview_layer < LAYER_COUNT ? layer_led_groups[g].layer == preview_layer : layer_state_cmp(layer_state, layer_led_groups[g].layer);
+        if (group_active) {
             rgb_t grp_rgb = hsv_to_rgb(layer_led_groups[g].color);
             rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max, grp_rgb);
             painted |= rgb_runtime_led_group_intersects(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max);

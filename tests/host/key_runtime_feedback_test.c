@@ -85,9 +85,52 @@ static void test_fallback_hold_has_no_hold_feedback(void) {
     CHECK(flags == 0);
 }
 
+static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) {
+    test_reset_state();
+
+    active_key = (active_key_state_t){
+        .keycode = KC_RIGHT_ALT,
+        .hold =
+            {
+                .present = true,
+                .action  = MO(3),
+                .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+            },
+    };
+
+    CHECK(key_feedback_preview_layer() == 3);
+}
+
+static void test_momentary_hold_preview_layer_stays_visible_while_held(void) {
+    test_reset_state();
+
+    active_key = (active_key_state_t){
+        .keycode             = KC_RIGHT_ALT,
+        .hold_fired          = true,
+        .held_action_keycode = MO(4),
+    };
+
+    CHECK(key_feedback_preview_layer() == 4);
+}
+
+static void test_non_layer_held_action_has_no_preview_layer(void) {
+    test_reset_state();
+
+    active_key = (active_key_state_t){
+        .keycode             = KC_RIGHT_ALT,
+        .hold_fired          = true,
+        .held_action_keycode = SAFE_RANGE + 1,
+    };
+
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+}
+
 int main(void) {
     test_non_passthrough_held_action_flashes();
     test_fallback_hold_has_no_hold_feedback();
+    test_momentary_hold_preview_layer_is_exposed_before_threshold();
+    test_momentary_hold_preview_layer_stays_visible_while_held();
+    test_non_layer_held_action_has_no_preview_layer();
 
     puts("key_runtime_feedback host tests passed");
     return 0;

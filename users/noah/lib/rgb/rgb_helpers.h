@@ -17,8 +17,13 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include QMK_KEYBOARD_H // IWYU pragma: keep
+
 #include "../pointing/pd_mode_flags.h"
-#include "color.h" // QMK
+
+#if __has_include("color.h")
+#    include "color.h" // QMK
+#endif
 
 // ─── RGB config types ───────────────────────────────────────────────────────
 

@@ -36,6 +36,34 @@ void key_feedback_pulse_arm(bool long_hold_level) {
     };
 }
 
+static uint8_t key_feedback_layer_hint_from_action(uint16_t action) {
+    if (!IS_QK_MOMENTARY(action)) {
+        return UINT8_MAX;
+    }
+
+    return QK_MOMENTARY_GET_LAYER(action);
+}
+
+uint8_t key_feedback_preview_layer(void) {
+    if (active_key.keycode == KC_NO || active_key.implicit_hold || active_key.fallback_hold_pending) {
+        return UINT8_MAX;
+    }
+
+    if (active_key.held_action_keycode != KC_NO) {
+        return key_feedback_layer_hint_from_action(active_key.held_action_keycode);
+    }
+
+    if (active_key.hold_fired || active_key.hold_one_shot_fired) {
+        return UINT8_MAX;
+    }
+
+    if (!active_key.hold.present || active_key.hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE) {
+        return UINT8_MAX;
+    }
+
+    return key_feedback_layer_hint_from_action(active_key.hold.action);
+}
+
 uint8_t key_feedback_pack(void) {
     uint8_t flags = 0;
 

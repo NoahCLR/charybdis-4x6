@@ -64,4 +64,5 @@ static inline bool key_feedback_flags_flash_phase(uint8_t flags) {
 
 // Compute packed flags from the master-side key engine state.
 uint8_t key_feedback_pack(void);
+uint8_t key_feedback_preview_layer(void);
 void    key_feedback_pulse_arm(bool long_hold_level);

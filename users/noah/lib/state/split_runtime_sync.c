@@ -58,8 +58,10 @@ static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
         .key_feedback_flags = key_feedback_pack(),
+        .key_preview_layer  = key_feedback_preview_layer(),
 #    else
         .key_feedback_flags = 0,
+        .key_preview_layer  = UINT8_MAX,
 #    endif
     };
 }
@@ -103,8 +105,8 @@ static void split_runtime_sync_slave_rpc(uint8_t initiator2target_buffer_size, c
 
 void split_runtime_sync_init(void) {
     transaction_register_rpc(PUT_SPLIT_RUNTIME_SYNC, split_runtime_sync_slave_rpc);
-    split_runtime_sync_remote      = (split_runtime_sync_packet_t){0};
-    split_runtime_sync_last_sent   = (split_runtime_sync_packet_t){0};
+    split_runtime_sync_remote      = (split_runtime_sync_packet_t){.key_preview_layer = UINT8_MAX};
+    split_runtime_sync_last_sent   = (split_runtime_sync_packet_t){.key_preview_layer = UINT8_MAX};
     split_runtime_sync_sent_once   = false;
     split_runtime_sync_initialized = true;
     split_runtime_sync_last_send   = timer_read32();
