@@ -346,7 +346,7 @@ while others are just my current app-launcher or utility bindings:
 | `VIA_MACRO_3` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` | current OCR text-copy shortcut for [TextGrabber](https://apps.apple.com/us/app/textgrabber/id6451423640?mt=12) |
 | `VIA_MACRO_4` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | current screenshot shortcut |
 | `VIA_MACRO_5` | `{KC_LCTL,KC_LGUI,KC_SPC}` | standard macOS Character Viewer shortcut |
-| `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` | current shortcut for my macOS Accessibility Zoom setup, used as a picture-in-picture looking glass |
+| `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` | current shortcut for my [macOS Accessibility Zoom](https://support.apple.com/guide/mac-help/zoom-in-on-whats-onscreen-mh40579/mac) setup, used as a picture-in-picture looking glass |
 | `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | current shortcut for [Maccy](https://maccy.app/), my clipboard manager |
 | `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | current shortcut for VS Code preview |
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | current shortcut for the VS Code command palette |
@@ -371,3 +371,5 @@ simply personal shortcuts rather than standard macOS conventions.
 - [INTERACTION_MODEL.md](./INTERACTION_MODEL.md): shared interaction semantics
 - [POINTER_MODES.md](./POINTER_MODES.md): raw pointing-device behavior after a
   mode is active
+- [VIA_TO_QMK.md](./VIA_TO_QMK.md): VIA export round-trip workflow for the
+  current keymap source
