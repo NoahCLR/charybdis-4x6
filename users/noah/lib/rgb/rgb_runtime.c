@@ -11,6 +11,9 @@
 #if defined(RGB_MATRIX_ENABLE)
 #    include "keymap_introspection.h" // QMK
 #endif
+#if defined(RGB_MATRIX_ENABLE) && defined(RGB_MATRIX_WS2812)
+#    include "ws2812.h" // QMK driver buffer access
+#endif
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 #    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
 #endif
@@ -61,6 +64,7 @@ static bool                layer_key_led_map[LAYER_COUNT][RGB_MATRIX_LED_COUNT];
 static rgb_runtime_frame_t rgb_runtime_frame_primary;
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
 static rgb_runtime_frame_t rgb_runtime_frame_secondary;
+static rgb_runtime_frame_t rgb_runtime_frame_base_effect;
 static rgb_t               automouse_end_override_rgb;
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
@@ -310,6 +314,41 @@ static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count,
 }
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+#        if defined(RGB_MATRIX_WS2812)
+extern ws2812_led_t ws2812_leds[WS2812_LED_COUNT];
+
+static bool rgb_runtime_frame_capture_base_effect(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max) {
+    rgb_runtime_frame_clear(frame, led_min, led_max);
+
+    bool captured = false;
+
+    for (uint8_t led = led_min; led < led_max; led++) {
+        int driver_index = rgb_matrix_led_index(led);
+        if (driver_index < 0) {
+            continue;
+        }
+
+        frame->colors[led] = (rgb_t){
+            .r = ws2812_leds[driver_index].r,
+            .g = ws2812_leds[driver_index].g,
+            .b = ws2812_leds[driver_index].b,
+        };
+        frame->painted[led] = true;
+        captured            = true;
+    }
+
+    return captured;
+}
+#        else
+static bool rgb_runtime_frame_capture_base_effect(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max) {
+    rgb_runtime_frame_clear(frame, led_min, led_max);
+    (void)frame;
+    (void)led_min;
+    (void)led_max;
+    return false;
+}
+#        endif
+
 static bool rgb_runtime_automouse_has_end_color_override(void) {
     return (automouse_rgb_config.flags & AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE) != 0;
 }
@@ -340,17 +379,27 @@ static bool rgb_runtime_render_automouse_layer_stage(layer_state_t state, uint8_
     } else {
         layer_state_t end_state = rgb_runtime_layer_state_without_layer(state, auto_mouse_layer);
         end_painted             = rgb_runtime_frame_render_layer_stage(&rgb_runtime_frame_secondary, end_state, led_min, led_max);
+        rgb_runtime_frame_capture_base_effect(&rgb_runtime_frame_base_effect, led_min, led_max);
 
-        if (rgb_runtime_automouse_fills_unpainted_end_leds()) {
-            for (uint8_t led = led_min; led < led_max; led++) {
-                if (rgb_runtime_frame_secondary.painted[led]) {
-                    continue;
-                }
+        for (uint8_t led = led_min; led < led_max; led++) {
+            if (rgb_runtime_frame_secondary.painted[led]) {
+                continue;
+            }
 
+            if (rgb_runtime_automouse_fills_unpainted_end_leds()) {
                 rgb_runtime_frame_secondary.colors[led]  = automouse_end_override_rgb;
                 rgb_runtime_frame_secondary.painted[led] = true;
                 end_painted                              = true;
+                continue;
             }
+
+            if (!rgb_runtime_frame_base_effect.painted[led]) {
+                continue;
+            }
+
+            rgb_runtime_frame_secondary.colors[led]  = rgb_runtime_frame_base_effect.colors[led];
+            rgb_runtime_frame_secondary.painted[led] = true;
+            end_painted                              = true;
         }
     }
 

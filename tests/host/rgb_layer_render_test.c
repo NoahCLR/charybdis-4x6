@@ -7,6 +7,7 @@
 #include "users/noah/lib/rgb/rgb_automouse.h"
 #include "users/noah/lib/rgb/rgb_runtime.h"
 #include "users/noah/lib/rgb/rgb_helpers.h"
+#include "ws2812.h"
 
 #ifndef RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
 #    define RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE 0
@@ -32,6 +33,8 @@ static rgb_t    led_output[RGB_MATRIX_LED_COUNT];
 static uint8_t  fake_preview_layer      = UINT8_MAX;
 static uint16_t fake_auto_mouse_elapsed = 0;
 static bool     fake_pd_mode_locked     = false;
+
+ws2812_led_t ws2812_leds[WS2812_LED_COUNT];
 
 led_config_t g_led_config = {0};
 
@@ -65,6 +68,10 @@ static rgb_t rgb_from_hsv(hsv_t hsv) {
     return (rgb_t){.r = hsv.h, .g = hsv.s, .b = hsv.v};
 }
 
+static rgb_t rgb_from_ws2812(ws2812_led_t led) {
+    return (rgb_t){.r = led.r, .g = led.g, .b = led.b};
+}
+
 static rgb_t rgb_blend(rgb_t start, rgb_t end, uint8_t amount) {
     uint32_t inv = (uint32_t)UINT8_MAX - amount;
 
@@ -90,6 +97,7 @@ static uint8_t automouse_blend_amount_from_elapsed(uint16_t elapsed) {
 static void test_reset(void) {
     memset(test_keymap, 0, sizeof(test_keymap));
     memset(led_output, 0, sizeof(led_output));
+    memset(ws2812_leds, 0, sizeof(ws2812_leds));
     layer_state             = 0;
     fake_preview_layer      = UINT8_MAX;
     fake_auto_mouse_elapsed = 0;
@@ -118,6 +126,14 @@ static void test_reset(void) {
 
 bool is_keyboard_master(void) {
     return true;
+}
+
+int rgb_matrix_led_index(int index) {
+    if (index < 0 || index >= RGB_MATRIX_LED_COUNT) {
+        return -1;
+    }
+
+    return index;
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
@@ -179,6 +195,14 @@ static void check_led(uint8_t index, rgb_t expected) {
     CHECK(led_output[index].b == expected.b);
 }
 
+static bool render_output(void) {
+    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
+        led_output[i] = rgb_from_ws2812(ws2812_leds[i]);
+    }
+
+    return noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT);
+}
+
 static void test_mapped_only_layers_compose_in_layer_order(void) {
     test_reset();
 
@@ -189,7 +213,7 @@ static void test_mapped_only_layers_compose_in_layer_order(void) {
 
     layer_state = ((layer_state_t)1u << LAYER_NUM) | ((layer_state_t)1u << LAYER_NAV);
 
-    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+    CHECK(render_output());
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
     check_led(1, rgb_from_hsv(layer_colors[LAYER_NAV].color));
@@ -203,7 +227,7 @@ static void test_full_board_layer_fills_gaps_under_mapped_only_layer(void) {
     test_keymap[LAYER_NAV][0][1] = 0x0030u;
     layer_state                  = ((layer_state_t)1u << LAYER_SYM) | ((layer_state_t)1u << LAYER_NAV);
 
-    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+    CHECK(render_output());
 
     for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
         rgb_t expected = rgb_from_hsv(layer_colors[LAYER_SYM].color);
@@ -220,7 +244,7 @@ static void test_invalidating_layer_map_refreshes_dynamic_keymap_coverage(void) 
     test_keymap[LAYER_NAV][0][1] = 0x0030u;
     layer_state                  = (layer_state_t)1u << LAYER_NAV;
 
-    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+    CHECK(render_output());
     check_led(1, rgb_from_hsv(layer_colors[LAYER_NAV].color));
     check_led(2, (rgb_t){0, 0, 0});
 
@@ -229,7 +253,7 @@ static void test_invalidating_layer_map_refreshes_dynamic_keymap_coverage(void) 
     test_keymap[LAYER_NAV][0][2] = 0x0031u;
     noah_rgb_runtime_invalidate_layer_maps();
 
-    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+    CHECK(render_output());
     check_led(1, (rgb_t){0, 0, 0});
     check_led(2, rgb_from_hsv(layer_colors[LAYER_NAV].color));
 }
@@ -242,7 +266,7 @@ static void test_preview_layer_overlays_existing_active_layers(void) {
     layer_state                  = (layer_state_t)1u << LAYER_SYM;
     fake_preview_layer           = LAYER_NUM;
 
-    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+    CHECK(render_output());
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
     check_led(1, rgb_from_hsv(layer_colors[LAYER_NUM].color));
@@ -254,6 +278,9 @@ static void test_preview_layer_overlays_existing_active_layers(void) {
 static void test_automouse_fades_pointer_layer_into_underlying_layers(void) {
     test_reset();
 
+    ws2812_leds[0] = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[3] = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
+
     test_keymap[LAYER_POINTER][0][0] = 0x0040u;
     test_keymap[LAYER_POINTER][0][1] = 0x0041u;
     test_keymap[LAYER_NAV][0][1]     = 0x0030u;
@@ -262,20 +289,25 @@ static void test_automouse_fades_pointer_layer_into_underlying_layers(void) {
     layer_state             = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_POINTER);
     fake_auto_mouse_elapsed = AUTOMOUSE_RGB_DEAD_TIME + (AUTOMOUSE_RGB_ACTIVE_SPAN / 2u);
 
-    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+    CHECK(render_output());
 
     rgb_t pointer_rgb = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
     rgb_t nav_rgb     = rgb_from_hsv(layer_colors[LAYER_NAV].color);
-    rgb_t blended     = rgb_blend(pointer_rgb, nav_rgb, automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed));
+    rgb_t base_rgb_0  = rgb_from_ws2812(ws2812_leds[0]);
+    rgb_t base_rgb_3  = rgb_from_ws2812(ws2812_leds[3]);
+    uint8_t blend     = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
 
-    check_led(0, pointer_rgb);
-    check_led(1, blended);
+    check_led(0, rgb_blend(pointer_rgb, base_rgb_0, blend));
+    check_led(1, rgb_blend(pointer_rgb, nav_rgb, blend));
     check_led(2, nav_rgb);
-    check_led(3, (rgb_t){0, 0, 0});
+    check_led(3, base_rgb_3);
 }
 
-static void test_automouse_hands_off_unmapped_leds_at_timeout_end(void) {
+static void test_automouse_lands_on_base_effect_at_timeout_end(void) {
     test_reset();
+
+    ws2812_leds[0] = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[3] = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
 
     test_keymap[LAYER_POINTER][0][0] = 0x0040u;
     test_keymap[LAYER_POINTER][0][1] = 0x0041u;
@@ -285,12 +317,12 @@ static void test_automouse_hands_off_unmapped_leds_at_timeout_end(void) {
     layer_state             = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_POINTER);
     fake_auto_mouse_elapsed = AUTO_MOUSE_TIME;
 
-    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+    CHECK(render_output());
 
-    check_led(0, (rgb_t){0, 0, 0});
+    check_led(0, rgb_from_ws2812(ws2812_leds[0]));
     check_led(1, rgb_from_hsv(layer_colors[LAYER_NAV].color));
     check_led(2, rgb_from_hsv(layer_colors[LAYER_NAV].color));
-    check_led(3, (rgb_t){0, 0, 0});
+    check_led(3, rgb_from_ws2812(ws2812_leds[3]));
 }
 #endif
 
@@ -306,7 +338,7 @@ static void test_automouse_end_fill_unpainted_preserves_layer_destinations(void)
     layer_state             = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_POINTER);
     fake_auto_mouse_elapsed = AUTOMOUSE_RGB_DEAD_TIME + (AUTOMOUSE_RGB_ACTIVE_SPAN / 2u);
 
-    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+    CHECK(render_output());
 
     rgb_t   pointer_rgb  = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
     rgb_t   nav_rgb      = rgb_from_hsv(layer_colors[LAYER_NAV].color);
@@ -330,7 +362,7 @@ static void test_automouse_end_override_replaces_layer_stack_destination(void) {
     layer_state             = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_POINTER);
     fake_auto_mouse_elapsed = AUTOMOUSE_RGB_DEAD_TIME + (AUTOMOUSE_RGB_ACTIVE_SPAN / 2u);
 
-    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+    CHECK(render_output());
 
     rgb_t   pointer_rgb  = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
     rgb_t   nav_rgb      = rgb_from_hsv(layer_colors[LAYER_NAV].color);
@@ -350,7 +382,7 @@ int main(void) {
     test_preview_layer_overlays_existing_active_layers();
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
     test_automouse_fades_pointer_layer_into_underlying_layers();
-    test_automouse_hands_off_unmapped_leds_at_timeout_end();
+    test_automouse_lands_on_base_effect_at_timeout_end();
 #endif
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
     test_automouse_end_fill_unpainted_preserves_layer_destinations();

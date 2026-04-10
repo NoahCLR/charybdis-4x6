@@ -17,6 +17,7 @@ trap cleanup EXIT INT TERM
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DRGB_MATRIX_ENABLE \
+    -DRGB_MATRIX_WS2812 \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
@@ -37,6 +38,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DRGB_MATRIX_ENABLE \
+    -DRGB_MATRIX_WS2812 \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
@@ -58,6 +60,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DRGB_MATRIX_ENABLE \
+    -DRGB_MATRIX_WS2812 \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \

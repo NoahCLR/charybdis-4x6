@@ -13,4 +13,5 @@ typedef struct {
 extern led_config_t g_led_config;
 
 void    rgb_matrix_set_color(int index, uint8_t red, uint8_t green, uint8_t blue);
+int     rgb_matrix_led_index(int index);
 uint8_t rgb_matrix_map_row_column_to_led(uint8_t row, uint8_t column, uint8_t *led_i);
