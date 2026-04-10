@@ -63,14 +63,14 @@ static const uint8_t      volume_mode_group_leds[] = {1, 6};
 const pd_mode_led_group_t pd_mode_led_groups[]     = {
     {.mode_flag = PD_MODE_VOLUME, .color = {230, 231, 232}, .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)},
 };
-const uint8_t                pd_mode_led_group_count = ARRAY_SIZE(pd_mode_led_groups);
+const uint8_t                     pd_mode_led_group_count   = ARRAY_SIZE(pd_mode_led_groups);
 const automouse_fade_end_config_t automouse_fade_end_config = {
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
-    .mode      = END_COLOR_ON_ALL_KEYS,
+    .mode = END_COLOR_ON_ALL_KEYS,
 #elif RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
-    .mode      = END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW,
+    .mode = END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW,
 #else
-    .mode      = FOLLOW_REAL_DESTINATION,
+    .mode = FOLLOW_REAL_DESTINATION,
 #endif
     .end_color = {200, 210, 220},
 };

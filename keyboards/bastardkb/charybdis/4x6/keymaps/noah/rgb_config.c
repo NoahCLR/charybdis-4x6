@@ -29,11 +29,11 @@
 //     transparent positions
 //                       {.color = {hue, sat, val}, .flags = ...}
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
-    [LAYER_BASE]    = {.color = {0, 0, 0}, .flags = ALL_KEYS},                        // no override
-    [LAYER_NUM]     = {.color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // green
+    [LAYER_BASE]    = {.color = {0, 0, 0}, .flags = ALL_KEYS},                                                       // no override
+    [LAYER_NUM]     = {.color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY},  // green
     [LAYER_SYM]     = {.color = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // blue
     [LAYER_NAV]     = {.color = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // purple
-    [LAYER_POINTER] = {.color = {0, 0, 150}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // default auto-mouse layer: white mapped keys
+    [LAYER_POINTER] = {.color = {0, 0, 150}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY},                               // default auto-mouse layer: white mapped keys
 };
 
 // ─── Pointing device mode colors ────────────────────────────────────────────

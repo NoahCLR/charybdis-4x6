@@ -33,7 +33,7 @@ typedef struct {
 } pd_mode_color_t;
 
 typedef enum {
-    ALL_KEYS                        = 0,
+    ALL_KEYS                       = 0,
     KEYS_MAPPED_ON_THIS_LAYER_ONLY = 1u << 0,
 } layer_color_flags_t;
 
