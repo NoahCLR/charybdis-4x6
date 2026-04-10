@@ -13,16 +13,18 @@
 
 bool automouse_rgb_should_render(void) {
     if (is_keyboard_master()) {
-        return is_auto_mouse_active();
+        uint16_t raw_elapsed = auto_mouse_get_time_elapsed();
+        return automouse_rgb_should_render_from_state(is_auto_mouse_active(), raw_elapsed);
     }
 
-    return (split_runtime_sync_remote.automouse_flags & SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_ACTIVE) != 0;
+    return (split_runtime_sync_remote.automouse_flags & SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_RENDER) != 0;
 }
 
 uint16_t automouse_rgb_current_progress(void) {
     uint16_t progress;
     if (is_keyboard_master()) {
-        progress = automouse_rgb_should_render() ? automouse_rgb_progress(auto_mouse_get_time_elapsed()) : 0;
+        uint16_t raw_elapsed = auto_mouse_get_time_elapsed();
+        progress             = automouse_rgb_should_render_from_state(is_auto_mouse_active(), raw_elapsed) ? automouse_rgb_progress(raw_elapsed) : 0;
     } else {
         progress = split_runtime_sync_remote.automouse_progress;
     }

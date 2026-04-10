@@ -51,6 +51,14 @@ static inline uint16_t automouse_rgb_quantize_progress(uint16_t raw_elapsed) {
     return progress / AUTOMOUSE_RGB_SYNC_STEP * AUTOMOUSE_RGB_SYNC_STEP;
 }
 
+static inline bool automouse_rgb_timeout_window_open(uint16_t raw_elapsed) {
+    return raw_elapsed > 0 && raw_elapsed < AUTO_MOUSE_TIME;
+}
+
+static inline bool automouse_rgb_should_render_from_state(bool automouse_active, uint16_t raw_elapsed) {
+    return automouse_active || automouse_rgb_timeout_window_open(raw_elapsed);
+}
+
 #endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)

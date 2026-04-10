@@ -16,6 +16,7 @@
 typedef enum {
     SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_NONE   = 0,
     SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_ACTIVE = 1u << 0,
+    SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_RENDER = 1u << 1,
 } split_runtime_sync_automouse_flags_t;
 
 typedef struct __attribute__((packed)) {
