@@ -33,7 +33,7 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
     [LAYER_NUM]     = {.color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY},  // green
     [LAYER_SYM]     = {.color = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, // blue
     [LAYER_NAV]     = {.color = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, // purple
-    [LAYER_POINTER] = {.color = {0, 0, 150}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY},                               // default auto-mouse layer: white mapped keys
+    [LAYER_POINTER] = {.color = {0, 0, 150}, .flags = LAYER_COLOR_FLAG_NONE},                                           // default auto-mouse layer: white mapped keys
 };
 
 // ─── Pointing device mode colors ────────────────────────────────────────────

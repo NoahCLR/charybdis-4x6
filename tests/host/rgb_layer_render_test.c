@@ -421,9 +421,11 @@ static void test_automouse_uses_configured_target_layer(void) {
 #endif
 }
 
-static void test_manual_pointer_layer_does_not_reuse_stale_automouse_fade_on_master(void) {
+static void test_timeout_end_keeps_automouse_at_destination_on_master(void) {
     test_reset();
 
+    ws2812_leds[0] = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[1] = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
     test_keymap[LAYER_POINTER][0][0] = 0x0040u;
     test_keymap[LAYER_POINTER][0][1] = 0x0041u;
     fake_auto_mouse_active           = false;
@@ -432,9 +434,15 @@ static void test_manual_pointer_layer_does_not_reuse_stale_automouse_fade_on_mas
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
-    check_led(1, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+#if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE || RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+    check_led(0, rgb_from_hsv(automouse_rgb_config.end_color));
+    check_led(1, rgb_from_hsv(automouse_rgb_config.end_color));
+    check_led(2, rgb_from_hsv(automouse_rgb_config.end_color));
+#else
+    check_led(0, rgb_from_ws2812(ws2812_leds[0]));
+    check_led(1, rgb_from_ws2812(ws2812_leds[1]));
     check_led(2, (rgb_t){0, 0, 0});
+#endif
 }
 
 static void test_timeout_window_keeps_fading_after_auto_mouse_active_drops_on_master(void) {
@@ -470,21 +478,28 @@ static void test_timeout_window_keeps_fading_after_auto_mouse_active_drops_on_ma
 #endif
 }
 
-static void test_manual_pointer_layer_does_not_reuse_remote_stale_automouse_fade_on_slave(void) {
+static void test_timeout_end_keeps_automouse_at_destination_on_slave(void) {
     test_reset();
 
     fake_is_master                               = false;
+    ws2812_leds[0]                               = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[1]                               = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
     test_keymap[LAYER_POINTER][0][0]             = 0x0040u;
     test_keymap[LAYER_POINTER][0][1]             = 0x0041u;
     layer_state                                  = (layer_state_t)1u << LAYER_POINTER;
     split_runtime_sync_remote.automouse_progress = AUTOMOUSE_RGB_ACTIVE_SPAN;
-    split_runtime_sync_remote.automouse_flags    = SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_NONE;
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
-    check_led(1, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+#if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE || RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+    check_led(0, rgb_from_hsv(automouse_rgb_config.end_color));
+    check_led(1, rgb_from_hsv(automouse_rgb_config.end_color));
+    check_led(2, rgb_from_hsv(automouse_rgb_config.end_color));
+#else
+    check_led(0, rgb_from_ws2812(ws2812_leds[0]));
+    check_led(1, rgb_from_ws2812(ws2812_leds[1]));
     check_led(2, (rgb_t){0, 0, 0});
+#endif
 }
 
 static void test_slave_timeout_window_renders_without_live_auto_mouse_active_flag(void) {
@@ -497,7 +512,6 @@ static void test_slave_timeout_window_renders_without_live_auto_mouse_active_fla
     test_keymap[LAYER_POINTER][0][1]             = 0x0041u;
     layer_state                                  = (layer_state_t)1u << LAYER_POINTER;
     split_runtime_sync_remote.automouse_progress = AUTOMOUSE_RGB_ACTIVE_SPAN / 2u;
-    split_runtime_sync_remote.automouse_flags    = SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_RENDER;
 
     CHECK(render_output());
 
@@ -695,9 +709,9 @@ int main(void) {
     test_slave_feedback_uses_remote_flags_and_flash_phase();
     test_pointer_mode_overlay_paints_right_half_and_groups();
     test_automouse_uses_configured_target_layer();
-    test_manual_pointer_layer_does_not_reuse_stale_automouse_fade_on_master();
+    test_timeout_end_keeps_automouse_at_destination_on_master();
     test_timeout_window_keeps_fading_after_auto_mouse_active_drops_on_master();
-    test_manual_pointer_layer_does_not_reuse_remote_stale_automouse_fade_on_slave();
+    test_timeout_end_keeps_automouse_at_destination_on_slave();
     test_slave_timeout_window_renders_without_live_auto_mouse_active_flag();
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
     test_automouse_updates_target_when_underlying_layer_appears_mid_fade();

@@ -137,7 +137,6 @@ static void test_init_registers_rpc_and_sends_initial_packet_on_master(void) {
     CHECK(rpc_registered_callback != NULL);
     CHECK(rpc_send_count == 1);
     CHECK(rpc_last_packet.automouse_progress == 60u);
-    CHECK(rpc_last_packet.automouse_flags == (SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_ACTIVE | SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_RENDER));
     CHECK(rpc_last_packet.pd_mode_flags == fake_pd_active_flags);
     CHECK(rpc_last_packet.pd_mode_locked_flags == fake_pd_locked_flags);
     CHECK(rpc_last_packet.key_feedback_flags == fake_key_feedback_flags);
@@ -193,28 +192,25 @@ static void test_locked_pd_mode_zeroes_automouse_progress(void) {
     split_runtime_sync_init();
 
     CHECK(rpc_last_packet.automouse_progress == 0);
-    CHECK(rpc_last_packet.automouse_flags == (SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_ACTIVE | SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_RENDER));
 }
 
-static void test_inactive_automouse_keeps_timeout_window_progress_and_render_flag(void) {
+static void test_inactive_automouse_keeps_timeout_window_progress(void) {
     test_reset_stubs();
     fake_auto_mouse_active = false;
 
     split_runtime_sync_init();
 
     CHECK(rpc_last_packet.automouse_progress == 60u);
-    CHECK(rpc_last_packet.automouse_flags == SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_RENDER);
 }
 
-static void test_expired_inactive_automouse_zeroes_progress_and_flags(void) {
+static void test_timeout_end_inactive_automouse_keeps_max_progress(void) {
     test_reset_stubs();
     fake_auto_mouse_active  = false;
     fake_auto_mouse_elapsed = AUTO_MOUSE_TIME;
 
     split_runtime_sync_init();
 
-    CHECK(rpc_last_packet.automouse_progress == 0);
-    CHECK(rpc_last_packet.automouse_flags == SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_NONE);
+    CHECK(rpc_last_packet.automouse_progress == 100u);
 }
 
 static void test_tick_uses_auto_mouse_elapsed_when_packet_changes(void) {
@@ -265,7 +261,6 @@ static void test_automouse_progress_quantizes_concrete_boundaries(void) {
 static void test_slave_rpc_applies_exact_packet_and_snapshot(void) {
     split_runtime_sync_packet_t packet = {
         .automouse_progress   = 42u,
-        .automouse_flags      = SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_ACTIVE | SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_RENDER,
         .pd_mode_flags        = PD_MODE_ARROW,
         .pd_mode_locked_flags = PD_MODE_VOLUME,
         .key_feedback_flags   = KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE,
@@ -281,7 +276,6 @@ static void test_slave_rpc_applies_exact_packet_and_snapshot(void) {
     rpc_registered_callback(sizeof(packet), &packet, 0, NULL);
 
     CHECK(split_runtime_sync_remote.automouse_progress == packet.automouse_progress);
-    CHECK(split_runtime_sync_remote.automouse_flags == packet.automouse_flags);
     CHECK(split_runtime_sync_remote.pd_mode_flags == packet.pd_mode_flags);
     CHECK(split_runtime_sync_remote.pd_mode_locked_flags == packet.pd_mode_locked_flags);
     CHECK(split_runtime_sync_remote.key_feedback_flags == packet.key_feedback_flags);
@@ -316,8 +310,8 @@ int main(void) {
     test_elapsed_skips_unchanged_packet_until_heartbeat();
     test_force_sync_sends_even_when_packet_is_unchanged();
     test_locked_pd_mode_zeroes_automouse_progress();
-    test_inactive_automouse_keeps_timeout_window_progress_and_render_flag();
-    test_expired_inactive_automouse_zeroes_progress_and_flags();
+    test_inactive_automouse_keeps_timeout_window_progress();
+    test_timeout_end_inactive_automouse_keeps_max_progress();
     test_tick_uses_auto_mouse_elapsed_when_packet_changes();
     test_automouse_progress_quantizes_concrete_boundaries();
     test_slave_rpc_applies_exact_packet_and_snapshot();
