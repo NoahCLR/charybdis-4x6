@@ -55,6 +55,7 @@ static inline uint16_t automouse_rgb_quantize_progress(uint16_t raw_elapsed) {
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 uint16_t              automouse_rgb_current_progress(void);
+bool                  automouse_rgb_should_render(void);
 static inline uint8_t automouse_rgb_blend_amount(uint16_t progress) {
     if (progress >= AUTOMOUSE_RGB_ACTIVE_SPAN) {
         return UINT8_MAX;
@@ -65,6 +66,9 @@ static inline uint8_t automouse_rgb_blend_amount(uint16_t progress) {
 #else
 static inline uint16_t automouse_rgb_current_progress(void) {
     return 0;
+}
+static inline bool automouse_rgb_should_render(void) {
+    return false;
 }
 static inline uint8_t automouse_rgb_blend_amount(uint16_t progress) {
     (void)progress;

@@ -11,10 +11,18 @@
 #    include "../state/split_runtime_sync.h"
 #    include "rgb_automouse.h"
 
+bool automouse_rgb_should_render(void) {
+    if (is_keyboard_master()) {
+        return is_auto_mouse_active();
+    }
+
+    return (split_runtime_sync_remote.automouse_flags & SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_ACTIVE) != 0;
+}
+
 uint16_t automouse_rgb_current_progress(void) {
     uint16_t progress;
     if (is_keyboard_master()) {
-        progress = automouse_rgb_progress(auto_mouse_get_time_elapsed());
+        progress = automouse_rgb_should_render() ? automouse_rgb_progress(auto_mouse_get_time_elapsed()) : 0;
     } else {
         progress = split_runtime_sync_remote.automouse_progress;
     }

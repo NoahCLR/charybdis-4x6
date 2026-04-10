@@ -449,7 +449,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 #    endif
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-    if (layer_state_cmp(layer_state, get_auto_mouse_layer())) {
+    if (layer_state_cmp(layer_state, get_auto_mouse_layer()) && automouse_rgb_should_render()) {
         painted |= rgb_runtime_render_automouse_layer_stage(layer_state, led_min, led_max);
     } else
 #    endif

@@ -36,6 +36,7 @@ static rgb_t    led_output[RGB_MATRIX_LED_COUNT];
 static uint8_t  fake_preview_layer      = UINT8_MAX;
 static uint8_t  fake_auto_mouse_layer   = LAYER_POINTER;
 static uint16_t fake_auto_mouse_elapsed = 0;
+static bool     fake_auto_mouse_active  = true;
 static bool     fake_is_master          = true;
 static pd_mode_mask_t fake_pd_active_flags = 0;
 static pd_mode_mask_t fake_pd_locked_flags = 0;
@@ -129,6 +130,7 @@ static void test_reset(void) {
     fake_preview_layer      = UINT8_MAX;
     fake_auto_mouse_layer   = LAYER_POINTER;
     fake_auto_mouse_elapsed = 0;
+    fake_auto_mouse_active  = true;
     fake_is_master          = true;
     fake_pd_active_flags    = 0;
     fake_pd_locked_flags    = 0;
@@ -195,6 +197,10 @@ uint8_t get_auto_mouse_layer(void) {
 
 uint16_t auto_mouse_get_time_elapsed(void) {
     return fake_auto_mouse_elapsed;
+}
+
+bool is_auto_mouse_active(void) {
+    return fake_auto_mouse_active;
 }
 
 bool pd_any_mode_locked(void) {
@@ -420,6 +426,39 @@ static void test_automouse_uses_configured_target_layer(void) {
 #endif
 }
 
+static void test_manual_pointer_layer_does_not_reuse_stale_automouse_fade_on_master(void) {
+    test_reset();
+
+    test_keymap[LAYER_POINTER][0][0] = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1] = 0x0041u;
+    fake_auto_mouse_active           = false;
+    fake_auto_mouse_elapsed          = AUTO_MOUSE_TIME;
+    layer_state                      = (layer_state_t)1u << LAYER_POINTER;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+    check_led(2, (rgb_t){0, 0, 0});
+}
+
+static void test_manual_pointer_layer_does_not_reuse_remote_stale_automouse_fade_on_slave(void) {
+    test_reset();
+
+    fake_is_master                          = false;
+    test_keymap[LAYER_POINTER][0][0]        = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1]        = 0x0041u;
+    layer_state                             = (layer_state_t)1u << LAYER_POINTER;
+    split_runtime_sync_remote.automouse_progress = AUTOMOUSE_RGB_ACTIVE_SPAN;
+    split_runtime_sync_remote.automouse_flags    = SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_NONE;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+    check_led(2, (rgb_t){0, 0, 0});
+}
+
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
 static void test_automouse_updates_target_when_underlying_layer_appears_mid_fade(void) {
     test_reset();
@@ -595,6 +634,8 @@ int main(void) {
     test_slave_feedback_uses_remote_flags_and_flash_phase();
     test_pointer_mode_overlay_paints_right_half_and_groups();
     test_automouse_uses_configured_target_layer();
+    test_manual_pointer_layer_does_not_reuse_stale_automouse_fade_on_master();
+    test_manual_pointer_layer_does_not_reuse_remote_stale_automouse_fade_on_slave();
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
     test_automouse_updates_target_when_underlying_layer_appears_mid_fade();
     test_automouse_updates_target_when_underlying_layer_returns_to_base_mid_fade();

@@ -13,8 +13,14 @@
 
 #include "../pointing/pd_mode_flags.h"
 
+typedef enum {
+    SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_NONE   = 0,
+    SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_ACTIVE = 1u << 0,
+} split_runtime_sync_automouse_flags_t;
+
 typedef struct __attribute__((packed)) {
     uint16_t automouse_progress;
+    uint8_t automouse_flags;
     pd_mode_mask_t pd_mode_flags;
     pd_mode_mask_t pd_mode_locked_flags;
     uint8_t key_feedback_flags;
