@@ -49,7 +49,7 @@ split_runtime_sync_packet_t split_runtime_sync_remote = {
 led_config_t g_led_config = {0};
 
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
-    [LAYER_BASE] = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE}, [LAYER_NUM] = {.color = {10, 20, 30}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, [LAYER_SYM] = {.color = {40, 50, 60}, .flags = LAYER_COLOR_FLAG_NONE}, [LAYER_NAV] = {.color = {70, 80, 90}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, [LAYER_POINTER] = {.color = {100, 110, 120}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY},
+    [LAYER_BASE] = {.color = {0, 0, 0}, .flags = ALL_KEYS}, [LAYER_NUM] = {.color = {10, 20, 30}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, [LAYER_SYM] = {.color = {40, 50, 60}, .flags = ALL_KEYS}, [LAYER_NAV] = {.color = {70, 80, 90}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, [LAYER_POINTER] = {.color = {100, 110, 120}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
 };
 
 const layer_led_group_t layer_led_groups[1]   = {0};
@@ -64,8 +64,14 @@ const pd_mode_led_group_t pd_mode_led_groups[]     = {
     {.mode_flag = PD_MODE_VOLUME, .color = {230, 231, 232}, .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)},
 };
 const uint8_t                pd_mode_led_group_count = ARRAY_SIZE(pd_mode_led_groups);
-const automouse_rgb_config_t automouse_rgb_config    = {
-    .flags     = (RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE ? AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE : 0) | (RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED ? AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED : 0),
+const automouse_fade_end_config_t automouse_fade_end_config = {
+#if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
+    .mode      = END_COLOR_ON_ALL_KEYS,
+#elif RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+    .mode      = END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW,
+#else
+    .mode      = FOLLOW_REAL_DESTINATION,
+#endif
     .end_color = {200, 210, 220},
 };
 const hsv_t         feedback_multi_tap_pending_color = {1, 2, 3};
@@ -409,7 +415,7 @@ static void test_automouse_uses_configured_target_layer(void) {
     uint8_t blend   = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
 
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
-    rgb_t end_override = rgb_from_hsv(automouse_rgb_config.end_color);
+    rgb_t end_override = rgb_from_hsv(automouse_fade_end_config.end_color);
 
     check_led(0, rgb_blend(nav_rgb, end_override, blend));
     check_led(1, rgb_blend(nav_rgb, end_override, blend));
@@ -435,9 +441,9 @@ static void test_timeout_end_keeps_automouse_at_destination_on_master(void) {
     CHECK(render_output());
 
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE || RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
-    check_led(0, rgb_from_hsv(automouse_rgb_config.end_color));
-    check_led(1, rgb_from_hsv(automouse_rgb_config.end_color));
-    check_led(2, rgb_from_hsv(automouse_rgb_config.end_color));
+    check_led(0, rgb_from_hsv(automouse_fade_end_config.end_color));
+    check_led(1, rgb_from_hsv(automouse_fade_end_config.end_color));
+    check_led(2, rgb_from_hsv(automouse_fade_end_config.end_color));
 #else
     check_led(0, rgb_from_ws2812(ws2812_leds[0]));
     check_led(1, rgb_from_ws2812(ws2812_leds[1]));
@@ -463,15 +469,15 @@ static void test_timeout_window_keeps_fading_after_auto_mouse_active_drops_on_ma
     uint8_t blend       = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
 
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE || RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
-    rgb_t end_rgb = rgb_from_hsv(automouse_rgb_config.end_color);
+    rgb_t end_rgb = rgb_from_hsv(automouse_fade_end_config.end_color);
 #else
     rgb_t end_rgb = rgb_from_ws2812(ws2812_leds[0]);
 #endif
 
     check_led(0, rgb_blend(pointer_rgb, end_rgb, blend));
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE || RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
-    check_led(1, rgb_blend(pointer_rgb, rgb_from_hsv(automouse_rgb_config.end_color), blend));
-    check_led(2, rgb_from_hsv(automouse_rgb_config.end_color));
+    check_led(1, rgb_blend(pointer_rgb, rgb_from_hsv(automouse_fade_end_config.end_color), blend));
+    check_led(2, rgb_from_hsv(automouse_fade_end_config.end_color));
 #else
     check_led(1, rgb_blend(pointer_rgb, rgb_from_ws2812(ws2812_leds[1]), blend));
     check_led(2, (rgb_t){0, 0, 0});
@@ -492,9 +498,9 @@ static void test_timeout_end_keeps_automouse_at_destination_on_slave(void) {
     CHECK(render_output());
 
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE || RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
-    check_led(0, rgb_from_hsv(automouse_rgb_config.end_color));
-    check_led(1, rgb_from_hsv(automouse_rgb_config.end_color));
-    check_led(2, rgb_from_hsv(automouse_rgb_config.end_color));
+    check_led(0, rgb_from_hsv(automouse_fade_end_config.end_color));
+    check_led(1, rgb_from_hsv(automouse_fade_end_config.end_color));
+    check_led(2, rgb_from_hsv(automouse_fade_end_config.end_color));
 #else
     check_led(0, rgb_from_ws2812(ws2812_leds[0]));
     check_led(1, rgb_from_ws2812(ws2812_leds[1]));
@@ -519,15 +525,15 @@ static void test_slave_timeout_window_renders_without_live_auto_mouse_active_fla
     uint8_t blend       = automouse_rgb_blend_amount(split_runtime_sync_remote.automouse_progress);
 
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE || RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
-    rgb_t end_rgb = rgb_from_hsv(automouse_rgb_config.end_color);
+    rgb_t end_rgb = rgb_from_hsv(automouse_fade_end_config.end_color);
 #else
     rgb_t end_rgb = rgb_from_ws2812(ws2812_leds[0]);
 #endif
 
     check_led(0, rgb_blend(pointer_rgb, end_rgb, blend));
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE || RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
-    check_led(1, rgb_blend(pointer_rgb, rgb_from_hsv(automouse_rgb_config.end_color), blend));
-    check_led(2, rgb_from_hsv(automouse_rgb_config.end_color));
+    check_led(1, rgb_blend(pointer_rgb, rgb_from_hsv(automouse_fade_end_config.end_color), blend));
+    check_led(2, rgb_from_hsv(automouse_fade_end_config.end_color));
 #else
     check_led(1, rgb_blend(pointer_rgb, rgb_from_ws2812(ws2812_leds[1]), blend));
     check_led(2, (rgb_t){0, 0, 0});
@@ -667,7 +673,7 @@ static void test_automouse_end_fill_unpainted_preserves_layer_destinations(void)
 
     rgb_t   pointer_rgb  = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
     rgb_t   nav_rgb      = rgb_from_hsv(layer_colors[LAYER_NAV].color);
-    rgb_t   end_fallback = rgb_from_hsv(automouse_rgb_config.end_color);
+    rgb_t   end_fallback = rgb_from_hsv(automouse_fade_end_config.end_color);
     uint8_t blend        = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
 
     check_led(0, rgb_blend(pointer_rgb, end_fallback, blend));
@@ -691,7 +697,7 @@ static void test_automouse_end_override_replaces_layer_stack_destination(void) {
 
     rgb_t   pointer_rgb  = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
     rgb_t   nav_rgb      = rgb_from_hsv(layer_colors[LAYER_NAV].color);
-    rgb_t   end_override = rgb_from_hsv(automouse_rgb_config.end_color);
+    rgb_t   end_override = rgb_from_hsv(automouse_fade_end_config.end_color);
     uint8_t blend        = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
 
     check_led(0, rgb_blend(pointer_rgb, end_override, blend));

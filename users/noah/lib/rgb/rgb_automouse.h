@@ -4,6 +4,11 @@
 //
 // Public interface for tracking auto-mouse timeout progress.
 // Rendering lives in rgb_runtime.c.
+//
+// raw_elapsed comes from the QMK auto-mouse timer. We clamp it to
+// AUTO_MOUSE_TIME so the fade can stay parked at its destination until the
+// auto-mouse layer bit actually drops out on a later scan. That avoids a
+// one-frame snap back to the authored pointer-layer color at timeout end.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -51,6 +56,10 @@ static inline uint16_t automouse_rgb_quantize_progress(uint16_t raw_elapsed) {
     return progress / AUTOMOUSE_RGB_SYNC_STEP * AUTOMOUSE_RGB_SYNC_STEP;
 }
 
+// This helper reflects the old "layer active or timeout window still open"
+// render rule. The current runtime now gates on derived progress instead,
+// which is safer because dead time, timeout end, and split sync all collapse
+// into the same visual state.
 static inline bool automouse_rgb_timeout_window_open(uint16_t raw_elapsed) {
     return raw_elapsed > 0 && raw_elapsed < AUTO_MOUSE_TIME;
 }

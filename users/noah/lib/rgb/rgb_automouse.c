@@ -16,6 +16,9 @@ bool automouse_rgb_should_render(void) {
 }
 
 uint16_t automouse_rgb_current_progress(void) {
+    // Master derives progress from the real QMK timeout clock; the slave only
+    // mirrors synced progress. Both halves then apply the same clamp/lock
+    // rules before rendering.
     uint16_t progress;
     if (is_keyboard_master()) {
         progress = automouse_rgb_progress(auto_mouse_get_time_elapsed());

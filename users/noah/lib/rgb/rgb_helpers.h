@@ -33,8 +33,8 @@ typedef struct {
 } pd_mode_color_t;
 
 typedef enum {
-    LAYER_COLOR_FLAG_NONE             = 0,
-    LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY = 1u << 0,
+    ALL_KEYS                        = 0,
+    KEYS_MAPPED_ON_THIS_LAYER_ONLY = 1u << 0,
 } layer_color_flags_t;
 
 typedef struct {
@@ -43,15 +43,15 @@ typedef struct {
 } layer_color_config_t;
 
 typedef enum {
-    AUTOMOUSE_RGB_FLAG_NONE                     = 0,
-    AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE       = 1u << 0,
-    AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED = 1u << 1,
-} automouse_rgb_flags_t;
+    FOLLOW_REAL_DESTINATION = 0,
+    END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW,
+    END_COLOR_ON_ALL_KEYS,
+} automouse_fade_end_mode_t;
 
 typedef struct {
-    uint8_t flags;
-    hsv_t   end_color;
-} automouse_rgb_config_t;
+    automouse_fade_end_mode_t mode;
+    hsv_t                     end_color;
+} automouse_fade_end_config_t;
 
 typedef struct {
     uint8_t        layer;

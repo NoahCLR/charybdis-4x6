@@ -37,7 +37,7 @@ extern const pd_mode_led_group_t pd_mode_led_groups[];
 extern const uint8_t             pd_mode_led_group_count;
 #    endif
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-extern const automouse_rgb_config_t automouse_rgb_config;
+extern const automouse_fade_end_config_t automouse_fade_end_config;
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 extern const hsv_t feedback_multi_tap_pending_color;
@@ -65,7 +65,7 @@ static rgb_runtime_frame_t rgb_runtime_frame_primary;
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
 static rgb_runtime_frame_t rgb_runtime_frame_secondary;
 static rgb_runtime_frame_t rgb_runtime_frame_base_effect;
-static rgb_t               automouse_end_override_rgb;
+static rgb_t               automouse_end_color_rgb;
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
 static rgb_t pd_mode_rgb[PD_MODE_COUNT];
@@ -91,7 +91,7 @@ void noah_rgb_runtime_post_init(void) {
     noah_rgb_runtime_invalidate_layer_maps();
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-    automouse_end_override_rgb = hsv_to_rgb(automouse_rgb_config.end_color);
+    automouse_end_color_rgb = hsv_to_rgb(automouse_fade_end_config.end_color);
 #    endif
 
 #    ifdef POINTING_DEVICE_ENABLE
@@ -118,8 +118,8 @@ static bool rgb_runtime_layer_has_solid_color(uint8_t layer) {
     return !(layer_colors[layer].color.s == 0 && layer_colors[layer].color.v == 0);
 }
 
-static bool rgb_runtime_layer_paints_mapped_keys_only(uint8_t layer) {
-    return (layer_colors[layer].flags & LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY) != 0;
+static bool rgb_runtime_layer_paints_only_keys_present_on_this_layer(uint8_t layer) {
+    return (layer_colors[layer].flags & KEYS_MAPPED_ON_THIS_LAYER_ONLY) != 0;
 }
 
 static bool rgb_runtime_keycode_is_mapped(uint16_t keycode) {
@@ -134,7 +134,7 @@ static void rgb_runtime_rebuild_layer_key_led_map(void) {
     memset(layer_key_led_map, 0, sizeof(layer_key_led_map));
 
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
-        if (!rgb_runtime_layer_paints_mapped_keys_only(layer)) {
+        if (!rgb_runtime_layer_paints_only_keys_present_on_this_layer(layer)) {
             continue;
         }
 
@@ -180,7 +180,7 @@ static bool rgb_runtime_frame_fill(rgb_runtime_frame_t *frame, rgb_t color, uint
 }
 
 static bool rgb_runtime_frame_paint_layer(rgb_runtime_frame_t *frame, uint8_t layer, uint8_t led_min, uint8_t led_max) {
-    if (!rgb_runtime_layer_paints_mapped_keys_only(layer)) {
+    if (!rgb_runtime_layer_paints_only_keys_present_on_this_layer(layer)) {
         return rgb_runtime_frame_fill(frame, layer_rgb[layer], led_min, led_max);
     }
 
@@ -202,7 +202,7 @@ static bool rgb_runtime_frame_paint_layer(rgb_runtime_frame_t *frame, uint8_t la
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static bool rgb_runtime_paint_layer(uint8_t layer, uint8_t led_min, uint8_t led_max) {
-    if (!rgb_runtime_layer_paints_mapped_keys_only(layer)) {
+    if (!rgb_runtime_layer_paints_only_keys_present_on_this_layer(layer)) {
         rgb_set_both_halves(layer_rgb[layer], led_min, led_max);
         return led_min < led_max;
     }
@@ -353,12 +353,8 @@ static bool rgb_runtime_frame_capture_base_effect(rgb_runtime_frame_t *frame, ui
 }
 #        endif
 
-static bool rgb_runtime_automouse_has_end_color_override(void) {
-    return (automouse_rgb_config.flags & AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE) != 0;
-}
-
-static bool rgb_runtime_automouse_fills_unpainted_end_leds(void) {
-    return (automouse_rgb_config.flags & AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED) != 0;
+static bool rgb_runtime_automouse_end_mode_is(automouse_fade_end_mode_t mode) {
+    return automouse_fade_end_config.mode == mode;
 }
 
 static layer_state_t rgb_runtime_layer_state_without_layer(layer_state_t state, uint8_t layer) {
@@ -369,6 +365,14 @@ static layer_state_t rgb_runtime_layer_state_without_layer(layer_state_t state, 
     return state & ~((layer_state_t)1u << layer);
 }
 
+// Auto-mouse renders as a two-frame blend:
+//   start = the current layer stack, including the auto-mouse layer
+//   end   = the layer stack after removing the auto-mouse layer, optionally
+//           replaced or filled by automouse_fade_end_config.mode
+//
+// This stage only owns the base layer render. Pointing-device overlays and key
+// feedback still paint later in the frame, so they can intentionally override
+// the fade result on top.
 static bool rgb_runtime_render_automouse_layer_stage(layer_state_t state, uint8_t led_min, uint8_t led_max) {
     uint8_t  auto_mouse_layer = get_auto_mouse_layer();
     uint16_t progress         = automouse_rgb_current_progress();
@@ -377,9 +381,9 @@ static bool rgb_runtime_render_automouse_layer_stage(layer_state_t state, uint8_
     bool start_painted = rgb_runtime_frame_render_layer_stage(&rgb_runtime_frame_primary, state, led_min, led_max);
     bool end_painted;
 
-    if (rgb_runtime_automouse_has_end_color_override()) {
+    if (rgb_runtime_automouse_end_mode_is(END_COLOR_ON_ALL_KEYS)) {
         rgb_runtime_frame_clear(&rgb_runtime_frame_secondary, led_min, led_max);
-        end_painted = rgb_runtime_frame_fill(&rgb_runtime_frame_secondary, automouse_end_override_rgb, led_min, led_max);
+        end_painted = rgb_runtime_frame_fill(&rgb_runtime_frame_secondary, automouse_end_color_rgb, led_min, led_max);
     } else {
         layer_state_t end_state = rgb_runtime_layer_state_without_layer(state, auto_mouse_layer);
         end_painted             = rgb_runtime_frame_render_layer_stage(&rgb_runtime_frame_secondary, end_state, led_min, led_max);
@@ -390,8 +394,8 @@ static bool rgb_runtime_render_automouse_layer_stage(layer_state_t state, uint8_
                 continue;
             }
 
-            if (rgb_runtime_automouse_fills_unpainted_end_leds()) {
-                rgb_runtime_frame_secondary.colors[led]  = automouse_end_override_rgb;
+            if (rgb_runtime_automouse_end_mode_is(END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW)) {
+                rgb_runtime_frame_secondary.colors[led]  = automouse_end_color_rgb;
                 rgb_runtime_frame_secondary.painted[led] = true;
                 end_painted                              = true;
                 continue;
@@ -452,6 +456,9 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 #    endif
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+    // The synthetic automouse destination is not a persistent board state.
+    // Once this branch stops running, the next frame falls back to ordinary
+    // layer rendering below.
     if (layer_state_cmp(layer_state, get_auto_mouse_layer()) && automouse_rgb_should_render()) {
         painted |= rgb_runtime_render_automouse_layer_stage(layer_state, led_min, led_max);
     } else

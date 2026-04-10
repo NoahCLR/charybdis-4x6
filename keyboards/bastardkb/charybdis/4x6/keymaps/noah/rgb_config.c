@@ -23,17 +23,17 @@
 // authored layer color as the timeout fade start state. In this keymap, that
 // target defaults to LAYER_POINTER.
 // .flags:
-//   - LAYER_COLOR_FLAG_NONE = paint the whole layer color wash
-//   - LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY = paint only keys with a non-
-//     transparent keycode on that layer; lower active layers remain visible
-//     underneath transparent positions
+//   - ALL_KEYS = paint the whole layer color wash
+//   - KEYS_MAPPED_ON_THIS_LAYER_ONLY = paint only keys that have a real key
+//     assigned on that layer; lower active layers remain visible underneath
+//     transparent positions
 //                       {.color = {hue, sat, val}, .flags = ...}
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
-    [LAYER_BASE]    = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE},                                             // no override
-    [LAYER_NUM]     = {.color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY},  // green
-    [LAYER_SYM]     = {.color = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, // blue
-    [LAYER_NAV]     = {.color = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, // purple
-    [LAYER_POINTER] = {.color = {0, 0, 150}, .flags = LAYER_COLOR_FLAG_NONE},                                           // default auto-mouse layer: white mapped keys
+    [LAYER_BASE]    = {.color = {0, 0, 0}, .flags = ALL_KEYS},                        // no override
+    [LAYER_NUM]     = {.color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // green
+    [LAYER_SYM]     = {.color = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // blue
+    [LAYER_NAV]     = {.color = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // purple
+    [LAYER_POINTER] = {.color = {0, 0, 150}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // default auto-mouse layer: white mapped keys
 };
 
 // ─── Pointing device mode colors ────────────────────────────────────────────
@@ -112,19 +112,25 @@ const uint8_t pd_mode_led_group_count = 0;
 // without changing the rendered look. Lower sync steps give a smoother slave-
 // half transition; higher values reduce split transactions.
 //
-// Default flags are NONE, so the timeout fade lands on the real layer-rendered
-// board state after the auto-mouse layer drops out. Set
-// AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED if you want pointer-only LEDs to
-// keep fading into end_color instead of handing off to the base effect at the
-// end. Set AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE to force the entire
-// destination to the authored solid end color instead.
+// .mode chooses only the fade destination. It does not create a persistent
+// board state; once the automouse renderer stops, normal layer rendering takes
+// back over on the next frame.
+//
+// .mode chooses how the fade picks its destination:
+//   - FOLLOW_REAL_DESTINATION = land on the real rendered board state after
+//     the auto-mouse layer drops out
+//   - END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW = keep the real destination where
+//     layers paint, but use end_color for keys that would otherwise reveal the
+//     base RGB effect
+//   - END_COLOR_ON_ALL_KEYS = use end_color as the fade destination on every
+//     key while the automouse renderer is active
 //
 // White is capped at v=150 (not MAX_BRIGHTNESS) to limit current draw — all
 // LEDs lit white at full brightness exceeds the USB power budget.
 #    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
-const automouse_rgb_config_t automouse_rgb_config = {
-    .flags     = AUTOMOUSE_RGB_FLAG_NONE,
-    .end_color = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}, // fallback or override destination, depending on flags
+const automouse_fade_end_config_t automouse_fade_end_config = {
+    .mode      = FOLLOW_REAL_DESTINATION,
+    .end_color = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS},
 };
 #    endif
 
