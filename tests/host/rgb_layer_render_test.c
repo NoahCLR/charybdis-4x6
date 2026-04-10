@@ -421,6 +421,71 @@ static void test_automouse_uses_configured_target_layer(void) {
 }
 
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+static void test_automouse_updates_target_when_underlying_layer_appears_mid_fade(void) {
+    test_reset();
+
+    ws2812_leds[0] = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[1] = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
+    ws2812_leds[2] = (ws2812_led_t){.r = 11, .g = 12, .b = 13};
+
+    test_keymap[LAYER_POINTER][0][0] = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1] = 0x0041u;
+    test_keymap[LAYER_NAV][0][1]     = 0x0030u;
+    test_keymap[LAYER_NAV][0][2]     = 0x0031u;
+
+    fake_auto_mouse_elapsed = AUTOMOUSE_RGB_DEAD_TIME + (AUTOMOUSE_RGB_ACTIVE_SPAN / 2u);
+    layer_state             = (layer_state_t)1u << LAYER_POINTER;
+
+    CHECK(render_output());
+    check_led(1, rgb_blend(rgb_from_hsv(layer_colors[LAYER_POINTER].color), rgb_from_ws2812(ws2812_leds[1]), automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed)));
+    check_led(2, rgb_from_ws2812(ws2812_leds[2]));
+
+    layer_state |= (layer_state_t)1u << LAYER_NAV;
+
+    CHECK(render_output());
+
+    rgb_t   pointer_rgb = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
+    rgb_t   nav_rgb     = rgb_from_hsv(layer_colors[LAYER_NAV].color);
+    uint8_t blend       = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
+
+    check_led(0, rgb_blend(pointer_rgb, rgb_from_ws2812(ws2812_leds[0]), blend));
+    check_led(1, rgb_blend(pointer_rgb, nav_rgb, blend));
+    check_led(2, nav_rgb);
+}
+
+static void test_automouse_updates_target_when_underlying_layer_returns_to_base_mid_fade(void) {
+    test_reset();
+
+    ws2812_leds[0] = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[1] = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
+    ws2812_leds[2] = (ws2812_led_t){.r = 11, .g = 12, .b = 13};
+    ws2812_leds[3] = (ws2812_led_t){.r = 14, .g = 15, .b = 16};
+
+    test_keymap[LAYER_POINTER][0][0] = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1] = 0x0041u;
+
+    fake_auto_mouse_elapsed = AUTOMOUSE_RGB_DEAD_TIME + (AUTOMOUSE_RGB_ACTIVE_SPAN / 2u);
+    layer_state             = ((layer_state_t)1u << LAYER_SYM) | ((layer_state_t)1u << LAYER_POINTER);
+
+    CHECK(render_output());
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+
+    layer_state = (layer_state_t)1u << LAYER_POINTER;
+
+    CHECK(render_output());
+
+    rgb_t   pointer_rgb = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
+    uint8_t blend       = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
+
+    check_led(0, rgb_blend(pointer_rgb, rgb_from_ws2812(ws2812_leds[0]), blend));
+    check_led(1, rgb_blend(pointer_rgb, rgb_from_ws2812(ws2812_leds[1]), blend));
+    check_led(2, rgb_from_ws2812(ws2812_leds[2]));
+    check_led(3, rgb_from_ws2812(ws2812_leds[3]));
+}
+#endif
+
+#if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
 static void test_automouse_fades_pointer_layer_into_underlying_layers(void) {
     test_reset();
 
@@ -531,6 +596,8 @@ int main(void) {
     test_pointer_mode_overlay_paints_right_half_and_groups();
     test_automouse_uses_configured_target_layer();
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+    test_automouse_updates_target_when_underlying_layer_appears_mid_fade();
+    test_automouse_updates_target_when_underlying_layer_returns_to_base_mid_fade();
     test_automouse_fades_pointer_layer_into_underlying_layers();
     test_automouse_lands_on_base_effect_at_timeout_end();
 #endif
