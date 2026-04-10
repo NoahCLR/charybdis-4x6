@@ -50,7 +50,10 @@ uint8_t key_feedback_preview_layer(void) {
     }
 
     if (active_key.held_action_keycode != KC_NO) {
-        return key_feedback_layer_hint_from_action(active_key.held_action_keycode);
+        // Once a held action is actually registered, the preview window is
+        // over. Held momentary layers should render only through layer_state
+        // so active MO() and locked layers compose identically in RGB.
+        return UINT8_MAX;
     }
 
     if (active_key.hold_fired || active_key.hold_one_shot_fired) {

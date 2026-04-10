@@ -13,11 +13,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static void test_reset_state(void) {
@@ -76,8 +76,8 @@ static void test_repeat_hold_flashes_while_active(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode                = KC_RIGHT_ALT,
-        .repeat_binding_active  = true,
+        .keycode               = KC_RIGHT_ALT,
+        .repeat_binding_active = true,
     };
 
     uint8_t flags = key_feedback_pack();
@@ -114,7 +114,7 @@ static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) 
     CHECK(key_feedback_preview_layer() == 3);
 }
 
-static void test_momentary_hold_preview_layer_stays_visible_while_held(void) {
+static void test_momentary_hold_preview_layer_clears_once_layer_is_active(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
@@ -123,7 +123,7 @@ static void test_momentary_hold_preview_layer_stays_visible_while_held(void) {
         .held_action_keycode = MO(4),
     };
 
-    CHECK(key_feedback_preview_layer() == 4);
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
 }
 
 static void test_non_layer_held_action_has_no_preview_layer(void) {
@@ -143,7 +143,7 @@ int main(void) {
     test_repeat_hold_flashes_while_active();
     test_fallback_hold_has_no_hold_feedback();
     test_momentary_hold_preview_layer_is_exposed_before_threshold();
-    test_momentary_hold_preview_layer_stays_visible_while_held();
+    test_momentary_hold_preview_layer_clears_once_layer_is_active();
     test_non_layer_held_action_has_no_preview_layer();
 
     puts("key_runtime_feedback host tests passed");
