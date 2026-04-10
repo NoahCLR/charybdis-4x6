@@ -17,18 +17,23 @@
 
 // ─── Layer colors ───────────────────────────────────────────────────────────
 //
-// Layer indicator colors (HSV), indexed by layer enum.
-// {0,0,0} means "no solid color" — LAYER_BASE falls through to the default
-// RGB matrix effect, and the configured auto-mouse target layer uses the
-// auto-mouse gradient instead. In this keymap, that target defaults to
+// Layer indicator colors and render flags, indexed by layer enum.
+// .color = {0,0,0} means "no solid color" — LAYER_BASE falls through to the
+// default RGB matrix effect, and the configured auto-mouse target layer uses
+// the auto-mouse gradient instead. In this keymap, that target defaults to
 // LAYER_POINTER.
-//                  {hue, sat, val}
-const hsv_t layer_colors[LAYER_COUNT] = {
-    [LAYER_BASE]    = {0, 0, 0},                                 // no override
-    [LAYER_NUM]     = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},  // green
-    [LAYER_SYM]     = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, // blue
-    [LAYER_NAV]     = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, // purple
-    [LAYER_POINTER] = {0, 0, 0},                                 // default auto-mouse layer: gradient
+// .flags:
+//   - LAYER_COLOR_FLAG_NONE = paint the whole layer color wash
+//   - LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY = paint only keys with a non-
+//     transparent keycode on that layer; lower active layers remain visible
+//     underneath transparent positions
+//                       {.color = {hue, sat, val}, .flags = ...}
+const layer_color_config_t layer_colors[LAYER_COUNT] = {
+    [LAYER_BASE]    = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE},                                             // no override
+    [LAYER_NUM]     = {.color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY},  // green
+    [LAYER_SYM]     = {.color = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, // blue
+    [LAYER_NAV]     = {.color = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, // purple
+    [LAYER_POINTER] = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE},                                             // default auto-mouse layer: gradient
 };
 
 // ─── Pointing device mode colors ────────────────────────────────────────────

@@ -40,15 +40,28 @@ quick reference when picking hue values:
 `layer_colors[]` is indexed by the layer enum values from the active keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
-Each row is an `hsv_t`:
+Each row is a `layer_color_config_t` with a color and per-layer render flags:
 
 ```c
-[LAYER_NUM] = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}
+[LAYER_NUM] = {
+    .color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},
+    .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY,
+}
 ```
 
-Use this when you want a whole-layer color wash.
+The available flags are:
 
-`{0, 0, 0}` means "do not paint a solid layer color here." That is useful for:
+- `LAYER_COLOR_FLAG_NONE`: paint the whole layer as a solid color wash
+- `LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY`: paint only LEDs whose key position has a
+  non-`KC_TRNS`, non-`KC_NO` keycode on that layer
+
+Mapped-only layers compose cleanly with overlap: lower active colored layers
+stay visible wherever the higher layer is transparent. The runtime resolves
+that against the effective keymap, so VIA dynamic keymap edits are reflected
+after the runtime refreshes its cached LED coverage.
+
+`.color = {0, 0, 0}` means "do not paint a solid layer color here." That is
+useful for:
 
 - `LAYER_BASE`, which should fall through to the normal RGB Matrix effect
 - the auto-mouse target layer, which uses the animated auto-mouse gradient
@@ -145,13 +158,17 @@ the flash-phase bit used to keep both halves in sync.
 
 [`rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c) applies RGB in a deliberate order:
 
-1. the topmost active non-base layer with a nonzero solid color
-2. the auto-mouse gradient on the configured auto-mouse layer, if no solid
+1. the preview layer color, if one is active and that layer has a nonzero
+   solid color
+2. otherwise, active non-base layers compose from low to high:
+   full-board layer colors wash the whole board, and mapped-only layers paint
+   only the LEDs owned by that layer's non-transparent keys
+3. the auto-mouse gradient on the configured auto-mouse layer, if no solid
    layer color was painted
-3. per-layer LED groups
-4. the first active pointing-device mode color on the right half
-5. per-mode LED groups
-6. the key-behavior feedback overlay on both halves
+4. per-layer LED groups
+5. the first active pointing-device mode color on the right half
+6. per-mode LED groups
+7. the key-behavior feedback overlay on both halves
 
 That order matters.
 

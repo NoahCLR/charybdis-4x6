@@ -2,10 +2,15 @@
 // RGB Runtime
 // ────────────────────────────────────────────────────────────────────────────
 
+#include <string.h>
+
 #include "rgb_runtime.h"
 #include "rgb_automouse.h"
 #include "rgb_helpers.h"
 
+#if defined(RGB_MATRIX_ENABLE)
+#    include "keymap_introspection.h" // QMK
+#endif
 #if defined(POINTING_DEVICE_ENABLE)
 #    include "../pointing/pd_modes.h"
 #endif
@@ -16,9 +21,9 @@
 
 // ─── Authored keymap data (defined in rgb_config.c) ──────────────────────
 #ifdef RGB_MATRIX_ENABLE
-extern const hsv_t             layer_colors[];
-extern const layer_led_group_t layer_led_groups[];
-extern const uint8_t           layer_led_group_count;
+extern const layer_color_config_t layer_colors[];
+extern const layer_led_group_t    layer_led_groups[];
+extern const uint8_t              layer_led_group_count;
 #    ifdef POINTING_DEVICE_ENABLE
 extern const pd_mode_color_t     pd_mode_colors[];
 extern const uint8_t             pd_mode_color_count;
@@ -44,6 +49,8 @@ extern const hsv_t feedback_long_hold_active_color;
 
 #ifdef RGB_MATRIX_ENABLE
 static rgb_t layer_rgb[LAYER_COUNT];
+static bool  layer_key_led_map_dirty = true;
+static bool  layer_key_led_map[LAYER_COUNT][RGB_MATRIX_LED_COUNT];
 #    ifdef POINTING_DEVICE_ENABLE
 static rgb_t pd_mode_rgb[PD_MODE_COUNT];
 #    endif
@@ -54,11 +61,18 @@ static rgb_t feedback_long_hold_active_rgb;
 #    endif
 #endif
 
+void noah_rgb_runtime_invalidate_layer_maps(void) {
+#ifdef RGB_MATRIX_ENABLE
+    layer_key_led_map_dirty = true;
+#endif
+}
+
 void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
     for (uint8_t i = 0; i < LAYER_COUNT; i++) {
-        layer_rgb[i] = hsv_to_rgb(layer_colors[i]);
+        layer_rgb[i] = hsv_to_rgb(layer_colors[i].color);
     }
+    noah_rgb_runtime_invalidate_layer_maps();
 
 #    ifdef POINTING_DEVICE_ENABLE
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
@@ -80,6 +94,72 @@ void noah_rgb_runtime_post_init(void) {
 }
 
 #ifdef RGB_MATRIX_ENABLE
+static bool rgb_runtime_layer_has_solid_color(uint8_t layer) {
+    return !(layer_colors[layer].color.s == 0 && layer_colors[layer].color.v == 0);
+}
+
+static bool rgb_runtime_layer_paints_mapped_keys_only(uint8_t layer) {
+    return (layer_colors[layer].flags & LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY) != 0;
+}
+
+static bool rgb_runtime_keycode_is_mapped(uint16_t keycode) {
+    return keycode != KC_NO && keycode != KC_TRNS;
+}
+
+static void rgb_runtime_rebuild_layer_key_led_map(void) {
+    if (!layer_key_led_map_dirty) {
+        return;
+    }
+
+    memset(layer_key_led_map, 0, sizeof(layer_key_led_map));
+
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+        if (!rgb_runtime_layer_paints_mapped_keys_only(layer)) {
+            continue;
+        }
+
+        for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+            for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+                uint16_t keycode = keycode_at_keymap_location(layer, row, col);
+                if (!rgb_runtime_keycode_is_mapped(keycode)) {
+                    continue;
+                }
+
+                uint8_t leds[RGB_MATRIX_LED_COUNT];
+                uint8_t led_count = rgb_matrix_map_row_column_to_led(row, col, leds);
+                for (uint8_t i = 0; i < led_count; i++) {
+                    if (leds[i] < RGB_MATRIX_LED_COUNT) {
+                        layer_key_led_map[layer][leds[i]] = true;
+                    }
+                }
+            }
+        }
+    }
+
+    layer_key_led_map_dirty = false;
+}
+
+static bool rgb_runtime_paint_layer(uint8_t layer, uint8_t led_min, uint8_t led_max) {
+    if (!rgb_runtime_layer_paints_mapped_keys_only(layer)) {
+        rgb_set_both_halves(layer_rgb[layer], led_min, led_max);
+        return led_min < led_max;
+    }
+
+    rgb_runtime_rebuild_layer_key_led_map();
+
+    bool painted = false;
+    for (uint8_t led = led_min; led < led_max; led++) {
+        if (!layer_key_led_map[layer][led]) {
+            continue;
+        }
+
+        rgb_set_led_color(led, led_min, led_max, layer_rgb[layer]);
+        painted = true;
+    }
+
+    return painted;
+}
+
 #    ifdef POINTING_DEVICE_ENABLE
 static bool rgb_runtime_led_range_intersects(uint8_t led_min, uint8_t led_max, uint8_t from, uint8_t to) {
     return led_min < to && led_max > from;
@@ -113,25 +193,25 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     preview_layer = rgb_runtime_preview_layer();
 #    endif
 
-    if (preview_layer < LAYER_COUNT && !(layer_colors[preview_layer].s == 0 && layer_colors[preview_layer].v == 0)) {
-        rgb_set_both_halves(layer_rgb[preview_layer], led_min, led_max);
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-        layer_painted = true;
+    if (preview_layer < LAYER_COUNT && rgb_runtime_layer_has_solid_color(preview_layer)) {
+        bool preview_painted = rgb_runtime_paint_layer(preview_layer, led_min, led_max);
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+        layer_painted = preview_painted;
 #    endif
-        painted = true;
+        painted = preview_painted;
     } else {
-        for (int8_t i = LAYER_COUNT - 1; i > 0; i--) {
+        for (uint8_t i = 1; i < LAYER_COUNT; i++) {
             if (!layer_state_cmp(layer_state, i)) continue;
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-            if (i == (int8_t)get_auto_mouse_layer()) continue;
+            if (i == get_auto_mouse_layer()) continue;
 #    endif
-            if (layer_colors[i].s == 0 && layer_colors[i].v == 0) continue;
-            rgb_set_both_halves(layer_rgb[i], led_min, led_max);
+            if (!rgb_runtime_layer_has_solid_color(i)) continue;
+
+            bool this_layer_painted = rgb_runtime_paint_layer(i, led_min, led_max);
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-            layer_painted = true;
+            layer_painted |= this_layer_painted;
 #    endif
-            painted = true;
-            break;
+            painted |= this_layer_painted;
         }
     }
 

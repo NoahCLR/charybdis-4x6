@@ -32,6 +32,16 @@ typedef struct {
     hsv_t          color;
 } pd_mode_color_t;
 
+typedef enum {
+    LAYER_COLOR_FLAG_NONE             = 0,
+    LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY = 1u << 0,
+} layer_color_flags_t;
+
+typedef struct {
+    hsv_t   color;
+    uint8_t flags;
+} layer_color_config_t;
+
 typedef struct {
     uint8_t        layer;
     hsv_t          color;

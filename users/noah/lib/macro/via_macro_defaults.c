@@ -19,6 +19,7 @@
 
 #    include "noah_keymap.h"
 #    include "macro_payload.h"
+#    include "../rgb/rgb_runtime.h"
 
 #    ifdef CONSOLE_ENABLE
 #        include "print.h"
@@ -213,8 +214,14 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
 #    ifdef VIA_EEPROM_ALLOW_RESET
         case id_eeprom_reset:
             via_macro_seed_scan_pending = true;
+            noah_rgb_runtime_invalidate_layer_maps();
             return false;
 #    endif
+        case id_dynamic_keymap_set_keycode:
+        case id_dynamic_keymap_set_buffer:
+        case id_dynamic_keymap_reset:
+            noah_rgb_runtime_invalidate_layer_maps();
+            return false;
         case id_dynamic_keymap_macro_reset:
             via_macro_seed_scan_pending = true;
             return false;

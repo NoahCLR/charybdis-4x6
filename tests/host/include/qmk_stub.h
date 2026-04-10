@@ -16,6 +16,7 @@
 #define LAYER_COUNT 8
 
 #define KC_NO 0x0000u
+#define KC_TRNS 0x0001u
 #define KC_LEFT_CTRL 0x00E0u
 #define KC_LEFT_SHIFT 0x00E1u
 #define KC_LEFT_ALT 0x00E2u
