@@ -193,26 +193,18 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     preview_layer = rgb_runtime_preview_layer();
 #    endif
 
-    if (preview_layer < LAYER_COUNT && rgb_runtime_layer_has_solid_color(preview_layer)) {
-        bool preview_painted = rgb_runtime_paint_layer(preview_layer, led_min, led_max);
-#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-        layer_painted = preview_painted;
-#    endif
-        painted = preview_painted;
-    } else {
-        for (uint8_t i = 1; i < LAYER_COUNT; i++) {
-            if (!layer_state_cmp(layer_state, i)) continue;
+    for (uint8_t i = 1; i < LAYER_COUNT; i++) {
+        if (!layer_state_cmp(layer_state, i)) continue;
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-            if (i == get_auto_mouse_layer()) continue;
+        if (i == get_auto_mouse_layer()) continue;
 #    endif
-            if (!rgb_runtime_layer_has_solid_color(i)) continue;
+        if (!rgb_runtime_layer_has_solid_color(i)) continue;
 
-            bool this_layer_painted = rgb_runtime_paint_layer(i, led_min, led_max);
+        bool this_layer_painted = rgb_runtime_paint_layer(i, led_min, led_max);
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-            layer_painted |= this_layer_painted;
+        layer_painted |= this_layer_painted;
 #    endif
-            painted |= this_layer_painted;
-        }
+        painted |= this_layer_painted;
     }
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
@@ -224,13 +216,29 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 #    endif
 
     for (uint8_t g = 0; g < layer_led_group_count; g++) {
-        bool group_active = preview_layer < LAYER_COUNT ? layer_led_groups[g].layer == preview_layer : layer_state_cmp(layer_state, layer_led_groups[g].layer);
+        bool group_active = layer_state_cmp(layer_state, layer_led_groups[g].layer);
         if (group_active) {
             rgb_t grp_rgb = hsv_to_rgb(layer_led_groups[g].color);
             rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max, grp_rgb);
             painted |= rgb_runtime_led_group_intersects(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max);
         }
     }
+
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+    if (preview_layer < LAYER_COUNT && rgb_runtime_layer_has_solid_color(preview_layer)) {
+        painted |= rgb_runtime_paint_layer(preview_layer, led_min, led_max);
+
+        for (uint8_t g = 0; g < layer_led_group_count; g++) {
+            if (layer_led_groups[g].layer != preview_layer) {
+                continue;
+            }
+
+            rgb_t grp_rgb = hsv_to_rgb(layer_led_groups[g].color);
+            rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max, grp_rgb);
+            painted |= rgb_runtime_led_group_intersects(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max);
+        }
+    }
+#    endif
 
     // ─── Pointing-device mode overlay ───────────────────────────────────
     //

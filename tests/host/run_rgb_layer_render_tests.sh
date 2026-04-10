@@ -15,6 +15,8 @@ trap cleanup EXIT INT TERM
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DRGB_MATRIX_ENABLE \
+    -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
+    -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

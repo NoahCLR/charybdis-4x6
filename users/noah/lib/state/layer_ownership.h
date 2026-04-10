@@ -15,3 +15,7 @@ bool layer_ownership_toggle_lock_state(uint8_t layer);
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer);
 bool layer_ownership_momentary_release(keypos_t key_pos);
+
+#ifdef NOAH_HOST_TESTS
+void layer_ownership_reset_for_test(void);
+#endif

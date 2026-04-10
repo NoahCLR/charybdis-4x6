@@ -21,6 +21,7 @@ layer_state_t layer_state;
 
 static uint16_t test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static rgb_t    led_output[RGB_MATRIX_LED_COUNT];
+static uint8_t  fake_preview_layer = UINT8_MAX;
 
 led_config_t g_led_config = {0};
 
@@ -28,8 +29,11 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
     [LAYER_BASE] = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE}, [LAYER_NUM] = {.color = {10, 20, 30}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, [LAYER_SYM] = {.color = {40, 50, 60}, .flags = LAYER_COLOR_FLAG_NONE}, [LAYER_NAV] = {.color = {70, 80, 90}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, [LAYER_POINTER] = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE},
 };
 
-const layer_led_group_t layer_led_groups[1]   = {0};
-const uint8_t           layer_led_group_count = 0;
+const layer_led_group_t layer_led_groups[1]              = {0};
+const uint8_t           layer_led_group_count            = 0;
+const hsv_t             feedback_multi_tap_pending_color = {1, 2, 3};
+const hsv_t             feedback_hold_active_color       = {4, 5, 6};
+const hsv_t             feedback_long_hold_active_color  = {7, 8, 9};
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -50,7 +54,8 @@ static rgb_t rgb_from_hsv(hsv_t hsv) {
 static void test_reset(void) {
     memset(test_keymap, 0, sizeof(test_keymap));
     memset(led_output, 0, sizeof(led_output));
-    layer_state = 0;
+    layer_state        = 0;
+    fake_preview_layer = UINT8_MAX;
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
@@ -89,6 +94,14 @@ uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t colu
     return test_keymap[layer_num][row][column];
 }
 
+uint8_t key_feedback_pack(void) {
+    return 0;
+}
+
+uint8_t key_feedback_preview_layer(void) {
+    return fake_preview_layer;
+}
+
 void rgb_matrix_set_color(int index, uint8_t red, uint8_t green, uint8_t blue) {
     if (index < 0 || index >= RGB_MATRIX_LED_COUNT) {
         test_fail("rgb_matrix_set_color index in range", __FILE__, __LINE__);
@@ -108,6 +121,9 @@ uint8_t rgb_matrix_map_row_column_to_led(uint8_t row, uint8_t column, uint8_t *l
 }
 
 static void check_led(uint8_t index, rgb_t expected) {
+    if (led_output[index].r != expected.r || led_output[index].g != expected.g || led_output[index].b != expected.b) {
+        fprintf(stderr, "LED %u mismatch: got (%u,%u,%u), expected (%u,%u,%u)\n", (unsigned int)index, (unsigned int)led_output[index].r, (unsigned int)led_output[index].g, (unsigned int)led_output[index].b, (unsigned int)expected.r, (unsigned int)expected.g, (unsigned int)expected.b);
+    }
     CHECK(led_output[index].r == expected.r);
     CHECK(led_output[index].g == expected.g);
     CHECK(led_output[index].b == expected.b);
@@ -168,9 +184,26 @@ static void test_invalidating_layer_map_refreshes_dynamic_keymap_coverage(void) 
     check_led(2, rgb_from_hsv(layer_colors[LAYER_NAV].color));
 }
 
+static void test_preview_layer_overlays_existing_active_layers(void) {
+    test_reset();
+
+    test_keymap[LAYER_NUM][0][0] = 0x0020u;
+    test_keymap[LAYER_NUM][0][1] = 0x0021u;
+    layer_state                  = (layer_state_t)1u << LAYER_SYM;
+    fake_preview_layer           = LAYER_NUM;
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
 int main(void) {
     test_mapped_only_layers_compose_in_layer_order();
     test_full_board_layer_fills_gaps_under_mapped_only_layer();
     test_invalidating_layer_map_refreshes_dynamic_keymap_coverage();
+    test_preview_layer_overlays_existing_active_layers();
     return 0;
 }

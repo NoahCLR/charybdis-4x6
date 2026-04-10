@@ -16,11 +16,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static keypos_t test_keypos(uint8_t row, uint8_t col) {
@@ -38,6 +38,7 @@ static void test_reset_stubs(void) {
     layer_state = 0;
     memset(layer_on_calls, 0, sizeof(layer_on_calls));
     memset(layer_off_calls, 0, sizeof(layer_off_calls));
+    layer_ownership_reset_for_test();
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
@@ -150,6 +151,26 @@ static void test_toggle_lock_state_activates_and_deactivates_layer(void) {
     CHECK(layer_off_calls[5] == 1);
 }
 
+static void test_multiple_locked_layers_can_coexist(void) {
+    test_reset_stubs();
+
+    CHECK(layer_ownership_set_lock_state(1, true));
+    CHECK(layer_ownership_set_lock_state(2, true));
+
+    CHECK(layer_ownership_is_locked(1));
+    CHECK(layer_ownership_is_locked(2));
+    CHECK(layer_state == (test_layer_mask(1) | test_layer_mask(2)));
+    CHECK(layer_on_calls[1] == 1);
+    CHECK(layer_on_calls[2] == 1);
+
+    CHECK(layer_ownership_set_lock_state(1, false));
+    CHECK(!layer_ownership_is_locked(1));
+    CHECK(layer_ownership_is_locked(2));
+    CHECK(layer_state == test_layer_mask(2));
+    CHECK(layer_off_calls[1] == 1);
+    CHECK(layer_off_calls[2] == 0);
+}
+
 static void test_locked_layer_stays_active_after_momentary_release(void) {
     keypos_t key_pos = test_keypos(6, 1);
 
@@ -175,7 +196,7 @@ static void test_locked_layer_stays_active_after_momentary_release(void) {
     CHECK(layer_off_calls[4] == 1);
 }
 
-static void test_switching_locked_layers_keeps_old_layer_if_still_held(void) {
+static void test_locking_another_layer_keeps_existing_locks_and_holds(void) {
     keypos_t key_pos = test_keypos(7, 3);
 
     test_reset_stubs();
@@ -190,13 +211,17 @@ static void test_switching_locked_layers_keeps_old_layer_if_still_held(void) {
     CHECK(layer_off_calls[1] == 0);
 
     CHECK(layer_ownership_set_lock_state(2, true));
-    CHECK(!layer_ownership_is_locked(1));
+    CHECK(layer_ownership_is_locked(1));
     CHECK(layer_ownership_is_locked(2));
     CHECK(layer_state == (test_layer_mask(1) | test_layer_mask(2)));
     CHECK(layer_off_calls[1] == 0);
     CHECK(layer_on_calls[2] == 1);
 
-    CHECK(layer_ownership_momentary_release(key_pos));
+    CHECK(!layer_ownership_momentary_release(key_pos));
+    CHECK(layer_state == (test_layer_mask(1) | test_layer_mask(2)));
+    CHECK(layer_off_calls[1] == 0);
+
+    CHECK(layer_ownership_set_lock_state(1, false));
     CHECK(layer_state == test_layer_mask(2));
     CHECK(layer_off_calls[1] == 1);
 
@@ -224,8 +249,9 @@ int main(void) {
     test_same_key_repress_same_layer_does_not_duplicate_refcount();
     test_same_key_can_move_its_momentary_binding_between_layers();
     test_toggle_lock_state_activates_and_deactivates_layer();
+    test_multiple_locked_layers_can_coexist();
     test_locked_layer_stays_active_after_momentary_release();
-    test_switching_locked_layers_keeps_old_layer_if_still_held();
+    test_locking_another_layer_keeps_existing_locks_and_holds();
     test_invalid_layer_requests_are_ignored();
 
     puts("layer_ownership host tests passed");

@@ -21,8 +21,12 @@ typedef struct {
 #define LAYER_OWNERSHIP_BINDING_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 
 static layer_momentary_binding_t layer_momentary_bindings[LAYER_OWNERSHIP_BINDING_CAPACITY] = {0};
-static uint8_t                   layer_momentary_refcounts[LAYER_COUNT]                      = {0};
-static uint8_t                   layer_locked_state                                           = UINT8_MAX;
+static uint8_t                   layer_momentary_refcounts[LAYER_COUNT]                     = {0};
+static layer_state_t             layer_locked_mask                                          = 0;
+
+static inline layer_state_t layer_ownership_mask_for_layer(uint8_t layer) {
+    return (layer_state_t)1u << layer;
+}
 
 static inline bool layer_ownership_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
@@ -58,7 +62,7 @@ static int16_t layer_ownership_find_free_slot(void) {
 }
 
 static bool layer_ownership_should_be_active(uint8_t layer) {
-    return layer < LAYER_COUNT && (layer_momentary_refcounts[layer] > 0 || layer_locked_state == layer);
+    return layer < LAYER_COUNT && (layer_momentary_refcounts[layer] > 0 || (layer_locked_mask & layer_ownership_mask_for_layer(layer)) != 0);
 }
 
 static bool layer_ownership_apply_layer(uint8_t layer) {
@@ -87,7 +91,7 @@ static bool layer_ownership_remove_slot(uint16_t slot) {
         return false;
     }
 
-    uint8_t layer = layer_momentary_bindings[slot].layer;
+    uint8_t layer                         = layer_momentary_bindings[slot].layer;
     layer_momentary_bindings[slot].active = false;
     layer_momentary_bindings[slot].layer  = 0;
 
@@ -100,7 +104,7 @@ static bool layer_ownership_remove_slot(uint16_t slot) {
 }
 
 bool layer_ownership_is_locked(uint8_t layer) {
-    return layer_locked_state == layer;
+    return layer < LAYER_COUNT && (layer_locked_mask & layer_ownership_mask_for_layer(layer)) != 0;
 }
 
 bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
@@ -108,29 +112,20 @@ bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
         return false;
     }
 
-    if (!locked) {
-        if (layer_locked_state != layer) {
-            return false;
-        }
+    layer_state_t layer_mask = layer_ownership_mask_for_layer(layer);
+    bool          is_locked  = (layer_locked_mask & layer_mask) != 0;
 
-        layer_locked_state = UINT8_MAX;
-        layer_ownership_apply_layer(layer);
-        return true;
+    if (locked == is_locked) {
+        return false;
     }
 
-    bool changed = false;
-
-    if (layer_locked_state < LAYER_COUNT && layer_locked_state != layer) {
-        uint8_t old_locked_layer = layer_locked_state;
-        layer_locked_state = UINT8_MAX;
-        changed |= layer_ownership_apply_layer(old_locked_layer);
+    if (locked) {
+        layer_locked_mask |= layer_mask;
+    } else {
+        layer_locked_mask &= ~layer_mask;
     }
 
-    if (layer_locked_state != layer) {
-        layer_locked_state = layer;
-        changed            = true;
-    }
-
+    bool changed = true;
     changed |= layer_ownership_apply_layer(layer);
     return changed;
 }
@@ -180,3 +175,11 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
 
     return layer_ownership_remove_slot((uint16_t)slot);
 }
+
+#ifdef NOAH_HOST_TESTS
+void layer_ownership_reset_for_test(void) {
+    memset(layer_momentary_bindings, 0, sizeof(layer_momentary_bindings));
+    memset(layer_momentary_refcounts, 0, sizeof(layer_momentary_refcounts));
+    layer_locked_mask = 0;
+}
+#endif

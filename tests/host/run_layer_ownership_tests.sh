@@ -13,6 +13,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DNOAH_HOST_TESTS \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

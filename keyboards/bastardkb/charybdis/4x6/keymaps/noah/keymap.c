@@ -201,8 +201,8 @@ enum keymap_custom_keycodes {
 // action can be a plain keycode, a modded keycode, a macro, a layer lock,
 // a pointer-mode lock, or a supported QMK behavior keycode such as MT()/OSM()
 //   - Use LOCK_LAYER(layer) to toggle a layer lock.
-//     Locking the same layer again turns it off; locking a different layer
-//     switches the lock to that layer.
+//     Locking the same layer again turns it off; different layers toggle
+//     independently and can stay active together.
 //   - Use PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for a momentary layer hold
 //     owned by the custom runtime.
 //   - Raw TG()/TO()/TT()/OSL()/LM()/LT() actions inside key_behaviors[] are
