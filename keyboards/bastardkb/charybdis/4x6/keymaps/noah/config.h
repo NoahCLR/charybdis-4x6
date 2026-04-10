@@ -109,12 +109,13 @@ enum charybdis_keymap_layers {
 // Flash half-period for keys held with PRESS_AND_HOLD_UNTIL_RELEASE or repeat actions.
 #    define RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS 200
 
-// Auto-mouse timeout gradient overlay.
-// Fades from white to red as the auto-mouse layer times out.
+// Auto-mouse timeout fade overlay.
+// Fades from the authored auto-mouse layer rendering toward its destination
+// state as the auto-mouse layer times out.
 // Comment out RGB_AUTOMOUSE_GRADIENT_ENABLE to disable.
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #        define RGB_AUTOMOUSE_GRADIENT_ENABLE
-// Dead time before the gradient starts animating (first third of the timeout window).
+// Dead time before the timeout fade starts animating (first third of the timeout window).
 #        define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3)
 #    endif
 

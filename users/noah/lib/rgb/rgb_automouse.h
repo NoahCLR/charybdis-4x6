@@ -1,9 +1,9 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Auto-Mouse RGB Gradient
+// Auto-Mouse RGB Timeout Fade
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Public interface for rendering the auto-mouse timeout gradient.
-// Implementation lives in rgb_automouse.c.
+// Public interface for tracking auto-mouse timeout progress.
+// Rendering lives in rgb_runtime.c.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -54,13 +54,20 @@ static inline uint16_t automouse_rgb_quantize_progress(uint16_t raw_elapsed) {
 #endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
-bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end);
+uint16_t              automouse_rgb_current_progress(void);
+static inline uint8_t automouse_rgb_blend_amount(uint16_t progress) {
+    if (progress >= AUTOMOUSE_RGB_ACTIVE_SPAN) {
+        return UINT8_MAX;
+    }
+
+    return (uint8_t)((uint32_t)progress * UINT8_MAX / AUTOMOUSE_RGB_ACTIVE_SPAN);
+}
 #else
-static inline bool automouse_rgb_render(uint8_t led_min, uint8_t led_max, hsv_t start, hsv_t end) {
-    (void)led_min;
-    (void)led_max;
-    (void)start;
-    (void)end;
-    return false;
+static inline uint16_t automouse_rgb_current_progress(void) {
+    return 0;
+}
+static inline uint8_t automouse_rgb_blend_amount(uint16_t progress) {
+    (void)progress;
+    return 0;
 }
 #endif // defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)

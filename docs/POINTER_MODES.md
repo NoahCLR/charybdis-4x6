@@ -30,6 +30,10 @@ changes how the modes feel in practice.
 
 - non-arrow modes can keep the configured auto-mouse layer anchored while
   active or locked
+- when `ARROW_MODE` is not active, the auto-mouse layer is allowed to overlap
+  other active keyboard layers instead of being forced off underneath them,
+  except for the configured auto-sniping layer, which keeps precedence over a
+  separate auto-mouse layer
 - `ARROW_MODE` prefers staying on the current typing or navigation surface
   instead of forcing the pointer layer back underneath it
 - this policy follows pd-mode state itself, so it behaves the same whether the

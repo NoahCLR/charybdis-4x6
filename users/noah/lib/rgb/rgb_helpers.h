@@ -42,6 +42,17 @@ typedef struct {
     uint8_t flags;
 } layer_color_config_t;
 
+typedef enum {
+    AUTOMOUSE_RGB_FLAG_NONE                     = 0,
+    AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE       = 1u << 0,
+    AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED = 1u << 1,
+} automouse_rgb_flags_t;
+
+typedef struct {
+    uint8_t flags;
+    hsv_t   end_color;
+} automouse_rgb_config_t;
+
 typedef struct {
     uint8_t        layer;
     hsv_t          color;

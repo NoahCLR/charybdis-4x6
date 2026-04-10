@@ -76,8 +76,7 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     bool          auto_mouse_anchored = pointer_layer_policy_auto_mouse_anchored();
     uint8_t       auto_mouse_layer    = get_auto_mouse_layer();
     layer_state_t auto_mouse_mask     = (layer_state_t)1 << auto_mouse_layer;
-    bool          auto_mouse_active   = layer_state_cmp(state, auto_mouse_layer);
-    bool          nav_active          = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
+    bool          sniping_layer_active = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
 
     // Arrow mode consumes trackball motion as arrows, so keep the keyboard on
     // the current typing/nav surface instead of forcing the pointer layer back
@@ -87,25 +86,19 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
         return state;
     }
 
-    // Keep the configured auto-mouse layer alive while anchored. Active pd
-    // modes must survive even if QMK drops that layer underneath an LT-held
-    // NAV key.
-    if (auto_mouse_anchored && (auto_mouse_layer == CHARYBDIS_AUTO_SNIPING_LAYER || !nav_active)) {
-        state |= auto_mouse_mask;
-        auto_mouse_active = true;
+    // Auto-sniping must stay authoritative while mousing. If the sniping
+    // layer is active and auto-mouse targets some other layer, strip that
+    // separate pointer layer regardless of anchors so NAV keeps keymap
+    // precedence and sniping stays enabled.
+    if (sniping_layer_active && auto_mouse_layer != CHARYBDIS_AUTO_SNIPING_LAYER) {
+        state &= ~auto_mouse_mask;
+        return state;
     }
 
-    if (auto_mouse_layer != CHARYBDIS_AUTO_SNIPING_LAYER && auto_mouse_active && nav_active) {
-        // NAV takes over from the configured auto-mouse layer, but not while a
-        // pd mode is running.
-        if (!auto_mouse_anchored) {
-            state &= ~auto_mouse_mask;
-        }
-    } else if (auto_mouse_active) {
-        bool other_layer_active = (state & ~auto_mouse_mask) != 0;
-        if (other_layer_active && !auto_mouse_anchored) {
-            state &= ~auto_mouse_mask;
-        }
+    // Keep the configured auto-mouse layer alive while anchored. Outside the
+    // sniping exception above, overlap with other keyboard layers is allowed.
+    if (auto_mouse_anchored) {
+        state |= auto_mouse_mask;
     }
 
     return state;

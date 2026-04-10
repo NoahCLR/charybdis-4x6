@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // All RGB color definitions: layer indicators, mode overlays, LED group
-// highlights, and auto-mouse gradient endpoints.
+// highlights, and auto-mouse timeout fade config.
 //
 // Want to change a color?  Edit this file.
 // Want to change the rendering logic?  Edit users/noah/lib/rgb/rgb_runtime.c.
@@ -19,9 +19,9 @@
 //
 // Layer indicator colors and render flags, indexed by layer enum.
 // .color = {0,0,0} means "no solid color" — LAYER_BASE falls through to the
-// default RGB matrix effect, and the configured auto-mouse target layer uses
-// the auto-mouse gradient instead. In this keymap, that target defaults to
-// LAYER_POINTER.
+// default RGB matrix effect. The configured auto-mouse target layer uses its
+// authored layer color as the timeout fade start state. In this keymap, that
+// target defaults to LAYER_POINTER.
 // .flags:
 //   - LAYER_COLOR_FLAG_NONE = paint the whole layer color wash
 //   - LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY = paint only keys with a non-
@@ -33,7 +33,7 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
     [LAYER_NUM]     = {.color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY},  // green
     [LAYER_SYM]     = {.color = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, // blue
     [LAYER_NAV]     = {.color = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, // purple
-    [LAYER_POINTER] = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE},                                             // default auto-mouse layer: gradient
+    [LAYER_POINTER] = {.color = {0, 0, 150}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY},                               // default auto-mouse layer: white mapped keys
 };
 
 // ─── Pointing device mode colors ────────────────────────────────────────────
@@ -95,24 +95,35 @@ const pd_mode_led_group_t pd_mode_led_groups[] = {
 };
 const uint8_t pd_mode_led_group_count = sizeof(pd_mode_led_groups) / sizeof(pd_mode_led_groups[0]);
 
-// ─── Auto-mouse gradient ────────────────────────────────────────────────────
+// ─── Auto-mouse timeout fade ────────────────────────────────────────────────
 //
-// Countdown gradient endpoints. When the auto-mouse layer activates, the first
-// AUTOMOUSE_RGB_DEAD_TIME ms are "dead time" — LEDs stay at the start color so
-// active trackball use doesn't cause flicker. The gradient animates only
-// during the remaining portion of the auto-mouse timeout after that dead time.
-// See AUTO_MOUSE_TIME and AUTOMOUSE_RGB_DEAD_TIME in config.h.
+// Auto-mouse now fades from the authored auto-mouse layer rendering into the
+// layer state that would remain after that layer drops out. When the auto-
+// mouse layer activates, the first AUTOMOUSE_RGB_DEAD_TIME ms are "dead time"
+// — LEDs stay at the start state so active trackball use doesn't cause
+// flicker. The fade animates only during the remaining portion of the timeout
+// after that dead time. See AUTO_MOUSE_TIME and AUTOMOUSE_RGB_DEAD_TIME in
+// config.h.
 //
 // Split sync only transmits the animated portion of the gradient. Dead time
 // and locked modes collapse to a single stable value, which cuts split chatter
 // without changing the rendered look. Lower sync steps give a smoother slave-
 // half transition; higher values reduce split transactions.
 //
-// White is capped at v=150 (not MAX_BRIGHTNESS) to limit current draw — all LEDs
-// lit white at full brightness exceeds the USB power budget.
+// Default flags are NONE, so the timeout fade lands on the real layer-rendered
+// board state after the auto-mouse layer drops out. Set
+// AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED if you want pointer-only LEDs to
+// keep fading into end_color instead of handing off to the base effect at the
+// end. Set AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE to force the entire
+// destination to the authored solid end color instead.
+//
+// White is capped at v=150 (not MAX_BRIGHTNESS) to limit current draw — all
+// LEDs lit white at full brightness exceeds the USB power budget.
 #    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
-const hsv_t automouse_color_start = {.h = 0, .s = 0, .v = 150};                             // white
-const hsv_t automouse_color_end   = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}; // red
+const automouse_rgb_config_t automouse_rgb_config = {
+    .flags     = AUTOMOUSE_RGB_FLAG_NONE,
+    .end_color = {.h = 0, .s = 255, .v = RGB_MATRIX_MAXIMUM_BRIGHTNESS}, // fallback or override destination, depending on flags
+};
 #    endif
 
 // ─── Key behavior feedback ──────────────────────────────────────────────────

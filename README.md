@@ -356,9 +356,9 @@ independently toggled in the keymap
 [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
 
 - **Auto-mouse gradient** (`RGB_AUTOMOUSE_GRADIENT_ENABLE`): the configured
-  auto-mouse layer uses a white-to-red countdown instead of a fixed solid
-  color, so you can see how much timeout remains before the pointer layer
-  clears
+  auto-mouse layer uses its authored `layer_colors[]` start state and fades
+  toward the real post-timeout layer render by default, so you can see how
+  much timeout remains before the pointer layer clears
 - **Key-behavior feedback** (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`): the
   key-behavior engine projects its state into the RGB overlay on both halves:
   multi-tap pending, hold pending, trigger pulses, and active held non-layer

@@ -106,22 +106,35 @@ pointing-device mode instead of layer.
 Use this when one mode should highlight a very specific LED or cluster, such as
 the trackball LED or one side of the board.
 
-### `automouse_color_start` and `automouse_color_end`
+### `automouse_rgb_config`
 
-These two HSV values define the auto-mouse timeout gradient.
+`automouse_rgb_config` defines the auto-mouse timeout destination.
 
 In the shared RGB runtime:
 
-- the configured auto-mouse layer does not use a fixed solid layer color
-- it starts at `automouse_color_start`
-- it transitions toward `automouse_color_end` as the auto-mouse timeout runs out
+- the configured auto-mouse layer now uses its authored `layer_colors[]` entry
+  as the timeout fade start state
+- the default destination is the real layer-rendered state that remains after
+  the auto-mouse layer drops out
+- the active keymap leaves `automouse_rgb_config.flags` at
+  `AUTOMOUSE_RGB_FLAG_NONE`, so that real layer-rendered destination is also
+  the current default behavior
+- if `AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED` is set, LEDs with no
+  authored layer-color destination fall back to `end_color`
+- if `AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE` is set, the fade lands on the
+  authored solid `end_color` instead
 
-The gradient does not animate during the entire timeout. The first
+The timeout fade does not animate during the entire timeout. The first
 `AUTOMOUSE_RGB_DEAD_TIME` milliseconds are dead time, and only the remaining
 span animates. `AUTOMOUSE_RGB_DEAD_TIME` is configurable in the active keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), so a
 profile can trade off smoother animation against less flicker while the
 trackball is still actively being used.
+
+One practical caveat: the runtime can only blend between layer-stage colors it
+controls. If an LED's post-timeout destination is just the underlying base RGB
+effect and no `end_color` fallback or override is configured, that LED hands
+off at the end of the timeout instead of alpha-fading into the base effect.
 
 ### `feedback_*_color`
 
@@ -158,17 +171,16 @@ the flash-phase bit used to keep both halves in sync.
 
 [`rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c) applies RGB in a deliberate order:
 
-1. the preview layer color, if one is active and that layer has a nonzero
-   solid color
-2. otherwise, active non-base layers compose from low to high:
+1. active non-base layers compose from low to high:
    full-board layer colors wash the whole board, and mapped-only layers paint
    only the LEDs owned by that layer's non-transparent keys
-3. the auto-mouse gradient on the configured auto-mouse layer, if no solid
-   layer color was painted
-4. per-layer LED groups
-5. the first active pointing-device mode color on the right half
-6. per-mode LED groups
-7. the key-behavior feedback overlay on both halves
+2. if the auto-mouse layer is active, that layer stage is blended toward its
+   destination state instead of being painted as a fixed separate gradient
+3. per-layer preview overlay, if one is active and that layer has a nonzero
+   solid color
+4. the first active pointing-device mode color on the right half
+5. per-mode LED groups
+6. the key-behavior feedback overlay on both halves
 
 That order matters.
 
@@ -185,6 +197,8 @@ Examples:
 [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c):
 
 - `pd_mode_color_t`
+- `layer_color_config_t`
+- `automouse_rgb_config_t`
 - `layer_led_group_t`
 - `pd_mode_led_group_t`
 
@@ -223,9 +237,12 @@ Edit the matching row in `pd_mode_colors[]`.
 1. Define a `uint8_t` LED index array.
 2. Add a row to `pd_mode_led_groups[]`.
 
-### Change the auto-mouse gradient
+### Change the auto-mouse timeout fade
 
-Edit `automouse_color_start` and `automouse_color_end`.
+Edit the `LAYER_POINTER` row in `layer_colors[]` to change the start state.
+Edit `automouse_rgb_config` if you want the timeout to land on an authored
+solid `end_color` instead of the real post-timeout layer state, or if you want
+an `end_color` fallback on LEDs with no authored layer destination underneath.
 
 If you want to change the timing model instead of just the colors, look at:
 

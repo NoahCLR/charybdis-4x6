@@ -4,8 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/rgb/rgb_automouse.h"
 #include "users/noah/lib/rgb/rgb_runtime.h"
 #include "users/noah/lib/rgb/rgb_helpers.h"
+
+#ifndef RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
+#    define RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE 0
+#endif
+#ifndef RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+#    define RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED 0
+#endif
 
 enum test_layers {
     LAYER_BASE = 0,
@@ -21,19 +29,25 @@ layer_state_t layer_state;
 
 static uint16_t test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static rgb_t    led_output[RGB_MATRIX_LED_COUNT];
-static uint8_t  fake_preview_layer = UINT8_MAX;
+static uint8_t  fake_preview_layer      = UINT8_MAX;
+static uint16_t fake_auto_mouse_elapsed = 0;
+static bool     fake_pd_mode_locked     = false;
 
 led_config_t g_led_config = {0};
 
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
-    [LAYER_BASE] = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE}, [LAYER_NUM] = {.color = {10, 20, 30}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, [LAYER_SYM] = {.color = {40, 50, 60}, .flags = LAYER_COLOR_FLAG_NONE}, [LAYER_NAV] = {.color = {70, 80, 90}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, [LAYER_POINTER] = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE},
+    [LAYER_BASE] = {.color = {0, 0, 0}, .flags = LAYER_COLOR_FLAG_NONE}, [LAYER_NUM] = {.color = {10, 20, 30}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, [LAYER_SYM] = {.color = {40, 50, 60}, .flags = LAYER_COLOR_FLAG_NONE}, [LAYER_NAV] = {.color = {70, 80, 90}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY}, [LAYER_POINTER] = {.color = {100, 110, 120}, .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY},
 };
 
-const layer_led_group_t layer_led_groups[1]              = {0};
-const uint8_t           layer_led_group_count            = 0;
-const hsv_t             feedback_multi_tap_pending_color = {1, 2, 3};
-const hsv_t             feedback_hold_active_color       = {4, 5, 6};
-const hsv_t             feedback_long_hold_active_color  = {7, 8, 9};
+const layer_led_group_t      layer_led_groups[1]   = {0};
+const uint8_t                layer_led_group_count = 0;
+const automouse_rgb_config_t automouse_rgb_config  = {
+    .flags     = (RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE ? AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE : 0) | (RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED ? AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED : 0),
+    .end_color = {200, 210, 220},
+};
+const hsv_t feedback_multi_tap_pending_color = {1, 2, 3};
+const hsv_t feedback_hold_active_color       = {4, 5, 6};
+const hsv_t feedback_long_hold_active_color  = {7, 8, 9};
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -51,11 +65,35 @@ static rgb_t rgb_from_hsv(hsv_t hsv) {
     return (rgb_t){.r = hsv.h, .g = hsv.s, .b = hsv.v};
 }
 
+static rgb_t rgb_blend(rgb_t start, rgb_t end, uint8_t amount) {
+    uint32_t inv = (uint32_t)UINT8_MAX - amount;
+
+    return (rgb_t){
+        .r = (uint8_t)(((uint32_t)start.r * inv + (uint32_t)end.r * amount + (UINT8_MAX / 2u)) / UINT8_MAX),
+        .g = (uint8_t)(((uint32_t)start.g * inv + (uint32_t)end.g * amount + (UINT8_MAX / 2u)) / UINT8_MAX),
+        .b = (uint8_t)(((uint32_t)start.b * inv + (uint32_t)end.b * amount + (UINT8_MAX / 2u)) / UINT8_MAX),
+    };
+}
+
+static uint8_t automouse_blend_amount_from_elapsed(uint16_t elapsed) {
+    uint16_t progress = automouse_rgb_progress(elapsed);
+    if (fake_pd_mode_locked) {
+        progress = 0;
+    }
+    if (progress > AUTOMOUSE_RGB_ACTIVE_SPAN) {
+        progress = AUTOMOUSE_RGB_ACTIVE_SPAN;
+    }
+
+    return automouse_rgb_blend_amount(progress);
+}
+
 static void test_reset(void) {
     memset(test_keymap, 0, sizeof(test_keymap));
     memset(led_output, 0, sizeof(led_output));
-    layer_state        = 0;
-    fake_preview_layer = UINT8_MAX;
+    layer_state             = 0;
+    fake_preview_layer      = UINT8_MAX;
+    fake_auto_mouse_elapsed = 0;
+    fake_pd_mode_locked     = false;
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
@@ -100,6 +138,18 @@ uint8_t key_feedback_pack(void) {
 
 uint8_t key_feedback_preview_layer(void) {
     return fake_preview_layer;
+}
+
+uint8_t get_auto_mouse_layer(void) {
+    return LAYER_POINTER;
+}
+
+uint16_t auto_mouse_get_time_elapsed(void) {
+    return fake_auto_mouse_elapsed;
+}
+
+bool pd_any_mode_locked(void) {
+    return fake_pd_mode_locked;
 }
 
 void rgb_matrix_set_color(int index, uint8_t red, uint8_t green, uint8_t blue) {
@@ -200,10 +250,113 @@ static void test_preview_layer_overlays_existing_active_layers(void) {
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
+#if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+static void test_automouse_fades_pointer_layer_into_underlying_layers(void) {
+    test_reset();
+
+    test_keymap[LAYER_POINTER][0][0] = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1] = 0x0041u;
+    test_keymap[LAYER_NAV][0][1]     = 0x0030u;
+    test_keymap[LAYER_NAV][0][2]     = 0x0031u;
+
+    layer_state             = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_POINTER);
+    fake_auto_mouse_elapsed = AUTOMOUSE_RGB_DEAD_TIME + (AUTOMOUSE_RGB_ACTIVE_SPAN / 2u);
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    rgb_t pointer_rgb = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
+    rgb_t nav_rgb     = rgb_from_hsv(layer_colors[LAYER_NAV].color);
+    rgb_t blended     = rgb_blend(pointer_rgb, nav_rgb, automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed));
+
+    check_led(0, pointer_rgb);
+    check_led(1, blended);
+    check_led(2, nav_rgb);
+    check_led(3, (rgb_t){0, 0, 0});
+}
+
+static void test_automouse_hands_off_unmapped_leds_at_timeout_end(void) {
+    test_reset();
+
+    test_keymap[LAYER_POINTER][0][0] = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1] = 0x0041u;
+    test_keymap[LAYER_NAV][0][1]     = 0x0030u;
+    test_keymap[LAYER_NAV][0][2]     = 0x0031u;
+
+    layer_state             = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_POINTER);
+    fake_auto_mouse_elapsed = AUTO_MOUSE_TIME;
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    check_led(0, (rgb_t){0, 0, 0});
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_NAV].color));
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_NAV].color));
+    check_led(3, (rgb_t){0, 0, 0});
+}
+#endif
+
+#if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+static void test_automouse_end_fill_unpainted_preserves_layer_destinations(void) {
+    test_reset();
+
+    test_keymap[LAYER_POINTER][0][0] = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1] = 0x0041u;
+    test_keymap[LAYER_NAV][0][1]     = 0x0030u;
+    test_keymap[LAYER_NAV][0][2]     = 0x0031u;
+
+    layer_state             = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_POINTER);
+    fake_auto_mouse_elapsed = AUTOMOUSE_RGB_DEAD_TIME + (AUTOMOUSE_RGB_ACTIVE_SPAN / 2u);
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    rgb_t   pointer_rgb  = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
+    rgb_t   nav_rgb      = rgb_from_hsv(layer_colors[LAYER_NAV].color);
+    rgb_t   end_fallback = rgb_from_hsv(automouse_rgb_config.end_color);
+    uint8_t blend        = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
+
+    check_led(0, rgb_blend(pointer_rgb, end_fallback, blend));
+    check_led(1, rgb_blend(pointer_rgb, nav_rgb, blend));
+    check_led(2, nav_rgb);
+    check_led(3, end_fallback);
+}
+#endif
+
+#if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
+static void test_automouse_end_override_replaces_layer_stack_destination(void) {
+    test_reset();
+
+    test_keymap[LAYER_POINTER][0][0] = 0x0040u;
+    test_keymap[LAYER_NAV][0][1]     = 0x0030u;
+
+    layer_state             = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_POINTER);
+    fake_auto_mouse_elapsed = AUTOMOUSE_RGB_DEAD_TIME + (AUTOMOUSE_RGB_ACTIVE_SPAN / 2u);
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    rgb_t   pointer_rgb  = rgb_from_hsv(layer_colors[LAYER_POINTER].color);
+    rgb_t   nav_rgb      = rgb_from_hsv(layer_colors[LAYER_NAV].color);
+    rgb_t   end_override = rgb_from_hsv(automouse_rgb_config.end_color);
+    uint8_t blend        = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
+
+    check_led(0, rgb_blend(pointer_rgb, end_override, blend));
+    check_led(1, rgb_blend(nav_rgb, end_override, blend));
+    check_led(2, end_override);
+}
+#endif
+
 int main(void) {
     test_mapped_only_layers_compose_in_layer_order();
     test_full_board_layer_fills_gaps_under_mapped_only_layer();
     test_invalidating_layer_map_refreshes_dynamic_keymap_coverage();
     test_preview_layer_overlays_existing_active_layers();
+#if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+    test_automouse_fades_pointer_layer_into_underlying_layers();
+    test_automouse_hands_off_unmapped_leds_at_timeout_end();
+#endif
+#if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
+    test_automouse_end_fill_unpainted_preserves_layer_destinations();
+#endif
+#if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
+    test_automouse_end_override_replaces_layer_stack_destination();
+#endif
     return 0;
 }
