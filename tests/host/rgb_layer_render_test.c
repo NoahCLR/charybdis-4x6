@@ -424,8 +424,8 @@ static void test_automouse_uses_configured_target_layer(void) {
 static void test_timeout_end_keeps_automouse_at_destination_on_master(void) {
     test_reset();
 
-    ws2812_leds[0] = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
-    ws2812_leds[1] = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
+    ws2812_leds[0]                   = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[1]                   = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
     test_keymap[LAYER_POINTER][0][0] = 0x0040u;
     test_keymap[LAYER_POINTER][0][1] = 0x0041u;
     fake_auto_mouse_active           = false;
