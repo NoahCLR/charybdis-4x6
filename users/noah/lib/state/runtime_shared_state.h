@@ -50,8 +50,8 @@ typedef struct {
     }
 
 typedef struct {
-    active_key_state_t          active_key;
-    multi_tap_t                 multi_tap;
+    active_key_state_t           active_key;
+    multi_tap_t                  multi_tap;
     key_runtime_feedback_state_t feedback;
 } key_runtime_shared_state_t;
 

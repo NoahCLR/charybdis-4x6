@@ -15,7 +15,7 @@
 _Static_assert(offsetof(keyrecord_t, event) == 0, "keyrecord_t.event must remain the first field");
 
 static void qmk_contract_field_smoke(void) {
-    keyrecord_t   record = {0};
+    keyrecord_t    record = {0};
     report_mouse_t report = {0};
 
     (void)record.event.key.row;

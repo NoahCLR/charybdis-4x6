@@ -36,20 +36,20 @@ typedef struct {
     union {
         uint16_t action;
         struct {
-            keypos_t  key_pos;
-            uint16_t  action;
+            keypos_t key_pos;
+            uint16_t action;
         } held_action;
         keypos_t key_pos;
         struct {
-            keypos_t  key_pos;
-            uint16_t  action;
-            uint16_t  repeat_hz;
+            keypos_t key_pos;
+            uint16_t action;
+            uint16_t repeat_hz;
         } repeat;
         struct {
             keypos_t key_pos;
             uint8_t  layer;
         } layer_press;
-        bool long_hold_level;
+        bool           long_hold_level;
         pd_mode_mask_t pd_mode;
         struct {
             uint16_t              action;

@@ -18,16 +18,16 @@ static pd_mode_mask_t fake_pd_locked_flags;
 static uint8_t        fake_key_feedback_flags;
 static uint8_t        fake_key_preview_layer;
 
-static uint8_t                    rpc_register_count;
-static int8_t                     rpc_registered_id;
-static slave_callback_t           rpc_registered_callback;
-static uint8_t                    rpc_send_count;
-static int8_t                     rpc_last_send_id;
-static uint8_t                    rpc_last_send_size;
+static uint8_t                     rpc_register_count;
+static int8_t                      rpc_registered_id;
+static slave_callback_t            rpc_registered_callback;
+static uint8_t                     rpc_send_count;
+static int8_t                      rpc_last_send_id;
+static uint8_t                     rpc_last_send_size;
 static split_runtime_sync_packet_t rpc_last_packet;
-static bool                       fake_rpc_send_result = true;
+static bool                        fake_rpc_send_result = true;
 
-static uint8_t       remote_snapshot_apply_count;
+static uint8_t        remote_snapshot_apply_count;
 static pd_mode_mask_t remote_snapshot_active;
 static pd_mode_mask_t remote_snapshot_locked;
 
@@ -36,11 +36,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static void test_reset_stubs(void) {
@@ -253,12 +253,12 @@ static void test_automouse_progress_quantizes_concrete_boundaries(void) {
 
 static void test_slave_rpc_applies_exact_packet_and_snapshot(void) {
     split_runtime_sync_packet_t packet = {
-        .automouse_progress  = 42u,
-        .automouse_flags     = SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_ACTIVE,
-        .pd_mode_flags       = PD_MODE_ARROW,
+        .automouse_progress   = 42u,
+        .automouse_flags      = SPLIT_RUNTIME_SYNC_AUTOMOUSE_FLAG_ACTIVE,
+        .pd_mode_flags        = PD_MODE_ARROW,
         .pd_mode_locked_flags = PD_MODE_VOLUME,
-        .key_feedback_flags  = KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE,
-        .key_preview_layer   = 6u,
+        .key_feedback_flags   = KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE,
+        .key_preview_layer    = 6u,
     };
 
     test_reset_stubs();

@@ -21,8 +21,8 @@ static bool sniping_enabled;
 
 static uint8_t split_sync_count;
 
-static uint8_t keyboard_mod_register_count;
-static uint8_t keyboard_mod_unregister_count;
+static uint8_t  keyboard_mod_register_count;
+static uint8_t  keyboard_mod_unregister_count;
 static uint16_t last_registered_keycode;
 static uint16_t last_unregistered_keycode;
 
@@ -41,11 +41,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static void test_reset_runtime(void) {
@@ -55,23 +55,23 @@ static void test_reset_runtime(void) {
 static void test_reset_stubs(void) {
     test_reset_runtime();
 
-    current_cpi                  = 0;
-    cpi_set_count                = 0;
-    default_dpi                  = 900;
-    dragscroll_enabled           = false;
-    sniping_enabled              = false;
-    split_sync_count             = 0;
-    keyboard_mod_register_count  = 0;
+    current_cpi                   = 0;
+    cpi_set_count                 = 0;
+    default_dpi                   = 900;
+    dragscroll_enabled            = false;
+    sniping_enabled               = false;
+    split_sync_count              = 0;
+    keyboard_mod_register_count   = 0;
     keyboard_mod_unregister_count = 0;
-    last_registered_keycode      = KC_NO;
-    last_unregistered_keycode    = KC_NO;
-    arrow_key_handler_count      = 0;
-    arrow_key_handler_result     = false;
-    reset_volume_count           = 0;
-    reset_brightness_count       = 0;
-    reset_zoom_count             = 0;
-    reset_arrow_count            = 0;
-    split_runtime_sync_remote    = (split_runtime_sync_packet_t){0};
+    last_registered_keycode       = KC_NO;
+    last_unregistered_keycode     = KC_NO;
+    arrow_key_handler_count       = 0;
+    arrow_key_handler_result      = false;
+    reset_volume_count            = 0;
+    reset_brightness_count        = 0;
+    reset_zoom_count              = 0;
+    reset_arrow_count             = 0;
+    split_runtime_sync_remote     = (split_runtime_sync_packet_t){0};
 }
 
 void split_runtime_sync_init(void) {}
@@ -241,9 +241,9 @@ static void test_handle_keycode_press_and_release_updates_state_and_syncs(void) 
 
     pd_mode_lock(PD_MODE_ARROW);
     pd_mode_activate(PD_MODE_VOLUME);
-    reset_arrow_count = 0;
+    reset_arrow_count  = 0;
     reset_volume_count = 0;
-    split_sync_count = 0;
+    split_sync_count   = 0;
 
     CHECK(pd_mode_handle_keycode_press(BRIGHTNESS_MODE));
     CHECK(split_sync_count == 1);
@@ -263,7 +263,7 @@ static void test_locked_mode_release_keeps_mode_active(void) {
     test_reset_stubs();
 
     pd_mode_lock(PD_MODE_VOLUME);
-    split_sync_count = 0;
+    split_sync_count   = 0;
     reset_volume_count = 0;
 
     CHECK(pd_mode_handle_keycode_release(VOLUME_MODE));
@@ -279,8 +279,8 @@ static void test_apply_active_dpi_respects_pointer_state(void) {
     pd_mode_activate(PD_MODE_VOLUME);
     CHECK(current_cpi == PD_MODE_VOLUME_DPI);
 
-    cpi_set_count = 0;
-    current_cpi   = 7777;
+    cpi_set_count      = 0;
+    current_cpi        = 7777;
     dragscroll_enabled = true;
     pd_mode_apply_active_dpi();
     CHECK(current_cpi == 7777);
@@ -319,10 +319,11 @@ static void test_pinch_mode_registers_gui_and_dragscroll_side_effects(void) {
 
 static void test_active_key_handler_only_runs_for_active_modes(void) {
     keyrecord_t record = {
-        .event = {
-            .key = {.row = 1, .col = 2},
-            .pressed = true,
-        },
+        .event =
+            {
+                .key     = {.row = 1, .col = 2},
+                .pressed = true,
+            },
     };
 
     test_reset_stubs();

@@ -9,18 +9,18 @@
 #include "users/noah/lib/key/key_runtime_transition.h"
 
 enum {
-    TEST_PLAIN_KEY            = 0x0004,
-    TEST_MULTI_TAP_KEY        = SAFE_RANGE + 0x10,
-    TEST_PD_MODE_KEY          = SAFE_RANGE + 0x11,
-    TEST_PREVIOUS_KEY         = SAFE_RANGE + 0x12,
-    TEST_NEW_KEY              = SAFE_RANGE + 0x13,
-    TEST_PREVIOUS_TAP_ACTION  = SAFE_RANGE + 0x14,
-    TEST_MULTI_STEP_ACTION    = SAFE_RANGE + 0x15,
-    TEST_IMMEDIATE_HOLD       = SAFE_RANGE + 0x16,
-    TEST_THRESHOLD_HOLD       = SAFE_RANGE + 0x17,
-    TEST_MULTI_TAP_HOLD       = SAFE_RANGE + 0x18,
-    TEST_FALLBACK_TAP_ACTION  = SAFE_RANGE + 0x19,
-    TEST_LAYER_LOCK_ACTION    = SAFE_RANGE + 0x1A,
+    TEST_PLAIN_KEY           = 0x0004,
+    TEST_MULTI_TAP_KEY       = SAFE_RANGE + 0x10,
+    TEST_PD_MODE_KEY         = SAFE_RANGE + 0x11,
+    TEST_PREVIOUS_KEY        = SAFE_RANGE + 0x12,
+    TEST_NEW_KEY             = SAFE_RANGE + 0x13,
+    TEST_PREVIOUS_TAP_ACTION = SAFE_RANGE + 0x14,
+    TEST_MULTI_STEP_ACTION   = SAFE_RANGE + 0x15,
+    TEST_IMMEDIATE_HOLD      = SAFE_RANGE + 0x16,
+    TEST_THRESHOLD_HOLD      = SAFE_RANGE + 0x17,
+    TEST_MULTI_TAP_HOLD      = SAFE_RANGE + 0x18,
+    TEST_FALLBACK_TAP_ACTION = SAFE_RANGE + 0x19,
+    TEST_LAYER_LOCK_ACTION   = SAFE_RANGE + 0x1A,
 };
 
 typedef enum {
@@ -38,11 +38,11 @@ typedef enum {
 } test_call_kind_t;
 
 typedef struct {
-    test_call_kind_t     kind;
-    uint16_t             action;
-    keypos_t             key_pos;
-    uint8_t              layer;
-    bool                 long_hold_level;
+    test_call_kind_t      kind;
+    uint16_t              action;
+    keypos_t              key_pos;
+    uint8_t               layer;
+    bool                  long_hold_level;
     delayed_action_mods_t mods;
 } test_call_t;
 
@@ -85,11 +85,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static keypos_t test_keypos(uint8_t row, uint8_t col) {
@@ -172,11 +172,11 @@ static void test_reset_runtime(void) {
 }
 
 static void test_reset_stubs(void) {
-    fake_time                          = 1000;
-    fake_mods                          = 0;
-    fake_weak_mods                     = 0;
-    fake_oneshot_mods                  = 0;
-    fake_oneshot_locked_mods           = 0;
+    fake_time                         = 1000;
+    fake_mods                         = 0;
+    fake_weak_mods                    = 0;
+    fake_oneshot_mods                 = 0;
+    fake_oneshot_locked_mods          = 0;
     held_action_survives_flush_result = false;
 
     memset(test_calls, 0, sizeof(test_calls));
@@ -377,9 +377,10 @@ static void test_flush_multi_tap_prefers_exact_step_tap(void) {
     key_runtime_transition_plan_t plan;
 
     test_reset_stubs();
-    test_add_behavior_step(TEST_MULTI_TAP_KEY, 2, (key_behavior_step_t){
-                                                  .tap = TAP_SENDS(TEST_MULTI_STEP_ACTION),
-                                              });
+    test_add_behavior_step(TEST_MULTI_TAP_KEY, 2,
+                           (key_behavior_step_t){
+                               .tap = TAP_SENDS(TEST_MULTI_STEP_ACTION),
+                           });
 
     multi_tap = (multi_tap_t){
         .keycode       = TEST_MULTI_TAP_KEY,
@@ -403,7 +404,7 @@ static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
 
     test_reset_stubs();
     test_add_pd_mode_mapping(TEST_PD_MODE_KEY, PD_MODE_VOLUME);
-    pd_locked_modes   = PD_MODE_VOLUME;
+    pd_locked_modes = PD_MODE_VOLUME;
 
     active_key = (active_key_state_t){
         .timer                       = (uint16_t)(fake_time - 50),
@@ -412,11 +413,12 @@ static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
         .held_action_keycode         = TEST_PD_MODE_KEY,
         .tap_hold_term               = 150,
         .pd_mode_was_locked_on_press = true,
-        .hold                        = {
-            .present = true,
-            .action  = TEST_PD_MODE_KEY,
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-        },
+        .hold =
+            {
+                .present = true,
+                .action  = TEST_PD_MODE_KEY,
+                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            },
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -450,11 +452,12 @@ static void test_quick_release_immediate_hold_unregisters_then_taps(void) {
         .held_action_keycode = TEST_IMMEDIATE_HOLD,
         .tap_action          = TEST_FALLBACK_TAP_ACTION,
         .tap_hold_term       = 150,
-        .hold                = {
-            .present = true,
-            .action  = TEST_IMMEDIATE_HOLD,
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-        },
+        .hold =
+            {
+                .present = true,
+                .action  = TEST_IMMEDIATE_HOLD,
+                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            },
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -641,9 +644,10 @@ static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
 
     test_reset_stubs();
     key.behavior.has_multi_tap = true;
-    test_add_behavior_step(KC_RIGHT_ALT, 2, (key_behavior_step_t){
-                                                .tap = TAP_SENDS(TEST_MULTI_STEP_ACTION),
-                                            });
+    test_add_behavior_step(KC_RIGHT_ALT, 2,
+                           (key_behavior_step_t){
+                               .tap = TAP_SENDS(TEST_MULTI_STEP_ACTION),
+                           });
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record_1, key, false, &plan));
@@ -941,11 +945,12 @@ static void test_scan_commits_immediate_hold_threshold_with_feedback(void) {
         .key_pos             = test_keypos(5, 0),
         .held_action_keycode = TEST_IMMEDIATE_HOLD,
         .tap_hold_term       = 120,
-        .hold                = {
-            .present = true,
-            .action  = TEST_IMMEDIATE_HOLD,
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-        },
+        .hold =
+            {
+                .present = true,
+                .action  = TEST_IMMEDIATE_HOLD,
+                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            },
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -974,11 +979,12 @@ static void test_scan_commits_implicit_hold_without_feedback(void) {
         .held_action_keycode = TEST_PD_MODE_KEY,
         .tap_hold_term       = 120,
         .implicit_hold       = true,
-        .hold                = {
-            .present = true,
-            .action  = TEST_PD_MODE_KEY,
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-        },
+        .hold =
+            {
+                .present = true,
+                .action  = TEST_PD_MODE_KEY,
+                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            },
     };
 
     key_runtime_transition_plan_init(&plan);

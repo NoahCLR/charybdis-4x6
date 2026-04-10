@@ -23,24 +23,24 @@ static uint8_t  fake_oneshot_locked_mods;
 static uint16_t integration_hold_modifier;
 static uint8_t  integration_expected_mask;
 
-static uint8_t  send_keyboard_report_count;
-static uint8_t  register_code_count;
-static uint8_t  unregister_code_count;
-static uint8_t  last_registered_keycode;
-static uint8_t  last_registered_mods;
-static uint8_t  last_unregistered_keycode;
-static uint8_t  last_unregistered_mods;
+static uint8_t send_keyboard_report_count;
+static uint8_t register_code_count;
+static uint8_t unregister_code_count;
+static uint8_t last_registered_keycode;
+static uint8_t last_registered_mods;
+static uint8_t last_unregistered_keycode;
+static uint8_t last_unregistered_mods;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static keypos_t test_keypos(uint8_t row, uint8_t col) {
@@ -265,8 +265,7 @@ void key_feedback_pulse_arm(bool long_hold_level) {
     (void)long_hold_level;
 }
 
-void split_runtime_sync(void) {
-}
+void split_runtime_sync(void) {}
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     (void)key_pos;
@@ -294,9 +293,9 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
 }
 
 static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifier, uint8_t expected_mask) {
-    handled_key_view_t key          = test_handled_key();
-    keypos_t           source_pos   = test_keypos(1, 1);
-    keyrecord_t        press_record = test_record(source_pos, true);
+    handled_key_view_t key            = test_handled_key();
+    keypos_t           source_pos     = test_keypos(1, 1);
+    keyrecord_t        press_record   = test_record(source_pos, true);
     keyrecord_t        release_record = test_record(source_pos, false);
 
     integration_hold_modifier = modifier;

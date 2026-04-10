@@ -38,8 +38,8 @@ static uint8_t              synthetic_tap_call_count;
 static literal_tap_call_t literal_tap_calls[TEST_MAX_CALLS];
 static uint8_t            literal_tap_call_count;
 
-static uint8_t  fallback_hold_activation_count;
-static bool     fallback_hold_active;
+static uint8_t fallback_hold_activation_count;
+static bool    fallback_hold_active;
 
 static uint8_t  keyboard_mod_register_count;
 static uint8_t  keyboard_mod_unregister_count;
@@ -51,11 +51,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static void test_clear_logs(void) {
@@ -74,9 +74,9 @@ static void test_clear_logs(void) {
 }
 
 static void test_reset_stubs(void) {
-    fake_mods               = 0;
-    fake_weak_mods          = 0;
-    fake_oneshot_mods       = 0;
+    fake_mods                = 0;
+    fake_weak_mods           = 0;
+    fake_oneshot_mods        = 0;
     fake_oneshot_locked_mods = 0;
 
     test_clear_logs();

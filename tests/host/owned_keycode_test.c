@@ -28,21 +28,21 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static void test_reset_stubs(void) {
-    register_code_count   = 0;
-    unregister_code_count = 0;
-    mod_register_count    = 0;
-    mod_unregister_count  = 0;
-    register_mods_count   = 0;
-    unregister_mods_count = 0;
-    wait_call_count       = 0;
+    register_code_count       = 0;
+    unregister_code_count     = 0;
+    mod_register_count        = 0;
+    mod_unregister_count      = 0;
+    register_mods_count       = 0;
+    unregister_mods_count     = 0;
+    wait_call_count           = 0;
     pointer_action_call_count = 0;
 }
 

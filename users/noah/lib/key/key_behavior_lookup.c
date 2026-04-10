@@ -103,11 +103,11 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
 }
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
-    const key_behavior_t *config    = key_behavior_config_lookup(keycode);
-    bool                  is_mo     = IS_QK_MOMENTARY(keycode);
-    bool                  is_lt     = IS_QK_LAYER_TAP(keycode);
+    const key_behavior_t *config     = key_behavior_config_lookup(keycode);
+    bool                  is_mo      = IS_QK_MOMENTARY(keycode);
+    bool                  is_lt      = IS_QK_LAYER_TAP(keycode);
     bool                  is_pd_mode = pd_mode_for_keycode(keycode) != 0;
-    bool                  custom_lt = is_lt && config;
+    bool                  custom_lt  = is_lt && config;
 
     uint16_t tap_term = CUSTOM_TAP_HOLD_TERM;
     if (config && config->tap_hold_term) {

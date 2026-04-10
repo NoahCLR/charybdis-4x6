@@ -8,15 +8,15 @@
 #include "users/noah/lib/key/held_action.h"
 
 enum {
-    TEST_SHARED_ACTION      = SAFE_RANGE + 0x40,
-    TEST_SECOND_ACTION      = SAFE_RANGE + 0x41,
-    TEST_PER_KEY_ACTION     = SAFE_RANGE + 0x42,
-    TEST_PRESS_ONLY_ACTION  = SAFE_RANGE + 0x43,
+    TEST_SHARED_ACTION     = SAFE_RANGE + 0x40,
+    TEST_SECOND_ACTION     = SAFE_RANGE + 0x41,
+    TEST_PER_KEY_ACTION    = SAFE_RANGE + 0x42,
+    TEST_PRESS_ONLY_ACTION = SAFE_RANGE + 0x43,
 };
 
 typedef struct {
-    keypos_t  key_pos;
-    uint16_t  action;
+    keypos_t key_pos;
+    uint16_t action;
 } action_call_t;
 
 typedef struct {
@@ -28,30 +28,30 @@ typedef struct {
     bool     pressed;
 } pointer_action_call_t;
 
-static action_call_t press_calls[16];
-static action_call_t release_calls[16];
-static tap_call_t    tap_calls[32];
+static action_call_t         press_calls[16];
+static action_call_t         release_calls[16];
+static tap_call_t            tap_calls[32];
 static pointer_action_call_t pointer_action_calls[16];
-static uint8_t       press_call_count;
-static uint8_t       release_call_count;
-static uint8_t       tap_call_count;
-static uint8_t       pointer_action_call_count;
-static uint16_t      mod_register_calls[16];
-static uint16_t      mod_unregister_calls[16];
-static uint8_t       mod_register_count;
-static uint8_t       mod_unregister_count;
-static uint16_t      fake_time;
+static uint8_t               press_call_count;
+static uint8_t               release_call_count;
+static uint8_t               tap_call_count;
+static uint8_t               pointer_action_call_count;
+static uint16_t              mod_register_calls[16];
+static uint16_t              mod_unregister_calls[16];
+static uint8_t               mod_register_count;
+static uint8_t               mod_unregister_count;
+static uint16_t              fake_time;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static keypos_t test_keypos(uint8_t row, uint8_t col) {
@@ -62,13 +62,13 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 }
 
 static void test_reset_stubs(void) {
-    press_call_count    = 0;
-    release_call_count  = 0;
-    tap_call_count      = 0;
+    press_call_count          = 0;
+    release_call_count        = 0;
+    tap_call_count            = 0;
     pointer_action_call_count = 0;
-    mod_register_count  = 0;
-    mod_unregister_count = 0;
-    fake_time           = 1000;
+    mod_register_count        = 0;
+    mod_unregister_count      = 0;
+    fake_time                 = 1000;
 }
 
 noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {

@@ -32,10 +32,10 @@ typedef enum {
 } active_key_release_outcome_t;
 
 typedef struct {
-    bool                        release_owned_state;
+    bool                         release_owned_state;
     active_key_release_outcome_t outcome;
-    uint16_t                    action;
-    pd_mode_mask_t              pd_mode_lock_tap;
+    uint16_t                     action;
+    pd_mode_mask_t               pd_mode_lock_tap;
 } active_key_release_resolution_t;
 
 typedef enum {
@@ -45,13 +45,13 @@ typedef enum {
 } active_key_scan_outcome_t;
 
 typedef struct {
-    bool                    commit_immediate_hold;
-    bool                    immediate_hold_needs_feedback;
-    bool                    immediate_hold_completes_hold;
-    bool                    activate_fallback_hold;
+    bool                      commit_immediate_hold;
+    bool                      immediate_hold_needs_feedback;
+    bool                      immediate_hold_completes_hold;
+    bool                      activate_fallback_hold;
     active_key_scan_outcome_t outcome;
-    hold_behavior_t         hold;
-    hold_behavior_t         long_hold;
+    hold_behavior_t           hold;
+    hold_behavior_t           long_hold;
 } active_key_scan_resolution_t;
 
 typedef enum {
@@ -96,82 +96,82 @@ static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan
 
 static void key_runtime_transition_plan_dispatch_action(key_runtime_transition_plan_t *plan, uint16_t action) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind        = KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION,
-                                            .data.action = action,
-                                        });
+                                               .kind        = KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION,
+                                               .data.action = action,
+                                           });
 }
 
 static void key_runtime_transition_plan_held_register(key_runtime_transition_plan_t *plan, keypos_t key_pos, uint16_t action) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind = KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER,
-                                            .data.held_action =
-                                                {
-                                                    .key_pos = key_pos,
-                                                    .action  = action,
-                                                },
-                                        });
+                                               .kind = KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER,
+                                               .data.held_action =
+                                                   {
+                                                       .key_pos = key_pos,
+                                                       .action  = action,
+                                                   },
+                                           });
 }
 
 static void key_runtime_transition_plan_held_unregister(key_runtime_transition_plan_t *plan, keypos_t key_pos, uint16_t action) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind = KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER,
-                                            .data.held_action =
-                                                {
-                                                    .key_pos = key_pos,
-                                                    .action  = action,
-                                                },
-                                        });
+                                               .kind = KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER,
+                                               .data.held_action =
+                                                   {
+                                                       .key_pos = key_pos,
+                                                       .action  = action,
+                                                   },
+                                           });
 }
 
 static void key_runtime_transition_plan_release_owned_state_by_key(key_runtime_transition_plan_t *plan, keypos_t key_pos) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind         = KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
-                                            .data.key_pos = key_pos,
-                                        });
+                                               .kind         = KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+                                               .data.key_pos = key_pos,
+                                           });
 }
 
 static void key_runtime_transition_plan_repeat_start(key_runtime_transition_plan_t *plan, keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind = KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START,
-                                            .data.repeat =
-                                                {
-                                                    .key_pos   = key_pos,
-                                                    .action    = action,
-                                                    .repeat_hz = repeat_hz,
-                                                },
-                                        });
+                                               .kind = KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START,
+                                               .data.repeat =
+                                                   {
+                                                       .key_pos   = key_pos,
+                                                       .action    = action,
+                                                       .repeat_hz = repeat_hz,
+                                                   },
+                                           });
 }
 
 static void key_runtime_transition_plan_layer_press(key_runtime_transition_plan_t *plan, keypos_t key_pos, uint8_t layer) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind = KEY_RUNTIME_TRANSITION_EFFECT_LAYER_PRESS,
-                                            .data.layer_press =
-                                                {
-                                                    .key_pos = key_pos,
-                                                    .layer   = layer,
-                                                },
-                                        });
+                                               .kind = KEY_RUNTIME_TRANSITION_EFFECT_LAYER_PRESS,
+                                               .data.layer_press =
+                                                   {
+                                                       .key_pos = key_pos,
+                                                       .layer   = layer,
+                                                   },
+                                           });
 }
 
 static void key_runtime_transition_plan_layer_release(key_runtime_transition_plan_t *plan, keypos_t key_pos) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind         = KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE,
-                                            .data.key_pos = key_pos,
-                                        });
+                                               .kind         = KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE,
+                                               .data.key_pos = key_pos,
+                                           });
 }
 
 static void key_runtime_transition_plan_feedback_pulse(key_runtime_transition_plan_t *plan, bool long_hold_level) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind                 = KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE,
-                                            .data.long_hold_level = long_hold_level,
-                                        });
+                                               .kind                 = KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE,
+                                               .data.long_hold_level = long_hold_level,
+                                           });
 }
 
 static void key_runtime_transition_plan_pd_mode_lock_tap(key_runtime_transition_plan_t *plan, pd_mode_mask_t mode) {
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind         = KEY_RUNTIME_TRANSITION_EFFECT_PD_MODE_LOCK_TAP,
-                                            .data.pd_mode = mode,
-                                        });
+                                               .kind         = KEY_RUNTIME_TRANSITION_EFFECT_PD_MODE_LOCK_TAP,
+                                               .data.pd_mode = mode,
+                                           });
 }
 
 static void key_runtime_transition_plan_delayed_action(key_runtime_transition_plan_t *plan, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
@@ -180,14 +180,14 @@ static void key_runtime_transition_plan_delayed_action(key_runtime_transition_pl
     }
 
     key_runtime_transition_plan_push(plan, (key_runtime_transition_effect_t){
-                                            .kind = KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION,
-                                            .data.delayed_action =
-                                                {
-                                                    .action       = action,
-                                                    .mods         = mods,
-                                                    .repeat_count = repeat_count,
-                                                },
-                                        });
+                                               .kind = KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION,
+                                               .data.delayed_action =
+                                                   {
+                                                       .action       = action,
+                                                       .mods         = mods,
+                                                       .repeat_count = repeat_count,
+                                                   },
+                                           });
 }
 
 static void key_runtime_transition_activate_pending_fallback_hold(key_runtime_transition_plan_t *plan) {
@@ -301,8 +301,8 @@ bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *rec
 
     key_runtime_transition_flush_active_key(active_held_action_survives_flush, plan);
     active_key_track(keycode, record->event.key, handled_key_tap_action(key), hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false);
-    active_key.implicit_hold = implicit;
-    active_key.fallback_hold_pending = !implicit && handled_key_uses_fallback_hold(key);
+    active_key.implicit_hold               = implicit;
+    active_key.fallback_hold_pending       = !implicit && handled_key_uses_fallback_hold(key);
     active_key.pd_mode_was_locked_on_press = mode && pd_mode_locked(mode);
     key_runtime_transition_activate_immediate_hold_if_needed(record, hold, plan);
     return true;
@@ -353,10 +353,10 @@ static pd_mode_mask_t key_runtime_transition_locked_pd_mode_tap_mode(uint16_t ke
 }
 
 static active_key_release_resolution_t key_runtime_transition_resolve_active_key_release(uint16_t keycode, active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed) {
-    bool                  quick_tap            = key_runtime_transition_release_is_quick_tap(released_key, behavior, elapsed);
-    bool                  quick_immediate_hold = hold_registers_on_press(released_key.hold) && quick_tap;
-    pd_mode_mask_t        lock_tap_mode        = key_runtime_transition_locked_pd_mode_tap_mode(keycode, released_key, elapsed, behavior);
-    active_key_release_resolution_t resolution = {
+    bool                            quick_tap            = key_runtime_transition_release_is_quick_tap(released_key, behavior, elapsed);
+    bool                            quick_immediate_hold = hold_registers_on_press(released_key.hold) && quick_tap;
+    pd_mode_mask_t                  lock_tap_mode        = key_runtime_transition_locked_pd_mode_tap_mode(keycode, released_key, elapsed, behavior);
+    active_key_release_resolution_t resolution           = {
         .release_owned_state = released_key.held_action_keycode != KC_NO || released_key.repeat_binding_active,
     };
 
@@ -543,7 +543,7 @@ static bool key_runtime_transition_process_active_key_release(uint16_t keycode, 
     active_key_state_t released_key = active_key;
     active_key_reset();
 
-    uint16_t                           elapsed    = timer_elapsed(released_key.timer);
+    uint16_t                        elapsed    = timer_elapsed(released_key.timer);
     active_key_release_resolution_t resolution = key_runtime_transition_resolve_active_key_release(keycode, released_key, behavior, elapsed);
 
     key_runtime_transition_apply_active_key_release_resolution(keycode, released_key, behavior, resolution, plan);
@@ -772,14 +772,14 @@ static void key_runtime_transition_apply_pending_multi_tap_scan_resolution(pendi
 
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
     if (active_key.keycode != KC_NO && !active_key.hold_fired) {
-        uint16_t                     elapsed     = timer_elapsed(active_key.timer);
+        uint16_t                     elapsed    = timer_elapsed(active_key.timer);
         active_key_scan_resolution_t resolution = key_runtime_transition_resolve_active_key_scan(active_key, elapsed);
 
         key_runtime_transition_apply_active_key_scan_resolution(resolution, plan);
     }
 
     if (multi_tap_pending_hold(&multi_tap) && active_key.keycode != KC_NO) {
-        uint16_t                           elapsed     = timer_elapsed(multi_tap.timer);
+        uint16_t                            elapsed    = timer_elapsed(multi_tap.timer);
         pending_multi_tap_scan_resolution_t resolution = key_runtime_transition_resolve_pending_multi_tap_scan(active_key, multi_tap, elapsed);
 
         key_runtime_transition_apply_pending_multi_tap_scan_resolution(resolution, plan);

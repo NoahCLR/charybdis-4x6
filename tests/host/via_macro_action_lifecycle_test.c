@@ -36,11 +36,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static void test_log_call(test_call_kind_t kind, uint16_t value, uint8_t interval) {
@@ -56,7 +56,7 @@ static void test_reset_state(void) {
     memset(macro_buffer, 0, sizeof(macro_buffer));
     memset(test_calls, 0, sizeof(test_calls));
     fake_macro_buffer_size = sizeof(macro_buffer);
-    test_call_count = 0;
+    test_call_count        = 0;
 }
 
 uint8_t dynamic_keymap_macro_get_count(void) {
@@ -317,7 +317,7 @@ static void test_zero_sized_macro_buffer_is_ignored(void) {
 
 static void test_non_terminated_macro_buffer_is_ignored(void) {
     test_reset_state();
-    macro_buffer[0]                         = 'A';
+    macro_buffer[0]                          = 'A';
     macro_buffer[TEST_MACRO_BUFFER_SIZE - 1] = 'Z';
 
     noah_action_tap(QK_MACRO_0);

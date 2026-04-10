@@ -24,7 +24,7 @@ enum {
 #define NOAH_PD_MODE_INDEX(name, keycode, handler, key_handler, reset, dpi) PD_MODE_INDEX_##name,
     NOAH_PD_MODE_LIST(NOAH_PD_MODE_INDEX)
 #undef NOAH_PD_MODE_INDEX
-    PD_MODE_COUNT,
+        PD_MODE_COUNT,
 };
 
 enum {

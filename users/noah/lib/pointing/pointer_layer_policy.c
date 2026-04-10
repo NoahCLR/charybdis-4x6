@@ -72,10 +72,10 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 }
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
-    bool          arrow_mode_active   = pointer_layer_policy_arrow_mode_prefers_typing_layer();
-    bool          auto_mouse_anchored = pointer_layer_policy_auto_mouse_anchored();
-    uint8_t       auto_mouse_layer    = get_auto_mouse_layer();
-    layer_state_t auto_mouse_mask     = (layer_state_t)1 << auto_mouse_layer;
+    bool          arrow_mode_active    = pointer_layer_policy_arrow_mode_prefers_typing_layer();
+    bool          auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored();
+    uint8_t       auto_mouse_layer     = get_auto_mouse_layer();
+    layer_state_t auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
     bool          sniping_layer_active = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
 
     // Arrow mode consumes trackball motion as arrows, so keep the keyboard on

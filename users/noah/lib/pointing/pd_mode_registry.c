@@ -118,9 +118,7 @@ static void pinch_mode_unregister_command(void) {
 #endif
 
 #define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, handler, key_handler, reset, dpi) {PD_MODE_##name, keycode, keycode##_LOCK, handler, key_handler, reset, dpi},
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
-    NOAH_PD_MODE_LIST(NOAH_PD_MODE_REGISTRY_ROW)
-};
+const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_REGISTRY_ROW)};
 #undef NOAH_PD_MODE_REGISTRY_ROW
 
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode) {

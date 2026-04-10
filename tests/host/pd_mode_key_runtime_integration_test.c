@@ -8,7 +8,7 @@
 #include "users/noah/lib/pointing/pd_modes.h"
 #include "users/noah/lib/state/runtime_shared_state.h"
 
-const key_behavior_t key_behaviors[1] = {0};
+const key_behavior_t key_behaviors[1]   = {0};
 const uint8_t        key_behavior_count = 0;
 
 static uint16_t fake_time;
@@ -22,11 +22,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static keypos_t test_keypos(uint8_t row, uint8_t col) {
@@ -49,13 +49,13 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 }
 
 static void test_reset_state(void) {
-    noah_runtime_shared_state = (runtime_shared_state_t){0};
+    noah_runtime_shared_state                = (runtime_shared_state_t){0};
     noah_runtime_shared_state.key.active_key = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
 
-    fake_time         = 1000;
-    current_cpi       = 0;
-    default_dpi       = 900;
-    split_sync_count  = 0;
+    fake_time          = 1000;
+    current_cpi        = 0;
+    default_dpi        = 900;
+    split_sync_count   = 0;
     reset_volume_count = 0;
 }
 
@@ -339,7 +339,7 @@ void reset_zoom_mode(void) {}
 void reset_arrow_mode(void) {}
 
 static void test_plain_pd_mode_key_activates_and_deactivates_through_process_record(void) {
-    keypos_t   key_pos        = test_keypos(1, 2);
+    keypos_t    key_pos        = test_keypos(1, 2);
     keyrecord_t press_record   = test_record(key_pos, true);
     keyrecord_t release_record = test_record(key_pos, false);
 

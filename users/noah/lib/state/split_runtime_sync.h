@@ -19,12 +19,12 @@ typedef enum {
 } split_runtime_sync_automouse_flags_t;
 
 typedef struct __attribute__((packed)) {
-    uint16_t automouse_progress;
-    uint8_t automouse_flags;
+    uint16_t       automouse_progress;
+    uint8_t        automouse_flags;
     pd_mode_mask_t pd_mode_flags;
     pd_mode_mask_t pd_mode_locked_flags;
-    uint8_t key_feedback_flags;
-    uint8_t key_preview_layer;
+    uint8_t        key_feedback_flags;
+    uint8_t        key_preview_layer;
 } split_runtime_sync_packet_t;
 
 _Static_assert(sizeof(split_runtime_sync_packet_t) <= UINT8_MAX, "split_runtime_sync_packet_t must fit in the QMK RPC length field");

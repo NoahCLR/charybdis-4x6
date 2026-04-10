@@ -7,10 +7,10 @@
 #include "users/noah/lib/key/key_runtime_state.h"
 #include "users/noah/lib/key/key_runtime_transition.h"
 
-static bool suppress_default;
-static bool tracked_physical_event;
-static bool handled_key_is_handled;
-static bool interrupted_active_key;
+static bool    suppress_default;
+static bool    tracked_physical_event;
+static bool    handled_key_is_handled;
+static bool    interrupted_active_key;
 static uint8_t executed_transition_plan_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -18,11 +18,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 static keypos_t test_keypos(uint8_t row, uint8_t col) {
@@ -45,11 +45,11 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 }
 
 static void test_reset_state(void) {
-    noah_runtime_shared_state = (runtime_shared_state_t){0};
-    suppress_default          = false;
-    tracked_physical_event    = false;
-    handled_key_is_handled    = false;
-    interrupted_active_key    = false;
+    noah_runtime_shared_state      = (runtime_shared_state_t){0};
+    suppress_default               = false;
+    tracked_physical_event         = false;
+    handled_key_is_handled         = false;
+    interrupted_active_key         = false;
     executed_transition_plan_count = 0;
 }
 
@@ -209,8 +209,8 @@ handled_key_view_t handled_key_lookup(uint16_t keycode) {
     return (handled_key_view_t){
         .behavior =
             {
-                .keycode  = keycode,
-                .handled  = handled_key_is_handled,
+                .keycode = keycode,
+                .handled = handled_key_is_handled,
             },
     };
 }
@@ -224,7 +224,7 @@ static void test_active_handled_release_bypasses_modifier_suppression(void) {
     keyrecord_t record = test_record(test_keypos(1, 2), false);
 
     test_reset_state();
-    suppress_default  = true;
+    suppress_default   = true;
     active_key.keycode = KC_RIGHT_ALT;
     active_key.key_pos = record.event.key;
 
@@ -236,7 +236,7 @@ static void test_unrelated_release_stays_suppressed(void) {
     keyrecord_t record = test_record(test_keypos(1, 2), false);
 
     test_reset_state();
-    suppress_default  = true;
+    suppress_default   = true;
     active_key.keycode = KC_RIGHT_ALT;
     active_key.key_pos = test_keypos(1, 3);
 

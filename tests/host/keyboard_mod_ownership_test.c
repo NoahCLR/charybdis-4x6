@@ -15,11 +15,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 uint8_t get_mods(void) {
@@ -78,8 +78,7 @@ void del_mods(uint8_t mods) {
     fake_mods &= (uint8_t)~mods;
 }
 
-void send_keyboard_report(void) {
-}
+void send_keyboard_report(void) {}
 
 void register_mods(uint8_t mods);
 void unregister_mods(uint8_t mods);

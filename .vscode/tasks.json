@@ -49,6 +49,16 @@
                 "iCloud"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "Format repo",
+            "type": "process",
+            "command": "bash",
+            "args": [
+                "-c",
+                "git ls-files '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' | xargs clang-format -i"
+            ],
+            "problemMatcher": []
         }
     ]
 }

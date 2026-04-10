@@ -351,7 +351,7 @@ void held_action_unregister(keypos_t key_pos, uint16_t action) {
 }
 
 void held_action_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
-    uint16_t interval_ms = held_repeat_interval_from_hz(repeat_hz);
+    uint16_t interval_ms          = held_repeat_interval_from_hz(repeat_hz);
     bool     anchor_needs_refresh = true;
 
     if (interval_ms == 0) {

@@ -31,11 +31,11 @@ static void test_fail(const char *expr, const char *file, int line) {
     exit(1);
 }
 
-#define CHECK(expr)            \
-    do {                       \
-        if (!(expr)) {         \
+#define CHECK(expr)                               \
+    do {                                          \
+        if (!(expr)) {                            \
             test_fail(#expr, __FILE__, __LINE__); \
-        }                      \
+        }                                         \
     } while (0)
 
 #define TEST_SEND_STRING_U8(value_) TEST_SEND_STRING_U8_IMPL(value_)
@@ -128,12 +128,7 @@ static void test_encode_emits_expected_qmk_sequence(void) {
     uint16_t written    = 0;
 
     static const uint8_t expected[] = {
-        'A',
-        SS_QMK_PREFIX, SS_DELAY_CODE, '1', '2', '|',
-        SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_LEFT_CTRL),
-        SS_QMK_PREFIX, SS_TAP_CODE, TEST_SEND_STRING_U8(X_C),
-        SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_CTRL),
-        SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_SHIFT),
+        'A', SS_QMK_PREFIX, SS_DELAY_CODE, '1', '2', '|', SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_LEFT_CTRL), SS_QMK_PREFIX, SS_TAP_CODE, TEST_SEND_STRING_U8(X_C), SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_CTRL), SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_SHIFT),
     };
 
     CHECK(macro_payload_encode("A{12}{KC_LCTL,KC_C}{-KC_LSFT}", buffer, sizeof(buffer), &written));
