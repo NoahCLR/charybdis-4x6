@@ -31,6 +31,7 @@ layer_state_t layer_state;
 static uint16_t test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static rgb_t    led_output[RGB_MATRIX_LED_COUNT];
 static uint8_t  fake_preview_layer      = UINT8_MAX;
+static uint8_t  fake_auto_mouse_layer   = LAYER_POINTER;
 static uint16_t fake_auto_mouse_elapsed = 0;
 static bool     fake_pd_mode_locked     = false;
 
@@ -100,6 +101,7 @@ static void test_reset(void) {
     memset(ws2812_leds, 0, sizeof(ws2812_leds));
     layer_state             = 0;
     fake_preview_layer      = UINT8_MAX;
+    fake_auto_mouse_layer   = LAYER_POINTER;
     fake_auto_mouse_elapsed = 0;
     fake_pd_mode_locked     = false;
 
@@ -157,7 +159,7 @@ uint8_t key_feedback_preview_layer(void) {
 }
 
 uint8_t get_auto_mouse_layer(void) {
-    return LAYER_POINTER;
+    return fake_auto_mouse_layer;
 }
 
 uint16_t auto_mouse_get_time_elapsed(void) {
@@ -274,6 +276,35 @@ static void test_preview_layer_overlays_existing_active_layers(void) {
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
+static void test_automouse_uses_configured_target_layer(void) {
+    test_reset();
+
+    fake_auto_mouse_layer     = LAYER_NAV;
+    test_keymap[LAYER_NAV][0][0] = 0x0030u;
+    test_keymap[LAYER_NAV][0][1] = 0x0031u;
+
+    layer_state             = ((layer_state_t)1u << LAYER_SYM) | ((layer_state_t)1u << LAYER_NAV);
+    fake_auto_mouse_elapsed = AUTOMOUSE_RGB_DEAD_TIME + (AUTOMOUSE_RGB_ACTIVE_SPAN / 2u);
+
+    CHECK(render_output());
+
+    rgb_t   nav_rgb       = rgb_from_hsv(layer_colors[LAYER_NAV].color);
+    rgb_t   sym_rgb       = rgb_from_hsv(layer_colors[LAYER_SYM].color);
+    uint8_t blend         = automouse_blend_amount_from_elapsed(fake_auto_mouse_elapsed);
+
+#if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
+    rgb_t end_override = rgb_from_hsv(automouse_rgb_config.end_color);
+
+    check_led(0, rgb_blend(nav_rgb, end_override, blend));
+    check_led(1, rgb_blend(nav_rgb, end_override, blend));
+    check_led(2, rgb_blend(sym_rgb, end_override, blend));
+#else
+    check_led(0, rgb_blend(nav_rgb, sym_rgb, blend));
+    check_led(1, rgb_blend(nav_rgb, sym_rgb, blend));
+    check_led(2, sym_rgb);
+#endif
+}
+
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
 static void test_automouse_fades_pointer_layer_into_underlying_layers(void) {
     test_reset();
@@ -380,6 +411,7 @@ int main(void) {
     test_full_board_layer_fills_gaps_under_mapped_only_layer();
     test_invalidating_layer_map_refreshes_dynamic_keymap_coverage();
     test_preview_layer_overlays_existing_active_layers();
+    test_automouse_uses_configured_target_layer();
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
     test_automouse_fades_pointer_layer_into_underlying_layers();
     test_automouse_lands_on_base_effect_at_timeout_end();
