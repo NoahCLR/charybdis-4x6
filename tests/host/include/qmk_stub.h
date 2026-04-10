@@ -13,7 +13,10 @@
 
 #define MATRIX_ROWS 8
 #define MATRIX_COLS 8
-#define LAYER_COUNT 8
+
+#ifndef QMK_STUB_SUPPRESS_LAYER_COUNT
+#    define LAYER_COUNT 8
+#endif
 
 #define KC_NO 0x0000u
 #define KC_TRNS 0x0001u
@@ -43,15 +46,29 @@
 
 #define MOD_BIT(keycode_) (1u << ((keycode_) & 0x07u))
 
-#define CUSTOM_TAP_HOLD_TERM 200u
-#define CUSTOM_LONGER_HOLD_TERM 350u
-#define CUSTOM_MULTI_TAP_TERM 175u
-#define TAPPING_TERM 200u
-#define KEY_BEHAVIOR_MAX_TAP_COUNT 5u
+#ifndef CUSTOM_TAP_HOLD_TERM
+#    define CUSTOM_TAP_HOLD_TERM 200u
+#endif
+#ifndef CUSTOM_LONGER_HOLD_TERM
+#    define CUSTOM_LONGER_HOLD_TERM 350u
+#endif
+#ifndef CUSTOM_MULTI_TAP_TERM
+#    define CUSTOM_MULTI_TAP_TERM 175u
+#endif
+#ifndef TAPPING_TERM
+#    define TAPPING_TERM 200u
+#endif
+#ifndef KEY_BEHAVIOR_MAX_TAP_COUNT
+#    define KEY_BEHAVIOR_MAX_TAP_COUNT 5u
+#endif
 #define TAP_CODE_DELAY 10u
 #define TAP_HOLD_CAPS_DELAY 80u
-#define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
-#define DYNAMIC_KEYMAP_MACRO_COUNT 16u
+#ifndef DYNAMIC_KEYMAP_LAYER_COUNT
+#    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
+#endif
+#ifndef DYNAMIC_KEYMAP_MACRO_COUNT
+#    define DYNAMIC_KEYMAP_MACRO_COUNT 16u
+#endif
 
 #define QK_MODS 0x0100u
 #define QK_MODS_MAX 0x1FFFu
@@ -137,6 +154,7 @@ uint16_t timer_elapsed(uint16_t last);
 uint32_t timer_read32(void);
 uint32_t timer_elapsed32(uint32_t last);
 bool     is_keyboard_master(void);
+void     eeconfig_update_user(uint32_t value);
 
 extern layer_state_t layer_state;
 bool                 layer_state_cmp(layer_state_t state, uint8_t layer);
@@ -169,4 +187,5 @@ bool     charybdis_get_pointer_dragscroll_enabled(void);
 bool     charybdis_get_pointer_sniping_enabled(void);
 uint16_t charybdis_get_pointer_default_dpi(void);
 void     charybdis_set_pointer_dragscroll_enabled(bool enabled);
+void     charybdis_set_pointer_sniping_enabled(bool enabled);
 void     pointing_device_set_cpi(uint16_t cpi);

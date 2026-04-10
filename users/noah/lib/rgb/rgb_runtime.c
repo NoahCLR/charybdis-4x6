@@ -200,6 +200,7 @@ static bool rgb_runtime_frame_paint_layer(rgb_runtime_frame_t *frame, uint8_t la
     return painted;
 }
 
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static bool rgb_runtime_paint_layer(uint8_t layer, uint8_t led_min, uint8_t led_max) {
     if (!rgb_runtime_layer_paints_mapped_keys_only(layer)) {
         rgb_set_both_halves(layer_rgb[layer], led_min, led_max);
@@ -220,6 +221,7 @@ static bool rgb_runtime_paint_layer(uint8_t layer, uint8_t led_min, uint8_t led_
 
     return painted;
 }
+#    endif
 
 static bool rgb_runtime_frame_paint_led_group(rgb_runtime_frame_t *frame, const uint8_t *leds, uint8_t count, rgb_t color, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
@@ -281,16 +283,6 @@ static bool rgb_runtime_apply_frame(const rgb_runtime_frame_t *frame, uint8_t le
     return painted;
 }
 
-static rgb_t rgb_runtime_blend_rgb(rgb_t start, rgb_t end, uint8_t amount) {
-    uint32_t inv = (uint32_t)UINT8_MAX - amount;
-
-    return (rgb_t){
-        .r = (uint8_t)(((uint32_t)start.r * inv + (uint32_t)end.r * amount + (UINT8_MAX / 2u)) / UINT8_MAX),
-        .g = (uint8_t)(((uint32_t)start.g * inv + (uint32_t)end.g * amount + (UINT8_MAX / 2u)) / UINT8_MAX),
-        .b = (uint8_t)(((uint32_t)start.b * inv + (uint32_t)end.b * amount + (UINT8_MAX / 2u)) / UINT8_MAX),
-    };
-}
-
 #    ifdef POINTING_DEVICE_ENABLE
 static bool rgb_runtime_led_range_intersects(uint8_t led_min, uint8_t led_max, uint8_t from, uint8_t to) {
     return led_min < to && led_max > from;
@@ -303,6 +295,7 @@ static uint8_t rgb_runtime_preview_layer(void) {
 }
 #    endif
 
+#    if defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE) || defined(POINTING_DEVICE_ENABLE)
 static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count, uint8_t led_min, uint8_t led_max) {
     for (uint8_t i = 0; i < count; i++) {
         if (leds[i] >= led_min && leds[i] < led_max) {
@@ -312,8 +305,19 @@ static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count,
 
     return false;
 }
+#    endif
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+static rgb_t rgb_runtime_blend_rgb(rgb_t start, rgb_t end, uint8_t amount) {
+    uint32_t inv = (uint32_t)UINT8_MAX - amount;
+
+    return (rgb_t){
+        .r = (uint8_t)(((uint32_t)start.r * inv + (uint32_t)end.r * amount + (UINT8_MAX / 2u)) / UINT8_MAX),
+        .g = (uint8_t)(((uint32_t)start.g * inv + (uint32_t)end.g * amount + (UINT8_MAX / 2u)) / UINT8_MAX),
+        .b = (uint8_t)(((uint32_t)start.b * inv + (uint32_t)end.b * amount + (UINT8_MAX / 2u)) / UINT8_MAX),
+    };
+}
+
 #        if defined(RGB_MATRIX_WS2812)
 extern ws2812_led_t ws2812_leds[WS2812_LED_COUNT];
 
@@ -443,9 +447,8 @@ static bool rgb_runtime_render_automouse_layer_stage(layer_state_t state, uint8_
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
-    uint8_t preview_layer = UINT8_MAX;
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    preview_layer = rgb_runtime_preview_layer();
+    uint8_t preview_layer = rgb_runtime_preview_layer();
 #    endif
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)

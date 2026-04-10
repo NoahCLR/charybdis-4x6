@@ -1,0 +1,11 @@
+#pragma once
+
+#include "noah_compile_config.h"
+
+#ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+#    undef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+#endif
+
+#ifdef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
+#    undef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
+#endif

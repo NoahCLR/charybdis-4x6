@@ -81,19 +81,21 @@ const uint8_t pd_mode_color_count = sizeof(pd_mode_colors) / sizeof(pd_mode_colo
 //
 // layer                           {hue, sat, val}                            leds                  count
 const layer_led_group_t layer_led_groups[] = {
+    {0}, // placeholder so the table stays standard C when no groups are enabled
     //    {LAYER_NAV, {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, nav_highlight_leds, sizeof(nav_highlight_leds)},  // red
     //    {LAYER_SYM, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, sym_highlight_leds, sizeof(sym_highlight_leds)},  // yellow
 };
-const uint8_t layer_led_group_count = sizeof(layer_led_groups) / sizeof(layer_led_groups[0]);
+const uint8_t layer_led_group_count = 0;
 
 // Same as above, but keyed on pointing device mode instead of layers.
 // Active while a trackball mode (volume, zoom, etc.) is being held.
 //
 // mode_flag            {hue, sat, val}                            leds                  count
 const pd_mode_led_group_t pd_mode_led_groups[] = {
+    {0}, // placeholder so the table stays standard C when no groups are enabled
     //    {PD_MODE_VOLUME, {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, trackball_led, sizeof(trackball_led)},
 };
-const uint8_t pd_mode_led_group_count = sizeof(pd_mode_led_groups) / sizeof(pd_mode_led_groups[0]);
+const uint8_t pd_mode_led_group_count = 0;
 
 // ─── Auto-mouse timeout fade ────────────────────────────────────────────────
 //

@@ -163,8 +163,9 @@ void pd_mode_apply_active_dpi(void) {
 }
 
 void pd_mode_activate(pd_mode_mask_t mode) {
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     bool was_any_mode_active = pd_any_mode_active();
-
+#endif
     pd_mode_set(mode);
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
@@ -183,8 +184,9 @@ void pd_mode_activate(pd_mode_mask_t mode) {
 }
 
 void pd_mode_deactivate(pd_mode_mask_t mode) {
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     bool was_any_mode_active = pd_any_mode_active();
-
+#endif
     pd_mode_clear(mode);
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
