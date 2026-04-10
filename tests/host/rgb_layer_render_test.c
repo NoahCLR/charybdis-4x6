@@ -4,7 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/key/key_runtime_feedback.h"
+#include "users/noah/lib/pointing/pd_modes.h"
 #include "users/noah/lib/rgb/rgb_automouse.h"
+#include "users/noah/lib/state/split_runtime_sync.h"
 #include "users/noah/lib/rgb/rgb_runtime.h"
 #include "users/noah/lib/rgb/rgb_helpers.h"
 #include "ws2812.h"
@@ -33,9 +36,14 @@ static rgb_t    led_output[RGB_MATRIX_LED_COUNT];
 static uint8_t  fake_preview_layer      = UINT8_MAX;
 static uint8_t  fake_auto_mouse_layer   = LAYER_POINTER;
 static uint16_t fake_auto_mouse_elapsed = 0;
-static bool     fake_pd_mode_locked     = false;
+static bool     fake_is_master          = true;
+static pd_mode_mask_t fake_pd_active_flags = 0;
+static pd_mode_mask_t fake_pd_locked_flags = 0;
 
 ws2812_led_t ws2812_leds[WS2812_LED_COUNT];
+split_runtime_sync_packet_t split_runtime_sync_remote = {
+    .key_preview_layer = UINT8_MAX,
+};
 
 led_config_t g_led_config = {0};
 
@@ -45,6 +53,16 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 
 const layer_led_group_t      layer_led_groups[1]   = {0};
 const uint8_t                layer_led_group_count = 0;
+const pd_mode_color_t        pd_mode_colors[]      = {
+    {.mode_flag = PD_MODE_ARROW, .color = {210, 211, 212}},
+    {.mode_flag = PD_MODE_VOLUME, .color = {220, 221, 222}},
+};
+const uint8_t                pd_mode_color_count   = ARRAY_SIZE(pd_mode_colors);
+static const uint8_t         volume_mode_group_leds[] = {1, 6};
+const pd_mode_led_group_t    pd_mode_led_groups[]  = {
+    {.mode_flag = PD_MODE_VOLUME, .color = {230, 231, 232}, .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)},
+};
+const uint8_t                pd_mode_led_group_count = ARRAY_SIZE(pd_mode_led_groups);
 const automouse_rgb_config_t automouse_rgb_config  = {
     .flags     = (RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE ? AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE : 0) | (RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED ? AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED : 0),
     .end_color = {200, 210, 220},
@@ -52,6 +70,14 @@ const automouse_rgb_config_t automouse_rgb_config  = {
 const hsv_t feedback_multi_tap_pending_color = {1, 2, 3};
 const hsv_t feedback_hold_active_color       = {4, 5, 6};
 const hsv_t feedback_long_hold_active_color  = {7, 8, 9};
+const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
+    [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL},
+    [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME},
+    [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS},
+    [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM},
+    [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW},
+    [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH},
+};
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -85,7 +111,7 @@ static rgb_t rgb_blend(rgb_t start, rgb_t end, uint8_t amount) {
 
 static uint8_t automouse_blend_amount_from_elapsed(uint16_t elapsed) {
     uint16_t progress = automouse_rgb_progress(elapsed);
-    if (fake_pd_mode_locked) {
+    if (fake_pd_locked_flags != 0) {
         progress = 0;
     }
     if (progress > AUTOMOUSE_RGB_ACTIVE_SPAN) {
@@ -103,7 +129,12 @@ static void test_reset(void) {
     fake_preview_layer      = UINT8_MAX;
     fake_auto_mouse_layer   = LAYER_POINTER;
     fake_auto_mouse_elapsed = 0;
-    fake_pd_mode_locked     = false;
+    fake_is_master          = true;
+    fake_pd_active_flags    = 0;
+    fake_pd_locked_flags    = 0;
+    split_runtime_sync_remote = (split_runtime_sync_packet_t){
+        .key_preview_layer = UINT8_MAX,
+    };
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
@@ -127,7 +158,7 @@ static void test_reset(void) {
 }
 
 bool is_keyboard_master(void) {
-    return true;
+    return fake_is_master;
 }
 
 int rgb_matrix_led_index(int index) {
@@ -167,7 +198,37 @@ uint16_t auto_mouse_get_time_elapsed(void) {
 }
 
 bool pd_any_mode_locked(void) {
-    return fake_pd_mode_locked;
+    return fake_pd_locked_flags != 0;
+}
+
+bool pd_mode_active(pd_mode_mask_t mode) {
+    return (fake_pd_active_flags & mode) != 0;
+}
+
+bool pd_mode_locked(pd_mode_mask_t mode) {
+    return (fake_pd_locked_flags & mode) != 0;
+}
+
+bool pd_any_mode_active(void) {
+    return fake_pd_active_flags != 0;
+}
+
+pd_mode_mask_t pd_mode_active_snapshot(void) {
+    return fake_pd_active_flags;
+}
+
+pd_mode_mask_t pd_mode_locked_snapshot(void) {
+    return fake_pd_locked_flags;
+}
+
+uint8_t pd_mode_first_active_index(void) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_mode_active(pd_modes[i].mode_flag)) {
+            return i;
+        }
+    }
+
+    return PD_MODE_COUNT;
 }
 
 void rgb_matrix_set_color(int index, uint8_t red, uint8_t green, uint8_t blue) {
@@ -274,6 +335,60 @@ static void test_preview_layer_overlays_existing_active_layers(void) {
     check_led(1, rgb_from_hsv(layer_colors[LAYER_NUM].color));
     check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
+static void test_slave_preview_layer_uses_remote_sync_state(void) {
+    test_reset();
+
+    fake_is_master = false;
+    test_keymap[LAYER_NUM][0][0] = 0x0020u;
+    test_keymap[LAYER_NUM][0][1] = 0x0021u;
+    layer_state = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
+static void test_slave_feedback_uses_remote_flags_and_flash_phase(void) {
+    test_reset();
+
+    fake_is_master = false;
+    layer_state = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.key_feedback_flags = KEY_FEEDBACK_FLAG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LEVEL_FLASH;
+
+    CHECK(render_output());
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+
+    memset(led_output, 0, sizeof(led_output));
+    split_runtime_sync_remote.key_feedback_flags |= KEY_FEEDBACK_FLAG_FLASH_PHASE;
+
+    CHECK(render_output());
+    check_led(0, rgb_from_hsv(feedback_long_hold_active_color));
+    check_led(7, rgb_from_hsv(feedback_long_hold_active_color));
+}
+
+static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
+    test_reset();
+
+    layer_state = (layer_state_t)1u << LAYER_SYM;
+    fake_pd_active_flags = PD_MODE_VOLUME;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(5, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(7, rgb_from_hsv(pd_mode_colors[1].color));
 }
 
 static void test_automouse_uses_configured_target_layer(void) {
@@ -411,6 +526,9 @@ int main(void) {
     test_full_board_layer_fills_gaps_under_mapped_only_layer();
     test_invalidating_layer_map_refreshes_dynamic_keymap_coverage();
     test_preview_layer_overlays_existing_active_layers();
+    test_slave_preview_layer_uses_remote_sync_state();
+    test_slave_feedback_uses_remote_flags_and_flash_phase();
+    test_pointer_mode_overlay_paints_right_half_and_groups();
     test_automouse_uses_configured_target_layer();
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
     test_automouse_fades_pointer_layer_into_underlying_layers();
