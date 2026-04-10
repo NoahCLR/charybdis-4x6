@@ -7,11 +7,13 @@
 //
 // Want to change a color?  Edit this file.
 // Want to change the rendering logic?  Edit users/noah/lib/rgb/rgb_runtime.c.
-// For the split-safe LED helper functions, see users/noah/lib/rgb/rgb_helpers.h.
+// For config helper macros, see users/noah/lib/rgb/rgb_config_helpers.h.
+// For split-safe LED helper functions, see users/noah/lib/rgb/rgb_helpers.h.
 //
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "noah_keymap.h" // layer enum, PD_MODE_* constants, hsv_t, rgb config types
+#include "users/noah/lib/rgb/rgb_config_helpers.h"
 
 #if defined(RGB_MATRIX_ENABLE)
 
@@ -33,7 +35,7 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
     [LAYER_NUM]     = {.color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY},  // green
     [LAYER_SYM]     = {.color = {169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // blue
     [LAYER_NAV]     = {.color = {180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, // purple
-    [LAYER_POINTER] = {.color = {0, 0, 150}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY},                               // default auto-mouse layer: white mapped keys
+    [LAYER_POINTER] = {.color = {0, 0, 150}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY},                               // default auto-mouse layer: white mapped keys, capped at v=150 to limit current draw
 };
 
 // ─── Pointing device mode colors ────────────────────────────────────────────
@@ -42,15 +44,14 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // Each entry is tagged with its mode flag so the order doesn't need to
 // match pd_modes[] — adding or reordering modes won't silently break colors.
 // mode_flag             {hue, sat, val}
-const pd_mode_color_t pd_mode_colors[] = {
+DEFINE_PD_MODE_COLORS(
     {PD_MODE_DRAGSCROLL, {21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},  // orange
     {PD_MODE_VOLUME, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},      // yellow
     {PD_MODE_BRIGHTNESS, {213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}}, // magenta
     {PD_MODE_ARROW, {127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},      // cyan
     {PD_MODE_PINCH, {55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},       // lime
     {PD_MODE_ZOOM, {70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},        // light green
-};
-const uint8_t pd_mode_color_count = sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]);
+);
 
 // ─── Per-layer LED group highlights ─────────────────────────────────────────
 //
@@ -70,7 +71,10 @@ const uint8_t pd_mode_color_count = sizeof(pd_mode_colors) / sizeof(pd_mode_colo
 //                           25  24     55     (56)
 //                     ╰────────────╯ ╰────────╯
 
-// Reserved example groups. Activate them by uncommenting the table entries below.
+// Optional examples. Uncomment any LED index lists you want, then uncomment
+// DEFINE_LAYER_LED_GROUPS(...) below to enable per-layer highlights. If you
+// leave the definition commented out, shared defaults keep the exported table
+// empty.
 // static const uint8_t nav_highlight_leds[] = {33, 18};
 // static const uint8_t sym_highlight_leds[] = {4, 47};
 // static const uint8_t left_thumb_leds[]    = {26, 27, 28, 25, 24};
@@ -80,41 +84,27 @@ const uint8_t pd_mode_color_count = sizeof(pd_mode_colors) / sizeof(pd_mode_colo
 // Highlight specific LEDs when a keyboard layer is active.
 //
 // layer                           {hue, sat, val}                            leds                  count
-const layer_led_group_t layer_led_groups[] = {
-    {0}, // placeholder so the table stays standard C when no groups are enabled
-    //    {LAYER_NAV, {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, nav_highlight_leds, sizeof(nav_highlight_leds)},  // red
-    //    {LAYER_SYM, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, sym_highlight_leds, sizeof(sym_highlight_leds)},  // yellow
-};
-const uint8_t layer_led_group_count = 0;
+// DEFINE_LAYER_LED_GROUPS(
+//     {LAYER_NAV, {0,  255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, nav_highlight_leds, sizeof(nav_highlight_leds)},  // red
+//     {LAYER_SYM, {43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, sym_highlight_leds, sizeof(sym_highlight_leds)},  // yellow
+// );
 
 // Same as above, but keyed on pointing device mode instead of layers.
-// Active while a trackball mode (volume, zoom, etc.) is being held.
+// Active while a trackball mode (volume, zoom, etc.) is active.
 //
 // mode_flag            {hue, sat, val}                            leds                  count
-const pd_mode_led_group_t pd_mode_led_groups[] = {
-    {0}, // placeholder so the table stays standard C when no groups are enabled
-    //    {PD_MODE_VOLUME, {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, trackball_led, sizeof(trackball_led)},
-};
-const uint8_t pd_mode_led_group_count = 0;
+// Uncomment DEFINE_PD_MODE_LED_GROUPS(...) below if you want one or more
+// per-mode LED highlights. If you leave it commented out, shared defaults keep
+// the exported table empty.
+// DEFINE_PD_MODE_LED_GROUPS(
+//     {PD_MODE_VOLUME, {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}, trackball_led, sizeof(trackball_led)},
+// );
 
 // ─── Auto-mouse timeout fade ────────────────────────────────────────────────
 //
-// Auto-mouse now fades from the authored auto-mouse layer rendering into the
-// layer state that would remain after that layer drops out. When the auto-
-// mouse layer activates, the first AUTOMOUSE_RGB_DEAD_TIME ms are "dead time"
-// — LEDs stay at the start state so active trackball use doesn't cause
-// flicker. The fade animates only during the remaining portion of the timeout
-// after that dead time. See AUTO_MOUSE_TIME and AUTOMOUSE_RGB_DEAD_TIME in
-// config.h.
-//
-// Split sync only transmits the animated portion of the gradient. Dead time
-// and locked modes collapse to a single stable value, which cuts split chatter
-// without changing the rendered look. Lower sync steps give a smoother slave-
-// half transition; higher values reduce split transactions.
-//
-// .mode chooses only the fade destination. It does not create a persistent
-// board state; once the automouse renderer stops, normal layer rendering takes
-// back over on the next frame.
+// Auto-mouse starts from the authored auto-mouse layer rendering above and
+// fades toward the destination chosen below. The first AUTOMOUSE_RGB_DEAD_TIME
+// ms are dead time; only the remaining portion of AUTO_MOUSE_TIME animates.
 //
 // .mode chooses how the fade picks its destination:
 //   - FOLLOW_REAL_DESTINATION = land on the real rendered board state after
@@ -125,8 +115,9 @@ const uint8_t pd_mode_led_group_count = 0;
 //   - END_COLOR_ON_ALL_KEYS = use end_color as the fade destination on every
 //     key while the automouse renderer is active
 //
-// White is capped at v=150 (not MAX_BRIGHTNESS) to limit current draw — all
-// LEDs lit white at full brightness exceeds the USB power budget.
+// .end_color is used only by the END_COLOR_* modes above. Later overlays such
+// as pd-mode color or key feedback can still repaint on top of the visible
+// result.
 #    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
 const automouse_fade_end_config_t automouse_fade_end_config = {
     .mode      = FOLLOW_REAL_DESTINATION,

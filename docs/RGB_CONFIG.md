@@ -20,6 +20,11 @@ If you want to change how RGB is rendered, look at:
 - [`users/noah/lib/rgb/rgb_automouse.c`](../users/noah/lib/rgb/rgb_automouse.c)
 - [`users/noah/lib/rgb/rgb_helpers.h`](../users/noah/lib/rgb/rgb_helpers.h)
 
+If you want to change the declarative config macros used by `rgb_config.c`,
+look at:
+
+- [`users/noah/lib/rgb/rgb_config_helpers.h`](../users/noah/lib/rgb/rgb_config_helpers.h)
+
 If you want to change what the key-behavior overlay means instead of how it is
 painted, also look at:
 
@@ -64,12 +69,15 @@ after the runtime refreshes its cached LED coverage.
 useful for:
 
 - `LAYER_BASE`, which should fall through to the normal RGB Matrix effect
-- the auto-mouse target layer, which uses the animated auto-mouse gradient
+- any layer you intentionally want to stay colorless in the layer stack
 
 ### `pd_mode_colors[]`
 
 `pd_mode_colors[]` defines the right-half overlay color for each active
 pointing-device mode.
+
+In `rgb_config.c`, use `DEFINE_PD_MODE_COLORS(...);` so the matching
+`pd_mode_color_count` is derived automatically.
 
 Each row is keyed by a `PD_MODE_*` flag rather than by array index. That means
 the color mapping follows the mode flag itself, not the order of `pd_modes[]`.
@@ -77,10 +85,15 @@ the color mapping follows the mode flag itself, not the order of `pd_modes[]`.
 Use this table when you want `ARROW_MODE`, `VOLUME_MODE`, `PINCH_MODE`, and the
 other pd modes to have distinct overlay colors.
 
-### `layer_led_groups[]`
+### `layer_led_groups`
 
-`layer_led_groups[]` lets a layer highlight specific LEDs instead of, or in
+`layer_led_groups` lets a layer highlight specific LEDs instead of, or in
 addition to, a full-board color.
+
+In `rgb_config.c`, use one of these helper forms:
+
+- leave the section commented out when no per-layer LED groups are enabled
+- `DEFINE_LAYER_LED_GROUPS(...);` when you want one or more authored rows
 
 Each row contains:
 
@@ -98,17 +111,22 @@ This is useful for things like:
 The LED map comment in [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) is the reference for the standard matrix
 indices on this board.
 
-### `pd_mode_led_groups[]`
+### `pd_mode_led_groups`
 
-`pd_mode_led_groups[]` is the same idea as `layer_led_groups[]`, but keyed by
+`pd_mode_led_groups` is the same idea as `layer_led_groups`, but keyed by
 pointing-device mode instead of layer.
 
 Use this when one mode should highlight a very specific LED or cluster, such as
 the trackball LED or one side of the board.
 
-### `automouse_rgb_config`
+As above, use:
 
-`automouse_rgb_config` defines the auto-mouse timeout destination.
+- leave the section commented out when no per-mode LED groups are enabled
+- `DEFINE_PD_MODE_LED_GROUPS(...);` when you want one or more authored rows
+
+### `automouse_fade_end_config`
+
+`automouse_fade_end_config` defines only the auto-mouse fade destination.
 
 In the shared RGB runtime:
 
@@ -116,13 +134,12 @@ In the shared RGB runtime:
   as the timeout fade start state
 - the default destination is the real layer-rendered state that remains after
   the auto-mouse layer drops out
-- the active keymap leaves `automouse_rgb_config.flags` at
-  `AUTOMOUSE_RGB_FLAG_NONE`, so that real layer-rendered destination is also
-  the current default behavior
-- if `AUTOMOUSE_RGB_FLAG_END_COLOR_FILL_UNPAINTED` is set, LEDs with no
-  authored layer-color destination fall back to `end_color`
-- if `AUTOMOUSE_RGB_FLAG_END_COLOR_OVERRIDE` is set, the fade lands on the
-  authored solid `end_color` instead
+- `FOLLOW_REAL_DESTINATION` lands on that real rendered destination
+- `END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW` keeps the real destination where
+  layers paint, but uses `end_color` where the base RGB effect would otherwise
+  show through
+- `END_COLOR_ON_ALL_KEYS` uses `end_color` as the destination on every key
+  while the automouse renderer is active
 
 The timeout fade does not animate during the entire timeout. The first
 `AUTOMOUSE_RGB_DEAD_TIME` milliseconds are dead time, and only the remaining
@@ -131,10 +148,9 @@ span animates. `AUTOMOUSE_RGB_DEAD_TIME` is configurable in the active keymap
 profile can trade off smoother animation against less flicker while the
 trackball is still actively being used.
 
-One practical caveat: the runtime can only blend between layer-stage colors it
-controls. If an LED's post-timeout destination is just the underlying base RGB
-effect and no `end_color` fallback or override is configured, that LED hands
-off at the end of the timeout instead of alpha-fading into the base effect.
+The configured destination is not a persistent board state. Once the automouse
+renderer stops, the next frame falls back to ordinary layer rendering and then
+later overlays such as pd-mode color or key feedback still paint on top.
 
 ### `feedback_*_color`
 
@@ -198,11 +214,17 @@ Examples:
 
 - `pd_mode_color_t`
 - `layer_color_config_t`
-- `automouse_rgb_config_t`
+- `automouse_fade_end_config_t`
 - `layer_led_group_t`
 - `pd_mode_led_group_t`
 
-The same header also provides split-safe helper functions such as:
+[`users/noah/lib/rgb/rgb_config_helpers.h`](../users/noah/lib/rgb/rgb_config_helpers.h) defines the declarative authoring macros such as:
+
+- `DEFINE_PD_MODE_COLORS(...)`
+- `DEFINE_LAYER_LED_GROUPS(...)`
+- `DEFINE_PD_MODE_LED_GROUPS(...)`
+
+`rgb_helpers.h` also provides split-safe helper functions such as:
 
 - `rgb_set_led()`
 - `rgb_set_led_group()`
@@ -230,19 +252,21 @@ Edit the matching row in `pd_mode_colors[]`.
 ### Add a small highlight to one layer
 
 1. Define a `uint8_t` LED index array.
-2. Add a row to `layer_led_groups[]`.
+2. Uncomment `DEFINE_LAYER_LED_GROUPS(...)` if needed, then add the rows you
+   want.
 
 ### Add a small highlight to one pd mode
 
 1. Define a `uint8_t` LED index array.
-2. Add a row to `pd_mode_led_groups[]`.
+2. Uncomment `DEFINE_PD_MODE_LED_GROUPS(...)` if needed, then add the rows you
+   want.
 
 ### Change the auto-mouse timeout fade
 
 Edit the `LAYER_POINTER` row in `layer_colors[]` to change the start state.
-Edit `automouse_rgb_config` if you want the timeout to land on an authored
-solid `end_color` instead of the real post-timeout layer state, or if you want
-an `end_color` fallback on LEDs with no authored layer destination underneath.
+Edit `automouse_fade_end_config` if you want the timeout destination to follow
+the real post-timeout layer state, use `end_color` where the base effect would
+show, or use `end_color` on every key.
 
 If you want to change the timing model instead of just the colors, look at:
 

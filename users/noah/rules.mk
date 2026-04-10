@@ -42,6 +42,7 @@ SRC += lib/state/layer_ownership.c
 SRC += lib/state/runtime_shared_state.c
 SRC += lib/state/split_runtime_sync.c
 SRC += lib/rgb/rgb_runtime.c
+SRC += lib/rgb/rgb_config_defaults.c
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
     SRC += lib/pointing/pd_runtime.c

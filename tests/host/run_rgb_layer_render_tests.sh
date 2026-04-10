@@ -37,6 +37,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
+    "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/rgb_runtime.c" \
     -o "$BIN"
 
@@ -66,6 +67,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
+    "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/rgb_runtime.c" \
     -o "$BIN_END_FILL_UNPAINTED"
 
@@ -95,6 +97,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
+    "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/rgb_runtime.c" \
     -o "$BIN_END_OVERRIDE"
 

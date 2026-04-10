@@ -266,7 +266,7 @@ Add a new row to `pd_mode_colors[]`:
 {PD_MODE_EXAMPLE, {120, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},
 ```
 
-Optional: add a matching `pd_mode_led_groups[]` entry if the mode wants a
+Optional: uncomment `DEFINE_PD_MODE_LED_GROUPS(...);` if the mode wants a
 specific LED subset highlighted.
 
 ### 8. Update User Docs If The Mode Is Real

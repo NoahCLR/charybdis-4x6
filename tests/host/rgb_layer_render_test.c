@@ -7,6 +7,7 @@
 #include "users/noah/lib/key/key_runtime_feedback.h"
 #include "users/noah/lib/pointing/pd_modes.h"
 #include "users/noah/lib/rgb/rgb_automouse.h"
+#include "users/noah/lib/rgb/rgb_config_helpers.h"
 #include "users/noah/lib/state/split_runtime_sync.h"
 #include "users/noah/lib/rgb/rgb_runtime.h"
 #include "users/noah/lib/rgb/rgb_helpers.h"
@@ -52,18 +53,14 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
     [LAYER_BASE] = {.color = {0, 0, 0}, .flags = ALL_KEYS}, [LAYER_NUM] = {.color = {10, 20, 30}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, [LAYER_SYM] = {.color = {40, 50, 60}, .flags = ALL_KEYS}, [LAYER_NAV] = {.color = {70, 80, 90}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, [LAYER_POINTER] = {.color = {100, 110, 120}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
 };
 
-const layer_led_group_t layer_led_groups[1]   = {0};
-const uint8_t           layer_led_group_count = 0;
-const pd_mode_color_t   pd_mode_colors[]      = {
+DEFINE_PD_MODE_COLORS(
     {.mode_flag = PD_MODE_ARROW, .color = {210, 211, 212}},
     {.mode_flag = PD_MODE_VOLUME, .color = {220, 221, 222}},
-};
-const uint8_t             pd_mode_color_count      = ARRAY_SIZE(pd_mode_colors);
+);
 static const uint8_t      volume_mode_group_leds[] = {1, 6};
-const pd_mode_led_group_t pd_mode_led_groups[]     = {
+DEFINE_PD_MODE_LED_GROUPS(
     {.mode_flag = PD_MODE_VOLUME, .color = {230, 231, 232}, .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)},
-};
-const uint8_t                     pd_mode_led_group_count   = ARRAY_SIZE(pd_mode_led_groups);
+);
 const automouse_fade_end_config_t automouse_fade_end_config = {
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
     .mode = END_COLOR_ON_ALL_KEYS,
