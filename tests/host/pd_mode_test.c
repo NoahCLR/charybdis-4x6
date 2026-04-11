@@ -196,20 +196,21 @@ static void test_registry_metadata_matches_manifest(void) {
     CHECK(arrow_mode->key_handler == handle_arrow_mode_key);
 
     pd_mode_apply_remote_snapshot(PD_MODE_ZOOM | PD_MODE_VOLUME, 0);
+    CHECK(pd_mode_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_first_active_index() == PD_MODE_INDEX_VOLUME);
 }
 
-static void test_apply_remote_snapshot_merges_locked_modes_into_active(void) {
+static void test_apply_remote_snapshot_keeps_only_one_effective_mode(void) {
     test_reset_stubs();
 
     pd_mode_apply_remote_snapshot(PD_MODE_VOLUME, PD_MODE_ARROW);
 
-    CHECK(pd_mode_active_snapshot() == (PD_MODE_VOLUME | PD_MODE_ARROW));
+    CHECK(pd_mode_active_snapshot() == PD_MODE_ARROW);
     CHECK(pd_mode_locked_snapshot() == PD_MODE_ARROW);
-    CHECK(pd_mode_active(PD_MODE_VOLUME));
     CHECK(pd_mode_active(PD_MODE_ARROW));
     CHECK(pd_mode_locked(PD_MODE_ARROW));
     CHECK(!pd_mode_locked(PD_MODE_VOLUME));
+    CHECK(!pd_mode_active(PD_MODE_VOLUME));
 }
 
 static void test_set_lock_state_switches_to_single_locked_mode(void) {
@@ -230,27 +231,40 @@ static void test_set_lock_state_switches_to_single_locked_mode(void) {
     CHECK(pd_mode_locked(PD_MODE_VOLUME));
     CHECK(!pd_mode_active(PD_MODE_ARROW));
     CHECK(!pd_mode_active(PD_MODE_BRIGHTNESS));
-    CHECK(reset_arrow_count == 1);
+    CHECK(reset_arrow_count == 0);
     CHECK(reset_brightness_count == 1);
     CHECK(current_cpi == PD_MODE_VOLUME_DPI);
     CHECK(cpi_set_count >= 1);
+}
+
+static void test_activate_switches_to_single_unlocked_mode(void) {
+    test_reset_stubs();
+
+    pd_mode_lock(PD_MODE_ARROW);
+    reset_arrow_count = 0;
+
+    pd_mode_activate(PD_MODE_VOLUME);
+
+    CHECK(pd_mode_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_locked_snapshot() == 0);
+    CHECK(pd_mode_active(PD_MODE_VOLUME));
+    CHECK(!pd_mode_active(PD_MODE_ARROW));
+    CHECK(!pd_mode_locked(PD_MODE_ARROW));
+    CHECK(reset_arrow_count == 1);
 }
 
 static void test_handle_keycode_press_and_release_updates_state_and_syncs(void) {
     test_reset_stubs();
 
     pd_mode_lock(PD_MODE_ARROW);
-    pd_mode_activate(PD_MODE_VOLUME);
-    reset_arrow_count  = 0;
-    reset_volume_count = 0;
-    split_sync_count   = 0;
+    reset_arrow_count = 0;
+    split_sync_count  = 0;
 
     CHECK(pd_mode_handle_keycode_press(BRIGHTNESS_MODE));
     CHECK(split_sync_count == 1);
     CHECK(pd_mode_active_snapshot() == PD_MODE_BRIGHTNESS);
     CHECK(pd_mode_locked_snapshot() == 0);
     CHECK(reset_arrow_count == 1);
-    CHECK(reset_volume_count == 1);
 
     CHECK(pd_mode_handle_keycode_release(BRIGHTNESS_MODE));
     CHECK(split_sync_count == 2);
@@ -339,8 +353,9 @@ static void test_active_key_handler_only_runs_for_active_modes(void) {
 
 int main(void) {
     test_registry_metadata_matches_manifest();
-    test_apply_remote_snapshot_merges_locked_modes_into_active();
+    test_apply_remote_snapshot_keeps_only_one_effective_mode();
     test_set_lock_state_switches_to_single_locked_mode();
+    test_activate_switches_to_single_unlocked_mode();
     test_handle_keycode_press_and_release_updates_state_and_syncs();
     test_locked_mode_release_keeps_mode_active();
     test_apply_active_dpi_respects_pointer_state();

@@ -11,6 +11,16 @@
 #define PD_MODE_ACTIVE_FLAGS (noah_runtime_shared_state.pd.active_flags)
 #define PD_MODE_LOCKED_FLAGS (noah_runtime_shared_state.pd.locked_flags)
 
+static pd_mode_mask_t pd_mode_first_snapshot_match(pd_mode_mask_t flags) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if ((flags & pd_modes[i].mode_flag) != 0) {
+            return pd_modes[i].mode_flag;
+        }
+    }
+
+    return 0;
+}
+
 void pd_mode_set(pd_mode_mask_t mode) {
     PD_MODE_ACTIVE_FLAGS |= mode;
 }
@@ -54,9 +64,13 @@ bool pd_any_mode_locked(void) {
 void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
     // Remote sync only mirrors mode state for the non-master half's policy/UI.
     // Do not replay local side effects such as dragscroll or auto-mouse
-    // ownership changes from this path.
-    PD_MODE_LOCKED_FLAGS = locked_flags;
-    PD_MODE_ACTIVE_FLAGS = active_flags | locked_flags;
+    // ownership changes from this path. Keep only one effective mode so the
+    // mirrored UI matches the local exclusivity invariant.
+    pd_mode_mask_t locked_mode = pd_mode_first_snapshot_match(locked_flags);
+    pd_mode_mask_t active_mode = locked_mode ? locked_mode : pd_mode_first_snapshot_match(active_flags);
+
+    PD_MODE_LOCKED_FLAGS = locked_mode;
+    PD_MODE_ACTIVE_FLAGS = active_mode;
 }
 
 bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {

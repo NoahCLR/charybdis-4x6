@@ -160,11 +160,20 @@ void pd_mode_apply_active_dpi(void) {
     pointing_device_set_cpi(charybdis_get_pointer_default_dpi());
 }
 
+static void pd_mode_enforce_exclusive_active_mode(pd_mode_mask_t keep_mode) {
+    pd_mode_unlock_other_locks(keep_mode);
+    pd_mode_deactivate_other_unlocked(keep_mode);
+}
+
 void pd_mode_activate(pd_mode_mask_t mode) {
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     bool was_any_mode_active = pd_any_mode_active();
 #endif
-    pd_mode_set(mode);
+    pd_mode_enforce_exclusive_active_mode(mode);
+
+    if (!pd_mode_active(mode)) {
+        pd_mode_set(mode);
+    }
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     pd_mode_auto_mouse_activate(mode, was_any_mode_active);
@@ -211,7 +220,11 @@ void pd_mode_deactivate(pd_mode_mask_t mode) {
 }
 
 void pd_mode_lock(pd_mode_mask_t mode) {
-    pd_mode_set_locked(mode);
+    pd_mode_enforce_exclusive_active_mode(mode);
+
+    if (!pd_mode_locked(mode)) {
+        pd_mode_set_locked(mode);
+    }
     pd_mode_activate(mode);
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
