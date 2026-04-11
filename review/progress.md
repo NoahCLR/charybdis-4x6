@@ -333,10 +333,36 @@ Additional verification completed for the continued Phase 4 press-path extractio
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Continued Phase 4 again by collapsing more handled-key press orchestration into slot-local planning:
+
+- added `key_runtime_slot_press_plan_t` and `key_runtime_slot_prepare_handled_press(...)` so the slot layer now owns:
+  - matching pending-multi-tap repress preparation
+  - foreign pending-multi-tap flush resolution
+  - conflicting active-slot reclaim/flush selection
+  - press-time begin-request generation for the selected slot
+- rewired `users/noah/lib/key/key_runtime_transition.c` so `key_runtime_transition_handled_key_press(...)` now queues plan effects from the returned slot-owned press plan instead of encoding those branch trees inline
+- pushed handled-key press slot selection up into `users/noah/lib/key/key_runtime_press.c` so the press flow chooses the slot once before transition planning
+- updated `tests/host/key_runtime_transition_test.c` for the new handled-key press entrypoint
+- extended `tests/host/key_runtime_slot_test.c` with direct coverage for:
+  - matching pending-multi-tap press reuse
+  - foreign pending-multi-tap flush plus immediate-hold begin
+
+Additional verification completed for the continued Phase 4 press-plan collapse pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Next recommended step:
 
-- continue Phase 4 by collapsing the remaining press-time orchestration that still lives in `key_runtime_transition.c`, especially:
-  - slot-selection and reclaim sequencing for handled-key presses
-  - the special-case matching pending-multi-tap press branch
-  - the remaining layer-press / tap-dispatch ordering decisions around press-time plan assembly
-  so the transition file trends further toward routing helper results rather than encoding branch-specific press behavior.
+- continue Phase 4 by collapsing the remaining press-time plan-assembly glue in `key_runtime_transition.c`, especially the ordering/routing around:
+  - delayed pending-multi-tap replay vs direct dispatch
+  - layer-press queueing vs slot-effect queueing
+  - any remaining press-specific helper wrappers that can become generic slot-plan application
+  so the transition file trends closer to pure effect-plan routing over slot-owned decisions.

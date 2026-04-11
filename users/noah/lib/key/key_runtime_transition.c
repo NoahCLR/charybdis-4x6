@@ -175,10 +175,6 @@ static void key_runtime_transition_activate_pending_fallback_hold(active_key_sta
     key_runtime_transition_plan_slot_effect_request(plan, slot->key_pos, key_runtime_slot_activate_pending_fallback_hold_request(slot));
 }
 
-static active_key_state_t *key_runtime_transition_select_press_slot(keypos_t key_pos) {
-    return key_runtime_select_slot_for_press(key_pos);
-}
-
 static void key_runtime_transition_flush_slot_pending_multi_tap(active_key_state_t *slot, key_runtime_transition_plan_t *plan) {
     key_runtime_slot_pending_multi_tap_flush_t flush = key_runtime_slot_take_pending_multi_tap_flush(slot);
     if (!flush.handled) {
@@ -235,47 +231,39 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
     }
 }
 
-bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *record, handled_key_view_t key, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
-    active_key_state_t *slot          = key_runtime_transition_select_press_slot(record->event.key);
+bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t keycode, keyrecord_t *record, handled_key_view_t key, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
     key_behavior_view_t behavior      = key.behavior;
     hold_behavior_t     hold          = handled_key_single_hold(key);
     bool                implicit      = handled_key_uses_implicit_hold(key);
     pd_mode_mask_t      mode          = pd_mode_for_keycode(keycode);
 
-    if (key.behavior.has_multi_tap && key_runtime_slot_pending_multi_tap_matches(slot, keycode, record->event.key)) {
-        uint16_t action = key_runtime_slot_advance_pending_multi_tap(slot, keycode);
-        if (action != KC_NO) {
-            key_runtime_transition_plan_dispatch_action(plan, action);
-        }
+    key_runtime_slot_press_plan_t press = key_runtime_slot_prepare_handled_press(
+        slot, keycode, record->event.key, active_held_action_survives_flush, key.behavior.has_multi_tap, behavior.is_momentary_layer, behavior.is_momentary_layer ? behavior_get_layer(keycode) : 0, handled_key_tap_action(key), hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, implicit, !implicit && handled_key_uses_fallback_hold(key), mode && pd_mode_locked(mode));
 
-        if (behavior.is_momentary_layer) {
-            key_runtime_transition_plan_layer_press(plan, record->event.key, behavior_get_layer(keycode));
-        }
-
-        bool pending_hold = key_runtime_slot_pending_multi_tap_pending_hold(slot);
-        if (pending_hold || behavior.is_momentary_layer) {
-            key_runtime_transition_plan_slot_effect_request(
-                plan, record->event.key,
-                key_runtime_slot_begin_press(slot, keycode, record->event.key, KC_NO, hold_behavior_none(), hold_behavior_none(), behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, !pending_hold, false, false, false));
-        }
-        return true;
+    if (!press.handled) {
+        return false;
     }
 
-    if (key_runtime_slot_has_pending_multi_tap(slot) && !key_runtime_slot_pending_multi_tap_matches(slot, keycode, record->event.key)) {
-        key_runtime_transition_flush_slot_pending_multi_tap(slot, plan);
+    if (press.pending_multi_tap_flush.handled) {
+        key_runtime_transition_plan_delayed_action(plan, press.pending_multi_tap_flush.action, press.pending_multi_tap_flush.mods, press.pending_multi_tap_flush.repeat_count);
     }
 
-    if (behavior.is_momentary_layer) {
-        key_runtime_transition_plan_layer_press(plan, record->event.key, behavior_get_layer(keycode));
+    if (press.dispatch_action != KC_NO) {
+        key_runtime_transition_plan_dispatch_action(plan, press.dispatch_action);
     }
 
-    if (key_runtime_slot_active(slot) && !key_runtime_slot_matches(slot, keycode, record->event.key)) {
-        keypos_t key_pos = slot->key_pos;
-        key_runtime_transition_plan_slot_effect_request(plan, key_pos, key_runtime_slot_take_flush(slot, active_held_action_survives_flush));
+    if (press.layer_press) {
+        key_runtime_transition_plan_layer_press(plan, record->event.key, press.layer);
     }
-    key_runtime_transition_plan_slot_effect_request(
-        plan, record->event.key,
-        key_runtime_slot_begin_press(slot, keycode, record->event.key, handled_key_tap_action(key), hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false, implicit, !implicit && handled_key_uses_fallback_hold(key), mode && pd_mode_locked(mode)));
+
+    if (press.reclaim_request.kind != KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE || press.reclaim_request.release_owned_state || press.reclaim_request.feedback_pulse) {
+        key_runtime_transition_plan_slot_effect_request(plan, press.reclaim_key_pos, press.reclaim_request);
+    }
+
+    if (press.begin_request.kind != KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE || press.begin_request.release_owned_state || press.begin_request.feedback_pulse) {
+        key_runtime_transition_plan_slot_effect_request(plan, press.begin_key_pos, press.begin_request);
+    }
+
     return true;
 }
 

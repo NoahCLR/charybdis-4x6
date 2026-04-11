@@ -487,6 +487,110 @@ static void test_begin_press_sets_metadata_and_immediate_hold_request(void) {
     CHECK(slot->pd_mode_was_locked_on_press);
 }
 
+static void test_prepare_handled_press_matching_pending_multi_tap_reuses_slot(void) {
+    active_key_state_t             *slot = key_runtime_primary_slot();
+    key_runtime_slot_press_plan_t   plan;
+    keypos_t                        pos = test_keypos(6, 6);
+
+    test_reset_state();
+
+    slot->pending_multi_tap = (multi_tap_t){
+        .keycode         = TEST_MULTI_TAP_KEY,
+        .key_pos         = pos,
+        .count           = 1,
+        .single_action   = TEST_SINGLE_ACTION,
+        .tap_hold_term   = 120,
+        .multi_tap_term  = 150,
+    };
+
+    plan = key_runtime_slot_prepare_handled_press(
+        slot,
+        TEST_MULTI_TAP_KEY,
+        pos,
+        false,
+        true,
+        true,
+        3,
+        TEST_SINGLE_ACTION,
+        hold_behavior_none(),
+        hold_behavior_none(),
+        120,
+        240,
+        150,
+        false,
+        false,
+        false);
+
+    CHECK(plan.handled);
+    CHECK(!plan.pending_multi_tap_flush.handled);
+    CHECK(plan.dispatch_action == KC_NO);
+    CHECK(plan.layer_press);
+    CHECK(plan.layer == 3);
+    CHECK(plan.reclaim_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
+    CHECK(plan.begin_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
+    CHECK(slot->keycode == TEST_MULTI_TAP_KEY);
+    CHECK(slot->key_pos.row == pos.row);
+    CHECK(slot->key_pos.col == pos.col);
+    CHECK(slot->tap_action == KC_NO);
+    CHECK(slot->hold_fired);
+    CHECK(slot->pending_multi_tap.count == 2);
+    CHECK(!slot->pending_multi_tap.pending_hold);
+}
+
+static void test_prepare_handled_press_flushes_pending_multi_tap_before_begin(void) {
+    active_key_state_t             *slot = key_runtime_primary_slot();
+    key_runtime_slot_press_plan_t   plan;
+    keypos_t                        pending_pos = test_keypos(7, 0);
+    keypos_t                        press_pos   = test_keypos(7, 1);
+
+    test_reset_state();
+
+    slot->pending_multi_tap = (multi_tap_t){
+        .keycode       = TEST_MULTI_TAP_KEY,
+        .key_pos       = pending_pos,
+        .count         = 1,
+        .single_action = TEST_SINGLE_ACTION,
+    };
+
+    plan = key_runtime_slot_prepare_handled_press(
+        slot,
+        TEST_ACTIVE_KEY,
+        press_pos,
+        false,
+        false,
+        false,
+        0,
+        TEST_SINGLE_ACTION,
+        (hold_behavior_t){
+            .present = true,
+            .action  = TEST_HOLD_ACTION,
+            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        },
+        hold_behavior_none(),
+        120,
+        240,
+        150,
+        true,
+        false,
+        true);
+
+    CHECK(plan.handled);
+    CHECK(plan.pending_multi_tap_flush.handled);
+    CHECK(plan.pending_multi_tap_flush.action == TEST_SINGLE_ACTION);
+    CHECK(plan.pending_multi_tap_flush.repeat_count == 1);
+    CHECK(plan.reclaim_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
+    CHECK(plan.begin_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
+    CHECK(plan.begin_request.action == TEST_HOLD_ACTION);
+    CHECK(slot->keycode == TEST_ACTIVE_KEY);
+    CHECK(slot->key_pos.row == press_pos.row);
+    CHECK(slot->key_pos.col == press_pos.col);
+    CHECK(slot->tap_action == TEST_SINGLE_ACTION);
+    CHECK(slot->held_action_keycode == TEST_HOLD_ACTION);
+    CHECK(slot->implicit_hold);
+    CHECK(slot->pd_mode_was_locked_on_press);
+    CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
+}
+
 static void test_interrupt_on_other_press_marks_layer_and_activates_fallback_hold(void) {
     active_key_state_t               *slot = key_runtime_primary_slot();
     key_runtime_slot_effect_request_t request;
@@ -583,6 +687,8 @@ int main(void) {
     test_take_pending_multi_tap_hold_release_returns_held_lifecycle();
     test_take_pending_multi_tap_flush_prefers_exact_step_tap();
     test_begin_press_sets_metadata_and_immediate_hold_request();
+    test_prepare_handled_press_matching_pending_multi_tap_reuses_slot();
+    test_prepare_handled_press_flushes_pending_multi_tap_before_begin();
     test_interrupt_on_other_press_marks_layer_and_activates_fallback_hold();
     test_commit_immediate_hold_sets_flags_and_feedback_request();
     test_take_flush_unregisters_held_action();

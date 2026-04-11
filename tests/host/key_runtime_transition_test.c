@@ -517,7 +517,7 @@ static void test_modifier_multi_tap_first_tap_is_buffered(void) {
     key.behavior.has_multi_tap = true;
 
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record, key, false, &plan));
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), KC_RIGHT_ALT, &press_record, key, false, &plan));
 
     CHECK(plan.count == 0);
     CHECK(active_key.keycode == KC_RIGHT_ALT);
@@ -548,7 +548,7 @@ static void test_single_tap_override_activates_fallback_hold_at_threshold(void) 
     key.behavior.single.tap = (tap_behavior_t)TAP_SENDS(TEST_FALLBACK_TAP_ACTION);
 
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record, key, false, &plan));
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), KC_RIGHT_ALT, &press_record, key, false, &plan));
 
     CHECK(plan.count == 0);
     CHECK(active_key.fallback_hold_pending);
@@ -579,7 +579,7 @@ static void test_single_tap_override_long_release_does_not_dispatch_tap(void) {
     key.behavior.single.tap = (tap_behavior_t)TAP_SENDS(TEST_FALLBACK_TAP_ACTION);
 
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record, key, false, &plan));
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), KC_RIGHT_ALT, &press_record, key, false, &plan));
 
     fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 10);
 
@@ -600,7 +600,7 @@ static void test_non_modifier_single_tap_override_activates_fallback_hold_at_thr
     key.behavior.single.tap = (tap_behavior_t)TAP_SENDS(TEST_FALLBACK_TAP_ACTION);
 
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_press(TEST_PLAIN_KEY, &press_record, key, false, &plan));
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), TEST_PLAIN_KEY, &press_record, key, false, &plan));
 
     CHECK(plan.count == 0);
     CHECK(active_key.fallback_hold_pending);
@@ -679,7 +679,7 @@ static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
                            });
 
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record_1, key, false, &plan));
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record_1.event.key), KC_RIGHT_ALT, &press_record_1, key, false, &plan));
     CHECK(plan.count == 0);
 
     fake_time = (uint16_t)(fake_time + 50);
@@ -691,7 +691,7 @@ static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
 
     fake_time = (uint16_t)(fake_time + 50);
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_press(KC_RIGHT_ALT, &press_record_2, key, false, &plan));
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record_2.event.key), KC_RIGHT_ALT, &press_record_2, key, false, &plan));
 
     CHECK(plan.count == 1);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
@@ -829,7 +829,7 @@ static void test_press_uses_free_secondary_slot_before_flushing_previous_tap(voi
     };
 
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_press(TEST_NEW_KEY, &record, key, false, &plan));
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(record.event.key), TEST_NEW_KEY, &record, key, false, &plan));
 
     CHECK(plan.count == 1);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
@@ -870,7 +870,7 @@ static void test_press_flushes_previous_tap_when_all_slots_are_busy(void) {
     };
 
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_press(TEST_NEW_KEY, &record, key, false, &plan));
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(record.event.key), TEST_NEW_KEY, &record, key, false, &plan));
 
     CHECK(plan.count == 2);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
@@ -973,7 +973,7 @@ static void test_press_reclaims_pending_multi_tap_before_active_slot(void) {
     };
 
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_press(TEST_NEW_KEY, &record, key, false, &plan));
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(record.event.key), TEST_NEW_KEY, &record, key, false, &plan));
 
     CHECK(plan.count == 2);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION);

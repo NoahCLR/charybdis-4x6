@@ -16,6 +16,7 @@
 #include "../pointing/pd_mode_flags.h"
 #include "delayed_action.h"
 #include "handled_key.h"
+#include "key_runtime_state.h"
 
 typedef enum {
     KEY_RUNTIME_TRANSITION_EFFECT_NONE = 0,
@@ -73,6 +74,6 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan);
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_transition_plan_t *plan);
-bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *record, handled_key_view_t key, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan);
+bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t keycode, keyrecord_t *record, handled_key_view_t key, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan);
 bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_view_t key, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan);

@@ -93,6 +93,18 @@ typedef struct {
     uint8_t             repeat_count;
 } key_runtime_slot_pending_multi_tap_flush_t;
 
+typedef struct {
+    bool                           handled;
+    key_runtime_slot_pending_multi_tap_flush_t pending_multi_tap_flush;
+    uint16_t                       dispatch_action;
+    bool                           layer_press;
+    uint8_t                        layer;
+    keypos_t                       reclaim_key_pos;
+    key_runtime_slot_effect_request_t reclaim_request;
+    keypos_t                       begin_key_pos;
+    key_runtime_slot_effect_request_t begin_request;
+} key_runtime_slot_press_plan_t;
+
 typedef enum {
     KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_NONE = 0,
     KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_DELAYED_ACTION,
@@ -144,6 +156,7 @@ key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(uint16_t 
 key_runtime_slot_scan_resolution_t key_runtime_slot_resolve_scan(active_key_state_t active_key_state, uint16_t elapsed);
 key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_resolve_pending_multi_tap_scan(active_key_state_t active_key_state, multi_tap_t multi_tap_state, uint16_t elapsed);
 key_runtime_slot_effect_request_t key_runtime_slot_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired, bool implicit_hold, bool fallback_hold_pending, bool pd_mode_was_locked_on_press);
+key_runtime_slot_press_plan_t key_runtime_slot_prepare_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, bool active_held_action_survives_flush, bool has_multi_tap, bool is_momentary_layer, uint8_t layer, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool implicit_hold, bool fallback_hold_pending, bool pd_mode_was_locked_on_press);
 key_runtime_slot_effect_request_t key_runtime_slot_activate_pending_fallback_hold_request(active_key_state_t *slot);
 key_runtime_slot_effect_request_t key_runtime_slot_interrupt_on_other_press(active_key_state_t *slot, keypos_t other_key_pos);
 key_runtime_slot_effect_request_t key_runtime_slot_commit_immediate_hold(active_key_state_t *slot, bool needs_feedback, bool completes_hold);
