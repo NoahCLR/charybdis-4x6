@@ -6,49 +6,13 @@
 
 #ifdef VIA_ENABLE
 
-#    include QMK_KEYBOARD_H // IWYU pragma: keep
-
-#    include "dynamic_keymap.h"
-#    include "eeprom.h"
-#    include "nvm_eeprom_eeconfig_internal.h" // IWYU pragma: keep
-#    include "nvm_eeprom_via_internal.h"
-#    include "via.h"
-#    ifdef ENCODER_MAP_ENABLE
-#        include "encoder.h"
-#    endif
-
-#    include "noah_keymap.h"
+#    include "noah_keymap_ids.h"
 #    include "macro_payload.h"
+#    include "../compat/qmk_via_contract.h"
 #    include "../rgb/rgb_runtime.h"
 
 #    ifdef CONSOLE_ENABLE
 #        include "print.h"
-#    endif
-
-#    ifndef DYNAMIC_KEYMAP_EEPROM_MAX_ADDR
-#        define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR (TOTAL_EEPROM_BYTE_COUNT - 1)
-#    endif
-
-#    ifndef DYNAMIC_KEYMAP_EEPROM_ADDR
-#        define DYNAMIC_KEYMAP_EEPROM_ADDR (VIA_EEPROM_CONFIG_END)
-#    endif
-
-#    ifndef DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR
-#        define DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR (DYNAMIC_KEYMAP_EEPROM_ADDR + (DYNAMIC_KEYMAP_LAYER_COUNT * MATRIX_ROWS * MATRIX_COLS * 2))
-#    endif
-
-#    ifdef ENCODER_MAP_ENABLE
-#        ifndef DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR
-#            define DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR (DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR + (DYNAMIC_KEYMAP_LAYER_COUNT * NUM_ENCODERS * 2 * 2))
-#        endif
-#    else
-#        ifndef DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR
-#            define DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR (DYNAMIC_KEYMAP_ENCODER_EEPROM_ADDR)
-#        endif
-#    endif
-
-#    ifndef DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE
-#        define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE (DYNAMIC_KEYMAP_EEPROM_MAX_ADDR - DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR + 1)
 #    endif
 
 typedef enum {
@@ -115,7 +79,7 @@ static bool via_macro_seed_writer_flush(via_macro_seed_writer_t *writer) {
     }
 
     start_offset = (uint16_t)(writer->offset - writer->buffered);
-    dynamic_keymap_macro_set_buffer(start_offset, writer->buffered, writer->chunk);
+    noah_qmk_via_macro_set_buffer(start_offset, writer->buffered, writer->chunk);
     writer->buffered = 0;
     return true;
 }
@@ -169,10 +133,10 @@ static bool seed_via_default_macros(uint16_t capacity, uint16_t *written) {
 }
 
 static void apply_via_default_macros(void) {
-    uint16_t capacity = dynamic_keymap_macro_get_buffer_size();
+    uint16_t capacity = noah_qmk_via_macro_seed_capacity();
     uint16_t written  = 0;
 
-    if (capacity == 0 || capacity > DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE) {
+    if (capacity == 0) {
         return;
     }
 
@@ -204,30 +168,23 @@ void noah_via_macro_defaults_keyboard_post_init(void) {
 }
 
 void via_init_kb(void) {
-    via_macro_seed_post_init_pending = !via_eeprom_is_valid();
+    via_macro_seed_post_init_pending = noah_qmk_via_should_seed_defaults_post_init();
 }
 
 bool via_command_kb(uint8_t *data, uint8_t length) {
+    uint8_t effects;
+
     (void)length;
 
-    switch (data[0]) {
-#    ifdef VIA_EEPROM_ALLOW_RESET
-        case id_eeprom_reset:
-            via_macro_seed_scan_pending = true;
-            noah_rgb_runtime_invalidate_layer_maps();
-            return false;
-#    endif
-        case id_dynamic_keymap_set_keycode:
-        case id_dynamic_keymap_set_buffer:
-        case id_dynamic_keymap_reset:
-            noah_rgb_runtime_invalidate_layer_maps();
-            return false;
-        case id_dynamic_keymap_macro_reset:
-            via_macro_seed_scan_pending = true;
-            return false;
-        default:
-            return false;
+    effects = noah_qmk_via_command_effects(data[0]);
+    if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS) {
+        via_macro_seed_scan_pending = true;
     }
+    if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB) {
+        noah_rgb_runtime_invalidate_layer_maps();
+    }
+
+    return false;
 }
 
 #endif

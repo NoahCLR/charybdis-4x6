@@ -8,6 +8,7 @@ COMMON_SOURCES="
 users/noah/runtime_init.c
 users/noah/lib/compat/qmk_contract.c
 users/noah/lib/compat/qmk_mod_contract.c
+users/noah/lib/compat/qmk_via_contract.c
 users/noah/lib/action/action_lifecycle.c
 users/noah/lib/macro/via_macro_defaults.c
 users/noah/lib/state/split_runtime_sync.c

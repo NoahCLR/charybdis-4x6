@@ -62,6 +62,24 @@ Completed in this pass:
   - `noah_keymap_ids.h` in runtime modules that only need ids or materialized authored data
   - `noah_runtime.h` in runtime test paths that actually call `noah_*` hook helpers
 - Confirmed that only authoring translation units and authoring-oriented validation tests still include `noah_keymap.h` directly.
+- Added a dedicated VIA compatibility layer for default-macro seeding and command classification:
+  - `users/noah/lib/compat/qmk_via_contract.h`
+  - `users/noah/lib/compat/qmk_via_contract.c`
+- Moved the remaining fork-coupled VIA seeding assumptions out of `users/noah/lib/macro/via_macro_defaults.c`:
+  - dynamic macro seed-capacity calculation
+  - macro-buffer writes
+  - post-init EEPROM validity decision
+  - VIA command id classification for RGB invalidation vs macro reseeding
+- Reduced `users/noah/lib/macro/via_macro_defaults.c` to userspace policy and scheduling logic over the new compat surface.
+- Added focused host coverage for the VIA default-macro path:
+  - `tests/host/via_macro_defaults_test.c`
+  - `tests/host/run_via_macro_defaults_tests.sh`
+- Added host stub headers needed by the new VIA compat path:
+  - `tests/host/include/via.h`
+  - `tests/host/include/eeprom.h`
+  - `tests/host/include/nvm_eeprom_eeconfig_internal.h`
+  - `tests/host/include/nvm_eeprom_via_internal.h`
+  - updated `tests/host/include/dynamic_keymap.h` with `dynamic_keymap_macro_set_buffer(...)`
 
 Verification completed in this pass:
 
@@ -71,6 +89,7 @@ Verification completed in this pass:
 - `sh tests/host/run_rgb_validation_tests.sh`
 - `sh tests/host/run_keyboard_mod_ownership_tests.sh`
 - `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_via_macro_defaults_tests.sh`
 - `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
 - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
 - `sh tests/host/run_pointer_layer_policy_tests.sh`
@@ -87,5 +106,5 @@ Follow-up wiring completed during verification:
 Next recommended step:
 
 - decide whether the next architectural slice should be:
-  - finish Phase 1 by moving remaining fork-coupled VIA seeding assumptions behind the compatibility boundary
   - continue Phase 2 by tightening authoring-only tests and docs around `noah_keymap.h` vs `noah_runtime.h`
+  - start the larger structural work on the pd-mode trait/plugin boundary
