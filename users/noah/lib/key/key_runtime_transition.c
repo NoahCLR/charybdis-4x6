@@ -171,16 +171,20 @@ static void key_runtime_transition_plan_slot_effect_request(key_runtime_transiti
     }
 }
 
+static void key_runtime_transition_plan_slot_effect_request_if_present(key_runtime_transition_plan_t *plan, keypos_t key_pos, key_runtime_slot_effect_request_t request) {
+    if (!key_runtime_transition_slot_effect_request_has_effect(request)) {
+        return;
+    }
+
+    key_runtime_transition_plan_slot_effect_request(plan, key_pos, request);
+}
+
 static void key_runtime_transition_apply_pending_multi_tap_flush(key_runtime_slot_pending_multi_tap_flush_t flush, key_runtime_transition_plan_t *plan) {
     if (!flush.handled) {
         return;
     }
 
     key_runtime_transition_plan_delayed_action(plan, flush.action, flush.mods, flush.repeat_count);
-}
-
-static void key_runtime_transition_flush_slot_pending_multi_tap(active_key_state_t *slot, key_runtime_transition_plan_t *plan) {
-    key_runtime_transition_apply_pending_multi_tap_flush(key_runtime_slot_take_pending_multi_tap_flush(slot), plan);
 }
 
 static void key_runtime_transition_apply_slot_press_plan(key_runtime_slot_press_plan_t press, key_runtime_transition_plan_t *plan) {
@@ -194,13 +198,8 @@ static void key_runtime_transition_apply_slot_press_plan(key_runtime_slot_press_
         key_runtime_transition_plan_layer_press(plan, press.begin_key_pos, press.layer);
     }
 
-    if (key_runtime_transition_slot_effect_request_has_effect(press.reclaim_request)) {
-        key_runtime_transition_plan_slot_effect_request(plan, press.reclaim_key_pos, press.reclaim_request);
-    }
-
-    if (key_runtime_transition_slot_effect_request_has_effect(press.begin_request)) {
-        key_runtime_transition_plan_slot_effect_request(plan, press.begin_key_pos, press.begin_request);
-    }
+    key_runtime_transition_plan_slot_effect_request_if_present(plan, press.reclaim_key_pos, press.reclaim_request);
+    key_runtime_transition_plan_slot_effect_request_if_present(plan, press.begin_key_pos, press.begin_request);
 }
 
 static void key_runtime_transition_apply_active_release(key_runtime_slot_release_apply_t release, key_runtime_transition_plan_t *plan) {
@@ -230,8 +229,8 @@ static void key_runtime_transition_apply_active_release(key_runtime_slot_release
 }
 
 static void key_runtime_transition_apply_slot_scan(keypos_t key_pos, key_runtime_slot_scan_apply_t apply, key_runtime_transition_plan_t *plan) {
-    key_runtime_transition_plan_slot_effect_request(plan, key_pos, apply.immediate_hold_request);
-    key_runtime_transition_plan_slot_effect_request(plan, key_pos, apply.outcome_request);
+    key_runtime_transition_plan_slot_effect_request_if_present(plan, key_pos, apply.immediate_hold_request);
+    key_runtime_transition_plan_slot_effect_request_if_present(plan, key_pos, apply.outcome_request);
 }
 
 static void key_runtime_transition_apply_pending_multi_tap_hold_release(key_runtime_slot_pending_multi_tap_hold_release_t release, key_runtime_transition_plan_t *plan) {
@@ -267,7 +266,7 @@ static void key_runtime_transition_apply_pending_multi_tap_plan(key_runtime_slot
             if (pending_multi_tap.release_layer_before_action) {
                 key_runtime_transition_plan_layer_release(plan, pending_multi_tap.key_pos);
             }
-            key_runtime_transition_plan_slot_effect_request(plan, pending_multi_tap.key_pos, pending_multi_tap.effect_request);
+            key_runtime_transition_plan_slot_effect_request_if_present(plan, pending_multi_tap.key_pos, pending_multi_tap.effect_request);
             return;
         case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_FLUSH:
             key_runtime_transition_apply_pending_multi_tap_flush(pending_multi_tap.flush, plan);
@@ -350,7 +349,7 @@ void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan)
             continue;
         }
 
-        key_runtime_transition_flush_slot_pending_multi_tap(slot, plan);
+        key_runtime_transition_apply_pending_multi_tap_flush(key_runtime_slot_take_pending_multi_tap_flush(slot), plan);
     }
 }
 
@@ -361,7 +360,7 @@ void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_po
             continue;
         }
 
-        key_runtime_transition_plan_slot_effect_request(plan, slot->key_pos, key_runtime_slot_interrupt_on_other_press(slot, key_pos));
+        key_runtime_transition_plan_slot_effect_request_if_present(plan, slot->key_pos, key_runtime_slot_interrupt_on_other_press(slot, key_pos));
     }
 }
 

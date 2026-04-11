@@ -439,10 +439,30 @@ Additional verification completed for the continued Phase 4 pending-multi-tap ro
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Completed the final Phase 4 cleanup sweep:
+
+- reduced the remaining duplication in `users/noah/lib/key/key_runtime_transition.c` by:
+  - adding a single `key_runtime_transition_plan_slot_effect_request_if_present(...)` helper for conditional effect-request queueing
+  - removing the last one-off pending-multi-tap flush wrapper and reusing the shared delayed-flush planner directly
+  - routing interrupt, press-plan, scan-plan, and pending-multi-tap plan application through the same conditional effect-request helper
+- confirmed that the remaining logic in `key_runtime_transition.c` is now mostly thin orchestration over slot-owned plan/apply results rather than another central decision tree
+
+Additional verification completed for the Phase 4 cleanup/closeout pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Phase status:
+
+- Phase 4 is complete enough to close. The handled-key runtime no longer centers its behavior decisions in a single transition-file-local state machine; slot-owned helpers now own press, release, scan, interrupt, flush, and pending multi-tap resolution/application, while transition code is primarily effect-plan assembly and execution.
+
 Next recommended step:
 
-- continue Phase 4 with final transition cleanup and boundary tightening, especially:
-  - reducing the remaining slot lookup/orchestration wrappers in `key_runtime_transition.c`
-  - deciding whether the remaining release-entry discovery can move beside press/release/scan process helpers or is now small enough to leave alone
-  - doing a final Phase 4 sweep for dead helpers, naming cleanup, and docs
-  so Phase 4 can be called complete before switching to the RGB/runtime decomposition work.
+- start Phase 5 by decomposing `users/noah/lib/rgb/rgb_runtime.c` into render stages, keeping the current visual/render order intact while splitting layer composition, automouse blend, preview, pd-mode overlay, and key feedback into narrower testable units
