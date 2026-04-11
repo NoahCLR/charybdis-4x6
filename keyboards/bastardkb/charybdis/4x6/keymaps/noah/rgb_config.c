@@ -8,7 +8,8 @@
 // Want to change layer, mode, LED-group, automouse, or key-behavior feedback
 // colors?  Edit this file.
 // Want to change the rendering logic?  Edit users/noah/lib/rgb/rgb_runtime.c.
-// For config helper macros, see users/noah/lib/rgb/rgb_config_helpers.h.
+// For shared RGB config types and the HSV helper, see
+// users/noah/lib/rgb/rgb_config_helpers.h.
 // For split-safe LED helper functions, see users/noah/lib/rgb/rgb_helpers.h.
 //
 // ────────────────────────────────────────────────────────────────────────────
@@ -62,21 +63,23 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // ─── Pointing device mode colors ────────────────────────────────────────────
 //
 // Overlay colors for the right half when a trackball mode is active.
-// Each entry is tagged with its mode flag so the order doesn't need to
+// Each entry is tagged with its pointing mode so the order doesn't need to
 // match pd_modes[] — adding or reordering modes won't silently break colors.
 // { .pointing_mode = ..., .color = HSV(hue, sat, val) }
-DEFINE_PD_MODE_COLORS({.pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},  // orange
-                      {.pointing_mode = PD_MODE_VOLUME, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},      // yellow
-                      {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)}, // magenta
-                      {.pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},      // cyan
-                      {.pointing_mode = PD_MODE_PINCH, .color = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},       // lime
-                      {.pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)}         // light green
-);
+const pd_mode_color_t pd_mode_colors[] = {
+    {.pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},  // orange
+    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},      // yellow
+    {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)}, // magenta
+    {.pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},      // cyan
+    {.pointing_mode = PD_MODE_PINCH, .color = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},       // lime
+    {.pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)}         // light green
+};
+const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 
-// ─── Per-layer LED group highlights ─────────────────────────────────────────
+// ─── Layer LED Groups ───────────────────────────────────────────────────────
 //
-// Paint specific LEDs a different color when a layer is active (e.g. to mark
-// modifier keys).  Define an LED index array, then add a row to the table.
+// Paint specific LEDs a different color when a layer is active. Define an LED
+// index array, then add a row to the table.
 //
 // ╭────────────────────────╮                 ╭────────────────────────╮
 //    0   7   8  15  16  20                     49  45  44  37  36  29
@@ -90,36 +93,41 @@ DEFINE_PD_MODE_COLORS({.pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(21, 255
 //                       26  27  28     53  54
 //                           25  24     55     (56)
 //                     ╰────────────╯ ╰────────╯
-
+//
 // Optional examples. Uncomment any LED index lists you want, then uncomment
-// DEFINE_LAYER_LED_GROUPS(...) below to enable per-layer highlights. If you
-// leave the definition commented out, shared defaults keep the exported table
-// empty.
+// the layer_led_groups_data block below plus EXPORT_LAYER_LED_GROUPS(...) to
+// enable per-layer highlights. If you leave it commented out, shared defaults
+// keep the exported table empty.
+//
 // static const uint8_t nav_highlight_leds[] = {33, 18};
 // static const uint8_t sym_highlight_leds[] = {4, 47};
 // static const uint8_t left_thumb_leds[]    = {26, 27, 28, 25, 24};
 // static const uint8_t right_thumb_leds[]   = {53, 54, 55};
-
-// static const uint8_t trackball_led[] = {56}; // Custom trackball led soldered on the right half, not part of the standard RGB matrix.
-// Highlight specific LEDs when a keyboard layer is active.
 //
-// { .layer = ..., .color = HSV(hue, sat, val), .leds = ..., .count = ARRAY_SIZE(...) }
-// DEFINE_LAYER_LED_GROUPS(
+// static const layer_led_group_t layer_led_groups_data[] = {
 //     { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = nav_highlight_leds, .count = ARRAY_SIZE(nav_highlight_leds) },  // red
 //     { .layer = LAYER_SYM, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = sym_highlight_leds, .count = ARRAY_SIZE(sym_highlight_leds) }  // yellow
-// );
-
-// Same as above, but keyed on pointing device mode instead of layers.
-// Active while a trackball mode (volume, zoom, etc.) is active.
+// };
+// EXPORT_LAYER_LED_GROUPS(layer_led_groups_data);
 //
-// { .pointing_mode = ..., .color = HSV(hue, sat, val), .leds = ..., .count = ARRAY_SIZE(...) }
-// Uncomment DEFINE_PD_MODE_LED_GROUPS(...) below if you want one or more
-// per-mode LED highlights. If you leave it commented out, shared defaults keep
-// the exported table empty.
-// DEFINE_PD_MODE_LED_GROUPS(
+//
+// ─── Pointing-Device Mode LED Groups ────────────────────────────────────────
+//
+// Paint specific LEDs a different color while a pointing mode is active.
+//
+// Uncomment the pd_mode_led_groups_data block below plus
+// EXPORT_PD_MODE_LED_GROUPS(...) if you want one or more per-mode LED
+// highlights. If you leave it commented out, shared defaults keep the
+// exported table empty.
+//
+// static const uint8_t trackball_led[] = {56}; // Custom trackball led soldered on the right half, not part of the standard RGB matrix.
+//
+// static const pd_mode_led_group_t pd_mode_led_groups_data[] = {
 //     { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = trackball_led, .count = ARRAY_SIZE(trackball_led) }
-// );
-
+// };
+// EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data);
+//
+//
 // ─── Auto-mouse timeout fade ────────────────────────────────────────────────
 //
 // Auto-mouse starts from the authored auto-mouse layer rendering above and
@@ -166,10 +174,11 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 // overlay, so authored tier feedback stays visible even on the trackball half
 // while a mode color is active.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(.multi_tap_pending_color = HSV(0, 0, 150),                              // neutral white while the engine is still resolving the active tap index
-                                    .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // orange for authored hold-tier pending / active states and hold-tier commit pulses
-                                    .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) // icy cyan for authored long-hold-tier active states and long-hold-tier commit pulses
-);
+const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
+    .multi_tap_pending_color = HSV(0, 0, 150),                              // neutral white while the engine is still resolving the active tap index
+    .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // orange for authored hold-tier pending / active states and hold-tier commit pulses
+    .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) // icy cyan for authored long-hold-tier active states and long-hold-tier commit pulses
+};
 #    endif
 
 #endif // RGB_MATRIX_ENABLE

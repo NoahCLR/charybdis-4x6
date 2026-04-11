@@ -77,9 +77,16 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
         },
 };
 
-DEFINE_PD_MODE_COLORS({.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212)}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222)});
+const pd_mode_color_t pd_mode_colors[] = {
+    {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212)},
+    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222)},
+};
+const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 static const uint8_t volume_mode_group_leds[] = {1, 6};
-DEFINE_PD_MODE_LED_GROUPS({.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)});
+static const pd_mode_led_group_t pd_mode_led_groups_data[] = {
+    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)},
+};
+EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data);
 const automouse_fade_end_config_t automouse_fade_end_config = {
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
     .mode = END_COLOR_ON_ALL_KEYS,
@@ -90,7 +97,11 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 #endif
     .end_color = HSV(200, 210, 220),
 };
-DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(.multi_tap_pending_color = HSV(1, 2, 3), .hold_active_color = HSV(4, 5, 6), .long_hold_active_color = HSV(7, 8, 9), );
+const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
+    .multi_tap_pending_color = HSV(1, 2, 3),
+    .hold_active_color       = HSV(4, 5, 6),
+    .long_hold_active_color  = HSV(7, 8, 9),
+};
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
     [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL}, [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME}, [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS}, [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM}, [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW}, [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH},
 };

@@ -20,7 +20,7 @@ If you want to change how RGB is rendered, look at:
 - [`users/noah/lib/rgb/rgb_automouse.c`](../users/noah/lib/rgb/rgb_automouse.c)
 - [`users/noah/lib/rgb/rgb_helpers.h`](../users/noah/lib/rgb/rgb_helpers.h)
 
-If you want to change the declarative config macros used by `rgb_config.c`,
+If you want to change the small helper surface used by `rgb_config.c`,
 look at:
 
 - [`users/noah/lib/rgb/rgb_config_helpers.h`](../users/noah/lib/rgb/rgb_config_helpers.h)
@@ -76,11 +76,12 @@ useful for:
 `pd_mode_colors[]` defines the right-half overlay color for each active
 pointing-device mode.
 
-In `rgb_config.c`, use `DEFINE_PD_MODE_COLORS(...);` so the matching
-`pd_mode_color_count` is derived automatically.
+In `rgb_config.c`, declare `pd_mode_colors[]` and `pd_mode_color_count`
+directly.
 
 Each row is keyed by a `PD_MODE_*` flag rather than by array index. That means
-the color mapping follows the mode flag itself, not the order of `pd_modes[]`.
+the color mapping follows the pointing mode itself, not the order of
+`pd_modes[]`.
 
 Use rows like:
 
@@ -99,7 +100,9 @@ addition to, a full-board color.
 In `rgb_config.c`, use one of these helper forms:
 
 - leave the section commented out when no per-layer LED groups are enabled
-- `DEFINE_LAYER_LED_GROUPS(...);` when you want one or more authored rows
+- declare `layer_led_groups_data` and then export it with
+  `EXPORT_LAYER_LED_GROUPS(layer_led_groups_data)` when you want one or more
+  authored rows
 
 Each row contains:
 
@@ -134,7 +137,9 @@ the trackball LED or one side of the board.
 As above, use:
 
 - leave the section commented out when no per-mode LED groups are enabled
-- `DEFINE_PD_MODE_LED_GROUPS(...);` when you want one or more authored rows
+- declare `pd_mode_led_groups_data` and then export it with
+  `EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data)` when you want one or
+  more authored rows
 
 Use rows like:
 
@@ -172,15 +177,14 @@ later overlays such as pd-mode color or key feedback still paint on top.
 
 ### `key_behavior_feedback_colors`
 
-In `rgb_config.c`, author the key-behavior feedback colors as three explicit
-rows:
+In `rgb_config.c`, declare `key_behavior_feedback_colors` directly:
 
 ```c
-DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(
+const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(0, 0, 150),
     .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-);
+};
 ```
 
 Those rows populate the shared
@@ -248,11 +252,9 @@ Examples:
 - `layer_led_group_t`
 - `pd_mode_led_group_t`
 
-[`users/noah/lib/rgb/rgb_config_helpers.h`](../users/noah/lib/rgb/rgb_config_helpers.h) defines the declarative authoring macros such as:
-
-- `DEFINE_PD_MODE_COLORS(...)`
-- `DEFINE_LAYER_LED_GROUPS(...)`
-- `DEFINE_PD_MODE_LED_GROUPS(...)`
+[`users/noah/lib/rgb/rgb_config_helpers.h`](../users/noah/lib/rgb/rgb_config_helpers.h)
+defines the shared `HSV(...)`, `EXPORT_LAYER_LED_GROUPS(...)`, and
+`EXPORT_PD_MODE_LED_GROUPS(...)` helpers used by the authored config tables.
 
 `rgb_helpers.h` also provides split-safe helper functions such as:
 
@@ -282,13 +284,15 @@ Edit the matching row in `pd_mode_colors[]`.
 ### Add a small highlight to one layer
 
 1. Define a `uint8_t` LED index array.
-2. Uncomment `DEFINE_LAYER_LED_GROUPS(...)` if needed, then add the rows you
+2. Uncomment the `layer_led_groups_data` block plus
+   `EXPORT_LAYER_LED_GROUPS(layer_led_groups_data)`, then add the rows you
    want.
 
 ### Add a small highlight to one pd mode
 
 1. Define a `uint8_t` LED index array.
-2. Uncomment `DEFINE_PD_MODE_LED_GROUPS(...)` if needed, then add the rows you
+2. Uncomment the `pd_mode_led_groups_data` block plus
+   `EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data)`, then add the rows you
    want.
 
 ### Change the auto-mouse timeout fade

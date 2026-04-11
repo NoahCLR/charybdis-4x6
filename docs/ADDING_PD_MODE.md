@@ -266,7 +266,7 @@ Add a new row to `pd_mode_colors[]`:
 { .pointing_mode = PD_MODE_EXAMPLE, .color = HSV(120, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },
 ```
 
-Optional: uncomment `DEFINE_PD_MODE_LED_GROUPS(...);` if the mode wants a
+Optional: uncomment the `pd_mode_led_groups_data` block if the mode wants a
 specific LED subset highlighted.
 
 ### 8. Update User Docs If The Mode Is Real
