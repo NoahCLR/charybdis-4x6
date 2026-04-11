@@ -15,6 +15,8 @@ LTO_ENABLE = yes
 
 SRC += runtime_init.c
 SRC += hooks.c
+SRC += lib/compat/qmk_contract.c
+SRC += lib/compat/qmk_mod_contract.c
 SRC += lib/action/action_lifecycle.c
 SRC += lib/action/synthetic_record.c
 SRC += lib/split_role.c

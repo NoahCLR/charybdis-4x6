@@ -6,10 +6,9 @@
 
 #include "pd_modes.h"
 #include "pointer_layer_policy.h"
+#include "../compat/qmk_contract.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-#    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
-
 static inline bool pointer_layer_policy_is_layer_hold_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
 }
@@ -36,7 +35,7 @@ static bool pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(uint16_t 
 }
 
 static inline bool pointer_layer_policy_auto_mouse_anchored(void) {
-    return get_auto_mouse_toggle() || get_auto_mouse_key_tracker() != 0 || pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored();
+    return noah_qmk_contract_auto_mouse_toggle_enabled() || noah_qmk_contract_auto_mouse_key_tracker() != 0 || pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored();
 }
 
 bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
@@ -68,13 +67,13 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
         return;
     }
 
-    auto_mouse_keyevent(pressed);
+    noah_qmk_contract_auto_mouse_keyevent(pressed);
 }
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     bool          arrow_mode_active    = pointer_layer_policy_arrow_mode_prefers_typing_layer();
     bool          auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored();
-    uint8_t       auto_mouse_layer     = get_auto_mouse_layer();
+    uint8_t       auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
     layer_state_t auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
     bool          sniping_layer_active = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
 

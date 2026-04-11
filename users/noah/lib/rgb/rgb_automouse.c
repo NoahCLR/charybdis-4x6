@@ -6,7 +6,7 @@
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 
-#    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
+#    include "../compat/qmk_contract.h"
 #    include "../pointing/pd_mode_flags.h"
 #    include "../state/split_runtime_sync.h"
 #    include "rgb_automouse.h"
@@ -21,7 +21,7 @@ uint16_t automouse_rgb_current_progress(void) {
     // rules before rendering.
     uint16_t progress;
     if (is_keyboard_master()) {
-        progress = automouse_rgb_progress(auto_mouse_get_time_elapsed());
+        progress = automouse_rgb_progress(noah_qmk_contract_auto_mouse_elapsed());
     } else {
         progress = split_runtime_sync_remote.automouse_progress;
     }

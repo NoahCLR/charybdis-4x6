@@ -9,9 +9,6 @@
 #    ifdef CONSOLE_ENABLE
 #        include "print.h"
 #    endif
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-#        include "pointing_device_auto_mouse.h" // QMK (firmware fork)
-#    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 #        include "../key/key_runtime_feedback.h"
 #    endif
@@ -21,6 +18,7 @@
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
 #        include "../rgb/rgb_automouse.h"
 #    endif
+#    include "../compat/qmk_contract.h"
 #    include "split_runtime_sync.h"
 #    include "transactions.h" // QMK
 
@@ -120,7 +118,7 @@ void split_runtime_sync_tick(void) {
     uint16_t raw_elapsed = 0;
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    raw_elapsed = auto_mouse_get_time_elapsed();
+    raw_elapsed = noah_qmk_contract_auto_mouse_elapsed();
 #    endif
 
     split_runtime_sync_elapsed(raw_elapsed);
@@ -142,7 +140,7 @@ void split_runtime_sync(void) {
     uint16_t raw_elapsed = 0;
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    raw_elapsed = auto_mouse_get_time_elapsed();
+    raw_elapsed = noah_qmk_contract_auto_mouse_elapsed();
 #    endif
 
     split_runtime_sync_elapsed_internal(raw_elapsed, true);

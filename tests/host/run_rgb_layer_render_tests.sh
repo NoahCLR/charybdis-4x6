@@ -36,6 +36,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
+    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
@@ -67,6 +68,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
+    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
@@ -98,6 +100,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
+    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/rgb_validation.c" \

@@ -41,6 +41,19 @@ Completed in this pass:
   - `KC_GRV`
   - `ARROW_MODE`
   Those rows were no longer referenced by `keymaps[][]` or active combo outputs.
+- Added a compatibility layer under `users/noah/lib/compat/` to centralize fork-specific QMK contracts:
+  - `qmk_contract.h`
+  - `qmk_contract.c`
+  - `qmk_mod_contract.c`
+- Moved the copied VIA dynamic macro playback contract out of `users/noah/lib/action/action_lifecycle.c` and into `users/noah/lib/compat/qmk_contract.c`.
+- Moved the `register_mods()` / `unregister_mods()` symbol override contract out of `users/noah/lib/state/keyboard_mod_ownership.c` and into `users/noah/lib/compat/qmk_mod_contract.c`.
+- Switched fork-specific auto-mouse API usage to the compatibility surface in:
+  - `users/noah/lib/pointing/pd_runtime.c`
+  - `users/noah/lib/pointing/pd_mode_registry.c`
+  - `users/noah/lib/pointing/pointer_layer_policy.c`
+  - `users/noah/lib/state/split_runtime_sync.c`
+  - `users/noah/lib/rgb/rgb_runtime.c`
+  - `users/noah/lib/rgb/rgb_automouse.c`
 
 Verification completed in this pass:
 
@@ -48,6 +61,12 @@ Verification completed in this pass:
 - `sh tests/host/run_keymap_validation_tests.sh`
 - `sh tests/host/run_real_profile_validation_tests.sh`
 - `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 
@@ -59,5 +78,5 @@ Follow-up wiring completed during verification:
 Next recommended step:
 
 - decide whether the next architectural slice should be:
-  - Phase 1 compatibility-layer work around fork-specific QMK contracts
-  - Phase 2 narrowing of the keymap authoring/runtime interface split
+  - finish Phase 1 by moving remaining fork-coupled VIA seeding assumptions behind the compatibility boundary
+  - start Phase 2 by splitting `users/noah/noah_keymap.h` into authoring and runtime-integration headers

@@ -7,11 +7,8 @@
 #include "noah_keymap.h"
 #include "pd_mode_manifest.h"
 #include "pd_mode_internal.h"
+#include "../compat/qmk_contract.h"
 #include "../state/keyboard_mod_ownership.h"
-
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-#    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
-#endif
 
 #include "pd_mode_handlers.h"
 
@@ -31,7 +28,7 @@ static void pd_mode_auto_mouse_sync_anchor(bool should_anchor) {
 
     // Pd-mode handlers freeze the outgoing mouse report, so locked modes need
     // an explicit auto-mouse anchor to behave like their physically-held form.
-    auto_mouse_keyevent(should_anchor);
+    noah_qmk_contract_auto_mouse_keyevent(should_anchor);
     pd_mode_auto_mouse_anchor_active = should_anchor;
 }
 
@@ -40,7 +37,7 @@ static void pd_mode_auto_mouse_activate(pd_mode_mask_t mode, bool was_any_mode_a
         // Arrow mode should fall back to the typing/nav surface immediately
         // instead of waiting for the auto-mouse timeout to drop the pointer
         // layer.
-        auto_mouse_layer_off();
+        noah_qmk_contract_auto_mouse_layer_off();
         return;
     }
 
@@ -60,18 +57,18 @@ static void pd_mode_auto_mouse_deactivate(pd_mode_mask_t mode, bool was_any_mode
 }
 
 static void scroll_mode_lock_attach_auto_mouse(void) {
-    if (get_auto_mouse_toggle()) {
+    if (noah_qmk_contract_auto_mouse_toggle_enabled()) {
         scroll_mode_auto_mouse_owned = false;
         return;
     }
 
-    auto_mouse_toggle();
+    noah_qmk_contract_auto_mouse_toggle();
     scroll_mode_auto_mouse_owned = true;
 }
 
 static void scroll_mode_lock_detach_auto_mouse(void) {
-    if (scroll_mode_auto_mouse_owned && get_auto_mouse_toggle()) {
-        auto_mouse_toggle();
+    if (scroll_mode_auto_mouse_owned && noah_qmk_contract_auto_mouse_toggle_enabled()) {
+        noah_qmk_contract_auto_mouse_toggle();
     }
 
     scroll_mode_auto_mouse_owned = false;

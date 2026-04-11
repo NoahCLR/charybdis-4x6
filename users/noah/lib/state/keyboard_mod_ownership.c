@@ -188,15 +188,3 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
 
     keyboard_mod_ownership_unregister_mods(keyboard_mod_ownership_mod_masks[index]);
 }
-
-// This userspace intentionally overrides QMK's register_mods()/unregister_mods()
-// symbols on this fork so all modifier registration flows through the shared
-// ownership refcount model. If the upstream fork changes how those symbols are
-// declared or routed, this override needs to be re-validated.
-void register_mods(uint8_t mods) {
-    keyboard_mod_ownership_register_mods(mods);
-}
-
-void unregister_mods(uint8_t mods) {
-    keyboard_mod_ownership_unregister_mods(mods);
-}

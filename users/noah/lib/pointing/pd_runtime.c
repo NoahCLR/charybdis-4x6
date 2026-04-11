@@ -7,15 +7,12 @@
 #include "noah_keymap.h"
 #include "pd_modes.h"
 #include "pointer_layer_policy.h"
-
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-#    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
-#endif
+#include "../compat/qmk_contract.h"
 
 #if defined(POINTING_DEVICE_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 void noah_pointing_device_init_user(void) {
-    set_auto_mouse_layer(AUTO_MOUSE_DEFAULT_LAYER);
-    set_auto_mouse_enable(true);
+    noah_qmk_contract_auto_mouse_set_layer(AUTO_MOUSE_DEFAULT_LAYER);
+    noah_qmk_contract_auto_mouse_set_enable(true);
 }
 
 bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {

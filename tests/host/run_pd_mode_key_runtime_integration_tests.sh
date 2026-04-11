@@ -20,6 +20,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/pd_mode_key_runtime_integration_test.c" \
+    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
     "$ROOT/users/noah/lib/key/held_action.c" \
     "$ROOT/users/noah/lib/key/key_behavior_lookup.c" \

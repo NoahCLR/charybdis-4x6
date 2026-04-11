@@ -15,9 +15,6 @@
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_MATRIX_WS2812)
 #    include "ws2812.h" // QMK driver buffer access
 #endif
-#if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
-#    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
-#endif
 #if defined(POINTING_DEVICE_ENABLE)
 #    include "../pointing/pd_modes.h"
 #endif
@@ -25,6 +22,7 @@
 #    include "../key/key_runtime_feedback.h"
 #    include "../state/split_runtime_sync.h"
 #endif
+#include "../compat/qmk_contract.h"
 
 // ─── Authored keymap data (defined in rgb_config.c) ──────────────────────
 #ifdef RGB_MATRIX_ENABLE
@@ -375,7 +373,7 @@ static layer_state_t rgb_runtime_layer_state_without_layer(layer_state_t state, 
 // feedback still paint later in the frame, so they can intentionally override
 // the fade result on top.
 static bool rgb_runtime_render_automouse_layer_stage(layer_state_t state, uint8_t led_min, uint8_t led_max) {
-    uint8_t  auto_mouse_layer = get_auto_mouse_layer();
+    uint8_t  auto_mouse_layer = noah_qmk_contract_auto_mouse_layer();
     uint16_t progress         = automouse_rgb_current_progress();
     uint8_t  blend            = automouse_rgb_blend_amount(progress);
 
@@ -460,7 +458,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     // The synthetic automouse destination is not a persistent board state.
     // Once this branch stops running, the next frame falls back to ordinary
     // layer rendering below.
-    if (layer_state_cmp(layer_state, get_auto_mouse_layer()) && automouse_rgb_should_render()) {
+    if (layer_state_cmp(layer_state, noah_qmk_contract_auto_mouse_layer()) && automouse_rgb_should_render()) {
         painted |= rgb_runtime_render_automouse_layer_stage(layer_state, led_min, led_max);
     } else
 #    endif
