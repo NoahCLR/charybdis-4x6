@@ -5,7 +5,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/key_runtime_feedback.h"
-#include "users/noah/lib/key/key_runtime_slot_result.h"
+#include "users/noah/lib/key/key_runtime_slot_step.h"
 #include "users/noah/lib/key/key_runtime_state.h"
 
 enum {
@@ -30,6 +30,17 @@ static void test_fail(const char *expr, const char *file, int line) {
 static void test_reset_state(void) {
     noah_runtime_shared_state = (runtime_shared_state_t){0};
     fake_time                 = 0;
+}
+
+static key_runtime_slot_result_t test_step_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_behavior_view_t behavior) {
+    return key_runtime_slot_step(slot, (key_runtime_slot_event_t){
+                                           .kind                = KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE,
+                                           .data.handled_release = {
+                                               .keycode  = keycode,
+                                               .key_pos  = key_pos,
+                                               .behavior = behavior,
+                                           },
+                                       });
 }
 
 uint16_t timer_read(void) {
@@ -250,7 +261,7 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
             },
     };
 
-    release = key_runtime_slot_take_handled_release_result(
+    release = test_step_handled_release(
         key_runtime_primary_slot(),
         TEST_MULTI_TAP_KEY,
         pos,

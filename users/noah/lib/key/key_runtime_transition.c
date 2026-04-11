@@ -11,7 +11,7 @@
 #include "key_runtime_feedback.h"
 #include "key_runtime_admission.h"
 #include "key_runtime_slot_effect.h"
-#include "key_runtime_slot_result.h"
+#include "key_runtime_slot_step.h"
 #include "key_runtime_state.h"
 #include "key_runtime_trace.h"
 #include "../action/action_dispatch.h"
@@ -213,6 +213,17 @@ static void key_runtime_transition_apply_slot_result(const key_runtime_slot_resu
     }
 }
 
+static bool key_runtime_transition_apply_slot_step(active_key_state_t *slot, key_runtime_slot_event_t event, key_runtime_transition_plan_t *plan) {
+    key_runtime_slot_result_t result = key_runtime_slot_step(slot, event);
+
+    if (!result.handled) {
+        return false;
+    }
+
+    key_runtime_transition_apply_slot_result(&result, plan);
+    return true;
+}
+
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan) {
     for (uint8_t i = 0; i < plan->count; i++) {
         const key_runtime_transition_effect_t *effect = &plan->effects[i];
@@ -261,14 +272,17 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 }
 
 bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
-    key_runtime_slot_result_t result = key_runtime_slot_take_handled_press_result(slot, keycode, key_pos, key, active_held_action_survives_flush);
-
-    if (!result.handled) {
-        return false;
-    }
-
-    key_runtime_transition_apply_slot_result(&result, plan);
-    return true;
+    return key_runtime_transition_apply_slot_step(slot,
+                                                  (key_runtime_slot_event_t){
+                                                      .kind              = KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS,
+                                                      .data.handled_press = {
+                                                          .keycode                          = keycode,
+                                                          .key_pos                          = key_pos,
+                                                          .key                              = key,
+                                                          .active_held_action_survives_flush = active_held_action_survives_flush,
+                                                      },
+                                                  },
+                                                  plan);
 }
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {
@@ -279,8 +293,7 @@ void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan)
             continue;
         }
 
-        key_runtime_slot_result_t result = key_runtime_slot_take_pending_multi_tap_flush_result(slot);
-        key_runtime_transition_apply_slot_result(&result, plan);
+        key_runtime_transition_apply_slot_step(slot, (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH}, plan);
     }
 }
 
@@ -291,8 +304,14 @@ void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_po
             continue;
         }
 
-        key_runtime_slot_result_t result = key_runtime_slot_take_interrupt_result(slot, key_pos);
-        key_runtime_transition_apply_slot_result(&result, plan);
+        key_runtime_transition_apply_slot_step(slot,
+                                               (key_runtime_slot_event_t){
+                                                   .kind           = KEY_RUNTIME_SLOT_EVENT_INTERRUPT,
+                                                   .data.interrupt = {
+                                                       .other_key_pos = key_pos,
+                                                   },
+                                               },
+                                               plan);
     }
 }
 
@@ -301,8 +320,16 @@ void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_tran
 }
 
 static bool key_runtime_transition_process_active_key_release(uint16_t keycode, keyrecord_t *record, key_behavior_view_t behavior, key_runtime_transition_plan_t *plan) {
-    key_runtime_slot_result_t result = key_runtime_slot_take_handled_release_result(key_runtime_find_slot_by_position(record->event.key), keycode, record->event.key, behavior);
-    key_runtime_transition_apply_slot_result(&result, plan);
+    key_runtime_transition_apply_slot_step(key_runtime_find_slot_by_position(record->event.key),
+                                           (key_runtime_slot_event_t){
+                                               .kind                = KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE,
+                                               .data.handled_release = {
+                                                   .keycode  = keycode,
+                                                   .key_pos  = record->event.key,
+                                                   .behavior = behavior,
+                                               },
+                                           },
+                                           plan);
     return true;
 }
 
@@ -312,12 +339,10 @@ bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *r
 
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
     for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        key_runtime_slot_result_t result = key_runtime_slot_take_active_scan_result(key_runtime_slot_at(index));
-        key_runtime_transition_apply_slot_result(&result, plan);
+        key_runtime_transition_apply_slot_step(key_runtime_slot_at(index), (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN}, plan);
     }
 
     for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        key_runtime_slot_result_t result = key_runtime_slot_take_pending_multi_tap_scan_result(key_runtime_slot_at(index));
-        key_runtime_transition_apply_slot_result(&result, plan);
+        key_runtime_transition_apply_slot_step(key_runtime_slot_at(index), (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN}, plan);
     }
 }

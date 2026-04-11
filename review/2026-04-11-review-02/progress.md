@@ -199,6 +199,59 @@ Verification result:
 - full host suite passed
 - firmware build passed
 
+## 2026-04-11 Slot Step Reducer Seam
+
+Completed in this pass:
+
+- Added a reducer-style slot-event contract in
+  [`users/noah/lib/key/key_runtime_slot_step.h`](../../users/noah/lib/key/key_runtime_slot_step.h).
+- Moved the public handled-key slot entry point to
+  `key_runtime_slot_step(...)` in
+  [`users/noah/lib/key/key_runtime_slot_result.c`](../../users/noah/lib/key/key_runtime_slot_result.c),
+  so press, release, active scan, pending multi-tap scan, interrupt, and
+  pending multi-tap flush now all cross one slot-event seam.
+- Moved the old per-event slot-result producer declarations behind
+  [`users/noah/lib/key/key_runtime_slot_result_internal.h`](../../users/noah/lib/key/key_runtime_slot_result_internal.h),
+  leaving [`key_runtime_slot_result.h`](../../users/noah/lib/key/key_runtime_slot_result.h)
+  focused on the shared result shape.
+- Updated
+  [`users/noah/lib/key/key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c)
+  to drive all slot orchestration through `key_runtime_slot_step(...)` instead
+  of calling the fragmented per-event producers directly.
+- Reworked slot and feedback host coverage to assert the reducer seam in
+  [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  and
+  [`tests/host/key_runtime_feedback_test.c`](../../tests/host/key_runtime_feedback_test.c).
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the new slot-step boundary.
+
+Why this pass landed now:
+
+- it gives the handled-key runtime one explicit transition-facing slot-event
+  contract instead of several event-specific entry points
+- it narrows the remaining reducer/FSM work to the duplicated internal
+  press/release/scan state logic instead of both API and implementation work
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+
 ## 2026-04-11 Slot Event Wrapper Extraction
 
 Completed in this pass:
