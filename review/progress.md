@@ -466,3 +466,34 @@ Phase status:
 Next recommended step:
 
 - start Phase 5 by decomposing `users/noah/lib/rgb/rgb_runtime.c` into render stages, keeping the current visual/render order intact while splitting layer composition, automouse blend, preview, pd-mode overlay, and key feedback into narrower testable units
+
+Started Phase 5 by extracting the RGB layer-composition stage out of `users/noah/lib/rgb/rgb_runtime.c`:
+
+- added `users/noah/lib/rgb/rgb_layer_stage.h` and `users/noah/lib/rgb/rgb_layer_stage.c`
+- moved the following layer-stage responsibilities into the new module:
+  - authored layer-key coverage-map rebuild/invalidation
+  - layer color caching during RGB post-init
+  - frame clear/fill/apply helpers used by RGB layer composition
+  - base layer-stack frame rendering
+  - preview-layer painting over mapped-only coverage
+- reduced `users/noah/lib/rgb/rgb_runtime.c` so it now orchestrates stage order over:
+  - base layer-stage render
+  - automouse blend stage
+  - preview overlay
+  - pd-mode overlay
+  - key feedback overlay
+- updated build wiring in:
+  - `users/noah/rules.mk`
+  - `tests/host/run_rgb_layer_render_tests.sh`
+  - `tests/host/run_feature_gate_compile_tests.sh`
+
+Additional verification completed for the Phase 5 layer-stage extraction pass:
+
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next recommended step:
+
+- continue Phase 5 by extracting the automouse blend stage next, so `rgb_runtime.c` keeps shrinking toward pure stage ordering while the remaining overlays stay behavior-identical
