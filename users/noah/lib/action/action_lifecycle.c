@@ -4,7 +4,7 @@
 
 #include "action_lifecycle.h"
 
-#include "noah_keymap.h"
+#include "noah_keymap_ids.h"
 
 #ifdef CONSOLE_ENABLE
 #    include "print.h"

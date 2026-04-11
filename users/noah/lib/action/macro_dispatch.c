@@ -5,7 +5,7 @@
 #endif
 
 #include "macro_dispatch.h"
-#include "noah_keymap.h"
+#include "noah_keymap_ids.h"
 #include "../macro/macro_payload.h"
 
 typedef enum {

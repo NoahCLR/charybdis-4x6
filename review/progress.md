@@ -54,6 +54,14 @@ Completed in this pass:
   - `users/noah/lib/state/split_runtime_sync.c`
   - `users/noah/lib/rgb/rgb_runtime.c`
   - `users/noah/lib/rgb/rgb_automouse.c`
+- Split the keymap header surface into:
+  - `users/noah/noah_keymap_ids.h` for shared layer ids, userspace keycodes, and materialized authored data symbols consumed by runtime modules
+  - `users/noah/noah_keymap.h` as the authoring surface for keymap-owned translation units
+- Removed the `noah_runtime.h` re-export from `users/noah/noah_keymap.h`.
+- Switched runtime modules off the authoring header and onto narrower dependencies:
+  - `noah_keymap_ids.h` in runtime modules that only need ids or materialized authored data
+  - `noah_runtime.h` in runtime test paths that actually call `noah_*` hook helpers
+- Confirmed that only authoring translation units and authoring-oriented validation tests still include `noah_keymap.h` directly.
 
 Verification completed in this pass:
 
@@ -64,6 +72,7 @@ Verification completed in this pass:
 - `sh tests/host/run_keyboard_mod_ownership_tests.sh`
 - `sh tests/host/run_action_lifecycle_tests.sh`
 - `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
 - `sh tests/host/run_pointer_layer_policy_tests.sh`
 - `sh tests/host/run_split_runtime_sync_tests.sh`
 - `sh tests/host/run_rgb_layer_render_tests.sh`
@@ -79,4 +88,4 @@ Next recommended step:
 
 - decide whether the next architectural slice should be:
   - finish Phase 1 by moving remaining fork-coupled VIA seeding assumptions behind the compatibility boundary
-  - start Phase 2 by splitting `users/noah/noah_keymap.h` into authoring and runtime-integration headers
+  - continue Phase 2 by tightening authoring-only tests and docs around `noah_keymap.h` vs `noah_runtime.h`

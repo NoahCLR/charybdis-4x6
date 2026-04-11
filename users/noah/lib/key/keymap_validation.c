@@ -2,7 +2,7 @@
 // Keymap Validation
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "noah_keymap.h"
+#include "noah_keymap_ids.h"
 #include "keymap_introspection.h" // QMK
 
 #ifdef CONSOLE_ENABLE

@@ -8,7 +8,7 @@
 
 #include "layer_ownership.h"
 
-#include "noah_keymap.h"
+#include "noah_keymap_ids.h"
 
 typedef struct {
     bool     active;

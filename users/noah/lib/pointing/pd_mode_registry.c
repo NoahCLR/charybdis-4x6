@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "noah_keymap.h"
+#include "noah_keymap_ids.h"
 #include "pd_mode_manifest.h"
 #include "pd_mode_internal.h"
 #include "../compat/qmk_contract.h"

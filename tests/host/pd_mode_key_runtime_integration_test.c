@@ -7,6 +7,7 @@
 #include "users/noah/lib/key/key_runtime_process.h"
 #include "users/noah/lib/pointing/pd_modes.h"
 #include "users/noah/lib/state/runtime_shared_state.h"
+#include "users/noah/noah_runtime.h"
 
 const key_behavior_t key_behaviors[1]   = {0};
 const uint8_t        key_behavior_count = 0;

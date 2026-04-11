@@ -5,7 +5,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/pointing/pd_modes.h"
-#include "users/noah/noah_keymap.h"
+#include "users/noah/noah_keymap_ids.h"
 
 enum {
     TEST_QMK_BEHAVIOR_ACTION = 0x2A01u,

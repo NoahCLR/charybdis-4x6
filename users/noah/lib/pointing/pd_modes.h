@@ -14,8 +14,8 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "noah_keymap.h"   // VOLUME_MODE, BRIGHTNESS_MODE, etc.
-#include "pd_mode_flags.h" // PD_MODE_* constants, state queries
+#include "noah_keymap_ids.h" // VOLUME_MODE, BRIGHTNESS_MODE, etc.
+#include "pd_mode_flags.h"   // PD_MODE_* constants, state queries
 
 #if defined(POINTING_DEVICE_ENABLE)
 typedef report_mouse_t (*pd_mode_handler_t)(report_mouse_t);

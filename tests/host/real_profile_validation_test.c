@@ -7,6 +7,7 @@
 
 #include "print.h"
 #include "users/noah/noah_keymap.h"
+#include "users/noah/noah_runtime.h"
 #include "users/noah/lib/key/keymap_validation.h"
 #include "users/noah/lib/pointing/pd_modes.h"
 #include "users/noah/lib/rgb/rgb_validation.h"

@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "noah_keymap.h"
+#include "noah_keymap_ids.h"
 #include "action_lifecycle.h"
 #include "../key/key_runtime_state.h"
 #include "../state/layer_ownership.h"
