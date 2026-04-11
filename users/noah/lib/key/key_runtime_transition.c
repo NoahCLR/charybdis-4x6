@@ -18,15 +18,6 @@
 #include "../state/split_runtime_sync.h"
 #include "held_action.h"
 
-typedef enum {
-    HOLD_THRESHOLD_DISPATCH_NONE = 0,
-    HOLD_THRESHOLD_DISPATCH_TAP,
-    HOLD_THRESHOLD_DISPATCH_HELD,
-    HOLD_THRESHOLD_DISPATCH_REPEAT,
-} hold_threshold_dispatch_t;
-
-static hold_threshold_dispatch_t key_runtime_transition_hold_threshold_dispatch_kind(hold_behavior_t hold);
-
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     *plan = (key_runtime_transition_plan_t){0};
 }
@@ -148,14 +139,37 @@ static void key_runtime_transition_plan_delayed_action(key_runtime_transition_pl
                                            });
 }
 
+static void key_runtime_transition_plan_slot_effect_request(key_runtime_transition_plan_t *plan, keypos_t key_pos, key_runtime_slot_effect_request_t request) {
+    if (request.release_owned_state) {
+        key_runtime_transition_plan_release_owned_state_by_key(plan, key_pos);
+    }
+
+    switch (request.kind) {
+        case KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION:
+            key_runtime_transition_plan_dispatch_action(plan, request.action);
+            break;
+        case KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER:
+            key_runtime_transition_plan_held_register(plan, key_pos, request.action);
+            break;
+        case KEY_RUNTIME_SLOT_EFFECT_REQUEST_REPEAT_START:
+            key_runtime_transition_plan_repeat_start(plan, key_pos, request.action, request.repeat_hz);
+            break;
+        case KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE:
+        default:
+            break;
+    }
+
+    if (request.feedback_pulse) {
+        key_runtime_transition_plan_feedback_pulse(plan, request.feedback_long_hold_level);
+    }
+}
+
 static void key_runtime_transition_activate_pending_fallback_hold(active_key_state_t *slot, key_runtime_transition_plan_t *plan) {
-    if (!slot || !slot->fallback_hold_pending || slot->held_action_keycode != KC_NO || slot->keycode == KC_NO) {
+    if (!slot) {
         return;
     }
 
-    key_runtime_transition_plan_held_register(plan, slot->key_pos, slot->keycode);
-    slot->held_action_keycode = slot->keycode;
-    slot->hold_fired          = true;
+    key_runtime_transition_plan_slot_effect_request(plan, slot->key_pos, key_runtime_slot_activate_pending_fallback_hold_request(slot));
 }
 
 static active_key_state_t *key_runtime_transition_select_press_slot(keypos_t key_pos) {
@@ -310,13 +324,6 @@ bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *rec
     return true;
 }
 
-static uint16_t key_runtime_transition_select_release_hold_action(uint16_t elapsed, uint16_t hold_action, hold_behavior_t long_hold, uint16_t longer_hold_term) {
-    if (hold_sends_on_release(long_hold) && elapsed >= longer_hold_term) {
-        return long_hold.action;
-    }
-    return hold_action;
-}
-
 static void key_runtime_transition_dispatch_released_key_tap(uint16_t keycode, active_key_state_t *slot, active_key_state_t released_key, key_behavior_view_t behavior, key_runtime_transition_plan_t *plan) {
     if (behavior.has_multi_tap) {
         key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.key_pos, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
@@ -378,51 +385,36 @@ void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_tran
     key_runtime_transition_interrupt_active_keys_on_other_press((keypos_t){0xFF, 0xFF}, plan);
 }
 
-static bool key_runtime_transition_pending_multi_tap_release_uses_held_lifecycle(const active_key_state_t *slot, hold_behavior_t hold, uint16_t action, uint8_t repeat_count, uint16_t elapsed) {
-    if (repeat_count != 1 || elapsed < slot->tap_hold_term) {
-        return false;
-    }
-
-    if (hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || action != hold.action) {
-        return false;
-    }
-
-    return key_runtime_transition_hold_threshold_dispatch_kind(hold) == HOLD_THRESHOLD_DISPATCH_HELD;
-}
-
 static bool key_runtime_transition_process_pending_multi_tap_hold_release(uint16_t keycode, keyrecord_t *record, key_behavior_view_t behavior, key_runtime_transition_plan_t *plan) {
     active_key_state_t *slot = key_runtime_find_slot_by_position(record->event.key);
-
-    if (!(slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_pending_multi_tap_matches(slot, keycode, record->event.key))) {
+    if (!slot) {
         return false;
     }
 
-    multi_tap_t             *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
-    uint16_t              elapsed          = timer_elapsed(slot->timer);
-    delayed_action_mods_t cached_mods      = delayed_action_mods_from_multi_tap(slot_multi_tap);
-    bool                  was_release_hold = hold_sends_on_release(slot_multi_tap->hold);
-    hold_behavior_t       cached_hold      = slot_multi_tap->hold;
-    hold_behavior_t       cached_long_hold = slot_multi_tap->long_hold;
-    uint8_t               repeat_count     = 0;
-    uint16_t              action           = key_runtime_slot_resolve_pending_multi_tap_hold(slot, keycode, &repeat_count);
+    uint16_t                                           elapsed  = timer_elapsed(slot->timer);
+    key_runtime_slot_pending_multi_tap_hold_release_t release = key_runtime_slot_take_pending_multi_tap_hold_release(slot, keycode, behavior, elapsed);
 
-    if (!cached_hold.present && hold_sends_on_release(cached_long_hold) && elapsed >= slot->longer_hold_term) {
-        action = cached_long_hold.action;
-    } else if (was_release_hold && cached_hold.present && repeat_count == 1 && action == cached_hold.action) {
-        action = key_runtime_transition_select_release_hold_action(elapsed, cached_hold.action, cached_long_hold, slot->longer_hold_term);
+    if (!release.handled) {
+        return false;
     }
 
-    if (key_runtime_transition_pending_multi_tap_release_uses_held_lifecycle(slot, cached_hold, action, repeat_count, elapsed)) {
-        key_runtime_transition_plan_held_register(plan, slot->key_pos, action);
-        key_runtime_transition_plan_held_unregister(plan, slot->key_pos, action);
-    } else {
-        key_runtime_transition_plan_delayed_action(plan, action, cached_mods, repeat_count);
+    switch (release.outcome) {
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_HELD_LIFECYCLE:
+            key_runtime_transition_plan_held_register(plan, release.key_pos, release.action);
+            key_runtime_transition_plan_held_unregister(plan, release.key_pos, release.action);
+            break;
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_DELAYED_ACTION:
+            key_runtime_transition_plan_delayed_action(plan, release.action, release.mods, release.repeat_count);
+            break;
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_NONE:
+        default:
+            break;
     }
 
-    if (behavior.is_momentary_layer) {
-        key_runtime_transition_plan_layer_release(plan, slot->key_pos);
+    if (release.release_layer_after_action) {
+        key_runtime_transition_plan_layer_release(plan, release.key_pos);
     }
-    key_runtime_slot_reset(slot);
+
     return true;
 }
 
@@ -457,109 +449,6 @@ bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *r
     return key_runtime_transition_process_active_key_release(keycode, record, key.behavior, plan);
 }
 
-static hold_threshold_dispatch_t key_runtime_transition_hold_threshold_dispatch_kind(hold_behavior_t hold) {
-    if (!hold.present) {
-        return HOLD_THRESHOLD_DISPATCH_NONE;
-    }
-
-    switch (hold.mode) {
-        case HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD:
-            return HOLD_THRESHOLD_DISPATCH_TAP;
-        case HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE:
-            return noah_action_hold_kind(hold.action) == NOAH_ACTION_HOLD_KIND_PRESS_ONLY ? HOLD_THRESHOLD_DISPATCH_TAP : HOLD_THRESHOLD_DISPATCH_HELD;
-        case HOLD_BEHAVIOR_REPEAT_WHILE_HELD:
-            return HOLD_THRESHOLD_DISPATCH_REPEAT;
-        default:
-            return HOLD_THRESHOLD_DISPATCH_NONE;
-    }
-}
-
-static bool key_runtime_transition_hold_activation_needs_pulse(hold_behavior_t hold, bool pulse_momentary_layer_action) {
-    if (action_dispatch_is_layer_lock(hold.action)) {
-        return true;
-    }
-
-    // Keep base momentary layer access quiet; alternate multi-tap layer
-    // branches can opt in to a confirmation pulse.
-    if (IS_QK_MOMENTARY(hold.action)) {
-        return pulse_momentary_layer_action;
-    }
-
-    return false;
-}
-
-static void key_runtime_transition_clear_active_owned_hold(active_key_state_t *slot, key_runtime_transition_plan_t *plan) {
-    if (slot->held_action_keycode != KC_NO || slot->repeat_binding_active) {
-        key_runtime_transition_plan_release_owned_state_by_key(plan, slot->key_pos);
-        slot->held_action_keycode   = KC_NO;
-        slot->repeat_binding_active = false;
-    }
-}
-
-static void key_runtime_transition_fire_hold_at_threshold(active_key_state_t *slot, hold_behavior_t hold, hold_behavior_t long_hold, bool pulse_momentary_layer_action, key_runtime_transition_plan_t *plan) {
-    switch (key_runtime_transition_hold_threshold_dispatch_kind(hold)) {
-        case HOLD_THRESHOLD_DISPATCH_TAP:
-            key_runtime_transition_clear_active_owned_hold(slot, plan);
-            key_runtime_transition_plan_dispatch_action(plan, hold.action);
-            key_runtime_transition_plan_feedback_pulse(plan, false);
-            if (long_hold.present) {
-                slot->hold_fired          = false;
-                slot->hold_one_shot_fired = true;
-            } else {
-                slot->hold_fired          = true;
-                slot->hold_one_shot_fired = false;
-            }
-            return;
-        case HOLD_THRESHOLD_DISPATCH_HELD:
-            key_runtime_transition_plan_held_register(plan, slot->key_pos, hold.action);
-            slot->held_action_keycode = hold.action;
-            slot->hold_fired          = !long_hold.present;
-            slot->hold_one_shot_fired = false;
-            if (key_runtime_transition_hold_activation_needs_pulse(hold, pulse_momentary_layer_action)) {
-                key_runtime_transition_plan_feedback_pulse(plan, false);
-            }
-            return;
-        case HOLD_THRESHOLD_DISPATCH_REPEAT:
-            key_runtime_transition_clear_active_owned_hold(slot, plan);
-            key_runtime_transition_plan_repeat_start(plan, slot->key_pos, hold.action, hold.repeat_hz);
-            key_runtime_transition_plan_feedback_pulse(plan, false);
-            slot->repeat_binding_active = true;
-            slot->hold_fired            = !long_hold.present;
-            slot->hold_one_shot_fired   = false;
-            return;
-        case HOLD_THRESHOLD_DISPATCH_NONE:
-            return;
-    }
-}
-
-static void key_runtime_transition_promote_to_long_hold(active_key_state_t *slot, hold_behavior_t long_hold, bool pulse_momentary_layer_action, key_runtime_transition_plan_t *plan) {
-    key_runtime_transition_clear_active_owned_hold(slot, plan);
-
-    switch (key_runtime_transition_hold_threshold_dispatch_kind(long_hold)) {
-        case HOLD_THRESHOLD_DISPATCH_TAP:
-            key_runtime_transition_plan_dispatch_action(plan, long_hold.action);
-            key_runtime_transition_plan_feedback_pulse(plan, true);
-            slot->hold_fired = true;
-            return;
-        case HOLD_THRESHOLD_DISPATCH_HELD:
-            key_runtime_transition_plan_held_register(plan, slot->key_pos, long_hold.action);
-            slot->held_action_keycode = long_hold.action;
-            slot->hold_fired          = true;
-            if (key_runtime_transition_hold_activation_needs_pulse(long_hold, pulse_momentary_layer_action)) {
-                key_runtime_transition_plan_feedback_pulse(plan, true);
-            }
-            return;
-        case HOLD_THRESHOLD_DISPATCH_REPEAT:
-            key_runtime_transition_plan_repeat_start(plan, slot->key_pos, long_hold.action, long_hold.repeat_hz);
-            key_runtime_transition_plan_feedback_pulse(plan, true);
-            slot->repeat_binding_active = true;
-            slot->hold_fired            = true;
-            return;
-        case HOLD_THRESHOLD_DISPATCH_NONE:
-            return;
-    }
-}
-
 static void key_runtime_transition_apply_active_key_scan_resolution(active_key_state_t *slot, key_runtime_slot_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
     if (resolution.commit_immediate_hold) {
         if (resolution.immediate_hold_needs_feedback) {
@@ -578,10 +467,10 @@ static void key_runtime_transition_apply_active_key_scan_resolution(active_key_s
 
     switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_SCAN_OUTCOME_FIRE_HOLD:
-            key_runtime_transition_fire_hold_at_threshold(slot, resolution.hold, resolution.long_hold, false, plan);
+            key_runtime_transition_plan_slot_effect_request(plan, slot->key_pos, key_runtime_slot_fire_hold_at_threshold(slot, resolution.hold, resolution.long_hold, false));
             return;
         case KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
-            key_runtime_transition_promote_to_long_hold(slot, resolution.long_hold, false, plan);
+            key_runtime_transition_plan_slot_effect_request(plan, slot->key_pos, key_runtime_slot_promote_to_long_hold(slot, resolution.long_hold, false));
             return;
         case KEY_RUNTIME_SLOT_SCAN_OUTCOME_NONE:
         default:
@@ -590,26 +479,17 @@ static void key_runtime_transition_apply_active_key_scan_resolution(active_key_s
 }
 
 static void key_runtime_transition_apply_pending_multi_tap_scan_resolution(active_key_state_t *slot, key_runtime_slot_pending_multi_tap_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+    if (!slot) {
+        return;
+    }
 
-    if (resolution.release_layer_before_action) {
+    key_runtime_slot_pending_multi_tap_scan_apply_t apply = key_runtime_slot_apply_pending_multi_tap_scan_resolution(slot, resolution);
+
+    if (apply.release_layer_before_action) {
         key_runtime_transition_plan_layer_release(plan, slot->key_pos);
     }
 
-    switch (resolution.outcome) {
-        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
-            slot->long_hold = resolution.long_hold;
-            key_runtime_transition_promote_to_long_hold(slot, slot->long_hold, true, plan);
-            key_runtime_slot_reset_pending_multi_tap(slot);
-            return;
-        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD:
-            slot->long_hold = resolution.long_hold;
-            key_runtime_transition_fire_hold_at_threshold(slot, resolution.hold, slot->long_hold, true, plan);
-            key_runtime_slot_reset_pending_multi_tap(slot);
-            return;
-        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_NONE:
-        default:
-            return;
-    }
+    key_runtime_transition_plan_slot_effect_request(plan, slot->key_pos, apply.effect_request);
 }
 
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {

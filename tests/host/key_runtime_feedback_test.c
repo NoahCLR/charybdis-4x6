@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/key_runtime_feedback.h"
 #include "users/noah/lib/key/key_runtime_state.h"
 
@@ -78,6 +79,16 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
 
 bool is_layer_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
+}
+
+noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
+    (void)action;
+    return NOAH_ACTION_HOLD_KIND_SHARED;
+}
+
+delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
+    (void)mt;
+    return (delayed_action_mods_t){0};
 }
 
 static void test_non_passthrough_held_action_flashes(void) {

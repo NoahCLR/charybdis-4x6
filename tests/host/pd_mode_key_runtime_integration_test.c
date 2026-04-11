@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/delayed_action.h"
 #include "users/noah/lib/key/key_runtime_process.h"
 #include "users/noah/lib/pointing/pd_modes.h"

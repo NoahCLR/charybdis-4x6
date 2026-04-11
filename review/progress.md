@@ -203,6 +203,32 @@ Completed in this pass:
   - long-hold scan promotion
   - pending multi-tap layer-lock scan resolution
 - Updated `tests/host/key_runtime_feedback_test.c` with the layer-key and layer-lock stubs now required by the slot module's explicit pending-multi-tap scan dependency surface
+- Continued Phase 4 by moving more slot-owned mutation work out of `users/noah/lib/key/key_runtime_transition.c` and into `users/noah/lib/key/key_runtime_slot.c`:
+  - added slot-level effect-request types in `users/noah/lib/key/key_runtime_state.h` so slot helpers can mutate state and hand transition-planning data back without depending on `key_runtime_transition.h`
+  - moved fallback-hold activation request generation into the slot layer
+  - moved hold-threshold and long-hold promotion state mutation into slot helpers that now own:
+    - owned-hold/repeat cleanup
+    - held/repeat binding activation
+    - hold feedback-level decisions
+  - moved pending multi-tap scan application into the slot layer so pending-chain reset and long-hold assignment are no longer transition-file-local
+  - moved pending multi-tap hold-release consumption into the slot layer so the slot helper now:
+    - resolves the released action
+    - decides delayed-action vs held-lifecycle replay
+    - captures delayed-action modifier state
+    - clears the slot after consumption
+- Reduced `users/noah/lib/key/key_runtime_transition.c` further toward pure effect-plan assembly:
+  - transition code now converts slot effect requests into queued plan effects
+  - transition code no longer owns the state mutations for fallback hold activation, threshold hold fire, long-hold promotion, pending multi-tap scan application, or pending multi-tap hold-release consumption
+- Extended `tests/host/key_runtime_slot_test.c` again with direct coverage for the new mutation helpers, including:
+  - repeat-hold threshold activation requests
+  - long-hold promotion replacing an existing owned hold
+  - pending multi-tap scan application consuming the pending chain
+  - pending multi-tap hold-release returning held-lifecycle replay data
+- Updated the smaller host harnesses that link `key_runtime_slot.c` so they provide the newly required shared-runtime stubs:
+  - `tests/host/key_runtime_slot_test.c`
+  - `tests/host/key_runtime_feedback_test.c`
+  - `tests/host/key_runtime_preflight_test.c`
+  - `tests/host/pd_mode_key_runtime_integration_test.c`
 
 Verification completed in this pass:
 
@@ -245,9 +271,22 @@ Additional verification completed for the continued Phase 4 pass:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Additional verification completed for the continued Phase 4 mutation-extraction pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Next recommended step:
 
-- continue Phase 4 by pulling the remaining slot-owned mutation branches out of `key_runtime_transition.c`, especially:
-  - pending multi-tap hold-release resolution
-  - hold-threshold / long-hold promotion state mutation
-  so the transition file trends toward pure effect-plan assembly over slot lifecycle helpers.
+- continue Phase 4 by collapsing the remaining transition-file-local slot bookkeeping, especially:
+  - immediate-hold threshold commit state updates
+  - interrupt-time layer/fallback bookkeeping
+  - active-key flush/release cleanup branches that still partially mutate slots inline
+  so `key_runtime_transition.c` trends further toward routing and plan assembly over slot lifecycle ownership.

@@ -11,6 +11,7 @@
 #pragma once
 
 #include "../state/runtime_shared_state.h"
+#include "delayed_action.h"
 #include "key_behavior_lookup.h"
 
 // Transitional aliases while key-runtime modules move from file-local globals
@@ -63,6 +64,43 @@ typedef struct {
     hold_behavior_t                                   long_hold;
 } key_runtime_slot_pending_multi_tap_scan_resolution_t;
 
+typedef enum {
+    KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE = 0,
+    KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION,
+    KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER,
+    KEY_RUNTIME_SLOT_EFFECT_REQUEST_REPEAT_START,
+} key_runtime_slot_effect_request_kind_t;
+
+typedef struct {
+    bool                                 release_owned_state;
+    bool                                 feedback_pulse;
+    bool                                 feedback_long_hold_level;
+    key_runtime_slot_effect_request_kind_t kind;
+    uint16_t                             action;
+    uint16_t                             repeat_hz;
+} key_runtime_slot_effect_request_t;
+
+typedef struct {
+    bool                           release_layer_before_action;
+    key_runtime_slot_effect_request_t effect_request;
+} key_runtime_slot_pending_multi_tap_scan_apply_t;
+
+typedef enum {
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_NONE = 0,
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_DELAYED_ACTION,
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_HELD_LIFECYCLE,
+} key_runtime_slot_pending_multi_tap_hold_release_outcome_t;
+
+typedef struct {
+    bool                                                    handled;
+    bool                                                    release_layer_after_action;
+    keypos_t                                                 key_pos;
+    key_runtime_slot_pending_multi_tap_hold_release_outcome_t outcome;
+    uint16_t                                                action;
+    delayed_action_mods_t                                   mods;
+    uint8_t                                                 repeat_count;
+} key_runtime_slot_pending_multi_tap_hold_release_t;
+
 uint8_t             behavior_get_layer(uint16_t keycode);
 bool                is_layer_key(uint16_t keycode);
 bool                key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs);
@@ -96,6 +134,11 @@ uint16_t            key_runtime_slot_resolve_pending_multi_tap_hold(active_key_s
 key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(uint16_t keycode, active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed);
 key_runtime_slot_scan_resolution_t key_runtime_slot_resolve_scan(active_key_state_t active_key_state, uint16_t elapsed);
 key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_resolve_pending_multi_tap_scan(active_key_state_t active_key_state, multi_tap_t multi_tap_state, uint16_t elapsed);
+key_runtime_slot_effect_request_t key_runtime_slot_activate_pending_fallback_hold_request(active_key_state_t *slot);
+key_runtime_slot_effect_request_t key_runtime_slot_fire_hold_at_threshold(active_key_state_t *slot, hold_behavior_t hold, hold_behavior_t long_hold, bool pulse_momentary_layer_action);
+key_runtime_slot_effect_request_t key_runtime_slot_promote_to_long_hold(active_key_state_t *slot, hold_behavior_t long_hold, bool pulse_momentary_layer_action);
+key_runtime_slot_pending_multi_tap_scan_apply_t key_runtime_slot_apply_pending_multi_tap_scan_resolution(active_key_state_t *slot, key_runtime_slot_pending_multi_tap_scan_resolution_t resolution);
+key_runtime_slot_pending_multi_tap_hold_release_t key_runtime_slot_take_pending_multi_tap_hold_release(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior, uint16_t elapsed);
 void                key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot);
 bool                active_key_matches(uint16_t keycode, keypos_t key_pos);
 bool                key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot);
