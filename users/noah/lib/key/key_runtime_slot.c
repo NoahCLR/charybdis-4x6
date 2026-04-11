@@ -312,6 +312,45 @@ uint16_t key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slo
     return multi_tap_resolve_hold(&slot->pending_multi_tap, keycode, key_behavior_has_more_taps, repeat_count);
 }
 
+key_runtime_slot_pending_multi_tap_flush_t key_runtime_slot_take_pending_multi_tap_flush(active_key_state_t *slot) {
+    key_runtime_slot_pending_multi_tap_flush_t flush = {0};
+    multi_tap_t                               *mt    = key_runtime_multi_tap_for_slot(slot);
+
+    if (!key_runtime_slot_has_pending_multi_tap(slot) || !mt) {
+        return flush;
+    }
+
+    flush.handled = true;
+    flush.mods    = delayed_action_mods_from_multi_tap(mt);
+
+    if (mt->pending_hold) {
+        if (mt->tap_action != KC_NO) {
+            flush.action       = mt->tap_action;
+            flush.repeat_count = 1;
+        } else {
+            flush.action       = mt->single_action;
+            flush.repeat_count = mt->count;
+        }
+        key_runtime_slot_reset_pending_multi_tap(slot);
+        return flush;
+    }
+
+    if (mt->count >= 2) {
+        key_behavior_step_t step = key_behavior_step_lookup(mt->keycode, mt->count);
+        if (step.tap.present && step.tap.action != KC_NO) {
+            flush.action       = step.tap.action;
+            flush.repeat_count = 1;
+            key_runtime_slot_reset_pending_multi_tap(slot);
+            return flush;
+        }
+    }
+
+    flush.action       = mt->single_action;
+    flush.repeat_count = mt->count;
+    key_runtime_slot_reset_pending_multi_tap(slot);
+    return flush;
+}
+
 static bool key_runtime_slot_release_is_interrupted_layer_tap(active_key_state_t released_key, key_behavior_view_t behavior) {
     return behavior.is_momentary_layer && released_key.layer_interrupted;
 }
@@ -475,6 +514,27 @@ key_runtime_slot_effect_request_t key_runtime_slot_activate_pending_fallback_hol
     slot->hold_fired          = true;
     request.kind              = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
     request.action            = slot->keycode;
+    return request;
+}
+
+key_runtime_slot_effect_request_t key_runtime_slot_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired, bool implicit_hold, bool fallback_hold_pending, bool pd_mode_was_locked_on_press) {
+    key_runtime_slot_effect_request_t request = key_runtime_slot_effect_request_none();
+
+    if (!slot) {
+        return request;
+    }
+
+    key_runtime_slot_track(slot, keycode, key_pos, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, hold_fired);
+    slot->implicit_hold               = implicit_hold;
+    slot->fallback_hold_pending       = fallback_hold_pending;
+    slot->pd_mode_was_locked_on_press = pd_mode_was_locked_on_press;
+
+    if (hold_registers_on_press(hold)) {
+        slot->held_action_keycode = hold.action;
+        request.kind              = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
+        request.action            = hold.action;
+    }
+
     return request;
 }
 

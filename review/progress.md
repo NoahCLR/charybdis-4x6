@@ -242,6 +242,19 @@ Completed in this pass:
   - immediate-hold threshold commit feedback requests
   - held-action flush unregistration
   - unheld tap flush dispatch
+- Continued Phase 4 once more by moving more of the handled-key press path into slot-local helpers:
+  - added `key_runtime_slot_begin_press(...)` in `users/noah/lib/key/key_runtime_slot.c` so slot lifecycle now owns:
+    - active-slot tracking for a new handled-key press
+    - implicit/fallback/pd-lock metadata initialization
+    - immediate-hold-on-press registration decisions
+  - added `key_runtime_slot_take_pending_multi_tap_flush(...)` so pending tap-chain flush resolution now lives in the slot layer instead of inside `key_runtime_transition.c`
+  - rewired `users/noah/lib/key/key_runtime_transition.c` to use those slot helpers for:
+    - regular handled-key press setup
+    - matching pending-multi-tap repress setup
+    - pending multi-tap flush plan assembly
+- Extended `tests/host/key_runtime_slot_test.c` again with direct coverage for the new press-path helper surface:
+  - pending multi-tap flush fallback replay
+  - begin-press metadata plus immediate-hold registration
 
 Verification completed in this pass:
 
@@ -308,10 +321,22 @@ Additional verification completed for the continued Phase 4 bookkeeping-extracti
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Additional verification completed for the continued Phase 4 press-path extraction pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Next recommended step:
 
-- continue Phase 4 by collapsing the remaining press-time slot setup that still lives in `key_runtime_transition.c`, especially:
-  - immediate-hold-on-press registration
-  - slot metadata initialization for implicit/fallback/pd-lock bookkeeping
-  - pending multi-tap flush/reclaim decisions that still blend slot selection with plan assembly
-  so the transition file trends further toward orchestration while slot lifecycle owns slot mutation.
+- continue Phase 4 by collapsing the remaining press-time orchestration that still lives in `key_runtime_transition.c`, especially:
+  - slot-selection and reclaim sequencing for handled-key presses
+  - the special-case matching pending-multi-tap press branch
+  - the remaining layer-press / tap-dispatch ordering decisions around press-time plan assembly
+  so the transition file trends further toward routing helper results rather than encoding branch-specific press behavior.

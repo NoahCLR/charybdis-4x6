@@ -429,6 +429,64 @@ static void test_take_pending_multi_tap_hold_release_returns_held_lifecycle(void
     CHECK(key_runtime_slot_idle(slot));
 }
 
+static void test_take_pending_multi_tap_flush_prefers_exact_step_tap(void) {
+    active_key_state_t                       *slot = key_runtime_primary_slot();
+    key_runtime_slot_pending_multi_tap_flush_t flush;
+    keypos_t                                  pos = test_keypos(6, 2);
+
+    test_reset_state();
+
+    slot->pending_multi_tap = (multi_tap_t){
+        .keycode       = TEST_MULTI_TAP_KEY,
+        .key_pos       = pos,
+        .count         = 2,
+        .single_action = TEST_SINGLE_ACTION,
+    };
+
+    flush = key_runtime_slot_take_pending_multi_tap_flush(slot);
+
+    CHECK(flush.handled);
+    CHECK(flush.action == TEST_SINGLE_ACTION);
+    CHECK(flush.repeat_count == 2);
+    CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
+}
+
+static void test_begin_press_sets_metadata_and_immediate_hold_request(void) {
+    active_key_state_t               *slot = key_runtime_primary_slot();
+    key_runtime_slot_effect_request_t request;
+    keypos_t                          pos = test_keypos(6, 3);
+
+    test_reset_state();
+
+    request = key_runtime_slot_begin_press(
+        slot,
+        TEST_ACTIVE_KEY,
+        pos,
+        TEST_SINGLE_ACTION,
+        (hold_behavior_t){
+            .present = true,
+            .action  = TEST_HOLD_ACTION,
+            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        },
+        hold_behavior_none(),
+        120,
+        240,
+        150,
+        false,
+        true,
+        false,
+        true);
+
+    CHECK(request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
+    CHECK(request.action == TEST_HOLD_ACTION);
+    CHECK(slot->keycode == TEST_ACTIVE_KEY);
+    CHECK(slot->tap_action == TEST_SINGLE_ACTION);
+    CHECK(slot->held_action_keycode == TEST_HOLD_ACTION);
+    CHECK(slot->implicit_hold);
+    CHECK(!slot->fallback_hold_pending);
+    CHECK(slot->pd_mode_was_locked_on_press);
+}
+
 static void test_interrupt_on_other_press_marks_layer_and_activates_fallback_hold(void) {
     active_key_state_t               *slot = key_runtime_primary_slot();
     key_runtime_slot_effect_request_t request;
@@ -523,6 +581,8 @@ int main(void) {
     test_promote_to_long_hold_releases_owned_state_before_dispatch();
     test_apply_pending_multi_tap_scan_resolution_consumes_pending_chain();
     test_take_pending_multi_tap_hold_release_returns_held_lifecycle();
+    test_take_pending_multi_tap_flush_prefers_exact_step_tap();
+    test_begin_press_sets_metadata_and_immediate_hold_request();
     test_interrupt_on_other_press_marks_layer_and_activates_fallback_hold();
     test_commit_immediate_hold_sets_flags_and_feedback_request();
     test_take_flush_unregisters_held_action();
