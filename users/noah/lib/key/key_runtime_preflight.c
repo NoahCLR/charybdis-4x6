@@ -27,7 +27,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         // Managed modifier releases normally suppress the raw QMK path, but a
         // handled key still needs its own release event so the custom runtime
         // can unregister the held action and clear feedback. That remains true
-        // even after another handled key flushes active_key, because the older
+        // even after another handled key flushes the runtime slot, because the older
         // key's owned held action is still released by physical key position.
         if (!record->event.pressed && (key_runtime_slot_matches(slot, keycode, record->event.key) || handled_key.behavior.handled)) {
             // Let the handled-key release path run.
@@ -38,7 +38,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.pressed) {
-        for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
             active_key_state_t *candidate = key_runtime_slot_at(index);
 
             if (!key_runtime_slot_active(candidate) || key_runtime_keypos_equal(candidate->key_pos, record->event.key)) {
@@ -59,7 +59,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.pressed && !handled_key.behavior.handled) {
-        for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
             active_key_state_t *candidate = key_runtime_slot_at(index);
 
             if (key_runtime_slot_has_pending_multi_tap(candidate) && !key_runtime_slot_pending_multi_tap_matches(candidate, keycode, record->event.key)) {

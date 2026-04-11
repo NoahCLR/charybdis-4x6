@@ -2,7 +2,7 @@
 
 Date: 2026-04-11
 
-Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, explicit handled-key slot lifecycle phase plus hold-strategy state, a shared slot-result surface between slot reduction and `key_runtime_transition.c`, a reducer-style `key_runtime_slot_step(...)` seam, a consolidated reducer implementation in `key_runtime_slot_step.c`, phase-local active scan and active release handling, explicit local pending-multi-tap release/scan handling, explicit handled-press context/outcome handling, and reducer-owned lifecycle effect transitions that removed `key_runtime_slot_effect.c` from the runtime build surface; the remaining recommendations below focus on what is still architecturally open after those changes.
+Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, explicit handled-key slot lifecycle phase plus hold-strategy state, a shared slot-result surface between slot reduction and `key_runtime_transition.c`, a reducer-style `key_runtime_slot_step(...)` seam, a consolidated reducer implementation in `key_runtime_slot_step.c`, phase-local active scan and active release handling, explicit local pending-multi-tap release/scan handling, explicit handled-press context/outcome handling, reducer-owned lifecycle effect transitions that removed `key_runtime_slot_effect.c` from the runtime build surface, and a position-indexed handled-key slot table that removed the fixed two-slot overlap ceiling; the remaining recommendations below focus on what is still architecturally open after those changes.
 
 Scope: the `noah` userspace in this repo only. This review ignores hardware changes and evaluates software structure, boundaries, state flow, extension cost, and verification surfaces.
 
@@ -36,8 +36,8 @@ The current extension cost looks like this:
   modes that fit the existing manifest traits
 - medium: new mode policy that needs another shared trait or another central
   policy consumer
-- hard: new handled-key semantics, more overlap than the current slot ceiling,
-  or any feature that changes the handled-key lifecycle itself
+- hard: new handled-key semantics or any feature that changes the handled-key
+  lifecycle itself
 
 ## What Is Working Well
 
@@ -196,30 +196,29 @@ Why this matters:
 
 This is the subsystem most likely to accumulate technical debt.
 
-### 2. The two-slot ceiling is still a hard scalability boundary
+### 2. Handled-key storage is now keyed by physical position
 
-The current runtime makes the handled-key overlap limit explicit:
+The old fixed overlap ceiling is gone:
 
-- `KEY_RUNTIME_ACTIVE_SLOT_CAPACITY` is `2` in
+- handled-key storage now uses a board-sized table in
   [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
-- slot selection and reclaim fallback now live in
+- press admission now maps directly by physical key position in
   [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
-
-That is much better than the old hidden single-key ceiling, but it is still a
-policy boundary built into the runtime architecture.
+- pending multi-tap state stays co-located with the same physical-key slot in
+  [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c)
 
 Why this matters:
 
-- any future feature that expects more than two independent handled-key
-  lifecycles will have to fight the storage model first
-- the reclaim/flush policy is part of correctness now, not just performance
-- other ownership modules already show a better scaling pattern; for example,
-  [`layer_ownership.c`](../../users/noah/lib/state/layer_ownership.c) keys its
-  bindings by physical switch capacity instead of a tiny fixed slot count
+- distinct handled keys no longer evict each other just because two unrelated
+  positions are already busy
+- the storage model now matches the scaling shape already used by
+  [`layer_ownership.c`](../../users/noah/lib/state/layer_ownership.c)
+- the remaining handled-key complexity is now mostly reducer/state-shape
+  complexity rather than slot-capacity policy
 
-If the intended long-term design really is “at most two overlapping handled
-keys,” that needs to stay a named contract. If not, this is the first place to
-refactor.
+The remaining tradeoff is simpler: storage now scales with matrix size, and the
+runtime scans a larger table for feedback and transition passes. That is a much
+better trade than the old correctness boundary for this board.
 
 ### 3. Pd-mode traits are effective, but the next novel policy will still land in central code
 
@@ -263,7 +262,7 @@ Why this matters:
   - pending multi-tap reclaim before a new handled press
   - interrupt-driven fallback hold activation
   - long-hold promotion after immediate-hold registration
-  - two-slot overflow that reuses the primary slot
+  - third distinct handled press preserving the earlier active positions
 - that is enough coverage to protect the next reducer cleanups better than
   before
 - the remaining reducer/FSM refactor will be safer once more of the current
@@ -362,7 +361,6 @@ The repo will scale well for:
 The repo will scale poorly for:
 
 - significantly richer handled-key lifecycles
-- features that need more than two concurrent handled-key states
 - more lifecycle variants landing in `key_runtime_slot_step.c` without another
   reducer/FSM cleanup
 
@@ -437,28 +435,21 @@ Benefits:
 - legal states become type-shaped instead of comment-shaped
 - new behavior work lands mostly in one reducer plus effect tests
 
-### Recommendation 2: continue separating slot capacity policy from lifecycle policy
+### Recommendation 2: keep the position-indexed storage model explicit
 
-The first step is now done:
+This storage refactor is now done:
 
-- slot lookup/admission/reclaim policy lives in
-  [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
-- admission and reclaim behavior has dedicated coverage in
-  [`tests/host/key_runtime_admission_test.c`](../../tests/host/key_runtime_admission_test.c)
+- handled-key slots are keyed by physical position
+- slot selection no longer depends on reclaiming a tiny overlap pool
+- admission coverage now protects the direct per-position selection contract
 
-Next step:
+The remaining guidance is to keep that boundary explicit:
 
-- introduce a smaller named policy surface for:
-  - slot capacity
-  - reclaim preference
-  - overflow behavior
-- keep that policy explicit enough that a future storage-model change does not
-  need another whole-runtime sweep
-
-Longer-term option:
-
-- move from a fixed two-slot pool to a key-position indexed ownership table, the
-  same way `layer_ownership` already keys bindings by physical location
+- avoid reintroducing tiny-capacity slot assumptions in new runtime helpers or
+  tests
+- keep whole-table scans centralized to the places that actually need them
+- treat broad mutable slot state, not slot capacity, as the next handled-key
+  simplification target
 
 ### Recommendation 3: promote pd-mode traits into a small policy object before the next unusual mode
 
@@ -487,7 +478,7 @@ The initial matrix now exists, and the first high-risk traces have landed:
 - reclaim after pending multi-tap ownership
 - interrupt-driven fallback hold activation
 - long-hold promotion after immediate-hold registration
-- two-slot contention where the primary slot is reused as overflow
+- third distinct handled press preserving the earlier active positions
 
 Next traces worth adding:
 
@@ -507,6 +498,7 @@ internal shape of the handled-key engine. The manifest deduplication, scenario
 harness, admission split, reducer seam, phase/hold-strategy extraction,
 phase-local release and scan handling, explicit pending multi-tap handling,
 explicit handled-press outcomes, and reducer-owned lifecycle effect transitions
-were the right moves. The remaining handled-key work is now narrower: either
-stop here with a much better reducer surface, or later take on the larger
-two-slot capacity rewrite if feature pressure actually justifies it.
+were the right moves. The position-indexed slot table was the other major
+structural fix. The remaining handled-key work is now narrower: either stop
+here with a much better reducer and storage surface, or later keep shrinking
+`key_runtime_slot_step.c` toward a smaller explicit FSM core.

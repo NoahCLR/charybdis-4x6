@@ -92,8 +92,8 @@ void key_runtime_scenario_reset(void) {
     memset(key_runtime_scenario_effects, 0, sizeof(key_runtime_scenario_effects));
 
     noah_runtime_shared_state = (runtime_shared_state_t){0};
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        noah_runtime_shared_state.key.active_slots[index] = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
+    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
+        noah_runtime_shared_state.key.slots_by_position[index] = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
     }
 }
 

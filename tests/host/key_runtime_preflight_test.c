@@ -27,6 +27,18 @@ static void test_fail(const char *expr, const char *file, int line) {
         }                                         \
     } while (0)
 
+static keypos_t test_active_slot_key_pos;
+
+static void test_set_active_slot_key_pos(keypos_t key_pos) {
+    test_active_slot_key_pos = key_pos;
+}
+
+static active_key_state_t *test_active_slot(void) {
+    return key_runtime_slot_for_position(test_active_slot_key_pos);
+}
+
+#define active_key (*test_active_slot())
+
 static keypos_t test_keypos(uint8_t row, uint8_t col) {
     return (keypos_t){
         .row = row,
@@ -48,6 +60,7 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 
 static void test_reset_state(void) {
     noah_runtime_shared_state      = (runtime_shared_state_t){0};
+    test_set_active_slot_key_pos(test_keypos(0, 0));
     suppress_default               = false;
     tracked_physical_event         = false;
     handled_key_is_handled         = false;
@@ -233,6 +246,7 @@ static void test_active_handled_release_bypasses_modifier_suppression(void) {
 
     test_reset_state();
     suppress_default   = true;
+    test_set_active_slot_key_pos(record.event.key);
     active_key.keycode = KC_RIGHT_ALT;
     active_key.key_pos = record.event.key;
 
@@ -242,11 +256,13 @@ static void test_active_handled_release_bypasses_modifier_suppression(void) {
 
 static void test_unrelated_release_stays_suppressed(void) {
     keyrecord_t record = test_record(test_keypos(1, 2), false);
+    keypos_t    stored = test_keypos(1, 3);
 
     test_reset_state();
     suppress_default   = true;
+    test_set_active_slot_key_pos(stored);
     active_key.keycode = KC_RIGHT_ALT;
-    active_key.key_pos = test_keypos(1, 3);
+    active_key.key_pos = stored;
 
     CHECK(!key_runtime_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
@@ -254,12 +270,14 @@ static void test_unrelated_release_stays_suppressed(void) {
 
 static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
     keyrecord_t record = test_record(test_keypos(1, 2), false);
+    keypos_t    stored = test_keypos(4, 4);
 
     test_reset_state();
     suppress_default       = true;
     handled_key_is_handled = true;
+    test_set_active_slot_key_pos(stored);
     active_key.keycode     = KC_LEFT_CTRL;
-    active_key.key_pos     = test_keypos(4, 4);
+    active_key.key_pos     = stored;
 
     CHECK(key_runtime_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
@@ -267,10 +285,12 @@ static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
 
 static void test_other_press_interrupts_active_key_through_transition_plan(void) {
     keyrecord_t record = test_record(test_keypos(2, 4), true);
+    keypos_t    stored = test_keypos(2, 3);
 
     test_reset_state();
+    test_set_active_slot_key_pos(stored);
     active_key.keycode        = KC_RIGHT_ALT;
-    active_key.key_pos        = test_keypos(2, 3);
+    active_key.key_pos        = stored;
     active_key.phase          = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
     active_key.hold_strategy  = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
 
@@ -285,7 +305,7 @@ static void test_handled_press_keeps_foreign_multi_tap_pending(void) {
 
     test_reset_state();
     handled_key_is_handled = true;
-    noah_runtime_shared_state.key.active_slots[0].pending_multi_tap = (multi_tap_t){
+    key_runtime_slot_for_position(test_keypos(3, 3))->pending_multi_tap = (multi_tap_t){
         .keycode = KC_RIGHT_ALT,
         .key_pos = test_keypos(3, 3),
         .count   = 1,
@@ -300,7 +320,7 @@ static void test_non_handled_press_flushes_foreign_multi_tap(void) {
     keyrecord_t record = test_record(test_keypos(3, 4), true);
 
     test_reset_state();
-    noah_runtime_shared_state.key.active_slots[0].pending_multi_tap = (multi_tap_t){
+    key_runtime_slot_for_position(test_keypos(3, 3))->pending_multi_tap = (multi_tap_t){
         .keycode = KC_RIGHT_ALT,
         .key_pos = test_keypos(3, 3),
         .count   = 1,
@@ -322,3 +342,5 @@ int main(void) {
     puts("key_runtime_preflight host tests passed");
     return 0;
 }
+
+#undef active_key

@@ -30,6 +30,10 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
     };
 }
 
+static active_key_state_t *test_slot(uint8_t row, uint8_t col) {
+    return key_runtime_slot_for_position(test_keypos(row, col));
+}
+
 static void test_reset_state(void) {
     noah_runtime_shared_state = (runtime_shared_state_t){0};
 }
@@ -102,20 +106,20 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 }
 
 static void test_find_slot_by_position_returns_matching_active_slot(void) {
-    active_key_state_t *secondary = key_runtime_slot_at(1);
-    keypos_t            pos       = test_keypos(4, 5);
+    active_key_state_t *slot = test_slot(4, 5);
+    keypos_t            pos  = test_keypos(4, 5);
 
     test_reset_state();
-    secondary->keycode = TEST_ACTIVE_KEY;
-    secondary->key_pos = pos;
+    slot->keycode = TEST_ACTIVE_KEY;
+    slot->key_pos = pos;
 
-    CHECK(key_runtime_find_slot_by_position(pos) == secondary);
-    CHECK(key_runtime_first_active_slot() == secondary);
+    CHECK(key_runtime_find_slot_by_position(pos) == slot);
+    CHECK(key_runtime_first_active_slot() == slot);
     CHECK(active_key_matches(TEST_ACTIVE_KEY, pos));
 }
 
-static void test_find_reclaimable_slot_returns_pending_multi_tap_owner(void) {
-    active_key_state_t *slot = key_runtime_slot_at(1);
+static void test_find_slot_with_pending_multi_tap_returns_position_owner(void) {
+    active_key_state_t *slot = test_slot(5, 2);
     keypos_t            pos  = test_keypos(5, 2);
 
     test_reset_state();
@@ -126,60 +130,53 @@ static void test_find_reclaimable_slot_returns_pending_multi_tap_owner(void) {
     };
 
     CHECK(key_runtime_find_slot_with_pending_multi_tap(pos) == slot);
-    CHECK(key_runtime_find_reclaimable_slot() == slot);
 }
 
-static void test_select_slot_for_press_prefers_free_slot_before_reclaim(void) {
-    active_key_state_t *primary   = key_runtime_primary_slot();
-    active_key_state_t *secondary = key_runtime_slot_at(1);
-    keypos_t            target    = test_keypos(6, 1);
+static void test_select_slot_for_press_returns_direct_position_slot(void) {
+    keypos_t            target = test_keypos(6, 1);
+    active_key_state_t *slot   = test_slot(6, 1);
 
     test_reset_state();
-    primary->pending_multi_tap = (multi_tap_t){
-        .keycode = TEST_MULTI_TAP_KEY,
-        .key_pos = test_keypos(1, 1),
-        .count   = 1,
-    };
 
-    CHECK(key_runtime_select_slot_for_press(target) == secondary);
+    CHECK(key_runtime_select_slot_for_press(target) == slot);
 }
 
-static void test_select_slot_for_press_prefers_slot_owning_pending_multi_tap(void) {
-    active_key_state_t *primary   = key_runtime_primary_slot();
-    active_key_state_t *secondary = key_runtime_slot_at(1);
-    keypos_t            target    = test_keypos(6, 2);
+static void test_select_slot_for_press_reuses_position_with_pending_multi_tap(void) {
+    keypos_t            target = test_keypos(6, 2);
+    active_key_state_t *slot   = test_slot(6, 2);
 
     test_reset_state();
-    primary->keycode = TEST_ACTIVE_KEY;
-    primary->key_pos = test_keypos(1, 1);
-    secondary->pending_multi_tap = (multi_tap_t){
+    slot->pending_multi_tap = (multi_tap_t){
         .keycode = TEST_MULTI_TAP_KEY,
         .key_pos = target,
         .count   = 1,
     };
 
-    CHECK(key_runtime_select_slot_for_press(target) == secondary);
+    CHECK(key_runtime_select_slot_for_press(target) == slot);
 }
 
-static void test_select_slot_for_press_falls_back_to_primary_when_all_slots_busy(void) {
-    active_key_state_t *primary   = key_runtime_primary_slot();
-    active_key_state_t *secondary = key_runtime_slot_at(1);
+static void test_select_slot_for_press_keeps_distinct_active_positions_independent(void) {
+    active_key_state_t *slot_a = test_slot(0, 0);
+    active_key_state_t *slot_b = test_slot(0, 1);
+    active_key_state_t *slot_c = test_slot(0, 2);
 
     test_reset_state();
-    primary->keycode = TEST_ACTIVE_KEY;
-    primary->key_pos = test_keypos(0, 0);
-    secondary->keycode = TEST_ACTIVE_KEY;
-    secondary->key_pos = test_keypos(0, 1);
+    slot_a->keycode = TEST_ACTIVE_KEY;
+    slot_a->key_pos = test_keypos(0, 0);
+    slot_b->keycode = TEST_ACTIVE_KEY;
+    slot_b->key_pos = test_keypos(0, 1);
 
-    CHECK(key_runtime_select_slot_for_press(test_keypos(0, 2)) == primary);
+    CHECK(key_runtime_select_slot_for_press(test_keypos(0, 2)) == slot_c);
+    CHECK(slot_a->keycode == TEST_ACTIVE_KEY);
+    CHECK(slot_b->keycode == TEST_ACTIVE_KEY);
 }
 
 int main(void) {
     test_find_slot_by_position_returns_matching_active_slot();
-    test_find_reclaimable_slot_returns_pending_multi_tap_owner();
-    test_select_slot_for_press_prefers_free_slot_before_reclaim();
-    test_select_slot_for_press_prefers_slot_owning_pending_multi_tap();
-    test_select_slot_for_press_falls_back_to_primary_when_all_slots_busy();
+    test_find_slot_with_pending_multi_tap_returns_position_owner();
+    test_select_slot_for_press_returns_direct_position_slot();
+    test_select_slot_for_press_reuses_position_with_pending_multi_tap();
+    test_select_slot_for_press_keeps_distinct_active_positions_independent();
 
     puts("key_runtime_admission host tests passed");
     return 0;

@@ -6,6 +6,7 @@
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/delayed_action.h"
 #include "users/noah/lib/key/key_runtime_process.h"
+#include "users/noah/lib/key/key_runtime_state.h"
 #include "users/noah/lib/pointing/pd_modes.h"
 #include "users/noah/lib/state/runtime_shared_state.h"
 #include "users/noah/noah_runtime.h"
@@ -52,7 +53,7 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 
 static void test_reset_state(void) {
     noah_runtime_shared_state                           = (runtime_shared_state_t){0};
-    noah_runtime_shared_state.key.active_slots[0] = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
+    *key_runtime_slot_for_position(test_keypos(1, 2)) = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
 
     fake_time          = 1000;
     current_cpi        = 0;
@@ -344,6 +345,7 @@ static void test_plain_pd_mode_key_activates_and_deactivates_through_process_rec
     keypos_t    key_pos        = test_keypos(1, 2);
     keyrecord_t press_record   = test_record(key_pos, true);
     keyrecord_t release_record = test_record(key_pos, false);
+    active_key_state_t *slot   = key_runtime_slot_for_position(key_pos);
 
     test_reset_state();
 
@@ -355,8 +357,8 @@ static void test_plain_pd_mode_key_activates_and_deactivates_through_process_rec
     CHECK(pd_mode_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_active(PD_MODE_VOLUME));
     CHECK(pd_mode_locked_snapshot() == 0);
-    CHECK(noah_runtime_shared_state.key.active_slots[0].keycode == VOLUME_MODE);
-    CHECK(noah_runtime_shared_state.key.active_slots[0].held_action_keycode == VOLUME_MODE);
+    CHECK(slot->keycode == VOLUME_MODE);
+    CHECK(slot->held_action_keycode == VOLUME_MODE);
     CHECK(split_sync_count >= 1);
 
     fake_time += 10;
@@ -365,8 +367,8 @@ static void test_plain_pd_mode_key_activates_and_deactivates_through_process_rec
     CHECK(pd_mode_active_snapshot() == 0);
     CHECK(!pd_mode_active(PD_MODE_VOLUME));
     CHECK(pd_mode_locked_snapshot() == 0);
-    CHECK(noah_runtime_shared_state.key.active_slots[0].keycode == KC_NO);
-    CHECK(noah_runtime_shared_state.key.active_slots[0].held_action_keycode == KC_NO);
+    CHECK(slot->keycode == KC_NO);
+    CHECK(slot->held_action_keycode == KC_NO);
     CHECK(reset_volume_count == 1);
     CHECK(current_cpi == default_dpi);
 }

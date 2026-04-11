@@ -297,6 +297,8 @@ static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifie
     keypos_t           source_pos     = test_keypos(1, 1);
     keyrecord_t        press_record   = test_record(source_pos, true);
     keyrecord_t        release_record = test_record(source_pos, false);
+    active_key_state_t *slot          = key_runtime_slot_for_position(source_pos);
+    multi_tap_t        *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
 
     integration_hold_modifier = modifier;
     integration_expected_mask = expected_mask;
@@ -304,26 +306,26 @@ static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifie
 
     CHECK(key_runtime_process_handled_key_press(TEST_MULTI_TAP_KEY, &press_record, key));
     CHECK(key_runtime_process_handled_key_release(TEST_MULTI_TAP_KEY, &release_record, key));
-    CHECK(multi_tap.count == 1);
+    CHECK(slot_multi_tap->count == 1);
     CHECK(get_mods() == 0);
 
     fake_time = (uint16_t)(fake_time + 40);
     CHECK(key_runtime_process_handled_key_press(TEST_MULTI_TAP_KEY, &press_record, key));
     CHECK(key_runtime_process_handled_key_release(TEST_MULTI_TAP_KEY, &release_record, key));
-    CHECK(multi_tap.count == 2);
+    CHECK(slot_multi_tap->count == 2);
     CHECK(get_mods() == 0);
 
     fake_time = (uint16_t)(fake_time + 40);
     CHECK(key_runtime_process_handled_key_press(TEST_MULTI_TAP_KEY, &press_record, key));
-    CHECK(multi_tap.pending_hold);
-    CHECK(active_key.keycode == TEST_MULTI_TAP_KEY);
+    CHECK(slot_multi_tap->pending_hold);
+    CHECK(slot->keycode == TEST_MULTI_TAP_KEY);
     CHECK(get_mods() == 0);
 
     fake_time = (uint16_t)(fake_time + 130);
     noah_key_runtime_scan();
 
-    CHECK(!multi_tap.pending_hold);
-    CHECK(active_key.held_action_keycode == modifier);
+    CHECK(!slot_multi_tap->pending_hold);
+    CHECK(slot->held_action_keycode == modifier);
     CHECK((get_mods() & integration_expected_mask) != 0);
     CHECK(send_keyboard_report_count == 1);
 
@@ -337,7 +339,7 @@ static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifie
 
     CHECK(key_runtime_process_handled_key_release(TEST_MULTI_TAP_KEY, &release_record, key));
     CHECK((get_mods() & integration_expected_mask) == 0);
-    CHECK(active_key.keycode == KC_NO);
+    CHECK(slot->keycode == KC_NO);
     CHECK(send_keyboard_report_count == 2);
 
     CHECK(owned_keycode_register(TEST_CHORD_KEY));

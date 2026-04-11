@@ -68,7 +68,7 @@ static uint8_t key_feedback_preview_layer_for_slot(const active_key_state_t *slo
 }
 
 uint8_t key_feedback_preview_layer(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
         uint8_t layer = key_feedback_preview_layer_for_slot(key_runtime_slot_at(index));
         if (layer != UINT8_MAX) {
             return layer;
@@ -169,7 +169,7 @@ uint8_t key_feedback_pack(void) {
 
     // Multi-tap pending: at least one slot still has an open tap window that
     // has not crossed into a pending hold.
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
         active_key_state_t *slot = key_runtime_slot_at(index);
 
         if (key_runtime_slot_has_pending_multi_tap(slot) && !key_runtime_slot_pending_multi_tap_pending_hold(slot)) {
@@ -178,7 +178,7 @@ uint8_t key_feedback_pack(void) {
         }
     }
 
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
         uint8_t slot_flags = key_feedback_pack_for_slot(key_runtime_slot_at(index));
         if (slot_flags != 0) {
             return flags | slot_flags;

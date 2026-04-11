@@ -50,7 +50,7 @@ typedef struct {
     multi_tap_t                      pending_multi_tap;
 } active_key_state_t;
 
-#define KEY_RUNTIME_ACTIVE_SLOT_CAPACITY 2
+#define KEY_RUNTIME_SLOT_TABLE_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 
 typedef active_key_state_t key_runtime_slot_state_t;
 
@@ -72,7 +72,7 @@ typedef struct {
     }
 
 typedef struct {
-    key_runtime_slot_state_t     active_slots[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY];
+    key_runtime_slot_state_t     slots_by_position[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
     key_runtime_feedback_state_t feedback;
 } key_runtime_shared_state_t;
 

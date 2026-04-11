@@ -42,6 +42,12 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
     };
 }
 
+static active_key_state_t *test_primary_slot(void) {
+    return key_runtime_slot_for_position(test_keypos(0, 0));
+}
+
+#define key_runtime_primary_slot() test_primary_slot()
+
 static key_runtime_slot_result_t test_step_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, bool active_held_action_survives_flush) {
     return key_runtime_slot_step(slot, (key_runtime_slot_event_t){
                                            .kind              = KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS,

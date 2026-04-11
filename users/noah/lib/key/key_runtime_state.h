@@ -14,11 +14,6 @@
 #include "delayed_action.h"
 #include "key_behavior_lookup.h"
 
-// Transitional aliases while key-runtime modules move from file-local globals
-// to the shared runtime-owned state object.
-#define active_key (noah_runtime_shared_state.key.active_slots[0])
-#define multi_tap (noah_runtime_shared_state.key.active_slots[0].pending_multi_tap)
-
 void noah_key_runtime_scan(void);
 
 typedef struct {
@@ -31,9 +26,8 @@ typedef struct {
 uint8_t             behavior_get_layer(uint16_t keycode);
 bool                is_layer_key(uint16_t keycode);
 bool                key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs);
-active_key_state_t *key_runtime_primary_slot(void);
+active_key_state_t *key_runtime_slot_for_position(keypos_t key_pos);
 active_key_state_t *key_runtime_slot_at(uint8_t index);
-uint8_t             key_runtime_slot_index(const active_key_state_t *slot);
 bool                key_runtime_slot_idle(const active_key_state_t *slot);
 bool                key_runtime_slot_active(const active_key_state_t *slot);
 key_runtime_slot_phase_t key_runtime_slot_phase(const active_key_state_t *slot);
@@ -49,7 +43,6 @@ bool                key_runtime_slot_has_pending_multi_tap(const active_key_stat
 bool                key_runtime_slot_pending_multi_tap_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos);
 bool                key_runtime_slot_pending_multi_tap_pending_hold(const active_key_state_t *slot);
 bool                key_runtime_slot_pending_multi_tap_expired(const active_key_state_t *slot);
-multi_tap_t        *key_runtime_primary_multi_tap(void);
 multi_tap_t        *key_runtime_multi_tap_slot_at(uint8_t index);
 multi_tap_t        *key_runtime_multi_tap_for_slot(const active_key_state_t *slot);
 active_key_state_t *key_runtime_slot_for_multi_tap(const multi_tap_t *mt);
@@ -68,5 +61,3 @@ void                key_runtime_slot_commit_hold_phase(active_key_state_t *slot,
 
 void key_runtime_slot_reset(active_key_state_t *slot);
 void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy);
-void active_key_reset(void);
-void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy);

@@ -456,6 +456,72 @@ Verification result:
 - firmware build passed
 - diff cleanliness checks passed
 
+## 2026-04-12 Position-Indexed Handled-Key Storage
+
+Completed in this pass:
+
+- Replaced the handled-key `active_slots[2]` pool with a board-sized
+  position-indexed slot table in
+  [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
+  and
+  [`users/noah/lib/state/runtime_shared_state.c`](../../users/noah/lib/state/runtime_shared_state.c).
+- Added direct physical-key lookup through
+  [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c)
+  and
+  [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
+  via `key_runtime_slot_for_position(...)`, while keeping `key_runtime_slot_at`
+  as the generic whole-table iterator.
+- Simplified admission in
+  [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
+  so handled presses now select their storage directly by key position instead
+  of looking for a free/reclaimable slot in a two-slot pool.
+- Rewired whole-table scans in the runtime, feedback, preflight, transition,
+  and scenario harness layers to use the new slot-table capacity instead of
+  the deleted two-slot constant.
+- Removed the old public primary-slot helpers from the runtime surface; host
+  tests that still want one convenient reducer slot now use local test-only
+  helpers instead of the public runtime API.
+- Updated the host suites that encoded the old pool assumptions so they now
+  assert the new behavior:
+  - third distinct handled presses preserve earlier active positions
+  - pending multi-tap chains stay local to their physical key
+  - unrelated handled positions no longer trigger reclaim/overflow behavior
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review now reflects the landed position-indexed storage model and
+  no longer describes the fixed two-slot ceiling as current architecture.
+
+Why this pass landed now:
+
+- the reducer work was already in a safe stopping state, so the next real
+  architectural payoff was removing the fixed overlap ceiling
+- the new storage model changes allocation/lookup behavior without reopening
+  the handled-key reducer design itself
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Verification result:
+
+- targeted admission, slot, transition, preflight, feedback, scenario,
+  integration, split-sync, and compile-gate checks passed
+- full host suite passed
+- firmware build passed
+- diff cleanliness checks passed
+
 ## 2026-04-11 Slot Step Reducer Seam
 
 Completed in this pass:

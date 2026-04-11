@@ -16,30 +16,28 @@ bool key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
 }
 
-active_key_state_t *key_runtime_primary_slot(void) {
-    return &noah_runtime_shared_state.key.active_slots[0];
+static bool key_runtime_slot_position_is_valid(keypos_t key_pos) {
+    return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
 }
 
-active_key_state_t *key_runtime_slot_at(uint8_t index) {
-    if (index >= KEY_RUNTIME_ACTIVE_SLOT_CAPACITY) {
+static uint16_t key_runtime_slot_table_index(keypos_t key_pos) {
+    return (uint16_t)((uint16_t)key_pos.row * (uint16_t)MATRIX_COLS + (uint16_t)key_pos.col);
+}
+
+active_key_state_t *key_runtime_slot_for_position(keypos_t key_pos) {
+    if (!key_runtime_slot_position_is_valid(key_pos)) {
         return NULL;
     }
 
-    return &noah_runtime_shared_state.key.active_slots[index];
+    return &noah_runtime_shared_state.key.slots_by_position[key_runtime_slot_table_index(key_pos)];
 }
 
-uint8_t key_runtime_slot_index(const active_key_state_t *slot) {
-    if (!slot) {
-        return KEY_RUNTIME_ACTIVE_SLOT_CAPACITY;
+active_key_state_t *key_runtime_slot_at(uint8_t index) {
+    if (index >= KEY_RUNTIME_SLOT_TABLE_CAPACITY) {
+        return NULL;
     }
 
-    const active_key_state_t *base = &noah_runtime_shared_state.key.active_slots[0];
-
-    if (slot < base || slot >= base + KEY_RUNTIME_ACTIVE_SLOT_CAPACITY) {
-        return KEY_RUNTIME_ACTIVE_SLOT_CAPACITY;
-    }
-
-    return (uint8_t)(slot - base);
+    return &noah_runtime_shared_state.key.slots_by_position[index];
 }
 
 bool key_runtime_slot_idle(const active_key_state_t *slot) {
@@ -107,10 +105,6 @@ bool key_runtime_slot_pending_multi_tap_expired(const active_key_state_t *slot) 
     return slot != NULL && multi_tap_expired(&slot->pending_multi_tap);
 }
 
-multi_tap_t *key_runtime_primary_multi_tap(void) {
-    return &noah_runtime_shared_state.key.active_slots[0].pending_multi_tap;
-}
-
 multi_tap_t *key_runtime_multi_tap_slot_at(uint8_t index) {
     active_key_state_t *slot = key_runtime_slot_at(index);
 
@@ -134,9 +128,9 @@ active_key_state_t *key_runtime_slot_for_multi_tap(const multi_tap_t *mt) {
         return NULL;
     }
 
-    const active_key_state_t *base = &noah_runtime_shared_state.key.active_slots[0];
+    const active_key_state_t *base = &noah_runtime_shared_state.key.slots_by_position[0];
     const multi_tap_t        *min  = &base[0].pending_multi_tap;
-    const multi_tap_t        *max  = &base[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY - 1].pending_multi_tap;
+    const multi_tap_t        *max  = &base[KEY_RUNTIME_SLOT_TABLE_CAPACITY - 1].pending_multi_tap;
 
     if (mt < min || mt > max) {
         return NULL;
@@ -150,7 +144,7 @@ bool key_runtime_multi_tap_slot_active(const multi_tap_t *mt) {
 }
 
 multi_tap_t *key_runtime_first_active_multi_tap(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
         multi_tap_t *mt = key_runtime_multi_tap_slot_at(index);
 
         if (key_runtime_multi_tap_slot_active(mt)) {
@@ -162,12 +156,10 @@ multi_tap_t *key_runtime_first_active_multi_tap(void) {
 }
 
 multi_tap_t *key_runtime_find_multi_tap_by_position(keypos_t key_pos) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
+    active_key_state_t *slot = key_runtime_slot_for_position(key_pos);
 
-        if (key_runtime_slot_has_pending_multi_tap(slot) && key_runtime_keypos_equal(slot->pending_multi_tap.key_pos, key_pos)) {
-            return &slot->pending_multi_tap;
-        }
+    if (key_runtime_slot_has_pending_multi_tap(slot) && key_runtime_keypos_equal(slot->pending_multi_tap.key_pos, key_pos)) {
+        return &slot->pending_multi_tap;
     }
 
     return NULL;
@@ -271,10 +263,6 @@ void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes
     slot->phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
 }
 
-void active_key_reset(void) {
-    key_runtime_slot_reset(key_runtime_primary_slot());
-}
-
 void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
     if (!slot) {
         return;
@@ -297,8 +285,4 @@ void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t
         .long_hold           = long_hold,
         .pending_multi_tap   = pending_multi_tap,
     };
-}
-
-void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
-    key_runtime_slot_track(key_runtime_primary_slot(), keycode, key_pos, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, phase, hold_strategy);
 }

@@ -27,6 +27,16 @@ static void test_fail(const char *expr, const char *file, int line) {
         }                                         \
     } while (0)
 
+static active_key_state_t *test_default_slot(void) {
+    return key_runtime_slot_for_position((keypos_t){.row = 0, .col = 0});
+}
+
+static active_key_state_t *test_other_slot(void) {
+    return key_runtime_slot_for_position((keypos_t){.row = 0, .col = 1});
+}
+
+#define active_key (*test_default_slot())
+
 static void test_reset_state(void) {
     noah_runtime_shared_state = (runtime_shared_state_t){0};
     fake_time                 = 0;
@@ -215,7 +225,7 @@ static void test_non_layer_held_action_has_no_preview_layer(void) {
 static void test_feedback_falls_back_to_secondary_active_slot(void) {
     test_reset_state();
 
-    noah_runtime_shared_state.key.active_slots[1] = (active_key_state_t){
+    *test_other_slot() = (active_key_state_t){
         .keycode             = KC_RIGHT_ALT,
         .held_action_keycode = SAFE_RANGE + 1,
     };
@@ -228,7 +238,7 @@ static void test_feedback_falls_back_to_secondary_active_slot(void) {
 static void test_multi_tap_pending_flag_uses_secondary_slot(void) {
     test_reset_state();
 
-    noah_runtime_shared_state.key.active_slots[1].pending_multi_tap = (multi_tap_t){
+    test_other_slot()->pending_multi_tap = (multi_tap_t){
         .keycode = KC_RIGHT_ALT,
         .key_pos = (keypos_t){.row = 4, .col = 2},
         .count   = 1,
@@ -262,7 +272,7 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
     };
 
     release = test_step_handled_release(
-        key_runtime_primary_slot(),
+        test_default_slot(),
         TEST_MULTI_TAP_KEY,
         pos,
         (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY});
@@ -283,7 +293,7 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
         .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
     };
 
-    noah_runtime_shared_state.key.active_slots[1] = (active_key_state_t){
+    *test_other_slot() = (active_key_state_t){
         .timer            = (uint16_t)(fake_time - 150),
         .keycode          = KC_LEFT,
         .tap_hold_term    = 100,
@@ -313,3 +323,5 @@ int main(void) {
     puts("key_runtime_feedback host tests passed");
     return 0;
 }
+
+#undef active_key
