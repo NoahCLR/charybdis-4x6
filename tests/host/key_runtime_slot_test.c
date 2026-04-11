@@ -429,6 +429,86 @@ static void test_take_pending_multi_tap_hold_release_returns_held_lifecycle(void
     CHECK(key_runtime_slot_idle(slot));
 }
 
+static void test_interrupt_on_other_press_marks_layer_and_activates_fallback_hold(void) {
+    active_key_state_t               *slot = key_runtime_primary_slot();
+    key_runtime_slot_effect_request_t request;
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .keycode               = TEST_LAYER_KEY,
+        .key_pos               = test_keypos(6, 2),
+        .fallback_hold_pending = true,
+    };
+
+    request = key_runtime_slot_interrupt_on_other_press(slot, test_keypos(6, 3));
+
+    CHECK(request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
+    CHECK(request.action == TEST_LAYER_KEY);
+    CHECK(slot->held_action_keycode == TEST_LAYER_KEY);
+    CHECK(slot->hold_fired);
+    CHECK(slot->layer_interrupted);
+}
+
+static void test_commit_immediate_hold_sets_flags_and_feedback_request(void) {
+    active_key_state_t               *slot = key_runtime_primary_slot();
+    key_runtime_slot_effect_request_t request;
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .keycode = TEST_ACTIVE_KEY,
+        .key_pos = test_keypos(6, 3),
+    };
+
+    request = key_runtime_slot_commit_immediate_hold(slot, true, true);
+
+    CHECK(request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
+    CHECK(request.feedback_pulse);
+    CHECK(!request.feedback_long_hold_level);
+    CHECK(slot->hold_one_shot_fired);
+    CHECK(slot->hold_fired);
+}
+
+static void test_take_flush_unregisters_held_action(void) {
+    active_key_state_t               *slot = key_runtime_primary_slot();
+    key_runtime_slot_effect_request_t request;
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .keycode             = TEST_ACTIVE_KEY,
+        .key_pos             = test_keypos(6, 4),
+        .held_action_keycode = TEST_HOLD_ACTION,
+        .hold_fired          = true,
+    };
+
+    request = key_runtime_slot_take_flush(slot, false);
+
+    CHECK(request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_UNREGISTER);
+    CHECK(request.action == TEST_HOLD_ACTION);
+    CHECK(key_runtime_slot_idle(slot));
+}
+
+static void test_take_flush_dispatches_tap_for_unheld_non_layer_key(void) {
+    active_key_state_t               *slot = key_runtime_primary_slot();
+    key_runtime_slot_effect_request_t request;
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .keycode    = TEST_ACTIVE_KEY,
+        .key_pos    = test_keypos(6, 5),
+        .tap_action = TEST_SINGLE_ACTION,
+    };
+
+    request = key_runtime_slot_take_flush(slot, false);
+
+    CHECK(request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION);
+    CHECK(request.action == TEST_SINGLE_ACTION);
+    CHECK(key_runtime_slot_idle(slot));
+}
+
 int main(void) {
     test_slot_pending_multi_tap_ownership_marks_slot_non_idle();
     test_select_slot_for_press_prefers_slot_owning_pending_multi_tap();
@@ -443,6 +523,10 @@ int main(void) {
     test_promote_to_long_hold_releases_owned_state_before_dispatch();
     test_apply_pending_multi_tap_scan_resolution_consumes_pending_chain();
     test_take_pending_multi_tap_hold_release_returns_held_lifecycle();
+    test_interrupt_on_other_press_marks_layer_and_activates_fallback_hold();
+    test_commit_immediate_hold_sets_flags_and_feedback_request();
+    test_take_flush_unregisters_held_action();
+    test_take_flush_dispatches_tap_for_unheld_non_layer_key();
 
     puts("key_runtime_slot host tests passed");
     return 0;

@@ -20,13 +20,16 @@ bool is_layer_key(uint16_t keycode) {
 }
 
 bool key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot) {
-    if (!slot || !slot->fallback_hold_pending || slot->held_action_keycode != KC_NO || slot->keycode == KC_NO) {
+    if (!slot) {
         return false;
     }
 
-    held_action_register(slot->key_pos, slot->keycode);
-    slot->held_action_keycode = slot->keycode;
-    slot->hold_fired          = true;
+    key_runtime_slot_effect_request_t request = key_runtime_slot_activate_pending_fallback_hold_request(slot);
+    if (request.kind != KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER) {
+        return false;
+    }
+
+    held_action_register(slot->key_pos, request.action);
     return true;
 }
 

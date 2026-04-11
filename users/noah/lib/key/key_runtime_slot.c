@@ -478,6 +478,58 @@ key_runtime_slot_effect_request_t key_runtime_slot_activate_pending_fallback_hol
     return request;
 }
 
+key_runtime_slot_effect_request_t key_runtime_slot_interrupt_on_other_press(active_key_state_t *slot, keypos_t other_key_pos) {
+    if (!key_runtime_slot_active(slot) || key_runtime_keypos_equal(slot->key_pos, other_key_pos)) {
+        return key_runtime_slot_effect_request_none();
+    }
+
+    key_runtime_slot_effect_request_t request = key_runtime_slot_activate_pending_fallback_hold_request(slot);
+
+    if (is_layer_key(slot->keycode)) {
+        slot->layer_interrupted = true;
+    }
+
+    return request;
+}
+
+key_runtime_slot_effect_request_t key_runtime_slot_commit_immediate_hold(active_key_state_t *slot, bool needs_feedback, bool completes_hold) {
+    key_runtime_slot_effect_request_t request = key_runtime_slot_effect_request_none();
+
+    if (!slot) {
+        return request;
+    }
+
+    slot->hold_one_shot_fired = true;
+    if (completes_hold) {
+        slot->hold_fired = true;
+    }
+
+    request.feedback_pulse           = needs_feedback;
+    request.feedback_long_hold_level = false;
+    return request;
+}
+
+key_runtime_slot_effect_request_t key_runtime_slot_take_flush(active_key_state_t *slot, bool active_held_action_survives_flush) {
+    key_runtime_slot_effect_request_t request = key_runtime_slot_effect_request_none();
+
+    if (!key_runtime_slot_active(slot)) {
+        return request;
+    }
+
+    if (slot->hold_fired || slot->held_action_keycode != KC_NO || slot->repeat_binding_active) {
+        if (slot->held_action_keycode != KC_NO && !active_held_action_survives_flush) {
+            request.kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_UNREGISTER;
+            request.action = slot->held_action_keycode;
+        }
+    } else if (!is_layer_key(slot->keycode) && slot->tap_action != KC_NO) {
+        request.kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION;
+        request.action = slot->tap_action;
+    }
+
+    key_runtime_slot_reset(slot);
+    return request;
+}
+
 key_runtime_slot_effect_request_t key_runtime_slot_fire_hold_at_threshold(active_key_state_t *slot, hold_behavior_t hold, hold_behavior_t long_hold, bool pulse_momentary_layer_action) {
     key_runtime_slot_effect_request_t request = key_runtime_slot_effect_request_none();
 

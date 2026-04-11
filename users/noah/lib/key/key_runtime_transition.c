@@ -151,6 +151,9 @@ static void key_runtime_transition_plan_slot_effect_request(key_runtime_transiti
         case KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER:
             key_runtime_transition_plan_held_register(plan, key_pos, request.action);
             break;
+        case KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_UNREGISTER:
+            key_runtime_transition_plan_held_unregister(plan, key_pos, request.action);
+            break;
         case KEY_RUNTIME_SLOT_EFFECT_REQUEST_REPEAT_START:
             key_runtime_transition_plan_repeat_start(plan, key_pos, request.action, request.repeat_hz);
             break;
@@ -255,23 +258,6 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
     }
 }
 
-static void key_runtime_transition_flush_active_key(active_key_state_t *slot, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
-    if (!key_runtime_slot_active(slot)) return;
-
-    if (slot->hold_fired || slot->held_action_keycode != KC_NO || slot->repeat_binding_active) {
-        slot->hold_fired = false;
-        if (slot->held_action_keycode != KC_NO && !active_held_action_survives_flush) {
-            key_runtime_transition_plan_held_unregister(plan, slot->key_pos, slot->held_action_keycode);
-            slot->held_action_keycode = KC_NO;
-        }
-        slot->repeat_binding_active = false;
-    } else if (!is_layer_key(slot->keycode) && slot->tap_action != KC_NO) {
-        key_runtime_transition_plan_dispatch_action(plan, slot->tap_action);
-    }
-
-    key_runtime_slot_reset(slot);
-}
-
 static void key_runtime_transition_activate_immediate_hold_if_needed(active_key_state_t *slot, keyrecord_t *record, hold_behavior_t hold, key_runtime_transition_plan_t *plan) {
     if (!hold_registers_on_press(hold)) {
         return;
@@ -314,7 +300,8 @@ bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *rec
     }
 
     if (key_runtime_slot_active(slot) && !key_runtime_slot_matches(slot, keycode, record->event.key)) {
-        key_runtime_transition_flush_active_key(slot, active_held_action_survives_flush, plan);
+        keypos_t key_pos = slot->key_pos;
+        key_runtime_transition_plan_slot_effect_request(plan, key_pos, key_runtime_slot_take_flush(slot, active_held_action_survives_flush));
     }
     key_runtime_slot_track(slot, keycode, record->event.key, handled_key_tap_action(key), hold, behavior.single.long_hold, behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, false);
     slot->implicit_hold               = implicit;
@@ -368,16 +355,11 @@ void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan)
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
     for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
         active_key_state_t *slot = key_runtime_slot_at(index);
-
-        if (!key_runtime_slot_active(slot) || key_runtime_keypos_equal(slot->key_pos, key_pos)) {
+        if (!slot) {
             continue;
         }
 
-        key_runtime_transition_activate_pending_fallback_hold(slot, plan);
-
-        if (is_layer_key(slot->keycode)) {
-            slot->layer_interrupted = true;
-        }
+        key_runtime_transition_plan_slot_effect_request(plan, slot->key_pos, key_runtime_slot_interrupt_on_other_press(slot, key_pos));
     }
 }
 
@@ -451,13 +433,7 @@ bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *r
 
 static void key_runtime_transition_apply_active_key_scan_resolution(active_key_state_t *slot, key_runtime_slot_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
     if (resolution.commit_immediate_hold) {
-        if (resolution.immediate_hold_needs_feedback) {
-            key_runtime_transition_plan_feedback_pulse(plan, false);
-        }
-        slot->hold_one_shot_fired = true;
-        if (resolution.immediate_hold_completes_hold) {
-            slot->hold_fired = true;
-        }
+        key_runtime_transition_plan_slot_effect_request(plan, slot->key_pos, key_runtime_slot_commit_immediate_hold(slot, resolution.immediate_hold_needs_feedback, resolution.immediate_hold_completes_hold));
     }
 
     if (resolution.activate_fallback_hold) {

@@ -229,6 +229,19 @@ Completed in this pass:
   - `tests/host/key_runtime_feedback_test.c`
   - `tests/host/key_runtime_preflight_test.c`
   - `tests/host/pd_mode_key_runtime_integration_test.c`
+- Continued Phase 4 again by extracting the remaining interrupt/scan/flush bookkeeping from `users/noah/lib/key/key_runtime_transition.c` into slot helpers:
+  - added new slot helpers in `users/noah/lib/key/key_runtime_slot.c` for:
+    - interrupt-time fallback/layer bookkeeping
+    - immediate-hold threshold commit state updates
+    - active-slot flush cleanup and effect selection
+  - extended slot effect requests in `users/noah/lib/key/key_runtime_state.h` with explicit held-unregister support so transition planning can stay data-driven even when a flush must drop a held action
+  - rewired `users/noah/lib/key/key_runtime_transition.c` to route those helper results into the transition plan instead of mutating slot state inline
+- Removed the last duplicated fallback-hold activation logic from `users/noah/lib/key/key_runtime.c` by reusing the slot-layer fallback-hold request helper for the direct runtime path
+- Extended `tests/host/key_runtime_slot_test.c` with direct coverage for the new bookkeeping helpers, including:
+  - interrupt-time layer interruption plus fallback-hold activation
+  - immediate-hold threshold commit feedback requests
+  - held-action flush unregistration
+  - unheld tap flush dispatch
 
 Verification completed in this pass:
 
@@ -283,10 +296,22 @@ Additional verification completed for the continued Phase 4 mutation-extraction 
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Additional verification completed for the continued Phase 4 bookkeeping-extraction pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Next recommended step:
 
-- continue Phase 4 by collapsing the remaining transition-file-local slot bookkeeping, especially:
-  - immediate-hold threshold commit state updates
-  - interrupt-time layer/fallback bookkeeping
-  - active-key flush/release cleanup branches that still partially mutate slots inline
-  so `key_runtime_transition.c` trends further toward routing and plan assembly over slot lifecycle ownership.
+- continue Phase 4 by collapsing the remaining press-time slot setup that still lives in `key_runtime_transition.c`, especially:
+  - immediate-hold-on-press registration
+  - slot metadata initialization for implicit/fallback/pd-lock bookkeeping
+  - pending multi-tap flush/reclaim decisions that still blend slot selection with plan assembly
+  so the transition file trends further toward orchestration while slot lifecycle owns slot mutation.
