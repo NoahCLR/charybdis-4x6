@@ -635,3 +635,24 @@ Phase status:
 Next recommended step:
 
 - start a Phase 6 coverage sweep, with the remaining obvious review-plan gap being hook override chaining expectations and any other integration tests that still rely on implicit behavior instead of explicit assertions
+
+Started Phase 6 by adding explicit hook override chaining coverage for the `noah` userspace hook boundary:
+
+- added `tests/host/hook_chaining_test.c`
+- added `tests/host/run_hook_chaining_tests.sh`
+- updated `tests/host/run_all_host_tests.sh` so the new hook-chain coverage runs in the default host regression pass
+- the new host harness covers two integration contracts around `users/noah/hooks.c`:
+  - weak default QMK hook implementations delegate to the matching `noah_*` helper and forward arguments/return values unchanged
+  - keymap-local strong overrides can replace the weak defaults, call back into the matching `noah_*` helper, and layer additional behavior on top without double-dispatch or linkage conflicts
+
+Additional verification completed for the Phase 6 hook-chaining coverage pass:
+
+- `sh tests/host/run_hook_chaining_tests.sh`
+
+Phase status:
+
+- Phase 6 is complete enough to close for the current review plan. Authored-profile integrity coverage and pd-mode trait coverage landed earlier in the plan, and hook override chaining expectations are now covered explicitly. The only remaining note from the original Phase 6 list is future-dependent: if the handled-key model changes materially again, extend overlapping-state integration coverage in that later refactor.
+
+Next recommended step:
+
+- treat the architecture-review follow-up as closed for now and switch to user-observed behavior work, with the outstanding commit-pulse feel/tuning pass being the clearest next non-architecture item
