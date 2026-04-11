@@ -656,3 +656,24 @@ Phase status:
 Next recommended step:
 
 - treat the architecture-review follow-up as closed for now and switch to user-observed behavior work, with the outstanding commit-pulse feel/tuning pass being the clearest next non-architecture item
+
+Documentation reconciliation completed in this pass:
+
+- refreshed `README.md` and the maintainer docs under `docs/` so they match the
+  current header split (`noah_keymap_ids.h` vs `noah_keymap.h`), pd-mode trait
+  manifest, RGB stage ownership, current `ARROW_MODE` exposure, and the repo's
+  required verification workflow
+- corrected the README's VIA bridge command examples so they point at
+  `via layouts/via_to_qmk_layout.py`
+- refreshed repo-internal documentation comments in:
+  - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
+  - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`
+  - `via layouts/via_to_qmk_layout.py`
+- refreshed `review/2026-04-11-review-01/userspace-architecture-review.md` so
+  it reflects the current post-follow-up architecture instead of the original
+  pre-refactor constraints
+
+Verification completed in this documentation pass:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`

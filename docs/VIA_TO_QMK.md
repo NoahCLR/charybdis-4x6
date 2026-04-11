@@ -130,8 +130,14 @@ After syncing from VIA, check these things:
 Then build:
 
 ```sh
+sh tests/host/run_real_profile_validation_tests.sh
+sh tests/host/run_all_host_tests.sh
 qmk compile -kb bastardkb/charybdis/4x6 -km noah
 ```
+
+For this repo's normal maintenance workflow, run those host checks before the
+firmware compile whenever the rewrite changes authored layers or VIA macro
+defaults in source.
 
 ## What This Script Is Good For
 

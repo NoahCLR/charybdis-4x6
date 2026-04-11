@@ -9,7 +9,7 @@
 //   - key_behaviors[]
 //   - keymaps[][]
 //
-// Userspace-owned keycodes live in users/noah/noah_keymap.h.
+// Userspace-owned keycodes live in users/noah/noah_keymap_ids.h.
 // Keymap-local custom keycodes live below.
 // Default standard QMK hooks live in users/noah/hooks.c; shared runtime
 // processing lives in the userspace runtime modules under users/noah/lib/.
@@ -94,7 +94,7 @@ enum keymap_custom_keycodes {
 // The via_to_qmk_layout.py converter never rewrites this block; it only knows the MACRO_n names
 // when converting VIA layout tokens.
 // If you need more hardcoded slots than MACRO_15, extend enum custom_keycodes
-// in users/noah/noah_keymap.h.
+// in users/noah/noah_keymap_ids.h.
 #define HARDCODED_MACROS(MACRO) \
     MACRO(MACRO_0, "")          \
     MACRO(MACRO_1, "")          \

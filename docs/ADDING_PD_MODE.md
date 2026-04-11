@@ -25,7 +25,8 @@ If you hand this task to an agent, give it this exact job:
 3. Expose the mode through at least one physical path in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), either directly in `keymaps[][]` or indirectly from another key behavior or combo. Add a `key_behaviors[]` row only if the mode itself needs custom taps or higher-tap behavior.
 4. Add an RGB color in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 5. Update user-facing docs if the mode changes real behavior in a meaningful way.
-6. Compile with `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+6. Run the matching host tests and compile gates for the files you touched.
+7. Finish with `sh tests/host/run_all_host_tests.sh` and then `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
 
 Do not rewrite the generic runtime unless the new mode truly needs runtime
 behavior that existing modes do not cover.
@@ -58,7 +59,7 @@ These are the rules most likely to break the system if you miss one.
 
 1. Every shared pd mode must exist as exactly one row in [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h).
 2. Shared pd-mode keycodes and lock keycodes are generated from that manifest.
-   Do not hand-edit the generated pd-mode section in [`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h).
+   Do not hand-edit the generated pd-mode section in [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h).
 3. `LOCK_PD_MODE(mode_keycode_)` token-pastes to the generated `<MODE>_LOCK`
    keycode, so authored mode keycodes must use the manifest-generated symbolic names.
 4. Mode flags and split sync now use `pd_mode_mask_t` / `uint16_t` storage:
@@ -81,6 +82,7 @@ Normal add-mode work lives in these files:
 
 Files you usually do not need to touch:
 
+- [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h)
 - [`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h)
 - [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h)
 - [`users/noah/lib/pointing/pd_modes.h`](../users/noah/lib/pointing/pd_modes.h)
@@ -103,7 +105,7 @@ Edit [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/p
 
 Add the new mode as one manifest row. That single row generates:
 
-- the shared mode keycode in [`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h)
+- the shared mode keycode in [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h)
 - the shared lock keycode used by `LOCK_PD_MODE(...)`
 - the `PD_MODE_*` flag
 - the `pd_modes[]` registry row
@@ -111,7 +113,7 @@ Add the new mode as one manifest row. That single row generates:
 Example:
 
 ```c
-    PDM(EXAMPLE, EXAMPLE_MODE, handle_example_mode, NULL, reset_example_mode, 0)
+    PDM(EXAMPLE, EXAMPLE_MODE, handle_example_mode, NULL, reset_example_mode, 0, PD_MODE_TRAIT_NONE)
 ```
 
 Field meaning:
@@ -122,10 +124,11 @@ Field meaning:
 - `NULL`: optional key-event interceptor
 - `reset_example_mode`: optional cleanup hook
 - `0`: DPI override (`0` = use normal pointer DPI)
+- `PD_MODE_TRAIT_NONE`: manifest traits consumed by shared policy; combine `PD_MODE_TRAIT_*` flags when the mode needs them
 
 ### 2. Verify The Generated Outputs
 
-You should not need to manually edit [`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h),
+You should not need to manually edit [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h),
 [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h),
 or [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c)
 for a normal new mode. The manifest row should materialize those changes.
@@ -196,7 +199,7 @@ You do not register the mode by hand anymore. The manifest row expands into a
 `pd_modes[]` entry in [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c):
 
 ```c
-{PD_MODE_EXAMPLE, EXAMPLE_MODE, LOCK_PD_MODE(EXAMPLE_MODE), handle_example_mode, NULL, reset_example_mode, 0},
+{PD_MODE_EXAMPLE, EXAMPLE_MODE, LOCK_PD_MODE(EXAMPLE_MODE), handle_example_mode, NULL, reset_example_mode, 0, PD_MODE_TRAIT_NONE},
 ```
 
 Field meaning:
@@ -208,6 +211,7 @@ Field meaning:
 - `key_handler`: optional key-event interceptor
 - `reset`: cleanup callback, or `NULL`
 - `dpi`: pointer CPI override while the mode is active (`0` = keep normal pointer DPI)
+- `traits`: manifest-defined `PD_MODE_TRAIT_*` flags consumed by shared pointer policy and registry behavior
 
 If the mode needs a custom DPI, thread that through from the keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
@@ -249,8 +253,9 @@ That row only matters if `EXAMPLE_MODE` is reachable. You can expose it:
 
 Current examples in this repo:
 
-- `ARROW_MODE`: the authored row supports double-tap hold lock, but the
-  current profile exposes arrow mode through `KC_RIGHT_ALT` tap lock
+- `ARROW_MODE`: the current profile does not place a plain mode key or a
+  dedicated `key_behaviors[]` row; arrow mode is exposed through
+  `KC_RIGHT_ALT` tap lock instead
 - `DRAGSCROLL`: single tap `.`, double-tap hold locks
 - `VOLUME_MODE`: double tap mutes instead of locking
 - `PINCH_MODE`: second tap is custom and can branch into `ZOOM_MODE`
@@ -293,6 +298,10 @@ Examples:
 
 Edit [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h)
 and, if needed, [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c).
+
+Prefer existing manifest traits first. If the behavior is genuinely new
+shared policy, add a new `PD_MODE_TRAIT_*` flag and consume that trait
+centrally instead of reintroducing per-mode identity checks.
 
 Current examples to copy:
 
@@ -367,8 +376,8 @@ This is the actual control path for pd modes:
    auto-mouse target layer alive while modes are active or locked.
 7. [`users/noah/lib/state/split_runtime_sync.c`](../users/noah/lib/state/split_runtime_sync.c) mirrors active and locked
    flags to the other half.
-8. [`users/noah/lib/rgb/rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c) renders the mode overlay on the right
-   half.
+8. [`users/noah/lib/rgb/rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c) orchestrates stage order, and
+   [`users/noah/lib/rgb/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/rgb_pd_mode_stage.c) renders the mode overlay on the right half.
 
 That is why most new modes are mostly a data-registration job, not a runtime rewrite.
 
@@ -393,7 +402,32 @@ A new mode is done when all of the following are true:
   combo.
 - The authored tap / lock behavior in `key_behaviors[]` matches the intended UX.
 - The mode has an RGB overlay color.
+- The matching host tests and compile gates for the touched surfaces pass.
+- `sh tests/host/run_all_host_tests.sh` passes.
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
+
+## Verification Workflow
+
+For normal pd-mode work in this repo, the usual verification set is:
+
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+
+If you changed authored keymap or RGB data as part of exposing the mode, also run:
+
+- `sh tests/host/run_real_profile_validation_tests.sh`
+
+If you changed runtime wiring, source lists, or header boundaries while adding
+the mode, also run:
+
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Before handing the work back, finish with:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
 ## Manual Verification
 

@@ -17,6 +17,11 @@ If you want to change how the current profile looks, start there.
 If you want to change how RGB is rendered, look at:
 
 - [`users/noah/lib/rgb/rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c)
+- [`users/noah/lib/rgb/rgb_layer_stage.c`](../users/noah/lib/rgb/rgb_layer_stage.c)
+- [`users/noah/lib/rgb/rgb_automouse_stage.c`](../users/noah/lib/rgb/rgb_automouse_stage.c)
+- [`users/noah/lib/rgb/rgb_preview_stage.c`](../users/noah/lib/rgb/rgb_preview_stage.c)
+- [`users/noah/lib/rgb/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/rgb_pd_mode_stage.c)
+- [`users/noah/lib/rgb/rgb_key_feedback_stage.c`](../users/noah/lib/rgb/rgb_key_feedback_stage.c)
 - [`users/noah/lib/rgb/rgb_automouse.c`](../users/noah/lib/rgb/rgb_automouse.c)
 - [`users/noah/lib/rgb/rgb_helpers.h`](../users/noah/lib/rgb/rgb_helpers.h)
 
@@ -24,6 +29,10 @@ If you want to change the small helper surface used by `rgb_config.c`,
 look at:
 
 - [`users/noah/lib/rgb/rgb_config_helpers.h`](../users/noah/lib/rgb/rgb_config_helpers.h)
+
+If you want to change what authored RGB data is considered valid, also look at:
+
+- [`users/noah/lib/rgb/rgb_validation.c`](../users/noah/lib/rgb/rgb_validation.c)
 
 If you want to change what the key-behavior overlay means instead of how it is
 painted, also look at:

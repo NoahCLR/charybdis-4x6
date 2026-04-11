@@ -63,9 +63,10 @@ to understand and easy to change:
   of that, two optional overlays, an auto-mouse countdown gradient and
   key-behavior engine feedback, can be independently toggled
 - the userspace hooks into QMK through weak defaults in
-  [`hooks.c`](./users/noah/hooks.c). A keymap can override any QMK hook and
-  call the matching `noah_*` helper to keep the shared behavior, or replace it
-  entirely (see [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md))
+  [`hooks.c`](./users/noah/hooks.c). If you add repo-specific hook overrides,
+  call the matching `noah_*` helper to keep the shared behavior unless you are
+  intentionally replacing it (see
+  [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md))
 - `split_runtime_sync` syncs active and locked pointing-device mode flags,
   auto-mouse progress, key-feedback flags, and preview-layer state from master
   to slave so both halves render consistently
@@ -90,12 +91,13 @@ For the full round-trip workflow, see
 
 Practical usage:
 
-- `python via_to_qmk_layout.py --print` previews rewritten `VIA_MACROS(MACRO)`
-  and `keymaps[][]`
-- `python via_to_qmk_layout.py --write` rewrites those VIA-owned sections in
+- `python 'via layouts/via_to_qmk_layout.py' --print` previews rewritten
+  `VIA_MACROS(MACRO)` and `keymaps[][]`
+- `python 'via layouts/via_to_qmk_layout.py' --write` rewrites those VIA-owned
+  sections in
   [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
-- `python via_to_qmk_layout.py --via-json path/to/export.json` uses a specific
-  VIA export instead of choosing one from `via layouts/`
+- `python 'via layouts/via_to_qmk_layout.py' --via-json path/to/export.json`
+  uses a specific VIA export instead of choosing one from `via layouts/`
 
 ## Where To Change Things
 
@@ -106,7 +108,8 @@ If you want to adapt this userspace, these are the main files to touch first:
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | physical layout, combos, keymap-local custom keycodes, `VIA_MACROS(MACRO)`, `HARDCODED_MACROS(MACRO)`, and the authored `key_behaviors[]` table |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pointer-mode colors, LED groups, auto-mouse gradient endpoints, and key-behavior feedback colors |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, RGB overlay toggles (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE`), auto-mouse target layer and timeout, auto-sniping, dragscroll feel, and other keymap-facing behavior |
-| [`users/noah/noah_keymap.h`](./users/noah/noah_keymap.h) | shared custom keycode ranges (macros, pd-mode keycodes, layer locks) and the `NOAH_KEYMAP_SAFE_RANGE` boundary for keymap-local keycodes |
+| [`users/noah/noah_keymap_ids.h`](./users/noah/noah_keymap_ids.h) | shared layer ids, hardcoded macro keycodes, generated pd-mode and layer-lock keycode ranges, and the `NOAH_KEYMAP_SAFE_RANGE` boundary for keymap-local keycodes |
+| [`users/noah/lib/pointing/pd_mode_manifest.h`](./users/noah/lib/pointing/pd_mode_manifest.h) | shared pd-mode definitions: mode keycodes, generated lock keycodes, handlers, DPI metadata, and manifest traits |
 | [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, sensor/report settings, and low-level QMK overrides |
 
 In other words:
@@ -115,7 +118,8 @@ In other words:
 - if you want to change how the board looks, start in [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - if you want to change how the keyboard feels, start in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 - if you want to add a layer, update the layer enum in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h); `LAYER_COUNT` is the sentinel last value and should stay last
-- if you want to add a shared custom keycode, start in [`noah_keymap.h`](./users/noah/noah_keymap.h)
+- if you want to add a shared custom keycode surface, start in [`noah_keymap_ids.h`](./users/noah/noah_keymap_ids.h)
+- if you want to add a shared pointing-device mode, start in [`pd_mode_manifest.h`](./users/noah/lib/pointing/pd_mode_manifest.h)
 - if you want to change board plumbing, start in [`users/noah/config.h`](./users/noah/config.h)
 
 ## Layer Model And VIA
@@ -402,7 +406,8 @@ These docs are the next place to look:
 - [`docs/VIA_TO_QMK.md`](./docs/VIA_TO_QMK.md): how the VIA export bridge
   rewrites `VIA_MACROS(MACRO)` and `keymaps[][]` back into `keymap.c`
 - [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md): how the weak-hook
-  model works and how to override QMK hooks in your keymap
+  model works and how to override QMK hooks without silently dropping shared
+  behavior
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
 

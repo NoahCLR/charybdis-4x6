@@ -316,10 +316,11 @@ not depend on BetterMouse.
 
 One important current detail:
 
-- the key-behavior row for `ARROW_MODE` exists, but there is no plain
-  `ARROW_MODE` key physically placed in `keymaps[][]` right now
-- in the current profile, arrow mode is exposed through the `KC_RIGHT_ALT` tap
-  lock action instead
+- there is no plain `ARROW_MODE` key physically placed in `keymaps[][]` right
+  now
+- there is also no dedicated `key_behaviors[]` row for `ARROW_MODE` in the
+  current profile
+- arrow mode is exposed through the `KC_RIGHT_ALT` tap lock action instead
 - because arrow mode emits real arrow taps, it can still be combined with held
   modifiers for bigger jumps
 - the current base layout keeps those modifiers nearby: `KC_RIGHT_ALT` sits on

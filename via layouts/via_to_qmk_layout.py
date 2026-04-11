@@ -52,7 +52,7 @@ VIA_CUSTOM_BASE = 64
 
 # Upstream Charybdis keyboard keycodes, defined by the keyboard in the
 # QK_KB_0..7 range. These are separate from this repo's
-# users/noah/noah_keymap.h SAFE_RANGE enum.
+# users/noah/noah_keymap_ids.h SAFE_RANGE enum.
 CHARYBDIS_UPSTREAM_KEYCODES = [
     "DPI_MOD",
     "DPI_RMOD",
@@ -94,7 +94,8 @@ def load_pd_mode_keycodes() -> list[str]:
 
 
 # Current custom_keycodes enum entries that can appear directly on VIA layers.
-# These are userspace-owned SAFE_RANGE keycodes from users/noah/noah_keymap.h.
+# These are userspace-owned SAFE_RANGE keycodes from
+# users/noah/noah_keymap_ids.h.
 # Keymap-local custom keycodes such as RIGHT_THUMB / LEFT_THUMB are handled
 # separately below by parsing enum keymap_custom_keycodes in keymap.c, so they
 # do not need hardcoded entries here.
@@ -177,7 +178,8 @@ for i in range(MACRO_COUNT):
     REPLACEMENTS[f"MACRO({i})"] = f"VIA_MACRO_{i}"
 
 # VIA assigns CUSTOM(64 + n) where n is the keycode's position in
-# users/noah/noah_keymap.h's custom_keycodes enum (0-indexed from SAFE_RANGE).
+# users/noah/noah_keymap_ids.h's custom_keycodes enum (0-indexed from
+# SAFE_RANGE).
 # MACRO_0–15 are the first custom keycodes → CUSTOM(64)–CUSTOM(79).
 # These remain the hardcoded custom macros handled by macro_dispatch(), and
 # must stay distinct from VIA's dynamic MACRO(n) keycodes in the JSON export.
@@ -186,7 +188,7 @@ for i in range(MACRO_COUNT):
 
 # The pointing-device mode keys follow at positions 16–21 → CUSTOM(80)–CUSTOM(85).
 # PD-mode and layer-lock action keycodes live above that range in
-# noah_keymap.h, but this script does not map them because VIA exports the
+# noah_keymap_ids.h, but this script does not map them because VIA exports the
 # direct layout keycodes that appear on layers, not the derived lock actions
 # authored through key_behaviors[].
 for i, keycode in enumerate(PD_MODE_KEYCODES, start=MACRO_COUNT):
@@ -196,7 +198,7 @@ for i, keycode in enumerate(PD_MODE_KEYCODES, start=MACRO_COUNT):
 def load_keymap_local_custom_keycodes() -> list[str]:
     # keymap.c owns the tail of the custom SAFE_RANGE block. Keycodes that are
     # specific to this keymap, such as RIGHT_THUMB / LEFT_THUMB, belong there
-    # instead of in users/noah/noah_keymap.h.
+    # instead of in users/noah/noah_keymap_ids.h.
     #
     # Keeping this dynamic means most keymap-local additions do not require any
     # script edits: add the enum entry in keymap.c and the converter will map
@@ -204,7 +206,7 @@ def load_keymap_local_custom_keycodes() -> list[str]:
     #
     # If the shared userspace custom-keycode range changes instead, update the
     # configuration section above so NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT stays
-    # aligned with users/noah/noah_keymap.h.
+    # aligned with users/noah/noah_keymap_ids.h.
     if not KEYMAP_FILE.exists():
         die(f"keymap.c not found: {KEYMAP_FILE}")
 

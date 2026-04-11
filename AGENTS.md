@@ -14,7 +14,8 @@ Use this repo like production firmware, not a scratch keymap.
 - For doc fixes, doc updates, doc audits, or user-facing explanation work, check `README.md` and the relevant files under `docs/` first.
 - Review folders under `review/` are internal architecture/planning notes, not the default target for normal documentation requests.
 - For refactors or runtime architecture work, read the newest review folder under `review/` first. The newest review folder is the primary source of truth for that architecture work.
-- Name new review folders with a sortable ISO date prefix such as `review/2026-04-11-phase-4/` so "newest review" is unambiguous.
+- Name new review folders with a sortable ISO date prefix. For distinct reviews opened on the same day, append a zero-padded review sequence such as `review/2026-04-11-review-01/`, `review/2026-04-11-review-02/`, and `review/2026-04-11-review-03/` so "newest review" is unambiguous.
+- If work belongs to an existing review, continue in that folder instead of creating a same-day duplicate with a different naming pattern.
 - Each new review lives in its own folder under `review/` and must include:
   - `userspace-architecture-review.md`: current architecture decisions, tradeoffs, and intended structure
   - `progress.md`: completed work, in-flight work, verification, and next steps

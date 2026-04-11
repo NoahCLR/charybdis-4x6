@@ -5,14 +5,19 @@ shared userspace hooks without accidentally dropping shared runtime behavior.
 
 The `noah` userspace ships weak default QMK hooks in
 [`users/noah/hooks.c`](../users/noah/hooks.c).
-That means a keymap can define the normal QMK hook names in `keymap.c`, and the
-keymap-local definition will override the default userspace one.
+Any stronger definition of the normal QMK hook name will override the weak
+userspace one.
 
 If you still want the shared `noah` userspace behavior, call the matching
 `noah_*` helper from
 [`users/noah/noah_runtime.h`](../users/noah/noah_runtime.h).
-`keymap.c` already gets those declarations through
-[`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h).
+
+One important boundary in this repo:
+
+- keymap-owned translation units under `keyboards/.../keymaps/noah/` are
+  compile-gated away from including `noah_runtime.h`
+- treat hook overrides as deliberate integration work, not ordinary keymap-data
+  authoring in `keymap.c` or `rgb_config.c`
 
 ## Default Model
 
@@ -175,11 +180,20 @@ This pattern applies to:
 | `is_mouse_record_user()` | `noah_is_mouse_record_user()` | pointer-layer mouse-key classification |
 | `rgb_matrix_indicators_advanced_user()` | `noah_rgb_matrix_indicators_advanced_user()` | shared layer, auto-mouse, LED-group, key-feedback, and pointer-mode RGB rendering |
 
+## Verification
+
+If you change hook wiring or override behavior, run:
+
+- `sh tests/host/run_hook_chaining_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 ## Custom Keycodes
 
 Keymap-local custom keycodes belong in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
-not in [`users/noah/noah_keymap.h`](../users/noah/noah_keymap.h):
+not in [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h):
 
 ```c
 enum keymap_custom_keycodes {
