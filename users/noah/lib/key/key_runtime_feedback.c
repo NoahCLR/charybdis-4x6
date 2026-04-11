@@ -45,7 +45,7 @@ static uint8_t key_feedback_layer_hint_from_action(uint16_t action) {
 }
 
 static uint8_t key_feedback_preview_layer_for_slot(const active_key_state_t *slot) {
-    if (!key_runtime_slot_active(slot) || slot->implicit_hold || slot->fallback_hold_pending) {
+    if (!key_runtime_slot_active(slot) || key_runtime_slot_uses_implicit_hold(slot) || key_runtime_slot_uses_fallback_hold(slot)) {
         return UINT8_MAX;
     }
 
@@ -56,7 +56,7 @@ static uint8_t key_feedback_preview_layer_for_slot(const active_key_state_t *slo
         return UINT8_MAX;
     }
 
-    if (slot->hold_fired || slot->hold_one_shot_fired) {
+    if (!key_runtime_slot_allows_tap_release(slot)) {
         return UINT8_MAX;
     }
 
@@ -88,13 +88,13 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     uint16_t elapsed           = timer_elapsed(slot->timer);
     bool     long_hold_reached = slot->long_hold.present && elapsed >= slot->longer_hold_term;
 
-    if (slot->implicit_hold) {
+    if (key_runtime_slot_uses_implicit_hold(slot)) {
         return flags;
     }
 
     // Fallback base holds are internal runtime glue for "tap override, normal
     // hold" semantics. They are not authored hold surfaces, so keep RGB quiet.
-    if (slot->fallback_hold_pending) {
+    if (key_runtime_slot_uses_fallback_hold(slot)) {
         return flags;
     }
 
@@ -140,7 +140,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
         return flags;
     }
 
-    if (!long_hold_reached && elapsed >= slot->tap_hold_term && hold_sends_on_release(slot->hold)) {
+    if (!long_hold_reached && key_runtime_slot_has_pending_release_hold(slot)) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
         return flags;
     }
@@ -149,7 +149,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     // not keep a hold color latched after the threshold. Only an authored
     // normal hold tier keeps the pending hold color before it resolves;
     // long-hold-only surfaces stay quiet until the long-hold tier commits.
-    if (!slot->hold_fired && !slot->hold_one_shot_fired && elapsed >= slot->tap_hold_term && slot->hold.present) {
+    if (key_runtime_slot_allows_tap_release(slot) && elapsed >= slot->tap_hold_term && slot->hold.present) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
     }
 

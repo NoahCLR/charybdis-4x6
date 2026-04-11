@@ -61,12 +61,12 @@ static void key_runtime_slot_clear_owned_hold(active_key_state_t *slot, key_runt
 key_runtime_slot_effect_request_t key_runtime_slot_activate_pending_fallback_hold_request(active_key_state_t *slot) {
     key_runtime_slot_effect_request_t request = {0};
 
-    if (!slot || !slot->fallback_hold_pending || slot->held_action_keycode != KC_NO || slot->keycode == KC_NO) {
+    if (!slot || !key_runtime_slot_uses_fallback_hold(slot) || slot->held_action_keycode != KC_NO || slot->keycode == KC_NO) {
         return request;
     }
 
     slot->held_action_keycode = slot->keycode;
-    slot->hold_fired          = true;
+    key_runtime_slot_commit_hold_phase(slot, true);
     request.kind              = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
     request.action            = slot->keycode;
     return request;
@@ -93,10 +93,7 @@ key_runtime_slot_effect_request_t key_runtime_slot_commit_immediate_hold(active_
         return request;
     }
 
-    slot->hold_one_shot_fired = true;
-    if (completes_hold) {
-        slot->hold_fired = true;
-    }
+    key_runtime_slot_commit_hold_phase(slot, completes_hold);
 
     request.feedback_pulse           = needs_feedback;
     request.feedback_long_hold_level = false;
@@ -110,7 +107,7 @@ key_runtime_slot_effect_request_t key_runtime_slot_take_flush(active_key_state_t
         return request;
     }
 
-    if (slot->hold_fired || slot->held_action_keycode != KC_NO || slot->repeat_binding_active) {
+    if (!key_runtime_slot_allows_tap_release(slot) || slot->held_action_keycode != KC_NO || slot->repeat_binding_active) {
         if (slot->held_action_keycode != KC_NO && !active_held_action_survives_flush) {
             request.kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_UNREGISTER;
             request.action = slot->held_action_keycode;
@@ -138,18 +135,11 @@ key_runtime_slot_effect_request_t key_runtime_slot_fire_hold_at_threshold(active
             request.action                  = hold.action;
             request.feedback_pulse          = true;
             request.feedback_long_hold_level = false;
-            if (long_hold.present) {
-                slot->hold_fired          = false;
-                slot->hold_one_shot_fired = true;
-            } else {
-                slot->hold_fired          = true;
-                slot->hold_one_shot_fired = false;
-            }
+            key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
             return request;
         case KEY_RUNTIME_SLOT_HOLD_THRESHOLD_DISPATCH_HELD:
             slot->held_action_keycode     = hold.action;
-            slot->hold_fired              = !long_hold.present;
-            slot->hold_one_shot_fired     = false;
+            key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
             request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
             request.action                = hold.action;
             request.feedback_pulse        = key_runtime_slot_hold_activation_needs_pulse(hold, pulse_momentary_layer_action);
@@ -158,8 +148,7 @@ key_runtime_slot_effect_request_t key_runtime_slot_fire_hold_at_threshold(active
         case KEY_RUNTIME_SLOT_HOLD_THRESHOLD_DISPATCH_REPEAT:
             key_runtime_slot_clear_owned_hold(slot, &request);
             slot->repeat_binding_active   = true;
-            slot->hold_fired              = !long_hold.present;
-            slot->hold_one_shot_fired     = false;
+            key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
             request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_REPEAT_START;
             request.action                = hold.action;
             request.repeat_hz             = hold.repeat_hz;
@@ -183,7 +172,7 @@ key_runtime_slot_effect_request_t key_runtime_slot_promote_to_long_hold(active_k
 
     switch (key_runtime_slot_hold_threshold_dispatch_kind(long_hold)) {
         case KEY_RUNTIME_SLOT_HOLD_THRESHOLD_DISPATCH_TAP:
-            slot->hold_fired              = true;
+            key_runtime_slot_commit_hold_phase(slot, true);
             request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION;
             request.action                = long_hold.action;
             request.feedback_pulse        = true;
@@ -191,7 +180,7 @@ key_runtime_slot_effect_request_t key_runtime_slot_promote_to_long_hold(active_k
             return request;
         case KEY_RUNTIME_SLOT_HOLD_THRESHOLD_DISPATCH_HELD:
             slot->held_action_keycode     = long_hold.action;
-            slot->hold_fired              = true;
+            key_runtime_slot_commit_hold_phase(slot, true);
             request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
             request.action                = long_hold.action;
             request.feedback_pulse        = key_runtime_slot_hold_activation_needs_pulse(long_hold, pulse_momentary_layer_action);
@@ -199,7 +188,7 @@ key_runtime_slot_effect_request_t key_runtime_slot_promote_to_long_hold(active_k
             return request;
         case KEY_RUNTIME_SLOT_HOLD_THRESHOLD_DISPATCH_REPEAT:
             slot->repeat_binding_active   = true;
-            slot->hold_fired              = true;
+            key_runtime_slot_commit_hold_phase(slot, true);
             request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_REPEAT_START;
             request.action                = long_hold.action;
             request.repeat_hz             = long_hold.repeat_hz;

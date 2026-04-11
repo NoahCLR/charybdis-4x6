@@ -269,9 +269,10 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
     keyrecord_t record = test_record(test_keypos(2, 4), true);
 
     test_reset_state();
-    active_key.keycode               = KC_RIGHT_ALT;
-    active_key.key_pos               = test_keypos(2, 3);
-    active_key.fallback_hold_pending = true;
+    active_key.keycode        = KC_RIGHT_ALT;
+    active_key.key_pos        = test_keypos(2, 3);
+    active_key.phase          = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
+    active_key.hold_strategy  = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
 
     CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(tracked_physical_event);

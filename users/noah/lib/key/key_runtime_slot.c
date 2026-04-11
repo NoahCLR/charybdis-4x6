@@ -50,6 +50,39 @@ bool key_runtime_slot_active(const active_key_state_t *slot) {
     return slot != NULL && slot->keycode != KC_NO;
 }
 
+key_runtime_slot_phase_t key_runtime_slot_phase(const active_key_state_t *slot) {
+    if (!slot || slot->keycode == KC_NO) {
+        return KEY_RUNTIME_SLOT_PHASE_IDLE;
+    }
+
+    return slot->phase == KEY_RUNTIME_SLOT_PHASE_IDLE ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : slot->phase;
+}
+
+bool key_runtime_slot_uses_implicit_hold(const active_key_state_t *slot) {
+    return slot != NULL && slot->hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
+}
+
+bool key_runtime_slot_uses_fallback_hold(const active_key_state_t *slot) {
+    return slot != NULL && slot->hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
+}
+
+bool key_runtime_slot_allows_tap_release(const active_key_state_t *slot) {
+    key_runtime_slot_phase_t phase = key_runtime_slot_phase(slot);
+    return phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW;
+}
+
+bool key_runtime_slot_has_pending_release_hold(const active_key_state_t *slot) {
+    return key_runtime_slot_phase(slot) == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
+}
+
+bool key_runtime_slot_has_active_hold_tier(const active_key_state_t *slot) {
+    return key_runtime_slot_phase(slot) == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
+}
+
+bool key_runtime_slot_hold_is_complete(const active_key_state_t *slot) {
+    return key_runtime_slot_phase(slot) == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE;
+}
+
 bool key_runtime_slot_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos) {
     return key_runtime_slot_active(slot) && slot->keycode == keycode && key_runtime_keypos_equal(slot->key_pos, key_pos);
 }
@@ -222,11 +255,27 @@ void key_runtime_slot_reset(active_key_state_t *slot) {
     *slot = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
 }
 
+void key_runtime_slot_set_release_hold_pending(active_key_state_t *slot) {
+    if (!slot) {
+        return;
+    }
+
+    slot->phase = KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
+}
+
+void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes_hold) {
+    if (!slot) {
+        return;
+    }
+
+    slot->phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
+}
+
 void active_key_reset(void) {
     key_runtime_slot_reset(key_runtime_primary_slot());
 }
 
-void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired) {
+void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
     if (!slot) {
         return;
     }
@@ -237,18 +286,19 @@ void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t
         .timer               = timer_read(),
         .keycode             = keycode,
         .key_pos             = key_pos,
-        .hold_fired          = hold_fired,
+        .phase               = phase,
         .held_action_keycode = KC_NO,
         .tap_action          = tap_action,
         .tap_hold_term       = tap_hold_term,
         .longer_hold_term    = longer_hold_term,
         .multi_tap_term      = multi_tap_term,
+        .hold_strategy       = hold_strategy,
         .hold                = hold,
         .long_hold           = long_hold,
         .pending_multi_tap   = pending_multi_tap,
     };
 }
 
-void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired) {
-    key_runtime_slot_track(key_runtime_primary_slot(), keycode, key_pos, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, hold_fired);
+void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
+    key_runtime_slot_track(key_runtime_primary_slot(), keycode, key_pos, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, phase, hold_strategy);
 }

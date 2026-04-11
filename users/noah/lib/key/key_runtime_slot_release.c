@@ -33,7 +33,7 @@ static bool key_runtime_slot_release_is_interrupted_layer_tap(active_key_state_t
 }
 
 static bool key_runtime_slot_release_is_buffered_base_tap(active_key_state_t released_key) {
-    return released_key.fallback_hold_pending && released_key.tap_action == KC_NO && released_key.held_action_keycode == KC_NO;
+    return key_runtime_slot_uses_fallback_hold(&released_key) && released_key.tap_action == KC_NO && released_key.held_action_keycode == KC_NO;
 }
 
 static bool key_runtime_slot_release_is_quick_tap(active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed) {
@@ -59,13 +59,13 @@ static pd_mode_mask_t key_runtime_slot_locked_pd_mode_tap_mode(uint16_t keycode,
 
 key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(uint16_t keycode, active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed) {
     bool                                  quick_tap            = key_runtime_slot_release_is_quick_tap(released_key, behavior, elapsed);
-    bool                                  quick_immediate_hold = hold_registers_on_press(released_key.hold) && quick_tap;
+    bool                                  quick_immediate_hold = hold_registers_on_press(released_key.hold) && key_runtime_slot_allows_tap_release(&released_key) && quick_tap;
     pd_mode_mask_t                        lock_tap_mode        = key_runtime_slot_locked_pd_mode_tap_mode(keycode, released_key, elapsed, behavior);
     key_runtime_slot_release_resolution_t resolution           = {
         .release_owned_state = released_key.held_action_keycode != KC_NO || released_key.repeat_binding_active,
     };
 
-    if (released_key.hold_fired || released_key.held_action_keycode != KC_NO || released_key.repeat_binding_active) {
+    if (key_runtime_slot_has_active_hold_tier(&released_key) || key_runtime_slot_hold_is_complete(&released_key) || released_key.held_action_keycode != KC_NO || released_key.repeat_binding_active) {
         if (lock_tap_mode) {
             resolution.outcome          = KEY_RUNTIME_SLOT_RELEASE_OUTCOME_PD_MODE_LOCK_TAP;
             resolution.pd_mode_lock_tap = lock_tap_mode;
@@ -100,11 +100,11 @@ key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(uint16_t 
         return resolution;
     }
 
-    if (released_key.fallback_hold_pending) {
+    if (key_runtime_slot_uses_fallback_hold(&released_key)) {
         return resolution;
     }
 
-    if (hold_sends_on_release(released_key.hold)) {
+    if (key_runtime_slot_has_pending_release_hold(&released_key) || hold_sends_on_release(released_key.hold)) {
         resolution.outcome = KEY_RUNTIME_SLOT_RELEASE_OUTCOME_ACTION;
         resolution.action  = hold_sends_on_release(released_key.long_hold) && elapsed >= released_key.longer_hold_term ? released_key.long_hold.action : released_key.hold.action;
         return resolution;
@@ -116,7 +116,7 @@ key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(uint16_t 
         return resolution;
     }
 
-    if (!released_key.hold_one_shot_fired && !behavior.is_momentary_layer && released_key.tap_action != KC_NO) {
+    if (key_runtime_slot_allows_tap_release(&released_key) && !behavior.is_momentary_layer && released_key.tap_action != KC_NO) {
         resolution.outcome = KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP;
     }
 

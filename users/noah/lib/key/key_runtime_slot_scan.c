@@ -22,6 +22,7 @@ typedef struct {
     bool                            commit_immediate_hold;
     bool                            immediate_hold_needs_feedback;
     bool                            immediate_hold_completes_hold;
+    bool                            set_release_hold_pending;
     bool                            activate_fallback_hold;
     key_runtime_slot_scan_outcome_t outcome;
     hold_behavior_t                 hold;
@@ -55,30 +56,48 @@ static bool key_runtime_slot_scan_request_has_effect(key_runtime_slot_effect_req
     return request.kind != KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE || request.release_owned_state || request.feedback_pulse;
 }
 
+static bool key_runtime_slot_should_mark_release_hold_pending(active_key_state_t active_key_state, uint16_t elapsed) {
+    if (key_runtime_slot_phase(&active_key_state) != KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW) {
+        return false;
+    }
+
+    if (hold_sends_on_release(active_key_state.hold) && elapsed >= active_key_state.tap_hold_term) {
+        return true;
+    }
+
+    return !active_key_state.hold.present && hold_sends_on_release(active_key_state.long_hold) && elapsed >= active_key_state.longer_hold_term;
+}
+
 static key_runtime_slot_scan_resolution_t key_runtime_slot_resolve_scan(active_key_state_t active_key_state, uint16_t elapsed) {
     key_runtime_slot_scan_resolution_t resolution = {0};
+    key_runtime_slot_phase_t           phase      = key_runtime_slot_phase(&active_key_state);
 
-    if (hold_registers_on_press(active_key_state.hold) && !active_key_state.hold_one_shot_fired && elapsed >= active_key_state.tap_hold_term) {
+    if (phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW && elapsed >= active_key_state.tap_hold_term) {
         resolution.commit_immediate_hold         = true;
-        resolution.immediate_hold_needs_feedback = !active_key_state.implicit_hold;
+        resolution.immediate_hold_needs_feedback = !key_runtime_slot_uses_implicit_hold(&active_key_state);
         resolution.immediate_hold_completes_hold = !active_key_state.long_hold.present;
     }
 
-    if (active_key_state.fallback_hold_pending && active_key_state.held_action_keycode == KC_NO && elapsed >= active_key_state.tap_hold_term) {
+    if (key_runtime_slot_uses_fallback_hold(&active_key_state) && phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW && active_key_state.held_action_keycode == KC_NO && elapsed >= active_key_state.tap_hold_term) {
         resolution.activate_fallback_hold = true;
         return resolution;
     }
 
-    if (hold_fires_at_threshold(active_key_state.long_hold) && elapsed >= active_key_state.longer_hold_term) {
+    if ((phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW || phase == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING || phase == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE) && hold_fires_at_threshold(active_key_state.long_hold) && elapsed >= active_key_state.longer_hold_term) {
         resolution.outcome   = KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD;
         resolution.long_hold = active_key_state.long_hold;
         return resolution;
     }
 
-    if (hold_fires_at_threshold(active_key_state.hold) && elapsed >= active_key_state.tap_hold_term) {
+    if (phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW && hold_fires_at_threshold(active_key_state.hold) && elapsed >= active_key_state.tap_hold_term) {
         resolution.outcome   = KEY_RUNTIME_SLOT_SCAN_OUTCOME_FIRE_HOLD;
         resolution.hold      = active_key_state.hold;
         resolution.long_hold = active_key_state.long_hold;
+        return resolution;
+    }
+
+    if (key_runtime_slot_should_mark_release_hold_pending(active_key_state, elapsed)) {
+        resolution.set_release_hold_pending = true;
     }
 
     return resolution;
@@ -89,6 +108,10 @@ static key_runtime_slot_active_scan_apply_t key_runtime_slot_apply_scan_resoluti
 
     if (!slot) {
         return apply;
+    }
+
+    if (resolution.set_release_hold_pending) {
+        key_runtime_slot_set_release_hold_pending(slot);
     }
 
     if (resolution.commit_immediate_hold) {
@@ -170,7 +193,7 @@ static key_runtime_slot_pending_multi_tap_scan_apply_t key_runtime_slot_apply_pe
 key_runtime_slot_scan_event_t key_runtime_slot_take_active_scan_event(active_key_state_t *slot) {
     key_runtime_slot_scan_event_t event = {0};
 
-    if (!(slot && key_runtime_slot_active(slot) && !slot->hold_fired)) {
+    if (!(slot && key_runtime_slot_active(slot) && !key_runtime_slot_hold_is_complete(slot))) {
         return event;
     }
 

@@ -124,9 +124,9 @@ static void test_fallback_hold_has_no_hold_feedback(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode               = KC_RIGHT_ALT,
-        .held_action_keycode   = KC_RIGHT_ALT,
-        .fallback_hold_pending = true,
+        .keycode             = KC_RIGHT_ALT,
+        .held_action_keycode = KC_RIGHT_ALT,
+        .hold_strategy       = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
     };
 
     uint8_t flags = key_feedback_pack();
@@ -154,7 +154,7 @@ static void test_momentary_hold_preview_layer_clears_once_layer_is_active(void) 
 
     active_key = (active_key_state_t){
         .keycode             = KC_RIGHT_ALT,
-        .hold_fired          = true,
+        .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
         .held_action_keycode = MO(4),
     };
 
@@ -166,7 +166,7 @@ static void test_non_layer_held_action_has_no_preview_layer(void) {
 
     active_key = (active_key_state_t){
         .keycode             = KC_RIGHT_ALT,
-        .hold_fired          = true,
+        .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
         .held_action_keycode = SAFE_RANGE + 1,
     };
 
@@ -242,7 +242,7 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
     active_key = (active_key_state_t){
         .keycode             = MO(2),
         .held_action_keycode = MO(2),
-        .hold_fired          = true,
+        .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
     };
 
     noah_runtime_shared_state.key.active_slots[1] = (active_key_state_t){

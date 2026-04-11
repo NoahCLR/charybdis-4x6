@@ -297,6 +297,63 @@ Verification result:
 - targeted slot, transition, scenario, and integration tests passed
 - feature-gate compile checks passed
 
+## 2026-04-11 Slot Lifecycle Phase Extraction
+
+Completed in this pass:
+
+- Replaced the handled-key slot's old hold/strategy booleans in
+  [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
+  with explicit `phase` and `hold_strategy` enums.
+- Added phase/strategy helper predicates and transitions in
+  [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
+  and
+  [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c)
+  so the runtime uses semantic slot-state helpers instead of direct flag
+  combinations.
+- Updated press, scan, release, effect, and feedback paths to consume the new
+  lifecycle model:
+  - [`key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c)
+  - [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+  - [`key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
+  - [`key_runtime_slot_effect.c`](../../users/noah/lib/key/key_runtime_slot_effect.c)
+  - [`key_runtime_feedback.c`](../../users/noah/lib/key/key_runtime_feedback.c)
+- Kept backward-compatible behavior for manually constructed active slot
+  fixtures by normalizing `phase == IDLE` plus `keycode != KC_NO` to the
+  effective tap window in the shared slot helpers.
+- Reworked the affected host coverage to assert the new lifecycle/strategy
+  state instead of the removed booleans.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the new lifecycle-state model.
+
+Why this pass landed now:
+
+- it is the first pass that changes the handled-key slot storage shape rather
+  than only reshaping module boundaries
+- it moves the runtime closer to an actual reducer by making lifecycle state a
+  named enum instead of an implicit boolean protocol
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, transition, feedback, preflight, scenario, and integration
+  tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+
 ## 2026-04-11 Press And Effect Boundary Extraction
 
 Completed in this pass:

@@ -14,27 +14,40 @@
 #include "../key/multi_tap_engine.h"
 #include "../pointing/pd_mode_flags.h"
 
+typedef enum {
+    KEY_RUNTIME_SLOT_PHASE_IDLE = 0,
+    KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+    KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+    KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING,
+    KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
+    KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+} key_runtime_slot_phase_t;
+
+typedef enum {
+    KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT = 0,
+    KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT,
+    KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
+} key_runtime_slot_hold_strategy_t;
+
 // One handled-key runtime slot: active press/hold state plus any deferred
 // multi-tap chain that still owns this physical key position after release.
 typedef struct {
-    uint16_t        timer;
-    uint16_t        keycode;
-    keypos_t        key_pos;
-    bool            hold_fired;
-    uint16_t        held_action_keycode;
-    bool            repeat_binding_active;
-    uint16_t        tap_action;
-    uint16_t        tap_hold_term;
-    uint16_t        longer_hold_term;
-    uint16_t        multi_tap_term;
-    bool            hold_one_shot_fired;
-    bool            implicit_hold;
-    bool            fallback_hold_pending;
-    bool            pd_mode_was_locked_on_press;
-    bool            layer_interrupted;
-    hold_behavior_t hold;
-    hold_behavior_t long_hold;
-    multi_tap_t     pending_multi_tap;
+    uint16_t                         timer;
+    uint16_t                         keycode;
+    keypos_t                         key_pos;
+    key_runtime_slot_phase_t         phase;
+    uint16_t                         held_action_keycode;
+    bool                             repeat_binding_active;
+    uint16_t                         tap_action;
+    uint16_t                         tap_hold_term;
+    uint16_t                         longer_hold_term;
+    uint16_t                         multi_tap_term;
+    key_runtime_slot_hold_strategy_t hold_strategy;
+    bool                             pd_mode_was_locked_on_press;
+    bool                             layer_interrupted;
+    hold_behavior_t                  hold;
+    hold_behavior_t                  long_hold;
+    multi_tap_t                      pending_multi_tap;
 } active_key_state_t;
 
 #define KEY_RUNTIME_ACTIVE_SLOT_CAPACITY 2
@@ -50,6 +63,7 @@ typedef struct {
 #define ACTIVE_KEY_STATE_INIT                           \
     {                                                   \
         .keycode             = KC_NO,                   \
+        .phase               = KEY_RUNTIME_SLOT_PHASE_IDLE, \
         .held_action_keycode = KC_NO,                   \
         .tap_hold_term       = CUSTOM_TAP_HOLD_TERM,    \
         .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM, \

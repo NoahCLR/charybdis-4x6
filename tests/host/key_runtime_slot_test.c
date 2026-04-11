@@ -237,7 +237,7 @@ static void test_slot_track_preserves_pending_multi_tap(void) {
     CHECK(key_runtime_slot_advance_pending_multi_tap(slot, TEST_MULTI_TAP_KEY) == KC_NO);
     CHECK(key_runtime_slot_pending_multi_tap_pending_hold(slot));
 
-    key_runtime_slot_track(slot, TEST_MULTI_TAP_KEY, pos, KC_NO, hold_behavior_none(), hold_behavior_none(), 120, 240, 150, false);
+    key_runtime_slot_track(slot, TEST_MULTI_TAP_KEY, pos, KC_NO, hold_behavior_none(), hold_behavior_none(), 120, 240, 150, KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
 
     CHECK(slot->keycode == TEST_MULTI_TAP_KEY);
     CHECK(slot->pending_multi_tap.count == 3);
@@ -276,6 +276,7 @@ static void test_resolve_release_quick_immediate_hold_becomes_tap(void) {
         (active_key_state_t){
             .keycode             = TEST_ACTIVE_KEY,
             .key_pos             = pos,
+            .phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
             .held_action_keycode = TEST_HOLD_ACTION,
             .tap_action          = TEST_SINGLE_ACTION,
             .tap_hold_term       = 150,
@@ -404,6 +405,7 @@ static void test_take_active_scan_event_promotes_long_hold_after_longer_term(voi
     *slot = (active_key_state_t){
         .keycode          = TEST_ACTIVE_KEY,
         .key_pos          = pos,
+        .phase            = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
         .timer            = (uint16_t)(fake_time - 260),
         .tap_hold_term    = 120,
         .longer_hold_term = 240,
@@ -422,7 +424,7 @@ static void test_take_active_scan_event_promotes_long_hold_after_longer_term(voi
     CHECK(event.data.active_effects.effect_request.action == TEST_HOLD_ACTION);
     CHECK(event.data.active_effects.effect_request.feedback_pulse);
     CHECK(event.data.active_effects.effect_request.feedback_long_hold_level);
-    CHECK(slot->hold_fired);
+    CHECK(key_runtime_slot_hold_is_complete(slot));
 }
 
 static void test_take_active_scan_event_returns_commit_and_long_hold_requests(void) {
@@ -434,6 +436,7 @@ static void test_take_active_scan_event_returns_commit_and_long_hold_requests(vo
     *slot = (active_key_state_t){
         .keycode             = TEST_ACTIVE_KEY,
         .key_pos             = test_keypos(3, 1),
+        .phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
         .timer               = (uint16_t)(fake_time - 260),
         .tap_hold_term       = 120,
         .longer_hold_term    = 240,
@@ -459,8 +462,7 @@ static void test_take_active_scan_event_returns_commit_and_long_hold_requests(vo
     CHECK(event.data.active_effects.effect_request.action == TEST_SINGLE_ACTION);
     CHECK(event.data.active_effects.effect_request.feedback_pulse);
     CHECK(event.data.active_effects.effect_request.feedback_long_hold_level);
-    CHECK(slot->hold_one_shot_fired);
-    CHECK(slot->hold_fired);
+    CHECK(key_runtime_slot_hold_is_complete(slot));
     CHECK(slot->held_action_keycode == KC_NO);
 }
 
@@ -471,11 +473,12 @@ static void test_take_active_scan_event_returns_fallback_hold_request(void) {
     test_reset_state();
 
     *slot = (active_key_state_t){
-        .keycode               = TEST_ACTIVE_KEY,
-        .key_pos               = test_keypos(3, 2),
-        .timer                 = (uint16_t)(fake_time - 120),
-        .tap_hold_term         = 100,
-        .fallback_hold_pending = true,
+        .keycode        = TEST_ACTIVE_KEY,
+        .key_pos        = test_keypos(3, 2),
+        .phase          = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+        .timer          = (uint16_t)(fake_time - 120),
+        .tap_hold_term  = 100,
+        .hold_strategy  = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
     };
 
     event = key_runtime_slot_take_active_scan_event(slot);
@@ -486,7 +489,7 @@ static void test_take_active_scan_event_returns_fallback_hold_request(void) {
     CHECK(event.data.active_effects.effect_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
     CHECK(event.data.active_effects.effect_request.action == TEST_ACTIVE_KEY);
     CHECK(slot->held_action_keycode == TEST_ACTIVE_KEY);
-    CHECK(slot->hold_fired);
+    CHECK(key_runtime_slot_hold_is_complete(slot));
 }
 
 static void test_fire_hold_at_threshold_starts_repeat_binding(void) {
@@ -498,6 +501,7 @@ static void test_fire_hold_at_threshold_starts_repeat_binding(void) {
     *slot = (active_key_state_t){
         .keycode  = TEST_ACTIVE_KEY,
         .key_pos  = test_keypos(3, 3),
+        .phase    = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
         .hold     = REPEAT_WHILE_HELD(TEST_HOLD_ACTION, 25),
     };
 
@@ -510,8 +514,7 @@ static void test_fire_hold_at_threshold_starts_repeat_binding(void) {
     CHECK(!request.feedback_long_hold_level);
     CHECK(!request.release_owned_state);
     CHECK(slot->repeat_binding_active);
-    CHECK(slot->hold_fired);
-    CHECK(!slot->hold_one_shot_fired);
+    CHECK(key_runtime_slot_hold_is_complete(slot));
 }
 
 static void test_promote_to_long_hold_releases_owned_state_before_dispatch(void) {
@@ -523,6 +526,7 @@ static void test_promote_to_long_hold_releases_owned_state_before_dispatch(void)
     *slot = (active_key_state_t){
         .keycode             = TEST_ACTIVE_KEY,
         .key_pos             = test_keypos(3, 4),
+        .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
         .held_action_keycode = TEST_SINGLE_ACTION,
     };
 
@@ -534,7 +538,7 @@ static void test_promote_to_long_hold_releases_owned_state_before_dispatch(void)
     CHECK(request.feedback_pulse);
     CHECK(request.feedback_long_hold_level);
     CHECK(slot->held_action_keycode == KC_NO);
-    CHECK(slot->hold_fired);
+    CHECK(key_runtime_slot_hold_is_complete(slot));
 }
 
 static void test_take_pending_multi_tap_scan_event_returns_long_hold_request(void) {
@@ -547,6 +551,7 @@ static void test_take_pending_multi_tap_scan_event_returns_long_hold_request(voi
     *slot = (active_key_state_t){
         .keycode          = TEST_LAYER_KEY,
         .key_pos          = pos,
+        .phase            = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
         .longer_hold_term = 240,
         .pending_multi_tap =
             {
@@ -574,7 +579,7 @@ static void test_take_pending_multi_tap_scan_event_returns_long_hold_request(voi
     CHECK(event.data.pending_multi_tap_effects.effect_request.feedback_long_hold_level);
     CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
     CHECK(slot->long_hold.action == TEST_LAYER_LOCK);
-    CHECK(slot->hold_fired);
+    CHECK(key_runtime_slot_hold_is_complete(slot));
 }
 
 static void test_take_pending_multi_tap_scan_event_flushes_expired_chain(void) {
@@ -728,9 +733,8 @@ static void test_begin_press_sets_metadata_and_immediate_hold_request(void) {
         120,
         240,
         150,
-        false,
-        true,
-        false,
+        KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+        KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT,
         true);
 
     CHECK(request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
@@ -738,8 +742,8 @@ static void test_begin_press_sets_metadata_and_immediate_hold_request(void) {
     CHECK(slot->keycode == TEST_ACTIVE_KEY);
     CHECK(slot->tap_action == TEST_SINGLE_ACTION);
     CHECK(slot->held_action_keycode == TEST_HOLD_ACTION);
-    CHECK(slot->implicit_hold);
-    CHECK(!slot->fallback_hold_pending);
+    CHECK(key_runtime_slot_uses_implicit_hold(slot));
+    CHECK(!key_runtime_slot_uses_fallback_hold(slot));
     CHECK(slot->pd_mode_was_locked_on_press);
 }
 
@@ -792,7 +796,7 @@ static void test_prepare_handled_press_matching_pending_multi_tap_reuses_slot(vo
     CHECK(slot->key_pos.row == pos.row);
     CHECK(slot->key_pos.col == pos.col);
     CHECK(slot->tap_action == KC_NO);
-    CHECK(slot->hold_fired);
+    CHECK(key_runtime_slot_hold_is_complete(slot));
     CHECK(slot->pending_multi_tap.count == 2);
     CHECK(!slot->pending_multi_tap.pending_hold);
 }
@@ -853,7 +857,8 @@ static void test_prepare_handled_press_flushes_pending_multi_tap_before_begin(vo
     CHECK(slot->key_pos.col == press_pos.col);
     CHECK(slot->tap_action == TEST_SINGLE_ACTION);
     CHECK(slot->held_action_keycode == TEST_HOLD_ACTION);
-    CHECK(slot->implicit_hold);
+    CHECK(key_runtime_slot_uses_implicit_hold(slot));
+    CHECK(slot->phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW);
     CHECK(slot->pd_mode_was_locked_on_press);
     CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
 }
@@ -890,9 +895,10 @@ static void test_interrupt_on_other_press_marks_layer_and_activates_fallback_hol
     test_reset_state();
 
     *slot = (active_key_state_t){
-        .keycode               = TEST_LAYER_KEY,
-        .key_pos               = test_keypos(6, 2),
-        .fallback_hold_pending = true,
+        .keycode       = TEST_LAYER_KEY,
+        .key_pos       = test_keypos(6, 2),
+        .phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+        .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
     };
 
     request = key_runtime_slot_interrupt_on_other_press(slot, test_keypos(6, 3));
@@ -900,7 +906,7 @@ static void test_interrupt_on_other_press_marks_layer_and_activates_fallback_hol
     CHECK(request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
     CHECK(request.action == TEST_LAYER_KEY);
     CHECK(slot->held_action_keycode == TEST_LAYER_KEY);
-    CHECK(slot->hold_fired);
+    CHECK(key_runtime_slot_hold_is_complete(slot));
     CHECK(slot->layer_interrupted);
 }
 
@@ -913,6 +919,7 @@ static void test_commit_immediate_hold_sets_flags_and_feedback_request(void) {
     *slot = (active_key_state_t){
         .keycode = TEST_ACTIVE_KEY,
         .key_pos = test_keypos(6, 3),
+        .phase   = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
     };
 
     request = key_runtime_slot_commit_immediate_hold(slot, true, true);
@@ -920,8 +927,7 @@ static void test_commit_immediate_hold_sets_flags_and_feedback_request(void) {
     CHECK(request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
     CHECK(request.feedback_pulse);
     CHECK(!request.feedback_long_hold_level);
-    CHECK(slot->hold_one_shot_fired);
-    CHECK(slot->hold_fired);
+    CHECK(key_runtime_slot_hold_is_complete(slot));
 }
 
 static void test_take_flush_unregisters_held_action(void) {
@@ -934,7 +940,7 @@ static void test_take_flush_unregisters_held_action(void) {
         .keycode             = TEST_ACTIVE_KEY,
         .key_pos             = test_keypos(6, 4),
         .held_action_keycode = TEST_HOLD_ACTION,
-        .hold_fired          = true,
+        .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
     };
 
     request = key_runtime_slot_take_flush(slot, false);

@@ -2,7 +2,7 @@
 
 Date: 2026-04-11
 
-Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, dedicated release/scan slot-transition modules, dedicated press/effect slot-transition modules, the first handled press/release slot-event wrappers, and scan-specific slot-event wrappers that replaced the old public scan resolution/apply structs; the remaining recommendations below focus on what is still architecturally open after those changes.
+Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, dedicated release/scan slot-transition modules, dedicated press/effect slot-transition modules, the first handled press/release slot-event wrappers, scan-specific slot-event wrappers that replaced the old public scan resolution/apply structs, and an explicit handled-key slot lifecycle phase plus hold-strategy model; the remaining recommendations below focus on what is still architecturally open after those changes.
 
 Scope: the `noah` userspace in this repo only. This review ignores hardware changes and evaluates software structure, boundaries, state flow, extension cost, and verification surfaces.
 
@@ -23,10 +23,12 @@ has already improved the surrounding structure by splitting admission policy
 into its own module, splitting release/scan slot transitions into their own
 modules, splitting press/effect helpers into their own modules, and adding a
 scenario-level host harness. The runtime now also has the start of a more
-event-shaped surface for handled press/release planning. It is still an
-implicit state machine expressed as a wide mutable slot struct plus a set of
-cooperating helpers. That is workable today, but it is still the place most
-likely to fight the next real feature.
+event-shaped surface for handled press/release/scan planning, plus an explicit
+slot lifecycle phase and hold-strategy model instead of the earlier
+`hold_fired` / `hold_one_shot_fired` / `implicit_hold` /
+`fallback_hold_pending` flag mix. It is still not a single explicit reducer,
+and the handled-key engine is still the place most likely to fight the next
+real feature.
 
 The current extension cost looks like this:
 
@@ -130,13 +132,16 @@ What is good now:
 - scan-specific resolution/apply details now stay private to
   [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
   instead of leaking through the public header
+- active slot lifecycle state now has explicit `phase` and `hold_strategy`
+  fields instead of the older hold/strategy boolean combination
 - press/release/scan are separated
 - effect execution is separated from state mutation
 
 What is still expensive:
 
-- `active_key_state_t` is a wide bag of booleans and timing fields rather than a
-  small number of explicit lifecycle phases
+- `active_key_state_t` now has explicit lifecycle phase and hold-strategy state,
+  but it still mixes lifecycle, timing, authored behavior, runtime ownership,
+  and interruption policy in one mutable storage struct
 - [`key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h) exposes a
   narrower storage-oriented surface plus shared slot helpers
 - lifecycle mutation and transition planning are still spread across
@@ -446,7 +451,8 @@ firmware repos.
 The main thing to protect now is not the outer shape of the repo; it is the
 internal shape of the handled-key engine. The manifest deduplication, scenario
 harness, admission split, release/scan boundary extraction, press/effect
-boundary extraction, and press/release/scan slot-event wrappers were the right
-setup moves. If the remaining handled-key core becomes an explicit reducer/FSM
-with a cleaner long-term capacity policy, the rest of the architecture is in a
-good position to keep scaling.
+boundary extraction, press/release/scan slot-event wrappers, and explicit slot
+lifecycle phase extraction were the right setup moves. If the remaining
+handled-key core becomes an explicit reducer/FSM with a cleaner long-term
+capacity policy, the rest of the architecture is in a good position to keep
+scaling.
