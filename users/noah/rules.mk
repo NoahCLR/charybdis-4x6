@@ -47,6 +47,7 @@ SRC += lib/state/layer_ownership.c
 SRC += lib/state/runtime_shared_state.c
 SRC += lib/state/split_runtime_sync.c
 SRC += lib/rgb/rgb_runtime.c
+SRC += lib/rgb/rgb_key_feedback_stage.c
 SRC += lib/rgb/rgb_layer_stage.c
 SRC += lib/rgb/rgb_automouse_stage.c
 SRC += lib/rgb/rgb_pd_mode_stage.c

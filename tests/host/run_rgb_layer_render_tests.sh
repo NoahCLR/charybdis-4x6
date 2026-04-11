@@ -39,6 +39,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_preview_stage.c" \
@@ -75,6 +76,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_preview_stage.c" \
@@ -111,6 +113,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_preview_stage.c" \

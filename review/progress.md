@@ -604,3 +604,34 @@ Additional verification completed for the Phase 5 pd-mode-stage extraction pass:
 Next recommended step:
 
 - finish Phase 5 by extracting the key-feedback overlay next if `rgb_runtime.c` still needs another ownership pass, then do a final cleanup sweep on the remaining top-level stage ordering
+
+Completed the final Phase 5 extraction pass by moving the key-feedback overlay out of `users/noah/lib/rgb/rgb_runtime.c`:
+
+- added `users/noah/lib/rgb/rgb_key_feedback_stage.h` and `users/noah/lib/rgb/rgb_key_feedback_stage.c`
+- moved the following key-feedback-stage responsibilities into the new module:
+  - key-feedback color-cache initialization during RGB post-init
+  - packed feedback-flag selection from live master state vs split-sync state
+  - multi-tap pending, hold-active, long-hold-active, and hold-pending overlay rendering
+- reduced `users/noah/lib/rgb/rgb_runtime.c` so it now acts primarily as top-level render ordering over:
+  - base layer-stage render
+  - automouse blend stage
+  - preview overlay stage
+  - pd-mode overlay stage
+  - key-feedback overlay stage
+- updated build and host-test wiring in:
+  - `users/noah/rules.mk`
+  - `tests/host/run_rgb_layer_render_tests.sh`
+  - `tests/host/run_feature_gate_compile_tests.sh`
+
+Additional verification completed for the final Phase 5 key-feedback-stage extraction pass:
+
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Phase status:
+
+- Phase 5 is complete enough to close. `users/noah/lib/rgb/rgb_runtime.c` is no longer a multi-responsibility renderer; it now coordinates a small set of focused stage modules while preserving the existing render order.
+
+Next recommended step:
+
+- start a Phase 6 coverage sweep, with the remaining obvious review-plan gap being hook override chaining expectations and any other integration tests that still rely on implicit behavior instead of explicit assertions
