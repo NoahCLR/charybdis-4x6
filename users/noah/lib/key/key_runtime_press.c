@@ -6,6 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "handled_key.h"
+#include "key_runtime_admission.h"
 #include "key_runtime_process.h"
 #include "key_runtime_state.h"
 #include "key_runtime_trace.h"

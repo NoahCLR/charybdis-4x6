@@ -2,7 +2,7 @@
 
 Date: 2026-04-11
 
-Status: new review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md), focused on current architectural shape and long-term extensibility rather than implementation follow-up tracking.
+Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, and a dedicated key-runtime admission boundary; the remaining recommendations below focus on what is still architecturally open after those changes.
 
 Scope: the `noah` userspace in this repo only. This review ignores hardware changes and evaluates software structure, boundaries, state flow, extension cost, and verification surfaces.
 
@@ -18,10 +18,12 @@ right big pieces:
 - broad host coverage plus compile-gated header boundaries
 
 The main architectural risk is now concentrated in one area: the handled-key
-runtime. The old single-active-key bottleneck is gone, but the replacement is
+runtime. The old single-active-key bottleneck is gone, and some follow-up work
+has already improved the surrounding structure by splitting admission policy
+into its own module and adding a scenario-level host harness. The replacement is
 still an implicit state machine expressed as a wide mutable slot struct plus a
 large set of request/resolution/apply helper types. That is workable today, but
-it is the place most likely to fight the next real feature.
+it is still the place most likely to fight the next real feature.
 
 The current extension cost looks like this:
 
@@ -98,6 +100,7 @@ recheck.
 The strongest remaining architectural smell is in the key runtime:
 
 - [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
+- [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
 - [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
 - [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c)
 - [`users/noah/lib/key/key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c)
@@ -105,6 +108,8 @@ The strongest remaining architectural smell is in the key runtime:
 What is good now:
 
 - slot ownership is explicit
+- slot admission and reclaim lookup now have a named home in
+  [`key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
 - press/release/scan are separated
 - effect execution is separated from state mutation
 
@@ -115,8 +120,9 @@ What is still expensive:
 - [`key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h) exposes a
   large transitional surface full of resolution/apply/plan types and helper
   entry points
-- `key_runtime_slot.c` is now the de facto policy center for both storage and
-  behavior
+- lifecycle mutation and transition planning are still spread across
+  `key_runtime_state.h`, `key_runtime_slot.c`, and `key_runtime_transition.c`
+  instead of one explicit reducer
 
 Why this matters:
 
@@ -136,8 +142,8 @@ The current runtime makes the handled-key overlap limit explicit:
 
 - `KEY_RUNTIME_ACTIVE_SLOT_CAPACITY` is `2` in
   [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
-- slot selection falls back to reclaiming or ultimately reusing the primary slot
-  in [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c)
+- slot selection and reclaim fallback now live in
+  [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
 
 That is much better than the old hidden single-key ceiling, but it is still a
 policy boundary built into the runtime architecture.
@@ -180,24 +186,24 @@ What this means in practice:
 That is acceptable today. It just means the trait system should be treated as a
 midpoint, not as the final extensibility model.
 
-### 4. The build surface is duplicated between firmware build wiring and compile gates
+### 4. Structured scenario coverage exists now, but only at the first layer
 
-The source inventory appears in at least two places:
+The handled-key runtime now has a real scenario harness:
 
-- [`users/noah/rules.mk`](../../users/noah/rules.mk)
-- [`tests/host/run_feature_gate_compile_tests.sh`](../../tests/host/run_feature_gate_compile_tests.sh)
+- [`tests/host/key_runtime_scenario_harness.c`](../../tests/host/key_runtime_scenario_harness.c)
+- [`tests/host/key_runtime_scenario_test.c`](../../tests/host/key_runtime_scenario_test.c)
 
-This is currently managed carefully, but it is still duplicated architecture.
+This closes an earlier testing gap, but the coverage is still intentionally
+small.
 
 Why this matters:
 
-- new source files require touching both lists
-- missing one update can weaken the compile gate or create false confidence
-- the repo instructions already call this out, which is a sign the duplication is
-  known and active
-
-This is not a correctness bug today. It is a maintenance tax that will keep
-recurring.
+- the current harness proves the shape works, but not yet across the full range
+  of interrupt, reclaim, and long-hold transitions
+- the remaining reducer/FSM refactor will be safer once more of the current
+  behavior is captured as reusable event traces
+- the scenario surface is now the right place to pin down semantics that are too
+  cross-cutting for slot-level unit tests alone
 
 ## Review By Priority
 
@@ -306,8 +312,8 @@ Current testing/debugging posture is strong:
 
 Remaining limitation:
 
-- tracing is human-readable text only; it is useful for live debugging, but not
-  yet structured enough to serve as a reusable scenario oracle in host tests
+- the repo now has a structured scenario oracle, but only a small number of
+  runtime traces are captured there so far
 
 ## Concrete Recommendations
 
@@ -355,18 +361,23 @@ Benefits:
 - legal states become type-shaped instead of comment-shaped
 - new behavior work lands mostly in one reducer plus effect tests
 
-### Recommendation 2: separate slot storage policy from lifecycle policy
+### Recommendation 2: continue separating slot capacity policy from lifecycle policy
 
-Keep the current slot pool if memory is the priority, but move capacity and
-reclaim rules into one named policy surface.
+The first step is now done:
 
-Pragmatic next step:
+- slot lookup/admission/reclaim policy lives in
+  [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
+- admission and reclaim behavior has dedicated coverage in
+  [`tests/host/key_runtime_admission_test.c`](../../tests/host/key_runtime_admission_test.c)
 
-- introduce `key_runtime_capacity.h` or similar for:
+Next step:
+
+- introduce a smaller named policy surface for:
   - slot capacity
   - reclaim preference
   - overflow behavior
-- add one dedicated test file for admission/reclaim policy only
+- keep that policy explicit enough that a future storage-model change does not
+  need another whole-runtime sweep
 
 Longer-term option:
 
@@ -393,31 +404,17 @@ typedef struct {
 The point is not dynamic plugins. The point is to keep novel mode policy from
 turning `pd_mode_registry.c` into another central accumulator.
 
-### Recommendation 4: give build wiring and compile gates one shared source manifest
+### Recommendation 4: expand the scenario harness into a reducer regression matrix
 
-Create a single source inventory consumed by both the firmware build and the
-host compile gates.
+The initial harness now exists. The next step is to grow it around the
+transitions most likely to regress during reducer/FSM work.
 
-Possible implementation options:
+Best next traces:
 
-- a `users/noah/sources.mk` included by `users/noah/rules.mk`
-- a small generated `.sh` source list derived from the same manifest
-
-The important part is this: adding a source file should require updating one
-canonical inventory, not two manually mirrored lists.
-
-### Recommendation 5: add one structured event-scenario harness for the key runtime
-
-The host suite is already strong. The next step is not “more unit tests”; it is
-one higher-level scenario runner for the handled-key reducer.
-
-Useful shape:
-
-- input: `PRESS`, `RELEASE`, `SCAN(+ms)`, `OTHER_KEY_PRESS`, `EXPECT_EFFECT(...)`
-- output: deterministic effect stream and final slot state
-
-That would make future key-runtime refactors much cheaper and would pair well
-with the reducer recommendation above.
+- reclaim after pending multi-tap ownership
+- interrupt-driven fallback hold activation
+- long-hold promotion after immediate-hold registration
+- two-slot contention where the primary slot is reused as overflow
 
 ## Bottom Line
 
@@ -426,6 +423,8 @@ design is already disciplined and significantly ahead of typical keyboard
 firmware repos.
 
 The main thing to protect now is not the outer shape of the repo; it is the
-internal shape of the handled-key engine. If that subsystem becomes an explicit
-FSM with a cleaner capacity policy, the rest of the architecture is in a good
-position to keep scaling.
+internal shape of the handled-key engine. The manifest deduplication, scenario
+harness, and admission split were the right setup moves. If the remaining
+handled-key core becomes an explicit reducer/FSM with a cleaner long-term
+capacity policy, the rest of the architecture is in a good position to keep
+scaling.

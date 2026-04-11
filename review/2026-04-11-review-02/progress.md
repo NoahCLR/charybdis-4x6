@@ -91,3 +91,59 @@ Verification result:
 - feature-gate compile checks passed
 - full host suite passed
 - firmware build passed
+
+## 2026-04-11 Admission Boundary Extraction
+
+Completed in this pass:
+
+- Split handled-key slot lookup and press-admission policy into
+  [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
+  and
+  [`users/noah/lib/key/key_runtime_admission.h`](../../users/noah/lib/key/key_runtime_admission.h).
+- Removed the admission/reclaim helper declarations from
+  [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
+  so the state/lifecycle header no longer also owns slot-capacity policy.
+- Kept slot lifecycle mutations in
+  [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c)
+  and updated the press/preflight/transition modules to depend on the new
+  admission boundary explicitly.
+- Added focused admission coverage in
+  [`tests/host/key_runtime_admission_test.c`](../../tests/host/key_runtime_admission_test.c)
+  and
+  [`tests/host/run_key_runtime_admission_tests.sh`](../../tests/host/run_key_runtime_admission_tests.sh),
+  then wired that suite into
+  [`tests/host/run_all_host_tests.sh`](../../tests/host/run_all_host_tests.sh).
+- Updated the canonical userspace source manifest and the affected host
+  integration runners so the new module participates in both firmware builds
+  and host-only link steps.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review now reflects the already-landed source manifest, scenario
+  harness, and admission-boundary work instead of listing them as still pending.
+
+Why this pass landed now:
+
+- it makes the handled-key runtime boundary more explicit without changing
+  press/release behavior
+- it gives future reducer/FSM work a smaller protocol surface to cut across
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted admission, slot, preflight, transition, scenario, and integration
+  tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed

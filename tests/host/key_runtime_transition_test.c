@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/key/key_runtime_admission.h"
 #include "users/noah/lib/key/key_runtime_state.h"
 #include "users/noah/lib/key/key_runtime_transition.h"
 

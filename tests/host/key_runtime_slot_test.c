@@ -124,25 +124,6 @@ static void test_slot_pending_multi_tap_ownership_marks_slot_non_idle(void) {
     CHECK(!key_runtime_slot_idle(slot));
     CHECK(key_runtime_slot_has_pending_multi_tap(slot));
     CHECK(key_runtime_slot_owns_key_position(slot, pos));
-    CHECK(key_runtime_find_slot_with_pending_multi_tap(pos) == slot);
-    CHECK(key_runtime_find_reclaimable_slot() == slot);
-}
-
-static void test_select_slot_for_press_prefers_slot_owning_pending_multi_tap(void) {
-    active_key_state_t *primary   = key_runtime_primary_slot();
-    active_key_state_t *secondary = key_runtime_slot_at(1);
-    keypos_t            target    = test_keypos(6, 2);
-
-    test_reset_state();
-    primary->keycode = TEST_ACTIVE_KEY;
-    primary->key_pos = test_keypos(1, 1);
-    secondary->pending_multi_tap = (multi_tap_t){
-        .keycode = TEST_MULTI_TAP_KEY,
-        .key_pos = target,
-        .count   = 1,
-    };
-
-    CHECK(key_runtime_select_slot_for_press(target) == secondary);
 }
 
 static void test_slot_pending_multi_tap_lifecycle_helpers(void) {
@@ -918,7 +899,6 @@ static void test_take_flush_dispatches_tap_for_unheld_non_layer_key(void) {
 
 int main(void) {
     test_slot_pending_multi_tap_ownership_marks_slot_non_idle();
-    test_select_slot_for_press_prefers_slot_owning_pending_multi_tap();
     test_slot_pending_multi_tap_lifecycle_helpers();
     test_slot_track_preserves_pending_multi_tap();
     test_resolve_pending_multi_tap_hold_clears_slot_owned_state();

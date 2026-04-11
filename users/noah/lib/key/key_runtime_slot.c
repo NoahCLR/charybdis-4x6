@@ -101,18 +101,6 @@ active_key_state_t *key_runtime_slot_at(uint8_t index) {
     return &noah_runtime_shared_state.key.active_slots[index];
 }
 
-active_key_state_t *key_runtime_first_active_slot(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
-
-        if (key_runtime_slot_active(slot)) {
-            return slot;
-        }
-    }
-
-    return NULL;
-}
-
 uint8_t key_runtime_slot_index(const active_key_state_t *slot) {
     if (!slot) {
         return KEY_RUNTIME_ACTIVE_SLOT_CAPACITY;
@@ -157,76 +145,6 @@ bool key_runtime_slot_pending_multi_tap_pending_hold(const active_key_state_t *s
 
 bool key_runtime_slot_pending_multi_tap_expired(const active_key_state_t *slot) {
     return slot != NULL && multi_tap_expired(&slot->pending_multi_tap);
-}
-
-active_key_state_t *key_runtime_find_slot_by_position(keypos_t key_pos) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
-
-        if (key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->key_pos, key_pos)) {
-            return slot;
-        }
-    }
-
-    return NULL;
-}
-
-active_key_state_t *key_runtime_find_slot_with_pending_multi_tap(keypos_t key_pos) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
-
-        if (!key_runtime_slot_active(slot) && key_runtime_slot_has_pending_multi_tap(slot) && key_runtime_keypos_equal(slot->pending_multi_tap.key_pos, key_pos)) {
-            return slot;
-        }
-    }
-
-    return NULL;
-}
-
-active_key_state_t *key_runtime_find_free_slot(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
-
-        if (key_runtime_slot_idle(slot)) {
-            return slot;
-        }
-    }
-
-    return NULL;
-}
-
-active_key_state_t *key_runtime_find_reclaimable_slot(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
-
-        if (!key_runtime_slot_active(slot) && key_runtime_slot_has_pending_multi_tap(slot)) {
-            return slot;
-        }
-    }
-
-    return NULL;
-}
-
-active_key_state_t *key_runtime_select_slot_for_press(keypos_t key_pos) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
-
-        if (key_runtime_slot_owns_key_position(slot, key_pos)) {
-            return slot;
-        }
-    }
-
-    active_key_state_t *slot = key_runtime_find_free_slot();
-    if (slot) {
-        return slot;
-    }
-
-    slot = key_runtime_find_reclaimable_slot();
-    if (slot) {
-        return slot;
-    }
-
-    return key_runtime_primary_slot();
 }
 
 multi_tap_t *key_runtime_primary_multi_tap(void) {
@@ -920,10 +838,6 @@ void key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot) {
     }
 
     multi_tap_reset(&slot->pending_multi_tap);
-}
-
-bool active_key_matches(uint16_t keycode, keypos_t key_pos) {
-    return key_runtime_slot_matches(key_runtime_find_slot_by_position(key_pos), keycode, key_pos);
 }
 
 void key_runtime_slot_reset(active_key_state_t *slot) {

@@ -15,6 +15,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/key_behavior_lookup.c \
     lib/key/keymap_validation.c \
     lib/key/key_runtime.c \
+    lib/key/key_runtime_admission.c \
     lib/key/key_runtime_slot.c \
     lib/key/key_runtime_preflight.c \
     lib/key/key_runtime_process.c \

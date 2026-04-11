@@ -9,6 +9,7 @@
 #endif
 
 #include "key_runtime_feedback.h"
+#include "key_runtime_admission.h"
 #include "key_runtime_state.h"
 #include "key_runtime_trace.h"
 #include "../action/action_dispatch.h"

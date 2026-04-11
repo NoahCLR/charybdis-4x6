@@ -18,6 +18,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_preflight_test.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_admission.c" \
     "$ROOT/users/noah/lib/key/key_runtime_trace.c" \
     "$ROOT/users/noah/lib/key/key_runtime_preflight.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot.c" \

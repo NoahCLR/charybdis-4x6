@@ -162,7 +162,6 @@ bool                is_layer_key(uint16_t keycode);
 bool                key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs);
 active_key_state_t *key_runtime_primary_slot(void);
 active_key_state_t *key_runtime_slot_at(uint8_t index);
-active_key_state_t *key_runtime_first_active_slot(void);
 uint8_t             key_runtime_slot_index(const active_key_state_t *slot);
 bool                key_runtime_slot_idle(const active_key_state_t *slot);
 bool                key_runtime_slot_active(const active_key_state_t *slot);
@@ -172,11 +171,6 @@ bool                key_runtime_slot_has_pending_multi_tap(const active_key_stat
 bool                key_runtime_slot_pending_multi_tap_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos);
 bool                key_runtime_slot_pending_multi_tap_pending_hold(const active_key_state_t *slot);
 bool                key_runtime_slot_pending_multi_tap_expired(const active_key_state_t *slot);
-active_key_state_t *key_runtime_find_slot_by_position(keypos_t key_pos);
-active_key_state_t *key_runtime_find_slot_with_pending_multi_tap(keypos_t key_pos);
-active_key_state_t *key_runtime_find_free_slot(void);
-active_key_state_t *key_runtime_find_reclaimable_slot(void);
-active_key_state_t *key_runtime_select_slot_for_press(keypos_t key_pos);
 multi_tap_t        *key_runtime_primary_multi_tap(void);
 multi_tap_t        *key_runtime_multi_tap_slot_at(uint8_t index);
 multi_tap_t        *key_runtime_multi_tap_for_slot(const active_key_state_t *slot);
@@ -205,7 +199,6 @@ key_runtime_slot_pending_multi_tap_scan_apply_t key_runtime_slot_apply_pending_m
 key_runtime_slot_pending_multi_tap_plan_t key_runtime_slot_take_pending_multi_tap_plan(active_key_state_t *slot);
 key_runtime_slot_pending_multi_tap_hold_release_t key_runtime_slot_take_pending_multi_tap_hold_release(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior, uint16_t elapsed);
 void                key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot);
-bool                active_key_matches(uint16_t keycode, keypos_t key_pos);
 bool                key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot);
 bool                key_runtime_activate_pending_fallback_hold(void);
 
