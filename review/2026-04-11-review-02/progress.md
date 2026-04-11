@@ -198,3 +198,145 @@ Verification result:
 - feature-gate compile checks passed
 - full host suite passed
 - firmware build passed
+
+## 2026-04-11 Slot Event Wrapper Extraction
+
+Completed in this pass:
+
+- Added a handled-press slot-event wrapper in
+  [`users/noah/lib/key/key_runtime_slot_press.h`](../../users/noah/lib/key/key_runtime_slot_press.h)
+  and
+  [`users/noah/lib/key/key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c)
+  so transition orchestration no longer needs to build raw press-plan inputs by
+  hand.
+- Added a handled-release slot-event wrapper in
+  [`users/noah/lib/key/key_runtime_slot_release.h`](../../users/noah/lib/key/key_runtime_slot_release.h)
+  and
+  [`users/noah/lib/key/key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
+  so pending multi-tap release, active release, and unmatched cleanup now come
+  back through one release-event contract.
+- Updated
+  [`users/noah/lib/key/key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c)
+  to consume the new handled press/release slot-event wrappers instead of
+  coordinating the lower-level helper calls directly.
+- Extended slot-level host coverage in
+  [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  to exercise the new event-oriented wrappers.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the new slot-event wrapper layer.
+
+Why this pass landed now:
+
+- it is the first step from separated helper modules toward an explicit
+  slot-event API
+- it reduces event orchestration inside `key_runtime_transition.c` without
+  changing runtime behavior
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+
+## 2026-04-11 Scan Event Contract Extraction
+
+Completed in this pass:
+
+- Replaced the public scan resolution/apply structs in
+  [`users/noah/lib/key/key_runtime_slot_scan.h`](../../users/noah/lib/key/key_runtime_slot_scan.h)
+  with named slot-event contracts for active scan effects and pending
+  multi-tap scan effects/flushes.
+- Moved the old scan resolution/apply details private to
+  [`users/noah/lib/key/key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+  so the scan module now exposes an event-shaped surface instead of a leaky
+  internal protocol.
+- Updated
+  [`users/noah/lib/key/key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c)
+  to consume the new scan events directly rather than coordinating scan
+  resolution/apply steps itself.
+- Reworked slot-level host coverage in
+  [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  so it validates the new scan event contracts and the same state mutations
+  through the public API.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the now-landed scan event boundary.
+
+Why this pass landed now:
+
+- it removes another leaky internal protocol from the handled-key public
+  surface
+- it leaves `key_runtime_transition.c` closer to an event consumer than a
+  transition coordinator
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Verification result:
+
+- targeted slot, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+
+## 2026-04-11 Press And Effect Boundary Extraction
+
+Completed in this pass:
+
+- Split slot effect-request contracts and mutation helpers into
+  [`users/noah/lib/key/key_runtime_slot_effect.h`](../../users/noah/lib/key/key_runtime_slot_effect.h)
+  and
+  [`users/noah/lib/key/key_runtime_slot_effect.c`](../../users/noah/lib/key/key_runtime_slot_effect.c).
+- Split press-specific slot planning helpers into
+  [`users/noah/lib/key/key_runtime_slot_press.h`](../../users/noah/lib/key/key_runtime_slot_press.h)
+  and
+  [`users/noah/lib/key/key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c).
+- Removed the effect-request and press-plan types from
+  [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
+  so the shared state header is now closer to pure storage plus shared slot
+  helpers.
+- Updated transition/runtime wiring and host runners to consume the new press
+  and effect boundaries explicitly.
+
+Why this pass landed now:
+
+- it removes the last large event/protocol chunk from the shared state header
+- it leaves the remaining handled-key core closer to an explicit slot-event
+  surface instead of one mixed internal protocol
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed

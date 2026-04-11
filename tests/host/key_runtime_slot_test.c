@@ -4,6 +4,8 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/key/key_runtime_slot_effect.h"
+#include "users/noah/lib/key/key_runtime_slot_press.h"
 #include "users/noah/lib/key/key_runtime_slot_release.h"
 #include "users/noah/lib/key/key_runtime_slot_scan.h"
 #include "users/noah/lib/key/key_runtime_state.h"
@@ -82,6 +84,12 @@ key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count
     return key_behavior_step_none();
 }
 
+key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
+    return (key_behavior_view_t){
+        .keycode = keycode,
+    };
+}
+
 bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 3;
 }
@@ -98,8 +106,18 @@ bool action_dispatch_is_layer_lock(uint16_t action) {
     return action == TEST_LAYER_LOCK;
 }
 
+bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
+    (void)action;
+    return false;
+}
+
 bool is_layer_key(uint16_t keycode) {
     return keycode == TEST_LAYER_KEY;
+}
+
+uint8_t behavior_get_layer(uint16_t keycode) {
+    (void)keycode;
+    return 3;
 }
 
 noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
@@ -110,6 +128,65 @@ noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
     (void)mt;
     return (delayed_action_mods_t){0};
+}
+
+static bool test_handled_key_uses_buffered_modifier_single_step(handled_key_view_t key) {
+    if (key.behavior.single.tap.present || key.behavior.single.hold.present || key.behavior.single.long_hold.present || key.behavior.is_momentary_layer) {
+        return false;
+    }
+
+    return key.behavior.has_multi_tap && key.behavior.keycode < SAFE_RANGE && false;
+}
+
+bool handled_key_uses_implicit_hold(handled_key_view_t key) {
+    return pd_mode_for_keycode(key.behavior.keycode) != 0;
+}
+
+bool handled_key_uses_fallback_hold(handled_key_view_t key) {
+    if (key.behavior.is_momentary_layer || key.behavior.keycode >= SAFE_RANGE) {
+        return false;
+    }
+
+    if (action_dispatch_is_qmk_behavior_keycode(key.behavior.keycode)) {
+        return false;
+    }
+
+    if (key.behavior.single.hold.present || key.behavior.single.long_hold.present) {
+        return false;
+    }
+
+    return key.behavior.single.tap.present || key.behavior.has_multi_tap;
+}
+
+hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
+    if (key.behavior.single.hold.present) {
+        return key.behavior.single.hold;
+    }
+
+    if (pd_mode_for_keycode(key.behavior.keycode)) {
+        return (hold_behavior_t){
+            .present = true,
+            .action  = key.behavior.keycode,
+            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        };
+    }
+
+    return hold_behavior_none();
+}
+
+uint16_t handled_key_tap_action(handled_key_view_t key) {
+    if (key.behavior.single.tap.present) return key.behavior.single.tap.action;
+    if (pd_mode_for_keycode(key.behavior.keycode)) return KC_NO;
+    if (test_handled_key_uses_buffered_modifier_single_step(key)) return KC_NO;
+    if (key.behavior.is_layer_tap) return QK_LAYER_TAP_GET_TAP_KEYCODE(key.behavior.keycode);
+    if (key.behavior.is_momentary_layer) return KC_NO;
+    if (key.behavior.keycode >= SAFE_RANGE) return KC_NO;
+    return key.behavior.keycode;
+}
+
+void held_action_register(keypos_t key_pos, uint16_t action) {
+    (void)key_pos;
+    (void)action;
 }
 
 static void test_slot_pending_multi_tap_ownership_marks_slot_non_idle(void) {
@@ -317,35 +394,49 @@ static void test_take_active_release_maps_locked_pd_mode_tap(void) {
     CHECK(key_runtime_slot_idle(slot));
 }
 
-static void test_resolve_scan_promotes_long_hold_after_longer_term(void) {
-    key_runtime_slot_scan_resolution_t resolution;
+static void test_take_active_scan_event_promotes_long_hold_after_longer_term(void) {
+    active_key_state_t          *slot = key_runtime_primary_slot();
+    key_runtime_slot_scan_event_t event;
+    keypos_t                     pos = test_keypos(3, 1);
 
     test_reset_state();
 
-    resolution = key_runtime_slot_resolve_scan(
-        (active_key_state_t){
-            .keycode          = TEST_ACTIVE_KEY,
-            .tap_hold_term    = 120,
-            .longer_hold_term = 240,
-            .hold             = TAP_AT_HOLD_THRESHOLD(TEST_SINGLE_ACTION),
-            .long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_HOLD_ACTION),
-        },
-        260);
+    *slot = (active_key_state_t){
+        .keycode          = TEST_ACTIVE_KEY,
+        .key_pos          = pos,
+        .timer            = (uint16_t)(fake_time - 260),
+        .tap_hold_term    = 120,
+        .longer_hold_term = 240,
+        .hold             = TAP_AT_HOLD_THRESHOLD(TEST_SINGLE_ACTION),
+        .long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_HOLD_ACTION),
+    };
 
-    CHECK(!resolution.activate_fallback_hold);
-    CHECK(resolution.outcome == KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD);
-    CHECK(resolution.long_hold.action == TEST_HOLD_ACTION);
+    event = key_runtime_slot_take_active_scan_event(slot);
+
+    CHECK(event.handled);
+    CHECK(event.kind == KEY_RUNTIME_SLOT_SCAN_EVENT_ACTIVE_EFFECTS);
+    CHECK(event.key_pos.row == pos.row);
+    CHECK(event.key_pos.col == pos.col);
+    CHECK(event.data.active_effects.immediate_hold_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
+    CHECK(event.data.active_effects.effect_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION);
+    CHECK(event.data.active_effects.effect_request.action == TEST_HOLD_ACTION);
+    CHECK(event.data.active_effects.effect_request.feedback_pulse);
+    CHECK(event.data.active_effects.effect_request.feedback_long_hold_level);
+    CHECK(slot->hold_fired);
 }
 
-static void test_apply_scan_resolution_returns_commit_and_long_hold_requests(void) {
-    active_key_state_t             *slot = key_runtime_primary_slot();
-    key_runtime_slot_scan_apply_t   apply;
+static void test_take_active_scan_event_returns_commit_and_long_hold_requests(void) {
+    active_key_state_t          *slot = key_runtime_primary_slot();
+    key_runtime_slot_scan_event_t event;
 
     test_reset_state();
 
     *slot = (active_key_state_t){
         .keycode             = TEST_ACTIVE_KEY,
         .key_pos             = test_keypos(3, 1),
+        .timer               = (uint16_t)(fake_time - 260),
+        .tap_hold_term       = 120,
+        .longer_hold_term    = 240,
         .held_action_keycode = TEST_HOLD_ACTION,
         .hold                =
             {
@@ -356,73 +447,46 @@ static void test_apply_scan_resolution_returns_commit_and_long_hold_requests(voi
         .long_hold           = TAP_AT_HOLD_THRESHOLD(TEST_SINGLE_ACTION),
     };
 
-    apply = key_runtime_slot_apply_scan_resolution(
-        slot,
-        (key_runtime_slot_scan_resolution_t){
-            .commit_immediate_hold         = true,
-            .immediate_hold_needs_feedback = true,
-            .immediate_hold_completes_hold = false,
-            .outcome                       = KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
-            .long_hold                     = TAP_AT_HOLD_THRESHOLD(TEST_SINGLE_ACTION),
-        });
+    event = key_runtime_slot_take_active_scan_event(slot);
 
-    CHECK(apply.immediate_hold_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
-    CHECK(apply.immediate_hold_request.feedback_pulse);
-    CHECK(!apply.immediate_hold_request.feedback_long_hold_level);
-    CHECK(apply.outcome_request.release_owned_state);
-    CHECK(apply.outcome_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION);
-    CHECK(apply.outcome_request.action == TEST_SINGLE_ACTION);
-    CHECK(apply.outcome_request.feedback_pulse);
-    CHECK(apply.outcome_request.feedback_long_hold_level);
+    CHECK(event.handled);
+    CHECK(event.kind == KEY_RUNTIME_SLOT_SCAN_EVENT_ACTIVE_EFFECTS);
+    CHECK(event.data.active_effects.immediate_hold_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
+    CHECK(event.data.active_effects.immediate_hold_request.feedback_pulse);
+    CHECK(!event.data.active_effects.immediate_hold_request.feedback_long_hold_level);
+    CHECK(event.data.active_effects.effect_request.release_owned_state);
+    CHECK(event.data.active_effects.effect_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION);
+    CHECK(event.data.active_effects.effect_request.action == TEST_SINGLE_ACTION);
+    CHECK(event.data.active_effects.effect_request.feedback_pulse);
+    CHECK(event.data.active_effects.effect_request.feedback_long_hold_level);
     CHECK(slot->hold_one_shot_fired);
     CHECK(slot->hold_fired);
     CHECK(slot->held_action_keycode == KC_NO);
 }
 
-static void test_apply_scan_resolution_returns_fallback_hold_request(void) {
-    active_key_state_t             *slot = key_runtime_primary_slot();
-    key_runtime_slot_scan_apply_t   apply;
+static void test_take_active_scan_event_returns_fallback_hold_request(void) {
+    active_key_state_t          *slot = key_runtime_primary_slot();
+    key_runtime_slot_scan_event_t event;
 
     test_reset_state();
 
     *slot = (active_key_state_t){
         .keycode               = TEST_ACTIVE_KEY,
         .key_pos               = test_keypos(3, 2),
+        .timer                 = (uint16_t)(fake_time - 120),
+        .tap_hold_term         = 100,
         .fallback_hold_pending = true,
     };
 
-    apply = key_runtime_slot_apply_scan_resolution(
-        slot,
-        (key_runtime_slot_scan_resolution_t){
-            .activate_fallback_hold = true,
-        });
+    event = key_runtime_slot_take_active_scan_event(slot);
 
-    CHECK(apply.immediate_hold_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
-    CHECK(apply.outcome_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
-    CHECK(apply.outcome_request.action == TEST_ACTIVE_KEY);
+    CHECK(event.handled);
+    CHECK(event.kind == KEY_RUNTIME_SLOT_SCAN_EVENT_ACTIVE_EFFECTS);
+    CHECK(event.data.active_effects.immediate_hold_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
+    CHECK(event.data.active_effects.effect_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
+    CHECK(event.data.active_effects.effect_request.action == TEST_ACTIVE_KEY);
     CHECK(slot->held_action_keycode == TEST_ACTIVE_KEY);
     CHECK(slot->hold_fired);
-}
-
-static void test_resolve_pending_multi_tap_scan_requires_layer_release_before_lock(void) {
-    key_runtime_slot_pending_multi_tap_scan_resolution_t resolution;
-
-    test_reset_state();
-
-    resolution = key_runtime_slot_resolve_pending_multi_tap_scan(
-        (active_key_state_t){
-            .keycode          = TEST_LAYER_KEY,
-            .longer_hold_term = 240,
-        },
-        (multi_tap_t){
-            .pending_hold = true,
-            .long_hold    = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK),
-        },
-        260);
-
-    CHECK(resolution.outcome == KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD);
-    CHECK(resolution.release_layer_before_action);
-    CHECK(resolution.long_hold.action == TEST_LAYER_LOCK);
 }
 
 static void test_fire_hold_at_threshold_starts_repeat_binding(void) {
@@ -473,47 +537,10 @@ static void test_promote_to_long_hold_releases_owned_state_before_dispatch(void)
     CHECK(slot->hold_fired);
 }
 
-static void test_apply_pending_multi_tap_scan_resolution_consumes_pending_chain(void) {
-    active_key_state_t                          *slot = key_runtime_primary_slot();
-    key_runtime_slot_pending_multi_tap_scan_apply_t apply;
-    keypos_t                                     pos = test_keypos(6, 0);
-
-    test_reset_state();
-
-    *slot = (active_key_state_t){
-        .keycode = TEST_LAYER_KEY,
-        .key_pos = pos,
-        .pending_multi_tap =
-            {
-                .keycode      = TEST_MULTI_TAP_KEY,
-                .key_pos      = pos,
-                .count        = 2,
-                .pending_hold = true,
-            },
-    };
-
-    apply = key_runtime_slot_apply_pending_multi_tap_scan_resolution(
-        slot,
-        (key_runtime_slot_pending_multi_tap_scan_resolution_t){
-            .outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
-            .release_layer_before_action = true,
-            .long_hold                   = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK),
-        });
-
-    CHECK(apply.release_layer_before_action);
-    CHECK(apply.effect_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION);
-    CHECK(apply.effect_request.action == TEST_LAYER_LOCK);
-    CHECK(apply.effect_request.feedback_pulse);
-    CHECK(apply.effect_request.feedback_long_hold_level);
-    CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
-    CHECK(slot->long_hold.action == TEST_LAYER_LOCK);
-    CHECK(slot->hold_fired);
-}
-
-static void test_take_pending_multi_tap_plan_returns_scan_effect_request(void) {
-    active_key_state_t                    *slot = key_runtime_primary_slot();
-    key_runtime_slot_pending_multi_tap_plan_t plan;
-    keypos_t                               pos = test_keypos(6, 1);
+static void test_take_pending_multi_tap_scan_event_returns_long_hold_request(void) {
+    active_key_state_t          *slot = key_runtime_primary_slot();
+    key_runtime_slot_scan_event_t event;
+    keypos_t                     pos = test_keypos(6, 0);
 
     test_reset_state();
 
@@ -534,24 +561,25 @@ static void test_take_pending_multi_tap_plan_returns_scan_effect_request(void) {
             },
     };
 
-    plan = key_runtime_slot_take_pending_multi_tap_plan(slot);
+    event = key_runtime_slot_take_pending_multi_tap_scan_event(slot);
 
-    CHECK(plan.handled);
-    CHECK(plan.key_pos.row == pos.row);
-    CHECK(plan.key_pos.col == pos.col);
-    CHECK(plan.kind == KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_EFFECT_REQUEST);
-    CHECK(plan.release_layer_before_action);
-    CHECK(plan.effect_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION);
-    CHECK(plan.effect_request.action == TEST_LAYER_LOCK);
-    CHECK(plan.effect_request.feedback_pulse);
-    CHECK(plan.effect_request.feedback_long_hold_level);
-    CHECK(slot->hold_fired);
+    CHECK(event.handled);
+    CHECK(event.kind == KEY_RUNTIME_SLOT_SCAN_EVENT_PENDING_MULTI_TAP_EFFECTS);
+    CHECK(event.key_pos.row == pos.row);
+    CHECK(event.key_pos.col == pos.col);
+    CHECK(event.data.pending_multi_tap_effects.release_layer_before_action);
+    CHECK(event.data.pending_multi_tap_effects.effect_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION);
+    CHECK(event.data.pending_multi_tap_effects.effect_request.action == TEST_LAYER_LOCK);
+    CHECK(event.data.pending_multi_tap_effects.effect_request.feedback_pulse);
+    CHECK(event.data.pending_multi_tap_effects.effect_request.feedback_long_hold_level);
     CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
+    CHECK(slot->long_hold.action == TEST_LAYER_LOCK);
+    CHECK(slot->hold_fired);
 }
 
-static void test_take_pending_multi_tap_plan_flushes_expired_chain(void) {
-    active_key_state_t                    *slot = key_runtime_primary_slot();
-    key_runtime_slot_pending_multi_tap_plan_t plan;
+static void test_take_pending_multi_tap_scan_event_flushes_expired_chain(void) {
+    active_key_state_t          *slot = key_runtime_primary_slot();
+    key_runtime_slot_scan_event_t event;
 
     test_reset_state();
 
@@ -564,13 +592,13 @@ static void test_take_pending_multi_tap_plan_flushes_expired_chain(void) {
         .multi_tap_term = 150,
     };
 
-    plan = key_runtime_slot_take_pending_multi_tap_plan(slot);
+    event = key_runtime_slot_take_pending_multi_tap_scan_event(slot);
 
-    CHECK(plan.handled);
-    CHECK(plan.kind == KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_FLUSH);
-    CHECK(plan.flush.handled);
-    CHECK(plan.flush.action == TEST_SINGLE_ACTION);
-    CHECK(plan.flush.repeat_count == 2);
+    CHECK(event.handled);
+    CHECK(event.kind == KEY_RUNTIME_SLOT_SCAN_EVENT_PENDING_MULTI_TAP_FLUSH);
+    CHECK(event.data.pending_multi_tap_flush.handled);
+    CHECK(event.data.pending_multi_tap_flush.action == TEST_SINGLE_ACTION);
+    CHECK(event.data.pending_multi_tap_flush.repeat_count == 2);
     CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
 }
 
@@ -731,22 +759,26 @@ static void test_prepare_handled_press_matching_pending_multi_tap_reuses_slot(vo
         .multi_tap_term  = 150,
     };
 
-    plan = key_runtime_slot_prepare_handled_press(
+    plan = key_runtime_slot_take_handled_press(
         slot,
         TEST_MULTI_TAP_KEY,
         pos,
-        false,
-        true,
-        true,
-        3,
-        TEST_SINGLE_ACTION,
-        hold_behavior_none(),
-        hold_behavior_none(),
-        120,
-        240,
-        150,
-        false,
-        false,
+        (handled_key_view_t){
+            .behavior =
+                {
+                    .keycode            = TEST_MULTI_TAP_KEY,
+                    .handled            = true,
+                    .has_multi_tap      = true,
+                    .is_momentary_layer = true,
+                    .tap_hold_term      = 120,
+                    .longer_hold_term   = 240,
+                    .multi_tap_term     = 150,
+                    .single =
+                        {
+                            .tap = TAP_SENDS(TEST_SINGLE_ACTION),
+                        },
+                },
+        },
         false);
 
     CHECK(plan.handled);
@@ -780,27 +812,34 @@ static void test_prepare_handled_press_flushes_pending_multi_tap_before_begin(vo
         .single_action = TEST_SINGLE_ACTION,
     };
 
-    plan = key_runtime_slot_prepare_handled_press(
+    test_pd_mode         = PD_MODE_VOLUME;
+    test_pd_locked_modes = PD_MODE_VOLUME;
+
+    plan = key_runtime_slot_take_handled_press(
         slot,
-        TEST_ACTIVE_KEY,
+        TEST_PD_MODE_KEY,
         press_pos,
-        false,
-        false,
-        false,
-        0,
-        TEST_SINGLE_ACTION,
-        (hold_behavior_t){
-            .present = true,
-            .action  = TEST_HOLD_ACTION,
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        (handled_key_view_t){
+            .behavior =
+                {
+                    .keycode          = TEST_PD_MODE_KEY,
+                    .handled          = true,
+                    .tap_hold_term    = 120,
+                    .longer_hold_term = 240,
+                    .multi_tap_term   = 150,
+                    .single =
+                        {
+                            .tap  = TAP_SENDS(TEST_SINGLE_ACTION),
+                            .hold =
+                                {
+                                    .present = true,
+                                    .action  = TEST_HOLD_ACTION,
+                                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                },
+                        },
+                },
         },
-        hold_behavior_none(),
-        120,
-        240,
-        150,
-        true,
-        false,
-        true);
+        false);
 
     CHECK(plan.handled);
     CHECK(plan.pending_multi_tap_flush.handled);
@@ -809,7 +848,7 @@ static void test_prepare_handled_press_flushes_pending_multi_tap_before_begin(vo
     CHECK(plan.reclaim_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
     CHECK(plan.begin_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
     CHECK(plan.begin_request.action == TEST_HOLD_ACTION);
-    CHECK(slot->keycode == TEST_ACTIVE_KEY);
+    CHECK(slot->keycode == TEST_PD_MODE_KEY);
     CHECK(slot->key_pos.row == press_pos.row);
     CHECK(slot->key_pos.col == press_pos.col);
     CHECK(slot->tap_action == TEST_SINGLE_ACTION);
@@ -817,6 +856,31 @@ static void test_prepare_handled_press_flushes_pending_multi_tap_before_begin(vo
     CHECK(slot->implicit_hold);
     CHECK(slot->pd_mode_was_locked_on_press);
     CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
+}
+
+static void test_take_handled_release_returns_cleanup_for_unmatched_release(void) {
+    key_runtime_slot_release_event_t release;
+    keypos_t                         pos = test_keypos(7, 3);
+
+    test_reset_state();
+    key_runtime_primary_slot()->keycode = TEST_ACTIVE_KEY;
+    key_runtime_primary_slot()->key_pos = test_keypos(7, 4);
+
+    release = key_runtime_slot_take_handled_release(
+        key_runtime_primary_slot(),
+        TEST_ACTIVE_KEY,
+        pos,
+        (key_behavior_view_t){
+            .keycode            = TEST_ACTIVE_KEY,
+            .is_momentary_layer = true,
+        });
+
+    CHECK(release.handled);
+    CHECK(release.kind == KEY_RUNTIME_SLOT_RELEASE_EVENT_CLEANUP);
+    CHECK(release.data.cleanup.key_pos.row == pos.row);
+    CHECK(release.data.cleanup.key_pos.col == pos.col);
+    CHECK(release.data.cleanup.release_layer);
+    CHECK(release.data.cleanup.release_owned_state);
 }
 
 static void test_interrupt_on_other_press_marks_layer_and_activates_fallback_hold(void) {
@@ -908,21 +972,20 @@ int main(void) {
     test_resolve_release_locked_pd_mode_becomes_lock_tap();
     test_take_active_release_starts_pending_multi_tap_chain();
     test_take_active_release_maps_locked_pd_mode_tap();
-    test_resolve_scan_promotes_long_hold_after_longer_term();
-    test_apply_scan_resolution_returns_commit_and_long_hold_requests();
-    test_apply_scan_resolution_returns_fallback_hold_request();
-    test_resolve_pending_multi_tap_scan_requires_layer_release_before_lock();
+    test_take_active_scan_event_promotes_long_hold_after_longer_term();
+    test_take_active_scan_event_returns_commit_and_long_hold_requests();
+    test_take_active_scan_event_returns_fallback_hold_request();
     test_fire_hold_at_threshold_starts_repeat_binding();
     test_promote_to_long_hold_releases_owned_state_before_dispatch();
-    test_apply_pending_multi_tap_scan_resolution_consumes_pending_chain();
-    test_take_pending_multi_tap_plan_returns_scan_effect_request();
-    test_take_pending_multi_tap_plan_flushes_expired_chain();
+    test_take_pending_multi_tap_scan_event_returns_long_hold_request();
+    test_take_pending_multi_tap_scan_event_flushes_expired_chain();
     test_take_pending_multi_tap_hold_release_returns_held_lifecycle();
     test_take_pending_multi_tap_hold_release_preserves_chain_for_higher_taps();
     test_take_pending_multi_tap_flush_prefers_exact_step_tap();
     test_begin_press_sets_metadata_and_immediate_hold_request();
     test_prepare_handled_press_matching_pending_multi_tap_reuses_slot();
     test_prepare_handled_press_flushes_pending_multi_tap_before_begin();
+    test_take_handled_release_returns_cleanup_for_unmatched_release();
     test_interrupt_on_other_press_marks_layer_and_activates_fallback_hold();
     test_commit_immediate_hold_sets_flags_and_feedback_request();
     test_take_flush_unregisters_held_action();

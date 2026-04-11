@@ -2,15 +2,60 @@
 // Key Runtime Slot Scan
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Scan-specific slot transition helpers for the handled-key runtime.
+// Scan-specific slot event helpers for the handled-key runtime.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_slot_scan.h"
 
+#include "key_runtime_slot_effect.h"
+
 #include "../action/action_dispatch.h"
 #include "../action/action_lifecycle.h"
 
-key_runtime_slot_scan_resolution_t key_runtime_slot_resolve_scan(active_key_state_t active_key_state, uint16_t elapsed) {
+typedef enum {
+    KEY_RUNTIME_SLOT_SCAN_OUTCOME_NONE = 0,
+    KEY_RUNTIME_SLOT_SCAN_OUTCOME_FIRE_HOLD,
+    KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
+} key_runtime_slot_scan_outcome_t;
+
+typedef struct {
+    bool                            commit_immediate_hold;
+    bool                            immediate_hold_needs_feedback;
+    bool                            immediate_hold_completes_hold;
+    bool                            activate_fallback_hold;
+    key_runtime_slot_scan_outcome_t outcome;
+    hold_behavior_t                 hold;
+    hold_behavior_t                 long_hold;
+} key_runtime_slot_scan_resolution_t;
+
+typedef enum {
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_NONE = 0,
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD,
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
+} key_runtime_slot_pending_multi_tap_scan_outcome_t;
+
+typedef struct {
+    key_runtime_slot_pending_multi_tap_scan_outcome_t outcome;
+    bool                                              release_layer_before_action;
+    hold_behavior_t                                   hold;
+    hold_behavior_t                                   long_hold;
+} key_runtime_slot_pending_multi_tap_scan_resolution_t;
+
+typedef struct {
+    bool                           release_layer_before_action;
+    key_runtime_slot_effect_request_t effect_request;
+} key_runtime_slot_pending_multi_tap_scan_apply_t;
+
+typedef struct {
+    key_runtime_slot_effect_request_t immediate_hold_request;
+    key_runtime_slot_effect_request_t effect_request;
+} key_runtime_slot_active_scan_apply_t;
+
+static bool key_runtime_slot_scan_request_has_effect(key_runtime_slot_effect_request_t request) {
+    return request.kind != KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE || request.release_owned_state || request.feedback_pulse;
+}
+
+static key_runtime_slot_scan_resolution_t key_runtime_slot_resolve_scan(active_key_state_t active_key_state, uint16_t elapsed) {
     key_runtime_slot_scan_resolution_t resolution = {0};
 
     if (hold_registers_on_press(active_key_state.hold) && !active_key_state.hold_one_shot_fired && elapsed >= active_key_state.tap_hold_term) {
@@ -39,8 +84,8 @@ key_runtime_slot_scan_resolution_t key_runtime_slot_resolve_scan(active_key_stat
     return resolution;
 }
 
-key_runtime_slot_scan_apply_t key_runtime_slot_apply_scan_resolution(active_key_state_t *slot, key_runtime_slot_scan_resolution_t resolution) {
-    key_runtime_slot_scan_apply_t apply = {0};
+static key_runtime_slot_active_scan_apply_t key_runtime_slot_apply_scan_resolution(active_key_state_t *slot, key_runtime_slot_scan_resolution_t resolution) {
+    key_runtime_slot_active_scan_apply_t apply = {0};
 
     if (!slot) {
         return apply;
@@ -51,16 +96,16 @@ key_runtime_slot_scan_apply_t key_runtime_slot_apply_scan_resolution(active_key_
     }
 
     if (resolution.activate_fallback_hold) {
-        apply.outcome_request = key_runtime_slot_activate_pending_fallback_hold_request(slot);
+        apply.effect_request = key_runtime_slot_activate_pending_fallback_hold_request(slot);
         return apply;
     }
 
     switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_SCAN_OUTCOME_FIRE_HOLD:
-            apply.outcome_request = key_runtime_slot_fire_hold_at_threshold(slot, resolution.hold, resolution.long_hold, false);
+            apply.effect_request = key_runtime_slot_fire_hold_at_threshold(slot, resolution.hold, resolution.long_hold, false);
             return apply;
         case KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
-            apply.outcome_request = key_runtime_slot_promote_to_long_hold(slot, resolution.long_hold, false);
+            apply.effect_request = key_runtime_slot_promote_to_long_hold(slot, resolution.long_hold, false);
             return apply;
         case KEY_RUNTIME_SLOT_SCAN_OUTCOME_NONE:
         default:
@@ -72,7 +117,7 @@ static bool key_runtime_slot_pending_multi_tap_hold_elapsed(const multi_tap_t *m
     return multi_tap_state->pending_hold && hold_fires_at_threshold(multi_tap_state->hold) && elapsed >= multi_tap_state->tap_hold_term;
 }
 
-key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_resolve_pending_multi_tap_scan(active_key_state_t active_key_state, multi_tap_t multi_tap_state, uint16_t elapsed) {
+static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_resolve_pending_multi_tap_scan(active_key_state_t active_key_state, multi_tap_t multi_tap_state, uint16_t elapsed) {
     key_runtime_slot_pending_multi_tap_scan_resolution_t resolution = {0};
 
     if (!multi_tap_state.pending_hold || active_key_state.keycode == KC_NO) {
@@ -96,7 +141,7 @@ key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_resolve_pe
     return resolution;
 }
 
-key_runtime_slot_pending_multi_tap_scan_apply_t key_runtime_slot_apply_pending_multi_tap_scan_resolution(active_key_state_t *slot, key_runtime_slot_pending_multi_tap_scan_resolution_t resolution) {
+static key_runtime_slot_pending_multi_tap_scan_apply_t key_runtime_slot_apply_pending_multi_tap_scan_resolution(active_key_state_t *slot, key_runtime_slot_pending_multi_tap_scan_resolution_t resolution) {
     key_runtime_slot_pending_multi_tap_scan_apply_t apply = {0};
 
     if (!slot) {
@@ -122,39 +167,62 @@ key_runtime_slot_pending_multi_tap_scan_apply_t key_runtime_slot_apply_pending_m
     }
 }
 
-key_runtime_slot_pending_multi_tap_plan_t key_runtime_slot_take_pending_multi_tap_plan(active_key_state_t *slot) {
-    key_runtime_slot_pending_multi_tap_plan_t plan = {0};
+key_runtime_slot_scan_event_t key_runtime_slot_take_active_scan_event(active_key_state_t *slot) {
+    key_runtime_slot_scan_event_t event = {0};
 
-    if (!slot || !key_runtime_slot_has_pending_multi_tap(slot)) {
-        return plan;
+    if (!(slot && key_runtime_slot_active(slot) && !slot->hold_fired)) {
+        return event;
     }
 
-    plan.key_pos = key_runtime_slot_active(slot) ? slot->key_pos : slot->pending_multi_tap.key_pos;
+    uint16_t                           elapsed    = timer_elapsed(slot->timer);
+    key_runtime_slot_scan_resolution_t resolution = key_runtime_slot_resolve_scan(*slot, elapsed);
+    key_runtime_slot_active_scan_apply_t apply    = key_runtime_slot_apply_scan_resolution(slot, resolution);
+
+    if (!(key_runtime_slot_scan_request_has_effect(apply.immediate_hold_request) || key_runtime_slot_scan_request_has_effect(apply.effect_request))) {
+        return event;
+    }
+
+    event.handled                                 = true;
+    event.kind                                    = KEY_RUNTIME_SLOT_SCAN_EVENT_ACTIVE_EFFECTS;
+    event.key_pos                                 = slot->key_pos;
+    event.data.active_effects.immediate_hold_request = apply.immediate_hold_request;
+    event.data.active_effects.effect_request      = apply.effect_request;
+    return event;
+}
+
+key_runtime_slot_scan_event_t key_runtime_slot_take_pending_multi_tap_scan_event(active_key_state_t *slot) {
+    key_runtime_slot_scan_event_t event = {0};
+
+    if (!slot || !key_runtime_slot_has_pending_multi_tap(slot)) {
+        return event;
+    }
+
+    event.key_pos = key_runtime_slot_active(slot) ? slot->key_pos : slot->pending_multi_tap.key_pos;
 
     if (key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_active(slot)) {
         multi_tap_t *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
         if (!slot_multi_tap) {
-            return plan;
+            return event;
         }
 
         uint16_t elapsed = timer_elapsed(slot_multi_tap->timer);
         key_runtime_slot_pending_multi_tap_scan_resolution_t resolution = key_runtime_slot_resolve_pending_multi_tap_scan(*slot, *slot_multi_tap, elapsed);
         key_runtime_slot_pending_multi_tap_scan_apply_t      apply      = key_runtime_slot_apply_pending_multi_tap_scan_resolution(slot, resolution);
 
-        if (apply.release_layer_before_action || apply.effect_request.kind != KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE || apply.effect_request.release_owned_state || apply.effect_request.feedback_pulse) {
-            plan.handled                     = true;
-            plan.kind                        = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_EFFECT_REQUEST;
-            plan.release_layer_before_action = apply.release_layer_before_action;
-            plan.effect_request              = apply.effect_request;
+        if (apply.release_layer_before_action || key_runtime_slot_scan_request_has_effect(apply.effect_request)) {
+            event.handled                                                = true;
+            event.kind                                                   = KEY_RUNTIME_SLOT_SCAN_EVENT_PENDING_MULTI_TAP_EFFECTS;
+            event.data.pending_multi_tap_effects.release_layer_before_action = apply.release_layer_before_action;
+            event.data.pending_multi_tap_effects.effect_request          = apply.effect_request;
         }
-        return plan;
+        return event;
     }
 
     if (key_runtime_slot_pending_multi_tap_expired(slot)) {
-        plan.handled = true;
-        plan.kind    = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_FLUSH;
-        plan.flush   = key_runtime_slot_take_pending_multi_tap_flush(slot);
+        event.handled                          = true;
+        event.kind                             = KEY_RUNTIME_SLOT_SCAN_EVENT_PENDING_MULTI_TAP_FLUSH;
+        event.data.pending_multi_tap_flush     = key_runtime_slot_take_pending_multi_tap_flush(slot);
     }
 
-    return plan;
+    return event;
 }

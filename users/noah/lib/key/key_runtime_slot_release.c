@@ -217,3 +217,32 @@ key_runtime_slot_pending_multi_tap_hold_release_t key_runtime_slot_take_pending_
     }
     return release;
 }
+
+key_runtime_slot_release_event_t key_runtime_slot_take_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_behavior_view_t behavior) {
+    key_runtime_slot_release_event_t event = {0};
+
+    if (slot) {
+        uint16_t                                           elapsed = timer_elapsed(slot->timer);
+        key_runtime_slot_pending_multi_tap_hold_release_t pending = key_runtime_slot_take_pending_multi_tap_hold_release(slot, keycode, behavior, elapsed);
+        if (pending.handled) {
+            event.handled                              = true;
+            event.kind                                 = KEY_RUNTIME_SLOT_RELEASE_EVENT_PENDING_MULTI_TAP_HOLD_RELEASE;
+            event.data.pending_multi_tap_hold_release = pending;
+            return event;
+        }
+    }
+
+    if (key_runtime_slot_matches(slot, keycode, key_pos)) {
+        event.handled             = true;
+        event.kind                = KEY_RUNTIME_SLOT_RELEASE_EVENT_ACTIVE_RELEASE;
+        event.data.active_release = key_runtime_slot_take_active_release(slot, keycode, behavior);
+        return event;
+    }
+
+    event.handled                   = true;
+    event.kind                      = KEY_RUNTIME_SLOT_RELEASE_EVENT_CLEANUP;
+    event.data.cleanup.key_pos      = key_pos;
+    event.data.cleanup.release_layer = behavior.is_momentary_layer;
+    event.data.cleanup.release_owned_state = true;
+    return event;
+}

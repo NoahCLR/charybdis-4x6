@@ -6,6 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "handled_key.h"
+#include "key_runtime_slot_effect.h"
 #include "key_runtime_state.h"
 #include "../action/action_dispatch.h"
 #include "../pointing/pd_modes.h"
