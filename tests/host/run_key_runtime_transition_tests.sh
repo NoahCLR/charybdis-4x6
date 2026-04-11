@@ -19,6 +19,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_transition_test.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_trace.c" \
     "$ROOT/users/noah/lib/key/key_runtime_transition.c" \
     "$ROOT/users/noah/lib/key/key_runtime.c" \
     "$ROOT/users/noah/lib/key/multi_tap_engine.c" \

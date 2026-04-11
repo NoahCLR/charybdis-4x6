@@ -7,6 +7,7 @@
 #include "rgb_runtime.h"
 #include "rgb_automouse.h"
 #include "rgb_helpers.h"
+#include "rgb_validation.h"
 
 #if defined(RGB_MATRIX_ENABLE)
 #    include "keymap_introspection.h" // QMK
@@ -83,6 +84,8 @@ void noah_rgb_runtime_invalidate_layer_maps(void) {
 
 void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
+    noah_rgb_validate_config();
+
     for (uint8_t i = 0; i < LAYER_COUNT; i++) {
         layer_rgb[i] = hsv_to_rgb(layer_colors[i].color);
     }

@@ -10,6 +10,7 @@
 
 #include "key_runtime_feedback.h"
 #include "key_runtime_state.h"
+#include "key_runtime_trace.h"
 #include "../action/action_dispatch.h"
 #include "../action/action_lifecycle.h"
 #include "../pointing/pd_modes.h"
@@ -203,6 +204,7 @@ static void key_runtime_transition_activate_pending_fallback_hold(key_runtime_tr
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan) {
     for (uint8_t i = 0; i < plan->count; i++) {
         const key_runtime_transition_effect_t *effect = &plan->effects[i];
+        key_runtime_trace_effect_execute(i, effect);
 
         switch (effect->kind) {
             case KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION:

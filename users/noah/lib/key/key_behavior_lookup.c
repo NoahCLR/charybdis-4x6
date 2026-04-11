@@ -94,6 +94,26 @@ static void key_behavior_log_invalid_repeat_rate(uint8_t index, uint8_t tap_coun
 #endif
 }
 
+static void key_behavior_log_duplicate_keycode(uint8_t first_index, uint8_t duplicate_index, uint16_t keycode) {
+#ifdef CONSOLE_ENABLE
+    uprintf("Duplicate key_behaviors rows at indices %u and %u for keycode 0x%04X; later rows are ignored by lookup\n", (unsigned int)first_index, (unsigned int)duplicate_index, (unsigned int)keycode);
+#else
+    (void)first_index;
+    (void)duplicate_index;
+    (void)keycode;
+#endif
+}
+
+static void key_behavior_validate_unique_keycodes(void) {
+    for (uint8_t i = 0; i < key_behavior_count; i++) {
+        for (uint8_t j = (uint8_t)(i + 1u); j < key_behavior_count; j++) {
+            if (key_behaviors[i].keycode == key_behaviors[j].keycode) {
+                key_behavior_log_duplicate_keycode(i, j, key_behaviors[i].keycode);
+            }
+        }
+    }
+}
+
 key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
     return key_behavior_step_lookup_in_config(key_behavior_config_lookup(keycode), tap_count);
 }
@@ -134,6 +154,8 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
 }
 
 void key_behavior_validate_all(void) {
+    key_behavior_validate_unique_keycodes();
+
     for (uint8_t i = 0; i < key_behavior_count; i++) {
         const key_behavior_t *config = &key_behaviors[i];
 

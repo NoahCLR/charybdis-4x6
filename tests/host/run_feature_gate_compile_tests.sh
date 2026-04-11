@@ -11,6 +11,9 @@ users/noah/lib/macro/via_macro_defaults.c
 users/noah/lib/state/split_runtime_sync.c
 users/noah/lib/rgb/rgb_config_defaults.c
 users/noah/lib/rgb/rgb_runtime.c
+users/noah/lib/rgb/rgb_validation.c
+users/noah/lib/key/keymap_validation.c
+users/noah/lib/key/key_runtime_trace.c
 "
 
 POINTING_SOURCES="
@@ -53,6 +56,7 @@ compile_variant() {
 }
 
 compile_variant "tests/host/include/noah_compile_config.h" "" "$COMMON_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DCONSOLE_ENABLE -DNOAH_KEY_RUNTIME_TRACE_ENABLE" "$COMMON_SOURCES users/noah/lib/key/key_runtime_process.c users/noah/lib/key/key_runtime_preflight.c users/noah/lib/key/key_runtime_press.c users/noah/lib/key/key_runtime_release.c users/noah/lib/key/key_runtime_scan.c users/noah/lib/key/key_runtime_transition.c"
 compile_variant "tests/host/include/noah_compile_config_no_rgb_feedback.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "$POINTING_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES"

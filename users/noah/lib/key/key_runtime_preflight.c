@@ -9,6 +9,7 @@
 #include "key_runtime_process.h"
 #include "handled_key.h"
 #include "key_runtime_state.h"
+#include "key_runtime_trace.h"
 #include "key_runtime_transition.h"
 #include "../action/action_dispatch.h"
 #include "../pointing/pd_modes.h"
@@ -26,6 +27,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         if (!record->event.pressed && (active_key_matches(keycode, record->event.key) || handled_key.behavior.handled)) {
             // Let the handled-key release path run.
         } else {
+            key_runtime_trace_message("preflight:suppress_default", "default QMK path suppressed before handled-key runtime");
             return false;
         }
     }
@@ -34,6 +36,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         key_runtime_transition_plan_t plan;
         key_runtime_transition_plan_init(&plan);
         key_runtime_transition_interrupt_active_key_on_other_press(&plan);
+        key_runtime_trace_plan("preflight:interrupt_active_key", &plan);
         key_runtime_transition_execute_plan(&plan);
     }
 
@@ -41,6 +44,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         key_runtime_transition_plan_t plan;
         key_runtime_transition_plan_init(&plan);
         key_runtime_transition_flush_multi_tap(&plan);
+        key_runtime_trace_plan("preflight:flush_multi_tap", &plan);
         key_runtime_transition_execute_plan(&plan);
     }
 
@@ -53,6 +57,7 @@ bool key_runtime_process_direct_action_key(uint16_t keycode, keyrecord_t *record
     }
 
     if (record->event.pressed) {
+        key_runtime_trace_record("preflight:direct_action_dispatch", keycode, record);
         action_dispatch(keycode);
     }
 

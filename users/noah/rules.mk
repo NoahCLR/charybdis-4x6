@@ -27,6 +27,7 @@ SRC += lib/key/key_runtime_press.c
 SRC += lib/key/key_runtime_release.c
 SRC += lib/key/key_runtime_scan.c
 SRC += lib/key/key_runtime_transition.c
+SRC += lib/key/key_runtime_trace.c
 SRC += lib/key/delayed_action.c
 SRC += lib/key/held_action.c
 SRC += lib/action/action_dispatch.c
@@ -43,6 +44,7 @@ SRC += lib/state/runtime_shared_state.c
 SRC += lib/state/split_runtime_sync.c
 SRC += lib/rgb/rgb_runtime.c
 SRC += lib/rgb/rgb_config_defaults.c
+SRC += lib/rgb/rgb_validation.c
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
     SRC += lib/pointing/pd_runtime.c
