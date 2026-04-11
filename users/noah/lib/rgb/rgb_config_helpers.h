@@ -10,6 +10,21 @@
 
 #include "rgb_helpers.h"
 
+#define HSV(h_, s_, v_) { .h = (h_), .s = (s_), .v = (v_) }
+
+#define LAYER_COLOR(color_, flags_) { .color = color_, .flags = (flags_) }
+
+#define PD_MODE_COLOR(mode_, color_) { .mode_flag = (mode_), .color = color_ }
+
+#define LAYER_LED_GROUP(layer_, color_, leds_) \
+    { .layer = (layer_), .color = color_, .leds = (leds_), .count = (uint8_t)ARRAY_SIZE(leds_) }
+
+#define PD_MODE_LED_GROUP(mode_, color_, leds_) \
+    { .mode_flag = (mode_), .color = color_, .leds = (leds_), .count = (uint8_t)ARRAY_SIZE(leds_) }
+
+#define DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(...)                                          \
+    const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {__VA_ARGS__}
+
 #define DEFINE_PD_MODE_COLORS(...)                                                  \
     const pd_mode_color_t pd_mode_colors[] = {__VA_ARGS__};                         \
     const uint8_t         pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]))

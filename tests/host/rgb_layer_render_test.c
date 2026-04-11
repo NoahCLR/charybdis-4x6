@@ -50,16 +50,20 @@ split_runtime_sync_packet_t split_runtime_sync_remote = {
 led_config_t g_led_config = {0};
 
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
-    [LAYER_BASE] = {.color = {0, 0, 0}, .flags = ALL_KEYS}, [LAYER_NUM] = {.color = {10, 20, 30}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, [LAYER_SYM] = {.color = {40, 50, 60}, .flags = ALL_KEYS}, [LAYER_NAV] = {.color = {70, 80, 90}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY}, [LAYER_POINTER] = {.color = {100, 110, 120}, .flags = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_BASE] = LAYER_COLOR(HSV(0, 0, 0), ALL_KEYS),
+    [LAYER_NUM] = LAYER_COLOR(HSV(10, 20, 30), KEYS_MAPPED_ON_THIS_LAYER_ONLY),
+    [LAYER_SYM] = LAYER_COLOR(HSV(40, 50, 60), ALL_KEYS),
+    [LAYER_NAV] = LAYER_COLOR(HSV(70, 80, 90), KEYS_MAPPED_ON_THIS_LAYER_ONLY),
+    [LAYER_POINTER] = LAYER_COLOR(HSV(100, 110, 120), KEYS_MAPPED_ON_THIS_LAYER_ONLY),
 };
 
 DEFINE_PD_MODE_COLORS(
-    {.mode_flag = PD_MODE_ARROW, .color = {210, 211, 212}},
-    {.mode_flag = PD_MODE_VOLUME, .color = {220, 221, 222}},
+    PD_MODE_COLOR(PD_MODE_ARROW, HSV(210, 211, 212)),
+    PD_MODE_COLOR(PD_MODE_VOLUME, HSV(220, 221, 222))
 );
 static const uint8_t      volume_mode_group_leds[] = {1, 6};
 DEFINE_PD_MODE_LED_GROUPS(
-    {.mode_flag = PD_MODE_VOLUME, .color = {230, 231, 232}, .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)},
+    PD_MODE_LED_GROUP(PD_MODE_VOLUME, HSV(230, 231, 232), volume_mode_group_leds)
 );
 const automouse_fade_end_config_t automouse_fade_end_config = {
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
@@ -69,11 +73,13 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 #else
     .mode = FOLLOW_REAL_DESTINATION,
 #endif
-    .end_color = {200, 210, 220},
+    .end_color = HSV(200, 210, 220),
 };
-const hsv_t         feedback_multi_tap_pending_color = {1, 2, 3};
-const hsv_t         feedback_hold_active_color       = {4, 5, 6};
-const hsv_t         feedback_long_hold_active_color  = {7, 8, 9};
+DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(
+    .multi_tap_pending_color = HSV(1, 2, 3),
+    .hold_active_color       = HSV(4, 5, 6),
+    .long_hold_active_color  = HSV(7, 8, 9),
+);
 const pd_mode_def_t pd_modes[PD_MODE_COUNT]          = {
     [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL}, [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME}, [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS}, [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM}, [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW}, [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH},
 };
@@ -373,8 +379,8 @@ static void test_slave_feedback_uses_remote_flags_and_flash_phase(void) {
     split_runtime_sync_remote.key_feedback_flags |= KEY_FEEDBACK_FLAG_FLASH_PHASE;
 
     CHECK(render_output());
-    check_led(0, rgb_from_hsv(feedback_long_hold_active_color));
-    check_led(7, rgb_from_hsv(feedback_long_hold_active_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
+    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
 }
 
 static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {

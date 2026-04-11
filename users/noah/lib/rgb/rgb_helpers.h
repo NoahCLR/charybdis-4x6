@@ -54,6 +54,12 @@ typedef struct {
 } automouse_fade_end_config_t;
 
 typedef struct {
+    hsv_t multi_tap_pending_color;
+    hsv_t hold_active_color;
+    hsv_t long_hold_active_color;
+} key_behavior_feedback_color_config_t;
+
+typedef struct {
     uint8_t        layer;
     hsv_t          color;
     const uint8_t *leds;

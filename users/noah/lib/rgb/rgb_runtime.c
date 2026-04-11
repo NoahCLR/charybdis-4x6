@@ -40,9 +40,7 @@ extern const uint8_t              pd_mode_led_group_count;
 extern const automouse_fade_end_config_t automouse_fade_end_config;
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-extern const hsv_t feedback_multi_tap_pending_color;
-extern const hsv_t feedback_hold_active_color;
-extern const hsv_t feedback_long_hold_active_color;
+extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
 #    endif
 #endif
 
@@ -71,9 +69,9 @@ static rgb_t               automouse_end_color_rgb;
 static rgb_t pd_mode_rgb[PD_MODE_COUNT];
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-static rgb_t feedback_multi_tap_pending_rgb;
-static rgb_t feedback_hold_active_rgb;
-static rgb_t feedback_long_hold_active_rgb;
+static rgb_t key_behavior_feedback_multi_tap_pending_rgb;
+static rgb_t key_behavior_feedback_hold_active_rgb;
+static rgb_t key_behavior_feedback_long_hold_active_rgb;
 #    endif
 #endif
 
@@ -106,9 +104,9 @@ void noah_rgb_runtime_post_init(void) {
 #    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    feedback_multi_tap_pending_rgb = hsv_to_rgb(feedback_multi_tap_pending_color);
-    feedback_hold_active_rgb       = hsv_to_rgb(feedback_hold_active_color);
-    feedback_long_hold_active_rgb  = hsv_to_rgb(feedback_long_hold_active_color);
+    key_behavior_feedback_multi_tap_pending_rgb = hsv_to_rgb(key_behavior_feedback_colors.multi_tap_pending_color);
+    key_behavior_feedback_hold_active_rgb       = hsv_to_rgb(key_behavior_feedback_colors.hold_active_color);
+    key_behavior_feedback_long_hold_active_rgb  = hsv_to_rgb(key_behavior_feedback_colors.long_hold_active_color);
 #    endif
 #endif
 }
@@ -516,19 +514,19 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     uint8_t fb = is_keyboard_master() ? key_feedback_pack() : split_runtime_sync_remote.key_feedback_flags;
 
     if (key_feedback_flags_multi_tap_pending(fb)) {
-        rgb_set_both_halves(feedback_multi_tap_pending_rgb, led_min, led_max);
+        rgb_set_both_halves(key_behavior_feedback_multi_tap_pending_rgb, led_min, led_max);
         painted = true;
     } else if (key_feedback_flags_hold_active(fb)) {
         if (!key_feedback_flags_level_flash(fb) || key_feedback_flags_flash_phase(fb)) {
             if (key_feedback_flags_long_hold_active(fb)) {
-                rgb_set_both_halves(feedback_long_hold_active_rgb, led_min, led_max);
+                rgb_set_both_halves(key_behavior_feedback_long_hold_active_rgb, led_min, led_max);
             } else {
-                rgb_set_both_halves(feedback_hold_active_rgb, led_min, led_max);
+                rgb_set_both_halves(key_behavior_feedback_hold_active_rgb, led_min, led_max);
             }
             painted = true;
         }
     } else if (key_feedback_flags_hold_pending(fb)) {
-        rgb_set_both_halves(feedback_hold_active_rgb, led_min, led_max);
+        rgb_set_both_halves(key_behavior_feedback_hold_active_rgb, led_min, led_max);
         painted = true;
     }
 #    endif

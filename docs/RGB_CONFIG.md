@@ -3,7 +3,7 @@
 This userspace keeps most RGB authoring in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 
-That file is the main visual configuration surface:
+That file is the main RGB configuration surface:
 
 - layer colors
 - pointing-device mode colors
@@ -33,7 +33,7 @@ painted, also look at:
 
 ## HSV Quick Reference
 
-The color values in [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) are authored as `hsv_t` structs. Use this
+The color values in [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) are authored with the `HSV(h, s, v)` helper. Use this
 quick reference when picking hue values:
 
 ![HSV quick reference](./media/hsv_colors.jpg)
@@ -48,16 +48,13 @@ quick reference when picking hue values:
 Each row is a `layer_color_config_t` with a color and per-layer render flags:
 
 ```c
-[LAYER_NUM] = {
-    .color = {85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS},
-    .flags = LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY,
-}
+[LAYER_NUM] = LAYER_COLOR(HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), KEYS_MAPPED_ON_THIS_LAYER_ONLY),
 ```
 
 The available flags are:
 
-- `LAYER_COLOR_FLAG_NONE`: paint the whole layer as a solid color wash
-- `LAYER_COLOR_FLAG_MAPPED_KEYS_ONLY`: paint only LEDs whose key position has a
+- `ALL_KEYS`: paint the whole layer as a solid color wash
+- `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: paint only LEDs whose key position has a
   non-`KC_TRNS`, non-`KC_NO` keycode on that layer
 
 Mapped-only layers compose cleanly with overlap: lower active colored layers
@@ -65,7 +62,7 @@ stay visible wherever the higher layer is transparent. The runtime resolves
 that against the effective keymap, so VIA dynamic keymap edits are reflected
 after the runtime refreshes its cached LED coverage.
 
-`.color = {0, 0, 0}` means "do not paint a solid layer color here." That is
+`HSV(0, 0, 0)` means "do not paint a solid layer color here." That is
 useful for:
 
 - `LAYER_BASE`, which should fall through to the normal RGB Matrix effect
@@ -76,8 +73,9 @@ useful for:
 `pd_mode_colors[]` defines the right-half overlay color for each active
 pointing-device mode.
 
-In `rgb_config.c`, use `DEFINE_PD_MODE_COLORS(...);` so the matching
-`pd_mode_color_count` is derived automatically.
+In `rgb_config.c`, use `DEFINE_PD_MODE_COLORS(...);` together with
+`PD_MODE_COLOR(...)` so the matching `pd_mode_color_count` is derived
+automatically.
 
 Each row is keyed by a `PD_MODE_*` flag rather than by array index. That means
 the color mapping follows the mode flag itself, not the order of `pd_modes[]`.
@@ -102,6 +100,9 @@ Each row contains:
 - a pointer to an LED index array
 - the LED count
 
+Use `LAYER_LED_GROUP(layer, HSV(...), leds)` to derive the LED count from the
+LED index array automatically.
+
 This is useful for things like:
 
 - highlighting thumb keys
@@ -123,6 +124,9 @@ As above, use:
 
 - leave the section commented out when no per-mode LED groups are enabled
 - `DEFINE_PD_MODE_LED_GROUPS(...);` when you want one or more authored rows
+
+Use `PD_MODE_LED_GROUP(mode, HSV(...), leds)` to derive the LED count from the
+LED index array automatically.
 
 ### `automouse_fade_end_config`
 
@@ -152,13 +156,25 @@ The configured destination is not a persistent board state. Once the automouse
 renderer stops, the next frame falls back to ordinary layer rendering and then
 later overlays such as pd-mode color or key feedback still paint on top.
 
-### `feedback_*_color`
+### `key_behavior_feedback_colors`
 
-These HSV values define the key-behavior feedback overlay:
+In `rgb_config.c`, author the key-behavior feedback colors as three explicit
+rows:
 
-- `feedback_multi_tap_pending_color`
-- `feedback_hold_active_color`
-- `feedback_long_hold_active_color`
+```c
+DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(
+    .multi_tap_pending_color = HSV(0, 0, 150),
+    .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+);
+```
+
+Those rows populate the shared
+`key_behavior_feedback_colors` config object:
+
+- `multi_tap_pending_color`
+- `hold_active_color`
+- `long_hold_active_color`
 
 In the shared runtime, those colors are used for these categories:
 
@@ -277,7 +293,8 @@ checks that at compile time.
 
 ### Change the key-behavior feedback colors
 
-Edit the relevant `feedback_*_color` values.
+Edit the three designated initializer rows in
+[`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 
 ### Disable the key-behavior overlay
 
