@@ -2,7 +2,7 @@
 
 Date: 2026-04-11
 
-Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, dedicated release/scan slot-transition modules, dedicated press/effect slot-transition modules, the first handled press/release slot-event wrappers, scan-specific slot-event wrappers that replaced the old public scan resolution/apply structs, an explicit handled-key slot lifecycle phase plus hold-strategy model, a shared slot-result surface that now sits between slot event producers and `key_runtime_transition.c`, a narrowed public header boundary that moved the old press/release/scan result structs behind internal headers, a direct slot-result production step that removed those internal press/release/scan event-plan headers entirely, a reducer-style `key_runtime_slot_step(...)` seam that routes slot events through one transition-facing contract, a consolidated reducer implementation in `key_runtime_slot_step.c`, the removal of the now-redundant press/release helper modules from the runtime build surface, and explicit phase-local active-release branches inside the slot reducer; the remaining recommendations below focus on what is still architecturally open after those changes.
+Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, dedicated release/scan slot-transition modules, dedicated press/effect slot-transition modules, the first handled press/release slot-event wrappers, scan-specific slot-event wrappers that replaced the old public scan resolution/apply structs, an explicit handled-key slot lifecycle phase plus hold-strategy model, a shared slot-result surface that now sits between slot event producers and `key_runtime_transition.c`, a narrowed public header boundary that moved the old press/release/scan result structs behind internal headers, a direct slot-result production step that removed those internal press/release/scan event-plan headers entirely, a reducer-style `key_runtime_slot_step(...)` seam that routes slot events through one transition-facing contract, a consolidated reducer implementation in `key_runtime_slot_step.c`, the removal of the now-redundant press/release helper modules from the runtime build surface, explicit phase-local active-release branches inside the slot reducer, and explicit local pending-multi-tap release/scan resolutions inside that reducer; the remaining recommendations below focus on what is still architecturally open after those changes.
 
 Scope: the `noah` userspace in this repo only. This review ignores hardware changes and evaluates software structure, boundaries, state flow, extension cost, and verification surfaces.
 
@@ -146,6 +146,10 @@ What is good now:
 - active release now runs through explicit phase-local reducer branches inside
   [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
   instead of one larger release-resolution condition pile
+- pending multi-tap release and pending multi-tap scan now also reduce through
+  named local contexts and resolutions inside
+  [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  instead of ad hoc resolve-then-patch logic
 - press-begin and release-resolution logic no longer sit behind separate
   runtime modules; they now live directly inside the slot reducer
 - active slot lifecycle state now has explicit `phase` and `hold_strategy`

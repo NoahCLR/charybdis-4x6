@@ -344,6 +344,54 @@ Verification result:
 - full host suite passed
 - firmware build passed
 
+## 2026-04-12 Pending Multi-Tap Reducer Cleanup
+
+Completed in this pass:
+
+- Reworked the pending multi-tap release path inside
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  around an explicit reducer-local context and resolution model instead of the
+  old resolve-then-patch flow.
+- Reworked pending multi-tap scan-hold handling in the same file around a
+  named resolution step so threshold-hold and long-hold promotion are now
+  explicit reducer outcomes.
+- Added direct reducer-seam coverage in
+  [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  for:
+  - pending multi-tap threshold-hold scan dispatch
+  - pending multi-tap release choosing the release long-hold action
+- Kept the public slot-step and slot-result contracts unchanged while making
+  the remaining pending multi-tap lifecycle logic easier to reason about
+  inside the reducer.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects that pending multi-tap release/scan now use
+  explicit local resolutions inside `key_runtime_slot_step.c`.
+
+Why this pass landed now:
+
+- it attacks the last large pending multi-tap condition pile after the active
+  release and scan paths were already made more explicit
+- it narrows the remaining handled-key reducer work further toward press setup
+  and the effect-helper boundary instead of pending multi-tap release/scan
+  behavior
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Verification result:
+
+- targeted slot tests passed
+- targeted scenario tests passed
+- full host suite passed
+- firmware build passed
+- diff cleanliness checks passed
+
 ## 2026-04-11 Slot Step Reducer Seam
 
 Completed in this pass:

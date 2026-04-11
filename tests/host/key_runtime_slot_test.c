@@ -739,6 +739,44 @@ static void test_take_pending_multi_tap_scan_event_returns_long_hold_request(voi
     CHECK(key_runtime_slot_hold_is_complete(slot));
 }
 
+static void test_take_pending_multi_tap_scan_event_returns_threshold_hold_request(void) {
+    active_key_state_t        *slot = key_runtime_primary_slot();
+    key_runtime_slot_result_t  result;
+    keypos_t                   pos = test_keypos(6, 4);
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .keycode       = TEST_ACTIVE_KEY,
+        .key_pos       = pos,
+        .phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+        .tap_hold_term = 120,
+        .pending_multi_tap =
+            {
+                .keycode       = TEST_MULTI_TAP_KEY,
+                .key_pos       = pos,
+                .timer         = (uint16_t)(fake_time - 130),
+                .count         = 2,
+                .pending_hold  = true,
+                .tap_hold_term = 120,
+                .hold          = TAP_AT_HOLD_THRESHOLD(TEST_HOLD_ACTION),
+                .long_hold     = hold_behavior_none(),
+            },
+    };
+
+    result = test_step_pending_multi_tap_scan(slot);
+
+    CHECK(result.handled);
+    CHECK(result.count == 1);
+    CHECK(result.effects[0].kind == KEY_RUNTIME_SLOT_RESULT_EFFECT_SLOT_EFFECT_REQUEST);
+    CHECK(result.effects[0].data.slot_effect_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION);
+    CHECK(result.effects[0].data.slot_effect_request.action == TEST_HOLD_ACTION);
+    CHECK(result.effects[0].data.slot_effect_request.feedback_pulse);
+    CHECK(!result.effects[0].data.slot_effect_request.feedback_long_hold_level);
+    CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
+    CHECK(key_runtime_slot_hold_is_complete(slot));
+}
+
 static void test_take_pending_multi_tap_scan_event_flushes_expired_chain(void) {
     active_key_state_t        *slot = key_runtime_primary_slot();
     key_runtime_slot_result_t  result;
@@ -802,6 +840,45 @@ static void test_take_pending_multi_tap_hold_release_returns_held_lifecycle(void
     CHECK(release.effects[1].kind == KEY_RUNTIME_SLOT_RESULT_EFFECT_SLOT_EFFECT_REQUEST);
     CHECK(release.effects[1].data.slot_effect_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_UNREGISTER);
     CHECK(release.effects[1].data.slot_effect_request.action == TEST_HOLD_ACTION);
+    CHECK(key_runtime_slot_idle(slot));
+}
+
+static void test_take_pending_multi_tap_hold_release_prefers_release_long_hold_action(void) {
+    active_key_state_t        *slot = key_runtime_primary_slot();
+    key_runtime_slot_result_t  release;
+    keypos_t                   pos = test_keypos(6, 5);
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .keycode          = TEST_MULTI_TAP_KEY,
+        .key_pos          = pos,
+        .tap_hold_term    = 120,
+        .longer_hold_term = 240,
+        .pending_multi_tap =
+            {
+                .keycode       = TEST_MULTI_TAP_KEY,
+                .key_pos       = pos,
+                .timer         = (uint16_t)(fake_time - 260),
+                .count         = 2,
+                .pending_hold  = true,
+                .tap_hold_term = 120,
+                .hold          = TAP_ON_RELEASE_AFTER_HOLD(TEST_HOLD_ACTION),
+                .long_hold     = TAP_ON_RELEASE_AFTER_HOLD(TEST_SINGLE_ACTION),
+            },
+    };
+
+    release = test_step_handled_release(
+        slot,
+        TEST_MULTI_TAP_KEY,
+        pos,
+        (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY});
+
+    CHECK(release.handled);
+    CHECK(release.count == 1);
+    CHECK(release.effects[0].kind == KEY_RUNTIME_SLOT_RESULT_EFFECT_DELAYED_ACTION);
+    CHECK(release.effects[0].data.delayed_action.action == TEST_SINGLE_ACTION);
+    CHECK(release.effects[0].data.delayed_action.repeat_count == 1);
     CHECK(key_runtime_slot_idle(slot));
 }
 
@@ -1266,8 +1343,10 @@ int main(void) {
     test_fire_hold_at_threshold_starts_repeat_binding();
     test_promote_to_long_hold_releases_owned_state_before_dispatch();
     test_take_pending_multi_tap_scan_event_returns_long_hold_request();
+    test_take_pending_multi_tap_scan_event_returns_threshold_hold_request();
     test_take_pending_multi_tap_scan_event_flushes_expired_chain();
     test_take_pending_multi_tap_hold_release_returns_held_lifecycle();
+    test_take_pending_multi_tap_hold_release_prefers_release_long_hold_action();
     test_take_pending_multi_tap_hold_release_preserves_chain_for_higher_taps();
     test_take_pending_multi_tap_flush_prefers_exact_step_tap();
     test_prepare_handled_press_matching_pending_multi_tap_reuses_slot();
