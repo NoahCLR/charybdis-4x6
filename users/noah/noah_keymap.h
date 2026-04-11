@@ -121,4 +121,5 @@ extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
 #include "lib/key/key_behavior.h"       // IWYU pragma: export
 #include "lib/keymap_materialize.h"     // IWYU pragma: export
 #include "lib/pointing/pd_mode_flags.h" // IWYU pragma: export
+#include "lib/rgb/rgb_config_helpers.h" // IWYU pragma: export
 #include "lib/rgb/rgb_helpers.h"        // IWYU pragma: export

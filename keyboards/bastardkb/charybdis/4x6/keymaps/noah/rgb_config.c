@@ -14,8 +14,7 @@
 //
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "noah_keymap.h" // layer enum, PD_MODE_* constants, hsv_t, rgb config types
-#include "users/noah/lib/rgb/rgb_config_helpers.h"
+#include "noah_keymap.h" // layer enum, PD_MODE_* constants, hsv_t, rgb config types, RGB config helpers
 
 #if defined(RGB_MATRIX_ENABLE)
 
