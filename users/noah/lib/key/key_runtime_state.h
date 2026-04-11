@@ -11,6 +11,7 @@
 #pragma once
 
 #include "../state/runtime_shared_state.h"
+#include "key_behavior_lookup.h"
 
 // Transitional aliases while key-runtime modules move from file-local globals
 // to the shared runtime-owned state object.
@@ -18,6 +19,49 @@
 #define multi_tap (noah_runtime_shared_state.key.active_slots[0].pending_multi_tap)
 
 void noah_key_runtime_scan(void);
+
+typedef enum {
+    KEY_RUNTIME_SLOT_RELEASE_OUTCOME_NONE = 0,
+    KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP,
+    KEY_RUNTIME_SLOT_RELEASE_OUTCOME_ACTION,
+    KEY_RUNTIME_SLOT_RELEASE_OUTCOME_PD_MODE_LOCK_TAP,
+} key_runtime_slot_release_outcome_t;
+
+typedef struct {
+    bool                               release_owned_state;
+    key_runtime_slot_release_outcome_t outcome;
+    uint16_t                           action;
+    pd_mode_mask_t                     pd_mode_lock_tap;
+} key_runtime_slot_release_resolution_t;
+
+typedef enum {
+    KEY_RUNTIME_SLOT_SCAN_OUTCOME_NONE = 0,
+    KEY_RUNTIME_SLOT_SCAN_OUTCOME_FIRE_HOLD,
+    KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
+} key_runtime_slot_scan_outcome_t;
+
+typedef struct {
+    bool                            commit_immediate_hold;
+    bool                            immediate_hold_needs_feedback;
+    bool                            immediate_hold_completes_hold;
+    bool                            activate_fallback_hold;
+    key_runtime_slot_scan_outcome_t outcome;
+    hold_behavior_t                 hold;
+    hold_behavior_t                 long_hold;
+} key_runtime_slot_scan_resolution_t;
+
+typedef enum {
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_NONE = 0,
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD,
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
+} key_runtime_slot_pending_multi_tap_scan_outcome_t;
+
+typedef struct {
+    key_runtime_slot_pending_multi_tap_scan_outcome_t outcome;
+    bool                                              release_layer_before_action;
+    hold_behavior_t                                   hold;
+    hold_behavior_t                                   long_hold;
+} key_runtime_slot_pending_multi_tap_scan_resolution_t;
 
 uint8_t             behavior_get_layer(uint16_t keycode);
 bool                is_layer_key(uint16_t keycode);
@@ -49,6 +93,9 @@ multi_tap_t        *key_runtime_find_multi_tap_by_position(keypos_t key_pos);
 void                key_runtime_slot_begin_pending_multi_tap(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term);
 uint16_t            key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, uint16_t keycode);
 uint16_t            key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slot, uint16_t keycode, uint8_t *repeat_count);
+key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(uint16_t keycode, active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed);
+key_runtime_slot_scan_resolution_t key_runtime_slot_resolve_scan(active_key_state_t active_key_state, uint16_t elapsed);
+key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_resolve_pending_multi_tap_scan(active_key_state_t active_key_state, multi_tap_t multi_tap_state, uint16_t elapsed);
 void                key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot);
 bool                active_key_matches(uint16_t keycode, keypos_t key_pos);
 bool                key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot);

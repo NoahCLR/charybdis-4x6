@@ -190,6 +190,19 @@ Completed in this pass:
 - Updated smaller host harnesses to match the refactored slot module's real dependency surface:
   - `tests/host/run_key_runtime_preflight_tests.sh` now links `multi_tap_engine.c`
   - `tests/host/key_runtime_preflight_test.c` and `tests/host/key_runtime_feedback_test.c` now provide the `key_behavior_step_lookup(...)` / `key_behavior_has_more_taps(...)` stubs that `key_runtime_slot.c` legitimately depends on
+- Continued Phase 4 by moving the remaining active-slot release/scan policy out of `users/noah/lib/key/key_runtime_transition.c` and into slot-local helpers:
+  - added slot-local resolution types and helper entry points in `users/noah/lib/key/key_runtime_state.h`
+  - added slot-local resolution helpers in `users/noah/lib/key/key_runtime_slot.c` for:
+    - active-key release outcomes
+    - active-key scan outcomes
+    - pending multi-tap scan outcomes
+  - reduced `users/noah/lib/key/key_runtime_transition.c` to applying slot-local resolutions into transition-plan effects instead of owning those decision trees directly
+- Extended slot-level host coverage for the new helper surface in `tests/host/key_runtime_slot_test.c`, including direct checks for:
+  - immediate-hold quick-release tap resolution
+  - locked pd-mode tap resolution
+  - long-hold scan promotion
+  - pending multi-tap layer-lock scan resolution
+- Updated `tests/host/key_runtime_feedback_test.c` with the layer-key and layer-lock stubs now required by the slot module's explicit pending-multi-tap scan dependency surface
 
 Verification completed in this pass:
 
@@ -220,6 +233,21 @@ Follow-up wiring completed during verification:
 - updated `tests/host/run_rgb_layer_render_tests.sh` to link the new `rgb_validation.c` module so the existing RGB runtime integration test still links against the same runtime shape as firmware builds
 - updated the host runners that link key-runtime modules so they also link `key_runtime_trace.c`
 
+Additional verification completed for the continued Phase 4 pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Next recommended step:
 
-- continue Phase 4 by pulling more of the remaining slot transition policy out of `key_runtime_transition.c` and into slot-local state-transition helpers, especially the active-press release/scan resolution branches that still operate as large transition-file-local decision trees.
+- continue Phase 4 by pulling the remaining slot-owned mutation branches out of `key_runtime_transition.c`, especially:
+  - pending multi-tap hold-release resolution
+  - hold-threshold / long-hold promotion state mutation
+  so the transition file trends toward pure effect-plan assembly over slot lifecycle helpers.

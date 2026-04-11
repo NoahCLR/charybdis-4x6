@@ -25,49 +25,6 @@ typedef enum {
     HOLD_THRESHOLD_DISPATCH_REPEAT,
 } hold_threshold_dispatch_t;
 
-typedef enum {
-    ACTIVE_KEY_RELEASE_OUTCOME_NONE = 0,
-    ACTIVE_KEY_RELEASE_OUTCOME_TAP,
-    ACTIVE_KEY_RELEASE_OUTCOME_ACTION,
-    ACTIVE_KEY_RELEASE_OUTCOME_PD_MODE_LOCK_TAP,
-} active_key_release_outcome_t;
-
-typedef struct {
-    bool                         release_owned_state;
-    active_key_release_outcome_t outcome;
-    uint16_t                     action;
-    pd_mode_mask_t               pd_mode_lock_tap;
-} active_key_release_resolution_t;
-
-typedef enum {
-    ACTIVE_KEY_SCAN_OUTCOME_NONE = 0,
-    ACTIVE_KEY_SCAN_OUTCOME_FIRE_HOLD,
-    ACTIVE_KEY_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
-} active_key_scan_outcome_t;
-
-typedef struct {
-    bool                      commit_immediate_hold;
-    bool                      immediate_hold_needs_feedback;
-    bool                      immediate_hold_completes_hold;
-    bool                      activate_fallback_hold;
-    active_key_scan_outcome_t outcome;
-    hold_behavior_t           hold;
-    hold_behavior_t           long_hold;
-} active_key_scan_resolution_t;
-
-typedef enum {
-    PENDING_MULTI_TAP_SCAN_OUTCOME_NONE = 0,
-    PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD,
-    PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
-} pending_multi_tap_scan_outcome_t;
-
-typedef struct {
-    pending_multi_tap_scan_outcome_t outcome;
-    bool                             release_layer_before_action;
-    hold_behavior_t                  hold;
-    hold_behavior_t                  long_hold;
-} pending_multi_tap_scan_resolution_t;
-
 static hold_threshold_dispatch_t key_runtime_transition_hold_threshold_dispatch_kind(hold_behavior_t hold);
 
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
@@ -368,117 +325,22 @@ static void key_runtime_transition_dispatch_released_key_tap(uint16_t keycode, a
     }
 }
 
-static bool key_runtime_transition_release_is_interrupted_layer_tap(active_key_state_t released_key, key_behavior_view_t behavior) {
-    return behavior.is_momentary_layer && released_key.layer_interrupted;
-}
-
-static bool key_runtime_transition_release_is_buffered_base_tap(active_key_state_t released_key) {
-    return released_key.fallback_hold_pending && released_key.tap_action == KC_NO && released_key.held_action_keycode == KC_NO;
-}
-
-static bool key_runtime_transition_release_is_quick_tap(active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed) {
-    return elapsed < released_key.tap_hold_term && !key_runtime_transition_release_is_interrupted_layer_tap(released_key, behavior);
-}
-
-static pd_mode_mask_t key_runtime_transition_locked_pd_mode_tap_mode(uint16_t keycode, active_key_state_t released_key, uint16_t elapsed, key_behavior_view_t behavior) {
-    pd_mode_mask_t mode = pd_mode_for_keycode(keycode);
-    if (!mode) {
-        return 0;
-    }
-
-    if (!released_key.pd_mode_was_locked_on_press || elapsed >= released_key.tap_hold_term) {
-        return 0;
-    }
-
-    if (key_runtime_transition_release_is_interrupted_layer_tap(released_key, behavior)) {
-        return 0;
-    }
-
-    return mode;
-}
-
-static active_key_release_resolution_t key_runtime_transition_resolve_active_key_release(uint16_t keycode, active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed) {
-    bool                            quick_tap            = key_runtime_transition_release_is_quick_tap(released_key, behavior, elapsed);
-    bool                            quick_immediate_hold = hold_registers_on_press(released_key.hold) && quick_tap;
-    pd_mode_mask_t                  lock_tap_mode        = key_runtime_transition_locked_pd_mode_tap_mode(keycode, released_key, elapsed, behavior);
-    active_key_release_resolution_t resolution           = {
-        .release_owned_state = released_key.held_action_keycode != KC_NO || released_key.repeat_binding_active,
-    };
-
-    if (released_key.hold_fired || released_key.held_action_keycode != KC_NO || released_key.repeat_binding_active) {
-        if (lock_tap_mode) {
-            resolution.outcome          = ACTIVE_KEY_RELEASE_OUTCOME_PD_MODE_LOCK_TAP;
-            resolution.pd_mode_lock_tap = lock_tap_mode;
-            return resolution;
-        }
-
-        if (quick_immediate_hold) {
-            resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_TAP;
-            return resolution;
-        }
-
-        if (hold_sends_on_release(released_key.long_hold) && elapsed >= released_key.longer_hold_term) {
-            resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_ACTION;
-            resolution.action  = released_key.long_hold.action;
-        }
-        return resolution;
-    }
-
-    if (key_runtime_transition_release_is_buffered_base_tap(released_key)) {
-        resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_TAP;
-        return resolution;
-    }
-
-    if (quick_tap) {
-        if (lock_tap_mode) {
-            resolution.outcome          = ACTIVE_KEY_RELEASE_OUTCOME_PD_MODE_LOCK_TAP;
-            resolution.pd_mode_lock_tap = lock_tap_mode;
-            return resolution;
-        }
-
-        resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_TAP;
-        return resolution;
-    }
-
-    if (released_key.fallback_hold_pending) {
-        return resolution;
-    }
-
-    if (hold_sends_on_release(released_key.hold)) {
-        resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_ACTION;
-        resolution.action  = key_runtime_transition_select_release_hold_action(elapsed, released_key.hold.action, released_key.long_hold, released_key.longer_hold_term);
-        return resolution;
-    }
-
-    if (hold_sends_on_release(released_key.long_hold) && elapsed >= released_key.longer_hold_term) {
-        resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_ACTION;
-        resolution.action  = released_key.long_hold.action;
-        return resolution;
-    }
-
-    if (!released_key.hold_one_shot_fired && !behavior.is_momentary_layer && released_key.tap_action != KC_NO) {
-        resolution.outcome = ACTIVE_KEY_RELEASE_OUTCOME_TAP;
-    }
-
-    return resolution;
-}
-
-static void key_runtime_transition_apply_active_key_release_resolution(uint16_t keycode, active_key_state_t *slot, active_key_state_t released_key, key_behavior_view_t behavior, active_key_release_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+static void key_runtime_transition_apply_active_key_release_resolution(uint16_t keycode, active_key_state_t *slot, active_key_state_t released_key, key_behavior_view_t behavior, key_runtime_slot_release_resolution_t resolution, key_runtime_transition_plan_t *plan) {
     if (resolution.release_owned_state) {
         key_runtime_transition_plan_release_owned_state_by_key(plan, released_key.key_pos);
     }
 
     switch (resolution.outcome) {
-        case ACTIVE_KEY_RELEASE_OUTCOME_TAP:
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP:
             key_runtime_transition_dispatch_released_key_tap(keycode, slot, released_key, behavior, plan);
             return;
-        case ACTIVE_KEY_RELEASE_OUTCOME_ACTION:
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_ACTION:
             key_runtime_transition_plan_dispatch_action(plan, resolution.action);
             return;
-        case ACTIVE_KEY_RELEASE_OUTCOME_PD_MODE_LOCK_TAP:
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_PD_MODE_LOCK_TAP:
             key_runtime_transition_plan_pd_mode_lock_tap(plan, resolution.pd_mode_lock_tap);
             return;
-        case ACTIVE_KEY_RELEASE_OUTCOME_NONE:
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_NONE:
         default:
             return;
     }
@@ -579,8 +441,8 @@ static bool key_runtime_transition_process_active_key_release(uint16_t keycode, 
     active_key_state_t released_key = *slot;
     key_runtime_slot_reset(slot);
 
-    uint16_t                        elapsed    = timer_elapsed(released_key.timer);
-    active_key_release_resolution_t resolution = key_runtime_transition_resolve_active_key_release(keycode, released_key, behavior, elapsed);
+    uint16_t                             elapsed    = timer_elapsed(released_key.timer);
+    key_runtime_slot_release_resolution_t resolution = key_runtime_slot_resolve_release(keycode, released_key, behavior, elapsed);
 
     key_runtime_transition_apply_active_key_release_resolution(keycode, slot, released_key, behavior, resolution, plan);
 
@@ -698,36 +560,7 @@ static void key_runtime_transition_promote_to_long_hold(active_key_state_t *slot
     }
 }
 
-static active_key_scan_resolution_t key_runtime_transition_resolve_active_key_scan(active_key_state_t active_key_state, uint16_t elapsed) {
-    active_key_scan_resolution_t resolution = {0};
-
-    if (hold_registers_on_press(active_key_state.hold) && !active_key_state.hold_one_shot_fired && elapsed >= active_key_state.tap_hold_term) {
-        resolution.commit_immediate_hold         = true;
-        resolution.immediate_hold_needs_feedback = !active_key_state.implicit_hold;
-        resolution.immediate_hold_completes_hold = !active_key_state.long_hold.present;
-    }
-
-    if (active_key_state.fallback_hold_pending && active_key_state.held_action_keycode == KC_NO && elapsed >= active_key_state.tap_hold_term) {
-        resolution.activate_fallback_hold = true;
-        return resolution;
-    }
-
-    if (hold_fires_at_threshold(active_key_state.long_hold) && elapsed >= active_key_state.longer_hold_term) {
-        resolution.outcome   = ACTIVE_KEY_SCAN_OUTCOME_PROMOTE_LONG_HOLD;
-        resolution.long_hold = active_key_state.long_hold;
-        return resolution;
-    }
-
-    if (hold_fires_at_threshold(active_key_state.hold) && elapsed >= active_key_state.tap_hold_term) {
-        resolution.outcome   = ACTIVE_KEY_SCAN_OUTCOME_FIRE_HOLD;
-        resolution.hold      = active_key_state.hold;
-        resolution.long_hold = active_key_state.long_hold;
-    }
-
-    return resolution;
-}
-
-static void key_runtime_transition_apply_active_key_scan_resolution(active_key_state_t *slot, active_key_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+static void key_runtime_transition_apply_active_key_scan_resolution(active_key_state_t *slot, key_runtime_slot_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
     if (resolution.commit_immediate_hold) {
         if (resolution.immediate_hold_needs_feedback) {
             key_runtime_transition_plan_feedback_pulse(plan, false);
@@ -744,64 +577,36 @@ static void key_runtime_transition_apply_active_key_scan_resolution(active_key_s
     }
 
     switch (resolution.outcome) {
-        case ACTIVE_KEY_SCAN_OUTCOME_FIRE_HOLD:
+        case KEY_RUNTIME_SLOT_SCAN_OUTCOME_FIRE_HOLD:
             key_runtime_transition_fire_hold_at_threshold(slot, resolution.hold, resolution.long_hold, false, plan);
             return;
-        case ACTIVE_KEY_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
+        case KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
             key_runtime_transition_promote_to_long_hold(slot, resolution.long_hold, false, plan);
             return;
-        case ACTIVE_KEY_SCAN_OUTCOME_NONE:
+        case KEY_RUNTIME_SLOT_SCAN_OUTCOME_NONE:
         default:
             return;
     }
 }
 
-static bool key_runtime_transition_pending_multi_tap_hold_elapsed(const multi_tap_t *multi_tap_state, uint16_t elapsed) {
-    return multi_tap_state->pending_hold && hold_fires_at_threshold(multi_tap_state->hold) && elapsed >= multi_tap_state->tap_hold_term;
-}
-
-static pending_multi_tap_scan_resolution_t key_runtime_transition_resolve_pending_multi_tap_scan(active_key_state_t active_key_state, multi_tap_t multi_tap_state, uint16_t elapsed) {
-    pending_multi_tap_scan_resolution_t resolution = {0};
-
-    if (!multi_tap_state.pending_hold || active_key_state.keycode == KC_NO) {
-        return resolution;
-    }
-
-    if (hold_fires_at_threshold(multi_tap_state.long_hold) && elapsed >= active_key_state.longer_hold_term) {
-        resolution.outcome                     = PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD;
-        resolution.long_hold                   = multi_tap_state.long_hold;
-        resolution.release_layer_before_action = is_layer_key(active_key_state.keycode) && action_dispatch_is_layer_lock(multi_tap_state.long_hold.action);
-        return resolution;
-    }
-
-    if (key_runtime_transition_pending_multi_tap_hold_elapsed(&multi_tap_state, elapsed)) {
-        resolution.outcome                     = PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD;
-        resolution.hold                        = multi_tap_state.hold;
-        resolution.long_hold                   = multi_tap_state.long_hold;
-        resolution.release_layer_before_action = is_layer_key(active_key_state.keycode) && action_dispatch_is_layer_lock(multi_tap_state.hold.action);
-    }
-
-    return resolution;
-}
-
-static void key_runtime_transition_apply_pending_multi_tap_scan_resolution(active_key_state_t *slot, pending_multi_tap_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+static void key_runtime_transition_apply_pending_multi_tap_scan_resolution(active_key_state_t *slot, key_runtime_slot_pending_multi_tap_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
 
     if (resolution.release_layer_before_action) {
         key_runtime_transition_plan_layer_release(plan, slot->key_pos);
     }
 
     switch (resolution.outcome) {
-        case PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
             slot->long_hold = resolution.long_hold;
             key_runtime_transition_promote_to_long_hold(slot, slot->long_hold, true, plan);
             key_runtime_slot_reset_pending_multi_tap(slot);
             return;
-        case PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD:
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD:
             slot->long_hold = resolution.long_hold;
             key_runtime_transition_fire_hold_at_threshold(slot, resolution.hold, slot->long_hold, true, plan);
             key_runtime_slot_reset_pending_multi_tap(slot);
             return;
-        case PENDING_MULTI_TAP_SCAN_OUTCOME_NONE:
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_NONE:
         default:
             return;
     }
@@ -815,8 +620,8 @@ void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
             continue;
         }
 
-        uint16_t                     elapsed    = timer_elapsed(slot->timer);
-        active_key_scan_resolution_t resolution = key_runtime_transition_resolve_active_key_scan(*slot, elapsed);
+        uint16_t                          elapsed    = timer_elapsed(slot->timer);
+        key_runtime_slot_scan_resolution_t resolution = key_runtime_slot_resolve_scan(*slot, elapsed);
 
         key_runtime_transition_apply_active_key_scan_resolution(slot, resolution, plan);
     }
@@ -826,8 +631,8 @@ void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
         multi_tap_t        *slot_multi_tap = key_runtime_multi_tap_slot_at(index);
 
         if (key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_active(slot)) {
-            uint16_t                            elapsed    = timer_elapsed(slot_multi_tap->timer);
-            pending_multi_tap_scan_resolution_t resolution = key_runtime_transition_resolve_pending_multi_tap_scan(*slot, *slot_multi_tap, elapsed);
+            uint16_t                                           elapsed    = timer_elapsed(slot_multi_tap->timer);
+            key_runtime_slot_pending_multi_tap_scan_resolution_t resolution = key_runtime_slot_resolve_pending_multi_tap_scan(*slot, *slot_multi_tap, elapsed);
 
             key_runtime_transition_apply_pending_multi_tap_scan_resolution(slot, resolution, plan);
         }

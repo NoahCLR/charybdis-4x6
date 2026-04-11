@@ -66,9 +66,18 @@ bool action_dispatch_is_layer_action(uint16_t action) {
     return false;
 }
 
+bool action_dispatch_is_layer_lock(uint16_t action) {
+    (void)action;
+    return false;
+}
+
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
+}
+
+bool is_layer_key(uint16_t keycode) {
+    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
 static void test_non_passthrough_held_action_flashes(void) {

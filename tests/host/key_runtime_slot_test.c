@@ -10,9 +10,14 @@ enum {
     TEST_ACTIVE_KEY    = SAFE_RANGE + 0x41,
     TEST_SINGLE_ACTION = SAFE_RANGE + 0x42,
     TEST_HOLD_ACTION   = SAFE_RANGE + 0x43,
+    TEST_PD_MODE_KEY   = SAFE_RANGE + 0x44,
+    TEST_LAYER_KEY     = SAFE_RANGE + 0x45,
+    TEST_LAYER_LOCK    = SAFE_RANGE + 0x46,
 };
 
 static uint16_t fake_time;
+static pd_mode_mask_t test_pd_mode;
+static pd_mode_mask_t test_pd_locked_modes;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -35,6 +40,8 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 
 static void test_reset_state(void) {
     fake_time                = 1000;
+    test_pd_mode             = 0;
+    test_pd_locked_modes     = 0;
     noah_runtime_shared_state = (runtime_shared_state_t){0};
 }
 
@@ -74,6 +81,22 @@ key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count
 
 bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 3;
+}
+
+pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+    return keycode == TEST_PD_MODE_KEY ? test_pd_mode : 0;
+}
+
+bool pd_mode_locked(pd_mode_mask_t mode) {
+    return (test_pd_locked_modes & mode) != 0;
+}
+
+bool action_dispatch_is_layer_lock(uint16_t action) {
+    return action == TEST_LAYER_LOCK;
+}
+
+bool is_layer_key(uint16_t keycode) {
+    return keycode == TEST_LAYER_KEY;
 }
 
 static void test_slot_pending_multi_tap_ownership_marks_slot_non_idle(void) {
@@ -171,12 +194,115 @@ static void test_resolve_pending_multi_tap_hold_clears_slot_owned_state(void) {
     CHECK(key_runtime_slot_idle(slot));
 }
 
+static void test_resolve_release_quick_immediate_hold_becomes_tap(void) {
+    key_runtime_slot_release_resolution_t resolution;
+    keypos_t                             pos = test_keypos(2, 1);
+
+    test_reset_state();
+
+    resolution = key_runtime_slot_resolve_release(
+        TEST_ACTIVE_KEY,
+        (active_key_state_t){
+            .keycode             = TEST_ACTIVE_KEY,
+            .key_pos             = pos,
+            .held_action_keycode = TEST_HOLD_ACTION,
+            .tap_action          = TEST_SINGLE_ACTION,
+            .tap_hold_term       = 150,
+            .hold =
+                {
+                    .present = true,
+                    .action  = TEST_HOLD_ACTION,
+                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                },
+        },
+        (key_behavior_view_t){
+            .keycode       = TEST_ACTIVE_KEY,
+            .tap_hold_term = 150,
+        },
+        50);
+
+    CHECK(resolution.release_owned_state);
+    CHECK(resolution.outcome == KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP);
+}
+
+static void test_resolve_release_locked_pd_mode_becomes_lock_tap(void) {
+    key_runtime_slot_release_resolution_t resolution;
+    keypos_t                             pos = test_keypos(2, 2);
+
+    test_reset_state();
+    test_pd_mode         = PD_MODE_VOLUME;
+    test_pd_locked_modes = PD_MODE_VOLUME;
+
+    resolution = key_runtime_slot_resolve_release(
+        TEST_PD_MODE_KEY,
+        (active_key_state_t){
+            .keycode                     = TEST_PD_MODE_KEY,
+            .key_pos                     = pos,
+            .tap_hold_term               = 150,
+            .pd_mode_was_locked_on_press = true,
+        },
+        (key_behavior_view_t){
+            .keycode       = TEST_PD_MODE_KEY,
+            .tap_hold_term = 150,
+        },
+        50);
+
+    CHECK(!resolution.release_owned_state);
+    CHECK(resolution.outcome == KEY_RUNTIME_SLOT_RELEASE_OUTCOME_PD_MODE_LOCK_TAP);
+    CHECK(resolution.pd_mode_lock_tap == PD_MODE_VOLUME);
+}
+
+static void test_resolve_scan_promotes_long_hold_after_longer_term(void) {
+    key_runtime_slot_scan_resolution_t resolution;
+
+    test_reset_state();
+
+    resolution = key_runtime_slot_resolve_scan(
+        (active_key_state_t){
+            .keycode          = TEST_ACTIVE_KEY,
+            .tap_hold_term    = 120,
+            .longer_hold_term = 240,
+            .hold             = TAP_AT_HOLD_THRESHOLD(TEST_SINGLE_ACTION),
+            .long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_HOLD_ACTION),
+        },
+        260);
+
+    CHECK(!resolution.activate_fallback_hold);
+    CHECK(resolution.outcome == KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD);
+    CHECK(resolution.long_hold.action == TEST_HOLD_ACTION);
+}
+
+static void test_resolve_pending_multi_tap_scan_requires_layer_release_before_lock(void) {
+    key_runtime_slot_pending_multi_tap_scan_resolution_t resolution;
+
+    test_reset_state();
+
+    resolution = key_runtime_slot_resolve_pending_multi_tap_scan(
+        (active_key_state_t){
+            .keycode          = TEST_LAYER_KEY,
+            .longer_hold_term = 240,
+        },
+        (multi_tap_t){
+            .pending_hold = true,
+            .long_hold    = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK),
+        },
+        260);
+
+    CHECK(resolution.outcome == KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD);
+    CHECK(resolution.release_layer_before_action);
+    CHECK(resolution.long_hold.action == TEST_LAYER_LOCK);
+}
+
 int main(void) {
     test_slot_pending_multi_tap_ownership_marks_slot_non_idle();
     test_select_slot_for_press_prefers_slot_owning_pending_multi_tap();
     test_slot_pending_multi_tap_lifecycle_helpers();
     test_slot_track_preserves_pending_multi_tap();
     test_resolve_pending_multi_tap_hold_clears_slot_owned_state();
+    test_resolve_release_quick_immediate_hold_becomes_tap();
+    test_resolve_release_locked_pd_mode_becomes_lock_tap();
+    test_resolve_scan_promotes_long_hold_after_longer_term();
+    test_resolve_pending_multi_tap_scan_requires_layer_release_before_lock();
 
     puts("key_runtime_slot host tests passed");
     return 0;
