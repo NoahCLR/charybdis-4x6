@@ -21,14 +21,14 @@
 typedef uint16_t pd_mode_mask_t;
 
 enum {
-#define NOAH_PD_MODE_INDEX(name, keycode, handler, key_handler, reset, dpi) PD_MODE_INDEX_##name,
+#define NOAH_PD_MODE_INDEX(name, keycode, handler, key_handler, reset, dpi, traits) PD_MODE_INDEX_##name,
     NOAH_PD_MODE_LIST(NOAH_PD_MODE_INDEX)
 #undef NOAH_PD_MODE_INDEX
         PD_MODE_COUNT,
 };
 
 enum {
-#define NOAH_PD_MODE_FLAG(name, keycode, handler, key_handler, reset, dpi) PD_MODE_##name = ((pd_mode_mask_t)1u << PD_MODE_INDEX_##name),
+#define NOAH_PD_MODE_FLAG(name, keycode, handler, key_handler, reset, dpi, traits) PD_MODE_##name = ((pd_mode_mask_t)1u << PD_MODE_INDEX_##name),
     NOAH_PD_MODE_LIST(NOAH_PD_MODE_FLAG)
 #undef NOAH_PD_MODE_FLAG
 };

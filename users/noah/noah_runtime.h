@@ -6,6 +6,8 @@
 // users/noah/hooks.c provides weak default *_user implementations that call
 // these helpers, and any keymap-local override can call back into them to keep
 // the shared userspace behavior.
+// Keymap-authored data files should stay on noah_keymap.h instead of including
+// this runtime entry-point surface directly.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

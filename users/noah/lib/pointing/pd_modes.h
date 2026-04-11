@@ -35,6 +35,7 @@ typedef struct {
     pd_mode_key_handler_t key_handler; // optional key-event interception while mode is active
     pd_mode_reset_t       reset;       // called on deactivation (NULL = no-op)
     uint16_t              dpi;         // pointer CPI while this mode is active (0 = use normal pointer DPI)
+    pd_mode_traits_t      traits;      // manifest-defined policy flags consumed by registry/pointer policy
 } pd_mode_def_t;
 
 _Static_assert(PD_MODE_KEYCODE_COUNT == PD_MODE_COUNT, "pd-mode keycode count in custom_keycodes enum doesn't match PD_MODE_COUNT — keep the pd-mode keycode block dense and update both together");
@@ -46,6 +47,8 @@ void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t l
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode);
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action);
 bool                 is_pd_mode_lock_action(uint16_t action);
+bool                 pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait);
+bool                 pd_any_active_mode_has_trait(pd_mode_traits_t trait);
 
 bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked);
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode);

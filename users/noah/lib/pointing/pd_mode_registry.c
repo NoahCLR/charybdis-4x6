@@ -15,8 +15,9 @@
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static bool scroll_mode_auto_mouse_owned = false;
 
-static inline bool pd_mode_auto_mouse_requires_anchor(pd_mode_mask_t mode) {
-    return mode != PD_MODE_ARROW;
+static inline bool pd_mode_registry_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
+    const pd_mode_def_t *def = pd_mode_lookup(mode);
+    return def && (def->traits & trait) == trait;
 }
 
 static void pd_mode_auto_mouse_sync_anchor(bool should_anchor) {
@@ -33,7 +34,7 @@ static void pd_mode_auto_mouse_sync_anchor(bool should_anchor) {
 }
 
 static void pd_mode_auto_mouse_activate(pd_mode_mask_t mode, bool was_any_mode_active) {
-    if (mode == PD_MODE_ARROW) {
+    if (pd_mode_registry_has_trait(mode, PD_MODE_TRAIT_PREFER_TYPING_LAYER)) {
         // Arrow mode should fall back to the typing/nav surface immediately
         // instead of waiting for the auto-mouse timeout to drop the pointer
         // layer.
@@ -41,13 +42,13 @@ static void pd_mode_auto_mouse_activate(pd_mode_mask_t mode, bool was_any_mode_a
         return;
     }
 
-    if (!was_any_mode_active && pd_mode_auto_mouse_requires_anchor(mode)) {
+    if (!was_any_mode_active && pd_mode_registry_has_trait(mode, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)) {
         pd_mode_auto_mouse_sync_anchor(true);
     }
 }
 
 static void pd_mode_auto_mouse_deactivate(pd_mode_mask_t mode, bool was_any_mode_active) {
-    if (!pd_mode_auto_mouse_requires_anchor(mode)) {
+    if (!pd_mode_registry_has_trait(mode, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)) {
         return;
     }
 
@@ -114,7 +115,7 @@ static void pinch_mode_unregister_command(void) {
 #    define PD_MODE_ARROW_DPI 0
 #endif
 
-#define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, handler, key_handler, reset, dpi) {PD_MODE_##name, keycode, keycode##_LOCK, handler, key_handler, reset, dpi},
+#define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, handler, key_handler, reset, dpi, traits) {PD_MODE_##name, keycode, keycode##_LOCK, handler, key_handler, reset, dpi, traits},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_REGISTRY_ROW)};
 #undef NOAH_PD_MODE_REGISTRY_ROW
 
@@ -134,6 +135,21 @@ const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
 
 bool is_pd_mode_lock_action(uint16_t action) {
     return pd_mode_lock_action_lookup(action) != NULL;
+}
+
+bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
+    const pd_mode_def_t *def = pd_mode_lookup(mode);
+    return def && (def->traits & trait) == trait;
+}
+
+bool pd_any_active_mode_has_trait(pd_mode_traits_t trait) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_mode_active(pd_modes[i].mode_flag) && (pd_modes[i].traits & trait) == trait) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void pd_mode_apply_active_dpi(void) {
@@ -176,13 +192,13 @@ void pd_mode_activate(pd_mode_mask_t mode) {
     pd_mode_auto_mouse_activate(mode, was_any_mode_active);
 #endif
 
-    if (mode == PD_MODE_DRAGSCROLL || mode == PD_MODE_PINCH) {
+    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND)) {
         charybdis_set_pointer_dragscroll_enabled(true);
         // Charybdis sets CHARYBDIS_DRAGSCROLL_DPI via maybe_update_pointing_device_cpi().
     } else {
         pd_mode_apply_active_dpi();
     }
-    if (mode == PD_MODE_PINCH) {
+    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_OWNS_LEFT_GUI)) {
         pinch_mode_register_command();
     }
 }
@@ -204,11 +220,11 @@ void pd_mode_deactivate(pd_mode_mask_t mode) {
         }
     }
 
-    if (mode == PD_MODE_PINCH) {
+    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_OWNS_LEFT_GUI)) {
         pinch_mode_unregister_command();
     }
 
-    if (mode == PD_MODE_DRAGSCROLL || mode == PD_MODE_PINCH) {
+    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND)) {
         charybdis_set_pointer_dragscroll_enabled(false);
         // Charybdis restores normal pointer DPI via maybe_update_pointing_device_cpi().
     } else {
@@ -225,7 +241,7 @@ void pd_mode_lock(pd_mode_mask_t mode) {
     pd_mode_activate(mode);
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (mode == PD_MODE_DRAGSCROLL || mode == PD_MODE_PINCH) {
+    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)) {
         scroll_mode_lock_attach_auto_mouse();
     }
 #endif
@@ -233,7 +249,7 @@ void pd_mode_lock(pd_mode_mask_t mode) {
 
 void pd_mode_unlock(pd_mode_mask_t mode) {
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (mode == PD_MODE_DRAGSCROLL || mode == PD_MODE_PINCH) {
+    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)) {
         scroll_mode_lock_detach_auto_mouse();
     }
 #endif

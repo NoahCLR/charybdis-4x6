@@ -21,17 +21,17 @@ static inline bool pointer_layer_policy_pd_mode_running(void) {
     return pd_any_mode_active();
 }
 
-static inline bool pointer_layer_policy_arrow_mode_prefers_typing_layer(void) {
-    return pd_mode_active(PD_MODE_ARROW);
+static inline bool pointer_layer_policy_active_mode_prefers_typing_layer(void) {
+    return pd_any_active_mode_has_trait(PD_MODE_TRAIT_PREFER_TYPING_LAYER);
 }
 
 static inline bool pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored(void) {
-    return pointer_layer_policy_pd_mode_running() && !pointer_layer_policy_arrow_mode_prefers_typing_layer();
+    return pointer_layer_policy_pd_mode_running() && pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED);
 }
 
 static bool pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(uint16_t keycode) {
     pd_mode_mask_t mode = pd_mode_for_keycode(keycode);
-    return mode != 0 && mode != PD_MODE_ARROW;
+    return pd_mode_has_trait(mode, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED);
 }
 
 static inline bool pointer_layer_policy_auto_mouse_anchored(void) {
@@ -71,7 +71,7 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 }
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
-    bool          arrow_mode_active    = pointer_layer_policy_arrow_mode_prefers_typing_layer();
+    bool          prefers_typing_layer = pointer_layer_policy_active_mode_prefers_typing_layer();
     bool          auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored();
     uint8_t       auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
     layer_state_t auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
@@ -80,7 +80,7 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     // Arrow mode consumes trackball motion as arrows, so keep the keyboard on
     // the current typing/nav surface instead of forcing the pointer layer back
     // underneath it. Holding NAV can still expose the pointer-button layout.
-    if (arrow_mode_active && auto_mouse_layer != CHARYBDIS_AUTO_SNIPING_LAYER) {
+    if (prefers_typing_layer && auto_mouse_layer != CHARYBDIS_AUTO_SNIPING_LAYER) {
         state &= ~auto_mouse_mask;
         return state;
     }

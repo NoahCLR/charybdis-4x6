@@ -76,6 +76,35 @@ bool pd_any_mode_active(void) {
     return fake_active_modes != 0;
 }
 
+bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
+    pd_mode_traits_t mode_traits = PD_MODE_TRAIT_NONE;
+
+    switch (mode) {
+        case PD_MODE_VOLUME:
+            mode_traits = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED;
+            break;
+        case PD_MODE_ARROW:
+            mode_traits = PD_MODE_TRAIT_PREFER_TYPING_LAYER;
+            break;
+        default:
+            break;
+    }
+
+    return (mode_traits & trait) == trait;
+}
+
+bool pd_any_active_mode_has_trait(pd_mode_traits_t trait) {
+    for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
+        pd_mode_mask_t mode = (pd_mode_mask_t)1u << index;
+
+        if ((fake_active_modes & mode) != 0 && pd_mode_has_trait(mode, trait)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static void test_non_arrow_pd_mode_marks_layer_holds_as_mouse_records(void) {
     test_reset_stubs();
     fake_active_modes = PD_MODE_VOLUME;

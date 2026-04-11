@@ -200,6 +200,28 @@ static void test_registry_metadata_matches_manifest(void) {
     CHECK(pd_mode_first_active_index() == PD_MODE_INDEX_VOLUME);
 }
 
+static void test_trait_queries_match_manifest_policy(void) {
+    test_reset_stubs();
+
+    CHECK(pd_mode_has_trait(PD_MODE_VOLUME, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
+    CHECK(!pd_mode_has_trait(PD_MODE_VOLUME, PD_MODE_TRAIT_PREFER_TYPING_LAYER));
+    CHECK(pd_mode_has_trait(PD_MODE_ARROW, PD_MODE_TRAIT_PREFER_TYPING_LAYER));
+    CHECK(!pd_mode_has_trait(PD_MODE_ARROW, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
+    CHECK(pd_mode_has_trait(PD_MODE_PINCH, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE | PD_MODE_TRAIT_OWNS_LEFT_GUI));
+    CHECK(!pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
+
+    pd_mode_activate(PD_MODE_ARROW);
+    CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_PREFER_TYPING_LAYER));
+    CHECK(!pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
+
+    pd_mode_activate(PD_MODE_PINCH);
+    CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
+    CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND));
+    CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_OWNS_LEFT_GUI));
+
+    pd_mode_deactivate(PD_MODE_PINCH);
+}
+
 static void test_apply_remote_snapshot_keeps_only_one_effective_mode(void) {
     test_reset_stubs();
 
@@ -353,6 +375,7 @@ static void test_active_key_handler_only_runs_for_active_modes(void) {
 
 int main(void) {
     test_registry_metadata_matches_manifest();
+    test_trait_queries_match_manifest_policy();
     test_apply_remote_snapshot_keeps_only_one_effective_mode();
     test_set_lock_state_switches_to_single_locked_mode();
     test_activate_switches_to_single_unlocked_mode();

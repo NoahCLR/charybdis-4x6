@@ -81,6 +81,27 @@ Completed in this pass:
   - `tests/host/include/nvm_eeprom_via_internal.h`
   - updated `tests/host/include/dynamic_keymap.h` with `dynamic_keymap_macro_set_buffer(...)`
 - Fixed a real-firmware compile mismatch in the VIA compat layer by aligning `noah_qmk_via_macro_set_buffer(...)` to QMK's non-const `uint8_t *` buffer signature.
+- Started the Phase 3 pd-mode trait/plugin refactor by moving pointer-layer and registry policy off hard-coded mode identities and onto manifest-defined traits:
+  - added `pd_mode_traits_t` and `PD_MODE_TRAIT_*` flags in `users/noah/lib/pointing/pd_mode_manifest.h`
+  - extended `pd_mode_def_t` with manifest-defined `traits`
+  - added `pd_mode_has_trait(...)` and `pd_any_active_mode_has_trait(...)` query helpers in `users/noah/lib/pointing/pd_mode_registry.c`
+  - rewired `users/noah/lib/pointing/pointer_layer_policy.c` to consume trait queries instead of special-casing `PD_MODE_ARROW` and implicit "all non-arrow modes anchor auto-mouse"
+  - rewired dragscroll backend, pinch GUI ownership, and locked auto-mouse toggle policy in `users/noah/lib/pointing/pd_mode_registry.c` to consume manifest traits instead of checking for `DRAGSCROLL` or `PINCH` directly
+- Updated pd-mode manifest consumers for the new seven-field row shape:
+  - `users/noah/lib/pointing/pd_mode_flags.h`
+  - `users/noah/noah_keymap_ids.h`
+  - `tests/host/real_profile_validation_test.c`
+- Fixed host harness fallout introduced by the trait refactor:
+  - added trait-aware stubs to `tests/host/pointer_layer_policy_test.c`
+  - fixed a macro-parameter substitution bug in `tests/host/real_profile_validation_test.c` where `.traits` was being preprocessed into an invalid designated field
+- Added direct trait coverage in `tests/host/pd_mode_test.c` for manifest traits and active-mode trait queries.
+- Added a header-boundary guard to `tests/host/run_feature_gate_compile_tests.sh` so:
+  - runtime modules under `users/noah/` cannot silently drift back to `noah_keymap.h`
+  - keymap-owned translation units under `keyboards/.../keymaps/noah/` cannot start depending on `noah_runtime.h`
+- Documented the intended split directly in:
+  - `users/noah/noah_keymap.h`
+  - `users/noah/noah_runtime.h`
+- Swept `users/noah/lib/` for remaining hard-coded pd-mode identity checks after the trait refactor and confirmed that the remaining named-mode references are manifest/default definitions rather than central policy branches.
 
 Verification completed in this pass:
 
@@ -94,6 +115,7 @@ Verification completed in this pass:
 - `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
 - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
 - `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
 - `sh tests/host/run_split_runtime_sync_tests.sh`
 - `sh tests/host/run_rgb_layer_render_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
@@ -106,6 +128,4 @@ Follow-up wiring completed during verification:
 
 Next recommended step:
 
-- decide whether the next architectural slice should be:
-  - continue Phase 2 by tightening authoring-only tests and docs around `noah_keymap.h` vs `noah_runtime.h`
-  - start the larger structural work on the pd-mode trait/plugin boundary
+- start Phase 4 by extracting a per-key runtime slot interface around the current single `active_key` model, so concurrent custom hold/tap behaviors can be introduced without growing more global transition special cases.

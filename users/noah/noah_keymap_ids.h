@@ -89,10 +89,10 @@ enum custom_keycodes {
     MACRO_13,
     MACRO_14,
     MACRO_15,
-#define NOAH_PD_MODE_KEYCODE(name, keycode, handler, key_handler, reset, dpi) keycode,
+#define NOAH_PD_MODE_KEYCODE(name, keycode, handler, key_handler, reset, dpi, traits) keycode,
     NOAH_PD_MODE_LIST(NOAH_PD_MODE_KEYCODE)
 #undef NOAH_PD_MODE_KEYCODE
-#define NOAH_PD_MODE_LOCK_KEYCODE(name, keycode, handler, key_handler, reset, dpi) keycode##_LOCK,
+#define NOAH_PD_MODE_LOCK_KEYCODE(name, keycode, handler, key_handler, reset, dpi, traits) keycode##_LOCK,
     NOAH_PD_MODE_LIST(NOAH_PD_MODE_LOCK_KEYCODE)
 #undef NOAH_PD_MODE_LOCK_KEYCODE
     LAYER_LOCK_BASE,

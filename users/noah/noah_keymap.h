@@ -4,6 +4,8 @@
 //
 // Convenience authoring surface for keymap-owned translation units such as
 // keymap.c and rgb_config.c.
+// Runtime modules should include the narrower ids/runtime headers they
+// actually consume instead of depending on this authoring bundle.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

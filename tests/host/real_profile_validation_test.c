@@ -17,7 +17,7 @@ static char log_buffer[16384];
 extern const pd_mode_color_t pd_mode_colors[];
 extern const uint8_t         pd_mode_color_count;
 
-#define NOAH_PD_MODE_TEST_ROW(name, mode_keycode, handler, key_handler, reset, dpi) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
+#define NOAH_PD_MODE_TEST_ROW(name, mode_keycode, handler, key_handler, reset, dpi, mode_traits) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK, .traits = (mode_traits)},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TEST_ROW)};
 #undef NOAH_PD_MODE_TEST_ROW
 

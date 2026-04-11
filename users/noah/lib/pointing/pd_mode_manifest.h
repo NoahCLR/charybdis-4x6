@@ -10,7 +10,7 @@
 // Do not hand-edit the generated keycode enum, flag enum, or registry table.
 //
 // Row format:
-//   PDM(NAME, MODE_KEYCODE, POINTER_HANDLER, KEY_HANDLER, RESET_FN, DPI_OVERRIDE)
+//   PDM(NAME, MODE_KEYCODE, POINTER_HANDLER, KEY_HANDLER, RESET_FN, DPI_OVERRIDE, TRAITS)
 //
 // Field meanings:
 //   NAME:
@@ -34,18 +34,36 @@
 //   DPI_OVERRIDE:
 //     Pointer CPI to apply while the mode is active. Use a PD_MODE_*_DPI macro
 //     for normal modes, or 0 to keep the current/default pointer DPI.
+//   TRAITS:
+//     Bitmask of PD_MODE_TRAIT_* flags that describe cross-cutting policy for
+//     pointer-layer anchoring, dragscroll backend ownership, lock behavior,
+//     and modifier ownership. Prefer adding a new trait over hard-coding
+//     per-mode identity checks in higher-level policy code.
 //
 // Example:
 //   PDM(MY_NEW_MODE, MY_NEW_MODE_KEY,
 //     handle_my_new_mode, NULL, reset_my_new_mode,
-//     PD_MODE_MY_NEW_MODE_DPI)
+//     PD_MODE_MY_NEW_MODE_DPI, PD_MODE_TRAIT_NONE)
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#define NOAH_PD_MODE_LIST(PDM)                                                                                    \
-    PDM(DRAGSCROLL, DRAGSCROLL, NULL, NULL, NULL, 0)                                                              \
-    PDM(VOLUME, VOLUME_MODE, handle_volume_mode, NULL, reset_volume_mode, PD_MODE_VOLUME_DPI)                     \
-    PDM(BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, NULL, reset_brightness_mode, PD_MODE_BRIGHTNESS_DPI) \
-    PDM(ZOOM, ZOOM_MODE, handle_zoom_mode, NULL, reset_zoom_mode, PD_MODE_ZOOM_DPI)                               \
-    PDM(ARROW, ARROW_MODE, handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode, PD_MODE_ARROW_DPI)         \
-    PDM(PINCH, PINCH_MODE, NULL, NULL, NULL, 0)
+#include <stdint.h>
+
+typedef uint16_t pd_mode_traits_t;
+
+enum {
+    PD_MODE_TRAIT_NONE                         = 0,
+    PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED    = (pd_mode_traits_t)1u << 0,
+    PD_MODE_TRAIT_PREFER_TYPING_LAYER         = (pd_mode_traits_t)1u << 1,
+    PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND   = (pd_mode_traits_t)1u << 2,
+    PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE = (pd_mode_traits_t)1u << 3,
+    PD_MODE_TRAIT_OWNS_LEFT_GUI               = (pd_mode_traits_t)1u << 4,
+};
+
+#define NOAH_PD_MODE_LIST(PDM)                                                                                                                                                                  \
+    PDM(DRAGSCROLL, DRAGSCROLL, NULL, NULL, NULL, 0, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)          \
+    PDM(VOLUME, VOLUME_MODE, handle_volume_mode, NULL, reset_volume_mode, PD_MODE_VOLUME_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)                                                         \
+    PDM(BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, NULL, reset_brightness_mode, PD_MODE_BRIGHTNESS_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)                                      \
+    PDM(ZOOM, ZOOM_MODE, handle_zoom_mode, NULL, reset_zoom_mode, PD_MODE_ZOOM_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)                                                                   \
+    PDM(ARROW, ARROW_MODE, handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode, PD_MODE_ARROW_DPI, PD_MODE_TRAIT_PREFER_TYPING_LAYER)                                                   \
+    PDM(PINCH, PINCH_MODE, NULL, NULL, NULL, 0, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE | PD_MODE_TRAIT_OWNS_LEFT_GUI)
