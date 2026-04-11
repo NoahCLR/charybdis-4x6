@@ -519,3 +519,34 @@ Additional verification completed for the key-runtime regression fix pass:
 Next recommended step:
 
 - continue Phase 5 by extracting the automouse blend stage next, so `rgb_runtime.c` keeps shrinking toward pure stage ordering while the remaining overlays stay behavior-identical
+
+Continued Phase 5 by extracting the automouse blend stage out of `users/noah/lib/rgb/rgb_runtime.c`:
+
+- added `users/noah/lib/rgb/rgb_automouse_stage.h` and `users/noah/lib/rgb/rgb_automouse_stage.c`
+- moved the following automouse-stage responsibilities into the new module:
+  - auto-mouse destination color caching during RGB post-init
+  - auto-mouse start/end/base-effect frame ownership
+  - end-state selection for layer-removal vs configured synthetic end colors
+  - WS2812 base-effect capture and per-LED blend application
+- reduced `users/noah/lib/rgb/rgb_runtime.c` so it now orchestrates stage order over:
+  - base layer-stage render
+  - automouse blend stage
+  - preview overlay
+  - pd-mode overlay
+  - key feedback overlay
+- updated build and host-test wiring in:
+  - `users/noah/rules.mk`
+  - `tests/host/run_rgb_layer_render_tests.sh`
+  - `tests/host/run_feature_gate_compile_tests.sh`
+- updated `users/noah/lib/rgb/rgb_automouse.h` to point its rendering ownership comment at the new automouse-stage module
+
+Additional verification completed for the Phase 5 automouse-stage extraction pass:
+
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next recommended step:
+
+- continue Phase 5 by extracting the preview overlay next, then split the remaining pd-mode and key-feedback overlays if `rgb_runtime.c` still needs another size/ownership pass

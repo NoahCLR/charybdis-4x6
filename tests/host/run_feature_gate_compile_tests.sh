@@ -13,6 +13,7 @@ users/noah/lib/action/action_lifecycle.c
 users/noah/lib/macro/via_macro_defaults.c
 users/noah/lib/state/split_runtime_sync.c
 users/noah/lib/rgb/rgb_config_defaults.c
+users/noah/lib/rgb/rgb_automouse_stage.c
 users/noah/lib/rgb/rgb_layer_stage.c
 users/noah/lib/rgb/rgb_runtime.c
 users/noah/lib/rgb/rgb_validation.c

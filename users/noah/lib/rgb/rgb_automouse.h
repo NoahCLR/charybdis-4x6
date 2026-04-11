@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Public interface for tracking auto-mouse timeout progress.
-// Rendering lives in rgb_runtime.c.
+// Rendering lives in rgb_automouse_stage.c.
 //
 // raw_elapsed comes from the QMK auto-mouse timer. We clamp it to
 // AUTO_MOUSE_TIME so the fade can stay parked at its destination until the
