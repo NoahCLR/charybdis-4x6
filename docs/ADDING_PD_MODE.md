@@ -263,7 +263,7 @@ Edit [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboard
 Add a new row to `pd_mode_colors[]`:
 
 ```c
-{PD_MODE_EXAMPLE, {120, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS}},
+{ .pointing_mode = PD_MODE_EXAMPLE, .color = HSV(120, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },
 ```
 
 Optional: uncomment `DEFINE_PD_MODE_LED_GROUPS(...);` if the mode wants a

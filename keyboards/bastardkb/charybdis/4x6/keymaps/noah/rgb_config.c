@@ -20,23 +20,38 @@
 
 // ─── Layer colors ───────────────────────────────────────────────────────────
 //
-// Layer indicator colors and render flags, indexed by layer enum.
+// Layer indicator colors and render modes, indexed by layer enum.
 // HSV(0, 0, 0) means "no solid color" — LAYER_BASE falls through to the
 // default RGB matrix effect. The configured auto-mouse target layer uses its
 // authored layer color as the timeout fade start state. In this keymap, that
 // target defaults to LAYER_POINTER.
-// .flags:
+// .mode:
 //   - ALL_KEYS = paint the whole layer color wash
 //   - KEYS_MAPPED_ON_THIS_LAYER_ONLY = paint only keys that have a real key
 //     assigned on that layer; lower active layers remain visible underneath
 //     transparent positions
-//                       LAYER_COLOR(HSV(hue, sat, val), flags)
+//                       { .color = HSV(hue, sat, val), .mode = ... }
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
-    [LAYER_BASE]    = LAYER_COLOR(HSV(0, 0, 0), ALL_KEYS),                                             // no override
-    [LAYER_NUM]     = LAYER_COLOR(HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), KEYS_MAPPED_ON_THIS_LAYER_ONLY),  // green
-    [LAYER_SYM]     = LAYER_COLOR(HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), KEYS_MAPPED_ON_THIS_LAYER_ONLY), // blue
-    [LAYER_NAV]     = LAYER_COLOR(HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), KEYS_MAPPED_ON_THIS_LAYER_ONLY), // purple
-    [LAYER_POINTER] = LAYER_COLOR(HSV(0, 0, 150), KEYS_MAPPED_ON_THIS_LAYER_ONLY),                     // default auto-mouse layer: white mapped keys, capped at v=150 to limit current draw
+    [LAYER_BASE] = {
+        .color = HSV(0, 0, 0),
+        .mode = ALL_KEYS,
+    }, // no override
+    [LAYER_NUM] = {
+        .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+    }, // green
+    [LAYER_SYM] = {
+        .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+    }, // blue
+    [LAYER_NAV] = {
+        .color = HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+    }, // purple
+    [LAYER_POINTER] = {
+        .color = HSV(0, 0, 150),
+        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+    }, // default auto-mouse layer: white mapped keys, capped at v=150 to limit current draw
 };
 
 // ─── Pointing device mode colors ────────────────────────────────────────────
@@ -44,14 +59,14 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // Overlay colors for the right half when a trackball mode is active.
 // Each entry is tagged with its mode flag so the order doesn't need to
 // match pd_modes[] — adding or reordering modes won't silently break colors.
-// mode_flag             HSV(hue, sat, val)
+// { .pointing_mode = ..., .color = HSV(hue, sat, val) }
 DEFINE_PD_MODE_COLORS(
-    PD_MODE_COLOR(PD_MODE_DRAGSCROLL, HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)),  // orange
-    PD_MODE_COLOR(PD_MODE_VOLUME, HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)),      // yellow
-    PD_MODE_COLOR(PD_MODE_BRIGHTNESS, HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)), // magenta
-    PD_MODE_COLOR(PD_MODE_ARROW, HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)),      // cyan
-    PD_MODE_COLOR(PD_MODE_PINCH, HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)),       // lime
-    PD_MODE_COLOR(PD_MODE_ZOOM, HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS))         // light green
+    { .pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },  // orange
+    { .pointing_mode = PD_MODE_VOLUME, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },      // yellow
+    { .pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) }, // magenta
+    { .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },      // cyan
+    { .pointing_mode = PD_MODE_PINCH, .color = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },       // lime
+    { .pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) }         // light green
 );
 
 // ─── Per-layer LED group highlights ─────────────────────────────────────────
@@ -84,21 +99,21 @@ DEFINE_PD_MODE_COLORS(
 // static const uint8_t trackball_led[] = {56}; // Custom trackball led soldered on the right half, not part of the standard RGB matrix.
 // Highlight specific LEDs when a keyboard layer is active.
 //
-// layer                           HSV(hue, sat, val)                         leds
+// { .layer = ..., .color = HSV(hue, sat, val), .leds = ..., .count = ARRAY_SIZE(...) }
 // DEFINE_LAYER_LED_GROUPS(
-//     LAYER_LED_GROUP(LAYER_NAV, HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), nav_highlight_leds),  // red
-//     LAYER_LED_GROUP(LAYER_SYM, HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), sym_highlight_leds)  // yellow
+//     { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = nav_highlight_leds, .count = ARRAY_SIZE(nav_highlight_leds) },  // red
+//     { .layer = LAYER_SYM, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = sym_highlight_leds, .count = ARRAY_SIZE(sym_highlight_leds) }  // yellow
 // );
 
 // Same as above, but keyed on pointing device mode instead of layers.
 // Active while a trackball mode (volume, zoom, etc.) is active.
 //
-// mode_flag            HSV(hue, sat, val)                         leds
+// { .pointing_mode = ..., .color = HSV(hue, sat, val), .leds = ..., .count = ARRAY_SIZE(...) }
 // Uncomment DEFINE_PD_MODE_LED_GROUPS(...) below if you want one or more
 // per-mode LED highlights. If you leave it commented out, shared defaults keep
 // the exported table empty.
 // DEFINE_PD_MODE_LED_GROUPS(
-//     PD_MODE_LED_GROUP(PD_MODE_VOLUME, HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), trackball_led)
+//     { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = trackball_led, .count = ARRAY_SIZE(trackball_led) }
 // );
 
 // ─── Auto-mouse timeout fade ────────────────────────────────────────────────

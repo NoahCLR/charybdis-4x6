@@ -28,18 +28,18 @@
 // ─── RGB config types ───────────────────────────────────────────────────────
 
 typedef struct {
-    pd_mode_mask_t mode_flag;
+    pd_mode_mask_t pointing_mode;
     hsv_t          color;
 } pd_mode_color_t;
 
 typedef enum {
-    ALL_KEYS                       = 0,
-    KEYS_MAPPED_ON_THIS_LAYER_ONLY = 1u << 0,
-} layer_color_flags_t;
+    ALL_KEYS = 0,
+    KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+} layer_color_mode_t;
 
 typedef struct {
     hsv_t   color;
-    uint8_t flags;
+    uint8_t mode;
 } layer_color_config_t;
 
 typedef enum {
@@ -67,7 +67,7 @@ typedef struct {
 } layer_led_group_t;
 
 typedef struct {
-    pd_mode_mask_t mode_flag;
+    pd_mode_mask_t pointing_mode;
     hsv_t          color;
     const uint8_t *leds;
     uint8_t        count;

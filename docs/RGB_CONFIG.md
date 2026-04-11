@@ -45,13 +45,16 @@ quick reference when picking hue values:
 `layer_colors[]` is indexed by the layer enum values from the active keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
-Each row is a `layer_color_config_t` with a color and per-layer render flags:
+Each row is a `layer_color_config_t` with a color and per-layer render mode:
 
 ```c
-[LAYER_NUM] = LAYER_COLOR(HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), KEYS_MAPPED_ON_THIS_LAYER_ONLY),
+[LAYER_NUM] = {
+    .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+},
 ```
 
-The available flags are:
+The available modes are:
 
 - `ALL_KEYS`: paint the whole layer as a solid color wash
 - `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: paint only LEDs whose key position has a
@@ -73,12 +76,17 @@ useful for:
 `pd_mode_colors[]` defines the right-half overlay color for each active
 pointing-device mode.
 
-In `rgb_config.c`, use `DEFINE_PD_MODE_COLORS(...);` together with
-`PD_MODE_COLOR(...)` so the matching `pd_mode_color_count` is derived
-automatically.
+In `rgb_config.c`, use `DEFINE_PD_MODE_COLORS(...);` so the matching
+`pd_mode_color_count` is derived automatically.
 
 Each row is keyed by a `PD_MODE_*` flag rather than by array index. That means
 the color mapping follows the mode flag itself, not the order of `pd_modes[]`.
+
+Use rows like:
+
+```c
+{ .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },
+```
 
 Use this table when you want `ARROW_MODE`, `VOLUME_MODE`, `PINCH_MODE`, and the
 other pd modes to have distinct overlay colors.
@@ -100,8 +108,11 @@ Each row contains:
 - a pointer to an LED index array
 - the LED count
 
-Use `LAYER_LED_GROUP(layer, HSV(...), leds)` to derive the LED count from the
-LED index array automatically.
+Use rows like:
+
+```c
+{ .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = nav_highlight_leds, .count = ARRAY_SIZE(nav_highlight_leds) },
+```
 
 This is useful for things like:
 
@@ -125,8 +136,11 @@ As above, use:
 - leave the section commented out when no per-mode LED groups are enabled
 - `DEFINE_PD_MODE_LED_GROUPS(...);` when you want one or more authored rows
 
-Use `PD_MODE_LED_GROUP(mode, HSV(...), leds)` to derive the LED count from the
-LED index array automatically.
+Use rows like:
+
+```c
+{ .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = trackball_led, .count = ARRAY_SIZE(trackball_led) },
+```
 
 ### `automouse_fade_end_config`
 

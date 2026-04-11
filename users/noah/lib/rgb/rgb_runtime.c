@@ -95,7 +95,7 @@ void noah_rgb_runtime_post_init(void) {
 #    ifdef POINTING_DEVICE_ENABLE
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         for (uint8_t c = 0; c < pd_mode_color_count; c++) {
-            if (pd_mode_colors[c].mode_flag == pd_modes[i].mode_flag) {
+            if (pd_mode_colors[c].pointing_mode == pd_modes[i].mode_flag) {
                 pd_mode_rgb[i] = hsv_to_rgb(pd_mode_colors[c].color);
                 break;
             }
@@ -117,7 +117,7 @@ static bool rgb_runtime_layer_has_solid_color(uint8_t layer) {
 }
 
 static bool rgb_runtime_layer_paints_only_keys_present_on_this_layer(uint8_t layer) {
-    return (layer_colors[layer].flags & KEYS_MAPPED_ON_THIS_LAYER_ONLY) != 0;
+    return layer_colors[layer].mode == KEYS_MAPPED_ON_THIS_LAYER_ONLY;
 }
 
 static bool rgb_runtime_keycode_is_mapped(uint16_t keycode) {
@@ -494,7 +494,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     }
 
     for (uint8_t g = 0; g < pd_mode_led_group_count; g++) {
-        if (pd_mode_active(pd_mode_led_groups[g].mode_flag)) {
+        if (pd_mode_active(pd_mode_led_groups[g].pointing_mode)) {
             rgb_t grp_rgb = hsv_to_rgb(pd_mode_led_groups[g].color);
             rgb_set_led_group(pd_mode_led_groups[g].leds, pd_mode_led_groups[g].count, led_min, led_max, grp_rgb);
             painted |= rgb_runtime_led_group_intersects(pd_mode_led_groups[g].leds, pd_mode_led_groups[g].count, led_min, led_max);
