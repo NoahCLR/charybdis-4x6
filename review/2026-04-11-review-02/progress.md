@@ -297,6 +297,66 @@ Verification result:
 - targeted slot, transition, scenario, and integration tests passed
 - feature-gate compile checks passed
 
+## 2026-04-11 Shared Slot Result Surface
+
+Completed in this pass:
+
+- Added a shared handled-key slot-result module in
+  [`users/noah/lib/key/key_runtime_slot_result.h`](../../users/noah/lib/key/key_runtime_slot_result.h)
+  and
+  [`users/noah/lib/key/key_runtime_slot_result.c`](../../users/noah/lib/key/key_runtime_slot_result.c)
+  so press, release, scan, interrupt, and pending multi-tap flush paths all
+  adapt into one common result shape before transition planning.
+- Rewired
+  [`users/noah/lib/key/key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c)
+  to consume that shared slot-result surface instead of separately translating
+  `key_runtime_slot_press_plan_t`, `key_runtime_slot_release_event_t`, and
+  `key_runtime_slot_scan_event_t`.
+- Kept the existing press/release/scan local helper protocols intact under the
+  new adapter layer so this pass changes the architectural boundary without
+  trying to collapse the reducer internals in the same step.
+- Wired the new module into the canonical userspace build manifest in
+  [`users/noah/source_manifest.mk`](../../users/noah/source_manifest.mk) and the
+  affected host runners:
+  - [`run_key_runtime_slot_tests.sh`](../../tests/host/run_key_runtime_slot_tests.sh)
+  - [`run_key_runtime_transition_tests.sh`](../../tests/host/run_key_runtime_transition_tests.sh)
+  - [`run_key_runtime_scenario_tests.sh`](../../tests/host/run_key_runtime_scenario_tests.sh)
+  - [`run_key_runtime_modifier_hold_integration_tests.sh`](../../tests/host/run_key_runtime_modifier_hold_integration_tests.sh)
+  - [`run_pd_mode_key_runtime_integration_tests.sh`](../../tests/host/run_pd_mode_key_runtime_integration_tests.sh)
+- Added direct host coverage in
+  [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  for the new shared slot-result adapter paths so the new boundary is tested
+  independently of the transition planner.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the new slot-result layer.
+
+Why this pass landed now:
+
+- it removes the last major place where `key_runtime_transition.c` had to know
+  several different handled-key result structs
+- it makes the remaining handled-key reducer work narrower: the next pass can
+  collapse the local press/release/scan protocols behind one shared slot-result
+  surface instead of also changing the transition layer again
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+
 ## 2026-04-11 Slot Lifecycle Phase Extraction
 
 Completed in this pass:
