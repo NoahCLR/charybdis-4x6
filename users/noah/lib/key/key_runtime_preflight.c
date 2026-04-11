@@ -16,7 +16,8 @@
 #include "../state/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
-    active_key_state_t *slot = key_runtime_primary_slot();
+    active_key_state_t *slot = key_runtime_find_slot_by_position(record->event.key);
+    bool                other_slot_active = false;
 
     keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
@@ -34,15 +35,28 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    if (record->event.pressed && key_runtime_slot_active(slot) && !key_runtime_slot_matches(slot, keycode, record->event.key)) {
+    if (record->event.pressed) {
+        for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+            active_key_state_t *candidate = key_runtime_slot_at(index);
+
+            if (!key_runtime_slot_active(candidate) || key_runtime_keypos_equal(candidate->key_pos, record->event.key)) {
+                continue;
+            }
+
+            other_slot_active = true;
+            break;
+        }
+    }
+
+    if (other_slot_active) {
         key_runtime_transition_plan_t plan;
         key_runtime_transition_plan_init(&plan);
-        key_runtime_transition_interrupt_active_key_on_other_press(&plan);
+        key_runtime_transition_interrupt_active_keys_on_other_press(record->event.key, &plan);
         key_runtime_trace_plan("preflight:interrupt_active_key", &plan);
         key_runtime_transition_execute_plan(&plan);
     }
 
-    if (multi_tap_active(&multi_tap) && record->event.pressed && keycode != multi_tap.keycode) {
+    if (multi_tap_active(&multi_tap) && record->event.pressed && !multi_tap_matches(&multi_tap, keycode, record->event.key)) {
         key_runtime_transition_plan_t plan;
         key_runtime_transition_plan_init(&plan);
         key_runtime_transition_flush_multi_tap(&plan);

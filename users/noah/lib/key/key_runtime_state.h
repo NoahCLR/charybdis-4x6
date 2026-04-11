@@ -3,9 +3,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Shared active-slot and multi-tap state for the split key runtime modules.
-// The slot container currently has capacity 1, but the helper surface keeps
-// higher-level code off the raw storage layout so the runtime can grow toward
-// per-key state without another global-state sweep.
+// The helper surface keeps higher-level code off the raw storage layout so the
+// runtime can grow toward richer per-key state without another global-state
+// sweep.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -20,10 +20,15 @@ void noah_key_runtime_scan(void);
 
 uint8_t             behavior_get_layer(uint16_t keycode);
 bool                is_layer_key(uint16_t keycode);
+bool                key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs);
 active_key_state_t *key_runtime_primary_slot(void);
+active_key_state_t *key_runtime_slot_at(uint8_t index);
+active_key_state_t *key_runtime_first_active_slot(void);
 bool                key_runtime_slot_active(const active_key_state_t *slot);
 bool                key_runtime_slot_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos);
 active_key_state_t *key_runtime_find_slot_by_position(keypos_t key_pos);
+active_key_state_t *key_runtime_find_free_slot(void);
+active_key_state_t *key_runtime_select_slot_for_press(keypos_t key_pos);
 bool                active_key_matches(uint16_t keycode, keypos_t key_pos);
 bool                key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot);
 bool                key_runtime_activate_pending_fallback_hold(void);

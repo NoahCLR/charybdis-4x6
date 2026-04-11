@@ -31,7 +31,13 @@ bool key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot) {
 }
 
 bool key_runtime_activate_pending_fallback_hold(void) {
-    return key_runtime_slot_activate_pending_fallback_hold(key_runtime_primary_slot());
+    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        if (key_runtime_slot_activate_pending_fallback_hold(key_runtime_slot_at(index))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 handled_key_view_t handled_key_lookup(uint16_t keycode) {
@@ -110,8 +116,8 @@ uint16_t handled_key_tap_action(handled_key_view_t key) {
     return key.behavior.keycode;
 }
 
-bool handled_key_multi_tap_repress(handled_key_view_t key, uint16_t keycode) {
-    return multi_tap_active(&multi_tap) && multi_tap.keycode == keycode && key.behavior.has_multi_tap;
+bool handled_key_multi_tap_repress(handled_key_view_t key, uint16_t keycode, keypos_t key_pos) {
+    return multi_tap_matches(&multi_tap, keycode, key_pos) && key.behavior.has_multi_tap;
 }
 
 uint16_t handled_key_advance_multi_tap(uint16_t keycode) {

@@ -785,13 +785,54 @@ static void test_mismatched_release_releases_owned_held_action(void) {
     CHECK(test_calls[0].key_pos.col == record.event.key.col);
 }
 
-static void test_press_flushes_previous_tap_and_registers_immediate_hold(void) {
+static void test_press_uses_free_secondary_slot_before_flushing_previous_tap(void) {
     key_runtime_transition_plan_t plan;
     keyrecord_t                   record = test_record(test_keypos(4, 1), true);
     handled_key_view_t            key    = test_handled_key(TEST_NEW_KEY);
 
     test_reset_stubs();
     active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
+
+    key.behavior.single.hold = (hold_behavior_t){
+        .present = true,
+        .action  = TEST_IMMEDIATE_HOLD,
+        .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(TEST_NEW_KEY, &record, key, false, &plan));
+
+    CHECK(plan.count == 1);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
+    CHECK(plan.effects[0].data.held_action.action == TEST_IMMEDIATE_HOLD);
+    CHECK(active_key.keycode == TEST_PREVIOUS_KEY);
+    CHECK(active_key.tap_action == TEST_PREVIOUS_TAP_ACTION);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].keycode == TEST_NEW_KEY);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].key_pos.row == record.event.key.row);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].key_pos.col == record.event.key.col);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].held_action_keycode == TEST_IMMEDIATE_HOLD);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(test_call_count == 1);
+    CHECK(test_calls[0].kind == TEST_CALL_HELD_REGISTER);
+    CHECK(test_calls[0].action == TEST_IMMEDIATE_HOLD);
+}
+
+static void test_press_flushes_previous_tap_when_all_slots_are_busy(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   record = test_record(test_keypos(4, 1), true);
+    handled_key_view_t            key    = test_handled_key(TEST_NEW_KEY);
+
+    test_reset_stubs();
+    active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
+    noah_runtime_shared_state.key.active_slots[1] = (active_key_state_t){
+        .timer       = fake_time,
+        .keycode     = TEST_PLAIN_KEY,
+        .key_pos     = test_keypos(0, 2),
+        .tap_action  = TEST_FALLBACK_TAP_ACTION,
+        .hold_fired  = true,
+        .held_action_keycode = TEST_PLAIN_KEY,
+    };
 
     key.behavior.single.hold = (hold_behavior_t){
         .present = true,
@@ -811,6 +852,7 @@ static void test_press_flushes_previous_tap_and_registers_immediate_hold(void) {
     CHECK(active_key.key_pos.row == record.event.key.row);
     CHECK(active_key.key_pos.col == record.event.key.col);
     CHECK(active_key.held_action_keycode == TEST_IMMEDIATE_HOLD);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].keycode == TEST_PLAIN_KEY);
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 2);
@@ -818,6 +860,61 @@ static void test_press_flushes_previous_tap_and_registers_immediate_hold(void) {
     CHECK(test_calls[0].action == TEST_PREVIOUS_TAP_ACTION);
     CHECK(test_calls[1].kind == TEST_CALL_HELD_REGISTER);
     CHECK(test_calls[1].action == TEST_IMMEDIATE_HOLD);
+}
+
+static void test_release_secondary_slot_leaves_primary_slot_active(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   record = test_record(test_keypos(4, 2), false);
+    handled_key_view_t            key    = test_handled_key(TEST_NEW_KEY);
+
+    test_reset_stubs();
+    active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
+    noah_runtime_shared_state.key.active_slots[1] = (active_key_state_t){
+        .timer         = (uint16_t)(fake_time - 40),
+        .keycode       = TEST_NEW_KEY,
+        .key_pos       = record.event.key,
+        .tap_action    = TEST_FALLBACK_TAP_ACTION,
+        .tap_hold_term = 120,
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_release(TEST_NEW_KEY, &record, key, &plan));
+
+    CHECK(plan.count == 1);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
+    CHECK(plan.effects[0].data.action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(active_key.keycode == TEST_PREVIOUS_KEY);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].keycode == KC_NO);
+}
+
+static void test_scan_fires_hold_for_secondary_slot(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    active_key = (active_key_state_t){
+        .timer      = fake_time,
+        .keycode    = TEST_PREVIOUS_KEY,
+        .key_pos    = test_keypos(1, 1),
+        .hold_fired = true,
+    };
+    noah_runtime_shared_state.key.active_slots[1] = (active_key_state_t){
+        .timer         = (uint16_t)(fake_time - 170),
+        .keycode       = TEST_NEW_KEY,
+        .key_pos       = test_keypos(6, 3),
+        .tap_hold_term = 120,
+        .hold          = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 2);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START);
+    CHECK(plan.effects[0].data.repeat.key_pos.row == noah_runtime_shared_state.key.active_slots[1].key_pos.row);
+    CHECK(plan.effects[0].data.repeat.key_pos.col == noah_runtime_shared_state.key.active_slots[1].key_pos.col);
+    CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].repeat_binding_active);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].hold_fired);
 }
 
 static void test_release_pending_multi_tap_hold_registers_then_unregisters_held_action(void) {
@@ -836,6 +933,7 @@ static void test_release_pending_multi_tap_hold_registers_then_unregisters_held_
 
     multi_tap = (multi_tap_t){
         .keycode       = TEST_MULTI_TAP_KEY,
+        .key_pos       = record.event.key,
         .timer         = (uint16_t)(fake_time - 150),
         .count         = 2,
         .pending_hold  = true,
@@ -882,6 +980,7 @@ static void test_scan_promotes_pending_multi_tap_hold(void) {
 
     multi_tap = (multi_tap_t){
         .keycode       = TEST_MULTI_TAP_KEY,
+        .key_pos       = test_keypos(6, 2),
         .timer         = (uint16_t)(fake_time - 150),
         .count         = 2,
         .pending_hold  = true,
@@ -1086,6 +1185,7 @@ static void test_scan_pending_multi_tap_long_hold_releases_layer_before_lock(voi
 
     multi_tap = (multi_tap_t){
         .keycode       = TEST_MULTI_TAP_KEY,
+        .key_pos       = active_key.key_pos,
         .timer         = (uint16_t)(fake_time - 250),
         .count         = 2,
         .pending_hold  = true,
@@ -1126,7 +1226,10 @@ int main(void) {
     test_release_hold_prefers_long_hold_after_longer_term();
     test_release_repeat_hold_releases_owned_state();
     test_mismatched_release_releases_owned_held_action();
-    test_press_flushes_previous_tap_and_registers_immediate_hold();
+    test_press_uses_free_secondary_slot_before_flushing_previous_tap();
+    test_press_flushes_previous_tap_when_all_slots_are_busy();
+    test_release_secondary_slot_leaves_primary_slot_active();
+    test_scan_fires_hold_for_secondary_slot();
     test_release_pending_multi_tap_hold_registers_then_unregisters_held_action();
     test_scan_promotes_pending_multi_tap_hold();
     test_scan_starts_repeat_hold_at_threshold();

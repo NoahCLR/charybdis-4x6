@@ -3,19 +3,38 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Shared slot storage helpers for the split key runtime modules.
-// The slot container currently has capacity 1, but this module centralizes
-// slot lookup and lifecycle so higher-level code does not depend on the raw
-// shared-state layout.
+// This module centralizes slot lookup and lifecycle so higher-level code does
+// not depend on the raw shared-state layout.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_state.h"
 
-static bool key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs) {
+bool key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
 }
 
 active_key_state_t *key_runtime_primary_slot(void) {
     return &noah_runtime_shared_state.key.active_slots[0];
+}
+
+active_key_state_t *key_runtime_slot_at(uint8_t index) {
+    if (index >= KEY_RUNTIME_ACTIVE_SLOT_CAPACITY) {
+        return NULL;
+    }
+
+    return &noah_runtime_shared_state.key.active_slots[index];
+}
+
+active_key_state_t *key_runtime_first_active_slot(void) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        active_key_state_t *slot = key_runtime_slot_at(index);
+
+        if (key_runtime_slot_active(slot)) {
+            return slot;
+        }
+    }
+
+    return NULL;
 }
 
 bool key_runtime_slot_active(const active_key_state_t *slot) {
@@ -27,13 +46,46 @@ bool key_runtime_slot_matches(const active_key_state_t *slot, uint16_t keycode, 
 }
 
 active_key_state_t *key_runtime_find_slot_by_position(keypos_t key_pos) {
-    active_key_state_t *slot = key_runtime_primary_slot();
+    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        active_key_state_t *slot = key_runtime_slot_at(index);
 
-    return key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->key_pos, key_pos) ? slot : NULL;
+        if (key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->key_pos, key_pos)) {
+            return slot;
+        }
+    }
+
+    return NULL;
+}
+
+active_key_state_t *key_runtime_find_free_slot(void) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        active_key_state_t *slot = key_runtime_slot_at(index);
+
+        if (!key_runtime_slot_active(slot)) {
+            return slot;
+        }
+    }
+
+    return NULL;
+}
+
+active_key_state_t *key_runtime_select_slot_for_press(keypos_t key_pos) {
+    active_key_state_t *slot = key_runtime_find_slot_by_position(key_pos);
+
+    if (slot) {
+        return slot;
+    }
+
+    slot = key_runtime_find_free_slot();
+    if (slot) {
+        return slot;
+    }
+
+    return key_runtime_primary_slot();
 }
 
 bool active_key_matches(uint16_t keycode, keypos_t key_pos) {
-    return key_runtime_slot_matches(key_runtime_primary_slot(), keycode, key_pos);
+    return key_runtime_slot_matches(key_runtime_find_slot_by_position(key_pos), keycode, key_pos);
 }
 
 void key_runtime_slot_reset(active_key_state_t *slot) {

@@ -48,6 +48,7 @@
 
 typedef struct {
     uint16_t        keycode;        // the key being tracked (KC_NO = idle)
+    keypos_t        key_pos;        // physical key that owns the current tap sequence
     uint16_t        timer;          // when the current pending window started
     uint8_t         count;          // taps counted so far (0 = idle)
     uint16_t        single_action;  // what to send if count stays at 1
@@ -68,8 +69,9 @@ bool multi_tap_active(const multi_tap_t *mt);
 bool multi_tap_pending_hold(const multi_tap_t *mt);
 bool multi_tap_expired(const multi_tap_t *mt);
 bool multi_tap_hold_elapsed(const multi_tap_t *mt);
+bool multi_tap_matches(const multi_tap_t *mt, uint16_t keycode, keypos_t key_pos);
 
-void     multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term);
+void     multi_tap_begin(multi_tap_t *mt, uint16_t keycode, keypos_t key_pos, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term);
 void     multi_tap_flush(multi_tap_t *mt, key_behavior_step_t (*lookup)(uint16_t, uint8_t), void (*dispatch)(uint16_t, const multi_tap_t *));
 uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode, key_behavior_step_t (*lookup)(uint16_t, uint8_t), bool (*has_more)(uint16_t, uint8_t));
 uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode, bool (*has_more)(uint16_t, uint8_t), uint8_t *repeat_count);

@@ -104,9 +104,11 @@ Completed in this pass:
 - Swept `users/noah/lib/` for remaining hard-coded pd-mode identity checks after the trait refactor and confirmed that the remaining named-mode references are manifest/default definitions rather than central policy branches.
 - Started Phase 4 of the key-runtime refactor by replacing the raw `active_key` field layout with a slot container in shared state:
   - `users/noah/lib/state/runtime_shared_state.h` now stores `active_slots[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY]`
-  - the current slot capacity remains `1`, so behavior is unchanged while the storage shape is no longer singular by construction
+  - slot capacity is now `2`, so the runtime can keep two handled-key state slots alive concurrently instead of forcing every new key through the primary slot
 - Added a dedicated slot helper module in `users/noah/lib/key/key_runtime_slot.c` for:
   - primary slot access
+  - first-active slot lookup
+  - free-slot lookup
   - slot-active and slot-match queries
   - slot reset and slot tracking
 - Narrowed `users/noah/lib/key/key_runtime.c` back to handled-key behavior helpers plus the fallback-hold activation bridge that still depends on `held_action`
@@ -115,6 +117,17 @@ Completed in this pass:
   - `users/noah/lib/key/key_runtime_preflight.c`
   - `users/noah/lib/key/key_runtime_feedback.c`
   - `users/noah/lib/key/key_runtime_transition.c`
+- Made `multi_tap` physical-key-aware by adding `key_pos` ownership in:
+  - `users/noah/lib/key/multi_tap_engine.h`
+  - `users/noah/lib/key/multi_tap_engine.c`
+- Added direct overlap coverage for the two-slot runtime in:
+  - `tests/host/key_runtime_transition_test.c`
+  - `tests/host/key_runtime_feedback_test.c`
+  This now covers:
+  - using a free secondary slot instead of eagerly flushing the first key
+  - reclaiming/flushing only when both slots are already occupied
+  - releasing a secondary-slot key without disturbing the primary slot
+  - scanning and feedback for a non-primary active slot
 - Updated host/runtime wiring for the new slot module:
   - `tests/host/run_key_runtime_feedback_tests.sh`
   - `tests/host/run_key_runtime_preflight_tests.sh`
@@ -149,6 +162,7 @@ Verification completed in this pass:
 - `sh tests/host/run_rgb_layer_render_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
 Follow-up wiring completed during verification:
 
@@ -157,4 +171,4 @@ Follow-up wiring completed during verification:
 
 Next recommended step:
 
-- continue Phase 4 by teaching the runtime to allocate and resolve slots by physical key position instead of always using the primary slot, then add overlap tests for two concurrent handled keys before increasing slot capacity beyond `1`.
+- continue Phase 4 by removing the remaining global `multi_tap` bottleneck and deciding whether multi-tap/hold ownership should become per-slot state, so overlapping advanced tap chains do not still collapse back to one shared runtime thread.

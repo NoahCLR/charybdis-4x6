@@ -136,6 +136,10 @@ bool multi_tap_active(const multi_tap_t *mt) {
     return mt->count > 0;
 }
 
+bool multi_tap_matches(const multi_tap_t *mt, uint16_t keycode, keypos_t key_pos) {
+    return multi_tap_active(mt) && mt->keycode == keycode && mt->key_pos.row == key_pos.row && mt->key_pos.col == key_pos.col;
+}
+
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     *plan = (key_runtime_transition_plan_t){0};
 }
@@ -146,6 +150,12 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {
     (void)plan;
+}
+
+void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
+    (void)key_pos;
+    interrupted_active_key = true;
+    plan->count++;
 }
 
 void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_transition_plan_t *plan) {

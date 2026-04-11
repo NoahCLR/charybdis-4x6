@@ -138,6 +138,19 @@ static void test_non_layer_held_action_has_no_preview_layer(void) {
     CHECK(key_feedback_preview_layer() == UINT8_MAX);
 }
 
+static void test_feedback_falls_back_to_secondary_active_slot(void) {
+    test_reset_state();
+
+    noah_runtime_shared_state.key.active_slots[1] = (active_key_state_t){
+        .keycode             = KC_RIGHT_ALT,
+        .held_action_keycode = SAFE_RANGE + 1,
+    };
+
+    uint8_t flags = key_feedback_pack();
+    CHECK(key_feedback_flags_hold_active(flags));
+    CHECK(key_feedback_flags_level_flash(flags));
+}
+
 int main(void) {
     test_non_passthrough_held_action_flashes();
     test_repeat_hold_flashes_while_active();
@@ -145,6 +158,7 @@ int main(void) {
     test_momentary_hold_preview_layer_is_exposed_before_threshold();
     test_momentary_hold_preview_layer_clears_once_layer_is_active();
     test_non_layer_held_action_has_no_preview_layer();
+    test_feedback_falls_back_to_secondary_active_slot();
 
     puts("key_runtime_feedback host tests passed");
     return 0;

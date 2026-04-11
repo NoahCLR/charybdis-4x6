@@ -44,8 +44,18 @@ static uint8_t key_feedback_layer_hint_from_action(uint16_t action) {
     return QK_MOMENTARY_GET_LAYER(action);
 }
 
+static const active_key_state_t *key_feedback_slot(void) {
+    active_key_state_t *primary_slot = key_runtime_primary_slot();
+
+    if (key_runtime_slot_active(primary_slot)) {
+        return primary_slot;
+    }
+
+    return key_runtime_first_active_slot();
+}
+
 uint8_t key_feedback_preview_layer(void) {
-    const active_key_state_t *slot = key_runtime_primary_slot();
+    const active_key_state_t *slot = key_feedback_slot();
 
     if (!key_runtime_slot_active(slot) || slot->implicit_hold || slot->fallback_hold_pending) {
         return UINT8_MAX;
@@ -85,7 +95,7 @@ uint8_t key_feedback_pack(void) {
         flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
     }
 
-    const active_key_state_t *slot      = key_runtime_primary_slot();
+    const active_key_state_t *slot      = key_feedback_slot();
     bool                      ak_active = key_runtime_slot_active(slot);
     if (!ak_active) return flags;
 

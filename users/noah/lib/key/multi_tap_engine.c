@@ -6,6 +6,10 @@
 
 #include "multi_tap_engine.h"
 
+static bool multi_tap_keypos_equal(keypos_t lhs, keypos_t rhs) {
+    return lhs.row == rhs.row && lhs.col == rhs.col;
+}
+
 void multi_tap_reset(multi_tap_t *mt) {
     mt->count                     = 0;
     mt->keycode                   = KC_NO;
@@ -38,10 +42,15 @@ bool multi_tap_hold_elapsed(const multi_tap_t *mt) {
     return mt->pending_hold && hold_fires_at_threshold(mt->hold) && timer_elapsed(mt->timer) >= mt->tap_hold_term;
 }
 
-void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term) {
+bool multi_tap_matches(const multi_tap_t *mt, uint16_t keycode, keypos_t key_pos) {
+    return multi_tap_active(mt) && mt->keycode == keycode && multi_tap_keypos_equal(mt->key_pos, key_pos);
+}
+
+void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, keypos_t key_pos, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term) {
     mt->count                     = 1;
     mt->timer                     = timer_read();
     mt->keycode                   = keycode;
+    mt->key_pos                   = key_pos;
     mt->single_action             = single_action;
     mt->pending_hold              = false;
     mt->tap_action                = KC_NO;

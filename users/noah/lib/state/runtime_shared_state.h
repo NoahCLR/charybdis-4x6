@@ -34,7 +34,7 @@ typedef struct {
     hold_behavior_t long_hold;
 } active_key_state_t;
 
-#define KEY_RUNTIME_ACTIVE_SLOT_CAPACITY 1
+#define KEY_RUNTIME_ACTIVE_SLOT_CAPACITY 2
 
 typedef active_key_state_t key_runtime_slot_state_t;
 
