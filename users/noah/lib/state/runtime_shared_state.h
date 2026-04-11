@@ -55,7 +55,7 @@ typedef struct {
 
 typedef struct {
     key_runtime_slot_state_t     active_slots[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY];
-    multi_tap_t                  multi_tap;
+    multi_tap_t                  multi_tap_slots[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY];
     key_runtime_feedback_state_t feedback;
 } key_runtime_shared_state_t;
 

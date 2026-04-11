@@ -12,7 +12,11 @@ runtime_shared_state_t noah_runtime_shared_state = {
                     [0] = (key_runtime_slot_state_t)ACTIVE_KEY_STATE_INIT,
                     [1] = (key_runtime_slot_state_t)ACTIVE_KEY_STATE_INIT,
                 },
-            .multi_tap = {0},
+            .multi_tap_slots =
+                {
+                    [0] = {0},
+                    [1] = {0},
+                },
         },
     .pd = {0},
 };

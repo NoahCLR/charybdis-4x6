@@ -11,6 +11,7 @@ static bool    suppress_default;
 static bool    tracked_physical_event;
 static bool    handled_key_is_handled;
 static bool    interrupted_active_key;
+static bool    flushed_multi_tap;
 static uint8_t executed_transition_plan_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -50,6 +51,7 @@ static void test_reset_state(void) {
     tracked_physical_event         = false;
     handled_key_is_handled         = false;
     interrupted_active_key         = false;
+    flushed_multi_tap              = false;
     executed_transition_plan_count = 0;
 }
 
@@ -149,7 +151,8 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 }
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {
-    (void)plan;
+    flushed_multi_tap = true;
+    plan->count++;
 }
 
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
@@ -261,11 +264,44 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
     CHECK(executed_transition_plan_count == 1);
 }
 
+static void test_handled_press_keeps_foreign_multi_tap_pending(void) {
+    keyrecord_t record = test_record(test_keypos(3, 4), true);
+
+    test_reset_state();
+    handled_key_is_handled = true;
+    noah_runtime_shared_state.key.multi_tap_slots[0] = (multi_tap_t){
+        .keycode = KC_RIGHT_ALT,
+        .key_pos = test_keypos(3, 3),
+        .count   = 1,
+    };
+
+    CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
+    CHECK(!flushed_multi_tap);
+    CHECK(executed_transition_plan_count == 0);
+}
+
+static void test_non_handled_press_flushes_foreign_multi_tap(void) {
+    keyrecord_t record = test_record(test_keypos(3, 4), true);
+
+    test_reset_state();
+    noah_runtime_shared_state.key.multi_tap_slots[0] = (multi_tap_t){
+        .keycode = KC_RIGHT_ALT,
+        .key_pos = test_keypos(3, 3),
+        .count   = 1,
+    };
+
+    CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
+    CHECK(flushed_multi_tap);
+    CHECK(executed_transition_plan_count == 1);
+}
+
 int main(void) {
     test_active_handled_release_bypasses_modifier_suppression();
     test_unrelated_release_stays_suppressed();
     test_inactive_handled_release_bypasses_modifier_suppression();
     test_other_press_interrupts_active_key_through_transition_plan();
+    test_handled_press_keeps_foreign_multi_tap_pending();
+    test_non_handled_press_flushes_foreign_multi_tap();
 
     puts("key_runtime_preflight host tests passed");
     return 0;

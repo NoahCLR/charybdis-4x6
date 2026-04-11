@@ -90,9 +90,15 @@ uint8_t key_feedback_pack(void) {
         return flags;
     }
 
-    // Multi-tap pending: window is open, not yet in pending-hold state.
-    if (multi_tap_active(&multi_tap) && !multi_tap_pending_hold(&multi_tap)) {
-        flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+    // Multi-tap pending: at least one slot still has an open tap window that
+    // has not crossed into a pending hold.
+    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        multi_tap_t *slot_multi_tap = key_runtime_multi_tap_slot_at(index);
+
+        if (multi_tap_active(slot_multi_tap) && !multi_tap_pending_hold(slot_multi_tap)) {
+            flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+            break;
+        }
     }
 
     const active_key_state_t *slot      = key_feedback_slot();

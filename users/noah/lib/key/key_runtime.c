@@ -116,10 +116,14 @@ uint16_t handled_key_tap_action(handled_key_view_t key) {
     return key.behavior.keycode;
 }
 
-bool handled_key_multi_tap_repress(handled_key_view_t key, uint16_t keycode, keypos_t key_pos) {
-    return multi_tap_matches(&multi_tap, keycode, key_pos) && key.behavior.has_multi_tap;
+bool handled_key_multi_tap_repress(handled_key_view_t key, multi_tap_t *mt, uint16_t keycode, keypos_t key_pos) {
+    return mt && multi_tap_matches(mt, keycode, key_pos) && key.behavior.has_multi_tap;
 }
 
-uint16_t handled_key_advance_multi_tap(uint16_t keycode) {
-    return multi_tap_advance(&multi_tap, keycode, key_behavior_step_lookup, key_behavior_has_more_taps);
+uint16_t handled_key_advance_multi_tap(multi_tap_t *mt, uint16_t keycode) {
+    if (!mt) {
+        return KC_NO;
+    }
+
+    return multi_tap_advance(mt, keycode, key_behavior_step_lookup, key_behavior_has_more_taps);
 }

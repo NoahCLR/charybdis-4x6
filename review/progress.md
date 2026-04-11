@@ -140,6 +140,29 @@ Completed in this pass:
 - Fixed test harness coupling to the old storage layout in:
   - `tests/host/pd_mode_key_runtime_integration_test.c`
   - `tests/host/key_runtime_preflight_test.c`
+- Continued Phase 4 by removing the last single-threaded `multi_tap` bottleneck from the handled-key runtime:
+  - `users/noah/lib/state/runtime_shared_state.h` now stores `multi_tap_slots[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY]` instead of one shared `multi_tap`
+  - `users/noah/lib/key/key_runtime_slot.c` now owns the slot-to-multi-tap mapping helpers and press-slot selection policy for:
+    - reusing a slot's own pending tap chain by `keypos_t`
+    - preferring truly free slots first
+    - reclaiming an inactive slot with a pending tap chain before flushing an unrelated active slot
+  - `users/noah/lib/key/key_runtime_transition.c` now resolves multi-tap state per slot for:
+    - repress/advance
+    - release-to-pending-multi-tap promotion
+    - pending-hold release
+    - scan-time hold/long-hold promotion
+    - forced reclaim and flush
+  - `users/noah/lib/key/key_runtime_feedback.c` now reports pending multi-tap feedback across all runtime slots instead of only slot 0
+  - `users/noah/lib/key/key_runtime_preflight.c` now keeps foreign pending multi-tap chains alive for handled-key presses and only force-flushes them on non-handled presses
+- Tightened host coverage around the new slot-local multi-tap behavior:
+  - `tests/host/key_runtime_transition_test.c` now covers:
+    - flushing multiple active multi-tap slots in deterministic slot order
+    - starting an independent secondary-slot multi-tap chain while another slot already has one pending
+    - reclaiming an inactive pending-multi-tap slot before flushing an unrelated active key slot
+  - `tests/host/key_runtime_preflight_test.c` now covers the new preflight interruption contract:
+    - handled-key presses do not flush foreign pending multi-tap slots
+    - non-handled presses still do
+  - `tests/host/key_runtime_feedback_test.c` now verifies the multi-tap pending feedback bit can come from a non-primary slot
 
 Verification completed in this pass:
 
@@ -171,4 +194,4 @@ Follow-up wiring completed during verification:
 
 Next recommended step:
 
-- continue Phase 4 by removing the remaining global `multi_tap` bottleneck and deciding whether multi-tap/hold ownership should become per-slot state, so overlapping advanced tap chains do not still collapse back to one shared runtime thread.
+- continue Phase 4 by collapsing the remaining split between active-slot state and per-slot pending-multi-tap state into a single clearer per-slot FSM surface, so release-time tap deferral and pressed-key hold resolution are modeled as one owned state object instead of parallel arrays.

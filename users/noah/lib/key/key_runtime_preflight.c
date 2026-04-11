@@ -16,8 +16,10 @@
 #include "../state/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
-    active_key_state_t *slot = key_runtime_find_slot_by_position(record->event.key);
+    active_key_state_t *slot             = key_runtime_find_slot_by_position(record->event.key);
+    handled_key_view_t  handled_key      = handled_key_lookup(keycode);
     bool                other_slot_active = false;
+    bool                flush_multi_taps  = false;
 
     keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
@@ -26,7 +28,6 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         // can unregister the held action and clear feedback. That remains true
         // even after another handled key flushes active_key, because the older
         // key's owned held action is still released by physical key position.
-        handled_key_view_t handled_key = handled_key_lookup(keycode);
         if (!record->event.pressed && (key_runtime_slot_matches(slot, keycode, record->event.key) || handled_key.behavior.handled)) {
             // Let the handled-key release path run.
         } else {
@@ -56,7 +57,18 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         key_runtime_transition_execute_plan(&plan);
     }
 
-    if (multi_tap_active(&multi_tap) && record->event.pressed && !multi_tap_matches(&multi_tap, keycode, record->event.key)) {
+    if (record->event.pressed && !handled_key.behavior.handled) {
+        for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+            multi_tap_t *slot_multi_tap = key_runtime_multi_tap_slot_at(index);
+
+            if (multi_tap_active(slot_multi_tap) && !multi_tap_matches(slot_multi_tap, keycode, record->event.key)) {
+                flush_multi_taps = true;
+                break;
+            }
+        }
+    }
+
+    if (flush_multi_taps) {
         key_runtime_transition_plan_t plan;
         key_runtime_transition_plan_init(&plan);
         key_runtime_transition_flush_multi_tap(&plan);

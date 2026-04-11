@@ -151,6 +151,19 @@ static void test_feedback_falls_back_to_secondary_active_slot(void) {
     CHECK(key_feedback_flags_level_flash(flags));
 }
 
+static void test_multi_tap_pending_flag_uses_secondary_slot(void) {
+    test_reset_state();
+
+    noah_runtime_shared_state.key.multi_tap_slots[1] = (multi_tap_t){
+        .keycode = KC_RIGHT_ALT,
+        .key_pos = (keypos_t){.row = 4, .col = 2},
+        .count   = 1,
+    };
+
+    uint8_t flags = key_feedback_pack();
+    CHECK(key_feedback_flags_multi_tap_pending(flags));
+}
+
 int main(void) {
     test_non_passthrough_held_action_flashes();
     test_repeat_hold_flashes_while_active();
@@ -159,6 +172,7 @@ int main(void) {
     test_momentary_hold_preview_layer_clears_once_layer_is_active();
     test_non_layer_held_action_has_no_preview_layer();
     test_feedback_falls_back_to_secondary_active_slot();
+    test_multi_tap_pending_flag_uses_secondary_slot();
 
     puts("key_runtime_feedback host tests passed");
     return 0;
