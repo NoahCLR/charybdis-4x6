@@ -102,6 +102,29 @@ Completed in this pass:
   - `users/noah/noah_keymap.h`
   - `users/noah/noah_runtime.h`
 - Swept `users/noah/lib/` for remaining hard-coded pd-mode identity checks after the trait refactor and confirmed that the remaining named-mode references are manifest/default definitions rather than central policy branches.
+- Started Phase 4 of the key-runtime refactor by replacing the raw `active_key` field layout with a slot container in shared state:
+  - `users/noah/lib/state/runtime_shared_state.h` now stores `active_slots[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY]`
+  - the current slot capacity remains `1`, so behavior is unchanged while the storage shape is no longer singular by construction
+- Added a dedicated slot helper module in `users/noah/lib/key/key_runtime_slot.c` for:
+  - primary slot access
+  - slot-active and slot-match queries
+  - slot reset and slot tracking
+- Narrowed `users/noah/lib/key/key_runtime.c` back to handled-key behavior helpers plus the fallback-hold activation bridge that still depends on `held_action`
+- Rewired the main key-runtime flow to consume slot helpers instead of raw shared-state fields:
+  - `users/noah/lib/key/key_runtime_press.c`
+  - `users/noah/lib/key/key_runtime_preflight.c`
+  - `users/noah/lib/key/key_runtime_feedback.c`
+  - `users/noah/lib/key/key_runtime_transition.c`
+- Updated host/runtime wiring for the new slot module:
+  - `tests/host/run_key_runtime_feedback_tests.sh`
+  - `tests/host/run_key_runtime_preflight_tests.sh`
+  - `tests/host/run_key_runtime_transition_tests.sh`
+  - `tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `tests/host/run_feature_gate_compile_tests.sh`
+- Fixed test harness coupling to the old storage layout in:
+  - `tests/host/pd_mode_key_runtime_integration_test.c`
+  - `tests/host/key_runtime_preflight_test.c`
 
 Verification completed in this pass:
 
@@ -116,6 +139,10 @@ Verification completed in this pass:
 - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
 - `sh tests/host/run_pointer_layer_policy_tests.sh`
 - `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
 - `sh tests/host/run_split_runtime_sync_tests.sh`
 - `sh tests/host/run_rgb_layer_render_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
@@ -128,4 +155,4 @@ Follow-up wiring completed during verification:
 
 Next recommended step:
 
-- start Phase 4 by extracting a per-key runtime slot interface around the current single `active_key` model, so concurrent custom hold/tap behaviors can be introduced without growing more global transition special cases.
+- continue Phase 4 by teaching the runtime to allocate and resolve slots by physical key position instead of always using the primary slot, then add overlap tests for two concurrent handled keys before increasing slot capacity beyond `1`.

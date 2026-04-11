@@ -16,6 +16,8 @@
 #include "../state/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
+    active_key_state_t *slot = key_runtime_primary_slot();
+
     keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
         // Managed modifier releases normally suppress the raw QMK path, but a
@@ -24,7 +26,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         // even after another handled key flushes active_key, because the older
         // key's owned held action is still released by physical key position.
         handled_key_view_t handled_key = handled_key_lookup(keycode);
-        if (!record->event.pressed && (active_key_matches(keycode, record->event.key) || handled_key.behavior.handled)) {
+        if (!record->event.pressed && (key_runtime_slot_matches(slot, keycode, record->event.key) || handled_key.behavior.handled)) {
             // Let the handled-key release path run.
         } else {
             key_runtime_trace_message("preflight:suppress_default", "default QMK path suppressed before handled-key runtime");
@@ -32,7 +34,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    if (record->event.pressed && active_key.keycode != KC_NO && !active_key_matches(keycode, record->event.key)) {
+    if (record->event.pressed && key_runtime_slot_active(slot) && !key_runtime_slot_matches(slot, keycode, record->event.key)) {
         key_runtime_transition_plan_t plan;
         key_runtime_transition_plan_init(&plan);
         key_runtime_transition_interrupt_active_key_on_other_press(&plan);

@@ -45,26 +45,28 @@ static uint8_t key_feedback_layer_hint_from_action(uint16_t action) {
 }
 
 uint8_t key_feedback_preview_layer(void) {
-    if (active_key.keycode == KC_NO || active_key.implicit_hold || active_key.fallback_hold_pending) {
+    const active_key_state_t *slot = key_runtime_primary_slot();
+
+    if (!key_runtime_slot_active(slot) || slot->implicit_hold || slot->fallback_hold_pending) {
         return UINT8_MAX;
     }
 
-    if (active_key.held_action_keycode != KC_NO) {
+    if (slot->held_action_keycode != KC_NO) {
         // Once a held action is actually registered, the preview window is
         // over. Held momentary layers should render only through layer_state
         // so active MO() and locked layers compose identically in RGB.
         return UINT8_MAX;
     }
 
-    if (active_key.hold_fired || active_key.hold_one_shot_fired) {
+    if (slot->hold_fired || slot->hold_one_shot_fired) {
         return UINT8_MAX;
     }
 
-    if (!active_key.hold.present || active_key.hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE) {
+    if (!slot->hold.present || slot->hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE) {
         return UINT8_MAX;
     }
 
-    return key_feedback_layer_hint_from_action(active_key.hold.action);
+    return key_feedback_layer_hint_from_action(slot->hold.action);
 }
 
 uint8_t key_feedback_pack(void) {
@@ -83,26 +85,27 @@ uint8_t key_feedback_pack(void) {
         flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
     }
 
-    bool ak_active = active_key.keycode != KC_NO;
+    const active_key_state_t *slot      = key_runtime_primary_slot();
+    bool                      ak_active = key_runtime_slot_active(slot);
     if (!ak_active) return flags;
 
-    uint16_t elapsed           = timer_elapsed(active_key.timer);
-    bool     long_hold_reached = active_key.long_hold.present && elapsed >= active_key.longer_hold_term;
+    uint16_t elapsed           = timer_elapsed(slot->timer);
+    bool     long_hold_reached = slot->long_hold.present && elapsed >= slot->longer_hold_term;
 
-    if (active_key.implicit_hold) {
+    if (slot->implicit_hold) {
         return flags;
     }
 
     // Fallback base holds are internal runtime glue for "tap override, normal
     // hold" semantics. They are not authored hold surfaces, so keep RGB quiet.
-    if (active_key.fallback_hold_pending) {
+    if (slot->fallback_hold_pending) {
         return flags;
     }
 
-    if (active_key.held_action_keycode != KC_NO) {
+    if (slot->held_action_keycode != KC_NO) {
         // Held layer and pd-mode actions do not keep a hold overlay once they
         // are active; the layer or pd-mode color itself is the feedback.
-        if (action_dispatch_is_layer_action(active_key.held_action_keycode) || pd_mode_for_keycode(active_key.held_action_keycode)) {
+        if (action_dispatch_is_layer_action(slot->held_action_keycode) || pd_mode_for_keycode(slot->held_action_keycode)) {
             return flags;
         }
 
@@ -121,7 +124,7 @@ uint8_t key_feedback_pack(void) {
         return flags;
     }
 
-    if (active_key.repeat_binding_active) {
+    if (slot->repeat_binding_active) {
         flags |= KEY_FEEDBACK_FLAG_LEVEL_FLASH;
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
         if (((timer_read() / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0) {
@@ -133,7 +136,7 @@ uint8_t key_feedback_pack(void) {
         return flags;
     }
 
-    if (long_hold_reached && hold_sends_on_release(active_key.long_hold)) {
+    if (long_hold_reached && hold_sends_on_release(slot->long_hold)) {
         // TAP_ON_RELEASE_AFTER_HOLD keeps feedback visible because the action
         // is still pending until release.
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
@@ -141,7 +144,7 @@ uint8_t key_feedback_pack(void) {
         return flags;
     }
 
-    if (!long_hold_reached && elapsed >= active_key.tap_hold_term && hold_sends_on_release(active_key.hold)) {
+    if (!long_hold_reached && elapsed >= slot->tap_hold_term && hold_sends_on_release(slot->hold)) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
         return flags;
     }
@@ -150,7 +153,7 @@ uint8_t key_feedback_pack(void) {
     // not keep a hold color latched after the threshold. Only an authored
     // normal hold tier keeps the pending hold color before it resolves;
     // long-hold-only surfaces stay quiet until the long-hold tier commits.
-    if (!active_key.hold_fired && !active_key.hold_one_shot_fired && elapsed >= active_key.tap_hold_term && active_key.hold.present) {
+    if (!slot->hold_fired && !slot->hold_one_shot_fired && elapsed >= slot->tap_hold_term && slot->hold.present) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
     }
 

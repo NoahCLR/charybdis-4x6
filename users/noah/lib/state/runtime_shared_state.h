@@ -34,6 +34,10 @@ typedef struct {
     hold_behavior_t long_hold;
 } active_key_state_t;
 
+#define KEY_RUNTIME_ACTIVE_SLOT_CAPACITY 1
+
+typedef active_key_state_t key_runtime_slot_state_t;
+
 typedef struct {
     uint16_t timer;
     bool     active;
@@ -50,7 +54,7 @@ typedef struct {
     }
 
 typedef struct {
-    active_key_state_t           active_key;
+    key_runtime_slot_state_t     active_slots[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY];
     multi_tap_t                  multi_tap;
     key_runtime_feedback_state_t feedback;
 } key_runtime_shared_state_t;

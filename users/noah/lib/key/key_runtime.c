@@ -19,43 +19,19 @@ bool is_layer_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
-static bool key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs) {
-    return lhs.row == rhs.row && lhs.col == rhs.col;
-}
-
-bool active_key_matches(uint16_t keycode, keypos_t key_pos) {
-    return active_key.keycode == keycode && key_runtime_keypos_equal(active_key.key_pos, key_pos);
-}
-
-bool key_runtime_activate_pending_fallback_hold(void) {
-    if (!active_key.fallback_hold_pending || active_key.held_action_keycode != KC_NO || active_key.keycode == KC_NO) {
+bool key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot) {
+    if (!slot || !slot->fallback_hold_pending || slot->held_action_keycode != KC_NO || slot->keycode == KC_NO) {
         return false;
     }
 
-    held_action_register(active_key.key_pos, active_key.keycode);
-    active_key.held_action_keycode = active_key.keycode;
-    active_key.hold_fired          = true;
+    held_action_register(slot->key_pos, slot->keycode);
+    slot->held_action_keycode = slot->keycode;
+    slot->hold_fired          = true;
     return true;
 }
 
-void active_key_reset(void) {
-    active_key = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
-}
-
-void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired) {
-    active_key = (active_key_state_t){
-        .timer               = timer_read(),
-        .keycode             = keycode,
-        .key_pos             = key_pos,
-        .hold_fired          = hold_fired,
-        .held_action_keycode = KC_NO,
-        .tap_action          = tap_action,
-        .tap_hold_term       = tap_hold_term,
-        .longer_hold_term    = longer_hold_term,
-        .multi_tap_term      = multi_tap_term,
-        .hold                = hold,
-        .long_hold           = long_hold,
-    };
+bool key_runtime_activate_pending_fallback_hold(void) {
+    return key_runtime_slot_activate_pending_fallback_hold(key_runtime_primary_slot());
 }
 
 handled_key_view_t handled_key_lookup(uint16_t keycode) {

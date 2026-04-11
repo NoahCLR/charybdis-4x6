@@ -20,6 +20,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/key_runtime_modifier_hold_integration_test.c" \
     "$ROOT/users/noah/lib/action/owned_keycode.c" \
     "$ROOT/users/noah/lib/key/key_runtime.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_slot.c" \
     "$ROOT/users/noah/lib/key/key_runtime_trace.c" \
     "$ROOT/users/noah/lib/key/key_runtime_press.c" \
     "$ROOT/users/noah/lib/key/key_runtime_release.c" \

@@ -16,6 +16,7 @@ users/noah/lib/rgb/rgb_config_defaults.c
 users/noah/lib/rgb/rgb_runtime.c
 users/noah/lib/rgb/rgb_validation.c
 users/noah/lib/key/keymap_validation.c
+users/noah/lib/key/key_runtime_slot.c
 users/noah/lib/key/key_runtime_trace.c
 "
 

@@ -128,28 +128,8 @@ void pointing_device_set_cpi(uint16_t cpi) {
     (void)cpi;
 }
 
-bool active_key_matches(uint16_t keycode, keypos_t key_pos) {
-    return active_key.keycode == keycode && active_key.key_pos.row == key_pos.row && active_key.key_pos.col == key_pos.col;
-}
-
 bool is_layer_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
-}
-
-void active_key_reset(void) {
-    active_key = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
-}
-
-void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, bool hold_fired) {
-    (void)tap_action;
-    (void)hold;
-    (void)long_hold;
-    (void)tap_hold_term;
-    (void)longer_hold_term;
-    (void)multi_tap_term;
-    (void)hold_fired;
-    active_key.keycode = keycode;
-    active_key.key_pos = key_pos;
 }
 
 bool multi_tap_active(const multi_tap_t *mt) {
