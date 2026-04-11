@@ -67,12 +67,30 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // match pd_modes[] — adding or reordering modes won't silently break colors.
 // { .pointing_mode = ..., .color = HSV(hue, sat, val) }
 const pd_mode_color_t pd_mode_colors[] = {
-    {.pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},  // orange
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},      // yellow
-    {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)}, // magenta
-    {.pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},      // cyan
-    {.pointing_mode = PD_MODE_PINCH, .color = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},       // lime
-    {.pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)}         // light green
+    {
+        .pointing_mode = PD_MODE_DRAGSCROLL,
+        .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    }, // orange
+    {
+        .pointing_mode = PD_MODE_VOLUME,
+        .color         = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    }, // yellow
+    {
+        .pointing_mode = PD_MODE_BRIGHTNESS,
+        .color         = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    }, // magenta
+    {
+        .pointing_mode = PD_MODE_ARROW,
+        .color         = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    }, // cyan
+    {
+        .pointing_mode = PD_MODE_PINCH,
+        .color         = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    }, // lime
+    {
+        .pointing_mode = PD_MODE_ZOOM,
+        .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    }, // light green
 };
 const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 
@@ -168,16 +186,29 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 //   - cyan = authored long-hold-tier feedback or long-hold-tier commit
 //   - missing tiers stay quiet; e.g. a long-hold-only surface does not show
 //     orange before the long-hold tier commits
-//   - primary momentary layer access uses the ambient layer color itself
+//   - the active tier picks the color: .hold always uses orange, .long_hold
+//     always uses cyan, regardless of which helper authored that tier
+//   - TAP_AT_HOLD_THRESHOLD(...) pulses once when that tier commits
+//   - TAP_ON_RELEASE_AFTER_HOLD(...) stays steady while that tier is pending
+//     release
+//   - PRESS_AND_HOLD_UNTIL_RELEASE(...) and REPEAT_WHILE_HELD(...) flash while
+//     that tier stays active
 //
 // These paint both halves last, on top of the current layer and any pd-mode
 // overlay, so authored tier feedback stays visible even on the trackball half
 // while a mode color is active.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    .multi_tap_pending_color = HSV(0, 0, 150),                              // neutral white while the engine is still resolving the active tap index
-    .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // orange for authored hold-tier pending / active states and hold-tier commit pulses
-    .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) // icy cyan for authored long-hold-tier active states and long-hold-tier commit pulses
+    // Neutral white while the engine is still resolving the active tap index.
+    .multi_tap_pending_color = HSV(0, 0, 150),
+
+    // Orange for authored hold-tier pending / active states and hold-tier
+    // commit pulses.
+    .hold_active_color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+
+    // Icy cyan for authored long-hold-tier active states and long-hold-tier
+    // commit pulses.
+    .long_hold_active_color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 };
 #    endif
 

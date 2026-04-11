@@ -203,6 +203,19 @@ In the shared runtime, those colors are used for these categories:
 - held non-layer action active: a `PRESS_AND_HOLD_UNTIL_RELEASE(...)` action is
   still registered and should stay visibly active
 
+The tier decides the color:
+
+- `.hold` surfaces use `hold_active_color`
+- `.long_hold` surfaces use `long_hold_active_color`
+
+The helper decides the RGB behavior shape:
+
+- `TAP_AT_HOLD_THRESHOLD(...)`: pulse once when that tier commits
+- `TAP_ON_RELEASE_AFTER_HOLD(...)`: stay steadily lit while that tier is
+  pending release
+- `PRESS_AND_HOLD_UNTIL_RELEASE(...)` and `REPEAT_WHILE_HELD(...)`: flash while
+  that tier remains active
+
 Held layer-switch actions are intentionally a special case: they get the short
 trigger pulse when the threshold is crossed, but they do not keep a persistent
 hold overlay after that. Once the layer is on, the layer color itself is the
