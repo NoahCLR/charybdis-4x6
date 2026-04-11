@@ -5,7 +5,8 @@
 // Release-specific slot transition helpers for the handled-key runtime.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_slot_release_internal.h"
+#include "key_runtime_slot_release.h"
+#include "key_runtime_slot_result_internal.h"
 
 #include "../action/action_lifecycle.h"
 #include "../pointing/pd_modes.h"
@@ -123,45 +124,48 @@ key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(uint16_t 
     return resolution;
 }
 
-key_runtime_slot_release_apply_t key_runtime_slot_take_active_release(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior) {
-    key_runtime_slot_release_apply_t apply = {0};
+static key_runtime_slot_result_t key_runtime_slot_take_active_release_result(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior) {
+    key_runtime_slot_result_t result = {0};
 
     if (!slot || slot->keycode == KC_NO) {
-        return apply;
+        return result;
     }
 
     active_key_state_t released_key = *slot;
     uint16_t           elapsed      = timer_elapsed(released_key.timer);
 
-    apply.handled       = true;
-    apply.release_layer = behavior.is_momentary_layer;
-    apply.key_pos       = released_key.key_pos;
+    result.handled = true;
+
+    if (behavior.is_momentary_layer) {
+        key_runtime_slot_result_push_layer_release(&result, released_key.key_pos);
+    }
 
     key_runtime_slot_reset(slot);
 
     key_runtime_slot_release_resolution_t resolution = key_runtime_slot_resolve_release(keycode, released_key, behavior, elapsed);
-    apply.release_owned_state                        = resolution.release_owned_state;
+    if (resolution.release_owned_state) {
+        key_runtime_slot_result_push_request_if_present(&result, released_key.key_pos, (key_runtime_slot_effect_request_t){
+                                                                                    .release_owned_state = true,
+                                                                                });
+    }
 
     switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP:
             if (behavior.has_multi_tap) {
                 key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.key_pos, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
             } else if (released_key.tap_action != KC_NO) {
-                apply.outcome = KEY_RUNTIME_SLOT_RELEASE_APPLY_OUTCOME_DISPATCH_ACTION;
-                apply.action  = released_key.tap_action;
+                key_runtime_slot_result_push_dispatch_action(&result, released_key.key_pos, released_key.tap_action);
             }
-            return apply;
+            return result;
         case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_ACTION:
-            apply.outcome = KEY_RUNTIME_SLOT_RELEASE_APPLY_OUTCOME_DISPATCH_ACTION;
-            apply.action  = resolution.action;
-            return apply;
+            key_runtime_slot_result_push_dispatch_action(&result, released_key.key_pos, resolution.action);
+            return result;
         case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_PD_MODE_LOCK_TAP:
-            apply.outcome          = KEY_RUNTIME_SLOT_RELEASE_APPLY_OUTCOME_PD_MODE_LOCK_TAP;
-            apply.pd_mode_lock_tap = resolution.pd_mode_lock_tap;
-            return apply;
+            key_runtime_slot_result_push_pd_mode_lock_tap(&result, resolution.pd_mode_lock_tap);
+            return result;
         case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_NONE:
         default:
-            return apply;
+            return result;
     }
 }
 
@@ -177,11 +181,11 @@ static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const
     return noah_action_hold_kind(hold.action) != NOAH_ACTION_HOLD_KIND_PRESS_ONLY;
 }
 
-key_runtime_slot_pending_multi_tap_hold_release_t key_runtime_slot_take_pending_multi_tap_hold_release(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior, uint16_t elapsed) {
-    key_runtime_slot_pending_multi_tap_hold_release_t release = {0};
+static key_runtime_slot_result_t key_runtime_slot_take_pending_multi_tap_hold_release_result(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior, uint16_t elapsed) {
+    key_runtime_slot_result_t result = {0};
 
     if (!(slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_pending_multi_tap_matches(slot, keycode, slot->key_pos))) {
-        return release;
+        return result;
     }
 
     multi_tap_t          *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
@@ -198,15 +202,24 @@ key_runtime_slot_pending_multi_tap_hold_release_t key_runtime_slot_take_pending_
         action = key_runtime_slot_select_release_hold_action(elapsed, cached_hold.action, cached_long_hold, slot->longer_hold_term);
     }
 
-    release.handled                    = true;
-    release.release_layer_after_action = behavior.is_momentary_layer;
-    release.key_pos                    = slot->key_pos;
-    release.action                     = action;
-    release.mods                       = cached_mods;
-    release.repeat_count               = repeat_count;
-    release.outcome = key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(slot, cached_hold, action, repeat_count, elapsed)
-                          ? KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_HELD_LIFECYCLE
-                          : KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_DELAYED_ACTION;
+    result.handled = true;
+
+    if (key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(slot, cached_hold, action, repeat_count, elapsed)) {
+        key_runtime_slot_result_push_request_if_present(&result, slot->key_pos, (key_runtime_slot_effect_request_t){
+                                                                                .kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER,
+                                                                                .action = action,
+                                                                            });
+        key_runtime_slot_result_push_request_if_present(&result, slot->key_pos, (key_runtime_slot_effect_request_t){
+                                                                                .kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_UNREGISTER,
+                                                                                .action = action,
+                                                                            });
+    } else {
+        key_runtime_slot_result_push_delayed_action(&result, action, cached_mods, repeat_count);
+    }
+
+    if (behavior.is_momentary_layer) {
+        key_runtime_slot_result_push_layer_release(&result, slot->key_pos);
+    }
 
     if (action == KC_NO && repeat_count == 0 && key_runtime_slot_has_pending_multi_tap(slot)) {
         // A quick release can intentionally keep the chain alive so a later
@@ -215,34 +228,30 @@ key_runtime_slot_pending_multi_tap_hold_release_t key_runtime_slot_take_pending_
     } else {
         key_runtime_slot_reset(slot);
     }
-    return release;
+    return result;
 }
 
-key_runtime_slot_release_event_t key_runtime_slot_take_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_behavior_view_t behavior) {
-    key_runtime_slot_release_event_t event = {0};
+key_runtime_slot_result_t key_runtime_slot_take_handled_release_result(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_behavior_view_t behavior) {
+    key_runtime_slot_result_t result = {0};
 
     if (slot) {
-        uint16_t                                           elapsed = timer_elapsed(slot->timer);
-        key_runtime_slot_pending_multi_tap_hold_release_t pending = key_runtime_slot_take_pending_multi_tap_hold_release(slot, keycode, behavior, elapsed);
-        if (pending.handled) {
-            event.handled                              = true;
-            event.kind                                 = KEY_RUNTIME_SLOT_RELEASE_EVENT_PENDING_MULTI_TAP_HOLD_RELEASE;
-            event.data.pending_multi_tap_hold_release = pending;
-            return event;
+        uint16_t elapsed = timer_elapsed(slot->timer);
+        result = key_runtime_slot_take_pending_multi_tap_hold_release_result(slot, keycode, behavior, elapsed);
+        if (result.handled) {
+            return result;
         }
     }
 
     if (key_runtime_slot_matches(slot, keycode, key_pos)) {
-        event.handled             = true;
-        event.kind                = KEY_RUNTIME_SLOT_RELEASE_EVENT_ACTIVE_RELEASE;
-        event.data.active_release = key_runtime_slot_take_active_release(slot, keycode, behavior);
-        return event;
+        return key_runtime_slot_take_active_release_result(slot, keycode, behavior);
     }
 
-    event.handled                   = true;
-    event.kind                      = KEY_RUNTIME_SLOT_RELEASE_EVENT_CLEANUP;
-    event.data.cleanup.key_pos      = key_pos;
-    event.data.cleanup.release_layer = behavior.is_momentary_layer;
-    event.data.cleanup.release_owned_state = true;
-    return event;
+    result.handled = true;
+    if (behavior.is_momentary_layer) {
+        key_runtime_slot_result_push_layer_release(&result, key_pos);
+    }
+    key_runtime_slot_result_push_request_if_present(&result, key_pos, (key_runtime_slot_effect_request_t){
+                                                                       .release_owned_state = true,
+                                                                   });
+    return result;
 }

@@ -297,6 +297,67 @@ Verification result:
 - targeted slot, transition, scenario, and integration tests passed
 - feature-gate compile checks passed
 
+## 2026-04-11 Direct Slot Result Producers
+
+Completed in this pass:
+
+- Reworked press, release, and scan to build
+  [`key_runtime_slot_result_t`](../../users/noah/lib/key/key_runtime_slot_result.h)
+  directly in their owning modules instead of translating through separate
+  internal press/release/scan event-plan structs:
+  - [`key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c)
+  - [`key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
+  - [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+- Added a single shared internal result-builder helper header in
+  [`key_runtime_slot_result_internal.h`](../../users/noah/lib/key/key_runtime_slot_result_internal.h)
+  and reduced
+  [`key_runtime_slot_result.c`](../../users/noah/lib/key/key_runtime_slot_result.c)
+  to shared result-builder helpers plus the remaining direct result producers
+  that are not owned by press/release/scan.
+- Deleted the no-longer-needed internal cross-module protocol headers:
+  - `key_runtime_slot_press_internal.h`
+  - `key_runtime_slot_release_internal.h`
+  - `key_runtime_slot_scan_internal.h`
+- Kept the public slot surfaces narrow while removing another layer of internal
+  indirection:
+  - [`key_runtime_slot_press.h`](../../users/noah/lib/key/key_runtime_slot_press.h)
+  - [`key_runtime_slot_release.h`](../../users/noah/lib/key/key_runtime_slot_release.h)
+  - [`key_runtime_slot_scan.h`](../../users/noah/lib/key/key_runtime_slot_scan.h)
+- Updated host coverage and runner wiring that depended on the shared result
+  surface and its direct producers:
+  - [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  - [`tests/host/key_runtime_feedback_test.c`](../../tests/host/key_runtime_feedback_test.c)
+  - [`tests/host/run_key_runtime_feedback_tests.sh`](../../tests/host/run_key_runtime_feedback_tests.sh)
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the removal of the internal event-plan headers.
+
+Why this pass landed now:
+
+- it removes the last cross-module press/release/scan result protocols instead
+  of merely hiding them
+- it leaves the next handled-key reducer step focused on consolidating
+  implementation logic and state transitions, not on another protocol rewrite
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+
 ## 2026-04-11 Internal Slot Protocol Header Narrowing
 
 Completed in this pass:
