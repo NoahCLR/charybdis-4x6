@@ -201,6 +201,8 @@ The main technical-debt vectors are:
 
 ## Recommended Plan
 
+Execution requirement for any agent applying this plan: after every implementation pass, the firmware must still compile cleanly, and tests should be run repeatedly throughout the work. Treat compile success as a required checkpoint after each phase or sub-phase, not just at the end of the overall refactor. Treat test execution as a frequent regression check during implementation, not something deferred until the end.
+
 ### Phase 0: Add guardrails first
 
 - validate duplicate `key_behaviors[]` keycodes
@@ -262,6 +264,9 @@ Goal: keep the current render order while making RGB logic easier to extend and 
 
 Recommended order for lowest regression risk:
 
+- after each pass, run a clean firmware build and do not continue until it compiles without errors
+- run host tests repeatedly during the work, especially after any nontrivial change, and do not leave test validation until the end
+
 1. validation and debug instrumentation
 2. QMK/fork compatibility isolation
 3. authoring/runtime header split
@@ -276,5 +281,7 @@ Recommended order for lowest regression risk:
 At review time, the host suite completed successfully:
 
 - `sh tests/host/run_all_host_tests.sh`
+
+For any agent-driven implementation work that follows from this review, verification should include frequent clean firmware builds and frequent host-test runs throughout the work. Compile checks and host tests serve different purposes, so neither should be treated as a one-time end-of-refactor checkpoint.
 
 That result is important context: the current architecture is not broken. The recommendation is to improve extension boundaries before future feature growth turns the current hotspots into long-term maintenance bottlenecks.
