@@ -66,8 +66,7 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
 }
 
 bool action_dispatch_is_layer_action(uint16_t action) {
-    (void)action;
-    return false;
+    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
 }
 
 bool action_dispatch_is_layer_lock(uint16_t action) {
@@ -236,6 +235,30 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
     CHECK(key_feedback_flags_multi_tap_pending(flags));
 }
 
+static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
+    test_reset_state();
+
+    active_key = (active_key_state_t){
+        .keycode             = MO(2),
+        .held_action_keycode = MO(2),
+        .hold_fired          = true,
+    };
+
+    noah_runtime_shared_state.key.active_slots[1] = (active_key_state_t){
+        .timer            = (uint16_t)(fake_time - 150),
+        .keycode          = KC_LEFT,
+        .tap_hold_term    = 100,
+        .longer_hold_term = 300,
+        .hold             = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
+        .long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
+    };
+
+    uint8_t flags = key_feedback_pack();
+    CHECK(key_feedback_flags_hold_pending(flags));
+    CHECK(!key_feedback_flags_hold_active(flags));
+    CHECK(!key_feedback_flags_long_hold_active(flags));
+}
+
 int main(void) {
     test_non_passthrough_held_action_flashes();
     test_repeat_hold_flashes_while_active();
@@ -246,6 +269,7 @@ int main(void) {
     test_feedback_falls_back_to_secondary_active_slot();
     test_multi_tap_pending_flag_uses_secondary_slot();
     test_multi_tap_pending_flag_survives_quick_release_for_higher_taps();
+    test_secondary_hold_pending_survives_primary_layer_hold();
 
     puts("key_runtime_feedback host tests passed");
     return 0;

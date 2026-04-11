@@ -44,19 +44,7 @@ static uint8_t key_feedback_layer_hint_from_action(uint16_t action) {
     return QK_MOMENTARY_GET_LAYER(action);
 }
 
-static const active_key_state_t *key_feedback_slot(void) {
-    active_key_state_t *primary_slot = key_runtime_primary_slot();
-
-    if (key_runtime_slot_active(primary_slot)) {
-        return primary_slot;
-    }
-
-    return key_runtime_first_active_slot();
-}
-
-uint8_t key_feedback_preview_layer(void) {
-    const active_key_state_t *slot = key_feedback_slot();
-
+static uint8_t key_feedback_preview_layer_for_slot(const active_key_state_t *slot) {
     if (!key_runtime_slot_active(slot) || slot->implicit_hold || slot->fallback_hold_pending) {
         return UINT8_MAX;
     }
@@ -79,31 +67,23 @@ uint8_t key_feedback_preview_layer(void) {
     return key_feedback_layer_hint_from_action(slot->hold.action);
 }
 
-uint8_t key_feedback_pack(void) {
+uint8_t key_feedback_preview_layer(void) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        uint8_t layer = key_feedback_preview_layer_for_slot(key_runtime_slot_at(index));
+        if (layer != UINT8_MAX) {
+            return layer;
+        }
+    }
+
+    return UINT8_MAX;
+}
+
+static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     uint8_t flags = 0;
 
-    if (key_feedback_pulse_active()) {
-        flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
-        if (key_feedback_pulse.long_hold_level) {
-            flags |= KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE;
-        }
+    if (!key_runtime_slot_active(slot)) {
         return flags;
     }
-
-    // Multi-tap pending: at least one slot still has an open tap window that
-    // has not crossed into a pending hold.
-    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
-
-        if (key_runtime_slot_has_pending_multi_tap(slot) && !key_runtime_slot_pending_multi_tap_pending_hold(slot)) {
-            flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
-            break;
-        }
-    }
-
-    const active_key_state_t *slot      = key_feedback_slot();
-    bool                      ak_active = key_runtime_slot_active(slot);
-    if (!ak_active) return flags;
 
     uint16_t elapsed           = timer_elapsed(slot->timer);
     bool     long_hold_reached = slot->long_hold.present && elapsed >= slot->longer_hold_term;
@@ -171,6 +151,38 @@ uint8_t key_feedback_pack(void) {
     // long-hold-only surfaces stay quiet until the long-hold tier commits.
     if (!slot->hold_fired && !slot->hold_one_shot_fired && elapsed >= slot->tap_hold_term && slot->hold.present) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
+    }
+
+    return flags;
+}
+
+uint8_t key_feedback_pack(void) {
+    uint8_t flags = 0;
+
+    if (key_feedback_pulse_active()) {
+        flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
+        if (key_feedback_pulse.long_hold_level) {
+            flags |= KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE;
+        }
+        return flags;
+    }
+
+    // Multi-tap pending: at least one slot still has an open tap window that
+    // has not crossed into a pending hold.
+    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        active_key_state_t *slot = key_runtime_slot_at(index);
+
+        if (key_runtime_slot_has_pending_multi_tap(slot) && !key_runtime_slot_pending_multi_tap_pending_hold(slot)) {
+            flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+            break;
+        }
+    }
+
+    for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
+        uint8_t slot_flags = key_feedback_pack_for_slot(key_runtime_slot_at(index));
+        if (slot_flags != 0) {
+            return flags | slot_flags;
+        }
     }
 
     return flags;
