@@ -81,8 +81,8 @@ const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212)},
     {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222)},
 };
-const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
-static const uint8_t volume_mode_group_leds[] = {1, 6};
+const uint8_t                    pd_mode_color_count       = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
+static const uint8_t             volume_mode_group_leds[]  = {1, 6};
 static const pd_mode_led_group_t pd_mode_led_groups_data[] = {
     {.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)},
 };
