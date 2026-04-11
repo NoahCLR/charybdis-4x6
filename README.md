@@ -80,6 +80,7 @@ VIA macro defaults, hardcoded macros, and pointing-mode entry gestures.
 
 There is also a small VIA bridge in
 [`via layouts/via_to_qmk_layout.py`](<./via layouts/via_to_qmk_layout.py>).
+If you want the browser config UI, start with [VIA](https://usevia.app/).
 That script is useful when you want to experiment quickly in VIA without
 giving up a readable, source-controlled
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c): it
