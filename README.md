@@ -28,10 +28,12 @@ This repo is built around the open-source Charybdis from
 [BastardKB](https://bastardkb.com/), designed by Quentin. The hardware files
 are available in the
 [BastardKB Charybdis project](https://github.com/Bastardkb/Charybdis).
-Quentin's design, and the many mods the community has built around this board,
-have given me hundreds of hours of fun optimizing both the hardware and the
-firmware, and I am very thankful for that. If you want to support the creator,
-buy the hardware from
+I do use AI as part of the workflow around this repo, but this is not a
+throwaway generated config: this board is my daily driver, and many
+hours have gone into tuning both the hardware and the firmware. Quentin's
+design, and the many mods the community has built around this board, have made
+that possible, and I am very thankful for that. If you want to support the
+creator, buy the hardware from
 [BastardKB](https://bastardkb.com/) rather than from a knockoff seller.
 
 ## What This Userspace Is For
