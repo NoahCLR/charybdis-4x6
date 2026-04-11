@@ -40,6 +40,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_layer_stage.c" \
+    "$ROOT/users/noah/lib/rgb/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/rgb_runtime.c" \
@@ -74,6 +75,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_layer_stage.c" \
+    "$ROOT/users/noah/lib/rgb/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/rgb_runtime.c" \
@@ -108,6 +110,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_layer_stage.c" \
+    "$ROOT/users/noah/lib/rgb/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/rgb_runtime.c" \

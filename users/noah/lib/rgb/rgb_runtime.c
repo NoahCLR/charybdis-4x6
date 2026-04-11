@@ -7,6 +7,7 @@
 #include "rgb_automouse_stage.h"
 #include "rgb_helpers.h"
 #include "rgb_layer_stage.h"
+#include "rgb_preview_stage.h"
 #include "rgb_validation.h"
 
 #if defined(POINTING_DEVICE_ENABLE)
@@ -19,8 +20,6 @@
 
 // ─── Authored keymap data (defined in rgb_config.c) ──────────────────────
 #ifdef RGB_MATRIX_ENABLE
-extern const layer_led_group_t *const layer_led_groups;
-extern const uint8_t                  layer_led_group_count;
 #    ifdef POINTING_DEVICE_ENABLE
 extern const pd_mode_color_t            pd_mode_colors[];
 extern const uint8_t                    pd_mode_color_count;
@@ -88,13 +87,7 @@ static bool rgb_runtime_led_range_intersects(uint8_t led_min, uint8_t led_max, u
 }
 #    endif
 
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-static uint8_t rgb_runtime_preview_layer(void) {
-    return is_keyboard_master() ? key_feedback_preview_layer() : split_runtime_sync_remote.key_preview_layer;
-}
-#    endif
-
-#    if defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE) || defined(POINTING_DEVICE_ENABLE)
+#    ifdef POINTING_DEVICE_ENABLE
 static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count, uint8_t led_min, uint8_t led_max) {
     for (uint8_t i = 0; i < count; i++) {
         if (leds[i] >= led_min && leds[i] < led_max) {
@@ -109,10 +102,6 @@ static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count,
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    uint8_t preview_layer = rgb_runtime_preview_layer();
-#    endif
-
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
     // The synthetic automouse destination is not a persistent board state.
     // Once this branch stops running, the next frame falls back to ordinary
@@ -126,21 +115,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
         painted |= rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
     }
 
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    if (preview_layer < LAYER_COUNT && rgb_runtime_layer_stage_has_solid_color(preview_layer)) {
-        painted |= rgb_runtime_layer_stage_paint_layer(preview_layer, led_min, led_max);
-
-        for (uint8_t g = 0; g < layer_led_group_count; g++) {
-            if (layer_led_groups[g].layer != preview_layer) {
-                continue;
-            }
-
-            rgb_t grp_rgb = hsv_to_rgb(layer_led_groups[g].color);
-            rgb_set_led_group(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max, grp_rgb);
-            painted |= rgb_runtime_led_group_intersects(layer_led_groups[g].leds, layer_led_groups[g].count, led_min, led_max);
-        }
-    }
-#    endif
+    painted |= rgb_runtime_preview_stage_render(led_min, led_max);
 
     // ─── Pointing-device mode overlay ───────────────────────────────────
     //

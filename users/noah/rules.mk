@@ -49,6 +49,7 @@ SRC += lib/state/split_runtime_sync.c
 SRC += lib/rgb/rgb_runtime.c
 SRC += lib/rgb/rgb_layer_stage.c
 SRC += lib/rgb/rgb_automouse_stage.c
+SRC += lib/rgb/rgb_preview_stage.c
 SRC += lib/rgb/rgb_config_defaults.c
 SRC += lib/rgb/rgb_validation.c
 
