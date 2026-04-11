@@ -5,6 +5,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/key_runtime_feedback.h"
+#include "users/noah/lib/key/key_runtime_slot_release.h"
 #include "users/noah/lib/key/key_runtime_state.h"
 
 enum {

@@ -147,3 +147,54 @@ Verification result:
 - feature-gate compile checks passed
 - full host suite passed
 - firmware build passed
+
+## 2026-04-11 Release And Scan Boundary Extraction
+
+Completed in this pass:
+
+- Split release-specific slot contracts and helpers into
+  [`users/noah/lib/key/key_runtime_slot_release.h`](../../users/noah/lib/key/key_runtime_slot_release.h)
+  and
+  [`users/noah/lib/key/key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c).
+- Split scan-specific slot contracts and helpers into
+  [`users/noah/lib/key/key_runtime_slot_scan.h`](../../users/noah/lib/key/key_runtime_slot_scan.h)
+  and
+  [`users/noah/lib/key/key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c).
+- Removed the release/scan resolution, apply, and pending-multi-tap plan types
+  from
+  [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
+  so the shared state header is narrower and less event-specific.
+- Kept shared slot storage, press preparation, and slot-owned mutation helpers
+  in
+  [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c),
+  while updating transition/test runners to depend on the new event-specific
+  module boundaries explicitly.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the now-landed release/scan boundary work.
+
+Why this pass landed now:
+
+- it shrinks the oversized internal key-runtime header without changing
+  behavior
+- it moves the runtime closer to an event-specific reducer shape by giving
+  release and scan semantics their own named contracts
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed

@@ -10,6 +10,8 @@
 
 #include "key_runtime_feedback.h"
 #include "key_runtime_admission.h"
+#include "key_runtime_slot_release.h"
+#include "key_runtime_slot_scan.h"
 #include "key_runtime_state.h"
 #include "key_runtime_trace.h"
 #include "../action/action_dispatch.h"

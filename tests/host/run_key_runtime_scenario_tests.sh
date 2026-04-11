@@ -24,6 +24,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/key_runtime.c" \
     "$ROOT/users/noah/lib/key/key_runtime_process.c" \
     "$ROOT/users/noah/lib/key/key_runtime_admission.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_slot_release.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_slot_scan.c" \
     "$ROOT/users/noah/lib/key/key_runtime_preflight.c" \
     "$ROOT/users/noah/lib/key/key_runtime_press.c" \
     "$ROOT/users/noah/lib/key/key_runtime_release.c" \

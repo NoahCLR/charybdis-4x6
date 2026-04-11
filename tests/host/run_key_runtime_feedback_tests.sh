@@ -20,6 +20,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_feedback_test.c" \
     "$ROOT/users/noah/lib/key/key_runtime_feedback.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_slot_release.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot.c" \
     "$ROOT/users/noah/lib/key/multi_tap_engine.c" \
     "$ROOT/users/noah/lib/state/runtime_shared_state.c" \

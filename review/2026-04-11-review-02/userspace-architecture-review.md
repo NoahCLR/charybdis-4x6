@@ -2,7 +2,7 @@
 
 Date: 2026-04-11
 
-Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, and a dedicated key-runtime admission boundary; the remaining recommendations below focus on what is still architecturally open after those changes.
+Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, and dedicated release/scan slot-transition modules; the remaining recommendations below focus on what is still architecturally open after those changes.
 
 Scope: the `noah` userspace in this repo only. This review ignores hardware changes and evaluates software structure, boundaries, state flow, extension cost, and verification surfaces.
 
@@ -20,10 +20,11 @@ right big pieces:
 The main architectural risk is now concentrated in one area: the handled-key
 runtime. The old single-active-key bottleneck is gone, and some follow-up work
 has already improved the surrounding structure by splitting admission policy
-into its own module and adding a scenario-level host harness. The replacement is
-still an implicit state machine expressed as a wide mutable slot struct plus a
-large set of request/resolution/apply helper types. That is workable today, but
-it is still the place most likely to fight the next real feature.
+into its own module, splitting release/scan slot transitions into their own
+modules, and adding a scenario-level host harness. The replacement is still an
+implicit state machine expressed as a wide mutable slot struct plus a large set
+of request/resolution/apply helper types. That is workable today, but it is
+still the place most likely to fight the next real feature.
 
 The current extension cost looks like this:
 
@@ -101,6 +102,8 @@ The strongest remaining architectural smell is in the key runtime:
 
 - [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
 - [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
+- [`users/noah/lib/key/key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
+- [`users/noah/lib/key/key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
 - [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
 - [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c)
 - [`users/noah/lib/key/key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c)
@@ -110,6 +113,10 @@ What is good now:
 - slot ownership is explicit
 - slot admission and reclaim lookup now have a named home in
   [`key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
+- release and scan slot-transition contracts now have named homes in
+  [`key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
+  and
+  [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
 - press/release/scan are separated
 - effect execution is separated from state mutation
 
@@ -118,11 +125,12 @@ What is still expensive:
 - `active_key_state_t` is a wide bag of booleans and timing fields rather than a
   small number of explicit lifecycle phases
 - [`key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h) exposes a
-  large transitional surface full of resolution/apply/plan types and helper
-  entry points
+  smaller but still transitional surface full of effect-request and press-plan
+  types plus shared slot helpers
 - lifecycle mutation and transition planning are still spread across
-  `key_runtime_state.h`, `key_runtime_slot.c`, and `key_runtime_transition.c`
-  instead of one explicit reducer
+  `key_runtime_slot.c`, `key_runtime_slot_release.c`,
+  `key_runtime_slot_scan.c`, and `key_runtime_transition.c` instead of one
+  explicit reducer
 
 Why this matters:
 
@@ -424,7 +432,7 @@ firmware repos.
 
 The main thing to protect now is not the outer shape of the repo; it is the
 internal shape of the handled-key engine. The manifest deduplication, scenario
-harness, and admission split were the right setup moves. If the remaining
-handled-key core becomes an explicit reducer/FSM with a cleaner long-term
-capacity policy, the rest of the architecture is in a good position to keep
-scaling.
+harness, admission split, and release/scan boundary extraction were the right
+setup moves. If the remaining handled-key core becomes an explicit reducer/FSM
+with a cleaner long-term capacity policy, the rest of the architecture is in a
+good position to keep scaling.
