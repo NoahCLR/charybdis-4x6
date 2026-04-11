@@ -7,12 +7,10 @@
 #include "rgb_automouse_stage.h"
 #include "rgb_helpers.h"
 #include "rgb_layer_stage.h"
+#include "rgb_pd_mode_stage.h"
 #include "rgb_preview_stage.h"
 #include "rgb_validation.h"
 
-#if defined(POINTING_DEVICE_ENABLE)
-#    include "../pointing/pd_modes.h"
-#endif
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
 #    include "../key/key_runtime_feedback.h"
 #    include "../state/split_runtime_sync.h"
@@ -20,12 +18,6 @@
 
 // ─── Authored keymap data (defined in rgb_config.c) ──────────────────────
 #ifdef RGB_MATRIX_ENABLE
-#    ifdef POINTING_DEVICE_ENABLE
-extern const pd_mode_color_t            pd_mode_colors[];
-extern const uint8_t                    pd_mode_color_count;
-extern const pd_mode_led_group_t *const pd_mode_led_groups;
-extern const uint8_t                    pd_mode_led_group_count;
-#    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
 #    endif
@@ -39,9 +31,6 @@ extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
 
 #ifdef RGB_MATRIX_ENABLE
 static rgb_runtime_frame_t rgb_runtime_frame_primary;
-#    ifdef POINTING_DEVICE_ENABLE
-static rgb_t pd_mode_rgb[PD_MODE_COUNT];
-#    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static rgb_t key_behavior_feedback_multi_tap_pending_rgb;
 static rgb_t key_behavior_feedback_hold_active_rgb;
@@ -60,17 +49,7 @@ void noah_rgb_runtime_post_init(void) {
     noah_rgb_validate_config();
     rgb_runtime_layer_stage_post_init();
     rgb_runtime_automouse_stage_post_init();
-
-#    ifdef POINTING_DEVICE_ENABLE
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        for (uint8_t c = 0; c < pd_mode_color_count; c++) {
-            if (pd_mode_colors[c].pointing_mode == pd_modes[i].mode_flag) {
-                pd_mode_rgb[i] = hsv_to_rgb(pd_mode_colors[c].color);
-                break;
-            }
-        }
-    }
-#    endif
+    rgb_runtime_pd_mode_stage_post_init();
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     key_behavior_feedback_multi_tap_pending_rgb = hsv_to_rgb(key_behavior_feedback_colors.multi_tap_pending_color);
@@ -81,24 +60,6 @@ void noah_rgb_runtime_post_init(void) {
 }
 
 #ifdef RGB_MATRIX_ENABLE
-#    ifdef POINTING_DEVICE_ENABLE
-static bool rgb_runtime_led_range_intersects(uint8_t led_min, uint8_t led_max, uint8_t from, uint8_t to) {
-    return led_min < to && led_max > from;
-}
-#    endif
-
-#    ifdef POINTING_DEVICE_ENABLE
-static bool rgb_runtime_led_group_intersects(const uint8_t *leds, uint8_t count, uint8_t led_min, uint8_t led_max) {
-    for (uint8_t i = 0; i < count; i++) {
-        if (leds[i] >= led_min && leds[i] < led_max) {
-            return true;
-        }
-    }
-
-    return false;
-}
-#    endif
-
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
@@ -121,21 +82,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     //
     // Paint active pointer-mode color and groups, then let interaction
     // feedback paint over that when needed.
-#    ifdef POINTING_DEVICE_ENABLE
-    uint8_t active_mode = pd_mode_first_active_index();
-    if (active_mode < PD_MODE_COUNT) {
-        rgb_set_right_half(pd_mode_rgb[active_mode], led_min, led_max);
-        painted |= rgb_runtime_led_range_intersects(led_min, led_max, RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT);
-    }
-
-    for (uint8_t g = 0; g < pd_mode_led_group_count; g++) {
-        if (pd_mode_active(pd_mode_led_groups[g].pointing_mode)) {
-            rgb_t grp_rgb = hsv_to_rgb(pd_mode_led_groups[g].color);
-            rgb_set_led_group(pd_mode_led_groups[g].leds, pd_mode_led_groups[g].count, led_min, led_max, grp_rgb);
-            painted |= rgb_runtime_led_group_intersects(pd_mode_led_groups[g].leds, pd_mode_led_groups[g].count, led_min, led_max);
-        }
-    }
-#    endif
+    painted |= rgb_runtime_pd_mode_stage_render(led_min, led_max);
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     // ─── Key behavior feedback ──────────────────────────────────────────

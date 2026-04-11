@@ -577,3 +577,30 @@ Additional verification completed for the Phase 5 preview-stage extraction pass:
 Next recommended step:
 
 - continue Phase 5 by extracting the pd-mode overlay next, then finish by splitting the key-feedback overlay if `rgb_runtime.c` still needs one more ownership pass
+
+Continued Phase 5 by extracting the pd-mode overlay out of `users/noah/lib/rgb/rgb_runtime.c`:
+
+- added `users/noah/lib/rgb/rgb_pd_mode_stage.h` and `users/noah/lib/rgb/rgb_pd_mode_stage.c`
+- moved the following pd-mode-stage responsibilities into the new module:
+  - pd-mode color-cache initialization during RGB post-init
+  - right-half active-mode color application
+  - pd-mode LED-group overlay painting and chunk intersection checks
+- reduced `users/noah/lib/rgb/rgb_runtime.c` so it now orchestrates stage order over:
+  - base layer-stage render
+  - automouse blend stage
+  - preview overlay stage
+  - pd-mode overlay stage
+  - key feedback overlay
+- updated build and host-test wiring in:
+  - `users/noah/rules.mk`
+  - `tests/host/run_rgb_layer_render_tests.sh`
+  - `tests/host/run_feature_gate_compile_tests.sh`
+
+Additional verification completed for the Phase 5 pd-mode-stage extraction pass:
+
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Next recommended step:
+
+- finish Phase 5 by extracting the key-feedback overlay next if `rgb_runtime.c` still needs another ownership pass, then do a final cleanup sweep on the remaining top-level stage ordering
