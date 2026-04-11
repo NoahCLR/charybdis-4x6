@@ -18,7 +18,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_slot_test.c" \
-    "$ROOT/users/noah/lib/key/key_runtime_slot_effect.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_result.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_step.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot.c" \

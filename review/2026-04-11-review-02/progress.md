@@ -392,6 +392,70 @@ Verification result:
 - firmware build passed
 - diff cleanliness checks passed
 
+## 2026-04-12 Reducer-Owned Lifecycle Effects And Explicit Handled Press
+
+Completed in this pass:
+
+- Moved the remaining lifecycle-effect decisions fully into
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  through reducer-local helpers for:
+  - fallback hold activation on interrupt
+  - immediate hold commit
+  - flush behavior
+  - threshold-hold firing
+  - long-hold promotion
+- Reworked handled press in the same file around an explicit local press
+  context and named outcomes, so reuse of a matching pending multi-tap and
+  begin-fresh press handling are now separate reducer paths.
+- Kept the shared effect-output contract in
+  [`users/noah/lib/key/key_runtime_slot_effect.h`](../../users/noah/lib/key/key_runtime_slot_effect.h)
+  but removed the runtime effect-helper implementation file:
+  - `users/noah/lib/key/key_runtime_slot_effect.c`
+- Updated
+  [`users/noah/lib/key/key_runtime.c`](../../users/noah/lib/key/key_runtime.c)
+  so the small runtime-owned fallback-hold activation helper now performs its
+  own state mutation and held-action registration directly.
+- Removed the deleted runtime effect-helper file from the canonical userspace
+  source manifest and the affected host runners.
+- Reworked
+  [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  so the focused assertions now exercise the reducer seam instead of the
+  deleted helper entry points.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review now reflects reducer-owned lifecycle effects and explicit
+  handled-press outcomes instead of describing `key_runtime_slot_effect.c` as
+  a current runtime boundary.
+
+Why this pass landed now:
+
+- it completes the two remaining focused reducer passes without changing the
+  public slot-step or slot-result contracts
+- it leaves the handled-key architecture at a pragmatic stopping point: the
+  remaining work is now optional deeper FSM cleanup or the separate long-term
+  slot-capacity/storage rewrite
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+- diff cleanliness checks passed
+
 ## 2026-04-11 Slot Step Reducer Seam
 
 Completed in this pass:

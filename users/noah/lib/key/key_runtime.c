@@ -6,7 +6,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "handled_key.h"
-#include "key_runtime_slot_effect.h"
 #include "key_runtime_state.h"
 #include "../action/action_dispatch.h"
 #include "../pointing/pd_modes.h"
@@ -21,16 +20,13 @@ bool is_layer_key(uint16_t keycode) {
 }
 
 bool key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot) {
-    if (!slot) {
+    if (!(slot && key_runtime_slot_uses_fallback_hold(slot) && slot->held_action_keycode == KC_NO && slot->keycode != KC_NO)) {
         return false;
     }
 
-    key_runtime_slot_effect_request_t request = key_runtime_slot_activate_pending_fallback_hold_request(slot);
-    if (request.kind != KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER) {
-        return false;
-    }
-
-    held_action_register(slot->key_pos, request.action);
+    slot->held_action_keycode = slot->keycode;
+    key_runtime_slot_commit_hold_phase(slot, true);
+    held_action_register(slot->key_pos, slot->keycode);
     return true;
 }
 
