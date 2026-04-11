@@ -24,6 +24,7 @@ SRC += lib/split_role.c
 SRC += lib/key/key_behavior_lookup.c
 SRC += lib/key/keymap_validation.c
 SRC += lib/key/key_runtime.c
+SRC += lib/key/key_runtime_slot.c
 SRC += lib/key/key_runtime_preflight.c
 SRC += lib/key/key_runtime_process.c
 SRC += lib/key/key_runtime_press.c

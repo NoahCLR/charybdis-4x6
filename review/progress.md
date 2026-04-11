@@ -122,6 +122,8 @@ Completed in this pass:
   - `tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
   - `tests/host/run_pd_mode_key_runtime_integration_tests.sh`
   - `tests/host/run_feature_gate_compile_tests.sh`
+- Fixed real firmware build wiring for the new slot module by adding:
+  - `users/noah/lib/key/key_runtime_slot.c` to `users/noah/rules.mk`
 - Fixed test harness coupling to the old storage layout in:
   - `tests/host/pd_mode_key_runtime_integration_test.c`
   - `tests/host/key_runtime_preflight_test.c`
