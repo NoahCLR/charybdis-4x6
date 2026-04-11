@@ -32,26 +32,31 @@
 //     transparent positions
 //                       { .color = HSV(hue, sat, val), .mode = ... }
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
-    [LAYER_BASE] = {
-        .color = HSV(0, 0, 0),
-        .mode = ALL_KEYS,
-    }, // no override
-    [LAYER_NUM] = {
-        .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-    }, // green
-    [LAYER_SYM] = {
-        .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-    }, // blue
-    [LAYER_NAV] = {
-        .color = HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-    }, // purple
-    [LAYER_POINTER] = {
-        .color = HSV(0, 0, 150),
-        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-    }, // default auto-mouse layer: white mapped keys, capped at v=150 to limit current draw
+    [LAYER_BASE] =
+        {
+            .color = HSV(0, 0, 0),
+            .mode  = ALL_KEYS,
+        }, // no override
+    [LAYER_NUM] =
+        {
+            .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+        }, // green
+    [LAYER_SYM] =
+        {
+            .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+        }, // blue
+    [LAYER_NAV] =
+        {
+            .color = HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+        }, // purple
+    [LAYER_POINTER] =
+        {
+            .color = HSV(0, 0, 150),
+            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+        }, // default auto-mouse layer: white mapped keys, capped at v=150 to limit current draw
 };
 
 // ─── Pointing device mode colors ────────────────────────────────────────────
@@ -60,13 +65,12 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // Each entry is tagged with its mode flag so the order doesn't need to
 // match pd_modes[] — adding or reordering modes won't silently break colors.
 // { .pointing_mode = ..., .color = HSV(hue, sat, val) }
-DEFINE_PD_MODE_COLORS(
-    { .pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },  // orange
-    { .pointing_mode = PD_MODE_VOLUME, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },      // yellow
-    { .pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) }, // magenta
-    { .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },      // cyan
-    { .pointing_mode = PD_MODE_PINCH, .color = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },       // lime
-    { .pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) }         // light green
+DEFINE_PD_MODE_COLORS({.pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},  // orange
+                      {.pointing_mode = PD_MODE_VOLUME, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},      // yellow
+                      {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)}, // magenta
+                      {.pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},      // cyan
+                      {.pointing_mode = PD_MODE_PINCH, .color = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)},       // lime
+                      {.pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)}         // light green
 );
 
 // ─── Per-layer LED group highlights ─────────────────────────────────────────
@@ -162,10 +166,9 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 // overlay, so authored tier feedback stays visible even on the trackball half
 // while a mode color is active.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(
-    .multi_tap_pending_color = HSV(0, 0, 150),                              // neutral white while the engine is still resolving the active tap index
-    .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // orange for authored hold-tier pending / active states and hold-tier commit pulses
-    .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) // icy cyan for authored long-hold-tier active states and long-hold-tier commit pulses
+DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(.multi_tap_pending_color = HSV(0, 0, 150),                              // neutral white while the engine is still resolving the active tap index
+                                    .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // orange for authored hold-tier pending / active states and hold-tier commit pulses
+                                    .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) // icy cyan for authored long-hold-tier active states and long-hold-tier commit pulses
 );
 #    endif
 

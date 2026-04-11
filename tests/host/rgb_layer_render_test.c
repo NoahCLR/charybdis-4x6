@@ -50,36 +50,36 @@ split_runtime_sync_packet_t split_runtime_sync_remote = {
 led_config_t g_led_config = {0};
 
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
-    [LAYER_BASE] = {
-        .color = HSV(0, 0, 0),
-        .mode = ALL_KEYS,
-    },
-    [LAYER_NUM] = {
-        .color = HSV(10, 20, 30),
-        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-    },
-    [LAYER_SYM] = {
-        .color = HSV(40, 50, 60),
-        .mode = ALL_KEYS,
-    },
-    [LAYER_NAV] = {
-        .color = HSV(70, 80, 90),
-        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-    },
-    [LAYER_POINTER] = {
-        .color = HSV(100, 110, 120),
-        .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-    },
+    [LAYER_BASE] =
+        {
+            .color = HSV(0, 0, 0),
+            .mode  = ALL_KEYS,
+        },
+    [LAYER_NUM] =
+        {
+            .color = HSV(10, 20, 30),
+            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+        },
+    [LAYER_SYM] =
+        {
+            .color = HSV(40, 50, 60),
+            .mode  = ALL_KEYS,
+        },
+    [LAYER_NAV] =
+        {
+            .color = HSV(70, 80, 90),
+            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+        },
+    [LAYER_POINTER] =
+        {
+            .color = HSV(100, 110, 120),
+            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+        },
 };
 
-DEFINE_PD_MODE_COLORS(
-    { .pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212) },
-    { .pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222) }
-);
-static const uint8_t      volume_mode_group_leds[] = {1, 6};
-DEFINE_PD_MODE_LED_GROUPS(
-    { .pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds) }
-);
+DEFINE_PD_MODE_COLORS({.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212)}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222)});
+static const uint8_t volume_mode_group_leds[] = {1, 6};
+DEFINE_PD_MODE_LED_GROUPS({.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)});
 const automouse_fade_end_config_t automouse_fade_end_config = {
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
     .mode = END_COLOR_ON_ALL_KEYS,
@@ -90,12 +90,8 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 #endif
     .end_color = HSV(200, 210, 220),
 };
-DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(
-    .multi_tap_pending_color = HSV(1, 2, 3),
-    .hold_active_color       = HSV(4, 5, 6),
-    .long_hold_active_color  = HSV(7, 8, 9),
-);
-const pd_mode_def_t pd_modes[PD_MODE_COUNT]          = {
+DEFINE_KEY_BEHAVIOR_FEEDBACK_COLORS(.multi_tap_pending_color = HSV(1, 2, 3), .hold_active_color = HSV(4, 5, 6), .long_hold_active_color = HSV(7, 8, 9), );
+const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
     [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL}, [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME}, [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS}, [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM}, [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW}, [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH},
 };
 

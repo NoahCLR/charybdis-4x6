@@ -27,14 +27,14 @@
 
 // ─── Authored keymap data (defined in rgb_config.c) ──────────────────────
 #ifdef RGB_MATRIX_ENABLE
-extern const layer_color_config_t  layer_colors[];
-extern const layer_led_group_t    *const layer_led_groups;
-extern const uint8_t               layer_led_group_count;
+extern const layer_color_config_t     layer_colors[];
+extern const layer_led_group_t *const layer_led_groups;
+extern const uint8_t                  layer_led_group_count;
 #    ifdef POINTING_DEVICE_ENABLE
-extern const pd_mode_color_t      pd_mode_colors[];
-extern const uint8_t              pd_mode_color_count;
+extern const pd_mode_color_t            pd_mode_colors[];
+extern const uint8_t                    pd_mode_color_count;
 extern const pd_mode_led_group_t *const pd_mode_led_groups;
-extern const uint8_t              pd_mode_led_group_count;
+extern const uint8_t                    pd_mode_led_group_count;
 #    endif
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
 extern const automouse_fade_end_config_t automouse_fade_end_config;
