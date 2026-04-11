@@ -97,6 +97,14 @@
 #define IS_QK_LAYER_TAP(keycode_) ((keycode_) >= QK_LAYER_TAP && (keycode_) <= QK_LAYER_TAP_MAX)
 #define IS_QK_MODS(keycode_) ((keycode_) >= QK_MODS && (keycode_) <= QK_MODS_MAX)
 #define IS_QK_MACRO(keycode_) ((keycode_) >= QK_MACRO_0 && (keycode_) < (QK_MACRO_0 + DYNAMIC_KEYMAP_MACRO_COUNT))
+#define IS_QK_TO(keycode_) (false)
+#define IS_QK_DEF_LAYER(keycode_) (false)
+#define IS_QK_TOGGLE_LAYER(keycode_) (false)
+#define IS_QK_ONE_SHOT_LAYER(keycode_) (false)
+#define IS_QK_LAYER_TAP_TOGGLE(keycode_) (false)
+#define IS_QK_LAYER_MOD(keycode_) (false)
+#define IS_QK_ONE_SHOT_MOD(keycode_) (false)
+#define IS_QK_MOD_TAP(keycode_) (false)
 #define IS_MOUSEKEY_BUTTON(keycode_) ((keycode_) >= QK_MOUSE_BUTTON_1 && (keycode_) <= QK_MOUSE_BUTTON_8)
 #define IS_MODIFIER_KEYCODE(keycode_) (((keycode_) & 0xFFF8u) == KC_LEFT_CTRL)
 #define QK_MODS_GET_BASIC_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
@@ -118,8 +126,20 @@ typedef struct {
 } keyevent_t;
 
 typedef struct {
+    uint8_t count;
+} tap_t;
+
+typedef struct {
     keyevent_t event;
+    tap_t      tap;
+    uint16_t   keycode;
 } keyrecord_t;
+
+#define MAKE_KEYEVENT(row_, col_, pressed_) \
+    ((keyevent_t){                          \
+        .key     = {.row = (row_), .col = (col_)}, \
+        .pressed = (pressed_),             \
+    })
 
 #define IS_NOEVENT(event_) (false)
 
@@ -155,6 +175,11 @@ uint32_t timer_read32(void);
 uint32_t timer_elapsed32(uint32_t last);
 bool     is_keyboard_master(void);
 void     eeconfig_update_user(uint32_t value);
+bool     process_record_user(uint16_t keycode, keyrecord_t *record);
+bool     process_record(keyrecord_t *record);
+typedef uint16_t action_t;
+action_t action_for_keycode(uint16_t keycode);
+void     process_action(keyrecord_t *record, action_t action);
 
 extern layer_state_t layer_state;
 bool                 layer_state_cmp(layer_state_t state, uint8_t layer);

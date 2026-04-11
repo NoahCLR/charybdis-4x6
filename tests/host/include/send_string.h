@@ -8,4 +8,5 @@
 #define SS_UP_CODE 3
 #define SS_DELAY_CODE 4
 
+void send_char(char ascii_code);
 void send_char_with_delay(char ascii_code, uint8_t interval);

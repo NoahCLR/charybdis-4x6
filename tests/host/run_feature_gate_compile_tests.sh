@@ -4,42 +4,11 @@ set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
-COMMON_SOURCES="
-users/noah/runtime_init.c
-users/noah/lib/compat/qmk_contract.c
-users/noah/lib/compat/qmk_mod_contract.c
-users/noah/lib/compat/qmk_via_contract.c
-users/noah/lib/action/action_lifecycle.c
-users/noah/lib/macro/via_macro_defaults.c
-users/noah/lib/state/split_runtime_sync.c
-users/noah/lib/rgb/rgb_config_defaults.c
-users/noah/lib/rgb/rgb_automouse_stage.c
-users/noah/lib/rgb/rgb_key_feedback_stage.c
-users/noah/lib/rgb/rgb_layer_stage.c
-users/noah/lib/rgb/rgb_pd_mode_stage.c
-users/noah/lib/rgb/rgb_preview_stage.c
-users/noah/lib/rgb/rgb_runtime.c
-users/noah/lib/rgb/rgb_validation.c
-users/noah/lib/key/keymap_validation.c
-users/noah/lib/key/key_runtime_slot.c
-users/noah/lib/key/key_runtime_trace.c
-"
-
-POINTING_SOURCES="
-users/noah/lib/pointing/pd_runtime.c
-users/noah/lib/pointing/pd_mode_state.c
-users/noah/lib/pointing/pd_mode_registry.c
-users/noah/lib/pointing/pointer_layer_policy.c
-users/noah/lib/pointing/pd_mode_handlers.c
-"
-
-RGB_SOURCES="
-keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c
-"
-
-AUTOMOUSE_SOURCES="
-users/noah/lib/rgb/rgb_automouse.c
-"
+. "$ROOT/tests/host/noah_source_manifest.sh"
+COMMON_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_COMMON_SOURCES)"
+POINTING_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_POINTING_SOURCES)"
+RGB_SOURCES="$(noah_source_manifest_raw_paths "$ROOT" NOAH_RGB_KEYMAP_SOURCES)"
+AUTOMOUSE_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_AUTOMOUSE_SOURCES)"
 
 POINTING_TEST_FLAGS="-DPOINTING_DEVICE_ENABLE -DDPI_MOD=0x5201u -DDPI_RMOD=0x5202u -DS_D_MOD=0x5203u -DS_D_RMOD=0x5204u"
 RGB_TEST_FLAGS="-DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812"

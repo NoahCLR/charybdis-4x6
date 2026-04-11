@@ -4,6 +4,8 @@
 # full ruleset for the current Charybdis keymap, including feature toggles and
 # reusable runtime sources.
 
+include $(USER_PATH)/source_manifest.mk
+
 # VIA support: enables runtime key remapping via the VIA desktop app.
 VIA_ENABLE = yes
 
@@ -13,59 +15,15 @@ COMBO_ENABLE = yes
 # Link-time optimization: reduces binary size.
 LTO_ENABLE = yes
 
-SRC += runtime_init.c
-SRC += hooks.c
-SRC += lib/compat/qmk_contract.c
-SRC += lib/compat/qmk_mod_contract.c
-SRC += lib/compat/qmk_via_contract.c
-SRC += lib/action/action_lifecycle.c
-SRC += lib/action/synthetic_record.c
-SRC += lib/split_role.c
-SRC += lib/key/key_behavior_lookup.c
-SRC += lib/key/keymap_validation.c
-SRC += lib/key/key_runtime.c
-SRC += lib/key/key_runtime_slot.c
-SRC += lib/key/key_runtime_preflight.c
-SRC += lib/key/key_runtime_process.c
-SRC += lib/key/key_runtime_press.c
-SRC += lib/key/key_runtime_release.c
-SRC += lib/key/key_runtime_scan.c
-SRC += lib/key/key_runtime_transition.c
-SRC += lib/key/key_runtime_trace.c
-SRC += lib/key/delayed_action.c
-SRC += lib/key/held_action.c
-SRC += lib/action/action_dispatch.c
-SRC += lib/action/owned_keycode.c
-SRC += lib/action/macro_dispatch.c
-SRC += lib/macro/macro_payload.c
-SRC += lib/macro/via_macro_defaults.c
-SRC += lib/key/multi_tap_engine.c
-SRC += lib/key/key_runtime_feedback.c
-SRC += lib/state/keyboard_mod_state.c
-SRC += lib/state/keyboard_mod_ownership.c
-SRC += lib/state/layer_ownership.c
-SRC += lib/state/runtime_shared_state.c
-SRC += lib/state/split_runtime_sync.c
-SRC += lib/rgb/rgb_runtime.c
-SRC += lib/rgb/rgb_key_feedback_stage.c
-SRC += lib/rgb/rgb_layer_stage.c
-SRC += lib/rgb/rgb_automouse_stage.c
-SRC += lib/rgb/rgb_pd_mode_stage.c
-SRC += lib/rgb/rgb_preview_stage.c
-SRC += lib/rgb/rgb_config_defaults.c
-SRC += lib/rgb/rgb_validation.c
+SRC += $(NOAH_COMMON_SOURCES)
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
-    SRC += lib/pointing/pd_runtime.c
-    SRC += lib/pointing/pd_mode_state.c
-    SRC += lib/pointing/pd_mode_registry.c
-    SRC += lib/pointing/pointer_layer_policy.c
-    SRC += lib/pointing/pd_mode_handlers.c
+    SRC += $(NOAH_POINTING_SOURCES)
 endif
 
 ifeq ($(strip $(RGB_MATRIX_ENABLE)), yes)
-    SRC += lib/rgb/rgb_automouse.c
-    SRC += $(KEYMAP_PATH)/rgb_config.c
+    SRC += $(NOAH_AUTOMOUSE_SOURCES)
+    SRC += $(NOAH_RGB_KEYMAP_SOURCES)
 endif
 
 # Split role override: build with FORCE_MASTER=yes or FORCE_SLAVE=yes
