@@ -51,7 +51,7 @@ uint16_t noah_qmk_via_macro_seed_capacity(void) {
     return capacity;
 }
 
-void noah_qmk_via_macro_set_buffer(uint16_t offset, uint16_t size, const uint8_t *data) {
+void noah_qmk_via_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
     dynamic_keymap_macro_set_buffer(offset, size, data);
 }
 

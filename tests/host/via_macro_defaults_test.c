@@ -49,7 +49,7 @@ uint16_t dynamic_keymap_macro_get_buffer_size(void) {
     return TEST_MACRO_BUFFER_CAPACITY;
 }
 
-void dynamic_keymap_macro_set_buffer(uint16_t offset, uint16_t size, const uint8_t *data) {
+void dynamic_keymap_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
     CHECK((uint32_t)offset + (uint32_t)size <= sizeof(macro_buffer));
     memcpy(&macro_buffer[offset], data, size);
     dynamic_keymap_set_buffer_calls++;

@@ -80,6 +80,7 @@ Completed in this pass:
   - `tests/host/include/nvm_eeprom_eeconfig_internal.h`
   - `tests/host/include/nvm_eeprom_via_internal.h`
   - updated `tests/host/include/dynamic_keymap.h` with `dynamic_keymap_macro_set_buffer(...)`
+- Fixed a real-firmware compile mismatch in the VIA compat layer by aligning `noah_qmk_via_macro_set_buffer(...)` to QMK's non-const `uint8_t *` buffer signature.
 
 Verification completed in this pass:
 
