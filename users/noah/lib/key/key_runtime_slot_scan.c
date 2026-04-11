@@ -5,7 +5,7 @@
 // Scan-specific slot event helpers for the handled-key runtime.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_slot_scan.h"
+#include "key_runtime_slot_scan_internal.h"
 
 #include "key_runtime_slot_effect.h"
 

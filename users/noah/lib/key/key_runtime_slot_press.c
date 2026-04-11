@@ -5,7 +5,7 @@
 // Press-specific slot transition planning helpers.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_slot_press.h"
+#include "key_runtime_slot_press_internal.h"
 
 #include "../pointing/pd_modes.h"
 

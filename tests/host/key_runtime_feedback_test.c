@@ -5,7 +5,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/key_runtime_feedback.h"
-#include "users/noah/lib/key/key_runtime_slot_release.h"
+#include "users/noah/lib/key/key_runtime_slot_result.h"
 #include "users/noah/lib/key/key_runtime_state.h"
 
 enum {
@@ -82,6 +82,34 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
 
 bool is_layer_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
+}
+
+uint8_t behavior_get_layer(uint16_t keycode) {
+    (void)keycode;
+    return 0;
+}
+
+hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
+    return key.behavior.single.hold;
+}
+
+uint16_t handled_key_tap_action(handled_key_view_t key) {
+    return key.behavior.single.tap.action;
+}
+
+bool handled_key_uses_fallback_hold(handled_key_view_t key) {
+    (void)key;
+    return false;
+}
+
+bool handled_key_uses_implicit_hold(handled_key_view_t key) {
+    (void)key;
+    return false;
+}
+
+bool pd_mode_locked(pd_mode_mask_t mode) {
+    (void)mode;
+    return false;
 }
 
 noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
@@ -200,8 +228,8 @@ static void test_multi_tap_pending_flag_uses_secondary_slot(void) {
 }
 
 static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(void) {
-    key_runtime_slot_pending_multi_tap_hold_release_t release;
-    keypos_t                                          pos = {.row = 5, .col = 1};
+    key_runtime_slot_result_t release;
+    keypos_t                  pos = {.row = 5, .col = 1};
 
     test_reset_state();
 
@@ -222,15 +250,14 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
             },
     };
 
-    release = key_runtime_slot_take_pending_multi_tap_hold_release(
+    release = key_runtime_slot_take_handled_release_result(
         key_runtime_primary_slot(),
         TEST_MULTI_TAP_KEY,
-        (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY},
-        50);
+        pos,
+        (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY});
 
     CHECK(release.handled);
-    CHECK(release.action == KC_NO);
-    CHECK(release.repeat_count == 0);
+    CHECK(release.count == 0);
 
     uint8_t flags = key_feedback_pack();
     CHECK(key_feedback_flags_multi_tap_pending(flags));

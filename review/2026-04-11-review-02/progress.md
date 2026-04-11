@@ -297,6 +297,62 @@ Verification result:
 - targeted slot, transition, scenario, and integration tests passed
 - feature-gate compile checks passed
 
+## 2026-04-11 Internal Slot Protocol Header Narrowing
+
+Completed in this pass:
+
+- Moved the old press/release/scan event and apply structs behind new internal
+  headers:
+  - [`key_runtime_slot_press_internal.h`](../../users/noah/lib/key/key_runtime_slot_press_internal.h)
+  - [`key_runtime_slot_release_internal.h`](../../users/noah/lib/key/key_runtime_slot_release_internal.h)
+  - [`key_runtime_slot_scan_internal.h`](../../users/noah/lib/key/key_runtime_slot_scan_internal.h)
+- Narrowed the public headers so they expose only the remaining externally
+  useful helpers:
+  - [`key_runtime_slot_press.h`](../../users/noah/lib/key/key_runtime_slot_press.h)
+  - [`key_runtime_slot_release.h`](../../users/noah/lib/key/key_runtime_slot_release.h)
+  - [`key_runtime_slot_scan.h`](../../users/noah/lib/key/key_runtime_slot_scan.h)
+- Rewired the internal module includes so
+  [`key_runtime_slot_result.c`](../../users/noah/lib/key/key_runtime_slot_result.c),
+  [`key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c),
+  [`key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c),
+  and
+  [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+  consume those internal headers directly.
+- Reworked host coverage so the slot and feedback tests assert the shared
+  slot-result surface instead of the deprecated local event structs:
+  - [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  - [`tests/host/key_runtime_feedback_test.c`](../../tests/host/key_runtime_feedback_test.c)
+- Updated the feedback runner wiring in
+  [`run_key_runtime_feedback_tests.sh`](../../tests/host/run_key_runtime_feedback_tests.sh)
+  so the result-layer dependencies are linked explicitly.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the narrower public boundary.
+
+Why this pass landed now:
+
+- it makes the shared slot-result layer the real public seam for slot events
+  instead of just one adapter sitting next to the old public protocols
+- it reduces the next reducer pass to internal implementation work rather than
+  another public-header reshuffle
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, feedback, transition, and scenario tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+
 ## 2026-04-11 Shared Slot Result Surface
 
 Completed in this pass:

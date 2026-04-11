@@ -2,7 +2,7 @@
 
 Date: 2026-04-11
 
-Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, dedicated release/scan slot-transition modules, dedicated press/effect slot-transition modules, the first handled press/release slot-event wrappers, scan-specific slot-event wrappers that replaced the old public scan resolution/apply structs, an explicit handled-key slot lifecycle phase plus hold-strategy model, and a shared slot-result surface that now sits between slot event producers and `key_runtime_transition.c`; the remaining recommendations below focus on what is still architecturally open after those changes.
+Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, dedicated release/scan slot-transition modules, dedicated press/effect slot-transition modules, the first handled press/release slot-event wrappers, scan-specific slot-event wrappers that replaced the old public scan resolution/apply structs, an explicit handled-key slot lifecycle phase plus hold-strategy model, a shared slot-result surface that now sits between slot event producers and `key_runtime_transition.c`, and a narrowed public header boundary that moved the old press/release/scan result structs behind internal headers; the remaining recommendations below focus on what is still architecturally open after those changes.
 
 Scope: the `noah` userspace in this repo only. This review ignores hardware changes and evaluates software structure, boundaries, state flow, extension cost, and verification surfaces.
 
@@ -133,6 +133,9 @@ What is good now:
   adapt into a shared slot-result surface in
   [`key_runtime_slot_result.c`](../../users/noah/lib/key/key_runtime_slot_result.c)
   before the transition layer plans system effects
+- the older press/release/scan result structs are now hidden behind
+  internal-only headers instead of being part of the normal slot-module
+  include surface
 - scan-specific resolution/apply details now stay private to
   [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
   instead of leaking through the public header
@@ -159,6 +162,8 @@ What is still expensive:
 - the transition layer no longer knows the press/release/scan-specific local
   structs, but those local structs still exist behind the shared slot-result
   adapter instead of being collapsed into one reducer contract directly
+- the slot-result adapter still translates several local mini-protocols instead
+  of those modules sharing one underlying reducer/state-step implementation
 
 Why this matters:
 

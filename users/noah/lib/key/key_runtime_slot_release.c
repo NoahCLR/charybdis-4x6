@@ -5,7 +5,7 @@
 // Release-specific slot transition helpers for the handled-key runtime.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_slot_release.h"
+#include "key_runtime_slot_release_internal.h"
 
 #include "../action/action_lifecycle.h"
 #include "../pointing/pd_modes.h"

@@ -8,9 +8,9 @@
 
 #include "key_runtime_slot_result.h"
 
-#include "key_runtime_slot_press.h"
-#include "key_runtime_slot_release.h"
-#include "key_runtime_slot_scan.h"
+#include "key_runtime_slot_press_internal.h"
+#include "key_runtime_slot_release_internal.h"
+#include "key_runtime_slot_scan_internal.h"
 
 static void key_runtime_slot_result_push(key_runtime_slot_result_t *result, key_runtime_slot_result_effect_t effect) {
     if (!result) {
