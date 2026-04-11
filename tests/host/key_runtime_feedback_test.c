@@ -49,6 +49,18 @@ uint8_t get_oneshot_locked_mods(void) {
     return 0;
 }
 
+key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
+    (void)keycode;
+    (void)tap_count;
+    return key_behavior_step_none();
+}
+
+bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
+    (void)keycode;
+    (void)count;
+    return false;
+}
+
 bool action_dispatch_is_layer_action(uint16_t action) {
     (void)action;
     return false;

@@ -205,7 +205,13 @@ static active_key_state_t *key_runtime_transition_select_press_slot(keypos_t key
     return key_runtime_select_slot_for_press(key_pos);
 }
 
-static void key_runtime_transition_flush_multi_tap_state(multi_tap_t *mt, key_runtime_transition_plan_t *plan) {
+static void key_runtime_transition_flush_slot_pending_multi_tap(active_key_state_t *slot, key_runtime_transition_plan_t *plan) {
+    multi_tap_t *mt = key_runtime_multi_tap_for_slot(slot);
+
+    if (!key_runtime_slot_has_pending_multi_tap(slot)) {
+        return;
+    }
+
     delayed_action_mods_t mods = delayed_action_mods_from_multi_tap(mt);
 
     if (mt->pending_hold) {
@@ -214,7 +220,7 @@ static void key_runtime_transition_flush_multi_tap_state(multi_tap_t *mt, key_ru
         } else {
             key_runtime_transition_plan_delayed_action(plan, mt->single_action, mods, mt->count);
         }
-        multi_tap_reset(mt);
+        key_runtime_slot_reset_pending_multi_tap(slot);
         return;
     }
 
@@ -222,13 +228,13 @@ static void key_runtime_transition_flush_multi_tap_state(multi_tap_t *mt, key_ru
         key_behavior_step_t step = key_behavior_step_lookup(mt->keycode, mt->count);
         if (step.tap.present && step.tap.action != KC_NO) {
             key_runtime_transition_plan_delayed_action(plan, step.tap.action, mods, 1);
-            multi_tap_reset(mt);
+            key_runtime_slot_reset_pending_multi_tap(slot);
             return;
         }
     }
 
     key_runtime_transition_plan_delayed_action(plan, mt->single_action, mods, mt->count);
-    multi_tap_reset(mt);
+    key_runtime_slot_reset_pending_multi_tap(slot);
 }
 
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan) {
@@ -306,14 +312,13 @@ static void key_runtime_transition_activate_immediate_hold_if_needed(active_key_
 
 bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *record, handled_key_view_t key, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
     active_key_state_t *slot          = key_runtime_transition_select_press_slot(record->event.key);
-    multi_tap_t        *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
     key_behavior_view_t behavior      = key.behavior;
     hold_behavior_t     hold          = handled_key_single_hold(key);
     bool                implicit      = handled_key_uses_implicit_hold(key);
     pd_mode_mask_t      mode          = pd_mode_for_keycode(keycode);
 
-    if (handled_key_multi_tap_repress(key, slot_multi_tap, keycode, record->event.key)) {
-        uint16_t action = handled_key_advance_multi_tap(slot_multi_tap, keycode);
+    if (key.behavior.has_multi_tap && key_runtime_slot_pending_multi_tap_matches(slot, keycode, record->event.key)) {
+        uint16_t action = key_runtime_slot_advance_pending_multi_tap(slot, keycode);
         if (action != KC_NO) {
             key_runtime_transition_plan_dispatch_action(plan, action);
         }
@@ -322,15 +327,15 @@ bool key_runtime_transition_handled_key_press(uint16_t keycode, keyrecord_t *rec
             key_runtime_transition_plan_layer_press(plan, record->event.key, behavior_get_layer(keycode));
         }
 
-        bool pending_hold = multi_tap_pending_hold(slot_multi_tap);
+        bool pending_hold = key_runtime_slot_pending_multi_tap_pending_hold(slot);
         if (pending_hold || behavior.is_momentary_layer) {
             key_runtime_slot_track(slot, keycode, record->event.key, KC_NO, hold_behavior_none(), hold_behavior_none(), behavior.tap_hold_term, behavior.longer_hold_term, behavior.multi_tap_term, !pending_hold);
         }
         return true;
     }
 
-    if (key_runtime_multi_tap_slot_active(slot_multi_tap) && !multi_tap_matches(slot_multi_tap, keycode, record->event.key)) {
-        key_runtime_transition_flush_multi_tap_state(slot_multi_tap, plan);
+    if (key_runtime_slot_has_pending_multi_tap(slot) && !key_runtime_slot_pending_multi_tap_matches(slot, keycode, record->event.key)) {
+        key_runtime_transition_flush_slot_pending_multi_tap(slot, plan);
     }
 
     if (behavior.is_momentary_layer) {
@@ -357,8 +362,7 @@ static uint16_t key_runtime_transition_select_release_hold_action(uint16_t elaps
 
 static void key_runtime_transition_dispatch_released_key_tap(uint16_t keycode, active_key_state_t *slot, active_key_state_t released_key, key_behavior_view_t behavior, key_runtime_transition_plan_t *plan) {
     if (behavior.has_multi_tap) {
-        multi_tap_t *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
-        multi_tap_begin(slot_multi_tap, keycode, released_key.key_pos, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
+        key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.key_pos, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
     } else if (released_key.tap_action != KC_NO) {
         key_runtime_transition_plan_dispatch_action(plan, released_key.tap_action);
     }
@@ -482,13 +486,13 @@ static void key_runtime_transition_apply_active_key_release_resolution(uint16_t 
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {
     for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-        multi_tap_t *mt = key_runtime_multi_tap_slot_at(index);
+        active_key_state_t *slot = key_runtime_slot_at(index);
 
-        if (!key_runtime_multi_tap_slot_active(mt)) {
+        if (!key_runtime_slot_has_pending_multi_tap(slot)) {
             continue;
         }
 
-        key_runtime_transition_flush_multi_tap_state(mt, plan);
+        key_runtime_transition_flush_slot_pending_multi_tap(slot, plan);
     }
 }
 
@@ -525,20 +529,20 @@ static bool key_runtime_transition_pending_multi_tap_release_uses_held_lifecycle
 }
 
 static bool key_runtime_transition_process_pending_multi_tap_hold_release(uint16_t keycode, keyrecord_t *record, key_behavior_view_t behavior, key_runtime_transition_plan_t *plan) {
-    active_key_state_t *slot          = key_runtime_find_slot_by_position(record->event.key);
-    multi_tap_t        *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
+    active_key_state_t *slot = key_runtime_find_slot_by_position(record->event.key);
 
-    if (!(slot_multi_tap && multi_tap_pending_hold(slot_multi_tap) && multi_tap_matches(slot_multi_tap, keycode, record->event.key))) {
+    if (!(slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_pending_multi_tap_matches(slot, keycode, record->event.key))) {
         return false;
     }
 
+    multi_tap_t             *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
     uint16_t              elapsed          = timer_elapsed(slot->timer);
     delayed_action_mods_t cached_mods      = delayed_action_mods_from_multi_tap(slot_multi_tap);
     bool                  was_release_hold = hold_sends_on_release(slot_multi_tap->hold);
     hold_behavior_t       cached_hold      = slot_multi_tap->hold;
     hold_behavior_t       cached_long_hold = slot_multi_tap->long_hold;
     uint8_t               repeat_count     = 0;
-    uint16_t              action           = multi_tap_resolve_hold(slot_multi_tap, keycode, key_behavior_has_more_taps, &repeat_count);
+    uint16_t              action           = key_runtime_slot_resolve_pending_multi_tap_hold(slot, keycode, &repeat_count);
 
     if (!cached_hold.present && hold_sends_on_release(cached_long_hold) && elapsed >= slot->longer_hold_term) {
         action = cached_long_hold.action;
@@ -780,7 +784,7 @@ static pending_multi_tap_scan_resolution_t key_runtime_transition_resolve_pendin
     return resolution;
 }
 
-static void key_runtime_transition_apply_pending_multi_tap_scan_resolution(active_key_state_t *slot, multi_tap_t *slot_multi_tap, pending_multi_tap_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+static void key_runtime_transition_apply_pending_multi_tap_scan_resolution(active_key_state_t *slot, pending_multi_tap_scan_resolution_t resolution, key_runtime_transition_plan_t *plan) {
 
     if (resolution.release_layer_before_action) {
         key_runtime_transition_plan_layer_release(plan, slot->key_pos);
@@ -790,12 +794,12 @@ static void key_runtime_transition_apply_pending_multi_tap_scan_resolution(activ
         case PENDING_MULTI_TAP_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
             slot->long_hold = resolution.long_hold;
             key_runtime_transition_promote_to_long_hold(slot, slot->long_hold, true, plan);
-            multi_tap_reset(slot_multi_tap);
+            key_runtime_slot_reset_pending_multi_tap(slot);
             return;
         case PENDING_MULTI_TAP_SCAN_OUTCOME_FIRE_HOLD:
             slot->long_hold = resolution.long_hold;
             key_runtime_transition_fire_hold_at_threshold(slot, resolution.hold, slot->long_hold, true, plan);
-            multi_tap_reset(slot_multi_tap);
+            key_runtime_slot_reset_pending_multi_tap(slot);
             return;
         case PENDING_MULTI_TAP_SCAN_OUTCOME_NONE:
         default:
@@ -821,15 +825,15 @@ void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
         active_key_state_t *slot          = key_runtime_slot_at(index);
         multi_tap_t        *slot_multi_tap = key_runtime_multi_tap_slot_at(index);
 
-        if (multi_tap_pending_hold(slot_multi_tap) && key_runtime_slot_active(slot)) {
+        if (key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_active(slot)) {
             uint16_t                            elapsed    = timer_elapsed(slot_multi_tap->timer);
             pending_multi_tap_scan_resolution_t resolution = key_runtime_transition_resolve_pending_multi_tap_scan(*slot, *slot_multi_tap, elapsed);
 
-            key_runtime_transition_apply_pending_multi_tap_scan_resolution(slot, slot_multi_tap, resolution, plan);
+            key_runtime_transition_apply_pending_multi_tap_scan_resolution(slot, resolution, plan);
         }
 
-        if (multi_tap_expired(slot_multi_tap)) {
-            key_runtime_transition_flush_multi_tap_state(slot_multi_tap, plan);
+        if (key_runtime_slot_pending_multi_tap_expired(slot)) {
+            key_runtime_transition_flush_slot_pending_multi_tap(slot, plan);
         }
     }
 }

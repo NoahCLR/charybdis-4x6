@@ -173,6 +173,23 @@ Completed in this pass:
 - Fixed one regression introduced during the storage collapse:
   - `key_runtime_slot_track(...)` now preserves an in-flight `pending_multi_tap` sequence when a multi-tap repress updates the slot's active press fields
   - without that preservation, the third-tap hold path in `key_runtime_modifier_hold_integration_test.c` dropped the pending hold state while retaking ownership of the pressed key
+- Continued Phase 4 by promoting the slot storage model into a clearer per-slot lifecycle API:
+  - `users/noah/lib/key/key_runtime_slot.c` now exposes slot-owned helpers for:
+    - slot idle / ownership queries
+    - pending multi-tap presence, match, hold-pending, and expiry queries
+    - beginning, advancing, resolving, and clearing a slot-owned pending multi-tap chain
+  - `users/noah/lib/key/key_runtime_transition.c` now consumes those slot helpers instead of coordinating `pending_multi_tap` as a raw embedded struct
+  - `users/noah/lib/key/key_runtime_preflight.c` and `users/noah/lib/key/key_runtime_feedback.c` now also query pending tap-chain state through slot helpers instead of directly calling `multi_tap_*` on raw slot fields
+- Narrowed the handled-key helper boundary again:
+  - removed the last multi-tap progression helpers from `users/noah/lib/key/handled_key.h` and `users/noah/lib/key/key_runtime.c`
+  - `handled_key.*` is back to behavior interpretation only, while slot lifecycle owns the per-slot tap-chain progression rules
+- Added direct host coverage for the new slot lifecycle surface:
+  - `tests/host/key_runtime_slot_test.c`
+  - `tests/host/run_key_runtime_slot_tests.sh`
+  - updated `tests/host/run_all_host_tests.sh` to keep the new slot-level suite in the default host regression pass
+- Updated smaller host harnesses to match the refactored slot module's real dependency surface:
+  - `tests/host/run_key_runtime_preflight_tests.sh` now links `multi_tap_engine.c`
+  - `tests/host/key_runtime_preflight_test.c` and `tests/host/key_runtime_feedback_test.c` now provide the `key_behavior_step_lookup(...)` / `key_behavior_has_more_taps(...)` stubs that `key_runtime_slot.c` legitimately depends on
 
 Verification completed in this pass:
 
@@ -189,6 +206,7 @@ Verification completed in this pass:
 - `sh tests/host/run_pd_mode_tests.sh`
 - `sh tests/host/run_key_runtime_feedback_tests.sh`
 - `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
 - `sh tests/host/run_key_runtime_transition_tests.sh`
 - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
 - `sh tests/host/run_split_runtime_sync_tests.sh`
@@ -204,4 +222,4 @@ Follow-up wiring completed during verification:
 
 Next recommended step:
 
-- continue Phase 4 by turning the now slot-owned press state and `pending_multi_tap` sub-state into a more explicit per-slot FSM API, so `key_runtime_transition.c` stops manually coordinating two sub-states and can resolve press/release/scan transitions through one clearer slot lifecycle surface.
+- continue Phase 4 by pulling more of the remaining slot transition policy out of `key_runtime_transition.c` and into slot-local state-transition helpers, especially the active-press release/scan resolution branches that still operate as large transition-file-local decision trees.

@@ -59,9 +59,9 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
 
     if (record->event.pressed && !handled_key.behavior.handled) {
         for (uint8_t index = 0; index < KEY_RUNTIME_ACTIVE_SLOT_CAPACITY; index++) {
-            multi_tap_t *slot_multi_tap = key_runtime_multi_tap_slot_at(index);
+            active_key_state_t *candidate = key_runtime_slot_at(index);
 
-            if (multi_tap_active(slot_multi_tap) && !multi_tap_matches(slot_multi_tap, keycode, record->event.key)) {
+            if (key_runtime_slot_has_pending_multi_tap(candidate) && !key_runtime_slot_pending_multi_tap_matches(candidate, keycode, record->event.key)) {
                 flush_multi_taps = true;
                 break;
             }

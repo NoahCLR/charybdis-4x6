@@ -134,14 +134,6 @@ bool is_layer_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
-bool multi_tap_active(const multi_tap_t *mt) {
-    return mt->count > 0;
-}
-
-bool multi_tap_matches(const multi_tap_t *mt, uint16_t keycode, keypos_t key_pos) {
-    return multi_tap_active(mt) && mt->keycode == keycode && mt->key_pos.row == key_pos.row && mt->key_pos.col == key_pos.col;
-}
-
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     *plan = (key_runtime_transition_plan_t){0};
 }
@@ -196,6 +188,18 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .keycode = keycode,
     };
+}
+
+key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
+    (void)keycode;
+    (void)tap_count;
+    return key_behavior_step_none();
+}
+
+bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
+    (void)keycode;
+    (void)count;
+    return false;
 }
 
 handled_key_view_t handled_key_lookup(uint16_t keycode) {
