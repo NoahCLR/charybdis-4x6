@@ -24,11 +24,15 @@ can adjust the board without having to rework the runtime.
 > qmk compile -kb bastardkb/charybdis/4x6 -km noah
 > ```
 
-This repo is built around the Charybdis from [BastardKB](https://bastardkb.com/),
-designed by Quentin. His work, and the community built around this board, have given me
-hundreds of hours of fun optimizing both the hardware and the firmware, and I
-am very thankful for that. If you are considering buying the hardware, buy it
-from him rather than from a knockoff seller.
+This repo is built around the open-source Charybdis from
+[BastardKB](https://bastardkb.com/), designed by Quentin. The hardware files
+are available in the
+[BastardKB Charybdis project](https://github.com/Bastardkb/Charybdis).
+Quentin's design, and the many mods the community has built around this board,
+have given me hundreds of hours of fun optimizing both the hardware and the
+firmware, and I am very thankful for that. If you want to support the creator,
+buy the hardware from
+[BastardKB](https://bastardkb.com/) rather than from a knockoff seller.
 
 ## What This Userspace Is For
 
