@@ -153,8 +153,9 @@ Use rows like:
 
 In the shared RGB runtime:
 
-- the configured auto-mouse layer now uses its authored `layer_colors[]` entry
-  as the timeout fade start state
+- the configured auto-mouse layer now uses the full authored layer-rendered
+  start state, including any active layer LED groups, as the timeout fade
+  start state
 - the default destination is the real layer-rendered state that remains after
   the auto-mouse layer drops out
 - `FOLLOW_REAL_DESTINATION` lands on that real rendered destination
@@ -310,10 +311,11 @@ Edit the matching row in `pd_mode_colors[]`.
 
 ### Change the auto-mouse timeout fade
 
-Edit the `LAYER_POINTER` row in `layer_colors[]` to change the start state.
-Edit `automouse_fade_end_config` if you want the timeout destination to follow
-the real post-timeout layer state, use `end_color` where the base effect would
-show, or use `end_color` on every key.
+Edit the `LAYER_POINTER` row in `layer_colors[]` to change the main start
+color. If the auto-mouse layer or overlapping layers use LED groups, those are
+also part of the visible start render. Edit `automouse_fade_end_config` if you
+want the timeout destination to follow the real post-timeout layer state, use
+`end_color` where the base effect would show, or use `end_color` on every key.
 
 If you want to change the timing model instead of just the colors, look at:
 

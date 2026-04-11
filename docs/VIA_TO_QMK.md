@@ -56,6 +56,12 @@ Preview a specific export:
 python 'via layouts/via_to_qmk_layout.py' --print --via-json /path/to/export.json
 ```
 
+Run the default interactive write flow:
+
+```sh
+python 'via layouts/via_to_qmk_layout.py'
+```
+
 Write back into `keymap.c`:
 
 ```sh
@@ -77,8 +83,9 @@ So you can sync macros only, layers only, or both.
 
 ## If You Omit `--via-json`
 
-If you do not pass `--via-json`, the script interactively asks you to choose a
-VIA export from the `via layouts/` directory.
+If you do not pass `--via-json`, the script uses the only JSON export in
+`via layouts/` automatically when there is just one. If there are multiple
+exports, it interactively asks you to choose one.
 
 ## Token Mapping
 
@@ -87,11 +94,16 @@ The script translates VIA tokens into the symbols used by this repo.
 Important cases:
 
 - `MACRO(n)` in VIA export becomes `VIA_MACRO_n`
+- upstream Charybdis keyboard keycodes `CUSTOM(0)` through `CUSTOM(7)` map to
+  the keyboard-defined symbols such as `DPI_MOD`, `DPI_RMOD`, `S_D_MOD`, and
+  `S_D_RMOD`
 - `CUSTOM(64 + n)` maps into this userspace custom-keycode range
 - shared pd-mode keycodes are loaded from
   [`pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h)
 - keymap-local custom keycodes are loaded from
   [`enum keymap_custom_keycodes`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
+- layer wrappers such as `MO(3)` or `LT(3,KC_F)` are rewritten back to the
+  named layer enum symbols from this keymap
 
 That means most keymap-local additions do not require manual script edits. If
 you add a new keymap-local custom keycode in `keymap.c`, the script can usually

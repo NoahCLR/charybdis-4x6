@@ -66,9 +66,9 @@ to understand and easy to change:
   [`hooks.c`](./users/noah/hooks.c). A keymap can override any QMK hook and
   call the matching `noah_*` helper to keep the shared behavior, or replace it
   entirely (see [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md))
-- `split_runtime_sync` syncs pointing-device mode flags, auto-mouse progress,
-  and key-feedback flags from master to slave so both halves render
-  consistently
+- `split_runtime_sync` syncs active and locked pointing-device mode flags,
+  auto-mouse progress, key-feedback flags, and preview-layer state from master
+  to slave so both halves render consistently
 
 The README is intentionally capability-focused. It explains what the shared
 runtime supports and how the pieces fit together. If you want one concrete
@@ -363,7 +363,7 @@ independently toggled in the keymap
 [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
 
 - **Auto-mouse gradient** (`RGB_AUTOMOUSE_GRADIENT_ENABLE`): the configured
-  auto-mouse layer uses its authored `layer_colors[]` start state and fades
+  auto-mouse layer uses its authored layer-rendered start state and fades
   toward the real post-timeout layer render by default, so you can see how
   much timeout remains before the pointer layer clears
 - **Key-behavior feedback** (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`): the
@@ -374,8 +374,9 @@ independently toggled in the keymap
 
 Both overlays are purely additive. With both disabled, `rgb_config.c` still
 provides full layer and pointer-mode color feedback. With both enabled, the
-render order is: layer color, auto-mouse gradient, layer LED groups,
-pointer-mode color, mode LED groups, key-behavior overlay.
+render order is: composed layer colors plus layer LED groups, auto-mouse fade
+on that layer stage when active, preview-layer overlay, pointer-mode color,
+mode LED groups, key-behavior overlay.
 
 The master half computes the feedback state and syncs what the slave needs
 through `split_runtime_sync`, so both halves render consistently.

@@ -178,7 +178,9 @@ These are small profile-specific quality-of-life keys:
 `KC_RIGHT_ALT` is a good example of the profile using a plain key's default held
 path while still stealing its tap for something more specialized. That matters
 for `ARROW_MODE`, because the mode emits real arrow taps. Holding `Right Alt`
-while using arrow mode still gives the usual `Option+Arrow` word-jump behavior.
+while using horizontal arrow-mode motion still gives the usual
+`Option+Left` / `Option+Right` word-jump behavior. Vertical arrow-mode taps
+intentionally mask `Alt` so up/down stays plain.
 
 ### Nav Arrows
 
@@ -266,7 +268,7 @@ This is the densest current layer. It combines:
 - direct macOS shortcuts
 - `MS_BTN1` and `MS_BTN2`
 - `DRAGSCROLL`
-- three VIA macros
+- four VIA macros
 
 It is also the current auto-sniping layer, so entering nav changes both keys
 and trackball feel.

@@ -103,6 +103,10 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 }
 ```
 
+Right now, `noah_get_hold_on_other_key_press()` is effectively a no-op and
+returns `false`, so this pattern only matters if the shared userspace later
+gains hold-preference logic or if your keymap adds its own checks after it.
+
 ### State-Transform Hooks
 
 Feed the current value through the shared helper, then continue from the
@@ -161,7 +165,7 @@ This pattern applies to:
 | QMK hook | Shared helper | What the helper currently owns |
 | --- | --- | --- |
 | `eeconfig_init_user()` | `noah_eeconfig_init_user()` | VIA macro seeding after EEPROM init |
-| `get_hold_on_other_key_press()` | `noah_get_hold_on_other_key_press()` | shared tap-hold exceptions |
+| `get_hold_on_other_key_press()` | `noah_get_hold_on_other_key_press()` | currently no shared behavior; keep the call-through if you want future shared hold-preference logic |
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, macros, direct actions |
 | `matrix_scan_user()` | `noah_matrix_scan_user()` | VIA macro default reseeding, key runtime scanning, and split shared-state sync ticks |
 | `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | macro and keymap validation, VIA macro default seeding, RGB runtime init, and split shared-state init |
@@ -187,5 +191,6 @@ enum keymap_custom_keycodes {
 
 Those keycodes can be handled in `process_record_user()` and also used in
 `key_behaviors[]` actions such as `TAP_SENDS(...)`,
-`TAP_AT_HOLD_THRESHOLD(...)`, `REPEAT_WHILE_HELD(...)`, and
+`TAP_AT_HOLD_THRESHOLD(...)`, `TAP_ON_RELEASE_AFTER_HOLD(...)`,
+`REPEAT_WHILE_HELD(...)`, and
 `PRESS_AND_HOLD_UNTIL_RELEASE(...)`.
