@@ -295,11 +295,9 @@ const key_behavior_t
 
             // Punctuation → shifted variants
             {.keycode = KC_MINS, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)}}},
-            {.keycode = KC_EQL, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_PLUS)}}},
             {.keycode = KC_LBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)}}},
             {.keycode = KC_RBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)}}},
             {.keycode = KC_BSLS, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_PIPE)}}},
-            {.keycode = KC_GRV, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_TILD)}}},
             {.keycode = KC_SCLN, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_COLN)}}},
             {.keycode = KC_QUOT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)}}},
             {.keycode = KC_COMM, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)}}},
@@ -371,7 +369,6 @@ const key_behavior_t
             // If [0].hold is omitted, single hold still uses the key's default momentary pd-mode.
             {.keycode = VOLUME_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_N)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
             {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_H)}}},
-            {.keycode = ARROW_MODE, .tap_counts = {[1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(ARROW_MODE))}}},
             {
                 .keycode = PINCH_MODE,
                 .tap_counts =

@@ -32,11 +32,21 @@ Completed in this pass:
 - Added host coverage for the new keymap-level validation path:
   - `tests/host/keymap_validation_test.c`
   - `tests/host/run_keymap_validation_tests.sh`
+- Added a real-profile host harness that compiles the authored keymap and RGB config translation units directly:
+  - `tests/host/include/noah_real_profile_keyboard.h`
+  - `tests/host/real_profile_validation_test.c`
+  - `tests/host/run_real_profile_validation_tests.sh`
+- Used the real-profile harness to remove three dead `key_behaviors[]` rows from `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`:
+  - `KC_EQL`
+  - `KC_GRV`
+  - `ARROW_MODE`
+  Those rows were no longer referenced by `keymaps[][]` or active combo outputs.
 
 Verification completed in this pass:
 
 - `sh tests/host/run_key_behavior_validation_tests.sh`
 - `sh tests/host/run_keymap_validation_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
 - `sh tests/host/run_rgb_validation_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
@@ -48,7 +58,6 @@ Follow-up wiring completed during verification:
 
 Next recommended step:
 
-- add a host harness that compiles the real authored `keymap.c` and `rgb_config.c`, then runs the shared validation path against those materialized tables
 - decide whether the next architectural slice should be:
-  - deeper authored-profile integrity checks around the real keymap translation unit
-  - narrowing the keymap authoring/runtime interface split
+  - Phase 1 compatibility-layer work around fork-specific QMK contracts
+  - Phase 2 narrowing of the keymap authoring/runtime interface split
