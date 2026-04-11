@@ -29,25 +29,73 @@ typedef enum {
     KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
 } key_runtime_slot_hold_strategy_t;
 
-// One handled-key runtime slot: active press/hold state plus any deferred
-// multi-tap chain that still owns this physical key position after release.
 typedef struct {
-    uint16_t                         timer;
-    uint16_t                         keycode;
-    keypos_t                         key_pos;
+    uint16_t keycode;
+    keypos_t key_pos;
+} key_runtime_slot_owner_state_t;
+
+typedef struct {
     key_runtime_slot_phase_t         phase;
     uint16_t                         held_action_keycode;
     bool                             repeat_binding_active;
-    uint16_t                         tap_action;
-    uint16_t                         tap_hold_term;
-    uint16_t                         longer_hold_term;
-    uint16_t                         multi_tap_term;
     key_runtime_slot_hold_strategy_t hold_strategy;
     bool                             pd_mode_was_locked_on_press;
     bool                             layer_interrupted;
-    hold_behavior_t                  hold;
-    hold_behavior_t                  long_hold;
-    multi_tap_t                      pending_multi_tap;
+} key_runtime_slot_lifecycle_state_t;
+
+typedef struct {
+    uint16_t        tap_action;
+    hold_behavior_t hold;
+    hold_behavior_t long_hold;
+} key_runtime_slot_binding_state_t;
+
+typedef struct {
+    uint16_t tap_hold_term;
+    uint16_t longer_hold_term;
+    uint16_t multi_tap_term;
+} key_runtime_slot_timing_state_t;
+
+// One handled-key runtime slot: active press/hold state plus any deferred
+// multi-tap chain that still owns this physical key position after release.
+typedef struct {
+    uint16_t timer;
+    // The anonymous unions preserve the existing flat designated initializers
+    // while giving the runtime named owner/binding/timing/lifecycle groups.
+    union {
+        struct {
+            uint16_t keycode;
+            keypos_t key_pos;
+        };
+        key_runtime_slot_owner_state_t owner;
+    };
+    union {
+        struct {
+            key_runtime_slot_phase_t         phase;
+            uint16_t                         held_action_keycode;
+            bool                             repeat_binding_active;
+            key_runtime_slot_hold_strategy_t hold_strategy;
+            bool                             pd_mode_was_locked_on_press;
+            bool                             layer_interrupted;
+        };
+        key_runtime_slot_lifecycle_state_t lifecycle;
+    };
+    union {
+        struct {
+            uint16_t        tap_action;
+            hold_behavior_t hold;
+            hold_behavior_t long_hold;
+        };
+        key_runtime_slot_binding_state_t binding;
+    };
+    union {
+        struct {
+            uint16_t tap_hold_term;
+            uint16_t longer_hold_term;
+            uint16_t multi_tap_term;
+        };
+        key_runtime_slot_timing_state_t timing;
+    };
+    multi_tap_t pending_multi_tap;
 } active_key_state_t;
 
 #define KEY_RUNTIME_SLOT_TABLE_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))

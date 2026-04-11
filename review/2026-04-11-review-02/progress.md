@@ -199,6 +199,60 @@ Verification result:
 - full host suite passed
 - firmware build passed
 
+## 2026-04-12 Grouped Slot State And Explicit Reducer Dispatch
+
+Completed in this pass:
+
+- Grouped handled-key slot state in
+  [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
+  into named `owner`, `lifecycle`, `binding`, and `timing` subrecords while
+  keeping the existing flat fixture style working through the compatibility
+  overlay.
+- Moved the runtime slot helpers in
+  [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c),
+  [`users/noah/lib/key/key_runtime.c`](../../users/noah/lib/key/key_runtime.c),
+  [`users/noah/lib/key/key_runtime_feedback.c`](../../users/noah/lib/key/key_runtime_feedback.c),
+  and
+  [`users/noah/lib/key/key_runtime_preflight.c`](../../users/noah/lib/key/key_runtime_preflight.c)
+  onto the grouped slot-state view instead of treating `active_key_state_t` as
+  one flat mutable bag.
+- Tightened
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  so active-scan phase dispatch, release phase resolution, and top-level slot
+  event dispatch now flow through explicit handler tables.
+- Kept the public slot-step and slot-result contracts stable while making the
+  reducer internals read more like a phase/event FSM core.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the grouped slot-state model and the new explicit
+  dispatch shape.
+
+Why this pass landed now:
+
+- it tackles the two remaining handled-key review findings directly:
+  reducer/FSM shape and the broad mutable slot-state surface
+- it improves the internal runtime model without reopening the now-finished
+  position-indexed storage rewrite
+- it keeps the next reducer cleanup focused on shrinking the compatibility
+  overlay and reducer size instead of rediscovering missing state boundaries
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Verification result:
+
+- targeted slot, feedback, transition, preflight, scenario, and integration
+  tests passed
+- feature-gate compile checks passed
+
 ## 2026-04-12 Press And Release Reducer Collapse
 
 Completed in this pass:

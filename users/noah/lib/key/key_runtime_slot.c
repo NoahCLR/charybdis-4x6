@@ -41,27 +41,27 @@ active_key_state_t *key_runtime_slot_at(uint8_t index) {
 }
 
 bool key_runtime_slot_idle(const active_key_state_t *slot) {
-    return slot != NULL && slot->keycode == KC_NO && !multi_tap_active(&slot->pending_multi_tap);
+    return slot != NULL && slot->owner.keycode == KC_NO && !multi_tap_active(&slot->pending_multi_tap);
 }
 
 bool key_runtime_slot_active(const active_key_state_t *slot) {
-    return slot != NULL && slot->keycode != KC_NO;
+    return slot != NULL && slot->owner.keycode != KC_NO;
 }
 
 key_runtime_slot_phase_t key_runtime_slot_phase(const active_key_state_t *slot) {
-    if (!slot || slot->keycode == KC_NO) {
+    if (!slot || slot->owner.keycode == KC_NO) {
         return KEY_RUNTIME_SLOT_PHASE_IDLE;
     }
 
-    return slot->phase == KEY_RUNTIME_SLOT_PHASE_IDLE ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : slot->phase;
+    return slot->lifecycle.phase == KEY_RUNTIME_SLOT_PHASE_IDLE ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : slot->lifecycle.phase;
 }
 
 bool key_runtime_slot_uses_implicit_hold(const active_key_state_t *slot) {
-    return slot != NULL && slot->hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
+    return slot != NULL && slot->lifecycle.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
 }
 
 bool key_runtime_slot_uses_fallback_hold(const active_key_state_t *slot) {
-    return slot != NULL && slot->hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
+    return slot != NULL && slot->lifecycle.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
 }
 
 bool key_runtime_slot_allows_tap_release(const active_key_state_t *slot) {
@@ -82,11 +82,11 @@ bool key_runtime_slot_hold_is_complete(const active_key_state_t *slot) {
 }
 
 bool key_runtime_slot_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos) {
-    return key_runtime_slot_active(slot) && slot->keycode == keycode && key_runtime_keypos_equal(slot->key_pos, key_pos);
+    return key_runtime_slot_active(slot) && slot->owner.keycode == keycode && key_runtime_keypos_equal(slot->owner.key_pos, key_pos);
 }
 
 bool key_runtime_slot_owns_key_position(const active_key_state_t *slot, keypos_t key_pos) {
-    return (key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->key_pos, key_pos)) || (key_runtime_slot_has_pending_multi_tap(slot) && key_runtime_keypos_equal(slot->pending_multi_tap.key_pos, key_pos));
+    return (key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) || (key_runtime_slot_has_pending_multi_tap(slot) && key_runtime_keypos_equal(slot->pending_multi_tap.key_pos, key_pos));
 }
 
 bool key_runtime_slot_has_pending_multi_tap(const active_key_state_t *slot) {
@@ -252,7 +252,7 @@ void key_runtime_slot_set_release_hold_pending(active_key_state_t *slot) {
         return;
     }
 
-    slot->phase = KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
+    slot->lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
 }
 
 void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes_hold) {
@@ -260,7 +260,7 @@ void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes
         return;
     }
 
-    slot->phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
+    slot->lifecycle.phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
 }
 
 void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
@@ -271,18 +271,27 @@ void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t
     multi_tap_t pending_multi_tap = slot->pending_multi_tap;
 
     *slot = (active_key_state_t){
-        .timer               = timer_read(),
-        .keycode             = keycode,
-        .key_pos             = key_pos,
-        .phase               = phase,
-        .held_action_keycode = KC_NO,
-        .tap_action          = tap_action,
-        .tap_hold_term       = tap_hold_term,
-        .longer_hold_term    = longer_hold_term,
-        .multi_tap_term      = multi_tap_term,
-        .hold_strategy       = hold_strategy,
-        .hold                = hold,
-        .long_hold           = long_hold,
-        .pending_multi_tap   = pending_multi_tap,
+        .timer         = timer_read(),
+        .owner.keycode = keycode,
+        .owner.key_pos = key_pos,
+        .lifecycle =
+            {
+                .phase               = phase,
+                .held_action_keycode = KC_NO,
+                .hold_strategy       = hold_strategy,
+            },
+        .binding =
+            {
+                .tap_action = tap_action,
+                .hold       = hold,
+                .long_hold  = long_hold,
+            },
+        .timing =
+            {
+                .tap_hold_term    = tap_hold_term,
+                .longer_hold_term = longer_hold_term,
+                .multi_tap_term   = multi_tap_term,
+            },
+        .pending_multi_tap = pending_multi_tap,
     };
 }

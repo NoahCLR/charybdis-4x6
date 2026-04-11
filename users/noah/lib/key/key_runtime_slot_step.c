@@ -40,10 +40,10 @@ static key_runtime_slot_effect_request_t key_runtime_slot_step_begin_press(activ
     }
 
     key_runtime_slot_track(slot, keycode, key_pos, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, phase, hold_strategy);
-    slot->pd_mode_was_locked_on_press = pd_mode_was_locked_on_press;
+    slot->lifecycle.pd_mode_was_locked_on_press = pd_mode_was_locked_on_press;
 
     if (hold_registers_on_press(hold)) {
-        slot->held_action_keycode = hold.action;
+        slot->lifecycle.held_action_keycode = hold.action;
         request.kind              = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
         request.action            = hold.action;
     }
@@ -92,36 +92,36 @@ static void key_runtime_slot_step_clear_owned_hold(active_key_state_t *slot, key
         return;
     }
 
-    if (slot->held_action_keycode != KC_NO || slot->repeat_binding_active) {
+    if (slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
         request->release_owned_state = true;
-        slot->held_action_keycode    = KC_NO;
-        slot->repeat_binding_active  = false;
+        slot->lifecycle.held_action_keycode    = KC_NO;
+        slot->lifecycle.repeat_binding_active  = false;
     }
 }
 
 static key_runtime_slot_effect_request_t key_runtime_slot_step_activate_pending_fallback_hold_request(active_key_state_t *slot) {
     key_runtime_slot_effect_request_t request = {0};
 
-    if (!slot || !key_runtime_slot_uses_fallback_hold(slot) || slot->held_action_keycode != KC_NO || slot->keycode == KC_NO) {
+    if (!slot || !key_runtime_slot_uses_fallback_hold(slot) || slot->lifecycle.held_action_keycode != KC_NO || slot->owner.keycode == KC_NO) {
         return request;
     }
 
-    slot->held_action_keycode = slot->keycode;
+    slot->lifecycle.held_action_keycode = slot->owner.keycode;
     key_runtime_slot_commit_hold_phase(slot, true);
     request.kind              = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
-    request.action            = slot->keycode;
+    request.action            = slot->owner.keycode;
     return request;
 }
 
 static key_runtime_slot_effect_request_t key_runtime_slot_step_interrupt_on_other_press(active_key_state_t *slot, keypos_t other_key_pos) {
-    if (!key_runtime_slot_active(slot) || key_runtime_keypos_equal(slot->key_pos, other_key_pos)) {
+    if (!key_runtime_slot_active(slot) || key_runtime_keypos_equal(slot->owner.key_pos, other_key_pos)) {
         return (key_runtime_slot_effect_request_t){0};
     }
 
     key_runtime_slot_effect_request_t request = key_runtime_slot_step_activate_pending_fallback_hold_request(slot);
 
-    if (is_layer_key(slot->keycode)) {
-        slot->layer_interrupted = true;
+    if (is_layer_key(slot->owner.keycode)) {
+        slot->lifecycle.layer_interrupted = true;
     }
 
     return request;
@@ -147,14 +147,14 @@ static key_runtime_slot_effect_request_t key_runtime_slot_step_take_flush(active
         return request;
     }
 
-    if (!key_runtime_slot_allows_tap_release(slot) || slot->held_action_keycode != KC_NO || slot->repeat_binding_active) {
-        if (slot->held_action_keycode != KC_NO && !active_held_action_survives_flush) {
+    if (!key_runtime_slot_allows_tap_release(slot) || slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
+        if (slot->lifecycle.held_action_keycode != KC_NO && !active_held_action_survives_flush) {
             request.kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_UNREGISTER;
-            request.action = slot->held_action_keycode;
+            request.action = slot->lifecycle.held_action_keycode;
         }
-    } else if (!is_layer_key(slot->keycode) && slot->tap_action != KC_NO) {
+    } else if (!is_layer_key(slot->owner.keycode) && slot->binding.tap_action != KC_NO) {
         request.kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION;
-        request.action = slot->tap_action;
+        request.action = slot->binding.tap_action;
     }
 
     key_runtime_slot_reset(slot);
@@ -178,7 +178,7 @@ static key_runtime_slot_effect_request_t key_runtime_slot_step_fire_hold_at_thre
             key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
             return request;
         case KEY_RUNTIME_SLOT_STEP_HOLD_THRESHOLD_DISPATCH_HELD:
-            slot->held_action_keycode     = hold.action;
+            slot->lifecycle.held_action_keycode     = hold.action;
             key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
             request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
             request.action                = hold.action;
@@ -187,7 +187,7 @@ static key_runtime_slot_effect_request_t key_runtime_slot_step_fire_hold_at_thre
             return request;
         case KEY_RUNTIME_SLOT_STEP_HOLD_THRESHOLD_DISPATCH_REPEAT:
             key_runtime_slot_step_clear_owned_hold(slot, &request);
-            slot->repeat_binding_active   = true;
+            slot->lifecycle.repeat_binding_active   = true;
             key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
             request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_REPEAT_START;
             request.action                = hold.action;
@@ -219,7 +219,7 @@ static key_runtime_slot_effect_request_t key_runtime_slot_step_promote_to_long_h
             request.feedback_long_hold_level = true;
             return request;
         case KEY_RUNTIME_SLOT_STEP_HOLD_THRESHOLD_DISPATCH_HELD:
-            slot->held_action_keycode     = long_hold.action;
+            slot->lifecycle.held_action_keycode     = long_hold.action;
             key_runtime_slot_commit_hold_phase(slot, true);
             request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
             request.action                = long_hold.action;
@@ -227,7 +227,7 @@ static key_runtime_slot_effect_request_t key_runtime_slot_step_promote_to_long_h
             request.feedback_long_hold_level = true;
             return request;
         case KEY_RUNTIME_SLOT_STEP_HOLD_THRESHOLD_DISPATCH_REPEAT:
-            slot->repeat_binding_active   = true;
+            slot->lifecycle.repeat_binding_active   = true;
             key_runtime_slot_commit_hold_phase(slot, true);
             request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_REPEAT_START;
             request.action                = long_hold.action;
@@ -348,7 +348,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_handled_press_begin_fresh
     }
 
     if (context->reclaim_active_slot) {
-        keypos_t                          reclaim_key_pos  = context->slot->key_pos;
+        keypos_t                          reclaim_key_pos  = context->slot->owner.key_pos;
         key_runtime_slot_effect_request_t reclaim_request = key_runtime_slot_step_take_flush(context->slot, context->active_held_action_survives_flush);
         key_runtime_slot_result_push_request_if_present(&result, reclaim_key_pos, reclaim_request);
     }
@@ -427,15 +427,15 @@ typedef struct {
 } key_runtime_slot_step_release_context_t;
 
 static bool key_runtime_slot_step_release_is_interrupted_layer_tap(const key_runtime_slot_step_release_context_t *context) {
-    return context && context->behavior.is_momentary_layer && context->released_key.layer_interrupted;
+    return context && context->behavior.is_momentary_layer && context->released_key.lifecycle.layer_interrupted;
 }
 
 static bool key_runtime_slot_step_release_is_buffered_base_tap(const key_runtime_slot_step_release_context_t *context) {
-    return context && key_runtime_slot_uses_fallback_hold(&context->released_key) && context->released_key.tap_action == KC_NO && context->released_key.held_action_keycode == KC_NO;
+    return context && key_runtime_slot_uses_fallback_hold(&context->released_key) && context->released_key.binding.tap_action == KC_NO && context->released_key.lifecycle.held_action_keycode == KC_NO;
 }
 
 static bool key_runtime_slot_step_release_is_quick_tap(const key_runtime_slot_step_release_context_t *context) {
-    return context && context->elapsed < context->released_key.tap_hold_term && !key_runtime_slot_step_release_is_interrupted_layer_tap(context);
+    return context && context->elapsed < context->released_key.timing.tap_hold_term && !key_runtime_slot_step_release_is_interrupted_layer_tap(context);
 }
 
 static pd_mode_mask_t key_runtime_slot_step_locked_pd_mode_tap_mode(const key_runtime_slot_step_release_context_t *context) {
@@ -450,7 +450,7 @@ static pd_mode_mask_t key_runtime_slot_step_locked_pd_mode_tap_mode(const key_ru
         return 0;
     }
 
-    if (!context->released_key.pd_mode_was_locked_on_press || context->elapsed >= context->released_key.tap_hold_term) {
+    if (!context->released_key.lifecycle.pd_mode_was_locked_on_press || context->elapsed >= context->released_key.timing.tap_hold_term) {
         return 0;
     }
 
@@ -463,7 +463,7 @@ static pd_mode_mask_t key_runtime_slot_step_locked_pd_mode_tap_mode(const key_ru
 
 static key_runtime_slot_step_release_resolution_t key_runtime_slot_step_release_resolution_base(const key_runtime_slot_step_release_context_t *context) {
     return (key_runtime_slot_step_release_resolution_t){
-        .release_owned_state = context && (context->released_key.held_action_keycode != KC_NO || context->released_key.repeat_binding_active),
+        .release_owned_state = context && (context->released_key.lifecycle.held_action_keycode != KC_NO || context->released_key.lifecycle.repeat_binding_active),
     };
 }
 
@@ -508,21 +508,21 @@ static key_runtime_slot_step_release_resolution_t key_runtime_slot_step_release_
         return key_runtime_slot_step_release_resolution_base(context);
     }
 
-    if (hold_sends_on_release(context->released_key.hold)) {
+    if (hold_sends_on_release(context->released_key.binding.hold)) {
         return key_runtime_slot_step_release_resolution_action(
             context,
             key_runtime_slot_select_release_hold_action(
                 context->elapsed,
-                context->released_key.hold.action,
-                context->released_key.long_hold,
-                context->released_key.longer_hold_term));
+                context->released_key.binding.hold.action,
+                context->released_key.binding.long_hold,
+                context->released_key.timing.longer_hold_term));
     }
 
-    if (hold_sends_on_release(context->released_key.long_hold) && context->elapsed >= context->released_key.longer_hold_term) {
-        return key_runtime_slot_step_release_resolution_action(context, context->released_key.long_hold.action);
+    if (hold_sends_on_release(context->released_key.binding.long_hold) && context->elapsed >= context->released_key.timing.longer_hold_term) {
+        return key_runtime_slot_step_release_resolution_action(context, context->released_key.binding.long_hold.action);
     }
 
-    if (!context->behavior.is_momentary_layer && context->released_key.tap_action != KC_NO) {
+    if (!context->behavior.is_momentary_layer && context->released_key.binding.tap_action != KC_NO) {
         return key_runtime_slot_step_release_resolution_tap(context);
     }
 
@@ -542,8 +542,8 @@ static key_runtime_slot_step_release_resolution_t key_runtime_slot_step_release_
         return key_runtime_slot_step_release_resolution_tap(context);
     }
 
-    if (hold_sends_on_release(context->released_key.long_hold) && context->elapsed >= context->released_key.longer_hold_term) {
-        return key_runtime_slot_step_release_resolution_action(context, context->released_key.long_hold.action);
+    if (hold_sends_on_release(context->released_key.binding.long_hold) && context->elapsed >= context->released_key.timing.longer_hold_term) {
+        return key_runtime_slot_step_release_resolution_action(context, context->released_key.binding.long_hold.action);
     }
 
     return key_runtime_slot_step_release_resolution_base(context);
@@ -558,9 +558,9 @@ static key_runtime_slot_step_release_resolution_t key_runtime_slot_step_release_
         context,
         key_runtime_slot_select_release_hold_action(
             context->elapsed,
-            context->released_key.hold.action,
-            context->released_key.long_hold,
-            context->released_key.longer_hold_term));
+            context->released_key.binding.hold.action,
+            context->released_key.binding.long_hold,
+            context->released_key.timing.longer_hold_term));
 }
 
 static key_runtime_slot_step_release_resolution_t key_runtime_slot_step_release_resolve_hold_phase(const key_runtime_slot_step_release_context_t *context) {
@@ -568,12 +568,23 @@ static key_runtime_slot_step_release_resolution_t key_runtime_slot_step_release_
         return (key_runtime_slot_step_release_resolution_t){0};
     }
 
-    if (hold_sends_on_release(context->released_key.long_hold) && context->elapsed >= context->released_key.longer_hold_term) {
-        return key_runtime_slot_step_release_resolution_action(context, context->released_key.long_hold.action);
+    if (hold_sends_on_release(context->released_key.binding.long_hold) && context->elapsed >= context->released_key.timing.longer_hold_term) {
+        return key_runtime_slot_step_release_resolution_action(context, context->released_key.binding.long_hold.action);
     }
 
     return key_runtime_slot_step_release_resolution_base(context);
 }
+
+typedef key_runtime_slot_step_release_resolution_t (*key_runtime_slot_step_release_phase_resolver_t)(const key_runtime_slot_step_release_context_t *context);
+
+static const key_runtime_slot_step_release_phase_resolver_t key_runtime_slot_step_release_phase_resolvers[] = {
+    [KEY_RUNTIME_SLOT_PHASE_IDLE]                 = key_runtime_slot_step_release_resolution_base,
+    [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW]           = key_runtime_slot_step_release_resolve_tap_window,
+    [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW]    = key_runtime_slot_step_release_resolve_press_held_window,
+    [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = key_runtime_slot_step_release_resolve_release_hold_pending,
+    [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE]     = key_runtime_slot_step_release_resolve_hold_phase,
+    [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE]        = key_runtime_slot_step_release_resolve_hold_phase,
+};
 
 static key_runtime_slot_step_release_resolution_t key_runtime_slot_step_resolve_release(uint16_t keycode, active_key_state_t released_key, key_behavior_view_t behavior, uint16_t elapsed) {
     key_runtime_slot_step_release_context_t context = {
@@ -582,32 +593,21 @@ static key_runtime_slot_step_release_resolution_t key_runtime_slot_step_resolve_
         .behavior     = behavior,
         .elapsed      = elapsed,
     };
+    key_runtime_slot_phase_t                       phase    = key_runtime_slot_phase(&released_key);
+    key_runtime_slot_step_release_phase_resolver_t resolver = key_runtime_slot_step_release_phase_resolvers[phase];
 
     context.quick_tap            = key_runtime_slot_step_release_is_quick_tap(&context);
-    context.quick_immediate_hold = hold_registers_on_press(released_key.hold) && key_runtime_slot_allows_tap_release(&released_key) && context.quick_tap;
+    context.quick_immediate_hold = hold_registers_on_press(released_key.binding.hold) && key_runtime_slot_allows_tap_release(&released_key) && context.quick_tap;
     context.buffered_base_tap    = key_runtime_slot_step_release_is_buffered_base_tap(&context);
     context.lock_tap_mode        = key_runtime_slot_step_locked_pd_mode_tap_mode(&context);
 
-    switch (key_runtime_slot_phase(&released_key)) {
-        case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
-            return key_runtime_slot_step_release_resolve_tap_window(&context);
-        case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
-            return key_runtime_slot_step_release_resolve_press_held_window(&context);
-        case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
-            return key_runtime_slot_step_release_resolve_release_hold_pending(&context);
-        case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
-        case KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE:
-            return key_runtime_slot_step_release_resolve_hold_phase(&context);
-        case KEY_RUNTIME_SLOT_PHASE_IDLE:
-        default:
-            return key_runtime_slot_step_release_resolution_base(&context);
-    }
+    return resolver ? resolver(&context) : key_runtime_slot_step_release_resolution_base(&context);
 }
 
 static key_runtime_slot_result_t key_runtime_slot_step_active_release(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior) {
     key_runtime_slot_result_t result = {0};
 
-    if (!slot || slot->keycode == KC_NO) {
+    if (!slot || slot->owner.keycode == KC_NO) {
         return result;
     }
 
@@ -617,14 +617,14 @@ static key_runtime_slot_result_t key_runtime_slot_step_active_release(active_key
     result.handled = true;
 
     if (behavior.is_momentary_layer) {
-        key_runtime_slot_result_push_layer_release(&result, released_key.key_pos);
+        key_runtime_slot_result_push_layer_release(&result, released_key.owner.key_pos);
     }
 
     key_runtime_slot_reset(slot);
 
     key_runtime_slot_step_release_resolution_t resolution = key_runtime_slot_step_resolve_release(keycode, released_key, behavior, elapsed);
     if (resolution.release_owned_state) {
-        key_runtime_slot_result_push_request_if_present(&result, released_key.key_pos, (key_runtime_slot_effect_request_t){
+        key_runtime_slot_result_push_request_if_present(&result, released_key.owner.key_pos, (key_runtime_slot_effect_request_t){
                                                                                     .release_owned_state = true,
                                                                                 });
     }
@@ -632,13 +632,13 @@ static key_runtime_slot_result_t key_runtime_slot_step_active_release(active_key
     switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_STEP_RELEASE_OUTCOME_TAP:
             if (behavior.has_multi_tap) {
-                key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.key_pos, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
-            } else if (released_key.tap_action != KC_NO) {
-                key_runtime_slot_result_push_dispatch_action(&result, released_key.key_pos, released_key.tap_action);
+                key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.owner.key_pos, released_key.binding.tap_action, released_key.timing.tap_hold_term, released_key.timing.multi_tap_term);
+            } else if (released_key.binding.tap_action != KC_NO) {
+                key_runtime_slot_result_push_dispatch_action(&result, released_key.owner.key_pos, released_key.binding.tap_action);
             }
             return result;
         case KEY_RUNTIME_SLOT_STEP_RELEASE_OUTCOME_ACTION:
-            key_runtime_slot_result_push_dispatch_action(&result, released_key.key_pos, resolution.action);
+            key_runtime_slot_result_push_dispatch_action(&result, released_key.owner.key_pos, resolution.action);
             return result;
         case KEY_RUNTIME_SLOT_STEP_RELEASE_OUTCOME_PD_MODE_LOCK_TAP:
             key_runtime_slot_result_push_pd_mode_lock_tap(&result, resolution.pd_mode_lock_tap);
@@ -650,7 +650,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_active_release(active_key
 }
 
 static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const active_key_state_t *slot, hold_behavior_t hold, uint16_t action, uint8_t repeat_count, uint16_t elapsed) {
-    if (!slot || !hold.present || repeat_count != 1 || elapsed < slot->tap_hold_term) {
+    if (!slot || !hold.present || repeat_count != 1 || elapsed < slot->timing.tap_hold_term) {
         return false;
     }
 
@@ -698,7 +698,7 @@ static key_runtime_slot_step_pending_multi_tap_release_context_t key_runtime_slo
     };
     multi_tap_t *slot_multi_tap;
 
-    if (!(slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_pending_multi_tap_matches(slot, keycode, slot->key_pos))) {
+    if (!(slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_pending_multi_tap_matches(slot, keycode, slot->owner.key_pos))) {
         return context;
     }
 
@@ -707,17 +707,17 @@ static key_runtime_slot_step_pending_multi_tap_release_context_t key_runtime_slo
         return context;
     }
 
-    context.key_pos = slot->key_pos;
+    context.key_pos = slot->owner.key_pos;
     context.mods    = delayed_action_mods_from_multi_tap(slot_multi_tap);
     context.hold    = slot_multi_tap->hold;
     context.long_hold = slot_multi_tap->long_hold;
     context.action  = key_runtime_slot_resolve_pending_multi_tap_hold(slot, keycode, &context.repeat_count);
     context.matched = true;
 
-    if (!context.hold.present && hold_sends_on_release(context.long_hold) && elapsed >= slot->longer_hold_term) {
+    if (!context.hold.present && hold_sends_on_release(context.long_hold) && elapsed >= slot->timing.longer_hold_term) {
         context.action = context.long_hold.action;
     } else if (hold_sends_on_release(context.hold) && context.repeat_count == 1 && context.action == context.hold.action) {
-        context.action = key_runtime_slot_select_release_hold_action(elapsed, context.hold.action, context.long_hold, slot->longer_hold_term);
+        context.action = key_runtime_slot_select_release_hold_action(elapsed, context.hold.action, context.long_hold, slot->timing.longer_hold_term);
     }
 
     return context;
@@ -842,11 +842,11 @@ static bool key_runtime_slot_active_scan_should_mark_release_hold_pending(active
         return false;
     }
 
-    if (hold_sends_on_release(active_key_state.hold) && elapsed >= active_key_state.tap_hold_term) {
+    if (hold_sends_on_release(active_key_state.binding.hold) && elapsed >= active_key_state.timing.tap_hold_term) {
         return true;
     }
 
-    return !active_key_state.hold.present && hold_sends_on_release(active_key_state.long_hold) && elapsed >= active_key_state.longer_hold_term;
+    return !active_key_state.binding.hold.present && hold_sends_on_release(active_key_state.binding.long_hold) && elapsed >= active_key_state.timing.longer_hold_term;
 }
 
 static bool key_runtime_slot_pending_multi_tap_hold_elapsed(const multi_tap_t *multi_tap_state, uint16_t elapsed) {
@@ -858,16 +858,16 @@ static key_runtime_slot_result_t key_runtime_slot_step_active_scan_tap_window(ac
         return (key_runtime_slot_result_t){0};
     }
 
-    if (key_runtime_slot_uses_fallback_hold(slot) && slot->held_action_keycode == KC_NO && elapsed >= slot->tap_hold_term) {
-        return key_runtime_slot_result_from_effect_requests(slot->key_pos, (key_runtime_slot_effect_request_t){0}, key_runtime_slot_step_activate_pending_fallback_hold_request(slot));
+    if (key_runtime_slot_uses_fallback_hold(slot) && slot->lifecycle.held_action_keycode == KC_NO && elapsed >= slot->timing.tap_hold_term) {
+        return key_runtime_slot_result_from_effect_requests(slot->owner.key_pos, (key_runtime_slot_effect_request_t){0}, key_runtime_slot_step_activate_pending_fallback_hold_request(slot));
     }
 
-    if (hold_fires_at_threshold(slot->long_hold) && elapsed >= slot->longer_hold_term) {
-        return key_runtime_slot_result_from_effect_requests(slot->key_pos, (key_runtime_slot_effect_request_t){0}, key_runtime_slot_step_promote_to_long_hold(slot, slot->long_hold, false));
+    if (hold_fires_at_threshold(slot->binding.long_hold) && elapsed >= slot->timing.longer_hold_term) {
+        return key_runtime_slot_result_from_effect_requests(slot->owner.key_pos, (key_runtime_slot_effect_request_t){0}, key_runtime_slot_step_promote_to_long_hold(slot, slot->binding.long_hold, false));
     }
 
-    if (hold_fires_at_threshold(slot->hold) && elapsed >= slot->tap_hold_term) {
-        return key_runtime_slot_result_from_effect_requests(slot->key_pos, (key_runtime_slot_effect_request_t){0}, key_runtime_slot_step_fire_hold_at_threshold(slot, slot->hold, slot->long_hold, false));
+    if (hold_fires_at_threshold(slot->binding.hold) && elapsed >= slot->timing.tap_hold_term) {
+        return key_runtime_slot_result_from_effect_requests(slot->owner.key_pos, (key_runtime_slot_effect_request_t){0}, key_runtime_slot_step_fire_hold_at_threshold(slot, slot->binding.hold, slot->binding.long_hold, false));
     }
 
     if (key_runtime_slot_active_scan_should_mark_release_hold_pending(*slot, elapsed)) {
@@ -885,49 +885,50 @@ static key_runtime_slot_result_t key_runtime_slot_step_active_scan_press_held_wi
         return (key_runtime_slot_result_t){0};
     }
 
-    if (elapsed >= slot->tap_hold_term) {
-        immediate_hold_request = key_runtime_slot_step_commit_immediate_hold(slot, !key_runtime_slot_uses_implicit_hold(slot), !slot->long_hold.present);
+    if (elapsed >= slot->timing.tap_hold_term) {
+        immediate_hold_request = key_runtime_slot_step_commit_immediate_hold(slot, !key_runtime_slot_uses_implicit_hold(slot), !slot->binding.long_hold.present);
     }
 
-    if (hold_fires_at_threshold(slot->long_hold) && elapsed >= slot->longer_hold_term) {
-        effect_request = key_runtime_slot_step_promote_to_long_hold(slot, slot->long_hold, false);
+    if (hold_fires_at_threshold(slot->binding.long_hold) && elapsed >= slot->timing.longer_hold_term) {
+        effect_request = key_runtime_slot_step_promote_to_long_hold(slot, slot->binding.long_hold, false);
     }
 
-    return key_runtime_slot_result_from_effect_requests(slot->key_pos, immediate_hold_request, effect_request);
+    return key_runtime_slot_result_from_effect_requests(slot->owner.key_pos, immediate_hold_request, effect_request);
 }
 
 static key_runtime_slot_result_t key_runtime_slot_step_active_scan_hold_phase(active_key_state_t *slot, uint16_t elapsed) {
-    if (!(slot && hold_fires_at_threshold(slot->long_hold) && elapsed >= slot->longer_hold_term)) {
+    if (!(slot && hold_fires_at_threshold(slot->binding.long_hold) && elapsed >= slot->timing.longer_hold_term)) {
         return (key_runtime_slot_result_t){0};
     }
 
-    return key_runtime_slot_result_from_effect_requests(slot->key_pos, (key_runtime_slot_effect_request_t){0}, key_runtime_slot_step_promote_to_long_hold(slot, slot->long_hold, false));
+    return key_runtime_slot_result_from_effect_requests(slot->owner.key_pos, (key_runtime_slot_effect_request_t){0}, key_runtime_slot_step_promote_to_long_hold(slot, slot->binding.long_hold, false));
 }
+
+typedef key_runtime_slot_result_t (*key_runtime_slot_step_active_scan_phase_handler_t)(active_key_state_t *slot, uint16_t elapsed);
+
+static const key_runtime_slot_step_active_scan_phase_handler_t key_runtime_slot_step_active_scan_phase_handlers[] = {
+    [KEY_RUNTIME_SLOT_PHASE_IDLE]                 = NULL,
+    [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW]           = key_runtime_slot_step_active_scan_tap_window,
+    [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW]    = key_runtime_slot_step_active_scan_press_held_window,
+    [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = key_runtime_slot_step_active_scan_hold_phase,
+    [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE]     = key_runtime_slot_step_active_scan_hold_phase,
+    [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE]        = NULL,
+};
 
 static key_runtime_slot_result_t key_runtime_slot_step_active_scan(active_key_state_t *slot) {
     if (!(slot && key_runtime_slot_active(slot) && !key_runtime_slot_hold_is_complete(slot))) {
         return (key_runtime_slot_result_t){0};
     }
 
-    uint16_t elapsed = timer_elapsed(slot->timer);
+    uint16_t                                     elapsed = timer_elapsed(slot->timer);
+    key_runtime_slot_phase_t                     phase   = key_runtime_slot_phase(slot);
+    key_runtime_slot_step_active_scan_phase_handler_t handler = key_runtime_slot_step_active_scan_phase_handlers[phase];
 
-    switch (key_runtime_slot_phase(slot)) {
-        case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
-            return key_runtime_slot_step_active_scan_tap_window(slot, elapsed);
-        case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
-            return key_runtime_slot_step_active_scan_press_held_window(slot, elapsed);
-        case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
-        case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
-            return key_runtime_slot_step_active_scan_hold_phase(slot, elapsed);
-        case KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE:
-        case KEY_RUNTIME_SLOT_PHASE_IDLE:
-        default:
-            return (key_runtime_slot_result_t){0};
-    }
+    return handler ? handler(slot, elapsed) : (key_runtime_slot_result_t){0};
 }
 
 static bool key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(const active_key_state_t *slot, uint16_t action) {
-    return slot && is_layer_key(slot->keycode) && action_dispatch_is_layer_lock(action);
+    return slot && is_layer_key(slot->owner.keycode) && action_dispatch_is_layer_lock(action);
 }
 
 typedef enum {
@@ -949,12 +950,12 @@ static key_runtime_slot_step_pending_multi_tap_scan_resolution_t key_runtime_slo
         return resolution;
     }
 
-    slot->long_hold = slot_multi_tap->long_hold;
+    slot->binding.long_hold = slot_multi_tap->long_hold;
 
-    if (hold_fires_at_threshold(slot_multi_tap->long_hold) && elapsed >= slot->longer_hold_term) {
+    if (hold_fires_at_threshold(slot_multi_tap->long_hold) && elapsed >= slot->timing.longer_hold_term) {
         resolution.outcome                    = KEY_RUNTIME_SLOT_STEP_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD;
         resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, slot_multi_tap->long_hold.action);
-        resolution.effect_request            = key_runtime_slot_step_promote_to_long_hold(slot, slot->long_hold, true);
+        resolution.effect_request            = key_runtime_slot_step_promote_to_long_hold(slot, slot->binding.long_hold, true);
         return resolution;
     }
 
@@ -964,7 +965,7 @@ static key_runtime_slot_step_pending_multi_tap_scan_resolution_t key_runtime_slo
 
     resolution.outcome                    = KEY_RUNTIME_SLOT_STEP_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD;
     resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, slot_multi_tap->hold.action);
-    resolution.effect_request            = key_runtime_slot_step_fire_hold_at_threshold(slot, slot_multi_tap->hold, slot->long_hold, true);
+    resolution.effect_request            = key_runtime_slot_step_fire_hold_at_threshold(slot, slot_multi_tap->hold, slot->binding.long_hold, true);
     return resolution;
 }
 
@@ -998,7 +999,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_pending_multi_tap_scan(ac
         return result;
     }
 
-    key_pos = key_runtime_slot_active(slot) ? slot->key_pos : slot->pending_multi_tap.key_pos;
+    key_pos = key_runtime_slot_active(slot) ? slot->owner.key_pos : slot->pending_multi_tap.key_pos;
 
     if (key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_active(slot)) {
         multi_tap_t *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
@@ -1028,7 +1029,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_interrupt(active_key_stat
     }
 
     result.handled = true;
-    key_runtime_slot_result_push_request_if_present(&result, slot ? slot->key_pos : (keypos_t){0}, request);
+    key_runtime_slot_result_push_request_if_present(&result, slot ? slot->owner.key_pos : (keypos_t){0}, request);
     return result;
 }
 
@@ -1045,31 +1046,56 @@ static key_runtime_slot_result_t key_runtime_slot_step_pending_multi_tap_flush(a
     return result;
 }
 
+typedef key_runtime_slot_result_t (*key_runtime_slot_step_event_handler_t)(active_key_state_t *slot, const key_runtime_slot_event_t *event);
+
+static key_runtime_slot_result_t key_runtime_slot_step_handle_event_handled_press(active_key_state_t *slot, const key_runtime_slot_event_t *event) {
+    return key_runtime_slot_step_handled_press(
+        slot,
+        event->data.handled_press.keycode,
+        event->data.handled_press.key_pos,
+        event->data.handled_press.key,
+        event->data.handled_press.active_held_action_survives_flush);
+}
+
+static key_runtime_slot_result_t key_runtime_slot_step_handle_event_handled_release(active_key_state_t *slot, const key_runtime_slot_event_t *event) {
+    return key_runtime_slot_step_handled_release(
+        slot,
+        event->data.handled_release.keycode,
+        event->data.handled_release.key_pos,
+        event->data.handled_release.behavior);
+}
+
+static key_runtime_slot_result_t key_runtime_slot_step_handle_event_active_scan(active_key_state_t *slot, const key_runtime_slot_event_t *event) {
+    (void)event;
+    return key_runtime_slot_step_active_scan(slot);
+}
+
+static key_runtime_slot_result_t key_runtime_slot_step_handle_event_pending_multi_tap_scan(active_key_state_t *slot, const key_runtime_slot_event_t *event) {
+    (void)event;
+    return key_runtime_slot_step_pending_multi_tap_scan(slot);
+}
+
+static key_runtime_slot_result_t key_runtime_slot_step_handle_event_interrupt(active_key_state_t *slot, const key_runtime_slot_event_t *event) {
+    return key_runtime_slot_step_interrupt(slot, event->data.interrupt.other_key_pos);
+}
+
+static key_runtime_slot_result_t key_runtime_slot_step_handle_event_pending_multi_tap_flush(active_key_state_t *slot, const key_runtime_slot_event_t *event) {
+    (void)event;
+    return key_runtime_slot_step_pending_multi_tap_flush(slot);
+}
+
+static const key_runtime_slot_step_event_handler_t key_runtime_slot_step_event_handlers[] = {
+    [KEY_RUNTIME_SLOT_EVENT_NONE]                   = NULL,
+    [KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS]          = key_runtime_slot_step_handle_event_handled_press,
+    [KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE]        = key_runtime_slot_step_handle_event_handled_release,
+    [KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN]            = key_runtime_slot_step_handle_event_active_scan,
+    [KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN] = key_runtime_slot_step_handle_event_pending_multi_tap_scan,
+    [KEY_RUNTIME_SLOT_EVENT_INTERRUPT]              = key_runtime_slot_step_handle_event_interrupt,
+    [KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH] = key_runtime_slot_step_handle_event_pending_multi_tap_flush,
+};
+
 key_runtime_slot_result_t key_runtime_slot_step(active_key_state_t *slot, key_runtime_slot_event_t event) {
-    switch (event.kind) {
-        case KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS:
-            return key_runtime_slot_step_handled_press(
-                slot,
-                event.data.handled_press.keycode,
-                event.data.handled_press.key_pos,
-                event.data.handled_press.key,
-                event.data.handled_press.active_held_action_survives_flush);
-        case KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE:
-            return key_runtime_slot_step_handled_release(
-                slot,
-                event.data.handled_release.keycode,
-                event.data.handled_release.key_pos,
-                event.data.handled_release.behavior);
-        case KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN:
-            return key_runtime_slot_step_active_scan(slot);
-        case KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN:
-            return key_runtime_slot_step_pending_multi_tap_scan(slot);
-        case KEY_RUNTIME_SLOT_EVENT_INTERRUPT:
-            return key_runtime_slot_step_interrupt(slot, event.data.interrupt.other_key_pos);
-        case KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH:
-            return key_runtime_slot_step_pending_multi_tap_flush(slot);
-        case KEY_RUNTIME_SLOT_EVENT_NONE:
-        default:
-            return (key_runtime_slot_result_t){0};
-    }
+    key_runtime_slot_step_event_handler_t handler = event.kind < ARRAY_SIZE(key_runtime_slot_step_event_handlers) ? key_runtime_slot_step_event_handlers[event.kind] : NULL;
+
+    return handler ? handler(slot, &event) : (key_runtime_slot_result_t){0};
 }

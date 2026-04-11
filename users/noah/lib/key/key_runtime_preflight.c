@@ -41,7 +41,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
             active_key_state_t *candidate = key_runtime_slot_at(index);
 
-            if (!key_runtime_slot_active(candidate) || key_runtime_keypos_equal(candidate->key_pos, record->event.key)) {
+            if (!key_runtime_slot_active(candidate) || key_runtime_keypos_equal(candidate->owner.key_pos, record->event.key)) {
                 continue;
             }
 
