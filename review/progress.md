@@ -494,6 +494,28 @@ Additional verification completed for the Phase 5 layer-stage extraction pass:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Follow-up key-runtime regression fix before continuing Phase 5:
+
+- fixed a pending multi-tap quick-release regression in `users/noah/lib/key/key_runtime_slot.c`:
+  - when a pending multi-tap hold is released quickly and higher tap counts still exist, the slot now clears only the active press state and preserves the deferred tap chain
+  - this restores second-tap media actions on layer-thumb keys and keeps multi-tap RGB feedback alive until the chain resolves or expires
+- added direct regression coverage in:
+  - `tests/host/key_runtime_slot_test.c`
+  - `tests/host/key_runtime_transition_test.c`
+  - `tests/host/key_runtime_feedback_test.c`
+
+Additional verification completed for the key-runtime regression fix pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Next recommended step:
 
 - continue Phase 5 by extracting the automouse blend stage next, so `rgb_runtime.c` keeps shrinking toward pure stage ordering while the remaining overlays stay behavior-identical

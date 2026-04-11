@@ -631,6 +631,49 @@ static void test_take_pending_multi_tap_hold_release_returns_held_lifecycle(void
     CHECK(key_runtime_slot_idle(slot));
 }
 
+static void test_take_pending_multi_tap_hold_release_preserves_chain_for_higher_taps(void) {
+    active_key_state_t                               *slot = key_runtime_primary_slot();
+    key_runtime_slot_pending_multi_tap_hold_release_t release;
+    keypos_t                                          pos = test_keypos(6, 2);
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .keycode          = TEST_MULTI_TAP_KEY,
+        .key_pos          = pos,
+        .tap_hold_term    = 120,
+        .longer_hold_term = 240,
+        .pending_multi_tap =
+            {
+                .keycode       = TEST_MULTI_TAP_KEY,
+                .key_pos       = pos,
+                .timer         = (uint16_t)(fake_time - 50),
+                .count         = 2,
+                .pending_hold  = true,
+                .tap_action    = TEST_SINGLE_ACTION,
+                .tap_hold_term = 120,
+            },
+    };
+
+    release = key_runtime_slot_take_pending_multi_tap_hold_release(
+        slot,
+        TEST_MULTI_TAP_KEY,
+        (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY},
+        50);
+
+    CHECK(release.handled);
+    CHECK(release.outcome == KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_DELAYED_ACTION);
+    CHECK(release.action == KC_NO);
+    CHECK(release.repeat_count == 0);
+    CHECK(slot->keycode == KC_NO);
+    CHECK(key_runtime_slot_has_pending_multi_tap(slot));
+    CHECK(slot->pending_multi_tap.keycode == TEST_MULTI_TAP_KEY);
+    CHECK(slot->pending_multi_tap.key_pos.row == pos.row);
+    CHECK(slot->pending_multi_tap.key_pos.col == pos.col);
+    CHECK(slot->pending_multi_tap.count == 2);
+    CHECK(!slot->pending_multi_tap.pending_hold);
+}
+
 static void test_take_pending_multi_tap_flush_prefers_exact_step_tap(void) {
     active_key_state_t                       *slot = key_runtime_primary_slot();
     key_runtime_slot_pending_multi_tap_flush_t flush;
@@ -893,6 +936,7 @@ int main(void) {
     test_take_pending_multi_tap_plan_returns_scan_effect_request();
     test_take_pending_multi_tap_plan_flushes_expired_chain();
     test_take_pending_multi_tap_hold_release_returns_held_lifecycle();
+    test_take_pending_multi_tap_hold_release_preserves_chain_for_higher_taps();
     test_take_pending_multi_tap_flush_prefers_exact_step_tap();
     test_begin_press_sets_metadata_and_immediate_hold_request();
     test_prepare_handled_press_matching_pending_multi_tap_reuses_slot();

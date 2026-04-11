@@ -7,6 +7,11 @@
 #include "users/noah/lib/key/key_runtime_feedback.h"
 #include "users/noah/lib/key/key_runtime_state.h"
 
+enum {
+    TEST_MULTI_TAP_KEY    = SAFE_RANGE + 0x20,
+    TEST_PENDING_TAP_ACTION = SAFE_RANGE + 0x21,
+};
+
 static uint16_t fake_time;
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -57,9 +62,7 @@ key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count
 }
 
 bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
-    (void)keycode;
-    (void)count;
-    return false;
+    return keycode == TEST_MULTI_TAP_KEY && count < 3;
 }
 
 bool action_dispatch_is_layer_action(uint16_t action) {
@@ -196,6 +199,43 @@ static void test_multi_tap_pending_flag_uses_secondary_slot(void) {
     CHECK(key_feedback_flags_multi_tap_pending(flags));
 }
 
+static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(void) {
+    key_runtime_slot_pending_multi_tap_hold_release_t release;
+    keypos_t                                          pos = {.row = 5, .col = 1};
+
+    test_reset_state();
+
+    active_key = (active_key_state_t){
+        .keycode          = TEST_MULTI_TAP_KEY,
+        .key_pos          = pos,
+        .tap_hold_term    = 120,
+        .longer_hold_term = 240,
+        .pending_multi_tap =
+            {
+                .keycode       = TEST_MULTI_TAP_KEY,
+                .key_pos       = pos,
+                .timer         = (uint16_t)(fake_time - 50),
+                .count         = 2,
+                .pending_hold  = true,
+                .tap_action    = TEST_PENDING_TAP_ACTION,
+                .tap_hold_term = 120,
+            },
+    };
+
+    release = key_runtime_slot_take_pending_multi_tap_hold_release(
+        key_runtime_primary_slot(),
+        TEST_MULTI_TAP_KEY,
+        (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY},
+        50);
+
+    CHECK(release.handled);
+    CHECK(release.action == KC_NO);
+    CHECK(release.repeat_count == 0);
+
+    uint8_t flags = key_feedback_pack();
+    CHECK(key_feedback_flags_multi_tap_pending(flags));
+}
+
 int main(void) {
     test_non_passthrough_held_action_flashes();
     test_repeat_hold_flashes_while_active();
@@ -205,6 +245,7 @@ int main(void) {
     test_non_layer_held_action_has_no_preview_layer();
     test_feedback_falls_back_to_secondary_active_slot();
     test_multi_tap_pending_flag_uses_secondary_slot();
+    test_multi_tap_pending_flag_survives_quick_release_for_higher_taps();
 
     puts("key_runtime_feedback host tests passed");
     return 0;

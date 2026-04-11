@@ -67,6 +67,16 @@ static void key_runtime_slot_clear_owned_hold(active_key_state_t *slot, key_runt
     }
 }
 
+static void key_runtime_slot_clear_active_state(active_key_state_t *slot) {
+    if (!slot) {
+        return;
+    }
+
+    multi_tap_t pending_multi_tap = slot->pending_multi_tap;
+    *slot                         = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
+    slot->pending_multi_tap       = pending_multi_tap;
+}
+
 static uint16_t key_runtime_slot_select_release_hold_action(uint16_t elapsed, uint16_t hold_action, hold_behavior_t long_hold, uint16_t longer_hold_term) {
     if (hold_sends_on_release(long_hold) && elapsed >= longer_hold_term) {
         return long_hold.action;
@@ -894,7 +904,13 @@ key_runtime_slot_pending_multi_tap_hold_release_t key_runtime_slot_take_pending_
                           ? KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_HELD_LIFECYCLE
                           : KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_HOLD_RELEASE_DELAYED_ACTION;
 
-    key_runtime_slot_reset(slot);
+    if (action == KC_NO && repeat_count == 0 && key_runtime_slot_has_pending_multi_tap(slot)) {
+        // A quick release can intentionally keep the chain alive so a later
+        // tap or timeout still resolves the current tap index.
+        key_runtime_slot_clear_active_state(slot);
+    } else {
+        key_runtime_slot_reset(slot);
+    }
     return release;
 }
 

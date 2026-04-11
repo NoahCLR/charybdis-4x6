@@ -1066,6 +1066,74 @@ static void test_release_pending_multi_tap_hold_registers_then_unregisters_held_
     CHECK(test_calls[1].action == TEST_MULTI_TAP_HOLD);
 }
 
+static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_layer_key(void) {
+    key_runtime_transition_plan_t release_plan;
+    key_runtime_transition_plan_t scan_plan;
+    keyrecord_t                   record = test_record(test_keypos(6, 2), false);
+    handled_key_view_t            key    = test_handled_key(MO(2));
+
+    test_reset_stubs();
+    key.behavior.has_multi_tap      = true;
+    key.behavior.is_momentary_layer = true;
+    key.behavior.tap_hold_term      = 120;
+    key.behavior.longer_hold_term   = 240;
+    key.behavior.multi_tap_term     = 150;
+    test_add_behavior_step(
+        MO(2),
+        2,
+        (key_behavior_step_t){
+            .tap       = TAP_SENDS(TEST_MULTI_STEP_ACTION),
+            .long_hold = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
+        });
+    test_add_behavior_step(
+        MO(2),
+        3,
+        (key_behavior_step_t){
+            .tap = TAP_SENDS(TEST_PREVIOUS_TAP_ACTION),
+        });
+
+    active_key = (active_key_state_t){
+        .timer            = (uint16_t)(fake_time - 50),
+        .keycode          = MO(2),
+        .key_pos          = record.event.key,
+        .tap_hold_term    = 120,
+        .longer_hold_term = 240,
+    };
+
+    multi_tap = (multi_tap_t){
+        .keycode        = MO(2),
+        .key_pos        = record.event.key,
+        .timer          = (uint16_t)(fake_time - 50),
+        .count          = 2,
+        .pending_hold   = true,
+        .tap_action     = TEST_MULTI_STEP_ACTION,
+        .single_action  = TEST_FALLBACK_TAP_ACTION,
+        .tap_hold_term  = 120,
+        .multi_tap_term = 150,
+        .long_hold      = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
+    };
+
+    key_runtime_transition_plan_init(&release_plan);
+    CHECK(key_runtime_transition_handled_key_release(MO(2), &record, key, &release_plan));
+
+    CHECK(release_plan.count == 1);
+    CHECK(release_plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE);
+    CHECK(active_key.keycode == KC_NO);
+    CHECK(multi_tap.keycode == MO(2));
+    CHECK(multi_tap.count == 2);
+    CHECK(!multi_tap.pending_hold);
+
+    fake_time = (uint16_t)(fake_time + 200);
+
+    key_runtime_transition_plan_init(&scan_plan);
+    key_runtime_transition_scan(&scan_plan);
+
+    CHECK(scan_plan.count == 1);
+    CHECK(scan_plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION);
+    CHECK(scan_plan.effects[0].data.delayed_action.action == TEST_MULTI_STEP_ACTION);
+    CHECK(scan_plan.effects[0].data.delayed_action.repeat_count == 1);
+}
+
 static void test_scan_promotes_pending_multi_tap_hold(void) {
     key_runtime_transition_plan_t plan;
 
@@ -1358,6 +1426,7 @@ int main(void) {
     test_press_reclaims_pending_multi_tap_before_active_slot();
     test_scan_fires_hold_for_secondary_slot();
     test_release_pending_multi_tap_hold_registers_then_unregisters_held_action();
+    test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_layer_key();
     test_scan_promotes_pending_multi_tap_hold();
     test_scan_flushes_expired_pending_multi_tap_chain();
     test_scan_starts_repeat_hold_at_threshold();
