@@ -19,7 +19,7 @@ bool key_runtime_process_handled_key_press(uint16_t keycode, keyrecord_t *record
     bool                          active_held_action_survives_flush = slot->held_action_keycode == KC_NO || held_action_survives_flush(slot->key_pos, slot->held_action_keycode);
 
     key_runtime_transition_plan_init(&plan);
-    bool handled = key_runtime_transition_handled_key_press(slot, keycode, record, key, active_held_action_survives_flush, &plan);
+    bool handled = key_runtime_transition_handled_key_press(slot, keycode, record->event.key, key, active_held_action_survives_flush, &plan);
     key_runtime_trace_plan("press", &plan);
     key_runtime_transition_execute_plan(&plan);
     if (handled) {

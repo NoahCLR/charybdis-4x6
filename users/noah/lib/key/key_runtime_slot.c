@@ -446,6 +446,48 @@ key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(uint16_t 
     return resolution;
 }
 
+key_runtime_slot_release_apply_t key_runtime_slot_take_active_release(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior) {
+    key_runtime_slot_release_apply_t apply = {0};
+
+    if (!slot || slot->keycode == KC_NO) {
+        return apply;
+    }
+
+    active_key_state_t released_key = *slot;
+    uint16_t           elapsed      = timer_elapsed(released_key.timer);
+
+    apply.handled       = true;
+    apply.release_layer = behavior.is_momentary_layer;
+    apply.key_pos       = released_key.key_pos;
+
+    key_runtime_slot_reset(slot);
+
+    key_runtime_slot_release_resolution_t resolution = key_runtime_slot_resolve_release(keycode, released_key, behavior, elapsed);
+    apply.release_owned_state                        = resolution.release_owned_state;
+
+    switch (resolution.outcome) {
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP:
+            if (behavior.has_multi_tap) {
+                key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.key_pos, released_key.tap_action, released_key.tap_hold_term, released_key.multi_tap_term);
+            } else if (released_key.tap_action != KC_NO) {
+                apply.outcome = KEY_RUNTIME_SLOT_RELEASE_APPLY_OUTCOME_DISPATCH_ACTION;
+                apply.action  = released_key.tap_action;
+            }
+            return apply;
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_ACTION:
+            apply.outcome = KEY_RUNTIME_SLOT_RELEASE_APPLY_OUTCOME_DISPATCH_ACTION;
+            apply.action  = resolution.action;
+            return apply;
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_PD_MODE_LOCK_TAP:
+            apply.outcome          = KEY_RUNTIME_SLOT_RELEASE_APPLY_OUTCOME_PD_MODE_LOCK_TAP;
+            apply.pd_mode_lock_tap = resolution.pd_mode_lock_tap;
+            return apply;
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_NONE:
+        default:
+            return apply;
+    }
+}
+
 key_runtime_slot_scan_resolution_t key_runtime_slot_resolve_scan(active_key_state_t active_key_state, uint16_t elapsed) {
     key_runtime_slot_scan_resolution_t resolution = {0};
 
@@ -473,6 +515,35 @@ key_runtime_slot_scan_resolution_t key_runtime_slot_resolve_scan(active_key_stat
     }
 
     return resolution;
+}
+
+key_runtime_slot_scan_apply_t key_runtime_slot_apply_scan_resolution(active_key_state_t *slot, key_runtime_slot_scan_resolution_t resolution) {
+    key_runtime_slot_scan_apply_t apply = {0};
+
+    if (!slot) {
+        return apply;
+    }
+
+    if (resolution.commit_immediate_hold) {
+        apply.immediate_hold_request = key_runtime_slot_commit_immediate_hold(slot, resolution.immediate_hold_needs_feedback, resolution.immediate_hold_completes_hold);
+    }
+
+    if (resolution.activate_fallback_hold) {
+        apply.outcome_request = key_runtime_slot_activate_pending_fallback_hold_request(slot);
+        return apply;
+    }
+
+    switch (resolution.outcome) {
+        case KEY_RUNTIME_SLOT_SCAN_OUTCOME_FIRE_HOLD:
+            apply.outcome_request = key_runtime_slot_fire_hold_at_threshold(slot, resolution.hold, resolution.long_hold, false);
+            return apply;
+        case KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD:
+            apply.outcome_request = key_runtime_slot_promote_to_long_hold(slot, resolution.long_hold, false);
+            return apply;
+        case KEY_RUNTIME_SLOT_SCAN_OUTCOME_NONE:
+        default:
+            return apply;
+    }
 }
 
 static bool key_runtime_slot_pending_multi_tap_hold_elapsed(const multi_tap_t *multi_tap_state, uint16_t elapsed) {

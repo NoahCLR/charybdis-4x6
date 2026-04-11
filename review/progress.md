@@ -359,10 +359,62 @@ Additional verification completed for the continued Phase 4 press-plan collapse 
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Continued Phase 4 once more by collapsing the last press-specific transition glue around the slot-owned press plan:
+
+- rewired `users/noah/lib/key/key_runtime_transition.c` so handled-key press transitions now:
+  - accept `keypos_t` instead of the full `keyrecord_t`
+  - apply the returned `key_runtime_slot_press_plan_t` through a dedicated transition helper instead of open-coding delayed-action, layer-press, reclaim, and begin-request routing inline
+- added small generic transition helpers for:
+  - slot-effect-request presence checks
+  - pending-multi-tap flush application
+  - slot press-plan application
+- updated `users/noah/lib/key/key_runtime_press.c` and `tests/host/key_runtime_transition_test.c` for the narrowed handled-key press entrypoint
+
+Additional verification completed for the continued Phase 4 press-transition narrowing pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Continued Phase 4 again by moving more release/scan application out of `users/noah/lib/key/key_runtime_transition.c` and into slot-local helpers:
+
+- added `key_runtime_slot_take_active_release(...)` plus `key_runtime_slot_release_apply_t` so the slot layer now owns:
+  - matched active-key release reset timing
+  - tap-to-pending-multi-tap promotion
+  - release-time dispatch vs pd-mode-lock routing for matched releases
+- added `key_runtime_slot_apply_scan_resolution(...)` plus `key_runtime_slot_scan_apply_t` so the slot layer now owns:
+  - immediate-hold commit request generation
+  - fallback-hold activation request generation during scan
+  - hold-threshold / long-hold promotion request selection during scan
+- rewired `users/noah/lib/key/key_runtime_transition.c` so active release and active scan transitions now apply those slot-owned helpers instead of branching over raw release/scan resolution structs inline
+- extended `tests/host/key_runtime_slot_test.c` with direct coverage for:
+  - matched active release promoting to a pending multi-tap chain
+  - matched active release producing a locked pd-mode tap plan
+  - scan application returning both immediate-hold and long-hold requests
+  - scan application returning fallback-hold activation
+
+Additional verification completed for the continued Phase 4 release-scan application pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Next recommended step:
 
-- continue Phase 4 by collapsing the remaining press-time plan-assembly glue in `key_runtime_transition.c`, especially the ordering/routing around:
-  - delayed pending-multi-tap replay vs direct dispatch
-  - layer-press queueing vs slot-effect queueing
-  - any remaining press-specific helper wrappers that can become generic slot-plan application
-  so the transition file trends closer to pure effect-plan routing over slot-owned decisions.
+- continue Phase 4 by collapsing the last pending-multi-tap release/expiry routing in `key_runtime_transition.c`, especially:
+  - pending-multi-tap hold-release replay packaging
+  - pending-multi-tap scan application vs layer-release ordering
+  - pending-multi-tap expiry flush routing
+  so the transition file trends closer to generic effect-plan routing over slot-owned pending-chain results as well.

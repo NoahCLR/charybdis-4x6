@@ -263,6 +263,77 @@ static void test_resolve_release_locked_pd_mode_becomes_lock_tap(void) {
     CHECK(resolution.pd_mode_lock_tap == PD_MODE_VOLUME);
 }
 
+static void test_take_active_release_starts_pending_multi_tap_chain(void) {
+    active_key_state_t                *slot = key_runtime_primary_slot();
+    key_runtime_slot_release_apply_t   apply;
+    keypos_t                           pos = test_keypos(2, 3);
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .timer          = (uint16_t)(fake_time - 50),
+        .keycode        = TEST_MULTI_TAP_KEY,
+        .key_pos        = pos,
+        .tap_action     = TEST_SINGLE_ACTION,
+        .tap_hold_term  = 120,
+        .multi_tap_term = 150,
+    };
+
+    apply = key_runtime_slot_take_active_release(
+        slot,
+        TEST_MULTI_TAP_KEY,
+        (key_behavior_view_t){
+            .keycode        = TEST_MULTI_TAP_KEY,
+            .has_multi_tap  = true,
+            .tap_hold_term  = 120,
+        });
+
+    CHECK(apply.handled);
+    CHECK(!apply.release_layer);
+    CHECK(!apply.release_owned_state);
+    CHECK(apply.outcome == KEY_RUNTIME_SLOT_RELEASE_APPLY_OUTCOME_NONE);
+    CHECK(slot->keycode == KC_NO);
+    CHECK(key_runtime_slot_has_pending_multi_tap(slot));
+    CHECK(slot->pending_multi_tap.keycode == TEST_MULTI_TAP_KEY);
+    CHECK(slot->pending_multi_tap.key_pos.row == pos.row);
+    CHECK(slot->pending_multi_tap.key_pos.col == pos.col);
+    CHECK(slot->pending_multi_tap.count == 1);
+    CHECK(slot->pending_multi_tap.single_action == TEST_SINGLE_ACTION);
+}
+
+static void test_take_active_release_maps_locked_pd_mode_tap(void) {
+    active_key_state_t                *slot = key_runtime_primary_slot();
+    key_runtime_slot_release_apply_t   apply;
+    keypos_t                           pos = test_keypos(2, 4);
+
+    test_reset_state();
+    test_pd_mode         = PD_MODE_VOLUME;
+    test_pd_locked_modes = PD_MODE_VOLUME;
+
+    *slot = (active_key_state_t){
+        .timer                      = (uint16_t)(fake_time - 50),
+        .keycode                    = TEST_PD_MODE_KEY,
+        .key_pos                    = pos,
+        .tap_hold_term              = 120,
+        .pd_mode_was_locked_on_press = true,
+    };
+
+    apply = key_runtime_slot_take_active_release(
+        slot,
+        TEST_PD_MODE_KEY,
+        (key_behavior_view_t){
+            .keycode       = TEST_PD_MODE_KEY,
+            .tap_hold_term = 120,
+        });
+
+    CHECK(apply.handled);
+    CHECK(!apply.release_layer);
+    CHECK(!apply.release_owned_state);
+    CHECK(apply.outcome == KEY_RUNTIME_SLOT_RELEASE_APPLY_OUTCOME_PD_MODE_LOCK_TAP);
+    CHECK(apply.pd_mode_lock_tap == PD_MODE_VOLUME);
+    CHECK(key_runtime_slot_idle(slot));
+}
+
 static void test_resolve_scan_promotes_long_hold_after_longer_term(void) {
     key_runtime_slot_scan_resolution_t resolution;
 
@@ -281,6 +352,73 @@ static void test_resolve_scan_promotes_long_hold_after_longer_term(void) {
     CHECK(!resolution.activate_fallback_hold);
     CHECK(resolution.outcome == KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD);
     CHECK(resolution.long_hold.action == TEST_HOLD_ACTION);
+}
+
+static void test_apply_scan_resolution_returns_commit_and_long_hold_requests(void) {
+    active_key_state_t             *slot = key_runtime_primary_slot();
+    key_runtime_slot_scan_apply_t   apply;
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .keycode             = TEST_ACTIVE_KEY,
+        .key_pos             = test_keypos(3, 1),
+        .held_action_keycode = TEST_HOLD_ACTION,
+        .hold                =
+            {
+                .present = true,
+                .action  = TEST_HOLD_ACTION,
+                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            },
+        .long_hold           = TAP_AT_HOLD_THRESHOLD(TEST_SINGLE_ACTION),
+    };
+
+    apply = key_runtime_slot_apply_scan_resolution(
+        slot,
+        (key_runtime_slot_scan_resolution_t){
+            .commit_immediate_hold         = true,
+            .immediate_hold_needs_feedback = true,
+            .immediate_hold_completes_hold = false,
+            .outcome                       = KEY_RUNTIME_SLOT_SCAN_OUTCOME_PROMOTE_LONG_HOLD,
+            .long_hold                     = TAP_AT_HOLD_THRESHOLD(TEST_SINGLE_ACTION),
+        });
+
+    CHECK(apply.immediate_hold_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
+    CHECK(apply.immediate_hold_request.feedback_pulse);
+    CHECK(!apply.immediate_hold_request.feedback_long_hold_level);
+    CHECK(apply.outcome_request.release_owned_state);
+    CHECK(apply.outcome_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION);
+    CHECK(apply.outcome_request.action == TEST_SINGLE_ACTION);
+    CHECK(apply.outcome_request.feedback_pulse);
+    CHECK(apply.outcome_request.feedback_long_hold_level);
+    CHECK(slot->hold_one_shot_fired);
+    CHECK(slot->hold_fired);
+    CHECK(slot->held_action_keycode == KC_NO);
+}
+
+static void test_apply_scan_resolution_returns_fallback_hold_request(void) {
+    active_key_state_t             *slot = key_runtime_primary_slot();
+    key_runtime_slot_scan_apply_t   apply;
+
+    test_reset_state();
+
+    *slot = (active_key_state_t){
+        .keycode               = TEST_ACTIVE_KEY,
+        .key_pos               = test_keypos(3, 2),
+        .fallback_hold_pending = true,
+    };
+
+    apply = key_runtime_slot_apply_scan_resolution(
+        slot,
+        (key_runtime_slot_scan_resolution_t){
+            .activate_fallback_hold = true,
+        });
+
+    CHECK(apply.immediate_hold_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE);
+    CHECK(apply.outcome_request.kind == KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER);
+    CHECK(apply.outcome_request.action == TEST_ACTIVE_KEY);
+    CHECK(slot->held_action_keycode == TEST_ACTIVE_KEY);
+    CHECK(slot->hold_fired);
 }
 
 static void test_resolve_pending_multi_tap_scan_requires_layer_release_before_lock(void) {
@@ -679,7 +817,11 @@ int main(void) {
     test_resolve_pending_multi_tap_hold_clears_slot_owned_state();
     test_resolve_release_quick_immediate_hold_becomes_tap();
     test_resolve_release_locked_pd_mode_becomes_lock_tap();
+    test_take_active_release_starts_pending_multi_tap_chain();
+    test_take_active_release_maps_locked_pd_mode_tap();
     test_resolve_scan_promotes_long_hold_after_longer_term();
+    test_apply_scan_resolution_returns_commit_and_long_hold_requests();
+    test_apply_scan_resolution_returns_fallback_hold_request();
     test_resolve_pending_multi_tap_scan_requires_layer_release_before_lock();
     test_fire_hold_at_threshold_starts_repeat_binding();
     test_promote_to_long_hold_releases_owned_state_before_dispatch();
