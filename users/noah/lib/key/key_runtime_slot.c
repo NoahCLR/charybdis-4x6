@@ -814,6 +814,43 @@ key_runtime_slot_pending_multi_tap_scan_apply_t key_runtime_slot_apply_pending_m
     }
 }
 
+key_runtime_slot_pending_multi_tap_plan_t key_runtime_slot_take_pending_multi_tap_plan(active_key_state_t *slot) {
+    key_runtime_slot_pending_multi_tap_plan_t plan = {0};
+
+    if (!slot || !key_runtime_slot_has_pending_multi_tap(slot)) {
+        return plan;
+    }
+
+    plan.key_pos = key_runtime_slot_active(slot) ? slot->key_pos : slot->pending_multi_tap.key_pos;
+
+    if (key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_active(slot)) {
+        multi_tap_t *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
+        if (!slot_multi_tap) {
+            return plan;
+        }
+
+        uint16_t elapsed = timer_elapsed(slot_multi_tap->timer);
+        key_runtime_slot_pending_multi_tap_scan_resolution_t resolution = key_runtime_slot_resolve_pending_multi_tap_scan(*slot, *slot_multi_tap, elapsed);
+        key_runtime_slot_pending_multi_tap_scan_apply_t apply = key_runtime_slot_apply_pending_multi_tap_scan_resolution(slot, resolution);
+
+        if (apply.release_layer_before_action || apply.effect_request.kind != KEY_RUNTIME_SLOT_EFFECT_REQUEST_NONE || apply.effect_request.release_owned_state || apply.effect_request.feedback_pulse) {
+            plan.handled                     = true;
+            plan.kind                        = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_EFFECT_REQUEST;
+            plan.release_layer_before_action = apply.release_layer_before_action;
+            plan.effect_request              = apply.effect_request;
+        }
+        return plan;
+    }
+
+    if (key_runtime_slot_pending_multi_tap_expired(slot)) {
+        plan.handled = true;
+        plan.kind    = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_FLUSH;
+        plan.flush   = key_runtime_slot_take_pending_multi_tap_flush(slot);
+    }
+
+    return plan;
+}
+
 static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const active_key_state_t *slot, hold_behavior_t hold, uint16_t action, uint8_t repeat_count, uint16_t elapsed) {
     if (!slot || repeat_count != 1 || elapsed < slot->tap_hold_term) {
         return false;

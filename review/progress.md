@@ -411,10 +411,38 @@ Additional verification completed for the continued Phase 4 release-scan applica
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Continued Phase 4 once more by collapsing the remaining pending-multi-tap scan/expiry routing into slot-owned planning:
+
+- added `key_runtime_slot_pending_multi_tap_plan_t` and `key_runtime_slot_take_pending_multi_tap_plan(...)` so the slot layer now owns:
+  - deciding between pending-hold scan application vs expired-chain flush
+  - packaging the key position plus layer-release-before-action requirement for pending-chain scan effects
+  - packaging expired pending-chain delayed-action replay as a slot-owned flush result
+- rewired `users/noah/lib/key/key_runtime_transition.c` so pending multi-tap scan/expiry now routes through:
+  - a dedicated pending-multi-tap plan application helper
+  - a dedicated pending-multi-tap hold-release application helper
+  instead of open-coding those branch trees inline
+- extended slot-level coverage in `tests/host/key_runtime_slot_test.c` for:
+  - pending-multi-tap scan returning a layer-release-before-lock effect request
+  - pending-multi-tap scan returning an expired-chain flush plan
+- extended transition coverage in `tests/host/key_runtime_transition_test.c` for:
+  - `key_runtime_transition_scan(...)` replaying an expired pending multi-tap chain as a delayed action
+
+Additional verification completed for the continued Phase 4 pending-multi-tap routing pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Next recommended step:
 
-- continue Phase 4 by collapsing the last pending-multi-tap release/expiry routing in `key_runtime_transition.c`, especially:
-  - pending-multi-tap hold-release replay packaging
-  - pending-multi-tap scan application vs layer-release ordering
-  - pending-multi-tap expiry flush routing
-  so the transition file trends closer to generic effect-plan routing over slot-owned pending-chain results as well.
+- continue Phase 4 with final transition cleanup and boundary tightening, especially:
+  - reducing the remaining slot lookup/orchestration wrappers in `key_runtime_transition.c`
+  - deciding whether the remaining release-entry discovery can move beside press/release/scan process helpers or is now small enough to leave alone
+  - doing a final Phase 4 sweep for dead helpers, naming cleanup, and docs
+  so Phase 4 can be called complete before switching to the RGB/runtime decomposition work.

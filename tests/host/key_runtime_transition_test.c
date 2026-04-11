@@ -1101,6 +1101,30 @@ static void test_scan_promotes_pending_multi_tap_hold(void) {
     CHECK(multi_tap.count == 0);
 }
 
+static void test_scan_flushes_expired_pending_multi_tap_chain(void) {
+    key_runtime_transition_plan_t plan;
+
+    test_reset_stubs();
+    multi_tap = (multi_tap_t){
+        .keycode       = TEST_MULTI_TAP_KEY,
+        .key_pos       = test_keypos(6, 4),
+        .timer         = (uint16_t)(fake_time - 200),
+        .count         = 2,
+        .single_action = TEST_FALLBACK_TAP_ACTION,
+        .multi_tap_term = 150,
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 1);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION);
+    CHECK(plan.effects[0].data.delayed_action.action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(plan.effects[0].data.delayed_action.repeat_count == 2);
+    CHECK(multi_tap.keycode == KC_NO);
+    CHECK(multi_tap.count == 0);
+}
+
 static void test_scan_starts_repeat_hold_at_threshold(void) {
     key_runtime_transition_plan_t plan;
 
@@ -1335,6 +1359,7 @@ int main(void) {
     test_scan_fires_hold_for_secondary_slot();
     test_release_pending_multi_tap_hold_registers_then_unregisters_held_action();
     test_scan_promotes_pending_multi_tap_hold();
+    test_scan_flushes_expired_pending_multi_tap_chain();
     test_scan_starts_repeat_hold_at_threshold();
     test_scan_commits_immediate_hold_threshold_with_feedback();
     test_scan_commits_implicit_hold_without_feedback();

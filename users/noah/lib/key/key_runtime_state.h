@@ -107,12 +107,27 @@ typedef struct {
     key_runtime_slot_effect_request_t outcome_request;
 } key_runtime_slot_scan_apply_t;
 
+typedef enum {
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_NONE = 0,
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_EFFECT_REQUEST,
+    KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_PLAN_FLUSH,
+} key_runtime_slot_pending_multi_tap_plan_kind_t;
+
 typedef struct {
     bool                handled;
     uint16_t            action;
     delayed_action_mods_t mods;
     uint8_t             repeat_count;
 } key_runtime_slot_pending_multi_tap_flush_t;
+
+typedef struct {
+    bool                                     handled;
+    keypos_t                                 key_pos;
+    key_runtime_slot_pending_multi_tap_plan_kind_t kind;
+    bool                                     release_layer_before_action;
+    key_runtime_slot_effect_request_t        effect_request;
+    key_runtime_slot_pending_multi_tap_flush_t flush;
+} key_runtime_slot_pending_multi_tap_plan_t;
 
 typedef struct {
     bool                           handled;
@@ -187,6 +202,7 @@ key_runtime_slot_effect_request_t key_runtime_slot_take_flush(active_key_state_t
 key_runtime_slot_effect_request_t key_runtime_slot_fire_hold_at_threshold(active_key_state_t *slot, hold_behavior_t hold, hold_behavior_t long_hold, bool pulse_momentary_layer_action);
 key_runtime_slot_effect_request_t key_runtime_slot_promote_to_long_hold(active_key_state_t *slot, hold_behavior_t long_hold, bool pulse_momentary_layer_action);
 key_runtime_slot_pending_multi_tap_scan_apply_t key_runtime_slot_apply_pending_multi_tap_scan_resolution(active_key_state_t *slot, key_runtime_slot_pending_multi_tap_scan_resolution_t resolution);
+key_runtime_slot_pending_multi_tap_plan_t key_runtime_slot_take_pending_multi_tap_plan(active_key_state_t *slot);
 key_runtime_slot_pending_multi_tap_hold_release_t key_runtime_slot_take_pending_multi_tap_hold_release(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior, uint16_t elapsed);
 void                key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot);
 bool                active_key_matches(uint16_t keycode, keypos_t key_pos);
