@@ -14,6 +14,8 @@
 #include "../key/multi_tap_engine.h"
 #include "../pointing/pd_mode_flags.h"
 
+// One handled-key runtime slot: active press/hold state plus any deferred
+// multi-tap chain that still owns this physical key position after release.
 typedef struct {
     uint16_t        timer;
     uint16_t        keycode;
@@ -32,6 +34,7 @@ typedef struct {
     bool            layer_interrupted;
     hold_behavior_t hold;
     hold_behavior_t long_hold;
+    multi_tap_t     pending_multi_tap;
 } active_key_state_t;
 
 #define KEY_RUNTIME_ACTIVE_SLOT_CAPACITY 2
@@ -51,11 +54,11 @@ typedef struct {
         .tap_hold_term       = CUSTOM_TAP_HOLD_TERM,    \
         .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM, \
         .multi_tap_term      = CUSTOM_MULTI_TAP_TERM,   \
+        .pending_multi_tap   = {0},                     \
     }
 
 typedef struct {
     key_runtime_slot_state_t     active_slots[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY];
-    multi_tap_t                  multi_tap_slots[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY];
     key_runtime_feedback_state_t feedback;
 } key_runtime_shared_state_t;
 

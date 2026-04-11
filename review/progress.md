@@ -163,6 +163,16 @@ Completed in this pass:
     - handled-key presses do not flush foreign pending multi-tap slots
     - non-handled presses still do
   - `tests/host/key_runtime_feedback_test.c` now verifies the multi-tap pending feedback bit can come from a non-primary slot
+- Continued Phase 4 again by collapsing the slot storage model itself:
+  - `users/noah/lib/state/runtime_shared_state.h` no longer stores parallel `active_slots[]` and `multi_tap_slots[]` arrays
+  - each `active_slots[]` entry now owns both:
+    - the active press/hold state
+    - the deferred `pending_multi_tap` chain for that same physical key position
+  - `users/noah/lib/key/key_runtime_slot.c` now resolves slot-to-pending-multi-tap ownership directly from the slot object instead of cross-indexing into a separate array
+  - this removes the last storage-level split between “pressed key state” and “released but still owned tap-chain state”, so the next refactor can focus on behavior/FSM cleanup instead of container plumbing
+- Fixed one regression introduced during the storage collapse:
+  - `key_runtime_slot_track(...)` now preserves an in-flight `pending_multi_tap` sequence when a multi-tap repress updates the slot's active press fields
+  - without that preservation, the third-tap hold path in `key_runtime_modifier_hold_integration_test.c` dropped the pending hold state while retaking ownership of the pressed key
 
 Verification completed in this pass:
 
@@ -194,4 +204,4 @@ Follow-up wiring completed during verification:
 
 Next recommended step:
 
-- continue Phase 4 by collapsing the remaining split between active-slot state and per-slot pending-multi-tap state into a single clearer per-slot FSM surface, so release-time tap deferral and pressed-key hold resolution are modeled as one owned state object instead of parallel arrays.
+- continue Phase 4 by turning the now slot-owned press state and `pending_multi_tap` sub-state into a more explicit per-slot FSM API, so `key_runtime_transition.c` stops manually coordinating two sub-states and can resolve press/release/scan transitions through one clearer slot lifecycle surface.

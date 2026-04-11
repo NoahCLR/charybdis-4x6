@@ -154,7 +154,7 @@ static void test_feedback_falls_back_to_secondary_active_slot(void) {
 static void test_multi_tap_pending_flag_uses_secondary_slot(void) {
     test_reset_state();
 
-    noah_runtime_shared_state.key.multi_tap_slots[1] = (multi_tap_t){
+    noah_runtime_shared_state.key.active_slots[1].pending_multi_tap = (multi_tap_t){
         .keycode = KC_RIGHT_ALT,
         .key_pos = (keypos_t){.row = 4, .col = 2},
         .count   = 1,

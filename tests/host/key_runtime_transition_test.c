@@ -401,12 +401,12 @@ static void test_flush_multi_tap_flushes_each_active_slot_in_order(void) {
     key_runtime_transition_plan_t plan;
 
     test_reset_stubs();
-    noah_runtime_shared_state.key.multi_tap_slots[0] = (multi_tap_t){
+    noah_runtime_shared_state.key.active_slots[0].pending_multi_tap = (multi_tap_t){
         .keycode       = TEST_MULTI_TAP_KEY,
         .count         = 1,
         .single_action = TEST_PREVIOUS_TAP_ACTION,
     };
-    noah_runtime_shared_state.key.multi_tap_slots[1] = (multi_tap_t){
+    noah_runtime_shared_state.key.active_slots[1].pending_multi_tap = (multi_tap_t){
         .keycode       = KC_RIGHT_ALT,
         .count         = 2,
         .single_action = TEST_FALLBACK_TAP_ACTION,
@@ -422,8 +422,8 @@ static void test_flush_multi_tap_flushes_each_active_slot_in_order(void) {
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION);
     CHECK(plan.effects[1].data.delayed_action.action == TEST_FALLBACK_TAP_ACTION);
     CHECK(plan.effects[1].data.delayed_action.repeat_count == 2);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[0].keycode == KC_NO);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[1].keycode == KC_NO);
+    CHECK(noah_runtime_shared_state.key.active_slots[0].pending_multi_tap.keycode == KC_NO);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].pending_multi_tap.keycode == KC_NO);
 }
 
 static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
@@ -923,7 +923,7 @@ static void test_release_secondary_slot_starts_independent_multi_tap_chain(void)
 
     test_reset_stubs();
     key.behavior.has_multi_tap = true;
-    noah_runtime_shared_state.key.multi_tap_slots[0] = (multi_tap_t){
+    noah_runtime_shared_state.key.active_slots[0].pending_multi_tap = (multi_tap_t){
         .keycode       = TEST_MULTI_TAP_KEY,
         .key_pos       = test_keypos(0, 1),
         .count         = 1,
@@ -943,13 +943,13 @@ static void test_release_secondary_slot_starts_independent_multi_tap_chain(void)
 
     CHECK(plan.count == 0);
     CHECK(noah_runtime_shared_state.key.active_slots[1].keycode == KC_NO);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[0].keycode == TEST_MULTI_TAP_KEY);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[0].count == 1);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[1].keycode == TEST_MULTI_TAP_KEY);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[1].key_pos.row == record.event.key.row);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[1].key_pos.col == record.event.key.col);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[1].count == 1);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[1].single_action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(noah_runtime_shared_state.key.active_slots[0].pending_multi_tap.keycode == TEST_MULTI_TAP_KEY);
+    CHECK(noah_runtime_shared_state.key.active_slots[0].pending_multi_tap.count == 1);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].pending_multi_tap.keycode == TEST_MULTI_TAP_KEY);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].pending_multi_tap.key_pos.row == record.event.key.row);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].pending_multi_tap.key_pos.col == record.event.key.col);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].pending_multi_tap.count == 1);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].pending_multi_tap.single_action == TEST_FALLBACK_TAP_ACTION);
 }
 
 static void test_press_reclaims_pending_multi_tap_before_active_slot(void) {
@@ -959,7 +959,7 @@ static void test_press_reclaims_pending_multi_tap_before_active_slot(void) {
 
     test_reset_stubs();
     active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
-    noah_runtime_shared_state.key.multi_tap_slots[1] = (multi_tap_t){
+    noah_runtime_shared_state.key.active_slots[1].pending_multi_tap = (multi_tap_t){
         .keycode       = TEST_MULTI_TAP_KEY,
         .key_pos       = test_keypos(0, 2),
         .count         = 1,
@@ -984,7 +984,7 @@ static void test_press_reclaims_pending_multi_tap_before_active_slot(void) {
     CHECK(active_key.keycode == TEST_PREVIOUS_KEY);
     CHECK(noah_runtime_shared_state.key.active_slots[1].keycode == TEST_NEW_KEY);
     CHECK(noah_runtime_shared_state.key.active_slots[1].held_action_keycode == TEST_IMMEDIATE_HOLD);
-    CHECK(noah_runtime_shared_state.key.multi_tap_slots[1].keycode == KC_NO);
+    CHECK(noah_runtime_shared_state.key.active_slots[1].pending_multi_tap.keycode == KC_NO);
 }
 
 static void test_scan_fires_hold_for_secondary_slot(void) {

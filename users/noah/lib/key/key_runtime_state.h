@@ -2,10 +2,11 @@
 // Key Runtime State
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Shared active-slot and multi-tap state for the split key runtime modules.
-// The helper surface keeps higher-level code off the raw storage layout so the
-// runtime can grow toward richer per-key state without another global-state
-// sweep.
+// Shared per-slot handled-key state for the split key runtime modules.
+// Each slot owns both the currently pressed key state and any deferred
+// multi-tap chain that still belongs to that physical key. The helper surface
+// keeps higher-level code off the raw storage layout so the runtime can keep
+// evolving toward clearer per-key FSMs without another global-state sweep.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -14,7 +15,7 @@
 // Transitional aliases while key-runtime modules move from file-local globals
 // to the shared runtime-owned state object.
 #define active_key (noah_runtime_shared_state.key.active_slots[0])
-#define multi_tap (noah_runtime_shared_state.key.multi_tap_slots[0])
+#define multi_tap (noah_runtime_shared_state.key.active_slots[0].pending_multi_tap)
 
 void noah_key_runtime_scan(void);
 

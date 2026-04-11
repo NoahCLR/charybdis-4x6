@@ -269,7 +269,7 @@ static void test_handled_press_keeps_foreign_multi_tap_pending(void) {
 
     test_reset_state();
     handled_key_is_handled = true;
-    noah_runtime_shared_state.key.multi_tap_slots[0] = (multi_tap_t){
+    noah_runtime_shared_state.key.active_slots[0].pending_multi_tap = (multi_tap_t){
         .keycode = KC_RIGHT_ALT,
         .key_pos = test_keypos(3, 3),
         .count   = 1,
@@ -284,7 +284,7 @@ static void test_non_handled_press_flushes_foreign_multi_tap(void) {
     keyrecord_t record = test_record(test_keypos(3, 4), true);
 
     test_reset_state();
-    noah_runtime_shared_state.key.multi_tap_slots[0] = (multi_tap_t){
+    noah_runtime_shared_state.key.active_slots[0].pending_multi_tap = (multi_tap_t){
         .keycode = KC_RIGHT_ALT,
         .key_pos = test_keypos(3, 3),
         .count   = 1,

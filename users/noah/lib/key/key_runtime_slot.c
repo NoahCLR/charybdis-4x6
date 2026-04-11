@@ -8,6 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_state.h"
+#include <stddef.h>
 
 bool key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
@@ -136,25 +137,25 @@ active_key_state_t *key_runtime_select_slot_for_press(keypos_t key_pos) {
 }
 
 multi_tap_t *key_runtime_primary_multi_tap(void) {
-    return &noah_runtime_shared_state.key.multi_tap_slots[0];
+    return &noah_runtime_shared_state.key.active_slots[0].pending_multi_tap;
 }
 
 multi_tap_t *key_runtime_multi_tap_slot_at(uint8_t index) {
-    if (index >= KEY_RUNTIME_ACTIVE_SLOT_CAPACITY) {
+    active_key_state_t *slot = key_runtime_slot_at(index);
+
+    if (!slot) {
         return NULL;
     }
 
-    return &noah_runtime_shared_state.key.multi_tap_slots[index];
+    return &slot->pending_multi_tap;
 }
 
 multi_tap_t *key_runtime_multi_tap_for_slot(const active_key_state_t *slot) {
-    uint8_t index = key_runtime_slot_index(slot);
-
-    if (index >= KEY_RUNTIME_ACTIVE_SLOT_CAPACITY) {
+    if (!slot) {
         return NULL;
     }
 
-    return key_runtime_multi_tap_slot_at(index);
+    return (multi_tap_t *)&slot->pending_multi_tap;
 }
 
 active_key_state_t *key_runtime_slot_for_multi_tap(const multi_tap_t *mt) {
@@ -162,13 +163,15 @@ active_key_state_t *key_runtime_slot_for_multi_tap(const multi_tap_t *mt) {
         return NULL;
     }
 
-    const multi_tap_t *base = &noah_runtime_shared_state.key.multi_tap_slots[0];
+    const active_key_state_t *base = &noah_runtime_shared_state.key.active_slots[0];
+    const multi_tap_t        *min  = &base[0].pending_multi_tap;
+    const multi_tap_t        *max  = &base[KEY_RUNTIME_ACTIVE_SLOT_CAPACITY - 1].pending_multi_tap;
 
-    if (mt < base || mt >= base + KEY_RUNTIME_ACTIVE_SLOT_CAPACITY) {
+    if (mt < min || mt > max) {
         return NULL;
     }
 
-    return key_runtime_slot_at((uint8_t)(mt - base));
+    return (active_key_state_t *)((char *)mt - offsetof(active_key_state_t, pending_multi_tap));
 }
 
 bool key_runtime_multi_tap_slot_active(const multi_tap_t *mt) {
@@ -220,6 +223,8 @@ void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t
         return;
     }
 
+    multi_tap_t pending_multi_tap = slot->pending_multi_tap;
+
     *slot = (active_key_state_t){
         .timer               = timer_read(),
         .keycode             = keycode,
@@ -232,6 +237,7 @@ void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t
         .multi_tap_term      = multi_tap_term,
         .hold                = hold,
         .long_hold           = long_hold,
+        .pending_multi_tap   = pending_multi_tap,
     };
 }
 
