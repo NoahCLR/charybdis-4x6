@@ -10,7 +10,10 @@ Use this repo like production firmware, not a scratch keymap.
 - Treat `charybdis-4x6` as the default write target. Do not edit sibling workspace folders unless the task explicitly requires it and the user wants that scope.
 - In general, prefer changes in this repo over changes in sibling workspace folders. `../builds` is output/artifact space, not source.
 - If the task depends on upstream QMK behavior or build wiring, inspect the relevant files in `../bastardkb-qmk` instead of guessing how upstream behaves.
-- For refactors or runtime architecture work, read the newest review folder under `review/` first. The newest review folder is the primary source of truth.
+- `README.md` and the files under `docs/` are the main human-facing documentation set for this repo.
+- For doc fixes, doc updates, doc audits, or user-facing explanation work, check `README.md` and the relevant files under `docs/` first.
+- Review folders under `review/` are internal architecture/planning notes, not the default target for normal documentation requests.
+- For refactors or runtime architecture work, read the newest review folder under `review/` first. The newest review folder is the primary source of truth for that architecture work.
 - Name new review folders with a sortable ISO date prefix such as `review/2026-04-11-phase-4/` so "newest review" is unambiguous.
 - Each new review lives in its own folder under `review/` and must include:
   - `userspace-architecture-review.md`: current architecture decisions, tradeoffs, and intended structure
@@ -66,4 +69,5 @@ Repo-specific guardrails:
 
 - When adding a new firmware source file that should participate in the userspace build, wire it into `users/noah/rules.mk` in the same pass. If host compile gates or test runners mirror that build surface, update them too.
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
+- If behavior, workflows, setup steps, or user-facing capabilities changed, update `README.md` and the relevant files under `docs/` in the same pass.
 - If architectural work lands, update the active review folder's `progress.md` in the same pass. If the intended structure or tradeoffs changed, update `userspace-architecture-review.md` too.
