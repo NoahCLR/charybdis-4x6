@@ -156,10 +156,10 @@ Completed in this pass:
   [`users/noah/lib/key/key_runtime_slot_release.h`](../../users/noah/lib/key/key_runtime_slot_release.h)
   and
   [`users/noah/lib/key/key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c).
-- Split scan-specific slot contracts and helpers into
+- Split scan-specific slot contracts into
   [`users/noah/lib/key/key_runtime_slot_scan.h`](../../users/noah/lib/key/key_runtime_slot_scan.h)
-  and
-  [`users/noah/lib/key/key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c).
+  with the corresponding reducer/helpers now consolidated in
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c).
 - Removed the release/scan resolution, apply, and pending-multi-tap plan types
   from
   [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
@@ -196,6 +196,151 @@ Verification result:
 
 - targeted slot, feedback, transition, scenario, and integration tests passed
 - feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+
+## 2026-04-12 Press And Release Reducer Collapse
+
+Completed in this pass:
+
+- Moved the reducer's remaining press-begin and release-resolution logic fully
+  into
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c).
+- Updated
+  [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  so the focused press/release assertions now exercise the reducer seam
+  directly instead of the deleted helper contracts.
+- Deleted the no-longer-needed helper modules:
+  - `users/noah/lib/key/key_runtime_slot_press.c`
+  - `users/noah/lib/key/key_runtime_slot_press.h`
+  - `users/noah/lib/key/key_runtime_slot_release.c`
+  - `users/noah/lib/key/key_runtime_slot_release.h`
+- Removed those files from the canonical userspace source manifest and the
+  affected host runners so the build surface matches the current reducer
+  architecture.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects that press/release helper modules are no longer
+  part of the current runtime structure.
+
+Why this pass landed now:
+
+- it removes the last separate press/release helper boundary that the slot
+  reducer still depended on
+- it makes `key_runtime_slot_step.c` the single runtime-owned reducer surface
+  for handled-key events, leaving the remaining architecture work focused on
+  simplifying the reducer internals rather than deleting more modules
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+
+## 2026-04-12 Phase-Local Active Release Reducer
+
+Completed in this pass:
+
+- Reworked active release resolution inside
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  around explicit lifecycle phases instead of one larger release-condition
+  pile.
+- Added a reducer-local release context plus named phase handlers for:
+  - `TAP_WINDOW`
+  - `PRESS_HELD_WINDOW`
+  - `RELEASE_HOLD_PENDING`
+  - `HOLD_TIER_ACTIVE`
+  - `HOLD_COMPLETE`
+- Kept the shared release result contract intact while making the remaining
+  release-owned-state, tap, action, and pd-mode lock-tap decisions phase-local
+  inside the reducer.
+- Added direct reducer-seam coverage in
+  [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  for:
+  - release-hold-pending release actions
+  - hold-tier-active release long-hold actions
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects that release, like scan, now reduces through
+  explicit phase-local logic inside `key_runtime_slot_step.c`.
+
+Why this pass landed now:
+
+- it removes another implicit lifecycle branch from the handled-key reducer
+  without changing the public slot-step contract
+- it narrows the remaining reducer work to press setup, pending multi-tap
+  paths, and the effect-helper boundary instead of both scan and release
+  resolution shape
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+- diff cleanliness checks passed
+
+## 2026-04-12 Scenario Matrix Expansion
+
+Completed in this pass:
+
+- Expanded
+  [`tests/host/key_runtime_scenario_test.c`](../../tests/host/key_runtime_scenario_test.c)
+  from basic harness smoke coverage into a broader reducer regression matrix.
+- Added scenario traces for:
+  - reclaim after pending multi-tap ownership when another slot is already busy
+  - interrupt-driven fallback hold activation on another key press
+  - long-hold promotion after immediate-hold registration
+  - two-slot contention where the primary slot is reused as overflow
+- Kept the harness surface stable; the new coverage landed without changing the
+  scenario harness API.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects that the first high-risk reducer traces now live
+  in the scenario harness.
+
+Why this pass landed now:
+
+- it reduces the risk of the remaining pending multi-tap and effect-helper
+  refactors without changing runtime behavior
+- it covers the exact transition families the review called out as the best
+  next traces for reducer/FSM work
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted scenario tests passed
 - full host suite passed
 - firmware build passed
 
@@ -314,7 +459,7 @@ Completed in this pass:
   with named slot-event contracts for active scan effects and pending
   multi-tap scan effects/flushes.
 - Moved the old scan resolution/apply details private to
-  [`users/noah/lib/key/key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
   so the scan module now exposes an event-shaped surface instead of a leaky
   internal protocol.
 - Updated
@@ -360,7 +505,7 @@ Completed in this pass:
   internal press/release/scan event-plan structs:
   - [`key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c)
   - [`key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
-  - [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+  - scan reducer logic that now lives in [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
 - Added a single shared internal result-builder helper header in
   [`key_runtime_slot_result_internal.h`](../../users/noah/lib/key/key_runtime_slot_result_internal.h)
   and reduced
@@ -430,7 +575,7 @@ Completed in this pass:
   [`key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c),
   [`key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c),
   and
-  [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+  [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
   consume those internal headers directly.
 - Reworked host coverage so the slot and feedback tests assert the shared
   slot-result surface instead of the deprecated local event structs:
@@ -543,10 +688,111 @@ Completed in this pass:
 - Updated press, scan, release, effect, and feedback paths to consume the new
   lifecycle model:
   - [`key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c)
-  - [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+  - [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
   - [`key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
   - [`key_runtime_slot_effect.c`](../../users/noah/lib/key/key_runtime_slot_effect.c)
   - [`key_runtime_feedback.c`](../../users/noah/lib/key/key_runtime_feedback.c)
+
+## 2026-04-11 Slot Reducer Implementation Consolidation
+
+Completed in this pass:
+
+- Added the consolidated slot reducer implementation in
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c).
+- Moved handled press, handled release, active scan, pending multi-tap scan,
+  interrupt, and pending multi-tap flush reduction into that one file so
+  `key_runtime_slot_step(...)` now has a real implementation boundary instead
+  of dispatching back out to fragmented per-event producers.
+- Reduced
+  [`users/noah/lib/key/key_runtime_slot_result.c`](../../users/noah/lib/key/key_runtime_slot_result.c)
+  to shared result-builder helpers only.
+- Reduced
+  [`users/noah/lib/key/key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c)
+  to the focused press-begin helper and
+  [`users/noah/lib/key/key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
+  to release resolution helpers.
+- Deleted the no-longer-needed reducer implementation file
+  `users/noah/lib/key/key_runtime_slot_scan.c`.
+- Updated the canonical userspace source manifest and the affected host
+  runners to compile `key_runtime_slot_step.c` instead of the removed scan
+  reducer file.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the consolidated reducer implementation boundary.
+
+Why this pass landed now:
+
+- it turns the slot-step API into a real reducer implementation boundary, not
+  just a wrapper contract
+- it narrows the remaining handled-key architecture work to the internal
+  phase/event logic inside that reducer instead of both reducer API and
+  reducer implementation shape
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+
+## 2026-04-11 Phase-Local Scan Reducer
+
+Completed in this pass:
+
+- Replaced the active-scan `resolution/apply` mini-protocol inside
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  with explicit phase-local reducer branches for:
+  - `TAP_WINDOW`
+  - `PRESS_HELD_WINDOW`
+  - `RELEASE_HOLD_PENDING`
+  - `HOLD_TIER_ACTIVE`
+- Replaced the pending-multi-tap scan `resolution/apply` mini-protocol in the
+  same file with direct reducer logic that mutates slot state and emits the
+  shared slot-result surface in one step.
+- Added direct slot coverage for the previously implicit scan phases in
+  [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c).
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects that scan now has explicit phase-local reducer
+  logic inside `key_runtime_slot_step.c`.
+
+Why this pass landed now:
+
+- it turns the scan portion of the handled-key reducer into explicit
+  phase-local logic instead of another resolution/apply helper protocol
+- it narrows the remaining reducer work to the press/release side and any
+  future tighter phase/event core extraction
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted slot, feedback, transition, scenario, and integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
 - Kept backward-compatible behavior for manually constructed active slot
   fixtures by normalizing `phase == IDLE` plus `keycode != KC_NO` to the
   effective tap window in the shared slot helpers.

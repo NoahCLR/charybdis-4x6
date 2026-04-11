@@ -2,7 +2,7 @@
 
 Date: 2026-04-11
 
-Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, dedicated release/scan slot-transition modules, dedicated press/effect slot-transition modules, the first handled press/release slot-event wrappers, scan-specific slot-event wrappers that replaced the old public scan resolution/apply structs, an explicit handled-key slot lifecycle phase plus hold-strategy model, a shared slot-result surface that now sits between slot event producers and `key_runtime_transition.c`, a narrowed public header boundary that moved the old press/release/scan result structs behind internal headers, a direct slot-result production step that removed those internal press/release/scan event-plan headers entirely, and a reducer-style `key_runtime_slot_step(...)` seam that now routes slot events through one transition-facing contract; the remaining recommendations below focus on what is still architecturally open after those changes.
+Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, dedicated release/scan slot-transition modules, dedicated press/effect slot-transition modules, the first handled press/release slot-event wrappers, scan-specific slot-event wrappers that replaced the old public scan resolution/apply structs, an explicit handled-key slot lifecycle phase plus hold-strategy model, a shared slot-result surface that now sits between slot event producers and `key_runtime_transition.c`, a narrowed public header boundary that moved the old press/release/scan result structs behind internal headers, a direct slot-result production step that removed those internal press/release/scan event-plan headers entirely, a reducer-style `key_runtime_slot_step(...)` seam that routes slot events through one transition-facing contract, a consolidated reducer implementation in `key_runtime_slot_step.c`, the removal of the now-redundant press/release helper modules from the runtime build surface, and explicit phase-local active-release branches inside the slot reducer; the remaining recommendations below focus on what is still architecturally open after those changes.
 
 Scope: the `noah` userspace in this repo only. This review ignores hardware changes and evaluates software structure, boundaries, state flow, extension cost, and verification surfaces.
 
@@ -27,8 +27,10 @@ event-shaped surface for handled press/release/scan planning, plus an explicit
 slot lifecycle phase and hold-strategy model instead of the earlier
 `hold_fired` / `hold_one_shot_fired` / `implicit_hold` /
 `fallback_hold_pending` flag mix. It now has one reducer-style slot-step API,
-but it is still not one shared reducer implementation, and the handled-key
-engine is still the place most likely to fight the next real feature.
+one reducer implementation file, and phase-local active-scan and
+active-release reducers inside that file, but it is still not a smaller
+explicit phase/event FSM core, and the handled-key engine is still the place
+most likely to fight the next real feature.
 
 The current extension cost looks like this:
 
@@ -107,9 +109,7 @@ The strongest remaining architectural smell is in the key runtime:
 - [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
 - [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
 - [`users/noah/lib/key/key_runtime_slot_effect.c`](../../users/noah/lib/key/key_runtime_slot_effect.c)
-- [`users/noah/lib/key/key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c)
-- [`users/noah/lib/key/key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
-- [`users/noah/lib/key/key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+- [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
 - [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
 - [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c)
 - [`users/noah/lib/key/key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c)
@@ -119,14 +119,11 @@ What is good now:
 - slot ownership is explicit
 - slot admission and reclaim lookup now have a named home in
   [`key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
-- press planning and effect-request helpers now have named homes in
-  [`key_runtime_slot_press.c`](../../users/noah/lib/key/key_runtime_slot_press.c)
-  and
+- effect-request helpers have a named home in
   [`key_runtime_slot_effect.c`](../../users/noah/lib/key/key_runtime_slot_effect.c)
-- release and scan slot-transition contracts now have named homes in
-  [`key_runtime_slot_release.c`](../../users/noah/lib/key/key_runtime_slot_release.c)
-  and
-  [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
+- handled press, release, scan, interrupt, and pending multi-tap flush
+  reduction now all live in
+  [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
 - handled press, release, scan, interrupt, and pending multi-tap flush now
   route through the reducer-style slot-step contract in
   [`key_runtime_slot_step.h`](../../users/noah/lib/key/key_runtime_slot_step.h)
@@ -136,12 +133,21 @@ What is good now:
   adapt into a shared slot-result surface in
   [`key_runtime_slot_result.c`](../../users/noah/lib/key/key_runtime_slot_result.c)
   before the transition layer plans system effects
-- press, release, and scan now build `key_runtime_slot_result_t` directly in
-  their owning modules instead of translating through extra cross-module
-  event-plan structs
+- the reducer switch plus handled press/release/scan/interrupt/flush result
+  production now live in
+  [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  instead of being split across separate event entry points
 - scan-specific resolution/apply details now stay private to
-  [`key_runtime_slot_scan.c`](../../users/noah/lib/key/key_runtime_slot_scan.c)
-  instead of leaking through the public header
+  [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  instead of leaking through the public header boundary
+- active scan now runs through explicit phase-local reducer branches inside
+  [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  instead of a separate resolution/apply mini-protocol
+- active release now runs through explicit phase-local reducer branches inside
+  [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  instead of one larger release-resolution condition pile
+- press-begin and release-resolution logic no longer sit behind separate
+  runtime modules; they now live directly inside the slot reducer
 - active slot lifecycle state now has explicit `phase` and `hold_strategy`
   fields instead of the older hold/strategy boolean combination
 - press/release/scan are separated
@@ -157,17 +163,18 @@ What is still expensive:
   and interruption policy in one mutable storage struct
 - [`key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h) exposes a
   narrower storage-oriented surface plus shared slot helpers
-- one public slot event/result model now exists, but lifecycle mutation and
-  transition planning are still spread across `key_runtime_slot_effect.c`,
-  `key_runtime_slot_press.c`, `key_runtime_slot_release.c`,
-  `key_runtime_slot_scan.c`, and `key_runtime_slot_result.c` instead of one
-  explicit reducer implementation
+- one public slot event/result model now exists, and one reducer
+  implementation now exists in `key_runtime_slot_step.c`, but lifecycle
+  mutation still leans on `key_runtime_slot_effect.c`, pending multi-tap
+  helper paths, and several local reducer helpers inside
+  `key_runtime_slot_step.c` instead of one smaller fully phase-local reducer
+  core
 - the transition layer no longer knows the press/release/scan-specific local
   structs, and those extra structs are gone; the remaining fragmentation is now
   in implementation logic rather than in cross-module result protocols
-- the shared slot-result helper layer is now small, but the underlying press,
-  release, and scan logic still does not share one reducer/state-step
-  implementation
+- the shared slot-result helper layer is now small, and the reducer entry
+  point is unified, but the underlying phase transitions still do not share a
+  tighter phase/event state-machine surface
 
 Why this matters:
 
@@ -231,20 +238,26 @@ What this means in practice:
 That is acceptable today. It just means the trait system should be treated as a
 midpoint, not as the final extensibility model.
 
-### 4. Structured scenario coverage exists now, but only at the first layer
+### 4. Structured scenario coverage exists now, and the first reducer matrix is landing
 
 The handled-key runtime now has a real scenario harness:
 
 - [`tests/host/key_runtime_scenario_harness.c`](../../tests/host/key_runtime_scenario_harness.c)
 - [`tests/host/key_runtime_scenario_test.c`](../../tests/host/key_runtime_scenario_test.c)
 
-This closes an earlier testing gap, but the coverage is still intentionally
-small.
+This closes an earlier testing gap, and the first high-risk reducer traces now
+exist there too.
 
 Why this matters:
 
-- the current harness proves the shape works, but not yet across the full range
-  of interrupt, reclaim, and long-hold transitions
+- the current harness now covers:
+  - single-tap timeout resolution
+  - pending multi-tap reclaim before a new handled press
+  - interrupt-driven fallback hold activation
+  - long-hold promotion after immediate-hold registration
+  - two-slot overflow that reuses the primary slot
+- that is enough coverage to protect the next pending multi-tap and
+  effect-helper refactors better than before
 - the remaining reducer/FSM refactor will be safer once more of the current
   behavior is captured as reusable event traces
 - the scenario surface is now the right place to pin down semantics that are too
@@ -449,17 +462,21 @@ typedef struct {
 The point is not dynamic plugins. The point is to keep novel mode policy from
 turning `pd_mode_registry.c` into another central accumulator.
 
-### Recommendation 4: expand the scenario harness into a reducer regression matrix
+### Recommendation 4: keep growing the scenario harness into a reducer regression matrix
 
-The initial harness now exists. The next step is to grow it around the
-transitions most likely to regress during reducer/FSM work.
-
-Best next traces:
+The initial matrix now exists, and the first high-risk traces have landed:
 
 - reclaim after pending multi-tap ownership
 - interrupt-driven fallback hold activation
 - long-hold promotion after immediate-hold registration
 - two-slot contention where the primary slot is reused as overflow
+
+Next traces worth adding:
+
+- pd-mode lock-tap release behavior after a locked press
+- release-hold-pending long-hold promotion across scan then release
+- reclaim behavior when a held action survives flush
+- multi-tap pending-hold release paths that intentionally preserve the chain
 
 ## Bottom Line
 

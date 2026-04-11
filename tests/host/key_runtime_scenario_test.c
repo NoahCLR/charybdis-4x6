@@ -7,11 +7,17 @@
 #include "users/noah/lib/key/key_runtime_state.h"
 
 enum {
+    TEST_FALLBACK_KEY = 0x0004u,
+    TEST_OTHER_KEY    = 0x0005u,
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,
     TEST_TAP_ACTION    = SAFE_RANGE + 0x71,
     TEST_ALT_ACTION    = SAFE_RANGE + 0x72,
     TEST_HOLD_KEY      = SAFE_RANGE + 0x73,
     TEST_HOLD_ACTION   = SAFE_RANGE + 0x74,
+    TEST_HOLD_KEY_TWO  = SAFE_RANGE + 0x75,
+    TEST_HOLD_KEY_THREE = SAFE_RANGE + 0x76,
+    TEST_HOLD_ACTION_TWO = SAFE_RANGE + 0x77,
+    TEST_HOLD_ACTION_THREE = SAFE_RANGE + 0x78,
 };
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -42,6 +48,39 @@ static void test_configure_multi_tap_key(void) {
 
     key_runtime_scenario_add_behavior_step(TEST_MULTI_TAP_KEY, 2, (key_behavior_step_t){
         .tap = TAP_SENDS(TEST_ALT_ACTION),
+    });
+}
+
+static void test_configure_fallback_tap_key(uint16_t keycode, uint16_t tap_action) {
+    key_runtime_scenario_add_behavior_view((key_behavior_view_t){
+        .keycode          = keycode,
+        .handled          = true,
+        .tap_hold_term    = 150,
+        .longer_hold_term = 350,
+        .multi_tap_term   = 120,
+        .single =
+            {
+                .tap = TAP_SENDS(tap_action),
+            },
+    });
+}
+
+static void test_configure_immediate_hold_key(uint16_t keycode, uint16_t hold_action, hold_behavior_t long_hold) {
+    key_runtime_scenario_add_behavior_view((key_behavior_view_t){
+        .keycode          = keycode,
+        .handled          = true,
+        .tap_hold_term    = 150,
+        .longer_hold_term = 350,
+        .multi_tap_term   = 120,
+        .single =
+            {
+                .hold = {
+                    .present = true,
+                    .action  = hold_action,
+                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                },
+                .long_hold = long_hold,
+            },
     });
 }
 
@@ -113,10 +152,120 @@ static void test_threshold_hold_registers_and_releases_owned_state(void) {
     CHECK(key_runtime_scenario_effect_at(1)->key_pos.col == 3);
 }
 
+static void test_press_after_pending_multi_tap_flushes_chain_before_new_layer_press(void) {
+    static const key_runtime_scenario_step_t setup[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 1, 3),
+    };
+    static const key_runtime_scenario_step_t reclaim[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(MO(2), 1, 2),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_multi_tap_key();
+    test_configure_immediate_hold_key(TEST_HOLD_KEY_TWO, TEST_HOLD_ACTION_TWO, hold_behavior_none());
+    key_runtime_scenario_run(setup, ARRAY_SIZE(setup));
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(reclaim, ARRAY_SIZE(reclaim));
+
+    CHECK(key_runtime_scenario_effect_count() == 2);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_SCENARIO_EFFECT_DELAYED_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->action == TEST_TAP_ACTION);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_SCENARIO_EFFECT_LAYER_PRESS);
+    CHECK(key_runtime_scenario_effect_at(1)->layer == 2);
+    CHECK(key_runtime_scenario_effect_at(1)->key_pos.row == 1);
+    CHECK(key_runtime_scenario_effect_at(1)->key_pos.col == 2);
+    CHECK(!key_runtime_slot_has_pending_multi_tap(&key_runtime_scenario_state()->key.active_slots[0]));
+    CHECK(key_runtime_scenario_state()->key.active_slots[0].keycode == MO(2));
+    CHECK(key_runtime_scenario_state()->key.active_slots[1].keycode == TEST_HOLD_KEY_TWO);
+}
+
+static void test_interrupt_other_press_activates_fallback_hold(void) {
+    static const key_runtime_scenario_step_t scenario[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_FALLBACK_KEY, 0, 0),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_OTHER_KEY, 0, 1),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_fallback_tap_key(TEST_FALLBACK_KEY, TEST_TAP_ACTION);
+    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
+
+    CHECK(key_runtime_scenario_effect_count() == 1);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_SCENARIO_EFFECT_HELD_REGISTER);
+    CHECK(key_runtime_scenario_effect_at(0)->action == TEST_FALLBACK_KEY);
+    CHECK(key_runtime_scenario_effect_at(0)->key_pos.row == 0);
+    CHECK(key_runtime_scenario_effect_at(0)->key_pos.col == 0);
+    CHECK(key_runtime_scenario_state()->key.active_slots[0].held_action_keycode == TEST_FALLBACK_KEY);
+    CHECK(key_runtime_slot_hold_is_complete(&key_runtime_scenario_state()->key.active_slots[0]));
+}
+
+static void test_immediate_hold_promotes_long_hold_after_registration(void) {
+    static const key_runtime_scenario_step_t scenario[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY, 0, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(151),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_ADVANCE(200),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_immediate_hold_key(TEST_HOLD_KEY, TEST_HOLD_ACTION, (hold_behavior_t)TAP_AT_HOLD_THRESHOLD(TEST_ALT_ACTION));
+    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
+
+    CHECK(key_runtime_scenario_effect_count() == 5);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_SCENARIO_EFFECT_HELD_REGISTER);
+    CHECK(key_runtime_scenario_effect_at(0)->action == TEST_HOLD_ACTION);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_SCENARIO_EFFECT_FEEDBACK_PULSE);
+    CHECK(!key_runtime_scenario_effect_at(1)->long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_SCENARIO_EFFECT_RELEASE_OWNED_BY_KEY);
+    CHECK(key_runtime_scenario_effect_at(2)->key_pos.row == 0);
+    CHECK(key_runtime_scenario_effect_at(2)->key_pos.col == 3);
+    CHECK(key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_SCENARIO_EFFECT_DISPATCH_ACTION);
+    CHECK(key_runtime_scenario_effect_at(3)->action == TEST_ALT_ACTION);
+    CHECK(key_runtime_scenario_effect_at(4)->kind == KEY_RUNTIME_SCENARIO_EFFECT_FEEDBACK_PULSE);
+    CHECK(key_runtime_scenario_effect_at(4)->long_hold_level);
+    CHECK(key_runtime_slot_hold_is_complete(&key_runtime_scenario_state()->key.active_slots[0]));
+    CHECK(key_runtime_scenario_state()->key.active_slots[0].held_action_keycode == KC_NO);
+}
+
+static void test_third_press_reuses_primary_slot_when_both_slots_busy(void) {
+    static const key_runtime_scenario_step_t scenario[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY, 2, 0),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 2, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_THREE, 2, 2),
+    };
+    const runtime_shared_state_t *state;
+
+    key_runtime_scenario_reset();
+    test_configure_immediate_hold_key(TEST_HOLD_KEY, TEST_HOLD_ACTION, hold_behavior_none());
+    test_configure_immediate_hold_key(TEST_HOLD_KEY_TWO, TEST_HOLD_ACTION_TWO, hold_behavior_none());
+    test_configure_immediate_hold_key(TEST_HOLD_KEY_THREE, TEST_HOLD_ACTION_THREE, hold_behavior_none());
+    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
+
+    state = key_runtime_scenario_state();
+
+    CHECK(key_runtime_scenario_effect_count() == 4);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_SCENARIO_EFFECT_HELD_REGISTER);
+    CHECK(key_runtime_scenario_effect_at(0)->action == TEST_HOLD_ACTION);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_SCENARIO_EFFECT_HELD_REGISTER);
+    CHECK(key_runtime_scenario_effect_at(1)->action == TEST_HOLD_ACTION_TWO);
+    CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_SCENARIO_EFFECT_HELD_UNREGISTER);
+    CHECK(key_runtime_scenario_effect_at(2)->action == TEST_HOLD_ACTION);
+    CHECK(key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_SCENARIO_EFFECT_HELD_REGISTER);
+    CHECK(key_runtime_scenario_effect_at(3)->action == TEST_HOLD_ACTION_THREE);
+    CHECK(state->key.active_slots[0].keycode == TEST_HOLD_KEY_THREE);
+    CHECK(state->key.active_slots[1].keycode == TEST_HOLD_KEY_TWO);
+}
+
 int main(void) {
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();
+    test_press_after_pending_multi_tap_flushes_chain_before_new_layer_press();
+    test_interrupt_other_press_activates_fallback_hold();
+    test_immediate_hold_promotes_long_hold_after_registration();
+    test_third_press_reuses_primary_slot_when_both_slots_busy();
 
     puts("key_runtime_scenario host tests passed");
     return 0;

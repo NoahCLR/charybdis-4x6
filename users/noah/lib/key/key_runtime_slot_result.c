@@ -2,11 +2,9 @@
 // Key Runtime Slot Results
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Shared slot-result helpers plus the reducer-style slot event seam used by
-// higher-level handled-key orchestration.
+// Shared slot-result builders used by the slot-step reducer implementation.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_slot_step.h"
 #include "key_runtime_slot_result_internal.h"
 
 void key_runtime_slot_result_push(key_runtime_slot_result_t *result, key_runtime_slot_result_effect_t effect) {
@@ -89,59 +87,4 @@ void key_runtime_slot_result_push_pd_mode_lock_tap(key_runtime_slot_result_t *re
                                            .kind         = KEY_RUNTIME_SLOT_RESULT_EFFECT_PD_MODE_LOCK_TAP,
                                            .data.pd_mode = mode,
                                        });
-}
-
-key_runtime_slot_result_t key_runtime_slot_step(active_key_state_t *slot, key_runtime_slot_event_t event) {
-    switch (event.kind) {
-        case KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS:
-            return key_runtime_slot_take_handled_press_result(
-                slot,
-                event.data.handled_press.keycode,
-                event.data.handled_press.key_pos,
-                event.data.handled_press.key,
-                event.data.handled_press.active_held_action_survives_flush);
-        case KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE:
-            return key_runtime_slot_take_handled_release_result(
-                slot,
-                event.data.handled_release.keycode,
-                event.data.handled_release.key_pos,
-                event.data.handled_release.behavior);
-        case KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN:
-            return key_runtime_slot_take_active_scan_result(slot);
-        case KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN:
-            return key_runtime_slot_take_pending_multi_tap_scan_result(slot);
-        case KEY_RUNTIME_SLOT_EVENT_INTERRUPT:
-            return key_runtime_slot_take_interrupt_result(slot, event.data.interrupt.other_key_pos);
-        case KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH:
-            return key_runtime_slot_take_pending_multi_tap_flush_result(slot);
-        case KEY_RUNTIME_SLOT_EVENT_NONE:
-        default:
-            return (key_runtime_slot_result_t){0};
-    }
-}
-
-key_runtime_slot_result_t key_runtime_slot_take_interrupt_result(active_key_state_t *slot, keypos_t other_key_pos) {
-    key_runtime_slot_result_t         result  = {0};
-    key_runtime_slot_effect_request_t request = key_runtime_slot_interrupt_on_other_press(slot, other_key_pos);
-
-    if (!key_runtime_slot_result_request_has_effect(request)) {
-        return result;
-    }
-
-    result.handled = true;
-    key_runtime_slot_result_push_request_if_present(&result, slot ? slot->key_pos : (keypos_t){0}, request);
-    return result;
-}
-
-key_runtime_slot_result_t key_runtime_slot_take_pending_multi_tap_flush_result(active_key_state_t *slot) {
-    key_runtime_slot_result_t                  result = {0};
-    key_runtime_slot_pending_multi_tap_flush_t flush  = key_runtime_slot_take_pending_multi_tap_flush(slot);
-
-    if (!flush.handled) {
-        return result;
-    }
-
-    result.handled = true;
-    key_runtime_slot_result_push_delayed_action(&result, flush.action, flush.mods, flush.repeat_count);
-    return result;
 }

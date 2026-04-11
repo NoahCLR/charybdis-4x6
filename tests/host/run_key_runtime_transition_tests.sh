@@ -21,10 +21,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/key_runtime_transition_test.c" \
     "$ROOT/users/noah/lib/key/key_runtime_admission.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_effect.c" \
-    "$ROOT/users/noah/lib/key/key_runtime_slot_press.c" \
-    "$ROOT/users/noah/lib/key/key_runtime_slot_release.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_result.c" \
-    "$ROOT/users/noah/lib/key/key_runtime_slot_scan.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_slot_step.c" \
     "$ROOT/users/noah/lib/key/key_runtime_trace.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot.c" \
     "$ROOT/users/noah/lib/key/key_runtime_transition.c" \
