@@ -174,7 +174,7 @@ This pattern applies to:
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, macros, direct actions |
 | `matrix_scan_user()` | `noah_matrix_scan_user()` | VIA macro default reseeding, key runtime scanning, and split shared-state sync ticks |
 | `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | macro and keymap validation, VIA macro default seeding, RGB runtime init, and split shared-state init |
-| `layer_state_set_user()` | `noah_layer_state_set_user()` | pointer-layer policy and sniping state |
+| `layer_state_set_user()` | `noah_layer_state_set_user()` | pointer-layer policy, sniping state, and re-applying any active pd-mode DPI after Charybdis layer changes |
 | `pointing_device_task_user()` | `noah_pointing_device_task_user()` | pointer-mode mouse-report transforms |
 | `pointing_device_init_user()` | `noah_pointing_device_init_user()` | auto-mouse init |
 | `is_mouse_record_user()` | `noah_is_mouse_record_user()` | pointer-layer mouse-key classification |

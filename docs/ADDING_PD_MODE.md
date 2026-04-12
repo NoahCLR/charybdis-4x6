@@ -21,7 +21,7 @@ If you have not read them yet, also see:
 If you hand this task to an agent, give it this exact job:
 
 1. Add a new manifest row in [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h).
-2. Add handler/reset declarations in [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h) and implementations in [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c), if the mode needs them.
+2. If the mode needs runtime behavior, add handler/reset declarations in [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h), implement them in a new per-mode file under [`users/noah/lib/pointing/`](../users/noah/lib/pointing/), and wire that file into [`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk).
 3. Expose the mode through at least one physical path in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), either directly in `keymaps[][]` or indirectly from another key behavior or combo. Add a `key_behaviors[]` row only if the mode itself needs custom taps or higher-tap behavior.
 4. Add an RGB color in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 5. Update user-facing docs if the mode changes real behavior in a meaningful way.
@@ -33,10 +33,13 @@ behavior that existing modes do not cover.
 
 If a mode needs unusual activation, deactivation, lock, or unlock side effects
 that are not shared policy, keep the normal manifest path intact and add an
-optional lifecycle hook object consumed by
-[`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c),
+optional lifecycle hook object defined alongside the registry materialization
+in [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c),
 then reference that object from the manifest row instead of introducing
-another one-off manifest trait or registry switch edit.
+another one-off manifest trait or registry switch edit. Only reach into
+[`users/noah/lib/pointing/pd_mode_lifecycle.c`](../users/noah/lib/pointing/pd_mode_lifecycle.c)
+when the shared activate / deactivate / lock / unlock policy itself needs to
+change.
 
 ## What Counts As A Pd Mode
 
@@ -83,7 +86,8 @@ Normal add-mode work lives in these files:
 
 - [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h)
 - [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h)
-- [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c)
+- a new per-mode implementation file under [`users/noah/lib/pointing/`](../users/noah/lib/pointing/) such as [`pd_mode_volume.c`](../users/noah/lib/pointing/pd_mode_volume.c)
+- [`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk)
 - [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 
@@ -94,6 +98,7 @@ Files you usually do not need to touch:
 - [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h)
 - [`users/noah/lib/pointing/pd_modes.h`](../users/noah/lib/pointing/pd_modes.h)
 - [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c)
+- [`users/noah/lib/pointing/pd_mode_lifecycle.c`](../users/noah/lib/pointing/pd_mode_lifecycle.c)
 - [`users/noah/lib/key/key_runtime_process.c`](../users/noah/lib/key/key_runtime_process.c)
 - [`users/noah/lib/key/held_action.c`](../users/noah/lib/key/held_action.c)
 - [`users/noah/lib/pointing/pd_mode_state.c`](../users/noah/lib/pointing/pd_mode_state.c)
@@ -157,7 +162,16 @@ events while active, like `ARROW_MODE`.
 
 ### 4. Implement The Handler
 
-Edit [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c).
+Create a new per-mode implementation file under
+[`users/noah/lib/pointing/`](../users/noah/lib/pointing/) and add it to
+[`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk).
+
+Copy the nearest existing mode file for structure. Modes such as
+[`pd_mode_volume.c`](../users/noah/lib/pointing/pd_mode_volume.c),
+[`pd_mode_brightness.c`](../users/noah/lib/pointing/pd_mode_brightness.c),
+[`pd_mode_zoom.c`](../users/noah/lib/pointing/pd_mode_zoom.c), and
+[`pd_mode_arrow.c`](../users/noah/lib/pointing/pd_mode_arrow.c) are now split
+per translation unit instead of growing one central handlers file.
 
 Typical pattern:
 
@@ -166,6 +180,10 @@ Typical pattern:
 - emit taps when the accumulated value crosses a threshold
 - return a zeroed `report_mouse_t` if the cursor should freeze while active
 - fully clear the mode-local state in the reset function
+
+Many vertical threshold modes can reuse helpers from
+[`pd_mode_handler_common.h`](../users/noah/lib/pointing/pd_mode_handler_common.h),
+but bespoke modes should still keep their own state in the per-mode file.
 
 Minimal skeleton:
 
@@ -308,7 +326,8 @@ Examples:
 - keep auto-mouse alive while the mode is locked
 
 Edit [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h)
-and, if needed, [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c).
+and, if needed, [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c)
+or [`users/noah/lib/pointing/pd_mode_lifecycle.c`](../users/noah/lib/pointing/pd_mode_lifecycle.c).
 
 Prefer existing manifest traits first. If the behavior is genuinely new
 shared policy, add a new `PD_MODE_TRAIT_*` flag and consume that trait
@@ -330,7 +349,9 @@ probably do not need extra branches here.
 ### Mode Needs Key Interception
 
 If the mode repurposes keyboard or mouse-button events while active, add a
-`key_handler` in [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c) and reference it from the manifest row.
+`key_handler` in the mode's own implementation file, as
+[`pd_mode_arrow.c`](../users/noah/lib/pointing/pd_mode_arrow.c) does, and
+reference it from the manifest row.
 
 Copy `ARROW_MODE` if you need a template.
 
@@ -382,17 +403,21 @@ This is the actual control path for pd modes:
    which routes them to `pd_mode_handle_keycode_press()` and
    `pd_mode_handle_keycode_release()`.
 3. [`users/noah/lib/pointing/pd_mode_state.c`](../users/noah/lib/pointing/pd_mode_state.c) owns active and locked mode state,
-   plus lock exclusivity.
+   local-vs-display snapshots, and split-applied mirrored UI state.
 4. [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c) materializes the mode table
-   from the manifest, including handlers, reset hooks, row-owned lifecycle
-   hooks, lock actions, and DPI behavior.
-5. [`users/noah/lib/pointing/pd_runtime.c`](../users/noah/lib/pointing/pd_runtime.c) calls the first active
+   from the manifest, including handlers, reset hooks, traits, row-owned
+   lifecycle hook selection, lock actions, and DPI metadata.
+5. [`users/noah/lib/pointing/pd_mode_lifecycle.c`](../users/noah/lib/pointing/pd_mode_lifecycle.c) owns activate / deactivate /
+   lock / unlock transitions, exclusivity, shared auto-mouse policy, DPI
+   application, and active-mode key interception.
+6. [`users/noah/lib/pointing/pd_runtime.c`](../users/noah/lib/pointing/pd_runtime.c) calls the first active
    handler in `pd_modes[]`.
-6. [`users/noah/lib/pointing/pointer_layer_policy.c`](../users/noah/lib/pointing/pointer_layer_policy.c) keeps the configured
+7. [`users/noah/lib/pointing/pointer_layer_policy.c`](../users/noah/lib/pointing/pointer_layer_policy.c) keeps the configured
    auto-mouse target layer alive while modes are active or locked.
-7. [`users/noah/lib/state/split_runtime_sync.c`](../users/noah/lib/state/split_runtime_sync.c) mirrors active and locked
-   flags to the other half.
-8. [`users/noah/lib/rgb/rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c) orchestrates stage order, and
+8. [`users/noah/lib/state/split_runtime_sync.c`](../users/noah/lib/state/split_runtime_sync.c) mirrors active and locked
+   flags to the other half, and [`pd_mode_state.c`](../users/noah/lib/pointing/pd_mode_state.c)
+   exposes those as display-state queries for UI consumers.
+9. [`users/noah/lib/rgb/rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c) orchestrates stage order, and
    [`users/noah/lib/rgb/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/rgb_pd_mode_stage.c) renders the mode overlay on the right half.
 
 That is why most new modes are mostly a data-registration job, not a runtime rewrite.
@@ -401,6 +426,7 @@ That is why most new modes are mostly a data-registration job, not a runtime rew
 
 - Editing the generated pd-mode section in `custom_keycodes` instead of the manifest.
 - Adding the new manifest row but forgetting the handler declaration or implementation it references.
+- Adding a new per-mode source file but forgetting to wire it into [`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk).
 - Adding a lifecycle hook object but forgetting to reference it from the manifest row.
 - Forgetting the reset function, which leaves stale accumulators or modifiers behind.
 - Adding side effects in activate / deactivate but forgetting the locked path.
@@ -413,7 +439,8 @@ A new mode is done when all of the following are true:
 
 - The manifest row exists in [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h).
 - The generated keycode, flag, and registry row all exist.
-- Any needed handler, key handler, and reset function exist.
+- Any needed handler, key handler, and reset function exist, and any new
+  per-mode source file is wired into [`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk).
 - The mode is reachable from at least one physical path, either directly in
   `keymaps[][]` or indirectly as an action emitted from another key behavior or
   combo.
@@ -463,11 +490,13 @@ After compiling, verify the real behavior on hardware:
 
 ## Quick Diff Checklist
 
-For a normal new mode, the minimum expected diff usually includes:
+For a normal new motion-transforming mode, the minimum expected diff usually
+includes:
 
 - [`users/noah/lib/pointing/pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h)
 - [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h)
-- [`users/noah/lib/pointing/pd_mode_handlers.c`](../users/noah/lib/pointing/pd_mode_handlers.c)
+- a new per-mode implementation file under [`users/noah/lib/pointing/`](../users/noah/lib/pointing/) such as [`pd_mode_volume.c`](../users/noah/lib/pointing/pd_mode_volume.c)
+- [`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk)
 - [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 
