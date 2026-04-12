@@ -177,7 +177,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_handled_press_begin_fresh
                                                         context->multi_tap_term,
                                                         key_runtime_slot_initial_press_phase(context->hold),
                                                         context->hold_strategy,
-                                                        context->pd_mode && pd_mode_locked(context->pd_mode)));
+                                                        context->pd_mode && pd_mode_local_locked(context->pd_mode)));
     return result;
 }
 

@@ -43,13 +43,13 @@ static void split_runtime_sync_log_packet_size_mismatch(uint8_t size) {
 static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_elapsed) {
     return (split_runtime_sync_packet_t){
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-        .automouse_progress = pd_any_mode_locked() ? 0 : automouse_rgb_quantize_progress(raw_elapsed),
+        .automouse_progress = pd_any_local_mode_locked() ? 0 : automouse_rgb_quantize_progress(raw_elapsed),
 #    else
         .automouse_progress = 0,
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
-        .pd_mode_flags        = pd_mode_active_snapshot(),
-        .pd_mode_locked_flags = pd_mode_locked_snapshot(),
+        .pd_mode_flags        = pd_mode_local_active_snapshot(),
+        .pd_mode_locked_flags = pd_mode_local_locked_snapshot(),
 #    else
         .pd_mode_flags        = 0,
         .pd_mode_locked_flags = 0,

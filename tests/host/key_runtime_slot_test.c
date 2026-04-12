@@ -145,7 +145,7 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     return keycode == TEST_PD_MODE_KEY ? test_pd_mode : 0;
 }
 
-bool pd_mode_locked(pd_mode_mask_t mode) {
+bool pd_mode_local_locked(pd_mode_mask_t mode) {
     return (test_pd_locked_modes & mode) != 0;
 }
 

@@ -59,7 +59,7 @@ static void pd_mode_auto_mouse_deactivate(pd_mode_mask_t mode, bool was_any_mode
         return;
     }
 
-    if (was_any_mode_active && !pd_any_mode_active()) {
+    if (was_any_mode_active && !pd_any_local_mode_active()) {
         pd_mode_auto_mouse_sync_anchor(false);
     }
 }
@@ -209,7 +209,7 @@ bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
 
 bool pd_any_active_mode_has_trait(pd_mode_traits_t trait) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_active(pd_modes[i].mode_flag) && (pd_modes[i].traits & trait) == trait) {
+        if (pd_mode_local_active(pd_modes[i].mode_flag) && (pd_modes[i].traits & trait) == trait) {
             return true;
         }
     }
@@ -228,7 +228,7 @@ void pd_mode_apply_active_dpi(void) {
     }
 
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_active(pd_modes[i].mode_flag) && pd_modes[i].dpi != 0) {
+        if (pd_mode_local_active(pd_modes[i].mode_flag) && pd_modes[i].dpi != 0) {
             pointing_device_set_cpi(pd_modes[i].dpi);
             return;
         }
@@ -244,9 +244,9 @@ static void pd_mode_enforce_exclusive_active_mode(pd_mode_mask_t keep_mode) {
 }
 
 void pd_mode_activate(pd_mode_mask_t mode) {
-    bool was_active = pd_mode_active(mode);
+    bool was_active = pd_mode_local_active(mode);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    bool was_any_mode_active = pd_any_mode_active();
+    bool was_any_mode_active = pd_any_local_mode_active();
 #endif
     pd_mode_enforce_exclusive_active_mode(mode);
 
@@ -271,10 +271,10 @@ void pd_mode_activate(pd_mode_mask_t mode) {
 }
 
 void pd_mode_deactivate(pd_mode_mask_t mode) {
-    bool was_active = pd_mode_active(mode);
+    bool was_active = pd_mode_local_active(mode);
     const pd_mode_def_t *def = pd_mode_lookup(mode);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    bool was_any_mode_active = pd_any_mode_active();
+    bool was_any_mode_active = pd_any_local_mode_active();
 #endif
     pd_mode_clear(mode);
 
@@ -299,7 +299,7 @@ void pd_mode_deactivate(pd_mode_mask_t mode) {
 }
 
 void pd_mode_lock(pd_mode_mask_t mode) {
-    bool was_locked = pd_mode_locked(mode);
+    bool was_locked = pd_mode_local_locked(mode);
 
     pd_mode_enforce_exclusive_active_mode(mode);
 
@@ -314,7 +314,7 @@ void pd_mode_lock(pd_mode_mask_t mode) {
 }
 
 void pd_mode_unlock(pd_mode_mask_t mode) {
-    if (!pd_mode_locked(mode)) {
+    if (!pd_mode_local_locked(mode)) {
         return;
     }
 
@@ -325,7 +325,7 @@ void pd_mode_unlock(pd_mode_mask_t mode) {
 
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_active(pd_modes[i].mode_flag) && pd_modes[i].key_handler && pd_modes[i].key_handler(keycode, record)) {
+        if (pd_mode_local_active(pd_modes[i].mode_flag) && pd_modes[i].key_handler && pd_modes[i].key_handler(keycode, record)) {
             return true;
         }
     }
@@ -339,10 +339,18 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     return 0;
 }
 
-uint8_t pd_mode_first_active_index(void) {
+static uint8_t pd_mode_first_snapshot_index(pd_mode_mask_t active_flags) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_active(pd_modes[i].mode_flag)) return i;
+        if ((active_flags & pd_modes[i].mode_flag) != 0) return i;
     }
 
     return PD_MODE_COUNT;
+}
+
+uint8_t pd_mode_first_local_active_index(void) {
+    return pd_mode_first_snapshot_index(pd_mode_local_active_snapshot());
+}
+
+uint8_t pd_mode_first_display_active_index(void) {
+    return pd_mode_first_snapshot_index(pd_mode_display_active_snapshot());
 }

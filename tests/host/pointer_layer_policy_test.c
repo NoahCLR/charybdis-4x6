@@ -68,11 +68,11 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     }
 }
 
-bool pd_mode_active(pd_mode_mask_t mode) {
+bool pd_mode_local_active(pd_mode_mask_t mode) {
     return (fake_active_modes & mode) != 0;
 }
 
-bool pd_any_mode_active(void) {
+bool pd_any_local_mode_active(void) {
     return fake_active_modes != 0;
 }
 

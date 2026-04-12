@@ -18,7 +18,7 @@ static inline bool pointer_layer_policy_is_mouse_button_action(uint16_t action) 
 }
 
 static inline bool pointer_layer_policy_pd_mode_running(void) {
-    return pd_any_mode_active();
+    return pd_any_local_mode_active();
 }
 
 static inline bool pointer_layer_policy_active_mode_prefers_typing_layer(void) {

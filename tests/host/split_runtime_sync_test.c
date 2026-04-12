@@ -86,15 +86,15 @@ bool is_auto_mouse_active(void) {
     return fake_auto_mouse_active;
 }
 
-bool pd_any_mode_locked(void) {
+bool pd_any_local_mode_locked(void) {
     return fake_any_mode_locked;
 }
 
-pd_mode_mask_t pd_mode_active_snapshot(void) {
+pd_mode_mask_t pd_mode_local_active_snapshot(void) {
     return fake_pd_active_flags;
 }
 
-pd_mode_mask_t pd_mode_locked_snapshot(void) {
+pd_mode_mask_t pd_mode_local_locked_snapshot(void) {
     return fake_pd_locked_flags;
 }
 

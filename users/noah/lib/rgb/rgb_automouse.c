@@ -26,7 +26,7 @@ uint16_t automouse_rgb_current_progress(void) {
         progress = split_runtime_sync_remote.automouse_progress;
     }
 
-    if (pd_any_mode_locked()) {
+    if (pd_any_display_mode_locked()) {
         progress = 0;
     }
 

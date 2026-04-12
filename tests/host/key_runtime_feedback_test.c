@@ -172,7 +172,7 @@ bool handled_key_is_layer_tap(handled_key_view_t key) {
     return key.behavior.is_layer_tap;
 }
 
-bool pd_mode_locked(pd_mode_mask_t mode) {
+bool pd_mode_local_locked(pd_mode_mask_t mode) {
     (void)mode;
     return false;
 }

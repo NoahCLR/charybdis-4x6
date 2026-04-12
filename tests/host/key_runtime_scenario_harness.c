@@ -402,7 +402,7 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     return 0;
 }
 
-bool pd_mode_locked(pd_mode_mask_t mode) {
+bool pd_mode_local_locked(pd_mode_mask_t mode) {
     return (key_runtime_scenario_pd_locked_modes & mode) != 0;
 }
 

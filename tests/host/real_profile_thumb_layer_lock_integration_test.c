@@ -371,7 +371,7 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     return false;
 }
 
-bool pd_mode_locked(pd_mode_mask_t mode) {
+bool pd_mode_local_locked(pd_mode_mask_t mode) {
     (void)mode;
     return false;
 }

@@ -36,11 +36,21 @@ enum {
 _Static_assert(PD_MODE_COUNT <= (sizeof(pd_mode_mask_t) * 8u), "PD_MODE_COUNT exceeds pd_mode_mask_t storage; widen the flag type and the split runtime sync packet before adding more modes");
 
 // ─── Read-only state queries ────────────────────────────────────────────────
+//
+// Local queries report the authoritative runtime state on the current half.
+// Display queries report what UI consumers should render: local state on the
+// master half, mirrored split-sync state on the slave half.
 
-pd_mode_mask_t pd_mode_active_snapshot(void);
-pd_mode_mask_t pd_mode_locked_snapshot(void);
+pd_mode_mask_t pd_mode_local_active_snapshot(void);
+pd_mode_mask_t pd_mode_local_locked_snapshot(void);
+pd_mode_mask_t pd_mode_display_active_snapshot(void);
+pd_mode_mask_t pd_mode_display_locked_snapshot(void);
 
-bool pd_mode_active(pd_mode_mask_t mode);
-bool pd_mode_locked(pd_mode_mask_t mode);
-bool pd_any_mode_active(void);
-bool pd_any_mode_locked(void);
+bool pd_mode_local_active(pd_mode_mask_t mode);
+bool pd_mode_local_locked(pd_mode_mask_t mode);
+bool pd_mode_display_active(pd_mode_mask_t mode);
+bool pd_mode_display_locked(pd_mode_mask_t mode);
+bool pd_any_local_mode_active(void);
+bool pd_any_local_mode_locked(void);
+bool pd_any_display_mode_active(void);
+bool pd_any_display_mode_locked(void);

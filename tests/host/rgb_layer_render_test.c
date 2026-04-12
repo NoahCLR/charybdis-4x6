@@ -136,9 +136,17 @@ static rgb_t rgb_blend(rgb_t start, rgb_t end, uint8_t amount) {
     };
 }
 
+static pd_mode_mask_t test_display_active_flags(void) {
+    return fake_is_master ? fake_pd_active_flags : split_runtime_sync_remote.pd_mode_flags;
+}
+
+static pd_mode_mask_t test_display_locked_flags(void) {
+    return fake_is_master ? fake_pd_locked_flags : split_runtime_sync_remote.pd_mode_locked_flags;
+}
+
 static uint8_t automouse_blend_amount_from_elapsed(uint16_t elapsed) {
     uint16_t progress = automouse_rgb_progress(elapsed);
-    if (fake_pd_locked_flags != 0) {
+    if (test_display_locked_flags() != 0) {
         progress = 0;
     }
     if (progress > AUTOMOUSE_RGB_ACTIVE_SPAN) {
@@ -229,33 +237,45 @@ bool is_auto_mouse_active(void) {
     return fake_auto_mouse_active;
 }
 
-bool pd_any_mode_locked(void) {
+bool pd_any_local_mode_locked(void) {
     return fake_pd_locked_flags != 0;
 }
 
-bool pd_mode_active(pd_mode_mask_t mode) {
+bool pd_mode_local_active(pd_mode_mask_t mode) {
     return (fake_pd_active_flags & mode) != 0;
 }
 
-bool pd_mode_locked(pd_mode_mask_t mode) {
+bool pd_mode_local_locked(pd_mode_mask_t mode) {
     return (fake_pd_locked_flags & mode) != 0;
 }
 
-bool pd_any_mode_active(void) {
+bool pd_any_local_mode_active(void) {
     return fake_pd_active_flags != 0;
 }
 
-pd_mode_mask_t pd_mode_active_snapshot(void) {
+pd_mode_mask_t pd_mode_local_active_snapshot(void) {
     return fake_pd_active_flags;
 }
 
-pd_mode_mask_t pd_mode_locked_snapshot(void) {
+pd_mode_mask_t pd_mode_local_locked_snapshot(void) {
     return fake_pd_locked_flags;
 }
 
-uint8_t pd_mode_first_active_index(void) {
+bool pd_any_display_mode_locked(void) {
+    return test_display_locked_flags() != 0;
+}
+
+bool pd_mode_display_active(pd_mode_mask_t mode) {
+    return (test_display_active_flags() & mode) != 0;
+}
+
+pd_mode_mask_t pd_mode_display_active_snapshot(void) {
+    return test_display_active_flags();
+}
+
+uint8_t pd_mode_first_display_active_index(void) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_active(pd_modes[i].mode_flag)) {
+        if (pd_mode_display_active(pd_modes[i].mode_flag)) {
             return i;
         }
     }
@@ -423,6 +443,25 @@ static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
     check_led(7, rgb_from_hsv(pd_mode_colors[1].color));
 }
 
+static void test_slave_pointer_mode_overlay_uses_remote_display_state(void) {
+    test_reset();
+
+    fake_is_master                   = false;
+    layer_state                      = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.pd_mode_flags = PD_MODE_VOLUME;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(5, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(7, rgb_from_hsv(pd_mode_colors[1].color));
+}
+
 static void test_automouse_uses_configured_target_layer(void) {
     test_reset();
 
@@ -563,6 +602,25 @@ static void test_slave_timeout_window_renders_without_live_auto_mouse_active_fla
     check_led(1, rgb_blend(pointer_rgb, rgb_from_ws2812(ws2812_leds[1]), blend));
     check_led(2, (rgb_t){0, 0, 0});
 #endif
+}
+
+static void test_slave_locked_pd_mode_clamps_remote_automouse_progress(void) {
+    test_reset();
+
+    fake_is_master                               = false;
+    ws2812_leds[0]                               = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[1]                               = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
+    test_keymap[LAYER_POINTER][0][0]             = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1]             = 0x0041u;
+    layer_state                                  = (layer_state_t)1u << LAYER_POINTER;
+    split_runtime_sync_remote.automouse_progress = AUTOMOUSE_RGB_ACTIVE_SPAN / 2u;
+    split_runtime_sync_remote.pd_mode_locked_flags = PD_MODE_VOLUME;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+    check_led(2, (rgb_t){0, 0, 0});
 }
 
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
@@ -739,11 +797,13 @@ int main(void) {
     test_slave_preview_layer_uses_remote_sync_state();
     test_slave_feedback_uses_remote_flags_and_flash_phase();
     test_pointer_mode_overlay_paints_right_half_and_groups();
+    test_slave_pointer_mode_overlay_uses_remote_display_state();
     test_automouse_uses_configured_target_layer();
     test_timeout_end_keeps_automouse_at_destination_on_master();
     test_timeout_window_keeps_fading_after_auto_mouse_active_drops_on_master();
     test_timeout_end_keeps_automouse_at_destination_on_slave();
     test_slave_timeout_window_renders_without_live_auto_mouse_active_flag();
+    test_slave_locked_pd_mode_clamps_remote_automouse_progress();
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
     test_automouse_updates_target_when_underlying_layer_appears_mid_fade();
     test_automouse_updates_target_when_underlying_layer_returns_to_base_mid_fade();

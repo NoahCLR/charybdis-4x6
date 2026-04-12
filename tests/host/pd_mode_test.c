@@ -21,6 +21,7 @@ static bool sniping_enabled;
 static bool auto_mouse_toggle_enabled;
 static bool auto_mouse_enabled;
 static bool auto_mouse_active;
+static bool fake_is_master;
 static int8_t auto_mouse_key_tracker;
 static uint8_t auto_mouse_layer;
 static uint8_t auto_mouse_toggle_count;
@@ -70,6 +71,7 @@ static void test_reset_stubs(void) {
     auto_mouse_toggle_enabled     = false;
     auto_mouse_enabled            = false;
     auto_mouse_active             = false;
+    fake_is_master                = true;
     auto_mouse_key_tracker        = 0;
     auto_mouse_layer              = 4;
     auto_mouse_toggle_count       = 0;
@@ -136,6 +138,10 @@ uint16_t auto_mouse_get_time_elapsed(void) {
 
 bool is_auto_mouse_active(void) {
     return auto_mouse_active;
+}
+
+bool is_keyboard_master(void) {
+    return fake_is_master;
 }
 
 void set_auto_mouse_enable(bool enable) {
@@ -254,9 +260,6 @@ static void test_registry_metadata_matches_manifest(void) {
     CHECK(pd_mode_lookup(PD_MODE_DRAGSCROLL)->lifecycle != NULL);
     CHECK(pd_mode_lookup(PD_MODE_PINCH)->lifecycle != NULL);
 
-    pd_mode_apply_remote_snapshot(PD_MODE_ZOOM | PD_MODE_VOLUME, 0);
-    CHECK(pd_mode_active_snapshot() == PD_MODE_VOLUME);
-    CHECK(pd_mode_first_active_index() == PD_MODE_INDEX_VOLUME);
 }
 
 static void test_trait_queries_match_manifest_policy(void) {
@@ -282,15 +285,21 @@ static void test_trait_queries_match_manifest_policy(void) {
 
 static void test_apply_remote_snapshot_keeps_only_one_effective_mode(void) {
     test_reset_stubs();
+    fake_is_master = false;
 
     pd_mode_apply_remote_snapshot(PD_MODE_VOLUME, PD_MODE_ARROW);
 
-    CHECK(pd_mode_active_snapshot() == PD_MODE_ARROW);
-    CHECK(pd_mode_locked_snapshot() == PD_MODE_ARROW);
-    CHECK(pd_mode_active(PD_MODE_ARROW));
-    CHECK(pd_mode_locked(PD_MODE_ARROW));
-    CHECK(!pd_mode_locked(PD_MODE_VOLUME));
-    CHECK(!pd_mode_active(PD_MODE_VOLUME));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pd_mode_display_active_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_display_locked_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_first_display_active_index() == PD_MODE_INDEX_ARROW);
+    CHECK(pd_mode_display_active(PD_MODE_ARROW));
+    CHECK(pd_mode_display_locked(PD_MODE_ARROW));
+    CHECK(!pd_mode_display_locked(PD_MODE_VOLUME));
+    CHECK(!pd_mode_display_active(PD_MODE_VOLUME));
+    CHECK(!pd_mode_local_active(PD_MODE_ARROW));
+    CHECK(!pd_mode_local_locked(PD_MODE_ARROW));
 }
 
 static void test_set_lock_state_switches_to_single_locked_mode(void) {
@@ -305,12 +314,12 @@ static void test_set_lock_state_switches_to_single_locked_mode(void) {
 
     CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, true));
 
-    CHECK(pd_mode_active_snapshot() == PD_MODE_VOLUME);
-    CHECK(pd_mode_locked_snapshot() == PD_MODE_VOLUME);
-    CHECK(pd_mode_active(PD_MODE_VOLUME));
-    CHECK(pd_mode_locked(PD_MODE_VOLUME));
-    CHECK(!pd_mode_active(PD_MODE_ARROW));
-    CHECK(!pd_mode_active(PD_MODE_BRIGHTNESS));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_active(PD_MODE_VOLUME));
+    CHECK(pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK(!pd_mode_local_active(PD_MODE_ARROW));
+    CHECK(!pd_mode_local_active(PD_MODE_BRIGHTNESS));
     CHECK(reset_arrow_count == 0);
     CHECK(reset_brightness_count == 1);
     CHECK(current_cpi == PD_MODE_VOLUME_DPI);
@@ -325,11 +334,11 @@ static void test_activate_switches_to_single_unlocked_mode(void) {
 
     pd_mode_activate(PD_MODE_VOLUME);
 
-    CHECK(pd_mode_active_snapshot() == PD_MODE_VOLUME);
-    CHECK(pd_mode_locked_snapshot() == 0);
-    CHECK(pd_mode_active(PD_MODE_VOLUME));
-    CHECK(!pd_mode_active(PD_MODE_ARROW));
-    CHECK(!pd_mode_locked(PD_MODE_ARROW));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pd_mode_local_active(PD_MODE_VOLUME));
+    CHECK(!pd_mode_local_active(PD_MODE_ARROW));
+    CHECK(!pd_mode_local_locked(PD_MODE_ARROW));
     CHECK(reset_arrow_count == 1);
 }
 
@@ -342,14 +351,14 @@ static void test_handle_keycode_press_and_release_updates_state_and_syncs(void) 
 
     CHECK(pd_mode_handle_keycode_press(BRIGHTNESS_MODE));
     CHECK(split_sync_count == 1);
-    CHECK(pd_mode_active_snapshot() == PD_MODE_BRIGHTNESS);
-    CHECK(pd_mode_locked_snapshot() == 0);
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_BRIGHTNESS);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(reset_arrow_count == 1);
 
     CHECK(pd_mode_handle_keycode_release(BRIGHTNESS_MODE));
     CHECK(split_sync_count == 2);
-    CHECK(pd_mode_active_snapshot() == 0);
-    CHECK(pd_mode_locked_snapshot() == 0);
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(reset_brightness_count == 1);
 }
 
@@ -361,8 +370,8 @@ static void test_locked_mode_release_keeps_mode_active(void) {
     reset_volume_count = 0;
 
     CHECK(pd_mode_handle_keycode_release(VOLUME_MODE));
-    CHECK(pd_mode_active_snapshot() == PD_MODE_VOLUME);
-    CHECK(pd_mode_locked_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
     CHECK(split_sync_count == 0);
     CHECK(reset_volume_count == 0);
 }
@@ -399,13 +408,13 @@ static void test_pinch_mode_registers_gui_and_dragscroll_side_effects(void) {
     test_reset_stubs();
 
     pd_mode_activate(PD_MODE_PINCH);
-    CHECK(pd_mode_active(PD_MODE_PINCH));
+    CHECK(pd_mode_local_active(PD_MODE_PINCH));
     CHECK(dragscroll_enabled);
     CHECK(keyboard_mod_register_count == 1);
     CHECK(last_registered_keycode == KC_LEFT_GUI);
 
     pd_mode_deactivate(PD_MODE_PINCH);
-    CHECK(!pd_mode_active(PD_MODE_PINCH));
+    CHECK(!pd_mode_local_active(PD_MODE_PINCH));
     CHECK(!dragscroll_enabled);
     CHECK(keyboard_mod_unregister_count == 1);
     CHECK(last_unregistered_keycode == KC_LEFT_GUI);

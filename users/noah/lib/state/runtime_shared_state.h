@@ -106,8 +106,10 @@ typedef struct {
 } key_runtime_shared_state_t;
 
 typedef struct {
-    pd_mode_mask_t active_flags;
-    pd_mode_mask_t locked_flags;
+    pd_mode_mask_t local_active_flags;
+    pd_mode_mask_t local_locked_flags;
+    pd_mode_mask_t remote_display_active_flags;
+    pd_mode_mask_t remote_display_locked_flags;
 } pd_mode_runtime_shared_state_t;
 
 typedef struct {

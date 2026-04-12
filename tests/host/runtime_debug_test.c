@@ -170,7 +170,8 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_reset_for_test();
 
     noah_runtime_shared_state.key.feedback.active                = true;
-    noah_runtime_shared_state.pd.active_flags                    = PD_MODE_VOLUME;
+    noah_runtime_shared_state.pd.local_active_flags              = PD_MODE_VOLUME;
+    noah_runtime_shared_state.pd.remote_display_active_flags     = PD_MODE_ARROW;
     noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_C;
 
     layer_ownership_set_lock_state(3, true);
@@ -187,7 +188,8 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_debug_snapshot(&snapshot);
 
     CHECK(snapshot.core.key.feedback.active);
-    CHECK(snapshot.core.pd.active_flags == PD_MODE_VOLUME);
+    CHECK(snapshot.core.pd.local_active_flags == PD_MODE_VOLUME);
+    CHECK(snapshot.core.pd.remote_display_active_flags == PD_MODE_ARROW);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_C);
 
     CHECK(snapshot.layer_ownership.applied_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
@@ -221,7 +223,8 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     noah_runtime_reset_for_test();
 
     noah_runtime_shared_state.key.feedback.active                = true;
-    noah_runtime_shared_state.pd.locked_flags                    = PD_MODE_ARROW;
+    noah_runtime_shared_state.pd.local_locked_flags              = PD_MODE_ARROW;
+    noah_runtime_shared_state.pd.remote_display_locked_flags     = PD_MODE_VOLUME;
     noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_V;
 
     layer_ownership_set_lock_state(1, true);
@@ -235,8 +238,10 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     noah_runtime_debug_snapshot(&snapshot);
 
     CHECK(!snapshot.core.key.feedback.active);
-    CHECK(snapshot.core.pd.active_flags == 0);
-    CHECK(snapshot.core.pd.locked_flags == 0);
+    CHECK(snapshot.core.pd.local_active_flags == 0);
+    CHECK(snapshot.core.pd.local_locked_flags == 0);
+    CHECK(snapshot.core.pd.remote_display_active_flags == 0);
+    CHECK(snapshot.core.pd.remote_display_locked_flags == 0);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_NO);
     CHECK(snapshot.core.key.slots_by_position[0].timing.tap_hold_term == CUSTOM_TAP_HOLD_TERM);
     CHECK(snapshot.core.key.slots_by_position[0].semantic.preview_layer == UINT8_MAX);
