@@ -80,6 +80,25 @@ static void test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(keypo
     CHECK(!noah_process_record_user(release_keycode, &release_record));
 }
 
+static void test_run_thumb_like_double_tap_hold_cycle_with_intermediate_scan(keypos_t key_pos, uint16_t release_keycode, uint16_t pre_threshold_scan_ms, uint16_t hold_ms) {
+    keyrecord_t press_record   = test_record(key_pos, true);
+    keyrecord_t release_record = test_record(key_pos, false);
+
+    CHECK(!noah_process_record_user(TEST_MULTI_TAP_KEY, &press_record));
+    CHECK(!noah_process_record_user(TEST_MULTI_TAP_KEY, &release_record));
+
+    fake_time = (uint16_t)(fake_time + 40);
+    CHECK(!noah_process_record_user(TEST_MULTI_TAP_KEY, &press_record));
+
+    fake_time = (uint16_t)(fake_time + pre_threshold_scan_ms);
+    noah_key_runtime_scan();
+
+    fake_time = (uint16_t)(fake_time + hold_ms);
+    noah_key_runtime_scan();
+
+    CHECK(!noah_process_record_user(release_keycode, &release_record));
+}
+
 static void test_run_thumb_like_double_tap_hold_cycle(keypos_t key_pos) {
     test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(key_pos, TEST_MULTI_TAP_KEY);
 }
@@ -403,9 +422,25 @@ static void test_thumb_cycle_release_still_clears_slot_when_layer_change_resolve
     CHECK(slot->owner.keycode == KC_NO);
 }
 
+static void test_double_tap_hold_with_prethreshold_scan_toggles_num_layer_only_once(void) {
+    keypos_t key_pos = test_keypos(4, 2);
+
+    test_reset_state();
+
+    test_run_thumb_like_double_tap_hold_cycle_with_intermediate_scan(key_pos, TEST_MULTI_TAP_KEY, 120, 240);
+    CHECK(layer_ownership_is_locked(TEST_NUM_LAYER));
+    CHECK(layer_state_cmp(layer_state, TEST_NUM_LAYER));
+
+    fake_time = (uint16_t)(fake_time + 40);
+    test_run_thumb_like_double_tap_hold_cycle_with_intermediate_scan(key_pos, TEST_MULTI_TAP_KEY, 120, 240);
+    CHECK(!layer_ownership_is_locked(TEST_NUM_LAYER));
+    CHECK(!layer_state_cmp(layer_state, TEST_NUM_LAYER));
+}
+
 int main(void) {
     test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle();
     test_thumb_cycle_release_still_clears_slot_when_layer_change_resolves_to_other_keycode();
+    test_double_tap_hold_with_prethreshold_scan_toggles_num_layer_only_once();
 
     puts("key_runtime layer-lock integration tests passed");
     return 0;

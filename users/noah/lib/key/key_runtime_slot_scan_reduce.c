@@ -101,6 +101,15 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_scan(active_key_state_t
         return (key_runtime_slot_result_t){0};
     }
 
+    // Pending multi-tap hold ownership lives in the dedicated pending-multi-tap
+    // reducer. Once that reducer seeds long-hold metadata into the slot, the
+    // generic active-scan reducer must not interpret it as an independent
+    // active-slot threshold; otherwise a realistic multi-scan hold can fire the
+    // same long-hold action twice.
+    if (key_runtime_slot_pending_multi_tap_pending_hold(slot)) {
+        return (key_runtime_slot_result_t){0};
+    }
+
     uint16_t                                     elapsed = timer_elapsed(slot->timer);
     key_runtime_slot_phase_t                     phase   = key_runtime_slot_phase(slot);
     key_runtime_slot_step_active_scan_phase_handler_t handler = key_runtime_slot_step_active_scan_phase_handlers[phase];

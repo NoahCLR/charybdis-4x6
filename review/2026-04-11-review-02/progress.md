@@ -3,6 +3,51 @@
 This file tracks the review pass captured in
 [userspace-architecture-review.md](./userspace-architecture-review.md).
 
+## 2026-04-12 Pending Multi-Tap Long-Hold Double-Dispatch Fix
+
+Completed in this pass:
+
+- Fixed a real hardware regression in the handled-key runtime where a pending
+  multi-tap long hold could leak its threshold metadata into the generic
+  active-scan reducer, allowing a realistic multi-scan hold to dispatch the
+  same long-hold action twice in one gesture.
+- Scoped active-scan ownership so pending multi-tap hold resolution remains
+  exclusive to the dedicated pending-multi-tap reducer in
+  [`users/noah/lib/key/key_runtime_slot_scan_reduce.c`](../../users/noah/lib/key/key_runtime_slot_scan_reduce.c).
+- Added host regressions that perform an intermediate pre-threshold scan before
+  crossing the long-hold boundary:
+  - [`tests/host/key_runtime_layer_lock_integration_test.c`](../../tests/host/key_runtime_layer_lock_integration_test.c)
+  - [`tests/host/real_profile_thumb_layer_lock_integration_test.c`](../../tests/host/real_profile_thumb_layer_lock_integration_test.c)
+- Wired the real-profile thumb regression into the default host suite in
+  [`tests/host/run_all_host_tests.sh`](../../tests/host/run_all_host_tests.sh).
+
+Why this bug escaped earlier host coverage:
+
+- the earlier thumb regressions jumped directly from second-press start to the
+  long-hold threshold in one scan
+- real firmware scans continuously, so one earlier scan can seed pending
+  multi-tap long-hold metadata into the active slot before a later threshold
+  scan
+- that made the hardware path capable of toggling `LOCK_LAYER(...)` twice in a
+  single double-tap-hold cycle even though the simpler host path stayed green
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- synthetic thumb layer-lock integration passed
+- real-profile thumb layer-lock integration passed
+- targeted transition/scenario coverage passed
+- full host suite passed
+- firmware build passed
+
 ## 2026-04-11
 
 Completed in this pass:
