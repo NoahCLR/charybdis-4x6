@@ -61,7 +61,10 @@ NOAH_POINTING_SOURCES := \
     lib/pointing/pd_mode_state.c \
     lib/pointing/pd_mode_registry.c \
     lib/pointing/pointer_layer_policy.c \
-    lib/pointing/pd_mode_handlers.c
+    lib/pointing/pd_mode_volume.c \
+    lib/pointing/pd_mode_brightness.c \
+    lib/pointing/pd_mode_zoom.c \
+    lib/pointing/pd_mode_arrow.c
 
 NOAH_AUTOMOUSE_SOURCES := \
     lib/rgb/rgb_automouse.c

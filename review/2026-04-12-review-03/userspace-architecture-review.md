@@ -47,13 +47,14 @@ Its strength is that most extension work is still declarative:
 
 The main remaining architecture risks are now local and specific:
 
-1. pd-mode implementation state is still accumulating inside one large
-   `pd_mode_handlers.c` translation unit
-2. cross-subsystem trace coverage is still thinner than the
+1. cross-subsystem trace coverage is still thinner than the
    rest of the runtime's host verification story
-3. the handled-key reducers are coherent but dense enough that the next major
+2. the handled-key reducers are coherent but dense enough that the next major
    lifecycle addition should split them by ownership seam instead of adding
    more local helper layers
+3. `pd_mode_registry.c` now carries the next most likely pointing-side split,
+   because manifest materialization, lifecycle hooks, and state transitions
+   still live together there
 
 Those are maintainability issues, not signs that the overall design is wrong.
 
@@ -153,11 +154,11 @@ coordinated edits in:
 
 That edit fanout is the main extensibility bottleneck in the repo.
 
-Pd modes have a smaller but real version of the same problem. The manifest is
-good, but mode-local implementation state still pools in
-[`pd_mode_handlers.c`](../../users/noah/lib/pointing/pd_mode_handlers.c). The
-next bespoke mode with substantial key interception, state, or lifecycle work
-will make that file harder to navigate than the manifest-driven API suggests.
+Pd modes are in a better place now that mode-local handler state lives in
+separate implementation files. The remaining pressure point is
+[`pd_mode_registry.c`](../../users/noah/lib/pointing/pd_mode_registry.c),
+because manifest materialization, lifecycle hook routing, and state transition
+policy still live together there.
 
 ### Architectural pattern recommendation
 
@@ -227,6 +228,21 @@ state. That is the right abstraction for this repo. Future work should keep
 new policy code on local queries and reserve display queries for rendering and
 other mirrored consumers.
 
+### Improved abstraction: pd-mode implementations now follow per-mode ownership
+
+Follow-up work on 2026-04-12 split the former
+`pd_mode_handlers.c` monolith into per-mode translation units:
+
+- [`pd_mode_volume.c`](../../users/noah/lib/pointing/pd_mode_volume.c)
+- [`pd_mode_brightness.c`](../../users/noah/lib/pointing/pd_mode_brightness.c)
+- [`pd_mode_zoom.c`](../../users/noah/lib/pointing/pd_mode_zoom.c)
+- [`pd_mode_arrow.c`](../../users/noah/lib/pointing/pd_mode_arrow.c)
+
+Shared vertical-axis behavior now lives in
+[`pd_mode_handler_common.h`](../../users/noah/lib/pointing/pd_mode_handler_common.h),
+while arrow-mode-specific state and key interception stay isolated in
+`pd_mode_arrow.c`.
+
 ## 4. Code Organization And Structure
 
 ### Overall structure is good
@@ -260,8 +276,6 @@ to benefit from a focused split on the next substantial change:
 - [`pd_mode_registry.c`](../../users/noah/lib/pointing/pd_mode_registry.c):
   lifecycle hook definitions, manifest materialization, DPI policy, and state
   transitions all live together
-- [`pd_mode_handlers.c`](../../users/noah/lib/pointing/pd_mode_handlers.c):
-  all mode-local state and helpers live in one file
 - [`held_action.c`](../../users/noah/lib/key/held_action.c): pure-mod binding
   logic, general held-action ownership, and repeat cleanup live together
 - [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
@@ -337,7 +351,8 @@ keep ownership rules simple.
 The real scaling risks are conceptual:
 
 - another handled-key feature increases reducer/effect surface area
-- another bespoke pd mode increases pressure on `pd_mode_handlers.c`
+- another bespoke pd mode with nontrivial lifecycle work increases pressure on
+  `pd_mode_registry.c`
 - another stateful subsystem increases the number of places that must stay in
   reset/debug sync
 
@@ -449,23 +464,12 @@ state on the slave half.
 
 Priority: medium
 
-Do not refactor `pd_mode_handlers.c` immediately. But when the next custom
-mode arrives, stop growing that file and split by mode:
+Status: implemented in follow-up work on 2026-04-12
 
-```text
-users/noah/lib/pointing/
-  pd_mode_registry.c
-  pd_mode_state.c
-  pd_modes/
-    pd_mode_axis.c
-    volume_mode.c
-    brightness_mode.c
-    zoom_mode.c
-    arrow_mode.c
-```
-
-The manifest can stay exactly as it is. This is only an implementation-file
-split to keep mode-local state discoverable.
+The manifest stayed exactly as it was, while mode-local implementations moved
+into per-mode translation units plus a small shared axis-helper header. That
+keeps mode-owned state discoverable without introducing a plugin system or
+changing the public pd-mode registry contract.
 
 ### Recommendation 4: keep the build/test contract manifest-driven
 

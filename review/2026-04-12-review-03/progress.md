@@ -136,11 +136,40 @@ Verification run for the effect-queue follow-up:
 
 Recommended next implementation work:
 
-1. When the next bespoke pd mode lands, stop growing `pd_mode_handlers.c` and
-   split mode-local implementations into per-mode translation units.
-2. Add a small shared runtime trace sink for cross-subsystem debugging so key
+Follow-up implementation completed after the handled-key effect-queue cleanup:
+
+- Split the former `pd_mode_handlers.c` monolith into per-mode translation
+  units: `pd_mode_volume.c`, `pd_mode_brightness.c`, `pd_mode_zoom.c`, and
+  `pd_mode_arrow.c`.
+- Added `pd_mode_handler_common.h` for the shared vertical-axis helper surface
+  while keeping arrow-mode-specific state, key interception, and modifier
+  policy isolated inside `pd_mode_arrow.c`.
+- Updated the pointing source manifest and the dedicated pd-mode handler host
+  runner so the build/test surface matches the new per-mode ownership layout.
+- Preserved the existing manifest-driven pd-mode registry API; this pass only
+  changed implementation ownership, not pd-mode identity or public contracts.
+
+Verification run for the pd-mode per-file split:
+
+- `git status --short`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Recommended next implementation work:
+
+1. Add a small shared runtime trace sink for cross-subsystem debugging so key
    runtime, pd mode, ownership, and split-sync events can be inspected through
    one vocabulary.
-3. If another handled-key lifecycle feature lands, split
+2. If another handled-key lifecycle feature lands, split
    `key_runtime_slot_step.c` and `key_runtime_slot_release_reduce.c` by
    ownership seam instead of layering more local helpers into either file.
+3. When the next meaningful pd-mode lifecycle or policy feature lands, split
+   `pd_mode_registry.c` by ownership seam instead of letting manifest
+   materialization, lifecycle hooks, and state transitions keep growing in one
+   file.

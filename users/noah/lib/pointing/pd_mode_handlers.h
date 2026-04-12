@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Public declarations for the per-mode motion handlers.
-// Implementation lives in pd_mode_handlers.c.
+// Implementations live in the per-mode translation units under this folder.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
