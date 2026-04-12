@@ -29,7 +29,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         // can unregister the held action and clear feedback. That remains true
         // even after another handled key flushes the runtime slot, because the older
         // key's owned held action is still released by physical key position.
-        if (!record->event.pressed && (key_runtime_slot_matches(slot, keycode, record->event.key) || handled_key.behavior.handled)) {
+        if (!record->event.pressed && (key_runtime_slot_matches(slot, keycode, record->event.key) || handled_key_is_handled(handled_key))) {
             // Let the handled-key release path run.
         } else {
             key_runtime_trace_message("preflight:suppress_default", "default QMK path suppressed before handled-key runtime");
@@ -58,7 +58,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         key_runtime_transition_execute_plan(&plan);
     }
 
-    if (record->event.pressed && !handled_key.behavior.handled) {
+    if (record->event.pressed && !handled_key_is_handled(handled_key)) {
         for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
             active_key_state_t *candidate = key_runtime_slot_at(index);
 

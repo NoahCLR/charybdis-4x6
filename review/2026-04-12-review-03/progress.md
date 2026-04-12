@@ -75,12 +75,44 @@ Verification run for the follow-up implementation:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Follow-up implementation completed after the pd-mode split:
+
+- Moved handled-key resolution into `users/noah/lib/key/handled_key.c` and
+  wired that source into `source_manifest.mk` plus the host runners that build
+  the real key-runtime userspace surface.
+- Made `handled_key_view_t` a resolved-only public contract by removing raw
+  authored behavior exposure and the `resolved` flag from the public type.
+- Updated key-runtime callers to consume explicit handled-key flags/accessors
+  instead of reading authored `behavior` fields through the handled-key view.
+- Updated key-runtime host tests and integration runners to build against the
+  resolved handled-key contract, including pd-mode release cases that now
+  resolve after authored pd-mode mappings are installed.
+- Deliberately left the remaining handled-key effect vocabulary cleanup for a
+  later pass so this change stayed focused on the contract boundary itself.
+
+Verification run for the handled-key follow-up:
+
+- `git status --short`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Recommended next implementation work:
 
-1. Harden the handled-key public contract by separating handled-key
-   resolution into its own implementation file, making the public handled-key
-   view fully resolved, and reducing effect-pipeline naming overlap.
+1. Collapse the remaining handled-key effect-pipeline naming overlap and add
+   explicit overflow/saturation tests for slot-result and transition-plan
+   capacity boundaries.
 2. When the next bespoke pd mode lands, stop growing `pd_mode_handlers.c` and
    split mode-local implementations into per-mode translation units.
-3. Add explicit overflow/saturation tests for the handled-key effect pipeline
-   and a small shared runtime trace sink for cross-subsystem debugging.
+3. Add a small shared runtime trace sink for cross-subsystem debugging so key
+   runtime, pd mode, ownership, and split-sync events can be inspected through
+   one vocabulary.

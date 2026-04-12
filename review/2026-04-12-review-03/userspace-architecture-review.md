@@ -47,8 +47,8 @@ Its strength is that most extension work is still declarative:
 
 The main remaining architecture risks are now local and specific:
 
-1. the handled-key runtime still exposes too much of its internal reduction
-   pipeline at once
+1. the handled-key runtime still pays too much naming and test fanout cost
+   across adjacent effect/result surfaces
 2. pd-mode implementation state is still accumulating inside one large
    `pd_mode_handlers.c` translation unit
 3. saturation and cross-subsystem trace coverage are still thinner than the
@@ -80,11 +80,12 @@ subsystems actually participate in startup, scan, and rendering.
 
 ### Where the separation still blurs
 
-The handled-key path is conceptually one pipeline, but its public surface is
-still spread across several layers:
+The handled-key path is conceptually one pipeline, and handled-key resolution
+now lives in its own implementation file. The remaining blur is that the
+effect-producing path is still spread across several adjacent layers:
 
-- handled-key resolution in
-  [`key_runtime.c`](../../users/noah/lib/key/key_runtime.c)
+- resolved handled-key lookup in
+  [`handled_key.c`](../../users/noah/lib/key/handled_key.c)
 - event entry and preflight in
   [`key_runtime_process.c`](../../users/noah/lib/key/key_runtime_process.c)
   and
@@ -186,20 +187,22 @@ These surfaces are meaningful and worth keeping:
 
 They each represent a real ownership boundary.
 
-### Leaky abstraction: `handled_key_view_t`
+### Improved abstraction: `handled_key_view_t` is now resolved-only
 
 [`handled_key.h`](../../users/noah/lib/key/handled_key.h) presents
-`handled_key_view_t` as the resolved handled-key contract, but it still
-contains:
+`handled_key_view_t` as the resolved handled-key contract, and follow-up work
+on 2026-04-12 now makes that true in code:
 
-- the underlying raw `key_behavior_view_t`
-- a `resolved` flag
-- fallback helper paths that re-derive semantics from `key.behavior`
+- handled-key resolution lives in
+  [`handled_key.c`](../../users/noah/lib/key/handled_key.c)
+- the public view no longer exposes raw `key_behavior_view_t`
+- the public view no longer carries a `resolved` flag
+- downstream runtime callers now use handled-key flags/accessors instead of
+  reading authored behavior through the handled-key surface
 
-That makes the type less stable than it looks. It is possible for downstream
-code to bypass the resolved meaning layer and inspect raw authored behavior
-again. The current code does not abuse that much, but the type still permits
-it.
+That is the right abstraction for this repo. The remaining handled-key issue is
+not data leakage anymore; it is the amount of adjacent vocabulary around
+reducers, slot results, and transition plans.
 
 ### Leaky abstraction: one effect pipeline, multiple public names
 
@@ -238,13 +241,14 @@ The build surface is also unusually well organized. `source_manifest.mk` is a
 real architectural asset because the firmware build and the feature-gate
 compile tests both derive their source inventory from the same manifest.
 
-### Discoverability issue: file naming does not always match ownership
+### Improved discoverability: handled-key resolution now matches file ownership
 
-The biggest discoverability mismatch is that `handled_key.h` is implemented in
-[`key_runtime.c`](../../users/noah/lib/key/key_runtime.c), a file name that
-also suggests more general slot/runtime helpers. That works technically, but
-it slows maintenance because "where does handled-key resolution live?" and
-"where do generic key-runtime helpers live?" currently have the same answer.
+Follow-up work on 2026-04-12 resolved the biggest naming mismatch here:
+`handled_key.h` is now implemented in
+[`handled_key.c`](../../users/noah/lib/key/handled_key.c), while
+[`key_runtime.c`](../../users/noah/lib/key/key_runtime.c) has gone back to
+generic runtime helpers. Preserve that split so handled-key resolution and
+generic runtime utilities do not blur together again.
 
 ### Modules that are approaching "split when touched again"
 
@@ -400,29 +404,20 @@ Today those limits exist, but they are not a prominent part of the test story.
 
 Priority: high
 
-Do three small, related cleanups:
+Status: partially implemented in follow-up work on 2026-04-12
 
-1. move handled-key resolution out of `key_runtime.c` into a dedicated
+The first two cleanups landed:
+
+1. handled-key resolution moved out of `key_runtime.c` into a dedicated
    `handled_key.c`
-2. make `handled_key_view_t` fully resolved on its public surface
-3. collapse the remaining builder/result naming overlap into one obvious
-   effect-queue vocabulary
+2. `handled_key_view_t` is now fully resolved on its public surface
 
-Example shape:
+The remaining handled-key follow-up is to collapse the builder/result naming
+overlap into one obvious effect-queue vocabulary.
+
+Example remaining direction:
 
 ```c
-typedef struct {
-    uint16_t tap_action;
-    hold_behavior_t hold;
-    hold_behavior_t long_hold;
-    uint16_t tap_hold_term;
-    uint16_t longer_hold_term;
-    uint16_t multi_tap_term;
-    uint8_t preview_layer;
-    pd_mode_mask_t pd_mode;
-    uint16_t flags;
-} handled_key_t;
-
 typedef struct {
     key_runtime_effect_t items[KEY_RUNTIME_SLOT_RESULT_CAPACITY];
     uint8_t count;
@@ -430,7 +425,7 @@ typedef struct {
 } key_runtime_effect_queue_t;
 ```
 
-That keeps the extension cost for new handled-key behavior closer to one
+That would keep the extension cost for new handled-key behavior closer to one
 pipeline instead of several adjacent vocabularies.
 
 ### Recommendation 2: preserve explicit pd-mode local and display queries

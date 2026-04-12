@@ -12,6 +12,7 @@ NOAH_COMMON_SOURCES := \
     lib/action/action_lifecycle.c \
     lib/action/synthetic_record.c \
     lib/split_role.c \
+    lib/key/handled_key.c \
     lib/key/key_behavior_lookup.c \
     lib/key/keymap_validation.c \
     lib/key/key_runtime.c \

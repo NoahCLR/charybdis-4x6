@@ -149,16 +149,34 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 }
 
 static handled_key_view_t test_handled_key(uint16_t keycode) {
-    return (handled_key_view_t){
-        .behavior =
-            {
-                .keycode          = keycode,
-                .handled          = true,
-                .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-                .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-                .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-            },
-    };
+    return handled_key_lookup(keycode);
+}
+
+static void test_handled_key_enable_multi_tap(handled_key_view_t *key) {
+    key->flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+}
+
+static void test_handled_key_enable_modifier_multi_tap(handled_key_view_t *key) {
+    key->flags |= HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_FALLBACK_HOLD;
+    key->hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
+    key->tap_action    = KC_NO;
+}
+
+static void test_handled_key_set_fallback_tap(handled_key_view_t *key, uint16_t action) {
+    key->flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+    key->hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
+    key->tap_action    = action;
+}
+
+static void test_handled_key_set_layer_contract(handled_key_view_t *key, uint8_t layer, bool layer_tap, uint16_t tap_action) {
+    key->flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER;
+    if (layer_tap) {
+        key->flags |= HANDLED_KEY_FLAG_LAYER_TAP;
+    } else {
+        key->flags &= (uint16_t)~HANDLED_KEY_FLAG_LAYER_TAP;
+    }
+    key->layer      = layer;
+    key->tap_action = tap_action;
 }
 
 static void test_log_call(test_call_kind_t kind, uint16_t action, keypos_t key_pos, uint8_t layer, bool long_hold_level, delayed_action_mods_t mods) {
@@ -252,6 +270,7 @@ uint8_t get_oneshot_locked_mods(void) {
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .keycode          = keycode,
+        .handled          = true,
         .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
         .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
@@ -472,11 +491,12 @@ static void test_flush_multi_tap_flushes_each_active_slot_in_order(void) {
 static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
     key_runtime_transition_plan_t plan;
     keyrecord_t                   record = test_record(test_keypos(2, 3), false);
-    handled_key_view_t            key    = test_handled_key(TEST_PD_MODE_KEY);
+    handled_key_view_t            key;
 
     test_reset_stubs();
     test_add_pd_mode_mapping(TEST_PD_MODE_KEY, PD_MODE_VOLUME);
     pd_locked_modes = PD_MODE_VOLUME;
+    key             = test_handled_key(TEST_PD_MODE_KEY);
     test_set_default_slot_key_pos(record.event.key);
 
     active_key = (active_key_state_t){
@@ -560,7 +580,7 @@ static void test_modifier_multi_tap_first_tap_is_buffered(void) {
 
     test_reset_stubs();
     test_set_default_slot_key_pos(press_record.event.key);
-    key.behavior.has_multi_tap = true;
+    test_handled_key_enable_modifier_multi_tap(&key);
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), KC_RIGHT_ALT, press_record.event.key, key, false, &plan));
@@ -592,7 +612,7 @@ static void test_single_tap_override_activates_fallback_hold_at_threshold(void) 
 
     test_reset_stubs();
     test_set_default_slot_key_pos(press_record.event.key);
-    key.behavior.single.tap = (tap_behavior_t)TAP_SENDS(TEST_FALLBACK_TAP_ACTION);
+    test_handled_key_set_fallback_tap(&key, TEST_FALLBACK_TAP_ACTION);
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), KC_RIGHT_ALT, press_record.event.key, key, false, &plan));
@@ -624,7 +644,7 @@ static void test_single_tap_override_long_release_does_not_dispatch_tap(void) {
 
     test_reset_stubs();
     test_set_default_slot_key_pos(press_record.event.key);
-    key.behavior.single.tap = (tap_behavior_t)TAP_SENDS(TEST_FALLBACK_TAP_ACTION);
+    test_handled_key_set_fallback_tap(&key, TEST_FALLBACK_TAP_ACTION);
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), KC_RIGHT_ALT, press_record.event.key, key, false, &plan));
@@ -646,7 +666,7 @@ static void test_non_modifier_single_tap_override_activates_fallback_hold_at_thr
 
     test_reset_stubs();
     test_set_default_slot_key_pos(press_record.event.key);
-    key.behavior.single.tap = (tap_behavior_t)TAP_SENDS(TEST_FALLBACK_TAP_ACTION);
+    test_handled_key_set_fallback_tap(&key, TEST_FALLBACK_TAP_ACTION);
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), TEST_PLAIN_KEY, press_record.event.key, key, false, &plan));
@@ -725,7 +745,7 @@ static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
 
     test_reset_stubs();
     test_set_default_slot_key_pos(press_record_1.event.key);
-    key.behavior.has_multi_tap = true;
+    test_handled_key_enable_modifier_multi_tap(&key);
     test_add_behavior_step(KC_RIGHT_ALT, 2,
                            (key_behavior_step_t){
                                .tap = TAP_SENDS(TEST_MULTI_STEP_ACTION),
@@ -757,15 +777,15 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
     key_runtime_transition_plan_t plan;
     keyrecord_t                   record = test_record(test_keypos(1, 5), false);
     handled_key_view_t            key    = test_handled_key(LT(2, TEST_FALLBACK_TAP_ACTION));
+    uint16_t                      layer_tap_keycode = LT(2, TEST_FALLBACK_TAP_ACTION);
 
     test_reset_stubs();
-    key.behavior.is_momentary_layer = true;
-    key.behavior.is_layer_tap       = true;
+    test_handled_key_set_layer_contract(&key, 2, true, TEST_FALLBACK_TAP_ACTION);
     test_set_default_slot_key_pos(record.event.key);
 
     active_key = (active_key_state_t){
         .timer                       = (uint16_t)(fake_time - 30),
-        .owner.keycode               = key.behavior.keycode,
+        .owner.keycode               = layer_tap_keycode,
         .owner.key_pos               = record.event.key,
         .binding.tap_action          = TEST_FALLBACK_TAP_ACTION,
         .timing.tap_hold_term        = 150,
@@ -773,7 +793,7 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
     };
 
     key_runtime_transition_plan_init(&plan);
-    CHECK(key_runtime_transition_handled_key_release(key.behavior.keycode, &record, key, &plan));
+    CHECK(key_runtime_transition_handled_key_release(layer_tap_keycode, &record, key, &plan));
 
     CHECK(plan.count == 1);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
@@ -880,7 +900,7 @@ static void test_press_on_different_position_preserves_existing_active_state(voi
     test_reset_stubs();
     active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
 
-    key.behavior.single.hold = (hold_behavior_t){
+    key.hold = (hold_behavior_t){
         .present = true,
         .action  = TEST_IMMEDIATE_HOLD,
         .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
@@ -923,7 +943,7 @@ static void test_press_on_third_position_keeps_existing_positions_active(void) {
         .lifecycle.held_action_keycode = TEST_PLAIN_KEY,
     };
 
-    key.behavior.single.hold = (hold_behavior_t){
+    key.hold = (hold_behavior_t){
         .present = true,
         .action  = TEST_IMMEDIATE_HOLD,
         .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
@@ -982,7 +1002,7 @@ static void test_release_on_other_position_starts_independent_multi_tap_chain(vo
     active_key_state_t           *released_slot  = test_slot_for_position(record.event.key);
 
     test_reset_stubs();
-    key.behavior.has_multi_tap = true;
+    test_handled_key_enable_multi_tap(&key);
     *previous_chain = (multi_tap_t){
         .keycode       = TEST_MULTI_TAP_KEY,
         .key_pos       = test_keypos(0, 1),
@@ -1028,7 +1048,7 @@ static void test_press_on_new_position_preserves_existing_pending_multi_tap(void
         .single_action = TEST_FALLBACK_TAP_ACTION,
     };
 
-    key.behavior.single.hold = (hold_behavior_t){
+    key.hold = (hold_behavior_t){
         .present = true,
         .action  = TEST_IMMEDIATE_HOLD,
         .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
@@ -1136,11 +1156,11 @@ static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_laye
     handled_key_view_t            key    = test_handled_key(MO(2));
 
     test_reset_stubs();
-    key.behavior.has_multi_tap      = true;
-    key.behavior.is_momentary_layer = true;
-    key.behavior.tap_hold_term      = 120;
-    key.behavior.longer_hold_term   = 240;
-    key.behavior.multi_tap_term     = 150;
+    test_handled_key_enable_multi_tap(&key);
+    test_handled_key_set_layer_contract(&key, 2, false, KC_NO);
+    key.tap_hold_term    = 120;
+    key.longer_hold_term = 240;
+    key.multi_tap_term   = 150;
     test_add_behavior_step(
         MO(2),
         2,

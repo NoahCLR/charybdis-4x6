@@ -48,6 +48,8 @@ static active_key_state_t *test_primary_slot(void) {
 
 #define key_runtime_primary_slot() test_primary_slot()
 
+static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior);
+
 static key_runtime_slot_result_t test_step_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, bool active_held_action_survives_flush) {
     return key_runtime_slot_step(slot, (key_runtime_slot_event_t){
                                            .kind              = KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS,
@@ -66,9 +68,7 @@ static key_runtime_slot_result_t test_step_handled_release(active_key_state_t *s
                                            .data.handled_release = {
                                                .keycode = keycode,
                                                .key_pos = key_pos,
-                                               .key     = {
-                                                   .behavior = behavior,
-                                               },
+                                               .key     = test_resolve_handled_key(behavior),
                                            },
                                        });
 }
@@ -167,6 +167,53 @@ uint8_t behavior_get_layer(uint16_t keycode) {
     return 3;
 }
 
+static bool test_handled_key_uses_buffered_modifier_single_step(key_behavior_view_t behavior) {
+    if (behavior.single.tap.present || behavior.single.hold.present || behavior.single.long_hold.present || behavior.is_momentary_layer) {
+        return false;
+    }
+
+    return behavior.has_multi_tap && behavior.keycode < SAFE_RANGE && false;
+}
+
+static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior) {
+    pd_mode_mask_t mode     = pd_mode_for_keycode(behavior.keycode);
+    bool           implicit = mode != 0;
+    bool           fallback = false;
+
+    if (!behavior.is_momentary_layer && behavior.keycode < SAFE_RANGE && !action_dispatch_is_qmk_behavior_keycode(behavior.keycode) && !behavior.single.hold.present && !behavior.single.long_hold.present) {
+        fallback = behavior.single.tap.present || behavior.has_multi_tap;
+    }
+
+    return (handled_key_view_t){
+        .tap_action =
+            behavior.single.tap.present ? behavior.single.tap.action
+                                        : implicit                ? KC_NO
+                                        : test_handled_key_uses_buffered_modifier_single_step(behavior) ? KC_NO
+                                        : behavior.is_layer_tap   ? QK_LAYER_TAP_GET_TAP_KEYCODE(behavior.keycode)
+                                        : behavior.is_momentary_layer ? KC_NO
+                                        : behavior.keycode >= SAFE_RANGE ? KC_NO
+                                                                          : behavior.keycode,
+        .hold =
+            behavior.single.hold.present
+                ? behavior.single.hold
+                : implicit ? (hold_behavior_t){
+                                 .present = true,
+                                 .action  = behavior.keycode,
+                                 .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                             }
+                           : hold_behavior_none(),
+        .long_hold        = behavior.single.long_hold,
+        .hold_strategy    = implicit ? KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT : fallback ? KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK
+                                                                                           : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+        .tap_hold_term    = behavior.tap_hold_term,
+        .longer_hold_term = behavior.longer_hold_term,
+        .multi_tap_term   = behavior.multi_tap_term,
+        .layer            = behavior.is_momentary_layer ? behavior_get_layer(behavior.keycode) : UINT8_MAX,
+        .pd_mode          = mode,
+        .flags            = (behavior.handled ? HANDLED_KEY_FLAG_HANDLED : 0) | (behavior.has_multi_tap ? HANDLED_KEY_FLAG_MULTI_TAP : 0) | (implicit ? HANDLED_KEY_FLAG_IMPLICIT_HOLD : 0) | (fallback ? HANDLED_KEY_FLAG_FALLBACK_HOLD : 0) | (behavior.is_momentary_layer ? HANDLED_KEY_FLAG_MOMENTARY_LAYER : 0) | (behavior.is_layer_tap ? HANDLED_KEY_FLAG_LAYER_TAP : 0),
+    };
+}
+
 noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
     (void)action;
     return NOAH_ACTION_HOLD_KIND_SHARED;
@@ -177,106 +224,60 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
     return (delayed_action_mods_t){0};
 }
 
-static bool test_handled_key_uses_buffered_modifier_single_step(handled_key_view_t key) {
-    if (key.behavior.single.tap.present || key.behavior.single.hold.present || key.behavior.single.long_hold.present || key.behavior.is_momentary_layer) {
-        return false;
-    }
-
-    return key.behavior.has_multi_tap && key.behavior.keycode < SAFE_RANGE && false;
-}
-
 bool handled_key_uses_implicit_hold(handled_key_view_t key) {
-    return pd_mode_for_keycode(key.behavior.keycode) != 0;
+    return (key.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) != 0;
 }
 
 bool handled_key_uses_fallback_hold(handled_key_view_t key) {
-    if (key.behavior.is_momentary_layer || key.behavior.keycode >= SAFE_RANGE) {
-        return false;
-    }
-
-    if (action_dispatch_is_qmk_behavior_keycode(key.behavior.keycode)) {
-        return false;
-    }
-
-    if (key.behavior.single.hold.present || key.behavior.single.long_hold.present) {
-        return false;
-    }
-
-    return key.behavior.single.tap.present || key.behavior.has_multi_tap;
+    return (key.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0;
 }
 
 hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
-    if (key.behavior.single.hold.present) {
-        return key.behavior.single.hold;
-    }
-
-    if (pd_mode_for_keycode(key.behavior.keycode)) {
-        return (hold_behavior_t){
-            .present = true,
-            .action  = key.behavior.keycode,
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-        };
-    }
-
-    return hold_behavior_none();
+    return key.hold;
 }
 
 hold_behavior_t handled_key_long_hold(handled_key_view_t key) {
-    return key.behavior.single.long_hold;
+    return key.long_hold;
 }
 
 key_runtime_slot_hold_strategy_t handled_key_hold_strategy(handled_key_view_t key) {
-    if (handled_key_uses_implicit_hold(key)) {
-        return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
-    }
-
-    if (handled_key_uses_fallback_hold(key)) {
-        return KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
-    }
-
-    return KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
+    return key.hold_strategy;
 }
 
 uint16_t handled_key_tap_action(handled_key_view_t key) {
-    if (key.behavior.single.tap.present) return key.behavior.single.tap.action;
-    if (pd_mode_for_keycode(key.behavior.keycode)) return KC_NO;
-    if (test_handled_key_uses_buffered_modifier_single_step(key)) return KC_NO;
-    if (key.behavior.is_layer_tap) return QK_LAYER_TAP_GET_TAP_KEYCODE(key.behavior.keycode);
-    if (key.behavior.is_momentary_layer) return KC_NO;
-    if (key.behavior.keycode >= SAFE_RANGE) return KC_NO;
-    return key.behavior.keycode;
+    return key.tap_action;
 }
 
 uint16_t handled_key_tap_hold_term(handled_key_view_t key) {
-    return key.behavior.tap_hold_term;
+    return key.tap_hold_term;
 }
 
 uint16_t handled_key_longer_hold_term(handled_key_view_t key) {
-    return key.behavior.longer_hold_term;
+    return key.longer_hold_term;
 }
 
 uint16_t handled_key_multi_tap_term(handled_key_view_t key) {
-    return key.behavior.multi_tap_term;
+    return key.multi_tap_term;
 }
 
 uint8_t handled_key_layer(handled_key_view_t key) {
-    return key.behavior.is_momentary_layer ? behavior_get_layer(key.behavior.keycode) : UINT8_MAX;
+    return key.layer;
 }
 
 pd_mode_mask_t handled_key_pd_mode(handled_key_view_t key) {
-    return pd_mode_for_keycode(key.behavior.keycode);
+    return key.pd_mode;
 }
 
 bool handled_key_has_multi_tap(handled_key_view_t key) {
-    return key.behavior.has_multi_tap;
+    return (key.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0;
 }
 
 bool handled_key_is_momentary_layer(handled_key_view_t key) {
-    return key.behavior.is_momentary_layer;
+    return (key.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
 }
 
 bool handled_key_is_layer_tap(handled_key_view_t key) {
-    return key.behavior.is_layer_tap;
+    return (key.flags & HANDLED_KEY_FLAG_LAYER_TAP) != 0;
 }
 
 void held_action_register(keypos_t key_pos, uint16_t action) {
@@ -984,22 +985,19 @@ static void test_prepare_handled_press_matching_pending_multi_tap_reuses_slot(vo
         slot,
         TEST_MULTI_TAP_KEY,
         pos,
-        (handled_key_view_t){
-            .behavior =
+        test_resolve_handled_key((key_behavior_view_t){
+            .keycode            = TEST_MULTI_TAP_KEY,
+            .handled            = true,
+            .has_multi_tap      = true,
+            .is_momentary_layer = true,
+            .tap_hold_term      = 120,
+            .longer_hold_term   = 240,
+            .multi_tap_term     = 150,
+            .single =
                 {
-                    .keycode            = TEST_MULTI_TAP_KEY,
-                    .handled            = true,
-                    .has_multi_tap      = true,
-                    .is_momentary_layer = true,
-                    .tap_hold_term      = 120,
-                    .longer_hold_term   = 240,
-                    .multi_tap_term     = 150,
-                    .single =
-                        {
-                            .tap = TAP_SENDS(TEST_SINGLE_ACTION),
-                        },
+                    .tap = TAP_SENDS(TEST_SINGLE_ACTION),
                 },
-        },
+        }),
         false);
 
     CHECK(plan.handled);
@@ -1040,26 +1038,23 @@ static void test_prepare_handled_press_flushes_pending_multi_tap_before_begin(vo
         slot,
         TEST_PD_MODE_KEY,
         press_pos,
-        (handled_key_view_t){
-            .behavior =
+        test_resolve_handled_key((key_behavior_view_t){
+            .keycode          = TEST_PD_MODE_KEY,
+            .handled          = true,
+            .tap_hold_term    = 120,
+            .longer_hold_term = 240,
+            .multi_tap_term   = 150,
+            .single =
                 {
-                    .keycode          = TEST_PD_MODE_KEY,
-                    .handled          = true,
-                    .tap_hold_term    = 120,
-                    .longer_hold_term = 240,
-                    .multi_tap_term   = 150,
-                    .single =
+                    .tap  = TAP_SENDS(TEST_SINGLE_ACTION),
+                    .hold =
                         {
-                            .tap  = TAP_SENDS(TEST_SINGLE_ACTION),
-                            .hold =
-                                {
-                                    .present = true,
-                                    .action  = TEST_HOLD_ACTION,
-                                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                                },
+                            .present = true,
+                            .action  = TEST_HOLD_ACTION,
+                            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
                         },
                 },
-        },
+        }),
         false);
 
     CHECK(plan.handled);
@@ -1127,26 +1122,23 @@ static void test_take_handled_press_result_maps_flush_and_begin_request(void) {
         slot,
         TEST_PD_MODE_KEY,
         press_pos,
-        (handled_key_view_t){
-            .behavior =
+        test_resolve_handled_key((key_behavior_view_t){
+            .keycode          = TEST_PD_MODE_KEY,
+            .handled          = true,
+            .tap_hold_term    = 120,
+            .longer_hold_term = 240,
+            .multi_tap_term   = 150,
+            .single =
                 {
-                    .keycode          = TEST_PD_MODE_KEY,
-                    .handled          = true,
-                    .tap_hold_term    = 120,
-                    .longer_hold_term = 240,
-                    .multi_tap_term   = 150,
-                    .single =
+                    .tap  = TAP_SENDS(TEST_SINGLE_ACTION),
+                    .hold =
                         {
-                            .tap  = TAP_SENDS(TEST_SINGLE_ACTION),
-                            .hold =
-                                {
-                                    .present = true,
-                                    .action  = TEST_HOLD_ACTION,
-                                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                                },
+                            .present = true,
+                            .action  = TEST_HOLD_ACTION,
+                            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
                         },
                 },
-        },
+        }),
         false);
 
     CHECK(result.handled);
@@ -1176,25 +1168,22 @@ static void test_take_handled_press_result_reclaims_held_action_before_begin_req
         slot,
         TEST_PD_MODE_KEY,
         press_pos,
-        (handled_key_view_t){
-            .behavior =
+        test_resolve_handled_key((key_behavior_view_t){
+            .keycode          = TEST_PD_MODE_KEY,
+            .handled          = true,
+            .tap_hold_term    = 120,
+            .longer_hold_term = 240,
+            .multi_tap_term   = 150,
+            .single =
                 {
-                    .keycode          = TEST_PD_MODE_KEY,
-                    .handled          = true,
-                    .tap_hold_term    = 120,
-                    .longer_hold_term = 240,
-                    .multi_tap_term   = 150,
-                    .single =
+                    .hold =
                         {
-                            .hold =
-                                {
-                                    .present = true,
-                                    .action  = TEST_HOLD_ACTION,
-                                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                                },
+                            .present = true,
+                            .action  = TEST_HOLD_ACTION,
+                            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
                         },
                 },
-        },
+        }),
         false);
 
     CHECK(result.handled);
@@ -1222,25 +1211,22 @@ static void test_take_handled_press_result_dispatches_tap_flush_before_begin_req
         slot,
         TEST_PD_MODE_KEY,
         press_pos,
-        (handled_key_view_t){
-            .behavior =
+        test_resolve_handled_key((key_behavior_view_t){
+            .keycode          = TEST_PD_MODE_KEY,
+            .handled          = true,
+            .tap_hold_term    = 120,
+            .longer_hold_term = 240,
+            .multi_tap_term   = 150,
+            .single =
                 {
-                    .keycode          = TEST_PD_MODE_KEY,
-                    .handled          = true,
-                    .tap_hold_term    = 120,
-                    .longer_hold_term = 240,
-                    .multi_tap_term   = 150,
-                    .single =
+                    .hold =
                         {
-                            .hold =
-                                {
-                                    .present = true,
-                                    .action  = TEST_HOLD_ACTION,
-                                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                                },
+                            .present = true,
+                            .action  = TEST_HOLD_ACTION,
+                            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
                         },
                 },
-        },
+        }),
         false);
 
     CHECK(result.handled);

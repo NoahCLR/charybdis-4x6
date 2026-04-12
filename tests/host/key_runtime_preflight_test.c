@@ -11,7 +11,7 @@
 
 static bool    suppress_default;
 static bool    tracked_physical_event;
-static bool    handled_key_is_handled;
+static bool    handled_key_stub_is_handled;
 static bool    interrupted_active_key;
 static bool    flushed_multi_tap;
 static uint8_t executed_transition_plan_count;
@@ -64,7 +64,7 @@ static void test_reset_state(void) {
     test_set_active_slot_key_pos(test_keypos(0, 0));
     suppress_default               = false;
     tracked_physical_event         = false;
-    handled_key_is_handled         = false;
+    handled_key_stub_is_handled    = false;
     interrupted_active_key         = false;
     flushed_multi_tap              = false;
     executed_transition_plan_count = 0;
@@ -219,25 +219,30 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
 }
 
 handled_key_view_t handled_key_lookup(uint16_t keycode) {
+    uint16_t flags = handled_key_stub_is_handled ? HANDLED_KEY_FLAG_HANDLED : 0;
+
     return (handled_key_view_t){
-        .behavior =
-            {
-                .keycode = keycode,
-                .handled = handled_key_is_handled,
-            },
+        .flags = flags,
     };
 }
 
+bool handled_key_is_handled(handled_key_view_t key) {
+    return (key.flags & HANDLED_KEY_FLAG_HANDLED) != 0;
+}
+
 bool handled_key_has_multi_tap(handled_key_view_t key) {
-    return key.behavior.has_multi_tap;
+    (void)key;
+    return false;
 }
 
 bool handled_key_is_momentary_layer(handled_key_view_t key) {
-    return key.behavior.is_momentary_layer;
+    (void)key;
+    return false;
 }
 
 bool handled_key_is_layer_tap(handled_key_view_t key) {
-    return key.behavior.is_layer_tap;
+    (void)key;
+    return false;
 }
 
 uint8_t handled_key_layer(handled_key_view_t key) {
@@ -298,7 +303,7 @@ static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
 
     test_reset_state();
     suppress_default       = true;
-    handled_key_is_handled = true;
+    handled_key_stub_is_handled = true;
     test_set_active_slot_key_pos(stored);
     active_key.owner.keycode = KC_LEFT_CTRL;
     active_key.owner.key_pos = stored;
@@ -328,7 +333,7 @@ static void test_handled_press_keeps_foreign_multi_tap_pending(void) {
     keyrecord_t record = test_record(test_keypos(3, 4), true);
 
     test_reset_state();
-    handled_key_is_handled = true;
+    handled_key_stub_is_handled = true;
     key_runtime_slot_for_position(test_keypos(3, 3))->pending_multi_tap = (multi_tap_t){
         .keycode = KC_RIGHT_ALT,
         .key_pos = test_keypos(3, 3),

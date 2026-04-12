@@ -64,17 +64,12 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 }
 
 static handled_key_view_t test_handled_key(void) {
-    return (handled_key_view_t){
-        .behavior =
-            {
-                .keycode          = TEST_MULTI_TAP_KEY,
-                .handled          = true,
-                .has_multi_tap    = true,
-                .tap_hold_term    = 120,
-                .longer_hold_term = 240,
-                .multi_tap_term   = 150,
-            },
-    };
+    handled_key_view_t key = handled_key_lookup(TEST_MULTI_TAP_KEY);
+    key.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    key.tap_hold_term    = 120;
+    key.longer_hold_term = 240;
+    key.multi_tap_term   = 150;
+    return key;
 }
 
 static void test_reset_state(void) {
@@ -197,6 +192,7 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .keycode = keycode,
+        .handled = true,
     };
 }
 

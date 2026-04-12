@@ -2,17 +2,16 @@
 // Handled Key View
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Runtime helpers that adapt a resolved key_behavior view into the press and
-// release engine's handled-key decisions.
+// Runtime helpers that adapt authored key_behavior rows into a fully resolved
+// handled-key contract for the press/release engine.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include "../pointing/pd_mode_flags.h"
 #include "../state/runtime_shared_state.h"
-#include "key_behavior_lookup.h"
+#include "key_behavior.h"
 
 typedef struct {
-    key_behavior_view_t              behavior;
     uint16_t                         tap_action;
     hold_behavior_t                  hold;
     hold_behavior_t                  long_hold;
@@ -23,18 +22,19 @@ typedef struct {
     uint8_t                          layer;
     pd_mode_mask_t                   pd_mode;
     uint16_t                         flags;
-    bool                             resolved;
 } handled_key_view_t;
 
 typedef enum {
-    HANDLED_KEY_FLAG_MULTI_TAP       = (1u << 0),
-    HANDLED_KEY_FLAG_IMPLICIT_HOLD   = (1u << 1),
-    HANDLED_KEY_FLAG_FALLBACK_HOLD   = (1u << 2),
-    HANDLED_KEY_FLAG_MOMENTARY_LAYER = (1u << 3),
-    HANDLED_KEY_FLAG_LAYER_TAP       = (1u << 4),
+    HANDLED_KEY_FLAG_HANDLED         = (1u << 0),
+    HANDLED_KEY_FLAG_MULTI_TAP       = (1u << 1),
+    HANDLED_KEY_FLAG_IMPLICIT_HOLD   = (1u << 2),
+    HANDLED_KEY_FLAG_FALLBACK_HOLD   = (1u << 3),
+    HANDLED_KEY_FLAG_MOMENTARY_LAYER = (1u << 4),
+    HANDLED_KEY_FLAG_LAYER_TAP       = (1u << 5),
 } handled_key_flag_t;
 
 handled_key_view_t handled_key_lookup(uint16_t keycode);
+bool               handled_key_is_handled(handled_key_view_t key);
 bool               handled_key_uses_implicit_hold(handled_key_view_t key);
 bool               handled_key_uses_fallback_hold(handled_key_view_t key);
 bool               handled_key_has_multi_tap(handled_key_view_t key);
