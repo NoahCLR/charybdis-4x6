@@ -89,6 +89,30 @@ bool key_runtime_slot_owns_key_position(const active_key_state_t *slot, keypos_t
     return (key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) || (key_runtime_slot_has_pending_multi_tap(slot) && key_runtime_keypos_equal(slot->pending_multi_tap.key_pos, key_pos));
 }
 
+static uint8_t key_runtime_slot_preview_layer_from_binding(hold_behavior_t hold, key_runtime_slot_hold_strategy_t hold_strategy) {
+    if (hold_strategy != KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT) {
+        return UINT8_MAX;
+    }
+
+    if (!hold.present || hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || !IS_QK_MOMENTARY(hold.action)) {
+        return UINT8_MAX;
+    }
+
+    return QK_MOMENTARY_GET_LAYER(hold.action);
+}
+
+uint8_t key_runtime_slot_preview_layer_hint(const active_key_state_t *slot) {
+    if (!slot) {
+        return UINT8_MAX;
+    }
+
+    if (slot->semantic.valid) {
+        return slot->semantic.preview_layer;
+    }
+
+    return key_runtime_slot_preview_layer_from_binding(slot->binding.hold, slot->lifecycle.hold_strategy);
+}
+
 bool key_runtime_slot_has_pending_multi_tap(const active_key_state_t *slot) {
     return slot != NULL && multi_tap_active(&slot->pending_multi_tap);
 }
@@ -261,6 +285,22 @@ void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes
     }
 
     slot->lifecycle.phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
+}
+
+void key_runtime_slot_apply_handled_metadata(active_key_state_t *slot, handled_key_view_t key) {
+    if (!slot) {
+        return;
+    }
+
+    slot->semantic = (key_runtime_slot_semantic_state_t){
+        .valid              = true,
+        .has_multi_tap      = handled_key_has_multi_tap(key),
+        .is_momentary_layer = handled_key_is_momentary_layer(key),
+        .is_layer_tap       = handled_key_is_layer_tap(key),
+        .layer              = handled_key_layer(key),
+        .preview_layer      = key_runtime_slot_preview_layer_from_binding(slot->binding.hold, slot->lifecycle.hold_strategy),
+        .pd_mode            = handled_key_pd_mode(key),
+    };
 }
 
 void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {

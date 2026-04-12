@@ -178,6 +178,11 @@ The actual handled-key semantics are still recomputed in several places:
 That means the "resolved handled key" abstraction does not yet own the full
 meaning of a handled key.
 
+This pass closed most of that gap for the live runtime path. The remaining
+design choice for feedback and debugging should be: resolve once when the
+handled press begins, cache the slot semantics needed by downstream readers,
+and keep later consumers off mutable binding re-interpretation.
+
 ### Leaky abstraction 2: effect protocols are duplicated
 
 The handled-key path currently has three related effect vocabularies:
@@ -400,6 +405,15 @@ typedef struct {
 } resolved_handled_key_t;
 ```
 
+Status after this review pass:
+
+- implemented via the expanded `handled_key_view_t`
+- press, release, pending multi-tap, and transition planning now consume the
+  resolved handled-key object directly
+- feedback preview-layer now reads cached slot semantic metadata seeded from
+  that resolved object instead of re-resolving against slot bindings
+- debug/test work still needs one shared runtime snapshot surface
+
 Priority: high.
 
 ### 2. Collapse slot-result and transition effects into one effect vocabulary
@@ -430,6 +444,12 @@ typedef struct {
     union { /* action/layer/pd payloads */ } data;
 } noah_runtime_effect_t;
 ```
+
+Status after this review pass: implemented in
+[`key_runtime_effect.h`](../../users/noah/lib/key/key_runtime_effect.h),
+[`key_runtime_slot_result.c`](../../users/noah/lib/key/key_runtime_slot_result.c),
+and
+[`key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c).
 
 That would let [`key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c)
 be mostly an executor instead of a translator.

@@ -23,7 +23,7 @@ static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavi
     return hold_registers_on_press(hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
 }
 
-static key_runtime_slot_effect_request_t key_runtime_slot_step_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
+static key_runtime_slot_effect_request_t key_runtime_slot_step_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
     key_runtime_slot_effect_request_t request = {0};
 
     if (!slot) {
@@ -31,6 +31,7 @@ static key_runtime_slot_effect_request_t key_runtime_slot_step_begin_press(activ
     }
 
     key_runtime_slot_track(slot, keycode, key_pos, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, phase, hold_strategy);
+    key_runtime_slot_apply_handled_metadata(slot, key);
     slot->lifecycle.pd_mode_was_locked_on_press = pd_mode_was_locked_on_press;
 
     if (hold_registers_on_press(hold)) {
@@ -123,6 +124,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_handled_press_reuse_pendi
             context->slot,
             context->keycode,
             context->key_pos,
+            context->key,
             KC_NO,
             hold_behavior_none(),
             hold_behavior_none(),
@@ -166,6 +168,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_handled_press_begin_fresh
                                                         context->slot,
                                                         context->keycode,
                                                         context->key_pos,
+                                                        context->key,
                                                         context->tap_action,
                                                         context->hold,
                                                         context->long_hold,

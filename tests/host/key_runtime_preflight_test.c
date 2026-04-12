@@ -226,6 +226,28 @@ handled_key_view_t handled_key_lookup(uint16_t keycode) {
     };
 }
 
+bool handled_key_has_multi_tap(handled_key_view_t key) {
+    return key.behavior.has_multi_tap;
+}
+
+bool handled_key_is_momentary_layer(handled_key_view_t key) {
+    return key.behavior.is_momentary_layer;
+}
+
+bool handled_key_is_layer_tap(handled_key_view_t key) {
+    return key.behavior.is_layer_tap;
+}
+
+uint8_t handled_key_layer(handled_key_view_t key) {
+    (void)key;
+    return UINT8_MAX;
+}
+
+pd_mode_mask_t handled_key_pd_mode(handled_key_view_t key) {
+    (void)key;
+    return 0;
+}
+
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;

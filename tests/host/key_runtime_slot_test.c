@@ -1009,6 +1009,10 @@ static void test_prepare_handled_press_matching_pending_multi_tap_reuses_slot(vo
     CHECK(slot->owner.key_pos.row == pos.row);
     CHECK(slot->owner.key_pos.col == pos.col);
     CHECK(slot->binding.tap_action == KC_NO);
+    CHECK(slot->semantic.valid);
+    CHECK(slot->semantic.has_multi_tap);
+    CHECK(slot->semantic.is_momentary_layer);
+    CHECK(slot->semantic.layer == 3);
     CHECK(key_runtime_slot_hold_is_complete(slot));
     CHECK(slot->pending_multi_tap.count == 2);
     CHECK(!slot->pending_multi_tap.pending_hold);
@@ -1072,6 +1076,9 @@ static void test_prepare_handled_press_flushes_pending_multi_tap_before_begin(vo
     CHECK(key_runtime_slot_uses_implicit_hold(slot));
     CHECK(slot->lifecycle.phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW);
     CHECK(slot->lifecycle.pd_mode_was_locked_on_press);
+    CHECK(slot->semantic.valid);
+    CHECK(slot->semantic.pd_mode == PD_MODE_VOLUME);
+    CHECK(slot->semantic.preview_layer == UINT8_MAX);
     CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
 }
 

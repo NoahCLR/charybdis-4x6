@@ -36,14 +36,6 @@ void key_feedback_pulse_arm(bool long_hold_level) {
     };
 }
 
-static uint8_t key_feedback_layer_hint_from_action(uint16_t action) {
-    if (!IS_QK_MOMENTARY(action)) {
-        return UINT8_MAX;
-    }
-
-    return QK_MOMENTARY_GET_LAYER(action);
-}
-
 static uint8_t key_feedback_preview_layer_for_slot(const active_key_state_t *slot) {
     if (!key_runtime_slot_active(slot) || key_runtime_slot_uses_implicit_hold(slot) || key_runtime_slot_uses_fallback_hold(slot)) {
         return UINT8_MAX;
@@ -60,11 +52,7 @@ static uint8_t key_feedback_preview_layer_for_slot(const active_key_state_t *slo
         return UINT8_MAX;
     }
 
-    if (!slot->binding.hold.present || slot->binding.hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE) {
-        return UINT8_MAX;
-    }
-
-    return key_feedback_layer_hint_from_action(slot->binding.hold.action);
+    return key_runtime_slot_preview_layer_hint(slot);
 }
 
 uint8_t key_feedback_preview_layer(void) {

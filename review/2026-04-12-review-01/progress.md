@@ -50,9 +50,19 @@ Completed in this pass:
     effects instead of translating slot-result effects into another enum/union
   - updated slot-runtime host assertions to validate the direct shared effect
     ordering and payloads
+- Implemented the feedback/debug follow-up slice from this review:
+  - chose cached slot semantic metadata as the remaining feedback/debug seam
+    instead of re-running handled-key resolution against mutable slot state
+  - added `active_key_state_t.semantic` to cache resolved multi-tap, layer,
+    pd-mode, and preview-layer hints when a handled press begins
+  - moved feedback preview-layer lookup onto that cached slot metadata while
+    keeping a binding-derived fallback for manual host fixtures
+  - updated the affected host harnesses, including admission and preflight
+    stubs, for the richer slot contract
 
 Verification run in this pass:
 
+- `sh tests/host/run_key_runtime_admission_tests.sh`
 - `sh tests/host/run_key_runtime_slot_tests.sh`
 - `sh tests/host/run_key_runtime_feedback_tests.sh`
 - `sh tests/host/run_key_runtime_transition_tests.sh`
@@ -79,9 +89,6 @@ Workspace scope:
 
 Recommended next implementation work:
 
-1. Decide whether the remaining feedback/debug surfaces should read resolved
-   handled-key state directly from the resolver or from cached slot metadata
-   before the next handled-key refactor.
-2. Add a small pd-mode lifecycle policy seam before the next unusual mode
+1. Add a small pd-mode lifecycle policy seam before the next unusual mode
    pushes more central trait branches into the registry.
-3. Add one shared runtime snapshot/reset surface for debugging and host tests.
+2. Add one shared runtime snapshot/reset surface for debugging and host tests.

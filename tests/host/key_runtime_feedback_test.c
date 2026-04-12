@@ -242,6 +242,21 @@ static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) 
     CHECK(key_feedback_preview_layer() == 3);
 }
 
+static void test_cached_preview_layer_metadata_is_used_when_present(void) {
+    test_reset_state();
+
+    active_key = (active_key_state_t){
+        .owner.keycode = KC_RIGHT_ALT,
+        .semantic =
+            {
+                .valid         = true,
+                .preview_layer = 4,
+            },
+    };
+
+    CHECK(key_feedback_preview_layer() == 4);
+}
+
 static void test_momentary_hold_preview_layer_clears_once_layer_is_active(void) {
     test_reset_state();
 
@@ -357,6 +372,7 @@ int main(void) {
     test_repeat_hold_flashes_while_active();
     test_fallback_hold_has_no_hold_feedback();
     test_momentary_hold_preview_layer_is_exposed_before_threshold();
+    test_cached_preview_layer_metadata_is_used_when_present();
     test_momentary_hold_preview_layer_clears_once_layer_is_active();
     test_non_layer_held_action_has_no_preview_layer();
     test_feedback_falls_back_to_secondary_active_slot();

@@ -55,6 +55,16 @@ typedef struct {
     uint16_t multi_tap_term;
 } key_runtime_slot_timing_state_t;
 
+typedef struct {
+    bool          valid;
+    bool          has_multi_tap;
+    bool          is_momentary_layer;
+    bool          is_layer_tap;
+    uint8_t       layer;
+    uint8_t       preview_layer;
+    pd_mode_mask_t pd_mode;
+} key_runtime_slot_semantic_state_t;
+
 // One handled-key runtime slot: active press/hold state plus any deferred
 // multi-tap chain that still owns this physical key position after release.
 typedef struct {
@@ -63,6 +73,7 @@ typedef struct {
     key_runtime_slot_lifecycle_state_t lifecycle;
     key_runtime_slot_binding_state_t   binding;
     key_runtime_slot_timing_state_t    timing;
+    key_runtime_slot_semantic_state_t  semantic;
     multi_tap_t pending_multi_tap;
 } active_key_state_t;
 
@@ -84,6 +95,8 @@ typedef struct {
         .timing.tap_hold_term          = CUSTOM_TAP_HOLD_TERM, \
         .timing.longer_hold_term       = CUSTOM_LONGER_HOLD_TERM, \
         .timing.multi_tap_term         = CUSTOM_MULTI_TAP_TERM, \
+        .semantic.layer                = UINT8_MAX,  \
+        .semantic.preview_layer        = UINT8_MAX,  \
         .pending_multi_tap             = {0},        \
     }
 

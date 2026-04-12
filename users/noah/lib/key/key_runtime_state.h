@@ -12,6 +12,7 @@
 
 #include "../state/runtime_shared_state.h"
 #include "delayed_action.h"
+#include "handled_key.h"
 #include "key_behavior_lookup.h"
 
 void noah_key_runtime_scan(void);
@@ -39,6 +40,7 @@ bool                key_runtime_slot_has_active_hold_tier(const active_key_state
 bool                key_runtime_slot_hold_is_complete(const active_key_state_t *slot);
 bool                key_runtime_slot_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos);
 bool                key_runtime_slot_owns_key_position(const active_key_state_t *slot, keypos_t key_pos);
+uint8_t             key_runtime_slot_preview_layer_hint(const active_key_state_t *slot);
 bool                key_runtime_slot_has_pending_multi_tap(const active_key_state_t *slot);
 bool                key_runtime_slot_pending_multi_tap_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos);
 bool                key_runtime_slot_pending_multi_tap_pending_hold(const active_key_state_t *slot);
@@ -58,6 +60,7 @@ bool                key_runtime_slot_activate_pending_fallback_hold(active_key_s
 bool                key_runtime_activate_pending_fallback_hold(void);
 void                key_runtime_slot_set_release_hold_pending(active_key_state_t *slot);
 void                key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes_hold);
+void                key_runtime_slot_apply_handled_metadata(active_key_state_t *slot, handled_key_view_t key);
 
 void key_runtime_slot_reset(active_key_state_t *slot);
 void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy);
