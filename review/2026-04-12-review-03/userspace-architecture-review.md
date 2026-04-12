@@ -510,15 +510,18 @@ This userspace already has the right long-term shape for a fixed keyboard:
 The highest-value follow-ups from this review have already landed:
 
 - the handled-key public contract is tighter
+- key-runtime press and active-release reducers are split by ownership seam
 - pd-mode authority vs display state is explicit
 - pd-mode implementations are split by mode
+- pd-mode lookup/manifest materialization is split from lifecycle/runtime
+  transitions
 - cross-subsystem runtime tracing is shared instead of ad hoc
 
-The next improvements should stay targeted, not sweeping:
+That closes the targeted follow-up set from this review.
 
-- split key-runtime reducers only when the next lifecycle feature justifies it
-- split `pd_mode_registry.c` only when another real lifecycle/policy feature
-  would otherwise make it materially harder to reason about
+Future changes should stay targeted, not sweeping. Open a new review when a
+new subsystem or ownership question appears, not just for routine feature
+growth inside the current shape.
 
 That path improves extensibility without throwing away the codebase's current
 strengths.

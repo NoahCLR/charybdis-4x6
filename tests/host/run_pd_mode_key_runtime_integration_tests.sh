@@ -30,7 +30,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/key/key_runtime_admission.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_policy.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_pending_multi_tap.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_slot_release_active.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_release_reduce.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_slot_press_reduce.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_result.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_scan_reduce.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_step.c" \
@@ -43,6 +45,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/key/key_runtime_transition.c" \
     "$ROOT/users/noah/lib/key/multi_tap_engine.c" \
     "$ROOT/users/noah/lib/pointing/pd_mode_registry.c" \
+    "$ROOT/users/noah/lib/pointing/pd_mode_lifecycle.c" \
     "$ROOT/users/noah/lib/pointing/pd_mode_state.c" \
     "$ROOT/users/noah/lib/state/runtime_shared_state.c" \
     -o "$BIN"

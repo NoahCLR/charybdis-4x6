@@ -23,6 +23,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/runtime_trace_test.c" \
     "$ROOT/users/noah/lib/key/key_runtime_trace.c" \
     "$ROOT/users/noah/lib/pointing/pd_mode_registry.c" \
+    "$ROOT/users/noah/lib/pointing/pd_mode_lifecycle.c" \
     "$ROOT/users/noah/lib/pointing/pd_mode_state.c" \
     "$ROOT/users/noah/lib/pointing/pd_mode_volume.c" \
     "$ROOT/users/noah/lib/pointing/pd_mode_brightness.c" \

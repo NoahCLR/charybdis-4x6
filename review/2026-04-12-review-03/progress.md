@@ -191,13 +191,40 @@ Verification run for the shared runtime trace follow-up:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
-Recommended next implementation work:
+Follow-up implementation completed after the shared runtime trace pass:
 
-1. If another handled-key lifecycle feature lands, split
-   `key_runtime_slot_step.c` and `key_runtime_slot_release_reduce.c` by
-   ownership seam instead of layering more local helpers into either file.
-2. When the next meaningful pd-mode lifecycle or policy feature lands, split
-   `pd_mode_registry.c` by ownership seam instead of letting manifest
-   materialization, lifecycle hooks, and state transitions keep growing in one
-   file.
+- Split handled-key press and active-release ownership out of
+  `key_runtime_slot_step.c` and `key_runtime_slot_release_reduce.c` into the
+  dedicated helpers `key_runtime_slot_press_reduce.c` and
+  `key_runtime_slot_release_active.c`.
+- Kept the public slot-step seam unchanged while making `key_runtime_slot_step.c`
+  a thin event router and `key_runtime_slot_release_reduce.c` a thin ownership
+  wrapper around pending-multi-tap and orphaned-release handling.
+- Split `pd_mode_registry.c` by ownership seam so manifest materialization,
+  lookup, and lifecycle hook objects stay in `pd_mode_registry.c`, while
+  runtime transitions and shared policy moved into `pd_mode_lifecycle.c`.
+- Added the new userspace files to `source_manifest.mk` and updated the direct
+  host runners that compile explicit key-runtime and pd-mode source lists.
+
+Verification run for the final review follow-up:
+
+- `git status --short`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Review status:
+
+- no remaining implementation items in this review
+- open a new review only when a new architecture question appears
  
