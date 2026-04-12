@@ -200,3 +200,4 @@ Recommended next implementation work:
    `pd_mode_registry.c` by ownership seam instead of letting manifest
    materialization, lifecycle hooks, and state transitions keep growing in one
    file.
+ 
