@@ -31,6 +31,11 @@ If you hand this task to an agent, give it this exact job:
 Do not rewrite the generic runtime unless the new mode truly needs runtime
 behavior that existing modes do not cover.
 
+If a mode needs unusual activation, deactivation, lock, or unlock side effects
+that are not shared policy, keep the normal manifest path intact and add an
+optional lifecycle hook in [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c)
+instead of introducing another one-off manifest trait.
+
 ## What Counts As A Pd Mode
 
 A pd mode is a custom keycode that:

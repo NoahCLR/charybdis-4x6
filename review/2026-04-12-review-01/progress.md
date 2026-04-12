@@ -59,6 +59,18 @@ Completed in this pass:
     keeping a binding-derived fallback for manual host fixtures
   - updated the affected host harnesses, including admission and preflight
     stubs, for the richer slot contract
+- Implemented the pd-mode lifecycle policy seam from this review:
+  - kept the normal add-mode workflow unchanged so standard pd modes still
+    remain manifest-first and do not require runtime edits
+  - added optional internal lifecycle hooks around pd-mode activate,
+    deactivate, lock, and unlock transitions for unusual side effects
+  - moved pinch mode's left-GUI ownership onto that lifecycle seam instead of
+    keeping it as a one-off manifest trait consumed centrally by the registry
+  - kept shared trait-driven policy for common cases such as auto-mouse lock
+    ownership, but now routed those lock/unlock side effects through the same
+    lifecycle surface
+  - updated the pd-mode host harness and maintainer doc to cover the new seam
+    without changing the manifest row schema
 
 Verification run in this pass:
 
@@ -71,6 +83,9 @@ Verification run in this pass:
 - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
 - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
 - `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
@@ -89,6 +104,6 @@ Workspace scope:
 
 Recommended next implementation work:
 
-1. Add a small pd-mode lifecycle policy seam before the next unusual mode
-   pushes more central trait branches into the registry.
-2. Add one shared runtime snapshot/reset surface for debugging and host tests.
+1. Add one shared runtime snapshot/reset surface for debugging and host tests.
+2. Separate held-action ownership from repeat scheduling once the runtime
+   snapshot/reset surface makes the cross-subsystem assertions easier to write.

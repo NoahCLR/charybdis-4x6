@@ -18,6 +18,13 @@ static uint16_t default_dpi;
 
 static bool dragscroll_enabled;
 static bool sniping_enabled;
+static bool auto_mouse_toggle_enabled;
+static bool auto_mouse_enabled;
+static bool auto_mouse_active;
+static int8_t auto_mouse_key_tracker;
+static uint8_t auto_mouse_layer;
+static uint8_t auto_mouse_toggle_count;
+static uint8_t auto_mouse_layer_off_count;
 
 static uint8_t split_sync_count;
 
@@ -60,6 +67,13 @@ static void test_reset_stubs(void) {
     default_dpi                   = 900;
     dragscroll_enabled            = false;
     sniping_enabled               = false;
+    auto_mouse_toggle_enabled     = false;
+    auto_mouse_enabled            = false;
+    auto_mouse_active             = false;
+    auto_mouse_key_tracker        = 0;
+    auto_mouse_layer              = 4;
+    auto_mouse_toggle_count       = 0;
+    auto_mouse_layer_off_count    = 0;
     split_sync_count              = 0;
     keyboard_mod_register_count   = 0;
     keyboard_mod_unregister_count = 0;
@@ -102,6 +116,47 @@ void charybdis_set_pointer_dragscroll_enabled(bool enabled) {
 void pointing_device_set_cpi(uint16_t cpi) {
     current_cpi = cpi;
     cpi_set_count++;
+}
+
+bool get_auto_mouse_toggle(void) {
+    return auto_mouse_toggle_enabled;
+}
+
+int8_t get_auto_mouse_key_tracker(void) {
+    return auto_mouse_key_tracker;
+}
+
+uint8_t get_auto_mouse_layer(void) {
+    return auto_mouse_layer;
+}
+
+uint16_t auto_mouse_get_time_elapsed(void) {
+    return 0;
+}
+
+bool is_auto_mouse_active(void) {
+    return auto_mouse_active;
+}
+
+void set_auto_mouse_enable(bool enable) {
+    auto_mouse_enabled = enable;
+}
+
+void set_auto_mouse_layer(uint8_t layer) {
+    auto_mouse_layer = layer;
+}
+
+void auto_mouse_layer_off(void) {
+    auto_mouse_layer_off_count++;
+}
+
+void auto_mouse_toggle(void) {
+    auto_mouse_toggle_enabled = !auto_mouse_toggle_enabled;
+    auto_mouse_toggle_count++;
+}
+
+void auto_mouse_keyevent(bool pressed) {
+    (void)pressed;
 }
 
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
@@ -207,7 +262,7 @@ static void test_trait_queries_match_manifest_policy(void) {
     CHECK(!pd_mode_has_trait(PD_MODE_VOLUME, PD_MODE_TRAIT_PREFER_TYPING_LAYER));
     CHECK(pd_mode_has_trait(PD_MODE_ARROW, PD_MODE_TRAIT_PREFER_TYPING_LAYER));
     CHECK(!pd_mode_has_trait(PD_MODE_ARROW, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
-    CHECK(pd_mode_has_trait(PD_MODE_PINCH, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE | PD_MODE_TRAIT_OWNS_LEFT_GUI));
+    CHECK(pd_mode_has_trait(PD_MODE_PINCH, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE));
     CHECK(!pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
 
     pd_mode_activate(PD_MODE_ARROW);
@@ -217,7 +272,6 @@ static void test_trait_queries_match_manifest_policy(void) {
     pd_mode_activate(PD_MODE_PINCH);
     CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
     CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND));
-    CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_OWNS_LEFT_GUI));
 
     pd_mode_deactivate(PD_MODE_PINCH);
 }
@@ -353,6 +407,29 @@ static void test_pinch_mode_registers_gui_and_dragscroll_side_effects(void) {
     CHECK(last_unregistered_keycode == KC_LEFT_GUI);
 }
 
+static void test_lock_owned_auto_mouse_toggle_tracks_mode_ownership(void) {
+    test_reset_stubs();
+
+    pd_mode_lock(PD_MODE_DRAGSCROLL);
+    CHECK(auto_mouse_toggle_enabled);
+    CHECK(auto_mouse_toggle_count == 1);
+
+    pd_mode_unlock(PD_MODE_DRAGSCROLL);
+    CHECK(!auto_mouse_toggle_enabled);
+    CHECK(auto_mouse_toggle_count == 2);
+
+    test_reset_stubs();
+    auto_mouse_toggle_enabled = true;
+
+    pd_mode_lock(PD_MODE_DRAGSCROLL);
+    CHECK(auto_mouse_toggle_enabled);
+    CHECK(auto_mouse_toggle_count == 0);
+
+    pd_mode_unlock(PD_MODE_DRAGSCROLL);
+    CHECK(auto_mouse_toggle_enabled);
+    CHECK(auto_mouse_toggle_count == 0);
+}
+
 static void test_active_key_handler_only_runs_for_active_modes(void) {
     keyrecord_t record = {
         .event =
@@ -383,6 +460,7 @@ int main(void) {
     test_locked_mode_release_keeps_mode_active();
     test_apply_active_dpi_respects_pointer_state();
     test_pinch_mode_registers_gui_and_dragscroll_side_effects();
+    test_lock_owned_auto_mouse_toggle_tracks_mode_ownership();
     test_active_key_handler_only_runs_for_active_modes();
 
     puts("pd_mode host tests passed");

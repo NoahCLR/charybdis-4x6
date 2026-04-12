@@ -37,8 +37,10 @@
 //   TRAITS:
 //     Bitmask of PD_MODE_TRAIT_* flags that describe cross-cutting policy for
 //     pointer-layer anchoring, dragscroll backend ownership, lock behavior,
-//     and modifier ownership. Prefer adding a new trait over hard-coding
-//     per-mode identity checks in higher-level policy code.
+//     and other shared registry/pointer policy. Prefer adding a new trait when
+//     multiple modes share the same policy. If a mode needs unusual lifecycle
+//     side effects, add an optional lifecycle hook in pd_mode_registry.c
+//     instead of another one-off trait branch.
 //
 // Example:
 //   PDM(MY_NEW_MODE, MY_NEW_MODE_KEY,
@@ -57,7 +59,6 @@ enum {
     PD_MODE_TRAIT_PREFER_TYPING_LAYER         = (pd_mode_traits_t)1u << 1,
     PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND   = (pd_mode_traits_t)1u << 2,
     PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE = (pd_mode_traits_t)1u << 3,
-    PD_MODE_TRAIT_OWNS_LEFT_GUI               = (pd_mode_traits_t)1u << 4,
 };
 
 #define NOAH_PD_MODE_LIST(PDM)                                                                                                                                                                  \
@@ -66,4 +67,4 @@ enum {
     PDM(BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, NULL, reset_brightness_mode, PD_MODE_BRIGHTNESS_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)                                      \
     PDM(ZOOM, ZOOM_MODE, handle_zoom_mode, NULL, reset_zoom_mode, PD_MODE_ZOOM_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)                                                                   \
     PDM(ARROW, ARROW_MODE, handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode, PD_MODE_ARROW_DPI, PD_MODE_TRAIT_PREFER_TYPING_LAYER)                                                   \
-    PDM(PINCH, PINCH_MODE, NULL, NULL, NULL, 0, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE | PD_MODE_TRAIT_OWNS_LEFT_GUI)
+    PDM(PINCH, PINCH_MODE, NULL, NULL, NULL, 0, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)

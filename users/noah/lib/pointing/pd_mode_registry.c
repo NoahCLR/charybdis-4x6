@@ -12,13 +12,20 @@
 
 #include "pd_mode_handlers.h"
 
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-static bool scroll_mode_auto_mouse_owned = false;
+typedef struct {
+    void (*on_activate)(pd_mode_mask_t mode);
+    void (*on_deactivate)(pd_mode_mask_t mode);
+    void (*on_lock)(pd_mode_mask_t mode);
+    void (*on_unlock)(pd_mode_mask_t mode);
+} pd_mode_lifecycle_hooks_t;
 
 static inline bool pd_mode_registry_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
     const pd_mode_def_t *def = pd_mode_lookup(mode);
     return def && (def->traits & trait) == trait;
 }
+
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+static bool scroll_mode_auto_mouse_owned = false;
 
 static void pd_mode_auto_mouse_sync_anchor(bool should_anchor) {
     static bool pd_mode_auto_mouse_anchor_active = false;
@@ -57,7 +64,9 @@ static void pd_mode_auto_mouse_deactivate(pd_mode_mask_t mode, bool was_any_mode
     }
 }
 
-static void scroll_mode_lock_attach_auto_mouse(void) {
+static void scroll_mode_lock_attach_auto_mouse(pd_mode_mask_t mode) {
+    (void)mode;
+
     if (noah_qmk_contract_auto_mouse_toggle_enabled()) {
         scroll_mode_auto_mouse_owned = false;
         return;
@@ -67,18 +76,27 @@ static void scroll_mode_lock_attach_auto_mouse(void) {
     scroll_mode_auto_mouse_owned = true;
 }
 
-static void scroll_mode_lock_detach_auto_mouse(void) {
+static void scroll_mode_lock_detach_auto_mouse(pd_mode_mask_t mode) {
+    (void)mode;
+
     if (scroll_mode_auto_mouse_owned && noah_qmk_contract_auto_mouse_toggle_enabled()) {
         noah_qmk_contract_auto_mouse_toggle();
     }
 
     scroll_mode_auto_mouse_owned = false;
 }
+
+static const pd_mode_lifecycle_hooks_t pd_mode_auto_mouse_lock_toggle_hooks = {
+    .on_lock   = scroll_mode_lock_attach_auto_mouse,
+    .on_unlock = scroll_mode_lock_detach_auto_mouse,
+};
 #endif
 
 static bool pinch_command_registered = false;
 
-static void pinch_mode_register_command(void) {
+static void pinch_mode_register_command(pd_mode_mask_t mode) {
+    (void)mode;
+
     if (pinch_command_registered) {
         return;
     }
@@ -90,7 +108,9 @@ static void pinch_mode_register_command(void) {
     pinch_command_registered = true;
 }
 
-static void pinch_mode_unregister_command(void) {
+static void pinch_mode_unregister_command(pd_mode_mask_t mode) {
+    (void)mode;
+
     if (!pinch_command_registered) {
         return;
     }
@@ -98,6 +118,11 @@ static void pinch_mode_unregister_command(void) {
     keyboard_mod_ownership_unregister(KC_LEFT_GUI);
     pinch_command_registered = false;
 }
+
+static const pd_mode_lifecycle_hooks_t pd_mode_pinch_lifecycle_hooks = {
+    .on_activate   = pinch_mode_register_command,
+    .on_deactivate = pinch_mode_unregister_command,
+};
 
 // Per-mode pointer DPI overrides. Override any of these in config.h.
 // 0 = no override: normal pointer DPI is used while that mode is active.
@@ -119,6 +144,63 @@ static void pinch_mode_unregister_command(void) {
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_REGISTRY_ROW)};
 #undef NOAH_PD_MODE_REGISTRY_ROW
 
+static const pd_mode_lifecycle_hooks_t *pd_mode_lifecycle_shared_hooks(pd_mode_mask_t mode) {
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    if (pd_mode_registry_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)) {
+        return &pd_mode_auto_mouse_lock_toggle_hooks;
+    }
+#endif
+
+    return NULL;
+}
+
+static const pd_mode_lifecycle_hooks_t *pd_mode_lifecycle_mode_hooks(pd_mode_mask_t mode) {
+    switch (mode) {
+        case PD_MODE_PINCH:
+            return &pd_mode_pinch_lifecycle_hooks;
+    }
+
+    return NULL;
+}
+
+static void pd_mode_run_lifecycle_callback(void (*callback)(pd_mode_mask_t mode), pd_mode_mask_t mode) {
+    if (callback) {
+        callback(mode);
+    }
+}
+
+static void pd_mode_run_activate_hooks(pd_mode_mask_t mode) {
+    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_shared_hooks(mode);
+    pd_mode_run_lifecycle_callback(hooks ? hooks->on_activate : NULL, mode);
+
+    hooks = pd_mode_lifecycle_mode_hooks(mode);
+    pd_mode_run_lifecycle_callback(hooks ? hooks->on_activate : NULL, mode);
+}
+
+static void pd_mode_run_deactivate_hooks(pd_mode_mask_t mode) {
+    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_shared_hooks(mode);
+    pd_mode_run_lifecycle_callback(hooks ? hooks->on_deactivate : NULL, mode);
+
+    hooks = pd_mode_lifecycle_mode_hooks(mode);
+    pd_mode_run_lifecycle_callback(hooks ? hooks->on_deactivate : NULL, mode);
+}
+
+static void pd_mode_run_lock_hooks(pd_mode_mask_t mode) {
+    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_shared_hooks(mode);
+    pd_mode_run_lifecycle_callback(hooks ? hooks->on_lock : NULL, mode);
+
+    hooks = pd_mode_lifecycle_mode_hooks(mode);
+    pd_mode_run_lifecycle_callback(hooks ? hooks->on_lock : NULL, mode);
+}
+
+static void pd_mode_run_unlock_hooks(pd_mode_mask_t mode) {
+    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_shared_hooks(mode);
+    pd_mode_run_lifecycle_callback(hooks ? hooks->on_unlock : NULL, mode);
+
+    hooks = pd_mode_lifecycle_mode_hooks(mode);
+    pd_mode_run_lifecycle_callback(hooks ? hooks->on_unlock : NULL, mode);
+}
+
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_modes[i].mode_flag == mode) return &pd_modes[i];
@@ -138,8 +220,7 @@ bool is_pd_mode_lock_action(uint16_t action) {
 }
 
 bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
-    const pd_mode_def_t *def = pd_mode_lookup(mode);
-    return def && (def->traits & trait) == trait;
+    return pd_mode_registry_has_trait(mode, trait);
 }
 
 bool pd_any_active_mode_has_trait(pd_mode_traits_t trait) {
@@ -179,12 +260,13 @@ static void pd_mode_enforce_exclusive_active_mode(pd_mode_mask_t keep_mode) {
 }
 
 void pd_mode_activate(pd_mode_mask_t mode) {
+    bool was_active = pd_mode_active(mode);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     bool was_any_mode_active = pd_any_mode_active();
 #endif
     pd_mode_enforce_exclusive_active_mode(mode);
 
-    if (!pd_mode_active(mode)) {
+    if (!was_active) {
         pd_mode_set(mode);
     }
 
@@ -198,12 +280,14 @@ void pd_mode_activate(pd_mode_mask_t mode) {
     } else {
         pd_mode_apply_active_dpi();
     }
-    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_OWNS_LEFT_GUI)) {
-        pinch_mode_register_command();
+
+    if (!was_active) {
+        pd_mode_run_activate_hooks(mode);
     }
 }
 
 void pd_mode_deactivate(pd_mode_mask_t mode) {
+    bool was_active = pd_mode_active(mode);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     bool was_any_mode_active = pd_any_mode_active();
 #endif
@@ -220,40 +304,39 @@ void pd_mode_deactivate(pd_mode_mask_t mode) {
         }
     }
 
-    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_OWNS_LEFT_GUI)) {
-        pinch_mode_unregister_command();
-    }
-
     if (pd_mode_has_trait(mode, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND)) {
         charybdis_set_pointer_dragscroll_enabled(false);
         // Charybdis restores normal pointer DPI via maybe_update_pointing_device_cpi().
     } else {
         pd_mode_apply_active_dpi();
     }
+
+    if (was_active) {
+        pd_mode_run_deactivate_hooks(mode);
+    }
 }
 
 void pd_mode_lock(pd_mode_mask_t mode) {
+    bool was_locked = pd_mode_locked(mode);
+
     pd_mode_enforce_exclusive_active_mode(mode);
 
-    if (!pd_mode_locked(mode)) {
+    if (!was_locked) {
         pd_mode_set_locked(mode);
     }
     pd_mode_activate(mode);
 
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)) {
-        scroll_mode_lock_attach_auto_mouse();
+    if (!was_locked) {
+        pd_mode_run_lock_hooks(mode);
     }
-#endif
 }
 
 void pd_mode_unlock(pd_mode_mask_t mode) {
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)) {
-        scroll_mode_lock_detach_auto_mouse();
+    if (!pd_mode_locked(mode)) {
+        return;
     }
-#endif
 
+    pd_mode_run_unlock_hooks(mode);
     pd_mode_clear_locked(mode);
     pd_mode_deactivate(mode);
 }

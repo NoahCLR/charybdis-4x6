@@ -472,6 +472,8 @@ Suggested shape:
 typedef struct {
     void (*on_activate)(pd_mode_mask_t mode);
     void (*on_deactivate)(pd_mode_mask_t mode);
+    void (*on_lock)(pd_mode_mask_t mode);
+    void (*on_unlock)(pd_mode_mask_t mode);
 } pd_mode_lifecycle_hooks_t;
 ```
 
@@ -479,6 +481,17 @@ That would keep future mode-specific auto-mouse, modifier, or side-effect
 rules from pushing more logic into
 [`pd_mode_registry.c`](../../users/noah/lib/pointing/pd_mode_registry.c) and
 [`pointer_layer_policy.c`](../../users/noah/lib/pointing/pointer_layer_policy.c).
+
+Status after this review pass:
+
+- implemented as an internal optional lifecycle-hook seam in
+  [`pd_mode_registry.c`](../../users/noah/lib/pointing/pd_mode_registry.c)
+- normal pd-mode additions still stay on the manifest-first path; standard
+  modes do not need extra runtime wiring
+- pinch mode's left-GUI ownership moved off a dedicated manifest trait and onto
+  lifecycle hooks
+- shared lock/unlock auto-mouse ownership now runs through the same lifecycle
+  surface while remaining trait-driven for common lockable modes
 
 Priority: medium.
 
