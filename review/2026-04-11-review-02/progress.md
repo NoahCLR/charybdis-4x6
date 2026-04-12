@@ -48,6 +48,82 @@ Verification result:
 - full host suite passed
 - firmware build passed
 
+## 2026-04-12 Multi-Scan Reducer Boundary Audit Coverage
+
+Completed in this pass:
+
+- Audited the remaining handled-key scan/release boundary for the same bug
+  class: one reducer mutating shared slot state early, then a later reducer
+  consuming that state on a subsequent scan as if it owned the transition.
+- Expanded the scenario suite in
+  [`tests/host/key_runtime_scenario_test.c`](../../tests/host/key_runtime_scenario_test.c)
+  so pending multi-tap paths are exercised with intermediate pre-threshold
+  scans instead of only single jump-to-threshold scans.
+- Added scenario coverage for:
+  - double-tap long-hold layer lock with an intermediate pre-threshold scan
+  - double-tap threshold hold registration with an intermediate pre-threshold
+    scan
+
+Why these tests matter:
+
+- they catch duplicate threshold dispatch caused by reducer-boundary leakage
+  even when the full thumb integration path is not in scope
+- they make the scan cadence explicit, which is where the earlier regression
+  escaped the simpler jump-in-time host tests
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- scenario coverage passed
+- synthetic thumb integration passed
+- real-profile thumb integration passed
+- full host suite passed
+- firmware build passed
+
+## 2026-04-12 Cross-Event Multi-Scan Regression Matrix
+
+Completed in this pass:
+
+- Expanded the handled-key scenario matrix so the main cross-event state
+  handoffs that still depend on shared slot mutation are exercised with real
+  intermediate scans instead of only jump-to-threshold timing.
+- Added scenario coverage in
+  [`tests/host/key_runtime_scenario_test.c`](../../tests/host/key_runtime_scenario_test.c)
+  for:
+  - interrupted layer-tap release after intermediate scans
+  - threshold hold followed by long-hold promotion across multiple scans
+  - repeat-while-held threshold activation plus release across multiple scans
+  - pd-mode quick tap with a pre-threshold scan
+  - pd-mode hold crossing the tap-hold threshold without spuriously toggling
+    the lock state
+
+Why this matrix matters:
+
+- the recent thumb bug was not about one specific key; it was about shared slot
+  state being seeded by one reducer path and later consumed by another on a
+  subsequent scan
+- these tests pin the remaining high-risk handoffs so future reducer changes
+  have to preserve scan-cadence behavior, not just final threshold outcomes
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- expanded scenario matrix passed
+- full host suite passed
+- firmware build passed
+
 ## 2026-04-11
 
 Completed in this pass:
