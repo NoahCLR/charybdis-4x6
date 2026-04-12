@@ -478,13 +478,13 @@ static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
     test_set_default_slot_key_pos(record.event.key);
 
     active_key = (active_key_state_t){
-        .timer                       = (uint16_t)(fake_time - 50),
-        .keycode                     = TEST_PD_MODE_KEY,
-        .key_pos                     = record.event.key,
-        .held_action_keycode         = TEST_PD_MODE_KEY,
-        .tap_hold_term               = 150,
-        .pd_mode_was_locked_on_press = true,
-        .hold =
+        .timer                                = (uint16_t)(fake_time - 50),
+        .owner.keycode                        = TEST_PD_MODE_KEY,
+        .owner.key_pos                        = record.event.key,
+        .lifecycle.held_action_keycode        = TEST_PD_MODE_KEY,
+        .timing.tap_hold_term                 = 150,
+        .lifecycle.pd_mode_was_locked_on_press = true,
+        .binding.hold =
             {
                 .present = true,
                 .action  = TEST_PD_MODE_KEY,
@@ -501,7 +501,7 @@ static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
     CHECK(plan.effects[0].data.key_pos.col == record.event.key.col);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_PD_MODE_LOCK_TAP);
     CHECK(plan.effects[1].data.pd_mode == PD_MODE_VOLUME);
-    CHECK(active_key.keycode == KC_NO);
+    CHECK(active_key.owner.keycode == KC_NO);
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 2);
@@ -518,13 +518,13 @@ static void test_quick_release_immediate_hold_unregisters_then_taps(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(record.event.key);
     active_key = (active_key_state_t){
-        .timer               = (uint16_t)(fake_time - 50),
-        .keycode             = TEST_NEW_KEY,
-        .key_pos             = record.event.key,
-        .held_action_keycode = TEST_IMMEDIATE_HOLD,
-        .tap_action          = TEST_FALLBACK_TAP_ACTION,
-        .tap_hold_term       = 150,
-        .hold =
+        .timer                         = (uint16_t)(fake_time - 50),
+        .owner.keycode                 = TEST_NEW_KEY,
+        .owner.key_pos                 = record.event.key,
+        .lifecycle.held_action_keycode = TEST_IMMEDIATE_HOLD,
+        .binding.tap_action            = TEST_FALLBACK_TAP_ACTION,
+        .timing.tap_hold_term          = 150,
+        .binding.hold =
             {
                 .present = true,
                 .action  = TEST_IMMEDIATE_HOLD,
@@ -541,7 +541,7 @@ static void test_quick_release_immediate_hold_unregisters_then_taps(void) {
     CHECK(plan.effects[0].data.key_pos.col == record.event.key.col);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
     CHECK(plan.effects[1].data.action == TEST_FALLBACK_TAP_ACTION);
-    CHECK(active_key.keycode == KC_NO);
+    CHECK(active_key.owner.keycode == KC_NO);
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 2);
@@ -564,11 +564,11 @@ static void test_modifier_multi_tap_first_tap_is_buffered(void) {
     CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), KC_RIGHT_ALT, press_record.event.key, key, false, &plan));
 
     CHECK(plan.count == 0);
-    CHECK(active_key.keycode == KC_RIGHT_ALT);
+    CHECK(active_key.owner.keycode == KC_RIGHT_ALT);
     CHECK(!key_runtime_slot_uses_implicit_hold(&active_key));
     CHECK(key_runtime_slot_uses_fallback_hold(&active_key));
-    CHECK(!active_key.hold.present);
-    CHECK(active_key.tap_action == KC_NO);
+    CHECK(!active_key.binding.hold.present);
+    CHECK(active_key.binding.tap_action == KC_NO);
 
     fake_time = (uint16_t)(fake_time + 50);
 
@@ -576,7 +576,7 @@ static void test_modifier_multi_tap_first_tap_is_buffered(void) {
     CHECK(key_runtime_transition_handled_key_release(KC_RIGHT_ALT, &release_record, key, &plan));
 
     CHECK(plan.count == 0);
-    CHECK(active_key.keycode == KC_NO);
+    CHECK(active_key.owner.keycode == KC_NO);
     CHECK(multi_tap.keycode == KC_RIGHT_ALT);
     CHECK(multi_tap.count == 1);
     CHECK(multi_tap.single_action == KC_NO);
@@ -597,8 +597,8 @@ static void test_single_tap_override_activates_fallback_hold_at_threshold(void) 
 
     CHECK(plan.count == 0);
     CHECK(key_runtime_slot_uses_fallback_hold(&active_key));
-    CHECK(active_key.tap_action == TEST_FALLBACK_TAP_ACTION);
-    CHECK(active_key.held_action_keycode == KC_NO);
+    CHECK(active_key.binding.tap_action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(active_key.lifecycle.held_action_keycode == KC_NO);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 10);
 
@@ -610,7 +610,7 @@ static void test_single_tap_override_activates_fallback_hold_at_threshold(void) 
     CHECK(plan.effects[0].data.held_action.key_pos.row == press_record.event.key.row);
     CHECK(plan.effects[0].data.held_action.key_pos.col == press_record.event.key.col);
     CHECK(plan.effects[0].data.held_action.action == KC_RIGHT_ALT);
-    CHECK(active_key.held_action_keycode == KC_RIGHT_ALT);
+    CHECK(active_key.lifecycle.held_action_keycode == KC_RIGHT_ALT);
     CHECK(key_runtime_slot_hold_is_complete(&active_key));
 }
 
@@ -633,7 +633,7 @@ static void test_single_tap_override_long_release_does_not_dispatch_tap(void) {
     CHECK(key_runtime_transition_handled_key_release(KC_RIGHT_ALT, &release_record, key, &plan));
 
     CHECK(plan.count == 0);
-    CHECK(active_key.keycode == KC_NO);
+    CHECK(active_key.owner.keycode == KC_NO);
     CHECK(test_call_count == 0);
 }
 
@@ -651,8 +651,8 @@ static void test_non_modifier_single_tap_override_activates_fallback_hold_at_thr
 
     CHECK(plan.count == 0);
     CHECK(key_runtime_slot_uses_fallback_hold(&active_key));
-    CHECK(active_key.tap_action == TEST_FALLBACK_TAP_ACTION);
-    CHECK(active_key.held_action_keycode == KC_NO);
+    CHECK(active_key.binding.tap_action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(active_key.lifecycle.held_action_keycode == KC_NO);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 10);
 
@@ -664,7 +664,7 @@ static void test_non_modifier_single_tap_override_activates_fallback_hold_at_thr
     CHECK(plan.effects[0].data.held_action.key_pos.row == press_record.event.key.row);
     CHECK(plan.effects[0].data.held_action.key_pos.col == press_record.event.key.col);
     CHECK(plan.effects[0].data.held_action.action == TEST_PLAIN_KEY);
-    CHECK(active_key.held_action_keycode == TEST_PLAIN_KEY);
+    CHECK(active_key.lifecycle.held_action_keycode == TEST_PLAIN_KEY);
     CHECK(key_runtime_slot_hold_is_complete(&active_key));
 }
 
@@ -674,10 +674,10 @@ static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(2, 2));
     active_key = (active_key_state_t){
-        .keycode       = TEST_PLAIN_KEY,
-        .key_pos       = test_keypos(2, 2),
-        .phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
-        .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
+        .owner.keycode           = TEST_PLAIN_KEY,
+        .owner.key_pos           = test_keypos(2, 2),
+        .lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+        .lifecycle.hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -685,10 +685,10 @@ static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
 
     CHECK(plan.count == 1);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
-    CHECK(plan.effects[0].data.held_action.key_pos.row == active_key.key_pos.row);
-    CHECK(plan.effects[0].data.held_action.key_pos.col == active_key.key_pos.col);
+    CHECK(plan.effects[0].data.held_action.key_pos.row == active_key.owner.key_pos.row);
+    CHECK(plan.effects[0].data.held_action.key_pos.col == active_key.owner.key_pos.col);
     CHECK(plan.effects[0].data.held_action.action == TEST_PLAIN_KEY);
-    CHECK(active_key.held_action_keycode == TEST_PLAIN_KEY);
+    CHECK(active_key.lifecycle.held_action_keycode == TEST_PLAIN_KEY);
     CHECK(key_runtime_slot_hold_is_complete(&active_key));
 
     key_runtime_transition_execute_plan(&plan);
@@ -703,15 +703,15 @@ static void test_interrupt_other_press_marks_layer_interrupted(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(2, 5));
     active_key = (active_key_state_t){
-        .keycode = LT(2, TEST_FALLBACK_TAP_ACTION),
-        .key_pos = test_keypos(2, 5),
+        .owner.keycode = LT(2, TEST_FALLBACK_TAP_ACTION),
+        .owner.key_pos = test_keypos(2, 5),
     };
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_interrupt_active_key_on_other_press(&plan);
 
     CHECK(plan.count == 0);
-    CHECK(active_key.layer_interrupted);
+    CHECK(active_key.lifecycle.layer_interrupted);
 }
 
 static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
@@ -748,7 +748,7 @@ static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
     CHECK(plan.effects[0].data.action == TEST_MULTI_STEP_ACTION);
     CHECK(multi_tap.keycode == KC_NO);
-    CHECK(active_key.keycode == KC_NO);
+    CHECK(active_key.owner.keycode == KC_NO);
 }
 
 static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
@@ -762,12 +762,12 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
     test_set_default_slot_key_pos(record.event.key);
 
     active_key = (active_key_state_t){
-        .timer             = (uint16_t)(fake_time - 30),
-        .keycode           = key.behavior.keycode,
-        .key_pos           = record.event.key,
-        .tap_action        = TEST_FALLBACK_TAP_ACTION,
-        .tap_hold_term     = 150,
-        .layer_interrupted = true,
+        .timer                       = (uint16_t)(fake_time - 30),
+        .owner.keycode               = key.behavior.keycode,
+        .owner.key_pos               = record.event.key,
+        .binding.tap_action          = TEST_FALLBACK_TAP_ACTION,
+        .timing.tap_hold_term        = 150,
+        .lifecycle.layer_interrupted = true,
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -777,7 +777,7 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE);
     CHECK(plan.effects[0].data.key_pos.row == record.event.key.row);
     CHECK(plan.effects[0].data.key_pos.col == record.event.key.col);
-    CHECK(active_key.keycode == KC_NO);
+    CHECK(active_key.owner.keycode == KC_NO);
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 1);
@@ -794,14 +794,14 @@ static void test_release_hold_prefers_long_hold_after_longer_term(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(record.event.key);
     active_key = (active_key_state_t){
-        .timer            = (uint16_t)(fake_time - 260),
-        .keycode          = TEST_NEW_KEY,
-        .key_pos          = record.event.key,
-        .tap_action       = TEST_FALLBACK_TAP_ACTION,
-        .tap_hold_term    = 120,
-        .longer_hold_term = 240,
-        .hold             = TAP_ON_RELEASE_AFTER_HOLD(TEST_THRESHOLD_HOLD),
-        .long_hold        = TAP_ON_RELEASE_AFTER_HOLD(TEST_MULTI_STEP_ACTION),
+        .timer                    = (uint16_t)(fake_time - 260),
+        .owner.keycode            = TEST_NEW_KEY,
+        .owner.key_pos            = record.event.key,
+        .binding.tap_action       = TEST_FALLBACK_TAP_ACTION,
+        .timing.tap_hold_term     = 120,
+        .timing.longer_hold_term  = 240,
+        .binding.hold             = TAP_ON_RELEASE_AFTER_HOLD(TEST_THRESHOLD_HOLD),
+        .binding.long_hold        = TAP_ON_RELEASE_AFTER_HOLD(TEST_MULTI_STEP_ACTION),
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -820,13 +820,13 @@ static void test_release_repeat_hold_releases_owned_state(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(record.event.key);
     active_key = (active_key_state_t){
-        .timer                 = (uint16_t)(fake_time - 160),
-        .keycode               = TEST_NEW_KEY,
-        .key_pos               = record.event.key,
-        .tap_hold_term         = 120,
-        .phase                 = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-        .repeat_binding_active = true,
-        .hold                  = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
+        .timer                           = (uint16_t)(fake_time - 160),
+        .owner.keycode                   = TEST_NEW_KEY,
+        .owner.key_pos                   = record.event.key,
+        .timing.tap_hold_term            = 120,
+        .lifecycle.phase                 = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+        .lifecycle.repeat_binding_active = true,
+        .binding.hold                    = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -850,8 +850,8 @@ static void test_mismatched_release_releases_owned_held_action(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(7, 6));
     active_key = (active_key_state_t){
-        .keycode = TEST_NEW_KEY,
-        .key_pos = test_keypos(7, 6),
+        .owner.keycode = TEST_NEW_KEY,
+        .owner.key_pos = test_keypos(7, 6),
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -890,12 +890,12 @@ static void test_press_on_different_position_preserves_existing_active_state(voi
     CHECK(plan.count == 1);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
     CHECK(plan.effects[0].data.held_action.action == TEST_IMMEDIATE_HOLD);
-    CHECK(active_key.keycode == TEST_PREVIOUS_KEY);
-    CHECK(active_key.tap_action == TEST_PREVIOUS_TAP_ACTION);
-    CHECK(new_slot->keycode == TEST_NEW_KEY);
-    CHECK(new_slot->key_pos.row == record.event.key.row);
-    CHECK(new_slot->key_pos.col == record.event.key.col);
-    CHECK(new_slot->held_action_keycode == TEST_IMMEDIATE_HOLD);
+    CHECK(active_key.owner.keycode == TEST_PREVIOUS_KEY);
+    CHECK(active_key.binding.tap_action == TEST_PREVIOUS_TAP_ACTION);
+    CHECK(new_slot->owner.keycode == TEST_NEW_KEY);
+    CHECK(new_slot->owner.key_pos.row == record.event.key.row);
+    CHECK(new_slot->owner.key_pos.col == record.event.key.col);
+    CHECK(new_slot->lifecycle.held_action_keycode == TEST_IMMEDIATE_HOLD);
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 1);
@@ -913,12 +913,12 @@ static void test_press_on_third_position_keeps_existing_positions_active(void) {
     test_reset_stubs();
     active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
     *other_slot = (active_key_state_t){
-        .timer              = fake_time,
-        .keycode            = TEST_PLAIN_KEY,
-        .key_pos            = test_keypos(0, 2),
-        .phase              = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-        .tap_action         = TEST_FALLBACK_TAP_ACTION,
-        .held_action_keycode = TEST_PLAIN_KEY,
+        .timer                         = fake_time,
+        .owner.keycode                 = TEST_PLAIN_KEY,
+        .owner.key_pos                 = test_keypos(0, 2),
+        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+        .binding.tap_action            = TEST_FALLBACK_TAP_ACTION,
+        .lifecycle.held_action_keycode = TEST_PLAIN_KEY,
     };
 
     key.behavior.single.hold = (hold_behavior_t){
@@ -933,12 +933,12 @@ static void test_press_on_third_position_keeps_existing_positions_active(void) {
     CHECK(plan.count == 1);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
     CHECK(plan.effects[0].data.held_action.action == TEST_IMMEDIATE_HOLD);
-    CHECK(active_key.keycode == TEST_PREVIOUS_KEY);
-    CHECK(other_slot->keycode == TEST_PLAIN_KEY);
-    CHECK(new_slot->keycode == TEST_NEW_KEY);
-    CHECK(new_slot->key_pos.row == record.event.key.row);
-    CHECK(new_slot->key_pos.col == record.event.key.col);
-    CHECK(new_slot->held_action_keycode == TEST_IMMEDIATE_HOLD);
+    CHECK(active_key.owner.keycode == TEST_PREVIOUS_KEY);
+    CHECK(other_slot->owner.keycode == TEST_PLAIN_KEY);
+    CHECK(new_slot->owner.keycode == TEST_NEW_KEY);
+    CHECK(new_slot->owner.key_pos.row == record.event.key.row);
+    CHECK(new_slot->owner.key_pos.col == record.event.key.col);
+    CHECK(new_slot->lifecycle.held_action_keycode == TEST_IMMEDIATE_HOLD);
 
     key_runtime_transition_execute_plan(&plan);
     CHECK(test_call_count == 1);
@@ -955,11 +955,11 @@ static void test_release_on_other_position_leaves_existing_position_active(void)
     test_reset_stubs();
     active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
     *released_slot = (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 40),
-        .keycode       = TEST_NEW_KEY,
-        .key_pos       = record.event.key,
-        .tap_action    = TEST_FALLBACK_TAP_ACTION,
-        .tap_hold_term = 120,
+        .timer                   = (uint16_t)(fake_time - 40),
+        .owner.keycode           = TEST_NEW_KEY,
+        .owner.key_pos           = record.event.key,
+        .binding.tap_action      = TEST_FALLBACK_TAP_ACTION,
+        .timing.tap_hold_term    = 120,
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -968,8 +968,8 @@ static void test_release_on_other_position_leaves_existing_position_active(void)
     CHECK(plan.count == 1);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
     CHECK(plan.effects[0].data.action == TEST_FALLBACK_TAP_ACTION);
-    CHECK(active_key.keycode == TEST_PREVIOUS_KEY);
-    CHECK(released_slot->keycode == KC_NO);
+    CHECK(active_key.owner.keycode == TEST_PREVIOUS_KEY);
+    CHECK(released_slot->owner.keycode == KC_NO);
 }
 
 static void test_release_on_other_position_starts_independent_multi_tap_chain(void) {
@@ -988,19 +988,19 @@ static void test_release_on_other_position_starts_independent_multi_tap_chain(vo
         .single_action = TEST_PREVIOUS_TAP_ACTION,
     };
     *released_slot = (active_key_state_t){
-        .timer          = (uint16_t)(fake_time - 40),
-        .keycode        = TEST_MULTI_TAP_KEY,
-        .key_pos        = record.event.key,
-        .tap_action     = TEST_FALLBACK_TAP_ACTION,
-        .tap_hold_term  = 120,
-        .multi_tap_term = 150,
+        .timer                   = (uint16_t)(fake_time - 40),
+        .owner.keycode           = TEST_MULTI_TAP_KEY,
+        .owner.key_pos           = record.event.key,
+        .binding.tap_action      = TEST_FALLBACK_TAP_ACTION,
+        .timing.tap_hold_term    = 120,
+        .timing.multi_tap_term   = 150,
     };
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_MULTI_TAP_KEY, &record, key, &plan));
 
     CHECK(plan.count == 0);
-    CHECK(released_slot->keycode == KC_NO);
+    CHECK(released_slot->owner.keycode == KC_NO);
     CHECK(previous_chain->keycode == TEST_MULTI_TAP_KEY);
     CHECK(previous_chain->count == 1);
     CHECK(released_slot->pending_multi_tap.keycode == TEST_MULTI_TAP_KEY);
@@ -1038,9 +1038,9 @@ static void test_press_on_new_position_preserves_existing_pending_multi_tap(void
     CHECK(plan.count == 1);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
     CHECK(plan.effects[0].data.held_action.action == TEST_IMMEDIATE_HOLD);
-    CHECK(active_key.keycode == TEST_PREVIOUS_KEY);
-    CHECK(new_slot->keycode == TEST_NEW_KEY);
-    CHECK(new_slot->held_action_keycode == TEST_IMMEDIATE_HOLD);
+    CHECK(active_key.owner.keycode == TEST_PREVIOUS_KEY);
+    CHECK(new_slot->owner.keycode == TEST_NEW_KEY);
+    CHECK(new_slot->lifecycle.held_action_keycode == TEST_IMMEDIATE_HOLD);
     CHECK(pending_slot_multi_tap->keycode == TEST_MULTI_TAP_KEY);
     CHECK(pending_slot_multi_tap->single_action == TEST_FALLBACK_TAP_ACTION);
 }
@@ -1052,17 +1052,17 @@ static void test_scan_fires_hold_for_independent_position_slot(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(1, 1));
     active_key = (active_key_state_t){
-        .timer   = fake_time,
-        .keycode = TEST_PREVIOUS_KEY,
-        .key_pos = test_keypos(1, 1),
-        .phase   = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+        .timer             = fake_time,
+        .owner.keycode     = TEST_PREVIOUS_KEY,
+        .owner.key_pos     = test_keypos(1, 1),
+        .lifecycle.phase   = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
     };
     *other_slot = (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 170),
-        .keycode       = TEST_NEW_KEY,
-        .key_pos       = test_keypos(6, 3),
-        .tap_hold_term = 120,
-        .hold          = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
+        .timer                   = (uint16_t)(fake_time - 170),
+        .owner.keycode           = TEST_NEW_KEY,
+        .owner.key_pos           = test_keypos(6, 3),
+        .timing.tap_hold_term    = 120,
+        .binding.hold            = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -1070,10 +1070,10 @@ static void test_scan_fires_hold_for_independent_position_slot(void) {
 
     CHECK(plan.count == 2);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START);
-    CHECK(plan.effects[0].data.repeat.key_pos.row == other_slot->key_pos.row);
-    CHECK(plan.effects[0].data.repeat.key_pos.col == other_slot->key_pos.col);
+    CHECK(plan.effects[0].data.repeat.key_pos.row == other_slot->owner.key_pos.row);
+    CHECK(plan.effects[0].data.repeat.key_pos.col == other_slot->owner.key_pos.col);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
-    CHECK(other_slot->repeat_binding_active);
+    CHECK(other_slot->lifecycle.repeat_binding_active);
     CHECK(key_runtime_slot_hold_is_complete(other_slot));
 }
 
@@ -1085,11 +1085,11 @@ static void test_release_pending_multi_tap_hold_registers_then_unregisters_held_
     test_reset_stubs();
     test_set_default_slot_key_pos(record.event.key);
     active_key = (active_key_state_t){
-        .timer            = (uint16_t)(fake_time - 200),
-        .keycode          = TEST_MULTI_TAP_KEY,
-        .key_pos          = record.event.key,
-        .tap_hold_term    = 120,
-        .longer_hold_term = 240,
+        .timer                    = (uint16_t)(fake_time - 200),
+        .owner.keycode            = TEST_MULTI_TAP_KEY,
+        .owner.key_pos            = record.event.key,
+        .timing.tap_hold_term     = 120,
+        .timing.longer_hold_term  = 240,
     };
 
     multi_tap = (multi_tap_t){
@@ -1115,7 +1115,7 @@ static void test_release_pending_multi_tap_hold_registers_then_unregisters_held_
     CHECK(plan.effects[1].data.held_action.key_pos.row == record.event.key.row);
     CHECK(plan.effects[1].data.held_action.key_pos.col == record.event.key.col);
     CHECK(plan.effects[1].data.held_action.action == TEST_MULTI_TAP_HOLD);
-    CHECK(active_key.keycode == KC_NO);
+    CHECK(active_key.owner.keycode == KC_NO);
     CHECK(multi_tap.keycode == KC_NO);
     CHECK(multi_tap.count == 0);
 
@@ -1155,11 +1155,11 @@ static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_laye
     test_set_default_slot_key_pos(record.event.key);
 
     active_key = (active_key_state_t){
-        .timer            = (uint16_t)(fake_time - 50),
-        .keycode          = MO(2),
-        .key_pos          = record.event.key,
-        .tap_hold_term    = 120,
-        .longer_hold_term = 240,
+        .timer                   = (uint16_t)(fake_time - 50),
+        .owner.keycode           = MO(2),
+        .owner.key_pos           = record.event.key,
+        .timing.tap_hold_term    = 120,
+        .timing.longer_hold_term = 240,
     };
 
     multi_tap = (multi_tap_t){
@@ -1180,7 +1180,7 @@ static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_laye
 
     CHECK(release_plan.count == 1);
     CHECK(release_plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE);
-    CHECK(active_key.keycode == KC_NO);
+    CHECK(active_key.owner.keycode == KC_NO);
     CHECK(multi_tap.keycode == MO(2));
     CHECK(multi_tap.count == 2);
     CHECK(!multi_tap.pending_hold);
@@ -1202,11 +1202,11 @@ static void test_scan_promotes_pending_multi_tap_hold(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(6, 2));
     active_key = (active_key_state_t){
-        .timer            = (uint16_t)(fake_time - 200),
-        .keycode          = TEST_MULTI_TAP_KEY,
-        .key_pos          = test_keypos(6, 2),
-        .tap_hold_term    = 120,
-        .longer_hold_term = 240,
+        .timer                   = (uint16_t)(fake_time - 200),
+        .owner.keycode           = TEST_MULTI_TAP_KEY,
+        .owner.key_pos           = test_keypos(6, 2),
+        .timing.tap_hold_term    = 120,
+        .timing.longer_hold_term = 240,
     };
 
     multi_tap = (multi_tap_t){
@@ -1226,7 +1226,7 @@ static void test_scan_promotes_pending_multi_tap_hold(void) {
     CHECK(plan.count == 1);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER);
     CHECK(plan.effects[0].data.held_action.action == TEST_MULTI_TAP_HOLD);
-    CHECK(active_key.held_action_keycode == TEST_MULTI_TAP_HOLD);
+    CHECK(active_key.lifecycle.held_action_keycode == TEST_MULTI_TAP_HOLD);
     CHECK(key_runtime_slot_hold_is_complete(&active_key));
     CHECK(multi_tap.keycode == KC_NO);
     CHECK(multi_tap.count == 0);
@@ -1263,11 +1263,11 @@ static void test_scan_starts_repeat_hold_at_threshold(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(6, 3));
     active_key = (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 170),
-        .keycode       = TEST_NEW_KEY,
-        .key_pos       = test_keypos(6, 3),
-        .tap_hold_term = 120,
-        .hold          = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
+        .timer                   = (uint16_t)(fake_time - 170),
+        .owner.keycode           = TEST_NEW_KEY,
+        .owner.key_pos           = test_keypos(6, 3),
+        .timing.tap_hold_term    = 120,
+        .binding.hold            = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -1275,13 +1275,13 @@ static void test_scan_starts_repeat_hold_at_threshold(void) {
 
     CHECK(plan.count == 2);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START);
-    CHECK(plan.effects[0].data.repeat.key_pos.row == active_key.key_pos.row);
-    CHECK(plan.effects[0].data.repeat.key_pos.col == active_key.key_pos.col);
+    CHECK(plan.effects[0].data.repeat.key_pos.row == active_key.owner.key_pos.row);
+    CHECK(plan.effects[0].data.repeat.key_pos.col == active_key.owner.key_pos.col);
     CHECK(plan.effects[0].data.repeat.action == TEST_THRESHOLD_HOLD);
     CHECK(plan.effects[0].data.repeat.repeat_hz == 25);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
     CHECK(!plan.effects[1].data.long_hold_level);
-    CHECK(active_key.repeat_binding_active);
+    CHECK(active_key.lifecycle.repeat_binding_active);
     CHECK(key_runtime_slot_hold_is_complete(&active_key));
 
     key_runtime_transition_execute_plan(&plan);
@@ -1297,13 +1297,13 @@ static void test_scan_commits_immediate_hold_threshold_with_feedback(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(5, 0));
     active_key = (active_key_state_t){
-        .timer               = (uint16_t)(fake_time - 170),
-        .keycode             = TEST_NEW_KEY,
-        .key_pos             = test_keypos(5, 0),
-        .phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
-        .held_action_keycode = TEST_IMMEDIATE_HOLD,
-        .tap_hold_term       = 120,
-        .hold =
+        .timer                         = (uint16_t)(fake_time - 170),
+        .owner.keycode                 = TEST_NEW_KEY,
+        .owner.key_pos                 = test_keypos(5, 0),
+        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+        .lifecycle.held_action_keycode = TEST_IMMEDIATE_HOLD,
+        .timing.tap_hold_term          = 120,
+        .binding.hold                  =
             {
                 .present = true,
                 .action  = TEST_IMMEDIATE_HOLD,
@@ -1331,14 +1331,14 @@ static void test_scan_commits_implicit_hold_without_feedback(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(5, 1));
     active_key = (active_key_state_t){
-        .timer               = (uint16_t)(fake_time - 170),
-        .keycode             = TEST_PD_MODE_KEY,
-        .key_pos             = test_keypos(5, 1),
-        .phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
-        .held_action_keycode = TEST_PD_MODE_KEY,
-        .tap_hold_term       = 120,
-        .hold_strategy       = KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT,
-        .hold =
+        .timer                         = (uint16_t)(fake_time - 170),
+        .owner.keycode                 = TEST_PD_MODE_KEY,
+        .owner.key_pos                 = test_keypos(5, 1),
+        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+        .lifecycle.held_action_keycode = TEST_PD_MODE_KEY,
+        .timing.tap_hold_term          = 120,
+        .lifecycle.hold_strategy       = KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT,
+        .binding.hold                  =
             {
                 .present = true,
                 .action  = TEST_PD_MODE_KEY,
@@ -1360,15 +1360,15 @@ static void test_scan_promotes_to_long_hold_and_replaces_held_action(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(3, 0));
     active_key = (active_key_state_t){
-        .timer               = (uint16_t)(fake_time - 260),
-        .keycode             = TEST_NEW_KEY,
-        .key_pos             = test_keypos(3, 0),
-        .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
-        .held_action_keycode = TEST_THRESHOLD_HOLD,
-        .tap_hold_term       = 120,
-        .longer_hold_term    = 240,
-        .hold                = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_THRESHOLD_HOLD),
-        .long_hold           = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION),
+        .timer                         = (uint16_t)(fake_time - 260),
+        .owner.keycode                 = TEST_NEW_KEY,
+        .owner.key_pos                 = test_keypos(3, 0),
+        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
+        .lifecycle.held_action_keycode = TEST_THRESHOLD_HOLD,
+        .timing.tap_hold_term          = 120,
+        .timing.longer_hold_term       = 240,
+        .binding.hold                  = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_THRESHOLD_HOLD),
+        .binding.long_hold             = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION),
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -1376,13 +1376,13 @@ static void test_scan_promotes_to_long_hold_and_replaces_held_action(void) {
 
     CHECK(plan.count == 3);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
-    CHECK(plan.effects[0].data.key_pos.row == active_key.key_pos.row);
-    CHECK(plan.effects[0].data.key_pos.col == active_key.key_pos.col);
+    CHECK(plan.effects[0].data.key_pos.row == active_key.owner.key_pos.row);
+    CHECK(plan.effects[0].data.key_pos.col == active_key.owner.key_pos.col);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
     CHECK(plan.effects[1].data.action == TEST_MULTI_STEP_ACTION);
     CHECK(plan.effects[2].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
     CHECK(plan.effects[2].data.long_hold_level);
-    CHECK(active_key.held_action_keycode == KC_NO);
+    CHECK(active_key.lifecycle.held_action_keycode == KC_NO);
     CHECK(key_runtime_slot_hold_is_complete(&active_key));
 
     key_runtime_transition_execute_plan(&plan);
@@ -1400,15 +1400,15 @@ static void test_scan_promotes_repeat_hold_to_long_hold(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(3, 1));
     active_key = (active_key_state_t){
-        .timer                 = (uint16_t)(fake_time - 260),
-        .keycode               = TEST_NEW_KEY,
-        .key_pos               = test_keypos(3, 1),
-        .phase                 = KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
-        .tap_hold_term         = 120,
-        .longer_hold_term      = 240,
-        .repeat_binding_active = true,
-        .hold                  = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
-        .long_hold             = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION),
+        .timer                           = (uint16_t)(fake_time - 260),
+        .owner.keycode                   = TEST_NEW_KEY,
+        .owner.key_pos                   = test_keypos(3, 1),
+        .lifecycle.phase                 = KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
+        .timing.tap_hold_term            = 120,
+        .timing.longer_hold_term         = 240,
+        .lifecycle.repeat_binding_active = true,
+        .binding.hold                    = REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25),
+        .binding.long_hold               = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION),
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -1416,13 +1416,13 @@ static void test_scan_promotes_repeat_hold_to_long_hold(void) {
 
     CHECK(plan.count == 3);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
-    CHECK(plan.effects[0].data.key_pos.row == active_key.key_pos.row);
-    CHECK(plan.effects[0].data.key_pos.col == active_key.key_pos.col);
+    CHECK(plan.effects[0].data.key_pos.row == active_key.owner.key_pos.row);
+    CHECK(plan.effects[0].data.key_pos.col == active_key.owner.key_pos.col);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
     CHECK(plan.effects[1].data.action == TEST_MULTI_STEP_ACTION);
     CHECK(plan.effects[2].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);
     CHECK(plan.effects[2].data.long_hold_level);
-    CHECK(!active_key.repeat_binding_active);
+    CHECK(!active_key.lifecycle.repeat_binding_active);
     CHECK(key_runtime_slot_hold_is_complete(&active_key));
 
     key_runtime_transition_execute_plan(&plan);
@@ -1440,16 +1440,16 @@ static void test_scan_pending_multi_tap_long_hold_releases_layer_before_lock(voi
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(6, 5));
     active_key = (active_key_state_t){
-        .timer            = (uint16_t)(fake_time - 260),
-        .keycode          = LT(1, TEST_FALLBACK_TAP_ACTION),
-        .key_pos          = test_keypos(6, 5),
-        .tap_hold_term    = 120,
-        .longer_hold_term = 240,
+        .timer                   = (uint16_t)(fake_time - 260),
+        .owner.keycode           = LT(1, TEST_FALLBACK_TAP_ACTION),
+        .owner.key_pos           = test_keypos(6, 5),
+        .timing.tap_hold_term    = 120,
+        .timing.longer_hold_term = 240,
     };
 
     multi_tap = (multi_tap_t){
         .keycode       = TEST_MULTI_TAP_KEY,
-        .key_pos       = active_key.key_pos,
+        .key_pos       = active_key.owner.key_pos,
         .timer         = (uint16_t)(fake_time - 250),
         .count         = 2,
         .pending_hold  = true,
@@ -1463,8 +1463,8 @@ static void test_scan_pending_multi_tap_long_hold_releases_layer_before_lock(voi
 
     CHECK(plan.count == 3);
     CHECK(plan.effects[0].kind == KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE);
-    CHECK(plan.effects[0].data.key_pos.row == active_key.key_pos.row);
-    CHECK(plan.effects[0].data.key_pos.col == active_key.key_pos.col);
+    CHECK(plan.effects[0].data.key_pos.row == active_key.owner.key_pos.row);
+    CHECK(plan.effects[0].data.key_pos.col == active_key.owner.key_pos.col);
     CHECK(plan.effects[1].kind == KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION);
     CHECK(plan.effects[1].data.action == TEST_LAYER_LOCK_ACTION);
     CHECK(plan.effects[2].kind == KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE);

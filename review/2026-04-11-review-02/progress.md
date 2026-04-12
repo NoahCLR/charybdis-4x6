@@ -199,6 +199,71 @@ Verification result:
 - full host suite passed
 - firmware build passed
 
+## 2026-04-12 Grouped Fixture Migration And Release/Scan Reducer Split
+
+Completed in this pass:
+
+- Removed the temporary flat handled-key slot compatibility overlay from
+  [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h),
+  so tests and production now both use the grouped `owner`, `lifecycle`,
+  `binding`, and `timing` slot model.
+- Migrated the host runtime fixtures that still depended on flat slot fields to
+  the grouped model, including:
+  - [`tests/host/key_runtime_feedback_test.c`](../../tests/host/key_runtime_feedback_test.c)
+  - [`tests/host/key_runtime_slot_test.c`](../../tests/host/key_runtime_slot_test.c)
+  - [`tests/host/key_runtime_transition_test.c`](../../tests/host/key_runtime_transition_test.c)
+  - [`tests/host/key_runtime_admission_test.c`](../../tests/host/key_runtime_admission_test.c)
+  - [`tests/host/key_runtime_preflight_test.c`](../../tests/host/key_runtime_preflight_test.c)
+  - [`tests/host/key_runtime_scenario_test.c`](../../tests/host/key_runtime_scenario_test.c)
+  - [`tests/host/key_runtime_modifier_hold_integration_test.c`](../../tests/host/key_runtime_modifier_hold_integration_test.c)
+  - [`tests/host/pd_mode_key_runtime_integration_test.c`](../../tests/host/pd_mode_key_runtime_integration_test.c)
+- Split active release into a dedicated internal reducer module:
+  - [`users/noah/lib/key/key_runtime_slot_release_reduce.h`](../../users/noah/lib/key/key_runtime_slot_release_reduce.h)
+  - [`users/noah/lib/key/key_runtime_slot_release_reduce.c`](../../users/noah/lib/key/key_runtime_slot_release_reduce.c)
+- Split active scan into a dedicated internal reducer module:
+  - [`users/noah/lib/key/key_runtime_slot_scan_reduce.h`](../../users/noah/lib/key/key_runtime_slot_scan_reduce.h)
+  - [`users/noah/lib/key/key_runtime_slot_scan_reduce.c`](../../users/noah/lib/key/key_runtime_slot_scan_reduce.c)
+- Reduced
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  to the handled-press reducer, interrupt/flush handling, and top-level slot
+  event dispatch. The main slot-step file now reads more like an event router
+  plus one event-family reducer instead of holding the full release and scan
+  families too.
+- Updated the canonical userspace source manifest in
+  [`users/noah/source_manifest.mk`](../../users/noah/source_manifest.mk) and
+  the affected host runners so the new internal reducer modules participate in
+  both firmware builds and host-only link steps.
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the grouped-only slot model and the new internal
+  release/scan reducer boundaries.
+
+Why this pass landed now:
+
+- it finishes the slot-state surface cleanup instead of leaving tests on a
+  different compatibility model than production
+- it shrinks the main reducer file without reopening public contracts or the
+  handled-key storage model
+- it leaves the remaining handled-key work focused on reducer/FSM shape and the
+  breadth of the slot record itself
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Verification result:
+
+- targeted slot, transition, feedback, admission, preflight, scenario,
+  integration, and compile-gate checks passed
+
 ## 2026-04-12 Test-Only Overlay And Internal Slot Policy Split
 
 Completed in this pass:

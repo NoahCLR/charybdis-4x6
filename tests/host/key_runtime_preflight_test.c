@@ -247,8 +247,8 @@ static void test_active_handled_release_bypasses_modifier_suppression(void) {
     test_reset_state();
     suppress_default   = true;
     test_set_active_slot_key_pos(record.event.key);
-    active_key.keycode = KC_RIGHT_ALT;
-    active_key.key_pos = record.event.key;
+    active_key.owner.keycode = KC_RIGHT_ALT;
+    active_key.owner.key_pos = record.event.key;
 
     CHECK(key_runtime_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
@@ -261,8 +261,8 @@ static void test_unrelated_release_stays_suppressed(void) {
     test_reset_state();
     suppress_default   = true;
     test_set_active_slot_key_pos(stored);
-    active_key.keycode = KC_RIGHT_ALT;
-    active_key.key_pos = stored;
+    active_key.owner.keycode = KC_RIGHT_ALT;
+    active_key.owner.key_pos = stored;
 
     CHECK(!key_runtime_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
@@ -276,8 +276,8 @@ static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
     suppress_default       = true;
     handled_key_is_handled = true;
     test_set_active_slot_key_pos(stored);
-    active_key.keycode     = KC_LEFT_CTRL;
-    active_key.key_pos     = stored;
+    active_key.owner.keycode = KC_LEFT_CTRL;
+    active_key.owner.key_pos = stored;
 
     CHECK(key_runtime_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
@@ -289,10 +289,10 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
 
     test_reset_state();
     test_set_active_slot_key_pos(stored);
-    active_key.keycode        = KC_RIGHT_ALT;
-    active_key.key_pos        = stored;
-    active_key.phase          = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
-    active_key.hold_strategy  = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
+    active_key.owner.keycode           = KC_RIGHT_ALT;
+    active_key.owner.key_pos           = stored;
+    active_key.lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
+    active_key.lifecycle.hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
 
     CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(tracked_physical_event);

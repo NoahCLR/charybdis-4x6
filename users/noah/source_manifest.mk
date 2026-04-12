@@ -18,7 +18,9 @@ NOAH_COMMON_SOURCES := \
     lib/key/key_runtime_admission.c \
     lib/key/key_runtime_slot_policy.c \
     lib/key/key_runtime_slot_pending_multi_tap.c \
+    lib/key/key_runtime_slot_release_reduce.c \
     lib/key/key_runtime_slot_result.c \
+    lib/key/key_runtime_slot_scan_reduce.c \
     lib/key/key_runtime_slot_step.c \
     lib/key/key_runtime_slot.c \
     lib/key/key_runtime_preflight.c \

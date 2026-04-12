@@ -179,8 +179,8 @@ static void test_press_on_other_position_preserves_pending_multi_tap_before_new_
     CHECK(key_runtime_scenario_effect_at(0)->key_pos.row == 1);
     CHECK(key_runtime_scenario_effect_at(0)->key_pos.col == 2);
     CHECK(key_runtime_slot_has_pending_multi_tap(test_slot_state(1, 1)));
-    CHECK(test_slot_state(1, 2)->keycode == MO(2));
-    CHECK(test_slot_state(1, 3)->keycode == TEST_HOLD_KEY_TWO);
+    CHECK(test_slot_state(1, 2)->owner.keycode == MO(2));
+    CHECK(test_slot_state(1, 3)->owner.keycode == TEST_HOLD_KEY_TWO);
 }
 
 static void test_interrupt_other_press_activates_fallback_hold(void) {
@@ -198,7 +198,7 @@ static void test_interrupt_other_press_activates_fallback_hold(void) {
     CHECK(key_runtime_scenario_effect_at(0)->action == TEST_FALLBACK_KEY);
     CHECK(key_runtime_scenario_effect_at(0)->key_pos.row == 0);
     CHECK(key_runtime_scenario_effect_at(0)->key_pos.col == 0);
-    CHECK(test_slot_state(0, 0)->held_action_keycode == TEST_FALLBACK_KEY);
+    CHECK(test_slot_state(0, 0)->lifecycle.held_action_keycode == TEST_FALLBACK_KEY);
     CHECK(key_runtime_slot_hold_is_complete(test_slot_state(0, 0)));
 }
 
@@ -228,7 +228,7 @@ static void test_immediate_hold_promotes_long_hold_after_registration(void) {
     CHECK(key_runtime_scenario_effect_at(4)->kind == KEY_RUNTIME_SCENARIO_EFFECT_FEEDBACK_PULSE);
     CHECK(key_runtime_scenario_effect_at(4)->long_hold_level);
     CHECK(key_runtime_slot_hold_is_complete(test_slot_state(0, 3)));
-    CHECK(test_slot_state(0, 3)->held_action_keycode == KC_NO);
+    CHECK(test_slot_state(0, 3)->lifecycle.held_action_keycode == KC_NO);
 }
 
 static void test_third_press_preserves_existing_positions_and_uses_its_own_slot(void) {
@@ -251,9 +251,9 @@ static void test_third_press_preserves_existing_positions_and_uses_its_own_slot(
     CHECK(key_runtime_scenario_effect_at(1)->action == TEST_HOLD_ACTION_TWO);
     CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_SCENARIO_EFFECT_HELD_REGISTER);
     CHECK(key_runtime_scenario_effect_at(2)->action == TEST_HOLD_ACTION_THREE);
-    CHECK(test_slot_state(2, 0)->keycode == TEST_HOLD_KEY);
-    CHECK(test_slot_state(2, 1)->keycode == TEST_HOLD_KEY_TWO);
-    CHECK(test_slot_state(2, 2)->keycode == TEST_HOLD_KEY_THREE);
+    CHECK(test_slot_state(2, 0)->owner.keycode == TEST_HOLD_KEY);
+    CHECK(test_slot_state(2, 1)->owner.keycode == TEST_HOLD_KEY_TWO);
+    CHECK(test_slot_state(2, 2)->owner.keycode == TEST_HOLD_KEY_THREE);
 }
 
 int main(void) {

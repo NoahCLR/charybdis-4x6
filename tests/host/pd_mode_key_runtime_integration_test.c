@@ -357,8 +357,8 @@ static void test_plain_pd_mode_key_activates_and_deactivates_through_process_rec
     CHECK(pd_mode_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_active(PD_MODE_VOLUME));
     CHECK(pd_mode_locked_snapshot() == 0);
-    CHECK(slot->keycode == VOLUME_MODE);
-    CHECK(slot->held_action_keycode == VOLUME_MODE);
+    CHECK(slot->owner.keycode == VOLUME_MODE);
+    CHECK(slot->lifecycle.held_action_keycode == VOLUME_MODE);
     CHECK(split_sync_count >= 1);
 
     fake_time += 10;
@@ -367,8 +367,8 @@ static void test_plain_pd_mode_key_activates_and_deactivates_through_process_rec
     CHECK(pd_mode_active_snapshot() == 0);
     CHECK(!pd_mode_active(PD_MODE_VOLUME));
     CHECK(pd_mode_locked_snapshot() == 0);
-    CHECK(slot->keycode == KC_NO);
-    CHECK(slot->held_action_keycode == KC_NO);
+    CHECK(slot->owner.keycode == KC_NO);
+    CHECK(slot->lifecycle.held_action_keycode == KC_NO);
     CHECK(reset_volume_count == 1);
     CHECK(current_cpi == default_dpi);
 }

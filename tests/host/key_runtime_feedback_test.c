@@ -147,8 +147,8 @@ static void test_non_passthrough_held_action_flashes(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode             = KC_RIGHT_ALT,
-        .held_action_keycode = SAFE_RANGE + 1,
+        .owner.keycode                 = KC_RIGHT_ALT,
+        .lifecycle.held_action_keycode = SAFE_RANGE + 1,
     };
 
     uint8_t flags = key_feedback_pack();
@@ -160,8 +160,8 @@ static void test_repeat_hold_flashes_while_active(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode               = KC_RIGHT_ALT,
-        .repeat_binding_active = true,
+        .owner.keycode                    = KC_RIGHT_ALT,
+        .lifecycle.repeat_binding_active  = true,
     };
 
     uint8_t flags = key_feedback_pack();
@@ -173,9 +173,9 @@ static void test_fallback_hold_has_no_hold_feedback(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode             = KC_RIGHT_ALT,
-        .held_action_keycode = KC_RIGHT_ALT,
-        .hold_strategy       = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
+        .owner.keycode                 = KC_RIGHT_ALT,
+        .lifecycle.held_action_keycode = KC_RIGHT_ALT,
+        .lifecycle.hold_strategy       = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
     };
 
     uint8_t flags = key_feedback_pack();
@@ -186,8 +186,8 @@ static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) 
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode = KC_RIGHT_ALT,
-        .hold =
+        .owner.keycode = KC_RIGHT_ALT,
+        .binding.hold =
             {
                 .present = true,
                 .action  = MO(3),
@@ -202,9 +202,9 @@ static void test_momentary_hold_preview_layer_clears_once_layer_is_active(void) 
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode             = KC_RIGHT_ALT,
-        .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-        .held_action_keycode = MO(4),
+        .owner.keycode                 = KC_RIGHT_ALT,
+        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+        .lifecycle.held_action_keycode = MO(4),
     };
 
     CHECK(key_feedback_preview_layer() == UINT8_MAX);
@@ -214,9 +214,9 @@ static void test_non_layer_held_action_has_no_preview_layer(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode             = KC_RIGHT_ALT,
-        .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-        .held_action_keycode = SAFE_RANGE + 1,
+        .owner.keycode                 = KC_RIGHT_ALT,
+        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+        .lifecycle.held_action_keycode = SAFE_RANGE + 1,
     };
 
     CHECK(key_feedback_preview_layer() == UINT8_MAX);
@@ -226,8 +226,8 @@ static void test_feedback_falls_back_to_secondary_active_slot(void) {
     test_reset_state();
 
     *test_other_slot() = (active_key_state_t){
-        .keycode             = KC_RIGHT_ALT,
-        .held_action_keycode = SAFE_RANGE + 1,
+        .owner.keycode                 = KC_RIGHT_ALT,
+        .lifecycle.held_action_keycode = SAFE_RANGE + 1,
     };
 
     uint8_t flags = key_feedback_pack();
@@ -255,10 +255,10 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode          = TEST_MULTI_TAP_KEY,
-        .key_pos          = pos,
-        .tap_hold_term    = 120,
-        .longer_hold_term = 240,
+        .owner.keycode          = TEST_MULTI_TAP_KEY,
+        .owner.key_pos          = pos,
+        .timing.tap_hold_term   = 120,
+        .timing.longer_hold_term = 240,
         .pending_multi_tap =
             {
                 .keycode       = TEST_MULTI_TAP_KEY,
@@ -288,18 +288,18 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .keycode             = MO(2),
-        .held_action_keycode = MO(2),
-        .phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+        .owner.keycode                 = MO(2),
+        .lifecycle.held_action_keycode = MO(2),
+        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
     };
 
     *test_other_slot() = (active_key_state_t){
-        .timer            = (uint16_t)(fake_time - 150),
-        .keycode          = KC_LEFT,
-        .tap_hold_term    = 100,
-        .longer_hold_term = 300,
-        .hold             = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
-        .long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
+        .timer                    = (uint16_t)(fake_time - 150),
+        .owner.keycode            = KC_LEFT,
+        .timing.tap_hold_term     = 100,
+        .timing.longer_hold_term  = 300,
+        .binding.hold             = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
+        .binding.long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
     };
 
     uint8_t flags = key_feedback_pack();

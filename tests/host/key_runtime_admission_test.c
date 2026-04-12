@@ -110,8 +110,8 @@ static void test_find_slot_by_position_returns_matching_active_slot(void) {
     keypos_t            pos  = test_keypos(4, 5);
 
     test_reset_state();
-    slot->keycode = TEST_ACTIVE_KEY;
-    slot->key_pos = pos;
+    slot->owner.keycode = TEST_ACTIVE_KEY;
+    slot->owner.key_pos = pos;
 
     CHECK(key_runtime_find_slot_by_position(pos) == slot);
     CHECK(key_runtime_first_active_slot() == slot);
@@ -161,14 +161,14 @@ static void test_select_slot_for_press_keeps_distinct_active_positions_independe
     active_key_state_t *slot_c = test_slot(0, 2);
 
     test_reset_state();
-    slot_a->keycode = TEST_ACTIVE_KEY;
-    slot_a->key_pos = test_keypos(0, 0);
-    slot_b->keycode = TEST_ACTIVE_KEY;
-    slot_b->key_pos = test_keypos(0, 1);
+    slot_a->owner.keycode = TEST_ACTIVE_KEY;
+    slot_a->owner.key_pos = test_keypos(0, 0);
+    slot_b->owner.keycode = TEST_ACTIVE_KEY;
+    slot_b->owner.key_pos = test_keypos(0, 1);
 
     CHECK(key_runtime_select_slot_for_press(test_keypos(0, 2)) == slot_c);
-    CHECK(slot_a->keycode == TEST_ACTIVE_KEY);
-    CHECK(slot_b->keycode == TEST_ACTIVE_KEY);
+    CHECK(slot_a->owner.keycode == TEST_ACTIVE_KEY);
+    CHECK(slot_b->owner.keycode == TEST_ACTIVE_KEY);
 }
 
 int main(void) {
