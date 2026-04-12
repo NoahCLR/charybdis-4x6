@@ -54,12 +54,13 @@ static void pd_mode_enforce_exclusive_active_mode(pd_mode_mask_t keep_mode) {
 }
 
 void pd_mode_apply_active_dpi(void) {
-    // Sniping and dragscroll manage their own CPI through Charybdis internals.
-    if (charybdis_get_pointer_dragscroll_enabled()) {
+    if (pd_any_active_mode_has_trait(PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND)) {
+        pointing_device_set_cpi(noah_qmk_contract_pointer_dragscroll_dpi());
         return;
     }
 
-    if (charybdis_get_pointer_sniping_enabled()) {
+    if (noah_qmk_contract_pointer_sniping_enabled()) {
+        noah_qmk_contract_pointer_set_sniping_enabled(true);
         return;
     }
 
@@ -71,7 +72,7 @@ void pd_mode_apply_active_dpi(void) {
     }
 
     // No active mode with a custom DPI — restore Charybdis's configured default.
-    pointing_device_set_cpi(charybdis_get_pointer_default_dpi());
+    pointing_device_set_cpi(noah_qmk_contract_pointer_default_dpi());
 }
 
 void pd_mode_activate(pd_mode_mask_t mode) {
@@ -89,12 +90,7 @@ void pd_mode_activate(pd_mode_mask_t mode) {
     pd_mode_auto_mouse_activate(mode, was_any_mode_active);
 #endif
 
-    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND)) {
-        charybdis_set_pointer_dragscroll_enabled(true);
-        // Charybdis sets CHARYBDIS_DRAGSCROLL_DPI via maybe_update_pointing_device_cpi().
-    } else {
-        pd_mode_apply_active_dpi();
-    }
+    pd_mode_apply_active_dpi();
 
     if (!was_active) {
         pd_mode_registry_run_activate_hooks(mode);
@@ -118,12 +114,7 @@ void pd_mode_deactivate(pd_mode_mask_t mode) {
         def->reset();
     }
 
-    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND)) {
-        charybdis_set_pointer_dragscroll_enabled(false);
-        // Charybdis restores normal pointer DPI via maybe_update_pointing_device_cpi().
-    } else {
-        pd_mode_apply_active_dpi();
-    }
+    pd_mode_apply_active_dpi();
 
     if (was_active) {
         pd_mode_registry_run_deactivate_hooks(mode);

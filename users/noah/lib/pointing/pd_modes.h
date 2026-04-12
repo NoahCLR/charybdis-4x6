@@ -32,7 +32,7 @@ typedef struct {
     pd_mode_mask_t        mode_flag;
     uint16_t              keycode;     // keycode that activates this mode (KC_NO = none)
     uint16_t              lock_action; // generated as <MODE_KEYCODE>_LOCK and toggles persistent mode lock
-    pd_mode_handler_t     handler;     // NULL = trackball handled externally (e.g. dragscroll)
+    pd_mode_handler_t     handler;     // NULL = mode has no pointer-motion transform
     pd_mode_key_handler_t key_handler; // optional key-event interception while mode is active
     pd_mode_reset_t       reset;       // called on deactivation (NULL = no-op)
     uint16_t              dpi;         // pointer CPI while this mode is active (0 = use normal pointer DPI)
@@ -63,6 +63,6 @@ uint8_t        pd_mode_first_local_active_index(void);
 uint8_t        pd_mode_first_display_active_index(void);
 
 // Apply the active mode's DPI, or restore Charybdis's normal pointer DPI if no
-// mode with a custom DPI is active. No-op when sniping or dragscroll is active
-// since those have their own CPI management.
+// mode with a custom DPI is active. Dragscroll-like modes use the shared local
+// dragscroll DPI; sniping still re-applies Charybdis-owned CPI.
 void pd_mode_apply_active_dpi(void);

@@ -309,11 +309,19 @@ void charybdis_set_pointer_dragscroll_enabled(bool enabled) {
     (void)enabled;
 }
 
+void charybdis_set_pointer_sniping_enabled(bool enabled) {
+    (void)enabled;
+}
+
 void pointing_device_set_cpi(uint16_t cpi) {
     current_cpi = cpi;
 }
 
 report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+
+report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
 
@@ -338,6 +346,8 @@ bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
 void reset_volume_mode(void) {
     reset_volume_count++;
 }
+
+void reset_dragscroll_mode(void) {}
 
 void reset_brightness_mode(void) {}
 void reset_zoom_mode(void) {}

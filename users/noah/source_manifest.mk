@@ -65,6 +65,7 @@ NOAH_POINTING_SOURCES := \
     lib/pointing/pd_mode_registry.c \
     lib/pointing/pd_mode_lifecycle.c \
     lib/pointing/pointer_layer_policy.c \
+    lib/pointing/pd_mode_dragscroll.c \
     lib/pointing/pd_mode_volume.c \
     lib/pointing/pd_mode_brightness.c \
     lib/pointing/pd_mode_zoom.c \

@@ -44,8 +44,8 @@ changes how the modes feel in practice.
 
 | Mode | Raw behavior | Notable side effects |
 | --- | --- | --- |
-| `DRAGSCROLL` | trackball motion becomes scrolling instead of cursor movement | enables Charybdis dragscroll while active |
-| `PINCH_MODE` | same scroll path as `DRAGSCROLL`, but with an owned real left `Cmd` hold | enables dragscroll and holds left `Cmd` while active |
+| `DRAGSCROLL` | trackball motion becomes scrolling instead of cursor movement | uses the local dragscroll handler while active |
+| `PINCH_MODE` | same scroll path as `DRAGSCROLL`, but with an owned real left `Cmd` hold | uses the local dragscroll handler and holds left `Cmd` while active |
 | `ZOOM_MODE` | vertical trackball motion sends `Cmd+=` / `Cmd+-` taps | no dragscroll; explicit keyboard zoom |
 | `ARROW_MODE` | dominant trackball motion emits arrow key taps instead of moving the cursor | repurposes mouse buttons for selection/copy/paste |
 | `VOLUME_MODE` | vertical trackball motion changes system volume in steps | no extra side effects |
@@ -58,10 +58,12 @@ changes how the modes feel in practice.
 While active:
 
 - the cursor stays frozen
-- trackball motion is routed through Charybdis dragscroll
+- trackball motion is routed through the shared local dragscroll handler
 - forward / backward motion becomes vertical scrolling
-- horizontal motion can still contribute to horizontal scroll if the firmware
-  dragscroll path allows it
+- the handler keeps a short axis lock so sideways gestures do not immediately
+  leak vertical residue
+- horizontal motion can still contribute to horizontal scroll when the host
+  surface accepts horizontal wheel input
 
 This is the base mode that scroll-like modes build on.
 
@@ -72,7 +74,7 @@ This is the base mode that scroll-like modes build on.
 While active:
 
 - the cursor stays frozen
-- Charybdis dragscroll is enabled
+- the same local dragscroll handler as `DRAGSCROLL` is active
 - left `Cmd` is held through the same owned real-mod path as other runtime modifiers
 - the ball is effectively producing command-scroll input
 

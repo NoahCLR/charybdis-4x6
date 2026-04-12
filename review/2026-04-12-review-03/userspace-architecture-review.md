@@ -233,6 +233,7 @@ other mirrored consumers.
 Follow-up work on 2026-04-12 split the former
 `pd_mode_handlers.c` monolith into per-mode translation units:
 
+- [`pd_mode_dragscroll.c`](../../users/noah/lib/pointing/pd_mode_dragscroll.c)
 - [`pd_mode_volume.c`](../../users/noah/lib/pointing/pd_mode_volume.c)
 - [`pd_mode_brightness.c`](../../users/noah/lib/pointing/pd_mode_brightness.c)
 - [`pd_mode_zoom.c`](../../users/noah/lib/pointing/pd_mode_zoom.c)
@@ -240,7 +241,8 @@ Follow-up work on 2026-04-12 split the former
 
 Shared vertical-axis behavior now lives in
 [`pd_mode_handler_common.h`](../../users/noah/lib/pointing/pd_mode_handler_common.h),
-while arrow-mode-specific state and key interception stay isolated in
+while dragscroll state stays isolated in `pd_mode_dragscroll.c` and
+arrow-mode-specific state and key interception stay isolated in
 `pd_mode_arrow.c`.
 
 ## 4. Code Organization And Structure

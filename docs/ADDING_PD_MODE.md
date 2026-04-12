@@ -339,8 +339,8 @@ mode-selection switch in the registry.
 
 Current examples to copy:
 
-- `DRAGSCROLL` toggles Charybdis dragscroll
-- `PINCH_MODE` toggles dragscroll and also registers / unregisters an owned real `GUI` mod
+- `DRAGSCROLL` uses the shared local dragscroll handler plus the locked auto-mouse helpers
+- `PINCH_MODE` uses the same dragscroll handler and also registers / unregisters an owned real `GUI` mod
 - locked scroll-like modes use the auto-mouse ownership helpers
 
 If your mode behaves like `VOLUME_MODE`, `BRIGHTNESS_MODE`, or `ZOOM_MODE`, you

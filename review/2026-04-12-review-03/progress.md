@@ -227,4 +227,39 @@ Review status:
 
 - no remaining implementation items in this review
 - open a new review only when a new architecture question appears
+
+Follow-up implementation completed after the final review follow-up:
+
+- Moved the dragscroll motion transform into
+  `users/noah/lib/pointing/pd_mode_dragscroll.c` so `DRAGSCROLL` and
+  `PINCH_MODE` now use the same repo-owned handler instead of the upstream
+  Charybdis keyboard dragscroll implementation.
+- Rewired the pd-mode manifest so both scroll-like modes share the local
+  dragscroll handler and reset hook, while lifecycle policy keeps the existing
+  owned `GUI` modifier and locked auto-mouse behavior.
+- Changed pd-mode DPI policy so dragscroll-like modes now apply their local
+  dragscroll CPI through userspace, while Charybdis remains responsible only
+  for default/sniping DPI state.
+- Added host coverage for the local dragscroll axis-lock behavior, including a
+  horizontal-with-jitter case and lock release after a pause, and updated the
+  direct pd-mode runners plus the source manifest to compile the new file.
+- Updated maintainer docs to describe dragscroll as a local pointer-mode
+  handler rather than an upstream Charybdis-owned path.
+
+Verification run for the local dragscroll follow-up so far:
+
+- `git status --short`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Next steps:
+
+- run the full host suite
+- run `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
  

@@ -8,6 +8,10 @@
 #include "users/noah/lib/state/runtime_shared_state.h"
 #include "users/noah/lib/state/split_runtime_sync.h"
 
+#ifndef CHARYBDIS_DRAGSCROLL_DPI
+#    define CHARYBDIS_DRAGSCROLL_DPI 100
+#endif
+
 enum {
     TEST_KEYCODE = SAFE_RANGE + 0x30,
 };
@@ -16,7 +20,6 @@ static uint16_t current_cpi;
 static uint16_t cpi_set_count;
 static uint16_t default_dpi;
 
-static bool dragscroll_enabled;
 static bool sniping_enabled;
 static bool auto_mouse_toggle_enabled;
 static bool auto_mouse_enabled;
@@ -66,7 +69,6 @@ static void test_reset_stubs(void) {
     current_cpi                   = 0;
     cpi_set_count                 = 0;
     default_dpi                   = 900;
-    dragscroll_enabled            = false;
     sniping_enabled               = false;
     auto_mouse_toggle_enabled     = false;
     auto_mouse_enabled            = false;
@@ -100,7 +102,7 @@ void split_runtime_sync(void) {
 }
 
 bool charybdis_get_pointer_dragscroll_enabled(void) {
-    return dragscroll_enabled;
+    return false;
 }
 
 bool charybdis_get_pointer_sniping_enabled(void) {
@@ -112,7 +114,11 @@ uint16_t charybdis_get_pointer_default_dpi(void) {
 }
 
 void charybdis_set_pointer_dragscroll_enabled(bool enabled) {
-    dragscroll_enabled = enabled;
+    (void)enabled;
+}
+
+void charybdis_set_pointer_sniping_enabled(bool enabled) {
+    sniping_enabled = enabled;
 }
 
 void pointing_device_set_cpi(uint16_t cpi) {
@@ -198,6 +204,10 @@ report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
 
+report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+
 report_mouse_t handle_brightness_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
@@ -220,6 +230,8 @@ bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
 void reset_volume_mode(void) {
     reset_volume_count++;
 }
+
+void reset_dragscroll_mode(void) {}
 
 void reset_brightness_mode(void) {
     reset_brightness_count++;
@@ -382,15 +394,16 @@ static void test_apply_active_dpi_respects_pointer_state(void) {
     pd_mode_activate(PD_MODE_VOLUME);
     CHECK(current_cpi == PD_MODE_VOLUME_DPI);
 
-    cpi_set_count      = 0;
-    current_cpi        = 7777;
-    dragscroll_enabled = true;
-    pd_mode_apply_active_dpi();
-    CHECK(current_cpi == 7777);
-    CHECK(cpi_set_count == 0);
+    cpi_set_count = 0;
+    current_cpi   = 7777;
+    pd_mode_activate(PD_MODE_DRAGSCROLL);
+    CHECK(current_cpi == CHARYBDIS_DRAGSCROLL_DPI);
+    CHECK(cpi_set_count >= 1);
 
-    dragscroll_enabled = false;
-    sniping_enabled    = true;
+    pd_mode_deactivate(PD_MODE_DRAGSCROLL);
+    cpi_set_count    = 0;
+    current_cpi      = 7777;
+    sniping_enabled  = true;
     pd_mode_apply_active_dpi();
     CHECK(current_cpi == 7777);
     CHECK(cpi_set_count == 0);
@@ -409,13 +422,13 @@ static void test_pinch_mode_registers_gui_and_dragscroll_side_effects(void) {
 
     pd_mode_activate(PD_MODE_PINCH);
     CHECK(pd_mode_local_active(PD_MODE_PINCH));
-    CHECK(dragscroll_enabled);
+    CHECK(current_cpi == CHARYBDIS_DRAGSCROLL_DPI);
     CHECK(keyboard_mod_register_count == 1);
     CHECK(last_registered_keycode == KC_LEFT_GUI);
 
     pd_mode_deactivate(PD_MODE_PINCH);
     CHECK(!pd_mode_local_active(PD_MODE_PINCH));
-    CHECK(!dragscroll_enabled);
+    CHECK(current_cpi == default_dpi);
     CHECK(keyboard_mod_unregister_count == 1);
     CHECK(last_unregistered_keycode == KC_LEFT_GUI);
 }

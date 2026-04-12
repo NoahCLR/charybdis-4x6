@@ -19,6 +19,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/pd_mode_handlers_test.c" \
+    "$ROOT/users/noah/lib/pointing/pd_mode_dragscroll.c" \
     "$ROOT/users/noah/lib/pointing/pd_mode_volume.c" \
     "$ROOT/users/noah/lib/pointing/pd_mode_brightness.c" \
     "$ROOT/users/noah/lib/pointing/pd_mode_zoom.c" \

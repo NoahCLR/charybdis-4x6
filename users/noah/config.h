@@ -85,16 +85,18 @@
 #    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
 
-// Drag-scroll tuning (DPI for the scroll speed lives in the keymap config).
-//   Speed      = DPI / STEP_DIVISOR  (lower = slower, more precise)
-//   Smoothness = RATE_LIMIT_MS       (lower = more frequent updates)
-//   Snap feel  = SNAP_RATIO          (higher = stricter axis lock)
+// Local drag-scroll tuning (DPI for the scroll speed lives in the keymap config).
+//   Speed          = DPI / STEP_DIVISOR           (lower = slower, more precise)
+//   Smoothness     = RATE_LIMIT_MS                (lower = more frequent updates)
+//   Snap feel      = SNAP_RATIO                   (higher = stricter axis lock)
+//   Lock feel      = AXIS_LOCK_TIMEOUT_MS         (higher = stickier gestures)
 #    define CHARYBDIS_DRAGSCROLL_REVERSE_Y
 #    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0
 #    define CHARYBDIS_SCROLL_STEP_DIVISOR 8
 #    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8
 #    define CHARYBDIS_SCROLL_SNAP_RATIO 3
 #    define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 80
+#    define NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS 40
 
 #endif // POINTING_DEVICE_ENABLE
 

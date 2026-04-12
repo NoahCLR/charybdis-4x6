@@ -109,10 +109,10 @@ If you want to adapt this userspace, these are the main files to touch first:
 | --- | --- |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | physical layout, combos, keymap-local custom keycodes, `VIA_MACROS(MACRO)`, `HARDCODED_MACROS(MACRO)`, and the authored `key_behaviors[]` table |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pointer-mode colors, LED groups, auto-mouse gradient endpoints, and key-behavior feedback colors |
-| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, RGB overlay toggles (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE`), auto-mouse target layer and timeout, auto-sniping, dragscroll feel, and other keymap-facing behavior |
+| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, RGB overlay toggles (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE`), auto-mouse target layer and timeout, auto-sniping, dragscroll DPI, and other keymap-facing behavior |
 | [`users/noah/noah_keymap_ids.h`](./users/noah/noah_keymap_ids.h) | shared layer ids, hardcoded macro keycodes, generated pd-mode and layer-lock keycode ranges, and the `NOAH_KEYMAP_SAFE_RANGE` boundary for keymap-local keycodes |
 | [`users/noah/lib/pointing/pd_mode_manifest.h`](./users/noah/lib/pointing/pd_mode_manifest.h) | shared pd-mode definitions: mode keycodes, generated lock keycodes, handlers, DPI metadata, and manifest traits |
-| [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, sensor/report settings, and low-level QMK overrides |
+| [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, sensor/report settings, local dragscroll tuning, and low-level QMK overrides |
 
 In other words:
 

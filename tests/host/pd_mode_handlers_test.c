@@ -42,6 +42,7 @@ static uint8_t            literal_tap_call_count;
 
 static uint8_t fallback_hold_activation_count;
 static bool    fallback_hold_active;
+static uint32_t fake_time32;
 
 static uint8_t  keyboard_mod_register_count;
 static uint8_t  keyboard_mod_unregister_count;
@@ -66,6 +67,7 @@ static void test_clear_logs(void) {
     literal_tap_call_count         = 0;
     fallback_hold_activation_count = 0;
     fallback_hold_active           = false;
+    fake_time32                    = 1000u;
     keyboard_mod_register_count    = 0;
     keyboard_mod_unregister_count  = 0;
     last_registered_keycode        = KC_NO;
@@ -84,6 +86,22 @@ static void test_reset_stubs(void) {
     test_clear_logs();
     reset_arrow_mode();
     test_clear_logs();
+}
+
+uint16_t timer_read(void) {
+    return (uint16_t)fake_time32;
+}
+
+uint16_t timer_elapsed(uint16_t last) {
+    return (uint16_t)(timer_read() - last);
+}
+
+uint32_t timer_read32(void) {
+    return fake_time32;
+}
+
+uint32_t timer_elapsed32(uint32_t last) {
+    return fake_time32 - last;
 }
 
 uint8_t get_mods(void) {
@@ -228,6 +246,52 @@ static keyrecord_t test_record(bool pressed) {
     };
 }
 
+static void test_dragscroll_horizontal_lock_filters_vertical_jitter(void) {
+    test_reset_stubs();
+
+    report_mouse_t report;
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+             .x = 80,
+             .y = 10,
+         });
+    CHECK(report.x == 0);
+    CHECK(report.y == 0);
+    CHECK(report.h == 10);
+    CHECK(report.v == 0);
+
+    fake_time32 = 1040u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+             .x = 8,
+             .y = 24,
+         });
+    CHECK(report.h == 1);
+    CHECK(report.v == 0);
+}
+
+static void test_dragscroll_axis_lock_releases_after_pause(void) {
+    test_reset_stubs();
+
+    report_mouse_t report;
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+             .x = 64,
+             .y = 0,
+         });
+    CHECK(report.h == 8);
+    CHECK(report.v == 0);
+
+    fake_time32 = 1085u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+             .x = 0,
+             .y = 64,
+         });
+    CHECK(report.h == 0);
+    CHECK(report.v == 8);
+}
+
 static void test_horizontal_arrow_tap_preserves_mod_state(void) {
     test_reset_stubs();
 
@@ -326,6 +390,8 @@ static void test_arrow_mode_copy_shortcut_suspends_ambient_mods(void) {
 }
 
 int main(void) {
+    test_dragscroll_horizontal_lock_filters_vertical_jitter();
+    test_dragscroll_axis_lock_releases_after_pause();
     test_horizontal_arrow_tap_preserves_mod_state();
     test_vertical_arrow_tap_masks_alt_and_restores_mod_state();
     test_arrow_mode_selection_button_holds_and_releases_shift();

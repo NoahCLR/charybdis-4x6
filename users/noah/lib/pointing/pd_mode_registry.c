@@ -100,7 +100,8 @@ static const pd_mode_lifecycle_hooks_t pd_mode_pinch_lifecycle_hooks = {
 
 // Per-mode pointer DPI overrides. Override any of these in config.h.
 // 0 = no override: normal pointer DPI is used while that mode is active.
-// Dragscroll and pinch are excluded — Charybdis manages their CPI internally.
+// Dragscroll and pinch are excluded — the shared dragscroll handler manages
+// their CPI through pd_mode_apply_active_dpi().
 #ifndef PD_MODE_VOLUME_DPI
 #    define PD_MODE_VOLUME_DPI 0
 #endif
