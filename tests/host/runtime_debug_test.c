@@ -5,6 +5,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/held_action.h"
+#include "users/noah/lib/key/held_repeat.h"
 #include "users/noah/lib/state/runtime_debug.h"
 
 enum {
@@ -170,7 +171,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     layer_ownership_momentary_press(layer_key, 2);
 
     held_action_register(action_key, TEST_ACTION);
-    held_action_repeat_start(repeat_key, TEST_ACTION, 25);
+    held_repeat_start(repeat_key, TEST_ACTION, 25);
 
     keyboard_mod_ownership_register(KC_LEFT_SHIFT);
     fake_weak_mods           = MOD_BIT(KC_RIGHT_ALT);
@@ -194,11 +195,11 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(snapshot.held_actions.actions[0].key_pos.row == action_key.row);
     CHECK(snapshot.held_actions.actions[0].key_pos.col == action_key.col);
     CHECK(snapshot.held_actions.actions[0].action == TEST_ACTION);
-    CHECK(snapshot.held_actions.repeats[0].active);
-    CHECK(snapshot.held_actions.repeats[0].key_pos.row == repeat_key.row);
-    CHECK(snapshot.held_actions.repeats[0].key_pos.col == repeat_key.col);
-    CHECK(snapshot.held_actions.repeats[0].action == TEST_ACTION);
-    CHECK(snapshot.held_actions.repeats[0].interval_ms == 40);
+    CHECK(snapshot.held_repeats.bindings[0].active);
+    CHECK(snapshot.held_repeats.bindings[0].key_pos.row == repeat_key.row);
+    CHECK(snapshot.held_repeats.bindings[0].key_pos.col == repeat_key.col);
+    CHECK(snapshot.held_repeats.bindings[0].action == TEST_ACTION);
+    CHECK(snapshot.held_repeats.bindings[0].interval_ms == 40);
 
     CHECK(snapshot.keyboard_mod_ownership.live_state.real == MOD_BIT(KC_LEFT_SHIFT));
     CHECK(snapshot.keyboard_mod_ownership.live_state.weak == MOD_BIT(KC_RIGHT_ALT));
@@ -240,7 +241,7 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(!snapshot.layer_ownership.bindings[0].active);
 
     CHECK(!snapshot.held_actions.actions[0].active);
-    CHECK(!snapshot.held_actions.repeats[0].active);
+    CHECK(!snapshot.held_repeats.bindings[0].active);
     CHECK(snapshot.held_actions.modifier_refcounts[2] == 0);
 
     CHECK(snapshot.keyboard_mod_ownership.live_state.real == 0);

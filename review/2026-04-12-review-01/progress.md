@@ -83,6 +83,18 @@ Completed in this pass:
     resets to valid slot defaults instead of ad hoc zeroed storage
   - added a dedicated `runtime_debug` host test and wired it into the full host
     suite
+- Implemented the held-action ownership split from this review:
+  - added `users/noah/lib/key/held_repeat.h` /
+    `users/noah/lib/key/held_repeat.c` as the dedicated repeat scheduler and
+    pointer-anchor module
+  - reduced `held_action.c` back to held modifier/action ownership while
+    keeping the existing per-key release seam so transition execution still has
+    one logical "release owned state by key" entry point
+  - split the runtime debug surface into separate `held_actions` and
+    `held_repeats` snapshots so cross-subsystem tests can inspect the new
+    boundary directly
+  - updated explicit host runners and host stubs that previously assumed
+    repeat start/tick lived in `held_action.c`
 
 Verification run in this pass:
 
@@ -106,6 +118,19 @@ Verification run in this pass:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Additional verification for the held-action/repeat split:
+
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Verification result:
 
 - targeted handled-key host tests passed
@@ -120,7 +145,5 @@ Workspace scope:
 
 Recommended next implementation work:
 
-1. Separate held-action ownership from repeat scheduling now that the runtime
-   snapshot/reset surface can support the cross-subsystem assertions.
-2. Write one permanent maintainer doc for the key runtime so the reducer/effect
+1. Write one permanent maintainer doc for the key runtime so the reducer/effect
    flow is documented outside the time-scoped review folders.

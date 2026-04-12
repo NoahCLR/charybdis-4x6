@@ -6,6 +6,7 @@
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/key_behavior.h"
 #include "users/noah/lib/key/held_action.h"
+#include "users/noah/lib/key/held_repeat.h"
 
 enum {
     TEST_SHARED_ACTION     = SAFE_RANGE + 0x40,
@@ -226,6 +227,7 @@ static void test_release_owned_by_key_reports_missing_bindings(void) {
 
     CHECK(!held_action_release_owned_by_key(test_keypos(7, 7)));
     CHECK(!held_modifier_release_owned_by_key(test_keypos(7, 7)));
+    CHECK(!held_repeat_release_owned_by_key(test_keypos(7, 7)));
 }
 
 static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void) {
@@ -233,7 +235,7 @@ static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void)
 
     test_reset_stubs();
 
-    held_action_repeat_start(key_pos, TEST_SHARED_ACTION, 25);
+    held_repeat_start(key_pos, TEST_SHARED_ACTION, 25);
 
     CHECK(tap_call_count == 1);
     CHECK(tap_calls[0].action == TEST_SHARED_ACTION);
@@ -242,21 +244,21 @@ static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void)
     CHECK(pointer_action_calls[0].pressed);
 
     fake_time = (uint16_t)(fake_time + 39);
-    held_action_repeat_tick();
+    held_repeat_tick();
     CHECK(tap_call_count == 1);
 
     fake_time = (uint16_t)(fake_time + 1);
-    held_action_repeat_tick();
+    held_repeat_tick();
     CHECK(tap_call_count == 2);
     CHECK(tap_calls[1].action == TEST_SHARED_ACTION);
 
-    CHECK(held_action_release_owned_by_key(key_pos));
+    CHECK(held_repeat_release_owned_by_key(key_pos));
     CHECK(pointer_action_call_count == 2);
     CHECK(pointer_action_calls[1].action == TEST_SHARED_ACTION);
     CHECK(!pointer_action_calls[1].pressed);
 
     fake_time = (uint16_t)(fake_time + 80);
-    held_action_repeat_tick();
+    held_repeat_tick();
     CHECK(tap_call_count == 2);
 }
 
@@ -265,11 +267,11 @@ static void test_repeat_binding_catches_up_after_scan_gap(void) {
 
     test_reset_stubs();
 
-    held_action_repeat_start(key_pos, TEST_SECOND_ACTION, 25);
+    held_repeat_start(key_pos, TEST_SECOND_ACTION, 25);
     CHECK(tap_call_count == 1);
 
     fake_time = (uint16_t)(fake_time + 120);
-    held_action_repeat_tick();
+    held_repeat_tick();
 
     CHECK(tap_call_count == 4);
     CHECK(tap_calls[1].action == TEST_SECOND_ACTION);
@@ -282,11 +284,11 @@ static void test_repeat_binding_rejects_rates_above_supported_range(void) {
 
     test_reset_stubs();
 
-    held_action_repeat_start(key_pos, TEST_SHARED_ACTION, (uint16_t)(KEY_BEHAVIOR_REPEAT_MAX_HZ + 1u));
+    held_repeat_start(key_pos, TEST_SHARED_ACTION, (uint16_t)(KEY_BEHAVIOR_REPEAT_MAX_HZ + 1u));
 
     CHECK(tap_call_count == 0);
     CHECK(pointer_action_call_count == 0);
-    CHECK(!held_action_release_owned_by_key(key_pos));
+    CHECK(!held_repeat_release_owned_by_key(key_pos));
 }
 
 int main(void) {

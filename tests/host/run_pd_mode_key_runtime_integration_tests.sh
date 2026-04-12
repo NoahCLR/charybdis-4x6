@@ -23,6 +23,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
     "$ROOT/users/noah/lib/key/held_action.c" \
+    "$ROOT/users/noah/lib/key/held_repeat.c" \
     "$ROOT/users/noah/lib/key/key_behavior_lookup.c" \
     "$ROOT/users/noah/lib/key/key_runtime.c" \
     "$ROOT/users/noah/lib/key/key_runtime_admission.c" \

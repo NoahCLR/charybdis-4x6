@@ -6,7 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_feedback.h"
-#include "held_action.h"
+#include "held_repeat.h"
 #include "key_runtime_trace.h"
 #include "key_runtime_transition.h"
 
@@ -17,5 +17,5 @@ void noah_key_runtime_scan(void) {
     key_runtime_transition_scan(&plan);
     key_runtime_trace_plan("scan", &plan);
     key_runtime_transition_execute_plan(&plan);
-    held_action_repeat_tick();
+    held_repeat_tick();
 }

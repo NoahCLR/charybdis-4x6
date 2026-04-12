@@ -19,6 +19,7 @@
 #include "../state/layer_ownership.h"
 #include "../state/split_runtime_sync.h"
 #include "held_action.h"
+#include "held_repeat.h"
 
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     *plan = (key_runtime_transition_plan_t){0};
@@ -85,7 +86,7 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
                 held_action_release_owned_by_key(effect->data.key_pos);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START:
-                held_action_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
+                held_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_PRESS:
                 layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);

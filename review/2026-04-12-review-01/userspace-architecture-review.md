@@ -506,6 +506,22 @@ Keep the public API stable if desired. The point is not file-count purity; it
 is making "ownership registry" and "time-based repeat engine" distinct
 maintenance units.
 
+Status after this review pass:
+
+- implemented by splitting repeat scheduling and pointer-layer anchor logic
+  into [`held_repeat.c`](../../users/noah/lib/key/held_repeat.c) and
+  [`held_repeat.h`](../../users/noah/lib/key/held_repeat.h)
+- [`held_action.c`](../../users/noah/lib/key/held_action.c) now owns held
+  modifier and non-modifier ownership only, while
+  [`held_repeat.c`](../../users/noah/lib/key/held_repeat.c) owns repeat timing
+  and pointer-anchor maintenance
+- the runtime debug surface now exposes separate `held_actions` and
+  `held_repeats` snapshots so higher-level tests can inspect the split module
+  state directly
+- the transition executor still keeps one logical per-key release seam through
+  [`held_action_release_owned_by_key()`](../../users/noah/lib/key/held_action.h)
+  so behavior stays stable while the internals are separated
+
 Priority: medium.
 
 ### 5. Add one read-only runtime snapshot API and one shared test reset API

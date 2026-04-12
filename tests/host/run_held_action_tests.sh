@@ -19,6 +19,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/held_action_test.c" \
     "$ROOT/users/noah/lib/key/held_action.c" \
+    "$ROOT/users/noah/lib/key/held_repeat.c" \
     -o "$BIN"
 
 "$BIN"

@@ -32,6 +32,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/key_runtime_trace.c \
     lib/key/delayed_action.c \
     lib/key/held_action.c \
+    lib/key/held_repeat.c \
     lib/action/action_dispatch.c \
     lib/action/owned_keycode.c \
     lib/action/macro_dispatch.c \

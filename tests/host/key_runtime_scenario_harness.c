@@ -428,7 +428,7 @@ void held_action_unregister(keypos_t key_pos, uint16_t action) {
     });
 }
 
-void held_action_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
+void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind      = KEY_RUNTIME_SCENARIO_EFFECT_REPEAT_START,
         .action    = action,
@@ -437,7 +437,7 @@ void held_action_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat
     });
 }
 
-void held_action_repeat_tick(void) {}
+void held_repeat_tick(void) {}
 
 bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
     (void)key_pos;

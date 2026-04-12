@@ -12,6 +12,7 @@ void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
     out->core = noah_runtime_shared_state;
     layer_ownership_debug_snapshot(&out->layer_ownership);
     held_action_debug_snapshot(&out->held_actions);
+    held_repeat_debug_snapshot(&out->held_repeats);
     keyboard_mod_ownership_debug_snapshot(&out->keyboard_mod_ownership);
 }
 
@@ -19,6 +20,7 @@ void noah_runtime_reset_for_test(void) {
     runtime_shared_state_reset(&noah_runtime_shared_state);
     layer_ownership_reset_for_test();
     held_action_reset_for_test();
+    held_repeat_reset_for_test();
     keyboard_mod_ownership_reset_for_test();
 
     layer_state = 0;

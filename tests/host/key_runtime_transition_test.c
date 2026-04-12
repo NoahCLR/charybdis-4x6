@@ -353,7 +353,7 @@ bool held_action_release_owned_by_key(keypos_t key_pos) {
     return true;
 }
 
-void held_action_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
+void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     (void)repeat_hz;
     test_log_call(TEST_CALL_REPEAT_START, action, key_pos, 0, false, (delayed_action_mods_t){0});
 }
