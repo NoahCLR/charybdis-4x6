@@ -106,13 +106,11 @@ static bool dragscroll_axis_ratio_satisfied(int32_t axis_abs, int32_t other_abs,
 }
 
 static bool dragscroll_axis_meets_start(dragscroll_axis_t axis, int32_t axis_abs, int32_t other_abs) {
-    return dragscroll_axis_above_threshold(axis, axis_abs) &&
-           dragscroll_axis_ratio_satisfied(axis_abs, other_abs, NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM, NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN);
+    return dragscroll_axis_above_threshold(axis, axis_abs) && dragscroll_axis_ratio_satisfied(axis_abs, other_abs, NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM, NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN);
 }
 
 static bool dragscroll_axis_meets_sustain(dragscroll_axis_t axis, int32_t axis_abs, int32_t other_abs) {
-    return dragscroll_axis_above_threshold(axis, axis_abs) &&
-           dragscroll_axis_ratio_satisfied(axis_abs, other_abs, NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM, NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN);
+    return dragscroll_axis_above_threshold(axis, axis_abs) && dragscroll_axis_ratio_satisfied(axis_abs, other_abs, NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM, NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN);
 }
 
 static int32_t dragscroll_consume(int32_t *buffer, dragscroll_axis_t axis) {
