@@ -7,17 +7,33 @@
 
 #include "key_runtime_slot_result_internal.h"
 
+#ifdef CONSOLE_ENABLE
+#    include "print.h"
+#endif
+
+static void key_runtime_slot_result_log_overflow(key_runtime_effect_kind_t kind, uint8_t capacity) {
+#ifdef CONSOLE_ENABLE
+    uprintf("Key runtime slot result overflow dropping effect kind %u after %u queued effects\n", (unsigned int)kind, (unsigned int)capacity);
+#else
+    (void)kind;
+    (void)capacity;
+#endif
+}
+
 void key_runtime_slot_result_push(key_runtime_slot_result_t *result, key_runtime_effect_t effect) {
     if (!result) {
         return;
     }
 
-    if (result->count < ARRAY_SIZE(result->effects)) {
-        result->effects[result->count++] = effect;
+    if (result->count < ARRAY_SIZE(result->items)) {
+        result->items[result->count++] = effect;
         return;
     }
 
-    result->overflowed = true;
+    if (!result->overflowed) {
+        result->overflowed = true;
+        key_runtime_slot_result_log_overflow(effect.kind, ARRAY_SIZE(result->items));
+    }
 }
 
 bool key_runtime_slot_result_builder_has_effect(key_runtime_effect_builder_t builder) {

@@ -5,6 +5,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/key_runtime_slot_effect.h"
+#include "users/noah/lib/key/key_runtime_slot_result_internal.h"
 #include "users/noah/lib/key/key_runtime_slot_result.h"
 #include "users/noah/lib/key/key_runtime_slot_step.h"
 #include "users/noah/lib/key/key_runtime_state.h"
@@ -22,6 +23,7 @@ enum {
 static uint16_t fake_time;
 static pd_mode_mask_t test_pd_mode;
 static pd_mode_mask_t test_pd_locked_modes;
+static uint8_t overflow_log_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -94,7 +96,14 @@ static void test_reset_state(void) {
     fake_time                = 1000;
     test_pd_mode             = 0;
     test_pd_locked_modes     = 0;
+    overflow_log_count       = 0;
     noah_runtime_shared_state = (runtime_shared_state_t){0};
+}
+
+int uprintf(const char *fmt, ...) {
+    (void)fmt;
+    overflow_log_count++;
+    return 0;
 }
 
 uint16_t timer_read(void) {
@@ -286,54 +295,54 @@ void held_action_register(keypos_t key_pos, uint16_t action) {
 }
 
 static void test_expect_dispatch_action(const key_runtime_slot_result_t *result, uint8_t index, uint16_t action) {
-    CHECK(result->effects[index].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
-    CHECK(result->effects[index].data.action == action);
+    CHECK(result->items[index].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK(result->items[index].data.action == action);
 }
 
 static void test_expect_held_register(const key_runtime_slot_result_t *result, uint8_t index, keypos_t key_pos, uint16_t action) {
-    CHECK(result->effects[index].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
-    CHECK(result->effects[index].data.held_action.key_pos.row == key_pos.row);
-    CHECK(result->effects[index].data.held_action.key_pos.col == key_pos.col);
-    CHECK(result->effects[index].data.held_action.action == action);
+    CHECK(result->items[index].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
+    CHECK(result->items[index].data.held_action.key_pos.row == key_pos.row);
+    CHECK(result->items[index].data.held_action.key_pos.col == key_pos.col);
+    CHECK(result->items[index].data.held_action.action == action);
 }
 
 static void test_expect_held_unregister(const key_runtime_slot_result_t *result, uint8_t index, keypos_t key_pos, uint16_t action) {
-    CHECK(result->effects[index].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER);
-    CHECK(result->effects[index].data.held_action.key_pos.row == key_pos.row);
-    CHECK(result->effects[index].data.held_action.key_pos.col == key_pos.col);
-    CHECK(result->effects[index].data.held_action.action == action);
+    CHECK(result->items[index].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER);
+    CHECK(result->items[index].data.held_action.key_pos.row == key_pos.row);
+    CHECK(result->items[index].data.held_action.key_pos.col == key_pos.col);
+    CHECK(result->items[index].data.held_action.action == action);
 }
 
 static void test_expect_release_owned_state(const key_runtime_slot_result_t *result, uint8_t index, keypos_t key_pos) {
-    CHECK(result->effects[index].kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
-    CHECK(result->effects[index].data.key_pos.row == key_pos.row);
-    CHECK(result->effects[index].data.key_pos.col == key_pos.col);
+    CHECK(result->items[index].kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK(result->items[index].data.key_pos.row == key_pos.row);
+    CHECK(result->items[index].data.key_pos.col == key_pos.col);
 }
 
 static void test_expect_repeat_start(const key_runtime_slot_result_t *result, uint8_t index, keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
-    CHECK(result->effects[index].kind == KEY_RUNTIME_EFFECT_REPEAT_START);
-    CHECK(result->effects[index].data.repeat.key_pos.row == key_pos.row);
-    CHECK(result->effects[index].data.repeat.key_pos.col == key_pos.col);
-    CHECK(result->effects[index].data.repeat.action == action);
-    CHECK(result->effects[index].data.repeat.repeat_hz == repeat_hz);
+    CHECK(result->items[index].kind == KEY_RUNTIME_EFFECT_REPEAT_START);
+    CHECK(result->items[index].data.repeat.key_pos.row == key_pos.row);
+    CHECK(result->items[index].data.repeat.key_pos.col == key_pos.col);
+    CHECK(result->items[index].data.repeat.action == action);
+    CHECK(result->items[index].data.repeat.repeat_hz == repeat_hz);
 }
 
 static void test_expect_layer_press(const key_runtime_slot_result_t *result, uint8_t index, keypos_t key_pos, uint8_t layer) {
-    CHECK(result->effects[index].kind == KEY_RUNTIME_EFFECT_LAYER_PRESS);
-    CHECK(result->effects[index].data.layer_press.key_pos.row == key_pos.row);
-    CHECK(result->effects[index].data.layer_press.key_pos.col == key_pos.col);
-    CHECK(result->effects[index].data.layer_press.layer == layer);
+    CHECK(result->items[index].kind == KEY_RUNTIME_EFFECT_LAYER_PRESS);
+    CHECK(result->items[index].data.layer_press.key_pos.row == key_pos.row);
+    CHECK(result->items[index].data.layer_press.key_pos.col == key_pos.col);
+    CHECK(result->items[index].data.layer_press.layer == layer);
 }
 
 static void test_expect_layer_release(const key_runtime_slot_result_t *result, uint8_t index, keypos_t key_pos) {
-    CHECK(result->effects[index].kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
-    CHECK(result->effects[index].data.key_pos.row == key_pos.row);
-    CHECK(result->effects[index].data.key_pos.col == key_pos.col);
+    CHECK(result->items[index].kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
+    CHECK(result->items[index].data.key_pos.row == key_pos.row);
+    CHECK(result->items[index].data.key_pos.col == key_pos.col);
 }
 
 static void test_expect_feedback_pulse(const key_runtime_slot_result_t *result, uint8_t index, bool long_hold_level) {
-    CHECK(result->effects[index].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(result->effects[index].data.long_hold_level == long_hold_level);
+    CHECK(result->items[index].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(result->items[index].data.long_hold_level == long_hold_level);
 }
 
 static void test_slot_pending_multi_tap_ownership_marks_slot_non_idle(void) {
@@ -516,8 +525,8 @@ static void test_take_active_release_maps_locked_pd_mode_tap(void) {
 
     CHECK(result.handled);
     CHECK(result.count == 1);
-    CHECK(result.effects[0].kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP);
-    CHECK(result.effects[0].data.pd_mode == PD_MODE_VOLUME);
+    CHECK(result.items[0].kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP);
+    CHECK(result.items[0].data.pd_mode == PD_MODE_VOLUME);
     CHECK(key_runtime_slot_idle(slot));
 }
 
@@ -820,9 +829,9 @@ static void test_take_pending_multi_tap_scan_event_flushes_expired_chain(void) {
 
     CHECK(result.handled);
     CHECK(result.count == 1);
-    CHECK(result.effects[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK(result.effects[0].data.delayed_action.action == TEST_SINGLE_ACTION);
-    CHECK(result.effects[0].data.delayed_action.repeat_count == 2);
+    CHECK(result.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(result.items[0].data.delayed_action.action == TEST_SINGLE_ACTION);
+    CHECK(result.items[0].data.delayed_action.repeat_count == 2);
     CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
 }
 
@@ -896,9 +905,9 @@ static void test_take_pending_multi_tap_hold_release_prefers_release_long_hold_a
 
     CHECK(release.handled);
     CHECK(release.count == 1);
-    CHECK(release.effects[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK(release.effects[0].data.delayed_action.action == TEST_SINGLE_ACTION);
-    CHECK(release.effects[0].data.delayed_action.repeat_count == 1);
+    CHECK(release.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(release.items[0].data.delayed_action.action == TEST_SINGLE_ACTION);
+    CHECK(release.items[0].data.delayed_action.repeat_count == 1);
     CHECK(key_runtime_slot_idle(slot));
 }
 
@@ -1059,9 +1068,9 @@ static void test_prepare_handled_press_flushes_pending_multi_tap_before_begin(vo
 
     CHECK(plan.handled);
     CHECK(plan.count == 2);
-    CHECK(plan.effects[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK(plan.effects[0].data.delayed_action.action == TEST_SINGLE_ACTION);
-    CHECK(plan.effects[0].data.delayed_action.repeat_count == 1);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(plan.items[0].data.delayed_action.action == TEST_SINGLE_ACTION);
+    CHECK(plan.items[0].data.delayed_action.repeat_count == 1);
     test_expect_held_register(&plan, 1, press_pos, TEST_HOLD_ACTION);
     CHECK(slot->owner.keycode == TEST_PD_MODE_KEY);
     CHECK(slot->owner.key_pos.row == press_pos.row);
@@ -1143,9 +1152,9 @@ static void test_take_handled_press_result_maps_flush_and_begin_request(void) {
 
     CHECK(result.handled);
     CHECK(result.count == 2);
-    CHECK(result.effects[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK(result.effects[0].data.delayed_action.action == TEST_SINGLE_ACTION);
-    CHECK(result.effects[0].data.delayed_action.repeat_count == 1);
+    CHECK(result.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(result.items[0].data.delayed_action.action == TEST_SINGLE_ACTION);
+    CHECK(result.items[0].data.delayed_action.repeat_count == 1);
     test_expect_held_register(&result, 1, press_pos, TEST_HOLD_ACTION);
 }
 
@@ -1349,6 +1358,25 @@ static void test_take_interrupt_result_maps_slot_effect_request(void) {
     test_expect_held_register(&result, 0, slot->owner.key_pos, TEST_LAYER_KEY);
 }
 
+static void test_slot_result_overflow_sets_flag_and_logs_once(void) {
+    key_runtime_slot_result_t result  = {.handled = true};
+    keypos_t                  key_pos = test_keypos(7, 7);
+
+    test_reset_state();
+
+    for (uint8_t index = 0; index < (uint8_t)(KEY_RUNTIME_SLOT_RESULT_CAPACITY + 2); index++) {
+        key_runtime_slot_result_push_dispatch_action(&result, key_pos, (uint16_t)(TEST_SINGLE_ACTION + index));
+    }
+
+    CHECK(result.count == KEY_RUNTIME_SLOT_RESULT_CAPACITY);
+    CHECK(result.overflowed);
+    CHECK(overflow_log_count == 1);
+    CHECK(result.items[0].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK(result.items[0].data.action == TEST_SINGLE_ACTION);
+    CHECK(result.items[KEY_RUNTIME_SLOT_RESULT_CAPACITY - 1].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK(result.items[KEY_RUNTIME_SLOT_RESULT_CAPACITY - 1].data.action == (uint16_t)(TEST_SINGLE_ACTION + KEY_RUNTIME_SLOT_RESULT_CAPACITY - 1));
+}
+
 int main(void) {
     test_slot_pending_multi_tap_ownership_marks_slot_non_idle();
     test_slot_pending_multi_tap_lifecycle_helpers();
@@ -1381,6 +1409,7 @@ int main(void) {
     test_take_active_scan_result_maps_commit_and_long_hold_requests();
     test_take_active_scan_result_starts_repeat_binding();
     test_take_interrupt_result_maps_slot_effect_request();
+    test_slot_result_overflow_sets_flag_and_logs_once();
 
     puts("key_runtime_slot host tests passed");
     return 0;

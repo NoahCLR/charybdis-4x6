@@ -47,12 +47,13 @@ Its strength is that most extension work is still declarative:
 
 The main remaining architecture risks are now local and specific:
 
-1. the handled-key runtime still pays too much naming and test fanout cost
-   across adjacent effect/result surfaces
-2. pd-mode implementation state is still accumulating inside one large
+1. pd-mode implementation state is still accumulating inside one large
    `pd_mode_handlers.c` translation unit
-3. saturation and cross-subsystem trace coverage are still thinner than the
+2. cross-subsystem trace coverage is still thinner than the
    rest of the runtime's host verification story
+3. the handled-key reducers are coherent but dense enough that the next major
+   lifecycle addition should split them by ownership seam instead of adding
+   more local helper layers
 
 Those are maintainability issues, not signs that the overall design is wrong.
 
@@ -201,21 +202,22 @@ on 2026-04-12 now makes that true in code:
   reading authored behavior through the handled-key surface
 
 That is the right abstraction for this repo. The remaining handled-key issue is
-not data leakage anymore; it is the amount of adjacent vocabulary around
-reducers, slot results, and transition plans.
+not data leakage anymore; it is simply keeping future reducer growth
+disciplined now that the public contract is clean.
 
-### Leaky abstraction: one effect pipeline, multiple public names
+### Improved abstraction: effect-bearing surfaces now share one queue vocabulary
 
-The executable effect vocabulary is finally centralized in
-[`key_runtime_effect.h`](../../users/noah/lib/key/key_runtime_effect.h), which
-is good. But maintainers still have to understand three adjacent layers:
+Follow-up work on 2026-04-12 finished the public vocabulary cleanup for the
+effect-bearing handled-key surfaces:
 
-- reducer-local builders in `key_runtime_slot_effect.h`
-- effect-bearing slot results in `key_runtime_slot_result.h`
-- effect-bearing transition plans in `key_runtime_transition.h`
+- slot results and transition plans now both expose `items/count/overflowed`
+- the shared queue field vocabulary lives in
+  [`key_runtime_effect_queue.h`](../../users/noah/lib/key/key_runtime_effect_queue.h)
+- host tests intentionally fill both queue capacities and assert overflow
+  logging plus saturation behavior
 
-That is lighter than the older architecture, but it still makes the reducer to
-executor seam feel more abstract than it really is.
+The reducer-local builder layer still exists, but it no longer leaks into the
+public queue naming. That is a reasonable balance for this repo.
 
 ### Improved abstraction: pd-mode local and display queries are now explicit
 
@@ -389,14 +391,13 @@ That does not need to be a full logging framework. A small ring buffer behind
 `CONSOLE_ENABLE` or a dedicated debug flag would already make multi-subsystem
 bugs easier to replay.
 
-The other concrete testing opportunity is saturation coverage:
+Saturation coverage is also better now:
 
-- add one host test that intentionally fills slot-result capacity
-- add one host test that intentionally fills transition-plan capacity
-- assert that overflow is logged and that the runtime fails in the documented
-  way
+- the slot host suite intentionally fills slot-result capacity
+- the transition host suite intentionally fills transition-plan capacity
+- both suites assert the overflow flag and first-overflow logging path
 
-Today those limits exist, but they are not a prominent part of the test story.
+Keep those tests in place whenever queue capacities or overflow policy change.
 
 ## 8. Concrete Recommendations
 
@@ -404,28 +405,17 @@ Today those limits exist, but they are not a prominent part of the test story.
 
 Priority: high
 
-Status: partially implemented in follow-up work on 2026-04-12
+Status: implemented in follow-up work on 2026-04-12
 
-The first two cleanups landed:
+All three cleanups landed:
 
 1. handled-key resolution moved out of `key_runtime.c` into a dedicated
    `handled_key.c`
 2. `handled_key_view_t` is now fully resolved on its public surface
+3. slot results and transition plans now share one explicit effect-queue
+   vocabulary with matching overflow coverage
 
-The remaining handled-key follow-up is to collapse the builder/result naming
-overlap into one obvious effect-queue vocabulary.
-
-Example remaining direction:
-
-```c
-typedef struct {
-    key_runtime_effect_t items[KEY_RUNTIME_SLOT_RESULT_CAPACITY];
-    uint8_t count;
-    bool overflowed;
-} key_runtime_effect_queue_t;
-```
-
-That would keep the extension cost for new handled-key behavior closer to one
+That keeps the extension cost for new handled-key behavior closer to one public
 pipeline instead of several adjacent vocabularies.
 
 ### Recommendation 2: preserve explicit pd-mode local and display queries

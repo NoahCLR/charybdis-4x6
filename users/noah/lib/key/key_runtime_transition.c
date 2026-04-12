@@ -35,14 +35,14 @@ static void key_runtime_transition_log_plan_overflow(key_runtime_effect_kind_t k
 }
 
 static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan, key_runtime_effect_t effect) {
-    if (plan->count < ARRAY_SIZE(plan->effects)) {
-        plan->effects[plan->count++] = effect;
+    if (plan->count < ARRAY_SIZE(plan->items)) {
+        plan->items[plan->count++] = effect;
         return;
     }
 
     if (!plan->overflowed) {
         plan->overflowed = true;
-        key_runtime_transition_log_plan_overflow(effect.kind, ARRAY_SIZE(plan->effects));
+        key_runtime_transition_log_plan_overflow(effect.kind, ARRAY_SIZE(plan->items));
     }
 }
 
@@ -52,7 +52,7 @@ static void key_runtime_transition_apply_slot_result(const key_runtime_slot_resu
     }
 
     for (uint8_t index = 0; index < result->count; index++) {
-        key_runtime_transition_plan_push(plan, result->effects[index]);
+        key_runtime_transition_plan_push(plan, result->items[index]);
     }
 }
 
@@ -69,7 +69,7 @@ static bool key_runtime_transition_apply_slot_step(active_key_state_t *slot, key
 
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan) {
     for (uint8_t i = 0; i < plan->count; i++) {
-        const key_runtime_effect_t *effect = &plan->effects[i];
+        const key_runtime_effect_t *effect = &plan->items[i];
         key_runtime_trace_effect_execute(i, effect);
 
         switch (effect->kind) {

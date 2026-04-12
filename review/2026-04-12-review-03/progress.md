@@ -106,13 +106,41 @@ Verification run for the handled-key follow-up:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Follow-up implementation completed after the handled-key contract cleanup:
+
+- Introduced a shared handled-key effect-queue vocabulary in
+  `key_runtime_effect_queue.h` so slot results and transition plans now expose
+  the same `items/count/overflowed` fields.
+- Updated the slot-result and transition-plan implementations plus trace output
+  to use the shared queue vocabulary instead of separate `effects` storage
+  names.
+- Added first-overflow logging to `key_runtime_slot_result.c` so slot-result
+  saturation now reports the dropped effect the same way transition-plan
+  saturation already did.
+- Extended the slot and transition host suites to intentionally fill both queue
+  capacities and assert the overflow flag plus first-overflow logging path.
+- Enabled `CONSOLE_ENABLE` in the dedicated slot/transition host runners so the
+  overflow logging contract is covered in normal host verification.
+
+Verification run for the effect-queue follow-up:
+
+- `git status --short`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Recommended next implementation work:
 
-1. Collapse the remaining handled-key effect-pipeline naming overlap and add
-   explicit overflow/saturation tests for slot-result and transition-plan
-   capacity boundaries.
-2. When the next bespoke pd mode lands, stop growing `pd_mode_handlers.c` and
+1. When the next bespoke pd mode lands, stop growing `pd_mode_handlers.c` and
    split mode-local implementations into per-mode translation units.
-3. Add a small shared runtime trace sink for cross-subsystem debugging so key
+2. Add a small shared runtime trace sink for cross-subsystem debugging so key
    runtime, pd mode, ownership, and split-sync events can be inspected through
    one vocabulary.
+3. If another handled-key lifecycle feature lands, split
+   `key_runtime_slot_step.c` and `key_runtime_slot_release_reduce.c` by
+   ownership seam instead of layering more local helpers into either file.

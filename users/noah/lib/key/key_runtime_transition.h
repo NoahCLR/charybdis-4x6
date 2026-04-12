@@ -14,15 +14,13 @@
 #include <stdint.h>
 
 #include "handled_key.h"
-#include "key_runtime_effect.h"
+#include "key_runtime_effect_queue.h"
 #include "key_runtime_state.h"
 
 #define KEY_RUNTIME_TRANSITION_PLAN_CAPACITY 16
 
 typedef struct {
-    key_runtime_effect_t effects[KEY_RUNTIME_TRANSITION_PLAN_CAPACITY];
-    uint8_t              count;
-    bool                 overflowed;
+    KEY_RUNTIME_EFFECT_QUEUE_FIELDS(KEY_RUNTIME_TRANSITION_PLAN_CAPACITY);
 } key_runtime_transition_plan_t;
 
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan);

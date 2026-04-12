@@ -13,6 +13,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DCONSOLE_ENABLE \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DSPLIT_TRANSACTION_IDS_USER \
     -I"$ROOT" \

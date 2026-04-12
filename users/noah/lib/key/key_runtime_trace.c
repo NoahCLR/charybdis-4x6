@@ -67,7 +67,7 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
     uprintf("Key runtime trace [%s] plan count=%u overflowed=%u\n", stage, (unsigned int)plan->count, plan->overflowed ? 1u : 0u);
 
     for (uint8_t i = 0; i < plan->count; i++) {
-        const key_runtime_effect_t *effect = &plan->effects[i];
+        const key_runtime_effect_t *effect = &plan->items[i];
 
         switch (effect->kind) {
             case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
