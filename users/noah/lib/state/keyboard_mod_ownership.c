@@ -188,3 +188,27 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
 
     keyboard_mod_ownership_unregister_mods(keyboard_mod_ownership_mod_masks[index]);
 }
+
+void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (keyboard_mod_ownership_debug_snapshot_t){
+        .live_state =
+            {
+                .real           = get_mods(),
+                .weak           = get_weak_mods(),
+                .oneshot        = get_oneshot_mods(),
+                .oneshot_locked = get_oneshot_locked_mods(),
+            },
+    };
+
+    memcpy(out->physical_refcounts, keyboard_mod_ownership_physical_refcounts, sizeof(keyboard_mod_ownership_physical_refcounts));
+    memcpy(out->managed_refcounts, keyboard_mod_ownership_managed_refcounts, sizeof(keyboard_mod_ownership_managed_refcounts));
+}
+
+void keyboard_mod_ownership_reset_for_test(void) {
+    memset(keyboard_mod_ownership_physical_refcounts, 0, sizeof(keyboard_mod_ownership_physical_refcounts));
+    memset(keyboard_mod_ownership_managed_refcounts, 0, sizeof(keyboard_mod_ownership_managed_refcounts));
+}

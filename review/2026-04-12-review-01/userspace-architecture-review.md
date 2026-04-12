@@ -525,6 +525,19 @@ void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out);
 void noah_runtime_reset_for_test(void);
 ```
 
+Status after this review pass:
+
+- implemented in
+  [`runtime_debug.h`](../../users/noah/lib/state/runtime_debug.h) and
+  [`runtime_debug.c`](../../users/noah/lib/state/runtime_debug.c)
+- layer ownership, held-action ownership, and keyboard modifier ownership now
+  expose read-only debug snapshots for higher-level tests
+- host tests can reset the shared runtime through one helper instead of mixing
+  ad hoc `noah_runtime_shared_state` zeroing with subsystem-specific cleanup
+  calls
+- `runtime_shared_state_reset()` now restores valid slot defaults for the key
+  runtime core state instead of leaving test resets to raw zeroed storage
+
 This would make scenario-level assertions and failure diagnosis faster,
 especially for cross-subsystem bugs.
 

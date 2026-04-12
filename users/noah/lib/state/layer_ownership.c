@@ -16,10 +16,6 @@ typedef struct {
     uint8_t  layer;
 } layer_momentary_binding_t;
 
-// Momentary layer ownership is keyed by physical switch position, so a board-
-// sized table avoids the semantic holes caused by a smaller arbitrary cap.
-#define LAYER_OWNERSHIP_BINDING_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
-
 static layer_momentary_binding_t layer_momentary_bindings[LAYER_OWNERSHIP_BINDING_CAPACITY] = {0};
 static uint8_t                   layer_momentary_refcounts[LAYER_COUNT]                     = {0};
 static layer_state_t             layer_locked_mask                                          = 0;
@@ -176,10 +172,29 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return layer_ownership_remove_slot((uint16_t)slot);
 }
 
-#ifdef NOAH_HOST_TESTS
+void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (layer_ownership_debug_snapshot_t){
+        .applied_layer_state = layer_state,
+        .locked_mask         = layer_locked_mask,
+    };
+
+    memcpy(out->momentary_refcounts, layer_momentary_refcounts, sizeof(layer_momentary_refcounts));
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(layer_momentary_bindings); i++) {
+        out->bindings[i] = (layer_ownership_binding_snapshot_t){
+            .active  = layer_momentary_bindings[i].active,
+            .key_pos = layer_momentary_bindings[i].key_pos,
+            .layer   = layer_momentary_bindings[i].layer,
+        };
+    }
+}
+
 void layer_ownership_reset_for_test(void) {
     memset(layer_momentary_bindings, 0, sizeof(layer_momentary_bindings));
     memset(layer_momentary_refcounts, 0, sizeof(layer_momentary_refcounts));
     layer_locked_mask = 0;
 }
-#endif

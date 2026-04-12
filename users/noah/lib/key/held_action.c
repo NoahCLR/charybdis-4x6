@@ -37,11 +37,6 @@ typedef struct {
     uint16_t last_fire_time;
 } held_repeat_binding_t;
 
-// Ownership is tracked by physical key position, so the natural upper bound is
-// the full matrix size. Using a smaller cap degrades semantics once a binding
-// overflows, which is not worth the tiny RAM saving on this board.
-#define HELD_ACTION_BINDING_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
-
 // Board-sized ownership tables keep per-key refcount behavior intact even on
 // unusually large chords. A free-slot miss now indicates state corruption or a
 // broken matrix definition rather than a routine rollover limit.
@@ -406,4 +401,46 @@ bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
 
     int16_t slot = held_action_find_slot_for_key(key_pos);
     return slot >= 0 && held_actions[slot].action == action;
+}
+
+void held_action_debug_snapshot(held_action_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (held_action_debug_snapshot_t){0};
+    memcpy(out->modifier_refcounts, held_modifier_refcounts, sizeof(held_modifier_refcounts));
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(held_modifiers); i++) {
+        out->modifiers[i] = (held_action_binding_snapshot_t){
+            .active  = held_modifiers[i].active,
+            .key_pos = held_modifiers[i].key_pos,
+            .action  = held_modifiers[i].action,
+        };
+    }
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
+        out->actions[i] = (held_action_binding_snapshot_t){
+            .active  = held_actions[i].active,
+            .key_pos = held_actions[i].key_pos,
+            .action  = held_actions[i].action,
+        };
+    }
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(held_repeats); i++) {
+        out->repeats[i] = (held_repeat_binding_snapshot_t){
+            .active         = held_repeats[i].active,
+            .key_pos        = held_repeats[i].key_pos,
+            .action         = held_repeats[i].action,
+            .interval_ms    = held_repeats[i].interval_ms,
+            .last_fire_time = held_repeats[i].last_fire_time,
+        };
+    }
+}
+
+void held_action_reset_for_test(void) {
+    memset(held_modifiers, 0, sizeof(held_modifiers));
+    memset(held_modifier_refcounts, 0, sizeof(held_modifier_refcounts));
+    memset(held_actions, 0, sizeof(held_actions));
+    memset(held_repeats, 0, sizeof(held_repeats));
 }

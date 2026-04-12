@@ -71,9 +71,25 @@ Completed in this pass:
     lifecycle surface
   - updated the pd-mode host harness and maintainer doc to cover the new seam
     without changing the manifest row schema
+- Implemented the shared runtime snapshot/reset surface from this review:
+  - added `runtime_debug.h` / `runtime_debug.c` with one aggregate
+    `noah_runtime_debug_snapshot_t` surface and one
+    `noah_runtime_reset_for_test()` entry point
+  - added subsystem snapshot/reset hooks for layer ownership, held-action
+    ownership, and keyboard modifier ownership so higher-level tests can
+    inspect and reset those hidden tables without rebuilding module-local
+    cleanup logic
+  - added `runtime_shared_state_reset()` so the shared key/pd runtime storage
+    resets to valid slot defaults instead of ad hoc zeroed storage
+  - added a dedicated `runtime_debug` host test and wired it into the full host
+    suite
 
 Verification run in this pass:
 
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_layer_ownership_tests.sh`
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
 - `sh tests/host/run_key_runtime_admission_tests.sh`
 - `sh tests/host/run_key_runtime_slot_tests.sh`
 - `sh tests/host/run_key_runtime_feedback_tests.sh`
@@ -104,6 +120,7 @@ Workspace scope:
 
 Recommended next implementation work:
 
-1. Add one shared runtime snapshot/reset surface for debugging and host tests.
-2. Separate held-action ownership from repeat scheduling once the runtime
-   snapshot/reset surface makes the cross-subsystem assertions easier to write.
+1. Separate held-action ownership from repeat scheduling now that the runtime
+   snapshot/reset surface can support the cross-subsystem assertions.
+2. Write one permanent maintainer doc for the key runtime so the reducer/effect
+   flow is documented outside the time-scoped review folders.

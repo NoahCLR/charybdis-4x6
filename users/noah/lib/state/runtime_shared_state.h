@@ -116,3 +116,5 @@ typedef struct {
 } runtime_shared_state_t;
 
 extern runtime_shared_state_t noah_runtime_shared_state;
+
+void runtime_shared_state_reset(runtime_shared_state_t *state);
