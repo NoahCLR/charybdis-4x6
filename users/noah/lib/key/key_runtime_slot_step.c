@@ -23,11 +23,11 @@ static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavi
     return hold_registers_on_press(hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
 }
 
-static key_runtime_slot_effect_request_t key_runtime_slot_step_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
-    key_runtime_slot_effect_request_t request = {0};
+static key_runtime_effect_builder_t key_runtime_slot_step_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
+    key_runtime_effect_builder_t builder = {0};
 
     if (!slot) {
-        return request;
+        return builder;
     }
 
     key_runtime_slot_track(slot, keycode, key_pos, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, phase, hold_strategy);
@@ -36,11 +36,11 @@ static key_runtime_slot_effect_request_t key_runtime_slot_step_begin_press(activ
 
     if (hold_registers_on_press(hold)) {
         slot->lifecycle.held_action_keycode = hold.action;
-        request.kind              = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
-        request.action            = hold.action;
+        builder.kind              = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
+        builder.action            = hold.action;
     }
 
-    return request;
+    return builder;
 }
 
 typedef enum {
@@ -120,7 +120,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_handled_press_reuse_pendi
     }
 
     if (key_runtime_slot_pending_multi_tap_pending_hold(context->slot) || context->needs_layer_press) {
-        key_runtime_slot_effect_request_t begin_request = key_runtime_slot_step_begin_press(
+        key_runtime_effect_builder_t begin_builder = key_runtime_slot_step_begin_press(
             context->slot,
             context->keycode,
             context->key_pos,
@@ -134,7 +134,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_handled_press_reuse_pendi
             key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
             KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
             false);
-        key_runtime_slot_result_push_request_if_present(&result, context->key_pos, begin_request);
+        key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, begin_builder);
     }
 
     return result;
@@ -160,11 +160,11 @@ static key_runtime_slot_result_t key_runtime_slot_step_handled_press_begin_fresh
 
     if (context->reclaim_active_slot) {
         keypos_t                          reclaim_key_pos  = context->slot->owner.key_pos;
-        key_runtime_slot_effect_request_t reclaim_request = key_runtime_slot_policy_take_flush(context->slot, context->active_held_action_survives_flush);
-        key_runtime_slot_result_push_request_if_present(&result, reclaim_key_pos, reclaim_request);
+        key_runtime_effect_builder_t reclaim_builder = key_runtime_slot_policy_take_flush(context->slot, context->active_held_action_survives_flush);
+        key_runtime_slot_result_push_builder_if_present(&result, reclaim_key_pos, reclaim_builder);
     }
 
-    key_runtime_slot_result_push_request_if_present(&result, context->key_pos, key_runtime_slot_step_begin_press(
+    key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, key_runtime_slot_step_begin_press(
                                                         context->slot,
                                                         context->keycode,
                                                         context->key_pos,
@@ -196,15 +196,15 @@ static key_runtime_slot_result_t key_runtime_slot_step_handled_press(active_key_
 }
 
 static key_runtime_slot_result_t key_runtime_slot_step_interrupt(active_key_state_t *slot, keypos_t other_key_pos) {
-    key_runtime_slot_result_t         result  = {0};
-    key_runtime_slot_effect_request_t request = key_runtime_slot_policy_interrupt_on_other_press(slot, other_key_pos);
+    key_runtime_slot_result_t        result  = {0};
+    key_runtime_effect_builder_t builder = key_runtime_slot_policy_interrupt_on_other_press(slot, other_key_pos);
 
-    if (!key_runtime_slot_result_request_has_effect(request)) {
+    if (!key_runtime_slot_result_builder_has_effect(builder)) {
         return result;
     }
 
     result.handled = true;
-    key_runtime_slot_result_push_request_if_present(&result, slot ? slot->owner.key_pos : (keypos_t){0}, request);
+    key_runtime_slot_result_push_builder_if_present(&result, slot ? slot->owner.key_pos : (keypos_t){0}, builder);
     return result;
 }
 

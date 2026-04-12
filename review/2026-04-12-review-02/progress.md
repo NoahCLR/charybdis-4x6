@@ -227,3 +227,48 @@ Recommended next implementation work:
 
 1. Collapse the remaining handled-key request/result/transition naming overlap
    so there is one obvious executable effect vocabulary.
+
+## 2026-04-12 follow-up: handled-key effect vocabulary cleanup
+
+Completed in this follow-up:
+
+- Renamed the reducer-local slot-policy surface in
+  `users/noah/lib/key/key_runtime_slot_effect.h` to
+  `key_runtime_effect_builder_t` so it no longer reads like another
+  executable effect protocol.
+- Removed the duplicated executable-effect aliases from:
+  - `users/noah/lib/key/key_runtime_slot_result.h`
+  - `users/noah/lib/key/key_runtime_transition.h`
+- Updated the slot-result builders, transition execution, and trace helpers so
+  slot results and transition plans now carry raw `key_runtime_effect_t`
+  payloads directly.
+- Updated the slot and transition host tests to assert `KEY_RUNTIME_EFFECT_*`
+  directly instead of slot-result or transition-specific re-export macros.
+- Updated `docs/KEY_RUNTIME.md` and the active review so the maintainer-facing
+  architecture notes now match the simplified effect surface.
+
+Verification run in this follow-up:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- slot and transition tests passed on the shared effect vocabulary
+- feature-gate compile tests passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- changed only this repo
+- no sibling workspace folders were modified
+
+Recommended next implementation work:
+
+1. No remaining required follow-up items remain from review-02.
+2. If another bespoke pd mode lands, consider splitting
+   `users/noah/lib/pointing/pd_mode_handlers.c` into per-mode files.

@@ -167,21 +167,21 @@ The handled-key path now has one shared executable effect vocabulary:
 
 There are still two layers inside the reducer implementation, on purpose:
 
-- `key_runtime_slot_effect_request_t` in
+- `key_runtime_effect_builder_t` in
   [`key_runtime_slot_effect.h`](../users/noah/lib/key/key_runtime_slot_effect.h)
-  is a narrow local helper used by slot-policy code
+  is a narrow reducer-local builder used by slot-policy code
 - `key_runtime_effect_t` in
   [`key_runtime_effect.h`](../users/noah/lib/key/key_runtime_effect.h) is the
-  real runtime effect surface that leaves the reducer and reaches transition
-  execution
+  real runtime effect surface carried directly by slot results and transition
+  plans
 
 The pipeline is:
 
-1. slot-policy helpers mutate slot state and return effect requests
+1. slot-policy helpers mutate slot state and return effect builders
 2. [`key_runtime_slot_result.c`](../users/noah/lib/key/key_runtime_slot_result.c)
-   expands those requests into ordered runtime effects
+   expands those builders into ordered runtime effects
 3. [`key_runtime_transition.c`](../users/noah/lib/key/key_runtime_transition.c)
-   batches effects into a plan
+   batches those same effects into a plan
 4. the transition executor applies the plan in order
 
 Current executable effects cover:

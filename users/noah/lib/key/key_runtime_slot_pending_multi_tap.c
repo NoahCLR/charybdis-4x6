@@ -137,12 +137,12 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(acti
 
     switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE:
-            key_runtime_slot_result_push_request_if_present(&result, context.key_pos, (key_runtime_slot_effect_request_t){
-                                                                                .kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER,
+            key_runtime_slot_result_push_builder_if_present(&result, context.key_pos, (key_runtime_effect_builder_t){
+                                                                                .kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER,
                                                                                 .action = resolution.action,
                                                                             });
-            key_runtime_slot_result_push_request_if_present(&result, context.key_pos, (key_runtime_slot_effect_request_t){
-                                                                                .kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_UNREGISTER,
+            key_runtime_slot_result_push_builder_if_present(&result, context.key_pos, (key_runtime_effect_builder_t){
+                                                                                .kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_UNREGISTER,
                                                                                 .action = resolution.action,
                                                                             });
             break;
@@ -185,7 +185,7 @@ typedef enum {
 typedef struct {
     key_runtime_slot_pending_multi_tap_scan_outcome_t outcome;
     bool                                              release_layer_before_action;
-    key_runtime_slot_effect_request_t                 effect_request;
+    key_runtime_effect_builder_t                      effect_builder;
 } key_runtime_slot_pending_multi_tap_scan_resolution_t;
 
 static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pending_multi_tap_scan_resolve(active_key_state_t *slot, multi_tap_t *slot_multi_tap, uint16_t elapsed) {
@@ -200,7 +200,7 @@ static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pen
     if (hold_fires_at_threshold(slot_multi_tap->long_hold) && elapsed >= slot->timing.longer_hold_term) {
         resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD;
         resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, slot_multi_tap->long_hold.action);
-        resolution.effect_request             = key_runtime_slot_policy_promote_to_long_hold(slot, slot->binding.long_hold, true);
+        resolution.effect_builder             = key_runtime_slot_policy_promote_to_long_hold(slot, slot->binding.long_hold, true);
         return resolution;
     }
 
@@ -210,7 +210,7 @@ static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pen
 
     resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD;
     resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, slot_multi_tap->hold.action);
-    resolution.effect_request             = key_runtime_slot_policy_fire_hold_at_threshold(slot, slot_multi_tap->hold, slot->binding.long_hold, true);
+    resolution.effect_builder             = key_runtime_slot_policy_fire_hold_at_threshold(slot, slot_multi_tap->hold, slot->binding.long_hold, true);
     return resolution;
 }
 
@@ -224,7 +224,7 @@ static key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_scan_hold(ac
 
     key_runtime_slot_reset_pending_multi_tap(slot);
 
-    if (!(resolution.release_layer_before_action || key_runtime_slot_result_request_has_effect(resolution.effect_request))) {
+    if (!(resolution.release_layer_before_action || key_runtime_slot_result_builder_has_effect(resolution.effect_builder))) {
         return result;
     }
 
@@ -232,7 +232,7 @@ static key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_scan_hold(ac
     if (resolution.release_layer_before_action) {
         key_runtime_slot_result_push_layer_release(&result, key_pos);
     }
-    key_runtime_slot_result_push_request_if_present(&result, key_pos, resolution.effect_request);
+    key_runtime_slot_result_push_builder_if_present(&result, key_pos, resolution.effect_builder);
     return result;
 }
 

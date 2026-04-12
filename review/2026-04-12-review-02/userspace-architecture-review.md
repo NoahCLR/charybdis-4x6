@@ -29,16 +29,11 @@ foundations are correct and worth preserving:
 - unusually strong host coverage, compile gates, and authored-profile
   validation
 
-The remaining architectural risk is now narrow. It is no longer a broad
-"the repo needs structure" problem. The main cross-cutting seam still worth
-cleaning up is:
-
-1. the handled-key effect model is improved, but still exposed through several
-   overlapping interface layers
-
-The recommendation is not a rewrite and not a plugin framework. The right
-next move is to keep the current data-driven design and finish tightening that
-one interface seam.
+The follow-up items identified at the start of this review have now landed.
+What remains are localized maintenance concerns, not urgent architecture
+debt. The recommendation is still not a rewrite and not a plugin framework:
+preserve the current data-driven design and only make further local cleanups
+when a concrete extension actually needs them.
 
 ## Status Update After Initial Implementation
 
@@ -80,6 +75,18 @@ The third follow-up item from this review has now landed in the repo:
 The remaining implementation priority is now the smaller handled-key
 interface cleanup.
 
+## Status Update After Effect Vocabulary Cleanup
+
+The fourth follow-up item from this review has now landed in the repo:
+
+- the reducer-local request layer now reads as a builder surface
+- slot results now carry `key_runtime_effect_t` directly
+- transition plans now carry `key_runtime_effect_t` directly
+- transition tracing and host tests now assert the shared effect vocabulary
+  without slot-result or transition-specific re-export macros
+
+There are no remaining required implementation items from this review.
+
 ## Architecture And Separation Of Concerns
 
 ### What is working well
@@ -97,22 +104,16 @@ interface cleanup.
   snapshot surface. That is materially better than the architecture captured
   in older reviews.
 
-### Main remaining concern: handled-key interfaces still over-describe one pipeline
+### Handled-key effects now read as one pipeline
 
-The runtime now has a real shared executable effect surface in
-[`key_runtime_effect.h`](../../users/noah/lib/key/key_runtime_effect.h), and
-the scenario harness now consumes that same vocabulary directly. That is the
-right architecture.
+The runtime now has one obvious executable effect vocabulary in
+[`key_runtime_effect.h`](../../users/noah/lib/key/key_runtime_effect.h).
 
-What still feels heavier than it needs to is the interface stack around that
-pipeline:
-
-- `key_runtime_slot_effect.h`
-- `key_runtime_slot_result.h`
-- `key_runtime_transition.h`
-
-Those headers describe distinct implementation stages, but they still make the
-real reducer-to-executor model look more layered than it is.
+The remaining reducer-local helper in
+[`key_runtime_slot_effect.h`](../../users/noah/lib/key/key_runtime_slot_effect.h)
+is intentionally narrower: it is a builder surface for slot-policy code, not
+another executable effect dialect. Slot results and transition plans now carry
+`key_runtime_effect_t` directly.
 
 ## Modularity And Extensibility
 
@@ -411,7 +412,7 @@ Follow-up status:
 - resolved in the second implementation slice recorded in
   [progress.md](./progress.md)
 
-### 3. Medium: the handled-key effect model still exposes overlapping protocol layers
+### 3. Medium at review time: the handled-key effect model exposed overlapping protocol layers
 
 Evidence:
 
@@ -433,6 +434,11 @@ Recommendation:
 
 The architecture is close here; the remaining work is mostly interface cleanup,
 not a redesign.
+
+Follow-up status:
+
+- resolved in the fourth implementation slice recorded in
+  [progress.md](./progress.md)
 
 ### 4. Medium: the scenario harness still mirrors runtime contracts instead of consuming them
 
@@ -467,8 +473,9 @@ Follow-up status:
 
 ## Concrete Next Steps
 
-1. Rename and narrow the handled-key request/result interfaces so there is one
-   obvious executable effect vocabulary.
+1. No further mandatory follow-up items remain from this review.
+2. If another bespoke pd mode lands, consider splitting
+   `users/noah/lib/pointing/pd_mode_handlers.c` into per-mode files.
 
 ## Overall Judgment
 

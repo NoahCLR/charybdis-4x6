@@ -229,7 +229,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_active_release(active_key
 
     key_runtime_slot_step_release_resolution_t resolution = key_runtime_slot_step_resolve_release(released_key, key, elapsed);
     if (resolution.release_owned_state) {
-        key_runtime_slot_result_push_request_if_present(&result, released_key.owner.key_pos, (key_runtime_slot_effect_request_t){
+        key_runtime_slot_result_push_builder_if_present(&result, released_key.owner.key_pos, (key_runtime_effect_builder_t){
                                                                                     .release_owned_state = true,
                                                                                 });
     }
@@ -273,7 +273,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_sta
     if (handled_key_is_momentary_layer(key)) {
         key_runtime_slot_result_push_layer_release(&result, key_pos);
     }
-    key_runtime_slot_result_push_request_if_present(&result, key_pos, (key_runtime_slot_effect_request_t){
+    key_runtime_slot_result_push_builder_if_present(&result, key_pos, (key_runtime_effect_builder_t){
                                                                        .release_owned_state = true,
                                                                    });
     return result;

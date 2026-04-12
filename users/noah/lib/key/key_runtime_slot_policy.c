@@ -43,13 +43,13 @@ static bool key_runtime_slot_policy_hold_activation_needs_pulse(hold_behavior_t 
     return false;
 }
 
-static void key_runtime_slot_policy_clear_owned_hold(active_key_state_t *slot, key_runtime_slot_effect_request_t *request) {
-    if (!slot || !request) {
+static void key_runtime_slot_policy_clear_owned_hold(active_key_state_t *slot, key_runtime_effect_builder_t *builder) {
+    if (!slot || !builder) {
         return;
     }
 
     if (slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
-        request->release_owned_state           = true;
+        builder->release_owned_state           = true;
         slot->lifecycle.held_action_keycode    = KC_NO;
         slot->lifecycle.repeat_binding_active  = false;
     }
@@ -63,144 +63,144 @@ uint16_t key_runtime_slot_policy_select_release_hold_action(uint16_t elapsed, ui
     return hold_action;
 }
 
-key_runtime_slot_effect_request_t key_runtime_slot_policy_activate_pending_fallback_hold(active_key_state_t *slot) {
-    key_runtime_slot_effect_request_t request = {0};
+key_runtime_effect_builder_t key_runtime_slot_policy_activate_pending_fallback_hold(active_key_state_t *slot) {
+    key_runtime_effect_builder_t builder = {0};
 
     if (!slot || !key_runtime_slot_uses_fallback_hold(slot) || slot->lifecycle.held_action_keycode != KC_NO || slot->owner.keycode == KC_NO) {
-        return request;
+        return builder;
     }
 
     slot->lifecycle.held_action_keycode = slot->owner.keycode;
     key_runtime_slot_commit_hold_phase(slot, true);
-    request.kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
-    request.action = slot->owner.keycode;
-    return request;
+    builder.kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
+    builder.action = slot->owner.keycode;
+    return builder;
 }
 
-key_runtime_slot_effect_request_t key_runtime_slot_policy_interrupt_on_other_press(active_key_state_t *slot, keypos_t other_key_pos) {
+key_runtime_effect_builder_t key_runtime_slot_policy_interrupt_on_other_press(active_key_state_t *slot, keypos_t other_key_pos) {
     if (!key_runtime_slot_active(slot) || key_runtime_keypos_equal(slot->owner.key_pos, other_key_pos)) {
-        return (key_runtime_slot_effect_request_t){0};
+        return (key_runtime_effect_builder_t){0};
     }
 
-    key_runtime_slot_effect_request_t request = key_runtime_slot_policy_activate_pending_fallback_hold(slot);
+    key_runtime_effect_builder_t builder = key_runtime_slot_policy_activate_pending_fallback_hold(slot);
 
     if (is_layer_key(slot->owner.keycode)) {
         slot->lifecycle.layer_interrupted = true;
     }
 
-    return request;
+    return builder;
 }
 
-key_runtime_slot_effect_request_t key_runtime_slot_policy_commit_immediate_hold(active_key_state_t *slot, bool needs_feedback, bool completes_hold) {
-    key_runtime_slot_effect_request_t request = {0};
+key_runtime_effect_builder_t key_runtime_slot_policy_commit_immediate_hold(active_key_state_t *slot, bool needs_feedback, bool completes_hold) {
+    key_runtime_effect_builder_t builder = {0};
 
     if (!slot) {
-        return request;
+        return builder;
     }
 
     key_runtime_slot_commit_hold_phase(slot, completes_hold);
-    request.feedback_pulse           = needs_feedback;
-    request.feedback_long_hold_level = false;
-    return request;
+    builder.feedback_pulse           = needs_feedback;
+    builder.feedback_long_hold_level = false;
+    return builder;
 }
 
-key_runtime_slot_effect_request_t key_runtime_slot_policy_take_flush(active_key_state_t *slot, bool active_held_action_survives_flush) {
-    key_runtime_slot_effect_request_t request = {0};
+key_runtime_effect_builder_t key_runtime_slot_policy_take_flush(active_key_state_t *slot, bool active_held_action_survives_flush) {
+    key_runtime_effect_builder_t builder = {0};
 
     if (!key_runtime_slot_active(slot)) {
-        return request;
+        return builder;
     }
 
     if (!key_runtime_slot_allows_tap_release(slot) || slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
         if (slot->lifecycle.held_action_keycode != KC_NO && !active_held_action_survives_flush) {
-            request.kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_UNREGISTER;
-            request.action = slot->lifecycle.held_action_keycode;
+            builder.kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_UNREGISTER;
+            builder.action = slot->lifecycle.held_action_keycode;
         }
     } else if (!is_layer_key(slot->owner.keycode) && slot->binding.tap_action != KC_NO) {
-        request.kind   = KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION;
-        request.action = slot->binding.tap_action;
+        builder.kind   = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
+        builder.action = slot->binding.tap_action;
     }
 
     key_runtime_slot_reset(slot);
-    return request;
+    return builder;
 }
 
-key_runtime_slot_effect_request_t key_runtime_slot_policy_fire_hold_at_threshold(active_key_state_t *slot, hold_behavior_t hold, hold_behavior_t long_hold, bool pulse_momentary_layer_action) {
-    key_runtime_slot_effect_request_t request = {0};
+key_runtime_effect_builder_t key_runtime_slot_policy_fire_hold_at_threshold(active_key_state_t *slot, hold_behavior_t hold, hold_behavior_t long_hold, bool pulse_momentary_layer_action) {
+    key_runtime_effect_builder_t builder = {0};
 
     if (!slot) {
-        return request;
+        return builder;
     }
 
     switch (key_runtime_slot_policy_hold_threshold_dispatch_kind(hold)) {
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP:
-            key_runtime_slot_policy_clear_owned_hold(slot, &request);
-            request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION;
-            request.action                = hold.action;
-            request.feedback_pulse        = true;
-            request.feedback_long_hold_level = false;
+            key_runtime_slot_policy_clear_owned_hold(slot, &builder);
+            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
+            builder.action                = hold.action;
+            builder.feedback_pulse        = true;
+            builder.feedback_long_hold_level = false;
             key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
-            return request;
+            return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_HELD:
             slot->lifecycle.held_action_keycode = hold.action;
             key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
-            request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
-            request.action                = hold.action;
-            request.feedback_pulse        = key_runtime_slot_policy_hold_activation_needs_pulse(hold, pulse_momentary_layer_action);
-            request.feedback_long_hold_level = false;
-            return request;
+            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
+            builder.action                = hold.action;
+            builder.feedback_pulse        = key_runtime_slot_policy_hold_activation_needs_pulse(hold, pulse_momentary_layer_action);
+            builder.feedback_long_hold_level = false;
+            return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_REPEAT:
-            key_runtime_slot_policy_clear_owned_hold(slot, &request);
+            key_runtime_slot_policy_clear_owned_hold(slot, &builder);
             slot->lifecycle.repeat_binding_active = true;
             key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
-            request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_REPEAT_START;
-            request.action                = hold.action;
-            request.repeat_hz             = hold.repeat_hz;
-            request.feedback_pulse        = true;
-            request.feedback_long_hold_level = false;
-            return request;
+            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_REPEAT_START;
+            builder.action                = hold.action;
+            builder.repeat_hz             = hold.repeat_hz;
+            builder.feedback_pulse        = true;
+            builder.feedback_long_hold_level = false;
+            return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_NONE:
         default:
-            return request;
+            return builder;
     }
 }
 
-key_runtime_slot_effect_request_t key_runtime_slot_policy_promote_to_long_hold(active_key_state_t *slot, hold_behavior_t long_hold, bool pulse_momentary_layer_action) {
-    key_runtime_slot_effect_request_t request = {0};
+key_runtime_effect_builder_t key_runtime_slot_policy_promote_to_long_hold(active_key_state_t *slot, hold_behavior_t long_hold, bool pulse_momentary_layer_action) {
+    key_runtime_effect_builder_t builder = {0};
 
     if (!slot) {
-        return request;
+        return builder;
     }
 
-    key_runtime_slot_policy_clear_owned_hold(slot, &request);
+    key_runtime_slot_policy_clear_owned_hold(slot, &builder);
 
     switch (key_runtime_slot_policy_hold_threshold_dispatch_kind(long_hold)) {
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP:
             key_runtime_slot_commit_hold_phase(slot, true);
-            request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_DISPATCH_ACTION;
-            request.action                = long_hold.action;
-            request.feedback_pulse        = true;
-            request.feedback_long_hold_level = true;
-            return request;
+            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
+            builder.action                = long_hold.action;
+            builder.feedback_pulse        = true;
+            builder.feedback_long_hold_level = true;
+            return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_HELD:
             slot->lifecycle.held_action_keycode = long_hold.action;
             key_runtime_slot_commit_hold_phase(slot, true);
-            request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_HELD_REGISTER;
-            request.action                = long_hold.action;
-            request.feedback_pulse        = key_runtime_slot_policy_hold_activation_needs_pulse(long_hold, pulse_momentary_layer_action);
-            request.feedback_long_hold_level = true;
-            return request;
+            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
+            builder.action                = long_hold.action;
+            builder.feedback_pulse        = key_runtime_slot_policy_hold_activation_needs_pulse(long_hold, pulse_momentary_layer_action);
+            builder.feedback_long_hold_level = true;
+            return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_REPEAT:
             slot->lifecycle.repeat_binding_active = true;
             key_runtime_slot_commit_hold_phase(slot, true);
-            request.kind                  = KEY_RUNTIME_SLOT_EFFECT_REQUEST_REPEAT_START;
-            request.action                = long_hold.action;
-            request.repeat_hz             = long_hold.repeat_hz;
-            request.feedback_pulse        = true;
-            request.feedback_long_hold_level = true;
-            return request;
+            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_REPEAT_START;
+            builder.action                = long_hold.action;
+            builder.repeat_hz             = long_hold.repeat_hz;
+            builder.feedback_pulse        = true;
+            builder.feedback_long_hold_level = true;
+            return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_NONE:
         default:
-            return request;
+            return builder;
     }
 }

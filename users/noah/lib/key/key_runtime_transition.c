@@ -25,7 +25,7 @@ void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     *plan = (key_runtime_transition_plan_t){0};
 }
 
-static void key_runtime_transition_log_plan_overflow(key_runtime_transition_effect_kind_t kind, uint8_t capacity) {
+static void key_runtime_transition_log_plan_overflow(key_runtime_effect_kind_t kind, uint8_t capacity) {
 #ifdef CONSOLE_ENABLE
     uprintf("Key runtime transition plan overflow dropping effect kind %u after %u queued effects\n", (unsigned int)kind, (unsigned int)capacity);
 #else
@@ -34,7 +34,7 @@ static void key_runtime_transition_log_plan_overflow(key_runtime_transition_effe
 #endif
 }
 
-static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan, key_runtime_transition_effect_t effect) {
+static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan, key_runtime_effect_t effect) {
     if (plan->count < ARRAY_SIZE(plan->effects)) {
         plan->effects[plan->count++] = effect;
         return;
@@ -69,45 +69,45 @@ static bool key_runtime_transition_apply_slot_step(active_key_state_t *slot, key
 
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan) {
     for (uint8_t i = 0; i < plan->count; i++) {
-        const key_runtime_transition_effect_t *effect = &plan->effects[i];
+        const key_runtime_effect_t *effect = &plan->effects[i];
         key_runtime_trace_effect_execute(i, effect);
 
         switch (effect->kind) {
-            case KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION:
+            case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
                 noah_emit_action_tap(effect->data.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER:
+            case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
                 held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER:
+            case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
                 held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
+            case KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
                 held_action_release_owned_by_key(effect->data.key_pos);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START:
+            case KEY_RUNTIME_EFFECT_REPEAT_START:
                 held_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_PRESS:
+            case KEY_RUNTIME_EFFECT_LAYER_PRESS:
                 layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE:
+            case KEY_RUNTIME_EFFECT_LAYER_RELEASE:
                 layer_ownership_momentary_release(effect->data.key_pos);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE:
+            case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
                 key_feedback_pulse_arm(effect->data.long_hold_level);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_PD_MODE_LOCK_TAP:
+            case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
                 if (pd_mode_toggle_lock_state(effect->data.pd_mode)) {
                     split_runtime_sync();
                 }
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION:
+            case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
                 for (uint8_t repeat = 0; repeat < effect->data.delayed_action.repeat_count; repeat++) {
                     dispatch_delayed_action(effect->data.delayed_action.action, effect->data.delayed_action.mods);
                 }
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_NONE:
+            case KEY_RUNTIME_EFFECT_NONE:
             default:
                 break;
         }

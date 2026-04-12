@@ -14,4 +14,4 @@ void key_runtime_trace_record(const char *stage, uint16_t keycode, const keyreco
 void key_runtime_trace_bool_result(const char *stage, uint16_t keycode, const keyrecord_t *record, bool value);
 void key_runtime_trace_message(const char *stage, const char *message);
 void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan_t *plan);
-void key_runtime_trace_effect_execute(uint8_t index, const key_runtime_transition_effect_t *effect);
+void key_runtime_trace_effect_execute(uint8_t index, const key_runtime_effect_t *effect);

@@ -8,29 +8,29 @@
 
 #    include "print.h"
 
-static const char *key_runtime_trace_effect_name(key_runtime_transition_effect_kind_t kind) {
+static const char *key_runtime_trace_effect_name(key_runtime_effect_kind_t kind) {
     switch (kind) {
-        case KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION:
+        case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
             return "dispatch_action";
-        case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER:
+        case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
             return "held_register";
-        case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER:
+        case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
             return "held_unregister";
-        case KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
+        case KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
             return "release_owned_state";
-        case KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START:
+        case KEY_RUNTIME_EFFECT_REPEAT_START:
             return "repeat_start";
-        case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_PRESS:
+        case KEY_RUNTIME_EFFECT_LAYER_PRESS:
             return "layer_press";
-        case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE:
+        case KEY_RUNTIME_EFFECT_LAYER_RELEASE:
             return "layer_release";
-        case KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE:
+        case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
             return "feedback_pulse";
-        case KEY_RUNTIME_TRANSITION_EFFECT_PD_MODE_LOCK_TAP:
+        case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
             return "pd_mode_lock_tap";
-        case KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION:
+        case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
             return "delayed_action";
-        case KEY_RUNTIME_TRANSITION_EFFECT_NONE:
+        case KEY_RUNTIME_EFFECT_NONE:
         default:
             return "none";
     }
@@ -67,36 +67,36 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
     uprintf("Key runtime trace [%s] plan count=%u overflowed=%u\n", stage, (unsigned int)plan->count, plan->overflowed ? 1u : 0u);
 
     for (uint8_t i = 0; i < plan->count; i++) {
-        const key_runtime_transition_effect_t *effect = &plan->effects[i];
+        const key_runtime_effect_t *effect = &plan->effects[i];
 
         switch (effect->kind) {
-            case KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION:
+            case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
                 uprintf("  [%u] %s action=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.action);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER:
-            case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_UNREGISTER:
+            case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
+            case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
                 uprintf("  [%u] %s key=(%u,%u) action=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.held_action.key_pos.row, (unsigned int)effect->data.held_action.key_pos.col, (unsigned int)effect->data.held_action.action);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
-            case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_RELEASE:
+            case KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
+            case KEY_RUNTIME_EFFECT_LAYER_RELEASE:
                 uprintf("  [%u] %s key=(%u,%u)\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.key_pos.row, (unsigned int)effect->data.key_pos.col);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_REPEAT_START:
+            case KEY_RUNTIME_EFFECT_REPEAT_START:
                 uprintf("  [%u] %s key=(%u,%u) action=0x%04X hz=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.repeat.key_pos.row, (unsigned int)effect->data.repeat.key_pos.col, (unsigned int)effect->data.repeat.action, (unsigned int)effect->data.repeat.repeat_hz);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_LAYER_PRESS:
+            case KEY_RUNTIME_EFFECT_LAYER_PRESS:
                 uprintf("  [%u] %s key=(%u,%u) layer=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.layer_press.key_pos.row, (unsigned int)effect->data.layer_press.key_pos.col, (unsigned int)effect->data.layer_press.layer);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_FEEDBACK_PULSE:
+            case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
                 uprintf("  [%u] %s long=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), effect->data.long_hold_level ? 1u : 0u);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_PD_MODE_LOCK_TAP:
+            case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
                 uprintf("  [%u] %s mode=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pd_mode);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_DELAYED_ACTION:
+            case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
                 uprintf("  [%u] %s action=0x%04X repeat=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.delayed_action.action, (unsigned int)effect->data.delayed_action.repeat_count);
                 break;
-            case KEY_RUNTIME_TRANSITION_EFFECT_NONE:
+            case KEY_RUNTIME_EFFECT_NONE:
             default:
                 uprintf("  [%u] %s\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind));
                 break;
@@ -104,7 +104,7 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
     }
 }
 
-void key_runtime_trace_effect_execute(uint8_t index, const key_runtime_transition_effect_t *effect) {
+void key_runtime_trace_effect_execute(uint8_t index, const key_runtime_effect_t *effect) {
     if (!effect) {
         uprintf("Key runtime trace [execute] [%u] effect=(null)\n", (unsigned int)index);
         return;
@@ -138,7 +138,7 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
     (void)plan;
 }
 
-void key_runtime_trace_effect_execute(uint8_t index, const key_runtime_transition_effect_t *effect) {
+void key_runtime_trace_effect_execute(uint8_t index, const key_runtime_effect_t *effect) {
     (void)index;
     (void)effect;
 }

@@ -515,7 +515,7 @@ static void test_take_active_release_maps_locked_pd_mode_tap(void) {
 
     CHECK(result.handled);
     CHECK(result.count == 1);
-    CHECK(result.effects[0].kind == KEY_RUNTIME_SLOT_RESULT_EFFECT_PD_MODE_LOCK_TAP);
+    CHECK(result.effects[0].kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP);
     CHECK(result.effects[0].data.pd_mode == PD_MODE_VOLUME);
     CHECK(key_runtime_slot_idle(slot));
 }
@@ -819,7 +819,7 @@ static void test_take_pending_multi_tap_scan_event_flushes_expired_chain(void) {
 
     CHECK(result.handled);
     CHECK(result.count == 1);
-    CHECK(result.effects[0].kind == KEY_RUNTIME_SLOT_RESULT_EFFECT_DELAYED_ACTION);
+    CHECK(result.effects[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(result.effects[0].data.delayed_action.action == TEST_SINGLE_ACTION);
     CHECK(result.effects[0].data.delayed_action.repeat_count == 2);
     CHECK(!key_runtime_slot_has_pending_multi_tap(slot));
@@ -895,7 +895,7 @@ static void test_take_pending_multi_tap_hold_release_prefers_release_long_hold_a
 
     CHECK(release.handled);
     CHECK(release.count == 1);
-    CHECK(release.effects[0].kind == KEY_RUNTIME_SLOT_RESULT_EFFECT_DELAYED_ACTION);
+    CHECK(release.effects[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(release.effects[0].data.delayed_action.action == TEST_SINGLE_ACTION);
     CHECK(release.effects[0].data.delayed_action.repeat_count == 1);
     CHECK(key_runtime_slot_idle(slot));
@@ -1064,7 +1064,7 @@ static void test_prepare_handled_press_flushes_pending_multi_tap_before_begin(vo
 
     CHECK(plan.handled);
     CHECK(plan.count == 2);
-    CHECK(plan.effects[0].kind == KEY_RUNTIME_SLOT_RESULT_EFFECT_DELAYED_ACTION);
+    CHECK(plan.effects[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(plan.effects[0].data.delayed_action.action == TEST_SINGLE_ACTION);
     CHECK(plan.effects[0].data.delayed_action.repeat_count == 1);
     test_expect_held_register(&plan, 1, press_pos, TEST_HOLD_ACTION);
@@ -1151,7 +1151,7 @@ static void test_take_handled_press_result_maps_flush_and_begin_request(void) {
 
     CHECK(result.handled);
     CHECK(result.count == 2);
-    CHECK(result.effects[0].kind == KEY_RUNTIME_SLOT_RESULT_EFFECT_DELAYED_ACTION);
+    CHECK(result.effects[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(result.effects[0].data.delayed_action.action == TEST_SINGLE_ACTION);
     CHECK(result.effects[0].data.delayed_action.repeat_count == 1);
     test_expect_held_register(&result, 1, press_pos, TEST_HOLD_ACTION);
