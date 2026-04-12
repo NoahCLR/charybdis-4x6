@@ -59,6 +59,18 @@ historical runtime-default policy, but it is no longer the only intended
 output seam. The remaining implementation priority now starts with pd-mode
 lifecycle ownership and the scenario harness rebuild.
 
+## Status Update After Pd-Mode Lifecycle Refactor
+
+The second follow-up item from this review has now landed in the repo:
+
+- `pd_mode_def_t` rows now own an optional lifecycle pointer
+- the manifest row shape now carries lifecycle ownership for unusual modes
+- the registry no longer selects per-mode lifecycle hooks through a central
+  switch
+
+The remaining implementation priority is now the scenario-harness rebuild and
+the smaller handled-key interface cleanup.
+
 ## Architecture And Separation Of Concerns
 
 ### What is working well
@@ -385,6 +397,11 @@ typedef struct {
 That keeps the current static model, but removes the registry switch as the
 next extensibility choke point.
 
+Follow-up status:
+
+- resolved in the second implementation slice recorded in
+  [progress.md](./progress.md)
+
 ### 3. Medium: the handled-key effect model still exposes overlapping protocol layers
 
 Evidence:
@@ -436,15 +453,9 @@ runtime instead of maintaining a test-only dialect.
 
 ## Concrete Next Steps
 
-1. Extend the pd-mode definition row with an optional lifecycle hook pointer,
-   then delete the `pd_mode_lifecycle_mode_hooks()` switch.
-2. Rename and narrow the handled-key request/result interfaces so there is one
+1. Rename and narrow the handled-key request/result interfaces so there is one
    obvious executable effect vocabulary.
-3. Add one maintainer-facing runtime doc under `docs/` that explains:
-   - handled-key press/release/scan flow
-   - where reducer policy lives
-   - where executable effects are queued and run
-4. Rebuild the scenario harness on shared runtime debug/effect surfaces before
+2. Rebuild the scenario harness on shared runtime debug/effect surfaces before
    adding another major integration scenario family.
 
 ## Overall Judgment

@@ -10,7 +10,7 @@
 // Do not hand-edit the generated keycode enum, flag enum, or registry table.
 //
 // Row format:
-//   PDM(NAME, MODE_KEYCODE, POINTER_HANDLER, KEY_HANDLER, RESET_FN, DPI_OVERRIDE, TRAITS)
+//   PDM(NAME, MODE_KEYCODE, POINTER_HANDLER, KEY_HANDLER, RESET_FN, DPI_OVERRIDE, TRAITS, LIFECYCLE)
 //
 // Field meanings:
 //   NAME:
@@ -38,14 +38,18 @@
 //     Bitmask of PD_MODE_TRAIT_* flags that describe cross-cutting policy for
 //     pointer-layer anchoring, dragscroll backend ownership, lock behavior,
 //     and other shared registry/pointer policy. Prefer adding a new trait when
-//     multiple modes share the same policy. If a mode needs unusual lifecycle
-//     side effects, add an optional lifecycle hook in pd_mode_registry.c
-//     instead of another one-off trait branch.
+//     multiple modes share the same policy.
+//   LIFECYCLE:
+//     Optional registry-owned lifecycle hook object selected by this
+//     definition row. Use NULL when the mode needs no custom activate,
+//     deactivate, lock, or unlock side effects beyond shared trait policy.
+//     This keeps unusual modes definition-owned instead of adding another
+//     central registry switch.
 //
 // Example:
 //   PDM(MY_NEW_MODE, MY_NEW_MODE_KEY,
 //     handle_my_new_mode, NULL, reset_my_new_mode,
-//     PD_MODE_MY_NEW_MODE_DPI, PD_MODE_TRAIT_NONE)
+//     PD_MODE_MY_NEW_MODE_DPI, PD_MODE_TRAIT_NONE, NULL)
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -62,9 +66,9 @@ enum {
 };
 
 #define NOAH_PD_MODE_LIST(PDM)                                                                                                                                                                  \
-    PDM(DRAGSCROLL, DRAGSCROLL, NULL, NULL, NULL, 0, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)          \
-    PDM(VOLUME, VOLUME_MODE, handle_volume_mode, NULL, reset_volume_mode, PD_MODE_VOLUME_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)                                                         \
-    PDM(BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, NULL, reset_brightness_mode, PD_MODE_BRIGHTNESS_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)                                      \
-    PDM(ZOOM, ZOOM_MODE, handle_zoom_mode, NULL, reset_zoom_mode, PD_MODE_ZOOM_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)                                                                   \
-    PDM(ARROW, ARROW_MODE, handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode, PD_MODE_ARROW_DPI, PD_MODE_TRAIT_PREFER_TYPING_LAYER)                                                   \
-    PDM(PINCH, PINCH_MODE, NULL, NULL, NULL, 0, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)
+    PDM(DRAGSCROLL, DRAGSCROLL, NULL, NULL, NULL, 0, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE, PD_MODE_LIFECYCLE_AUTO_MOUSE_LOCK) \
+    PDM(VOLUME, VOLUME_MODE, handle_volume_mode, NULL, reset_volume_mode, PD_MODE_VOLUME_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED, NULL)                                                    \
+    PDM(BRIGHTNESS, BRIGHTNESS_MODE, handle_brightness_mode, NULL, reset_brightness_mode, PD_MODE_BRIGHTNESS_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED, NULL)                                \
+    PDM(ZOOM, ZOOM_MODE, handle_zoom_mode, NULL, reset_zoom_mode, PD_MODE_ZOOM_DPI, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED, NULL)                                                              \
+    PDM(ARROW, ARROW_MODE, handle_arrow_mode, handle_arrow_mode_key, reset_arrow_mode, PD_MODE_ARROW_DPI, PD_MODE_TRAIT_PREFER_TYPING_LAYER, NULL)                                              \
+    PDM(PINCH, PINCH_MODE, NULL, NULL, NULL, 0, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE, PD_MODE_LIFECYCLE_PINCH)

@@ -229,8 +229,9 @@ These are the easiest runtime rules to break by accident:
   valid.
 - Authored momentary layers are owned through `layer_ownership.c`, not raw
   `layer_on()` and `layer_off()` calls in the key runtime.
-- Unusual pd-mode side effects belong in the pd-mode lifecycle seam, not in
-  ad hoc key-runtime branches.
+- Unusual pd-mode side effects belong in the pd-mode lifecycle seam owned by
+  the `pd_mode_def_t` row, not in ad hoc key-runtime branches or registry
+  mode-selection switches.
 
 ## Where To Change What
 

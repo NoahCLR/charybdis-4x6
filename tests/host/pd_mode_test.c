@@ -241,6 +241,7 @@ static void test_registry_metadata_matches_manifest(void) {
     CHECK(volume_mode->keycode == VOLUME_MODE);
     CHECK(volume_mode->lock_action == VOLUME_MODE_LOCK);
     CHECK(volume_mode->dpi == PD_MODE_VOLUME_DPI);
+    CHECK(volume_mode->lifecycle == NULL);
     CHECK(pd_mode_lock_action_lookup(VOLUME_MODE_LOCK) == volume_mode);
     CHECK(is_pd_mode_lock_action(VOLUME_MODE_LOCK));
     CHECK(pd_mode_for_keycode(VOLUME_MODE) == PD_MODE_VOLUME);
@@ -249,6 +250,9 @@ static void test_registry_metadata_matches_manifest(void) {
     CHECK(arrow_mode->keycode == ARROW_MODE);
     CHECK(arrow_mode->lock_action == ARROW_MODE_LOCK);
     CHECK(arrow_mode->key_handler == handle_arrow_mode_key);
+    CHECK(arrow_mode->lifecycle == NULL);
+    CHECK(pd_mode_lookup(PD_MODE_DRAGSCROLL)->lifecycle != NULL);
+    CHECK(pd_mode_lookup(PD_MODE_PINCH)->lifecycle != NULL);
 
     pd_mode_apply_remote_snapshot(PD_MODE_ZOOM | PD_MODE_VOLUME, 0);
     CHECK(pd_mode_active_snapshot() == PD_MODE_VOLUME);

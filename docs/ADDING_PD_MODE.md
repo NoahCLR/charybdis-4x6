@@ -33,8 +33,10 @@ behavior that existing modes do not cover.
 
 If a mode needs unusual activation, deactivation, lock, or unlock side effects
 that are not shared policy, keep the normal manifest path intact and add an
-optional lifecycle hook in [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c)
-instead of introducing another one-off manifest trait.
+optional lifecycle hook object consumed by
+[`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c),
+then reference that object from the manifest row instead of introducing
+another one-off manifest trait or registry switch edit.
 
 ## What Counts As A Pd Mode
 
@@ -118,7 +120,7 @@ Add the new mode as one manifest row. That single row generates:
 Example:
 
 ```c
-    PDM(EXAMPLE, EXAMPLE_MODE, handle_example_mode, NULL, reset_example_mode, 0, PD_MODE_TRAIT_NONE)
+    PDM(EXAMPLE, EXAMPLE_MODE, handle_example_mode, NULL, reset_example_mode, 0, PD_MODE_TRAIT_NONE, NULL)
 ```
 
 Field meaning:
@@ -130,6 +132,7 @@ Field meaning:
 - `reset_example_mode`: optional cleanup hook
 - `0`: DPI override (`0` = use normal pointer DPI)
 - `PD_MODE_TRAIT_NONE`: manifest traits consumed by shared policy; combine `PD_MODE_TRAIT_*` flags when the mode needs them
+- `NULL`: optional lifecycle hook pointer (`NULL` = no custom activate / deactivate / lock / unlock side effects)
 
 ### 2. Verify The Generated Outputs
 
@@ -137,6 +140,8 @@ You should not need to manually edit [`users/noah/noah_keymap_ids.h`](../users/n
 [`users/noah/lib/pointing/pd_mode_flags.h`](../users/noah/lib/pointing/pd_mode_flags.h),
 or [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c)
 for a normal new mode. The manifest row should materialize those changes.
+Only unusual lifecycle hook objects need extra registry work, and even then the
+mode definition row should own the selection.
 
 ### 3. Add Handler Declarations If Needed
 
@@ -204,7 +209,7 @@ You do not register the mode by hand anymore. The manifest row expands into a
 `pd_modes[]` entry in [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c):
 
 ```c
-{PD_MODE_EXAMPLE, EXAMPLE_MODE, LOCK_PD_MODE(EXAMPLE_MODE), handle_example_mode, NULL, reset_example_mode, 0, PD_MODE_TRAIT_NONE},
+{PD_MODE_EXAMPLE, EXAMPLE_MODE, LOCK_PD_MODE(EXAMPLE_MODE), handle_example_mode, NULL, reset_example_mode, 0, PD_MODE_TRAIT_NONE, NULL},
 ```
 
 Field meaning:
@@ -217,6 +222,7 @@ Field meaning:
 - `reset`: cleanup callback, or `NULL`
 - `dpi`: pointer CPI override while the mode is active (`0` = keep normal pointer DPI)
 - `traits`: manifest-defined `PD_MODE_TRAIT_*` flags consumed by shared pointer policy and registry behavior
+- `lifecycle`: optional activate / deactivate / lock / unlock side-effect hooks owned by this mode definition row
 
 If the mode needs a custom DPI, thread that through from the keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
@@ -308,6 +314,10 @@ Prefer existing manifest traits first. If the behavior is genuinely new
 shared policy, add a new `PD_MODE_TRAIT_*` flag and consume that trait
 centrally instead of reintroducing per-mode identity checks.
 
+If the behavior is mode-specific instead of shared policy, add an optional
+lifecycle hook object and point the manifest row at it. Do not reintroduce a
+mode-selection switch in the registry.
+
 Current examples to copy:
 
 - `DRAGSCROLL` toggles Charybdis dragscroll
@@ -374,7 +384,8 @@ This is the actual control path for pd modes:
 3. [`users/noah/lib/pointing/pd_mode_state.c`](../users/noah/lib/pointing/pd_mode_state.c) owns active and locked mode state,
    plus lock exclusivity.
 4. [`users/noah/lib/pointing/pd_mode_registry.c`](../users/noah/lib/pointing/pd_mode_registry.c) materializes the mode table
-   from the manifest, including handlers, reset hooks, lock actions, and DPI behavior.
+   from the manifest, including handlers, reset hooks, row-owned lifecycle
+   hooks, lock actions, and DPI behavior.
 5. [`users/noah/lib/pointing/pd_runtime.c`](../users/noah/lib/pointing/pd_runtime.c) calls the first active
    handler in `pd_modes[]`.
 6. [`users/noah/lib/pointing/pointer_layer_policy.c`](../users/noah/lib/pointing/pointer_layer_policy.c) keeps the configured
@@ -390,6 +401,7 @@ That is why most new modes are mostly a data-registration job, not a runtime rew
 
 - Editing the generated pd-mode section in `custom_keycodes` instead of the manifest.
 - Adding the new manifest row but forgetting the handler declaration or implementation it references.
+- Adding a lifecycle hook object but forgetting to reference it from the manifest row.
 - Forgetting the reset function, which leaves stale accumulators or modifiers behind.
 - Adding side effects in activate / deactivate but forgetting the locked path.
 - Adding a 17th mode without widening the `pd_mode_mask_t` storage and the

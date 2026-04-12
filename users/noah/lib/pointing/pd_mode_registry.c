@@ -12,12 +12,12 @@
 
 #include "pd_mode_handlers.h"
 
-typedef struct {
+struct pd_mode_lifecycle_hooks {
     void (*on_activate)(pd_mode_mask_t mode);
     void (*on_deactivate)(pd_mode_mask_t mode);
     void (*on_lock)(pd_mode_mask_t mode);
     void (*on_unlock)(pd_mode_mask_t mode);
-} pd_mode_lifecycle_hooks_t;
+};
 
 static inline bool pd_mode_registry_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
     const pd_mode_def_t *def = pd_mode_lookup(mode);
@@ -90,6 +90,10 @@ static const pd_mode_lifecycle_hooks_t pd_mode_auto_mouse_lock_toggle_hooks = {
     .on_lock   = scroll_mode_lock_attach_auto_mouse,
     .on_unlock = scroll_mode_lock_detach_auto_mouse,
 };
+
+#    define PD_MODE_LIFECYCLE_AUTO_MOUSE_LOCK (&pd_mode_auto_mouse_lock_toggle_hooks)
+#else
+#    define PD_MODE_LIFECYCLE_AUTO_MOUSE_LOCK NULL
 #endif
 
 static bool pinch_command_registered = false;
@@ -122,7 +126,13 @@ static void pinch_mode_unregister_command(pd_mode_mask_t mode) {
 static const pd_mode_lifecycle_hooks_t pd_mode_pinch_lifecycle_hooks = {
     .on_activate   = pinch_mode_register_command,
     .on_deactivate = pinch_mode_unregister_command,
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    .on_lock       = scroll_mode_lock_attach_auto_mouse,
+    .on_unlock     = scroll_mode_lock_detach_auto_mouse,
+#endif
 };
+
+#define PD_MODE_LIFECYCLE_PINCH (&pd_mode_pinch_lifecycle_hooks)
 
 // Per-mode pointer DPI overrides. Override any of these in config.h.
 // 0 = no override: normal pointer DPI is used while that mode is active.
@@ -140,27 +150,13 @@ static const pd_mode_lifecycle_hooks_t pd_mode_pinch_lifecycle_hooks = {
 #    define PD_MODE_ARROW_DPI 0
 #endif
 
-#define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, handler, key_handler, reset, dpi, traits) {PD_MODE_##name, keycode, keycode##_LOCK, handler, key_handler, reset, dpi, traits},
+#define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, handler, key_handler, reset, dpi, traits, lifecycle) {PD_MODE_##name, keycode, keycode##_LOCK, handler, key_handler, reset, dpi, traits, lifecycle},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_REGISTRY_ROW)};
 #undef NOAH_PD_MODE_REGISTRY_ROW
 
-static const pd_mode_lifecycle_hooks_t *pd_mode_lifecycle_shared_hooks(pd_mode_mask_t mode) {
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (pd_mode_registry_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE)) {
-        return &pd_mode_auto_mouse_lock_toggle_hooks;
-    }
-#endif
-
-    return NULL;
-}
-
-static const pd_mode_lifecycle_hooks_t *pd_mode_lifecycle_mode_hooks(pd_mode_mask_t mode) {
-    switch (mode) {
-        case PD_MODE_PINCH:
-            return &pd_mode_pinch_lifecycle_hooks;
-    }
-
-    return NULL;
+static const pd_mode_lifecycle_hooks_t *pd_mode_lifecycle_hooks_for_mode(pd_mode_mask_t mode) {
+    const pd_mode_def_t *def = pd_mode_lookup(mode);
+    return def ? def->lifecycle : NULL;
 }
 
 static void pd_mode_run_lifecycle_callback(void (*callback)(pd_mode_mask_t mode), pd_mode_mask_t mode) {
@@ -170,34 +166,22 @@ static void pd_mode_run_lifecycle_callback(void (*callback)(pd_mode_mask_t mode)
 }
 
 static void pd_mode_run_activate_hooks(pd_mode_mask_t mode) {
-    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_shared_hooks(mode);
-    pd_mode_run_lifecycle_callback(hooks ? hooks->on_activate : NULL, mode);
-
-    hooks = pd_mode_lifecycle_mode_hooks(mode);
+    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     pd_mode_run_lifecycle_callback(hooks ? hooks->on_activate : NULL, mode);
 }
 
 static void pd_mode_run_deactivate_hooks(pd_mode_mask_t mode) {
-    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_shared_hooks(mode);
-    pd_mode_run_lifecycle_callback(hooks ? hooks->on_deactivate : NULL, mode);
-
-    hooks = pd_mode_lifecycle_mode_hooks(mode);
+    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     pd_mode_run_lifecycle_callback(hooks ? hooks->on_deactivate : NULL, mode);
 }
 
 static void pd_mode_run_lock_hooks(pd_mode_mask_t mode) {
-    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_shared_hooks(mode);
-    pd_mode_run_lifecycle_callback(hooks ? hooks->on_lock : NULL, mode);
-
-    hooks = pd_mode_lifecycle_mode_hooks(mode);
+    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     pd_mode_run_lifecycle_callback(hooks ? hooks->on_lock : NULL, mode);
 }
 
 static void pd_mode_run_unlock_hooks(pd_mode_mask_t mode) {
-    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_shared_hooks(mode);
-    pd_mode_run_lifecycle_callback(hooks ? hooks->on_unlock : NULL, mode);
-
-    hooks = pd_mode_lifecycle_mode_hooks(mode);
+    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     pd_mode_run_lifecycle_callback(hooks ? hooks->on_unlock : NULL, mode);
 }
 
@@ -288,6 +272,7 @@ void pd_mode_activate(pd_mode_mask_t mode) {
 
 void pd_mode_deactivate(pd_mode_mask_t mode) {
     bool was_active = pd_mode_active(mode);
+    const pd_mode_def_t *def = pd_mode_lookup(mode);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     bool was_any_mode_active = pd_any_mode_active();
 #endif
@@ -297,11 +282,8 @@ void pd_mode_deactivate(pd_mode_mask_t mode) {
     pd_mode_auto_mouse_deactivate(mode, was_any_mode_active);
 #endif
 
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].mode_flag == mode && pd_modes[i].reset) {
-            pd_modes[i].reset();
-            break;
-        }
+    if (def && def->reset) {
+        def->reset();
     }
 
     if (pd_mode_has_trait(mode, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND)) {

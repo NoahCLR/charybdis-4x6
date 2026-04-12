@@ -120,3 +120,59 @@ Recommended next implementation work:
    production effect/reset contracts.
 3. Collapse the remaining handled-key request/result/transition naming overlap
    now that the executable effect path is no longer the main coupling risk.
+
+## 2026-04-12 follow-up: pd-mode lifecycle ownership
+
+Completed in this follow-up:
+
+- Added an optional lifecycle pointer to `pd_mode_def_t` in
+  `users/noah/lib/pointing/pd_modes.h`.
+- Moved pd-mode lifecycle ownership onto the mode definition row by extending
+  `NOAH_PD_MODE_LIST(...)` with a lifecycle argument in
+  `users/noah/lib/pointing/pd_mode_manifest.h`.
+- Removed the registry-owned per-mode lifecycle switch in
+  `users/noah/lib/pointing/pd_mode_registry.c` and replaced it with row-owned
+  lifecycle lookup through each mode definition.
+- Kept existing activation, deactivation, lock, and unlock ordering intact
+  while moving:
+  - dragscroll's auto-mouse lock ownership
+  - pinch mode's activate/deactivate GUI ownership
+  - pinch mode's lock/unlock auto-mouse ownership
+  onto mode-owned lifecycle data.
+- Simplified `pd_mode_deactivate()` to use direct mode lookup for reset hooks
+  instead of re-scanning the registry table.
+- Updated `docs/ADDING_PD_MODE.md` and `docs/KEY_RUNTIME.md` so they no longer
+  direct contributors to add registry switch cases for unusual mode side
+  effects.
+- Updated the pd-mode metadata tests and manifest-expansion host fixtures for
+  the new row shape.
+
+Verification run in this follow-up:
+
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- targeted pd-mode and profile/integration tests passed
+- feature-gate compile tests passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- changed only this repo
+- no sibling workspace folders were modified
+
+Recommended next implementation work:
+
+1. Rebuild the scenario harness on `key_runtime_effect_t` and
+   `noah_runtime_reset_for_test()` so higher-level scenarios stop mirroring
+   production effect/reset contracts.
+2. Collapse the remaining handled-key request/result/transition naming overlap
+   so there is one obvious executable effect vocabulary.
