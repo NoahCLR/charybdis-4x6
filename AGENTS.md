@@ -71,4 +71,4 @@ Repo-specific guardrails:
 - When adding a new firmware source file that should participate in the userspace build, wire it into `users/noah/rules.mk` in the same pass. If host compile gates or test runners mirror that build surface, update them too.
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update `README.md` and the relevant files under `docs/` in the same pass.
-- If architectural work lands, update the active review folder's `progress.md` in the same pass. If the intended structure or tradeoffs changed, update `userspace-architecture-review.md` too.
+- If architectural work lands, update the active review folder's `progress.md`, do this in a structured way so it is a clear history in the same pass always include next steps. If the intended structure or tradeoffs changed, update `userspace-architecture-review.md` too.
