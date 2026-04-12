@@ -275,6 +275,16 @@ For higher-level debugging, use
 [`runtime_debug.c`](../users/noah/lib/state/runtime_debug.c) instead of
 rebuilding partial resets inside individual tests.
 
+The scenario harness in
+[`tests/host/key_runtime_scenario_harness.h`](../tests/host/key_runtime_scenario_harness.h)
+and
+[`tests/host/key_runtime_scenario_harness.c`](../tests/host/key_runtime_scenario_harness.c)
+now records the shared [`key_runtime_effect_t`](../users/noah/lib/key/key_runtime_effect.h)
+payloads directly and resets runtime state through
+[`noah_runtime_reset_for_test()`](../users/noah/lib/state/runtime_debug.h).
+Keep new scripted scenarios on that shared surface instead of adding a
+test-only effect or reset dialect.
+
 The most relevant host checks for the runtime are:
 
 - `sh tests/host/run_key_runtime_admission_tests.sh`

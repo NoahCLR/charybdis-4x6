@@ -5,33 +5,11 @@
 
 #include "users/noah/lib/key/delayed_action.h"
 #include "users/noah/lib/key/key_behavior_lookup.h"
+#include "users/noah/lib/key/key_runtime_effect.h"
 #include "users/noah/lib/pointing/pd_mode_flags.h"
 #include "users/noah/lib/state/runtime_shared_state.h"
 
-typedef enum {
-    KEY_RUNTIME_SCENARIO_EFFECT_NONE = 0,
-    KEY_RUNTIME_SCENARIO_EFFECT_DISPATCH_ACTION,
-    KEY_RUNTIME_SCENARIO_EFFECT_HELD_REGISTER,
-    KEY_RUNTIME_SCENARIO_EFFECT_HELD_UNREGISTER,
-    KEY_RUNTIME_SCENARIO_EFFECT_RELEASE_OWNED_BY_KEY,
-    KEY_RUNTIME_SCENARIO_EFFECT_REPEAT_START,
-    KEY_RUNTIME_SCENARIO_EFFECT_LAYER_PRESS,
-    KEY_RUNTIME_SCENARIO_EFFECT_LAYER_RELEASE,
-    KEY_RUNTIME_SCENARIO_EFFECT_FEEDBACK_PULSE,
-    KEY_RUNTIME_SCENARIO_EFFECT_DELAYED_ACTION,
-    KEY_RUNTIME_SCENARIO_EFFECT_PD_MODE_LOCK_TOGGLE,
-} key_runtime_scenario_effect_kind_t;
-
-typedef struct {
-    key_runtime_scenario_effect_kind_t kind;
-    uint16_t                           action;
-    keypos_t                           key_pos;
-    uint8_t                            layer;
-    uint16_t                           repeat_hz;
-    bool                               long_hold_level;
-    delayed_action_mods_t              mods;
-    pd_mode_mask_t                     pd_mode;
-} key_runtime_scenario_effect_t;
+typedef key_runtime_effect_t key_runtime_scenario_effect_t;
 
 typedef enum {
     KEY_RUNTIME_SCENARIO_STEP_PRESS = 0,

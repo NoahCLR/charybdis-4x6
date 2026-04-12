@@ -29,20 +29,16 @@ foundations are correct and worth preserving:
 - unusually strong host coverage, compile gates, and authored-profile
   validation
 
-The remaining architectural risks are narrower now. They are no longer broad
-"the repo needs structure" problems. They are specific cross-cutting seams
-where policy still leaks across modules:
+The remaining architectural risk is now narrow. It is no longer a broad
+"the repo needs structure" problem. The main cross-cutting seam still worth
+cleaning up is:
 
-1. action emission still carries hidden key-runtime mutation policy
-2. pd-mode lifecycle extensibility is still partly registry-owned instead of
-   definition-owned
-3. the handled-key effect model is improved, but still exposed through several
+1. the handled-key effect model is improved, but still exposed through several
    overlapping interface layers
-4. the scenario harness still mirrors runtime contracts instead of consuming
-   them directly
 
 The recommendation is not a rewrite and not a plugin framework. The right
-next move is to keep the current data-driven design and tighten those seams.
+next move is to keep the current data-driven design and finish tightening that
+one interface seam.
 
 ## Status Update After Initial Implementation
 
@@ -71,6 +67,19 @@ The second follow-up item from this review has now landed in the repo:
 The remaining implementation priority is now the scenario-harness rebuild and
 the smaller handled-key interface cleanup.
 
+## Status Update After Scenario Harness Refactor
+
+The third follow-up item from this review has now landed in the repo:
+
+- the scenario harness now stores shared `key_runtime_effect_t` payloads
+  directly
+- scenario resets now flow through `noah_runtime_reset_for_test()`
+- scenario assertions now consume the shared effect union instead of a
+  harness-only flattened payload
+
+The remaining implementation priority is now the smaller handled-key
+interface cleanup.
+
 ## Architecture And Separation Of Concerns
 
 ### What is working well
@@ -88,21 +97,22 @@ the smaller handled-key interface cleanup.
   snapshot surface. That is materially better than the architecture captured
   in older reviews.
 
-### Main remaining concern: output paths still mutate key-runtime state
+### Main remaining concern: handled-key interfaces still over-describe one pipeline
 
-`action_dispatch()` in
-[`action_dispatch.c`](../../users/noah/lib/action/action_dispatch.c)
-still calls `key_runtime_activate_pending_fallback_hold()` before it emits a
-tap. That means "dispatch an action" is not a pure output operation. It can
-retroactively change active handled-key state.
+The runtime now has a real shared executable effect surface in
+[`key_runtime_effect.h`](../../users/noah/lib/key/key_runtime_effect.h), and
+the scenario harness now consumes that same vocabulary directly. That is the
+right architecture.
 
-That same fallback-hold activation is also called directly in
-[`pd_mode_handlers.c`](../../users/noah/lib/pointing/pd_mode_handlers.c)
-before synthetic taps and shortcuts. So the policy is not even fully
-centralized in one dispatch helper; multiple output paths must remember to
-participate in key-runtime mutation rules.
+What still feels heavier than it needs to is the interface stack around that
+pipeline:
 
-That is the strongest remaining hidden dependency in the codebase.
+- `key_runtime_slot_effect.h`
+- `key_runtime_slot_result.h`
+- `key_runtime_transition.h`
+
+Those headers describe distinct implementation stages, but they still make the
+real reducer-to-executor model look more layered than it is.
 
 ## Modularity And Extensibility
 
@@ -116,14 +126,15 @@ That is the strongest remaining hidden dependency in the codebase.
 
 ### Expensive today
 
-- adding a new source of emitted actions without accidentally changing hold
-  semantics
-- adding an unusual pd mode whose lifecycle side effects do not fit the shared
-  trait set
 - extending the handled-key reducer with another effect type or another stage
   without updating several interface layers
-- expanding high-level scenario testing across subsystems without duplicating
-  more runtime contracts
+- renaming or reorganizing the reducer/executor surface without touching
+  multiple effect-facing headers
+- adding another bespoke pd mode with substantial local state without putting
+  more pressure on `pd_mode_handlers.c`
+- expanding high-level scenario testing still requires explicit shared-effect
+  assertions, even though it no longer needs a harness-only effect/reset
+  dialect
 
 ### Why new key behaviors still scale well
 
@@ -140,20 +151,20 @@ The authored path remains coherent:
 For this board, that is the right extensibility shape. Complexity stays on the
 runtime side while the authoring surface remains declarative.
 
-### Why unusual pd modes still scale less well than ordinary ones
+### Why pd modes are in better shape now
 
-The repo now has lifecycle hooks, which was the correct direction. But the
-hooks are still defined in
-[`pd_mode_registry.c`](../../users/noah/lib/pointing/pd_mode_registry.c),
-selected by a central `switch`, and composed with central trait checks.
+The lifecycle refactor removed the main extensibility bottleneck: unusual
+mode-owned side effects now live on the `pd_mode_def_t` row instead of behind
+a registry-owned switch.
 
-That means:
+The remaining friction is more local than architectural:
 
-- normal modes are data-driven
-- exceptional modes are still registry-owned
+- mode-local state and helper logic still accumulate in
+  [`pd_mode_handlers.c`](../../users/noah/lib/pointing/pd_mode_handlers.c)
+- another bespoke mode would probably justify splitting one or more handlers
+  into per-mode files
 
-This is manageable with six modes. It becomes the next growth bottleneck if
-the mode set gains more specialized gesture or modifier behavior.
+That is a manageable maintenance concern, not a structural design problem.
 
 ## Abstractions And Interfaces
 
@@ -297,21 +308,19 @@ This repo is already better tested than most keyboard firmware projects:
 - `runtime_debug.h` gives tests a shared reset/snapshot seam
 - real-profile validation protects the authored configuration surface
 
-### Main remaining testability issue
+### Scenario testability posture is now aligned
 
 [`key_runtime_scenario_harness.h`](../../tests/host/key_runtime_scenario_harness.h)
 and
 [`key_runtime_scenario_harness.c`](../../tests/host/key_runtime_scenario_harness.c)
-still define their own effect enum, their own effect recorder, and their own
-partial runtime reset behavior.
+now consume the same effect/reset surfaces that production runtime code
+already exposes:
 
-That creates two maintenance costs:
+1. `key_runtime_effect_t`
+2. `noah_runtime_reset_for_test()`
 
-1. production runtime contracts can change without the scenario harness
-   changing with them
-2. higher-level tests cannot naturally see the same effect/state surfaces that
-   production code now exposes through `key_runtime_effect.h` and
-   `runtime_debug.h`
+That removes the main test-drift risk that remained after the earlier
+runtime-debug work.
 
 ## Findings
 
@@ -451,12 +460,15 @@ Recommendation:
 That would let higher-level tests use the same state/effect vocabulary as the
 runtime instead of maintaining a test-only dialect.
 
+Follow-up status:
+
+- resolved in the third implementation slice recorded in
+  [progress.md](./progress.md)
+
 ## Concrete Next Steps
 
 1. Rename and narrow the handled-key request/result interfaces so there is one
    obvious executable effect vocabulary.
-2. Rebuild the scenario harness on shared runtime debug/effect surfaces before
-   adding another major integration scenario family.
 
 ## Overall Judgment
 

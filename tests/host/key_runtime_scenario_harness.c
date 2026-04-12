@@ -9,6 +9,7 @@
 #include "users/noah/lib/key/key_runtime_process.h"
 #include "users/noah/lib/key/key_runtime_state.h"
 #include "users/noah/lib/pointing/pd_modes.h"
+#include "users/noah/lib/state/runtime_debug.h"
 #include "users/noah/noah_runtime.h"
 
 enum {
@@ -47,6 +48,8 @@ static pd_mode_mask_t                             key_runtime_scenario_pd_locked
 static key_runtime_scenario_effect_t              key_runtime_scenario_effects[KEY_RUNTIME_SCENARIO_MAX_EFFECTS];
 static uint8_t                                    key_runtime_scenario_effect_count_value;
 
+layer_state_t layer_state;
+
 static void key_runtime_scenario_log_effect(key_runtime_scenario_effect_t effect) {
     if (key_runtime_scenario_effect_count_value >= ARRAY_SIZE(key_runtime_scenario_effects)) {
         return;
@@ -79,24 +82,21 @@ static key_behavior_view_t key_runtime_scenario_default_behavior(uint16_t keycod
 }
 
 void key_runtime_scenario_reset(void) {
-    key_runtime_scenario_time               = 1000;
+    key_runtime_scenario_time                = 1000;
     key_runtime_scenario_hold_survives_flush = false;
-    key_runtime_scenario_behavior_count     = 0;
-    key_runtime_scenario_step_entry_count   = 0;
-    key_runtime_scenario_pd_mode_count      = 0;
-    key_runtime_scenario_locked_layers      = 0;
-    key_runtime_scenario_pd_locked_modes    = 0;
-    key_runtime_scenario_effect_count_value = 0;
+    key_runtime_scenario_behavior_count      = 0;
+    key_runtime_scenario_step_entry_count    = 0;
+    key_runtime_scenario_pd_mode_count       = 0;
+    key_runtime_scenario_locked_layers       = 0;
+    key_runtime_scenario_pd_locked_modes     = 0;
+    key_runtime_scenario_effect_count_value  = 0;
 
     memset(key_runtime_scenario_behaviors, 0, sizeof(key_runtime_scenario_behaviors));
     memset(key_runtime_scenario_steps, 0, sizeof(key_runtime_scenario_steps));
     memset(key_runtime_scenario_pd_modes, 0, sizeof(key_runtime_scenario_pd_modes));
     memset(key_runtime_scenario_effects, 0, sizeof(key_runtime_scenario_effects));
 
-    noah_runtime_shared_state = (runtime_shared_state_t){0};
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        noah_runtime_shared_state.key.slots_by_position[index] = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
-    }
+    noah_runtime_reset_for_test();
 }
 
 void key_runtime_scenario_clear_effects(void) {
@@ -263,6 +263,48 @@ void del_mods(uint8_t mods) {
 }
 void send_keyboard_report(void) {}
 
+void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (layer_ownership_debug_snapshot_t){0};
+}
+
+void layer_ownership_reset_for_test(void) {
+    key_runtime_scenario_locked_layers = 0;
+}
+
+void held_action_debug_snapshot(held_action_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (held_action_debug_snapshot_t){0};
+}
+
+void held_action_reset_for_test(void) {}
+
+void held_repeat_debug_snapshot(held_repeat_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (held_repeat_debug_snapshot_t){0};
+}
+
+void held_repeat_reset_for_test(void) {}
+
+void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (keyboard_mod_ownership_debug_snapshot_t){0};
+}
+
+void keyboard_mod_ownership_reset_for_test(void) {}
+
 bool noah_synthetic_record_active(void) {
     return false;
 }
@@ -320,8 +362,8 @@ void action_dispatch(uint16_t action) {
     }
 
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind   = KEY_RUNTIME_SCENARIO_EFFECT_DISPATCH_ACTION,
-        .action = action,
+        .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+        .data.action = action,
     });
 }
 
@@ -344,8 +386,8 @@ bool is_pd_mode_lock_action(uint16_t action) {
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     key_runtime_scenario_pd_locked_modes ^= mode;
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind    = KEY_RUNTIME_SCENARIO_EFFECT_PD_MODE_LOCK_TOGGLE,
-        .pd_mode = mode,
+        .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+        .data.pd_mode = mode,
     });
     return true;
 }
@@ -411,34 +453,43 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind   = KEY_RUNTIME_SCENARIO_EFFECT_DELAYED_ACTION,
-        .action = action,
-        .mods   = mods,
+        .kind                = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
+        .data.delayed_action = {
+            .action       = action,
+            .mods         = mods,
+            .repeat_count = 1,
+        },
     });
 }
 
 void held_action_register(keypos_t key_pos, uint16_t action) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind    = KEY_RUNTIME_SCENARIO_EFFECT_HELD_REGISTER,
-        .action  = action,
-        .key_pos = key_pos,
+        .kind             = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
+        .data.held_action = {
+            .key_pos = key_pos,
+            .action  = action,
+        },
     });
 }
 
 void held_action_unregister(keypos_t key_pos, uint16_t action) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind    = KEY_RUNTIME_SCENARIO_EFFECT_HELD_UNREGISTER,
-        .action  = action,
-        .key_pos = key_pos,
+        .kind             = KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER,
+        .data.held_action = {
+            .key_pos = key_pos,
+            .action  = action,
+        },
     });
 }
 
 void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind      = KEY_RUNTIME_SCENARIO_EFFECT_REPEAT_START,
-        .action    = action,
-        .key_pos   = key_pos,
-        .repeat_hz = repeat_hz,
+        .kind        = KEY_RUNTIME_EFFECT_REPEAT_START,
+        .data.repeat = {
+            .key_pos   = key_pos,
+            .action    = action,
+            .repeat_hz = repeat_hz,
+        },
     });
 }
 
@@ -452,8 +503,8 @@ bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
 
 bool held_action_release_owned_by_key(keypos_t key_pos) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind    = KEY_RUNTIME_SCENARIO_EFFECT_RELEASE_OWNED_BY_KEY,
-        .key_pos = key_pos,
+        .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+        .data.key_pos = key_pos,
     });
     return true;
 }
@@ -465,24 +516,26 @@ bool held_modifier_release_owned_by_key(keypos_t key_pos) {
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind    = KEY_RUNTIME_SCENARIO_EFFECT_LAYER_PRESS,
-        .key_pos = key_pos,
-        .layer   = layer,
+        .kind             = KEY_RUNTIME_EFFECT_LAYER_PRESS,
+        .data.layer_press = {
+            .key_pos = key_pos,
+            .layer   = layer,
+        },
     });
 }
 
 bool layer_ownership_momentary_release(keypos_t key_pos) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind    = KEY_RUNTIME_SCENARIO_EFFECT_LAYER_RELEASE,
-        .key_pos = key_pos,
+        .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
+        .data.key_pos = key_pos,
     });
     return true;
 }
 
 void key_feedback_pulse_arm(bool long_hold_level) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind            = KEY_RUNTIME_SCENARIO_EFFECT_FEEDBACK_PULSE,
-        .long_hold_level = long_hold_level,
+        .kind                 = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
+        .data.long_hold_level = long_hold_level,
     });
 }
 

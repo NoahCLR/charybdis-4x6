@@ -176,3 +176,54 @@ Recommended next implementation work:
    production effect/reset contracts.
 2. Collapse the remaining handled-key request/result/transition naming overlap
    so there is one obvious executable effect vocabulary.
+
+## 2026-04-12 follow-up: scenario harness shared runtime contracts
+
+Completed in this follow-up:
+
+- Rebuilt `tests/host/key_runtime_scenario_harness.h` around the shared
+  `key_runtime_effect_t` contract instead of maintaining a parallel
+  scenario-only effect enum and payload layout.
+- Reworked `tests/host/key_runtime_scenario_harness.c` to log real runtime
+  effect payloads for:
+  - action dispatch
+  - delayed action replay
+  - held action register/unregister
+  - repeat start
+  - owned-state release
+  - layer press/release
+  - feedback pulse
+  - pd-mode lock taps
+- Switched `key_runtime_scenario_reset()` to the production
+  `noah_runtime_reset_for_test()` seam and linked
+  `users/noah/lib/state/runtime_debug.c` into
+  `sh tests/host/run_key_runtime_scenario_tests.sh`.
+- Updated `tests/host/key_runtime_scenario_test.c` so its assertions now read
+  the real shared effect payload union instead of flattened harness-only
+  fields.
+- Updated `docs/KEY_RUNTIME.md` so the maintainer guidance for scripted
+  scenarios points at the shared effect/reset surfaces.
+
+Verification run in this follow-up:
+
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification result:
+
+- scenario harness tests passed on the shared effect/reset surface
+- runtime debug tests passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- changed only this repo
+- no sibling workspace folders were modified
+
+Recommended next implementation work:
+
+1. Collapse the remaining handled-key request/result/transition naming overlap
+   so there is one obvious executable effect vocabulary.
