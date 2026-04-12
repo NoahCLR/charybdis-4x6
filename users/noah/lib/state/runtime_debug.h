@@ -17,6 +17,7 @@
 #include "keyboard_mod_ownership.h"
 #include "layer_ownership.h"
 #include "runtime_shared_state.h"
+#include "runtime_trace.h"
 
 typedef struct {
     runtime_shared_state_t                  core;
@@ -24,6 +25,7 @@ typedef struct {
     held_action_debug_snapshot_t            held_actions;
     held_repeat_debug_snapshot_t            held_repeats;
     keyboard_mod_ownership_debug_snapshot_t keyboard_mod_ownership;
+    noah_runtime_trace_snapshot_t           trace;
 } noah_runtime_debug_snapshot_t;
 
 void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out);

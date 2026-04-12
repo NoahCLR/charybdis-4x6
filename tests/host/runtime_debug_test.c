@@ -176,6 +176,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
 
     layer_ownership_set_lock_state(3, true);
     layer_ownership_momentary_press(layer_key, 2);
+    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, PD_MODE_VOLUME, PD_MODE_ARROW);
 
     held_action_register(action_key, TEST_ACTION);
     held_repeat_start(repeat_key, TEST_ACTION, 25);
@@ -214,6 +215,17 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(snapshot.keyboard_mod_ownership.live_state.oneshot == MOD_BIT(KC_LEFT_GUI));
     CHECK(snapshot.keyboard_mod_ownership.live_state.oneshot_locked == MOD_BIT(KC_RIGHT_GUI));
     CHECK(snapshot.keyboard_mod_ownership.managed_refcounts[1] == 1);
+
+    CHECK(snapshot.trace.count == 3u);
+    CHECK(!snapshot.trace.overflowed);
+    CHECK(snapshot.trace.entries[0].kind == NOAH_TRACE_LAYER_OWNERSHIP);
+    CHECK(snapshot.trace.entries[0].event == NOAH_TRACE_LAYER_OWNERSHIP_EVENT_LOCK);
+    CHECK(snapshot.trace.entries[1].kind == NOAH_TRACE_LAYER_OWNERSHIP);
+    CHECK(snapshot.trace.entries[1].event == NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_PRESS);
+    CHECK(snapshot.trace.entries[2].kind == NOAH_TRACE_SPLIT_SYNC);
+    CHECK(snapshot.trace.entries[2].event == NOAH_TRACE_SPLIT_SYNC_EVENT_SEND);
+    CHECK(snapshot.trace.entries[2].a == PD_MODE_VOLUME);
+    CHECK(snapshot.trace.entries[2].b == PD_MODE_ARROW);
 }
 
 static void test_reset_clears_all_runtime_surfaces(void) {
@@ -260,6 +272,8 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(snapshot.keyboard_mod_ownership.live_state.oneshot == 0);
     CHECK(snapshot.keyboard_mod_ownership.live_state.oneshot_locked == 0);
     CHECK(snapshot.keyboard_mod_ownership.managed_refcounts[2] == 0);
+    CHECK(snapshot.trace.count == 0u);
+    CHECK(!snapshot.trace.overflowed);
     CHECK(send_keyboard_report_count >= 2);
 }
 

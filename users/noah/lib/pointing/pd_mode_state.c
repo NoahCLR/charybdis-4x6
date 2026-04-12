@@ -6,6 +6,7 @@
 
 #include "../state/runtime_shared_state.h"
 #include "../state/split_runtime_sync.h"
+#include "../state/runtime_trace.h"
 #include "pd_mode_internal.h"
 
 #define PD_MODE_LOCAL_ACTIVE_FLAGS (noah_runtime_shared_state.pd.local_active_flags)
@@ -101,6 +102,7 @@ void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t l
 
     PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS = locked_mode;
     PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS = active_mode;
+    noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT, active_mode, locked_mode);
 }
 
 bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {

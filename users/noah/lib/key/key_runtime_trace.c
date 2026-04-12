@@ -4,6 +4,57 @@
 
 #include "key_runtime_trace.h"
 
+#include <string.h>
+
+#include "../state/runtime_trace.h"
+
+static uint8_t key_runtime_trace_stage_id(const char *stage) {
+    if (!stage) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_UNKNOWN;
+    }
+
+    if (strcmp(stage, "preflight:interrupt_active_key") == 0) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_INTERRUPT_ACTIVE_KEY;
+    }
+
+    if (strcmp(stage, "preflight:flush_multi_tap") == 0) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_FLUSH_MULTI_TAP;
+    }
+
+    if (strcmp(stage, "press") == 0) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_PRESS;
+    }
+
+    if (strcmp(stage, "release") == 0) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_RELEASE;
+    }
+
+    if (strcmp(stage, "scan") == 0) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_SCAN;
+    }
+
+    return NOAH_TRACE_KEY_RUNTIME_STAGE_UNKNOWN;
+}
+
+static void key_runtime_trace_emit_plan_event(const char *stage, const key_runtime_transition_plan_t *plan) {
+    uint16_t detail = 0;
+
+    if (plan) {
+        detail = (uint16_t)(plan->count & 0x00FFu);
+        if (plan->overflowed) {
+            detail |= 0x8000u;
+        }
+    }
+
+    noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME, NOAH_TRACE_KEY_RUNTIME_EVENT_PLAN, key_runtime_trace_stage_id(stage), detail);
+}
+
+static void key_runtime_trace_emit_effect_event(uint8_t index, const key_runtime_effect_t *effect) {
+    uint16_t effect_kind = effect ? (uint16_t)effect->kind : (uint16_t)KEY_RUNTIME_EFFECT_NONE;
+
+    noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME, NOAH_TRACE_KEY_RUNTIME_EVENT_EFFECT_EXECUTE, effect_kind, index);
+}
+
 #if defined(CONSOLE_ENABLE) && defined(NOAH_KEY_RUNTIME_TRACE_ENABLE)
 
 #    include "print.h"
@@ -59,6 +110,8 @@ void key_runtime_trace_message(const char *stage, const char *message) {
 }
 
 void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan_t *plan) {
+    key_runtime_trace_emit_plan_event(stage, plan);
+
     if (!plan) {
         uprintf("Key runtime trace [%s] plan=(null)\n", stage);
         return;
@@ -105,6 +158,8 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
 }
 
 void key_runtime_trace_effect_execute(uint8_t index, const key_runtime_effect_t *effect) {
+    key_runtime_trace_emit_effect_event(index, effect);
+
     if (!effect) {
         uprintf("Key runtime trace [execute] [%u] effect=(null)\n", (unsigned int)index);
         return;
@@ -134,13 +189,11 @@ void key_runtime_trace_message(const char *stage, const char *message) {
 }
 
 void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan_t *plan) {
-    (void)stage;
-    (void)plan;
+    key_runtime_trace_emit_plan_event(stage, plan);
 }
 
 void key_runtime_trace_effect_execute(uint8_t index, const key_runtime_effect_t *effect) {
-    (void)index;
-    (void)effect;
+    key_runtime_trace_emit_effect_event(index, effect);
 }
 
 #endif // defined(CONSOLE_ENABLE) && defined(NOAH_KEY_RUNTIME_TRACE_ENABLE)

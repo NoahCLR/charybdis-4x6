@@ -14,6 +14,7 @@ trap cleanup EXIT INT TERM
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DNOAH_RUNTIME_TRACE_ENABLE \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
@@ -24,6 +25,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/state/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/runtime_debug.c" \
     "$ROOT/users/noah/lib/state/runtime_shared_state.c" \
+    "$ROOT/users/noah/lib/state/runtime_trace.c" \
     -o "$BIN"
 
 "$BIN"

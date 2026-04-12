@@ -381,30 +381,17 @@ Strengths:
 - `runtime_debug` snapshot/reset surface
 - scenario harness rebuilt on real `key_runtime_effect_t`
 
-The main remaining gap is live observability across subsystem boundaries.
-`key_runtime_trace` is useful, but it is still runtime-specific. Pd-mode
-lifecycle, split sync, and ownership modules do not all share one structured
-debug vocabulary.
+That live-observability gap was closed in follow-up work on 2026-04-12:
 
-An optional unified event sink would help future debugging more than more
-ad hoc printf traces would.
+- `runtime_trace` now provides one optional ring-buffer sink behind
+  `NOAH_RUNTIME_TRACE_ENABLE`
+- `runtime_debug` snapshots now capture the trace buffer and reset it for host
+  tests
+- key-runtime, pd-mode, layer-ownership, and split-runtime-sync now all emit
+  into the same structured trace surface
 
-Example direction:
-
-```c
-typedef enum {
-    NOAH_TRACE_KEY_EFFECT = 0,
-    NOAH_TRACE_PD_MODE,
-    NOAH_TRACE_LAYER_OWNERSHIP,
-    NOAH_TRACE_SPLIT_SYNC,
-} noah_trace_kind_t;
-
-void noah_trace_emit(noah_trace_kind_t kind, uint16_t a, uint16_t b);
-```
-
-That does not need to be a full logging framework. A small ring buffer behind
-`CONSOLE_ENABLE` or a dedicated debug flag would already make multi-subsystem
-bugs easier to replay.
+That stays intentionally small: a shared event vocabulary with two 16-bit
+payload slots, not a larger logging framework.
 
 Saturation coverage is also better now:
 
@@ -490,11 +477,21 @@ When new runtime files appear:
 
 Priority: medium
 
-Add:
+Status: implemented in follow-up work on 2026-04-12
+
+Both parts landed:
 
 - saturation tests for slot-result and transition-plan capacities
-- one shared optional trace sink for key-runtime, pd-mode, and split-sync
-  events
+- one shared optional trace sink for key-runtime, pd-mode, layer-ownership,
+  and split-sync events
+
+The trace follow-up stayed small on purpose:
+
+- `runtime_trace` is an in-memory ring buffer, not a generic logger
+- `runtime_debug` snapshots expose it to host tests
+- feature-gate compilation now covers the dedicated trace flag
+- dedicated host coverage asserts both direct sink behavior and real
+  subsystem emit points
 
 That will pay off faster than a larger refactor because the remaining
 architecture risks are mostly about understanding cross-subsystem flow when
@@ -510,12 +507,18 @@ This userspace already has the right long-term shape for a fixed keyboard:
 - state ownership is explicit
 - tests are strong enough to support continued refactoring
 
-The next improvements should be targeted, not sweeping:
+The highest-value follow-ups from this review have already landed:
 
-- tighten the handled-key public contract
-- preserve the explicit pd-mode authority/display split
-- split large implementation files only when the next real feature touches
-  them
+- the handled-key public contract is tighter
+- pd-mode authority vs display state is explicit
+- pd-mode implementations are split by mode
+- cross-subsystem runtime tracing is shared instead of ad hoc
+
+The next improvements should stay targeted, not sweeping:
+
+- split key-runtime reducers only when the next lifecycle feature justifies it
+- split `pd_mode_registry.c` only when another real lifecycle/policy feature
+  would otherwise make it materially harder to reason about
 
 That path improves extensibility without throwing away the codebase's current
 strengths.

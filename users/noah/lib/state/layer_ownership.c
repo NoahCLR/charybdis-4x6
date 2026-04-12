@@ -9,6 +9,7 @@
 #include "layer_ownership.h"
 
 #include "noah_keymap_ids.h"
+#include "runtime_trace.h"
 
 typedef struct {
     bool     active;
@@ -28,7 +29,12 @@ static inline bool layer_ownership_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
 }
 
+static uint16_t layer_ownership_trace_pack_keypos(keypos_t key_pos) {
+    return (uint16_t)(((uint16_t)key_pos.row << 8) | key_pos.col);
+}
+
 static void layer_ownership_log_binding_overflow(keypos_t key_pos, uint8_t layer) {
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_OVERFLOW, layer, layer_ownership_trace_pack_keypos(key_pos));
 #ifdef CONSOLE_ENABLE
     uprintf("Layer ownership table overflow at key (%u,%u) for layer %u; bounded capacity was exhausted unexpectedly\n", (unsigned int)key_pos.row, (unsigned int)key_pos.col, (unsigned int)layer);
 #else
@@ -121,6 +127,8 @@ bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
         layer_locked_mask &= ~layer_mask;
     }
 
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_LOCK, layer, locked ? 1u : 0u);
+
     bool changed = true;
     changed |= layer_ownership_apply_layer(layer);
     return changed;
@@ -157,6 +165,8 @@ void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
         .layer   = layer,
     };
 
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_PRESS, layer, layer_ownership_trace_pack_keypos(key_pos));
+
     if (layer_momentary_refcounts[layer]++ == 0) {
         layer_ownership_apply_layer(layer);
     }
@@ -168,6 +178,8 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     if (slot < 0) {
         return false;
     }
+
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_RELEASE, layer_momentary_bindings[slot].layer, layer_ownership_trace_pack_keypos(key_pos));
 
     return layer_ownership_remove_slot((uint16_t)slot);
 }

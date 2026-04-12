@@ -161,15 +161,42 @@ Verification run for the pd-mode per-file split:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Follow-up implementation completed after the pd-mode per-file split:
+
+- Added `users/noah/lib/state/runtime_trace.c` and `runtime_trace.h` as a
+  small optional ring-buffer trace sink behind `NOAH_RUNTIME_TRACE_ENABLE`,
+  then wired that source into `source_manifest.mk`.
+- Extended `runtime_debug` so snapshots now capture trace entries and test
+  resets clear the shared trace buffer alongside the rest of the userspace
+  runtime state.
+- Fed the shared trace sink from key-runtime plan/effect tracing, pd-mode
+  lifecycle and mirrored-remote state application, layer-ownership lock and
+  momentary bindings, and split-runtime-sync init/send/receive paths.
+- Added a dedicated `runtime_trace` host runner plus assertions in
+  `runtime_debug_test.c`, and updated compile/test runners so the new optional
+  debug flag is exercised in host verification and feature-gate compilation.
+
+Verification run for the shared runtime trace follow-up:
+
+- `git status --short`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_layer_ownership_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 Recommended next implementation work:
 
-1. Add a small shared runtime trace sink for cross-subsystem debugging so key
-   runtime, pd mode, ownership, and split-sync events can be inspected through
-   one vocabulary.
-2. If another handled-key lifecycle feature lands, split
+1. If another handled-key lifecycle feature lands, split
    `key_runtime_slot_step.c` and `key_runtime_slot_release_reduce.c` by
    ownership seam instead of layering more local helpers into either file.
-3. When the next meaningful pd-mode lifecycle or policy feature lands, split
+2. When the next meaningful pd-mode lifecycle or policy feature lands, split
    `pd_mode_registry.c` by ownership seam instead of letting manifest
    materialization, lifecycle hooks, and state transitions keep growing in one
    file.

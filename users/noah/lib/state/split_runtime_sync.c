@@ -19,6 +19,7 @@
 #        include "../rgb/rgb_automouse.h"
 #    endif
 #    include "../compat/qmk_contract.h"
+#    include "runtime_trace.h"
 #    include "split_runtime_sync.h"
 #    include "transactions.h" // QMK
 
@@ -79,6 +80,7 @@ static void split_runtime_sync_broadcast(const split_runtime_sync_packet_t *pkt,
         split_runtime_sync_last_sent = *pkt;
         split_runtime_sync_sent_once = true;
         split_runtime_sync_last_send = timer_read32();
+        noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, pkt->pd_mode_flags, pkt->pd_mode_locked_flags);
     }
 }
 
@@ -96,6 +98,7 @@ static void split_runtime_sync_slave_rpc(uint8_t initiator2target_buffer_size, c
     }
 
     memcpy(&split_runtime_sync_remote, initiator2target_buffer, sizeof(split_runtime_sync_packet_t));
+    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, split_runtime_sync_remote.pd_mode_flags, split_runtime_sync_remote.pd_mode_locked_flags);
 #    ifdef POINTING_DEVICE_ENABLE
     pd_mode_apply_remote_snapshot(split_runtime_sync_remote.pd_mode_flags, split_runtime_sync_remote.pd_mode_locked_flags);
 #    endif
@@ -108,6 +111,7 @@ void split_runtime_sync_init(void) {
     split_runtime_sync_sent_once   = false;
     split_runtime_sync_initialized = true;
     split_runtime_sync_last_send   = timer_read32();
+    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_INIT, is_keyboard_master() ? 1u : 0u, 0u);
 
     if (is_keyboard_master()) {
         split_runtime_sync();

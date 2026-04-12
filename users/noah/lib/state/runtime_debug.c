@@ -14,6 +14,7 @@ void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
     held_action_debug_snapshot(&out->held_actions);
     held_repeat_debug_snapshot(&out->held_repeats);
     keyboard_mod_ownership_debug_snapshot(&out->keyboard_mod_ownership);
+    noah_runtime_trace_snapshot(&out->trace);
 }
 
 void noah_runtime_reset_for_test(void) {
@@ -22,6 +23,7 @@ void noah_runtime_reset_for_test(void) {
     held_action_reset_for_test();
     held_repeat_reset_for_test();
     keyboard_mod_ownership_reset_for_test();
+    noah_runtime_trace_reset();
 
     layer_state = 0;
     clear_mods();

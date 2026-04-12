@@ -45,6 +45,7 @@ NOAH_COMMON_SOURCES := \
     lib/state/keyboard_mod_ownership.c \
     lib/state/layer_ownership.c \
     lib/state/runtime_debug.c \
+    lib/state/runtime_trace.c \
     lib/state/runtime_shared_state.c \
     lib/state/split_runtime_sync.c \
     lib/rgb/rgb_runtime.c \

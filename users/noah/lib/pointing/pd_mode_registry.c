@@ -9,6 +9,7 @@
 #include "pd_mode_internal.h"
 #include "../compat/qmk_contract.h"
 #include "../state/keyboard_mod_ownership.h"
+#include "../state/runtime_trace.h"
 
 #include "pd_mode_handlers.h"
 
@@ -267,6 +268,7 @@ void pd_mode_activate(pd_mode_mask_t mode) {
 
     if (!was_active) {
         pd_mode_run_activate_hooks(mode);
+        noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_ACTIVATE, mode, pd_mode_local_active_snapshot());
     }
 }
 
@@ -295,6 +297,7 @@ void pd_mode_deactivate(pd_mode_mask_t mode) {
 
     if (was_active) {
         pd_mode_run_deactivate_hooks(mode);
+        noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_DEACTIVATE, mode, pd_mode_local_active_snapshot());
     }
 }
 
@@ -310,6 +313,7 @@ void pd_mode_lock(pd_mode_mask_t mode) {
 
     if (!was_locked) {
         pd_mode_run_lock_hooks(mode);
+        noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_LOCK, mode, pd_mode_local_locked_snapshot());
     }
 }
 
@@ -321,6 +325,7 @@ void pd_mode_unlock(pd_mode_mask_t mode) {
     pd_mode_run_unlock_hooks(mode);
     pd_mode_clear_locked(mode);
     pd_mode_deactivate(mode);
+    noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_UNLOCK, mode, pd_mode_local_locked_snapshot());
 }
 
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
