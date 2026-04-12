@@ -57,7 +57,8 @@ enum charybdis_keymap_layers {
 
 // Per-mode pointer DPI. Each mode can optionally override the normal pointer
 // DPI while it is active. Sniping always takes priority when active.
-// Dragscroll and pinch are excluded — Charybdis manages their CPI internally.
+// Dragscroll and pinch are excluded — the shared local dragscroll handler
+// owns their CPI through the pd-mode lifecycle.
 // 0 means "keep normal pointer DPI" for that mode.
 #    define PD_MODE_VOLUME_DPI 0
 #    define PD_MODE_BRIGHTNESS_DPI 0

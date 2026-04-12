@@ -86,17 +86,29 @@
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
 
 // Local drag-scroll tuning (DPI for the scroll speed lives in the keymap config).
-//   Speed          = DPI / STEP_DIVISOR           (lower = slower, more precise)
-//   Smoothness     = RATE_LIMIT_MS                (lower = more frequent updates)
-//   Snap feel      = SNAP_RATIO                   (higher = stricter axis lock)
-//   Lock feel      = AXIS_LOCK_TIMEOUT_MS         (higher = stickier gestures)
+// The repo-owned NOAH_DRAGSCROLL_* surface controls gesture feel; the older
+// CHARYBDIS_* scroll defines remain as compatibility fallbacks only.
+//   Thresholds     = start moving one axis intentionally before it scrolls
+//   Divisors       = counts per emitted scroll unit
+//   Start ratio    = dominance needed to begin a one-axis gesture
+//   Sustain ratio  = looser dominance needed to keep the gesture on one axis
+//   Lock timeout   = pause window that ends the current gesture
 #    define CHARYBDIS_DRAGSCROLL_REVERSE_Y
 #    define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 0
 #    define CHARYBDIS_SCROLL_STEP_DIVISOR 8
 #    define CHARYBDIS_SCROLL_RATE_LIMIT_MS 8
 #    define CHARYBDIS_SCROLL_SNAP_RATIO 3
 #    define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 80
-#    define NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS 40
+#    define NOAH_DRAGSCROLL_THRESHOLD_H 2
+#    define NOAH_DRAGSCROLL_THRESHOLD_V 3
+#    define NOAH_DRAGSCROLL_DIVISOR_H 6
+#    define NOAH_DRAGSCROLL_DIVISOR_V 8
+#    define NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM 7
+#    define NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN 4
+#    define NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM 5
+#    define NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN 4
+#    define NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS 55
+#    define NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR 4
 
 #endif // POINTING_DEVICE_ENABLE
 

@@ -84,6 +84,7 @@ static void test_reset_stubs(void) {
     fake_oneshot_locked_mods = 0;
 
     test_clear_logs();
+    reset_dragscroll_mode();
     reset_arrow_mode();
     test_clear_logs();
 }
@@ -253,43 +254,195 @@ static void test_dragscroll_horizontal_lock_filters_vertical_jitter(void) {
 
     fake_time32 = 1020u;
     report      = handle_dragscroll_mode((report_mouse_t){
-        .x = 80,
-        .y = 10,
+        .x = 18,
+        .y = 2,
     });
     CHECK(report.x == 0);
     CHECK(report.y == 0);
-    CHECK(report.h == 10);
+    CHECK(report.h == 3);
     CHECK(report.v == 0);
 
     fake_time32 = 1040u;
     report      = handle_dragscroll_mode((report_mouse_t){
-        .x = 8,
-        .y = 24,
+        .x = 6,
+        .y = 4,
     });
     CHECK(report.h == 1);
     CHECK(report.v == 0);
 }
 
-static void test_dragscroll_axis_lock_releases_after_pause(void) {
+static void test_dragscroll_vertical_lock_filters_horizontal_jitter(void) {
     test_reset_stubs();
 
     report_mouse_t report;
 
     fake_time32 = 1020u;
     report      = handle_dragscroll_mode((report_mouse_t){
-        .x = 64,
-        .y = 0,
-    });
-    CHECK(report.h == 8);
-    CHECK(report.v == 0);
-
-    fake_time32 = 1085u;
-    report      = handle_dragscroll_mode((report_mouse_t){
-        .x = 0,
-        .y = 64,
+        .x = 2,
+        .y = -24,
     });
     CHECK(report.h == 0);
-    CHECK(report.v == 8);
+    CHECK(report.v == 3);
+
+    fake_time32 = 1040u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 5,
+        .y = -8,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 1);
+}
+
+static void test_dragscroll_near_diagonal_motion_waits_for_dominant_axis(void) {
+    test_reset_stubs();
+
+    report_mouse_t report;
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 8,
+        .y = 7,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
+
+    fake_time32 = 1040u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 6,
+        .y = 0,
+    });
+    CHECK(report.h == 2);
+    CHECK(report.v == 0);
+}
+
+static void test_dragscroll_opposite_axis_does_not_steal_active_lock(void) {
+    test_reset_stubs();
+
+    report_mouse_t report;
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 22,
+        .y = 1,
+    });
+    CHECK(report.h == 3);
+    CHECK(report.v == 0);
+
+    fake_time32 = 1040u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 11,
+        .y = 12,
+    });
+    CHECK(report.h == 2);
+    CHECK(report.v == 0);
+}
+
+static void test_dragscroll_lock_releases_after_pause_and_switches_axes_cleanly(void) {
+    test_reset_stubs();
+
+    report_mouse_t report;
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 18,
+        .y = 1,
+    });
+    CHECK(report.h == 3);
+    CHECK(report.v == 0);
+
+    fake_time32 = 1080u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = 0,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
+
+    fake_time32 = 1100u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -24,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 3);
+}
+
+static void test_dragscroll_uses_different_horizontal_and_vertical_divisors(void) {
+    test_reset_stubs();
+
+    report_mouse_t report;
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 12,
+        .y = 0,
+    });
+    CHECK(report.h == 2);
+    CHECK(report.v == 0);
+
+    reset_dragscroll_mode();
+
+    fake_time32 = 1040u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -12,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 1);
+}
+
+static void test_dragscroll_cross_axis_decay_prevents_residual_leakage(void) {
+    test_reset_stubs();
+
+    report_mouse_t report;
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 18,
+        .y = 8,
+    });
+    CHECK(report.h == 3);
+    CHECK(report.v == 0);
+
+    fake_time32 = 1040u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 6,
+        .y = 0,
+    });
+    CHECK(report.h == 1);
+    CHECK(report.v == 0);
+
+    fake_time32 = 1060u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = 0,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
+}
+
+static void test_dragscroll_reset_clears_buffers_and_lock_state(void) {
+    test_reset_stubs();
+
+    report_mouse_t report;
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 18,
+        .y = 1,
+    });
+    CHECK(report.h == 3);
+    CHECK(report.v == 0);
+
+    reset_dragscroll_mode();
+
+    fake_time32 = 1040u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -16,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 2);
 }
 
 static void test_horizontal_arrow_tap_preserves_mod_state(void) {
@@ -391,7 +544,13 @@ static void test_arrow_mode_copy_shortcut_suspends_ambient_mods(void) {
 
 int main(void) {
     test_dragscroll_horizontal_lock_filters_vertical_jitter();
-    test_dragscroll_axis_lock_releases_after_pause();
+    test_dragscroll_vertical_lock_filters_horizontal_jitter();
+    test_dragscroll_near_diagonal_motion_waits_for_dominant_axis();
+    test_dragscroll_opposite_axis_does_not_steal_active_lock();
+    test_dragscroll_lock_releases_after_pause_and_switches_axes_cleanly();
+    test_dragscroll_uses_different_horizontal_and_vertical_divisors();
+    test_dragscroll_cross_axis_decay_prevents_residual_leakage();
+    test_dragscroll_reset_clears_buffers_and_lock_state();
     test_horizontal_arrow_tap_preserves_mod_state();
     test_vertical_arrow_tap_masks_alt_and_restores_mod_state();
     test_arrow_mode_selection_button_holds_and_releases_shift();

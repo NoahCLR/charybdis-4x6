@@ -262,4 +262,48 @@ Next steps:
 
 - run the full host suite
 - run `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Follow-up implementation completed after the local dragscroll migration:
+
+- Reworked `users/noah/lib/pointing/pd_mode_dragscroll.c` into an explicit
+  single-axis gesture state machine with signed per-axis buffers,
+  start-vs-sustain dominance checks, timeout-based lock release, and
+  cross-axis decay so dragscroll no longer emits simultaneous horizontal and
+  vertical scroll in one report.
+- Introduced a repo-owned `NOAH_DRAGSCROLL_*` tuning surface in
+  `users/noah/config.h` with separate horizontal/vertical thresholds and step
+  divisors, explicit start/sustain lock ratios, a dragscroll lock timeout, and
+  compatibility fallbacks back to the older Charybdis-style config names.
+- Updated the direct pd-mode handler host runner to compile against the real
+  userspace config surface so the handler tests exercise the same dragscroll
+  tuning that firmware builds use.
+- Expanded direct dragscroll host coverage to assert horizontal jitter
+  filtering, vertical jitter filtering, diagonal wait-until-dominant behavior,
+  lock retention against cross-axis motion, pause-and-switch recovery,
+  different horizontal/vertical divisors, cross-axis decay cleanup, and full
+  state reset semantics.
+- Updated pointer-mode docs and the keymap config comments so dragscroll tuning
+  is documented as a local userspace responsibility rather than an upstream
+  Charybdis-owned behavior knob.
+
+Verification run for the dragscroll behavior rewrite:
+
+- `git status --short`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- flash and feel-test the new dragscroll defaults on-device, especially
+  horizontal document nudges and pause-then-switch gestures on macOS
+- tune only the `NOAH_DRAGSCROLL_*` constants if the feel still needs work;
+  keep the single-axis gesture model intact unless on-device behavior exposes a
+  real regression
  

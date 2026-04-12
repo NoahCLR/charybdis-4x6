@@ -8,6 +8,7 @@
 
 #    include "pd_mode_handler_common.h"
 
+#    include <stdbool.h>
 #    include <limits.h>
 
 #    ifndef CHARYBDIS_DRAGSCROLL_BUFFER_SIZE
@@ -25,14 +26,36 @@
 #    ifndef CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS
 #        define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 100
 #    endif
-#    ifndef NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS
-#        define NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS 40
+#    ifndef NOAH_DRAGSCROLL_THRESHOLD_H
+#        define NOAH_DRAGSCROLL_THRESHOLD_H CHARYBDIS_DRAGSCROLL_BUFFER_SIZE
 #    endif
-#    ifndef NOAH_DRAGSCROLL_HORIZONTAL_STEP_DIVISOR
-#        define NOAH_DRAGSCROLL_HORIZONTAL_STEP_DIVISOR CHARYBDIS_SCROLL_STEP_DIVISOR
+#    ifndef NOAH_DRAGSCROLL_THRESHOLD_V
+#        define NOAH_DRAGSCROLL_THRESHOLD_V CHARYBDIS_DRAGSCROLL_BUFFER_SIZE
 #    endif
-#    ifndef NOAH_DRAGSCROLL_VERTICAL_STEP_DIVISOR
-#        define NOAH_DRAGSCROLL_VERTICAL_STEP_DIVISOR CHARYBDIS_SCROLL_STEP_DIVISOR
+#    ifndef NOAH_DRAGSCROLL_DIVISOR_H
+#        define NOAH_DRAGSCROLL_DIVISOR_H CHARYBDIS_SCROLL_STEP_DIVISOR
+#    endif
+#    ifndef NOAH_DRAGSCROLL_DIVISOR_V
+#        define NOAH_DRAGSCROLL_DIVISOR_V CHARYBDIS_SCROLL_STEP_DIVISOR
+#    endif
+#    ifndef NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM
+#        define NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM CHARYBDIS_SCROLL_SNAP_RATIO
+#    endif
+#    ifndef NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN
+#        define NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN 1
+#    endif
+#    ifndef NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM
+#        define NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM CHARYBDIS_SCROLL_SNAP_RATIO
+#    endif
+#    ifndef NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN
+#        define NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN 1
+#    endif
+#    ifndef NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS
+#        ifdef NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS
+#            define NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS
+#        else
+#            define NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS 40
+#        endif
 #    endif
 #    ifndef NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR
 #        define NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR 2
@@ -65,17 +88,35 @@ static int32_t dragscroll_abs32(int32_t value) {
     return value >= 0 ? value : -value;
 }
 
-static bool dragscroll_buffer_ready(int32_t value) {
-    return dragscroll_abs32(value) > CHARYBDIS_DRAGSCROLL_BUFFER_SIZE;
+static int32_t dragscroll_axis_threshold(dragscroll_axis_t axis) {
+    return axis == DRAGSCROLL_AXIS_X ? NOAH_DRAGSCROLL_THRESHOLD_H : NOAH_DRAGSCROLL_THRESHOLD_V;
 }
 
-static int32_t dragscroll_step_divisor(bool horizontal) {
-    int32_t divisor = horizontal ? NOAH_DRAGSCROLL_HORIZONTAL_STEP_DIVISOR : NOAH_DRAGSCROLL_VERTICAL_STEP_DIVISOR;
+static int32_t dragscroll_axis_divisor(dragscroll_axis_t axis) {
+    int32_t divisor = axis == DRAGSCROLL_AXIS_X ? NOAH_DRAGSCROLL_DIVISOR_H : NOAH_DRAGSCROLL_DIVISOR_V;
     return divisor > 0 ? divisor : 1;
 }
 
-static int32_t dragscroll_consume(int32_t *buffer, bool horizontal) {
-    int32_t divisor = dragscroll_step_divisor(horizontal);
+static bool dragscroll_axis_above_threshold(dragscroll_axis_t axis, int32_t value_abs) {
+    return value_abs >= dragscroll_axis_threshold(axis);
+}
+
+static bool dragscroll_axis_ratio_satisfied(int32_t axis_abs, int32_t other_abs, uint16_t ratio_num, uint16_t ratio_den) {
+    return (int64_t)axis_abs * ratio_den >= (int64_t)other_abs * ratio_num;
+}
+
+static bool dragscroll_axis_meets_start(dragscroll_axis_t axis, int32_t axis_abs, int32_t other_abs) {
+    return dragscroll_axis_above_threshold(axis, axis_abs) &&
+           dragscroll_axis_ratio_satisfied(axis_abs, other_abs, NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM, NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN);
+}
+
+static bool dragscroll_axis_meets_sustain(dragscroll_axis_t axis, int32_t axis_abs, int32_t other_abs) {
+    return dragscroll_axis_above_threshold(axis, axis_abs) &&
+           dragscroll_axis_ratio_satisfied(axis_abs, other_abs, NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM, NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN);
+}
+
+static int32_t dragscroll_consume(int32_t *buffer, dragscroll_axis_t axis) {
+    int32_t divisor = dragscroll_axis_divisor(axis);
     int32_t step    = *buffer / divisor;
 
     if (step == 0) {
@@ -98,76 +139,106 @@ static int32_t dragscroll_clamp_hv(int32_t value) {
     return value;
 }
 
-static void dragscroll_decay_cross_axis(int32_t *buffer) {
+static void dragscroll_decay_cross_axis(int32_t *buffer, dragscroll_axis_t axis) {
     if (*buffer == 0) {
         return;
     }
 
     *buffer /= NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR;
-    if (!dragscroll_buffer_ready(*buffer)) {
+    if (!dragscroll_axis_above_threshold(axis, dragscroll_abs32(*buffer))) {
         *buffer = 0;
     }
 }
 
-static dragscroll_axis_t dragscroll_try_lock_axis(int32_t abs_x, int32_t abs_y) {
-    if (abs_x == 0 && abs_y == 0) {
+static dragscroll_axis_t dragscroll_choose_start_axis(int32_t abs_x, int32_t abs_y) {
+    bool can_start_x = dragscroll_axis_meets_start(DRAGSCROLL_AXIS_X, abs_x, abs_y);
+    bool can_start_y = dragscroll_axis_meets_start(DRAGSCROLL_AXIS_Y, abs_y, abs_x);
+
+    if (can_start_x == can_start_y) {
         return DRAGSCROLL_AXIS_NONE;
     }
 
-    if (abs_x >= abs_y * CHARYBDIS_SCROLL_SNAP_RATIO) {
+    if (can_start_x) {
         return DRAGSCROLL_AXIS_X;
     }
 
-    if (abs_y >= abs_x * CHARYBDIS_SCROLL_SNAP_RATIO) {
-        return DRAGSCROLL_AXIS_Y;
-    }
-
-    return DRAGSCROLL_AXIS_NONE;
+    return DRAGSCROLL_AXIS_Y;
 }
 
-static void dragscroll_refresh_axis_lock(void) {
-    int32_t abs_x = dragscroll_abs32(dragscroll_state.buffer_x);
-    int32_t abs_y = dragscroll_abs32(dragscroll_state.buffer_y);
+static bool dragscroll_gesture_active(bool had_motion, uint32_t motion_age) {
+    return had_motion || motion_age <= NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS;
+}
 
-    if (dragscroll_state.locked_axis == DRAGSCROLL_AXIS_X) {
-        if (dragscroll_buffer_ready(dragscroll_state.buffer_x)) {
-            return;
-        }
+static dragscroll_axis_t dragscroll_opposite_axis(dragscroll_axis_t axis) {
+    return axis == DRAGSCROLL_AXIS_X ? DRAGSCROLL_AXIS_Y : DRAGSCROLL_AXIS_X;
+}
 
-        if (abs_y >= abs_x * CHARYBDIS_SCROLL_SNAP_RATIO) {
-            dragscroll_state.locked_axis = DRAGSCROLL_AXIS_Y;
-        } else if (!dragscroll_buffer_ready(dragscroll_state.buffer_y)) {
-            dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
-        }
-    } else if (dragscroll_state.locked_axis == DRAGSCROLL_AXIS_Y) {
-        if (dragscroll_buffer_ready(dragscroll_state.buffer_y)) {
-            return;
-        }
-
-        if (abs_x >= abs_y * CHARYBDIS_SCROLL_SNAP_RATIO) {
-            dragscroll_state.locked_axis = DRAGSCROLL_AXIS_X;
-        } else if (!dragscroll_buffer_ready(dragscroll_state.buffer_x)) {
-            dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
-        }
-    }
+static bool dragscroll_refresh_axis_lock(bool had_motion, uint32_t motion_age) {
+    int32_t abs_x          = dragscroll_abs32(dragscroll_state.buffer_x);
+    int32_t abs_y          = dragscroll_abs32(dragscroll_state.buffer_y);
+    bool    gesture_active = dragscroll_gesture_active(had_motion, motion_age);
 
     if (dragscroll_state.locked_axis == DRAGSCROLL_AXIS_NONE) {
-        dragscroll_state.locked_axis = dragscroll_try_lock_axis(abs_x, abs_y);
+        if (!gesture_active) {
+            return false;
+        }
+
+        dragscroll_state.locked_axis = dragscroll_choose_start_axis(abs_x, abs_y);
+        return dragscroll_state.locked_axis != DRAGSCROLL_AXIS_NONE;
     }
+
+    dragscroll_axis_t locked_axis   = dragscroll_state.locked_axis;
+    dragscroll_axis_t opposite_axis = dragscroll_opposite_axis(locked_axis);
+    int32_t           locked_abs    = locked_axis == DRAGSCROLL_AXIS_X ? abs_x : abs_y;
+    int32_t           opposite_abs  = opposite_axis == DRAGSCROLL_AXIS_X ? abs_x : abs_y;
+
+    if (!gesture_active) {
+        dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
+        return false;
+    }
+
+    if (dragscroll_axis_meets_sustain(locked_axis, locked_abs, opposite_abs)) {
+        return true;
+    }
+
+    if (!dragscroll_axis_above_threshold(DRAGSCROLL_AXIS_X, abs_x) && !dragscroll_axis_above_threshold(DRAGSCROLL_AXIS_Y, abs_y)) {
+        dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
+        return false;
+    }
+
+    if (opposite_axis == DRAGSCROLL_AXIS_X) {
+        if (dragscroll_axis_meets_start(DRAGSCROLL_AXIS_X, abs_x, abs_y)) {
+            dragscroll_state.locked_axis = DRAGSCROLL_AXIS_X;
+            return true;
+        }
+    } else {
+        if (dragscroll_axis_meets_start(DRAGSCROLL_AXIS_Y, abs_y, abs_x)) {
+            dragscroll_state.locked_axis = DRAGSCROLL_AXIS_Y;
+            return true;
+        }
+    }
+
+    dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
+    return false;
 }
 
-static bool dragscroll_emit_axis(report_mouse_t *mouse_report, bool horizontal) {
-    int32_t *buffer = horizontal ? &dragscroll_state.buffer_x : &dragscroll_state.buffer_y;
-    int32_t  step   = dragscroll_consume(buffer, horizontal);
+static bool dragscroll_emit_locked_axis(report_mouse_t *mouse_report) {
+    dragscroll_axis_t locked_axis = dragscroll_state.locked_axis;
+    int32_t          *buffer      = locked_axis == DRAGSCROLL_AXIS_X ? &dragscroll_state.buffer_x : &dragscroll_state.buffer_y;
+    int32_t           step        = dragscroll_consume(buffer, locked_axis);
 
     if (step == 0) {
         return false;
     }
 
-    if (horizontal) {
+    if (locked_axis == DRAGSCROLL_AXIS_X) {
         mouse_report->h = dragscroll_clamp_hv((int32_t)mouse_report->h + step);
-    } else {
+        dragscroll_decay_cross_axis(&dragscroll_state.buffer_y, DRAGSCROLL_AXIS_Y);
+    } else if (locked_axis == DRAGSCROLL_AXIS_Y) {
         mouse_report->v = dragscroll_clamp_hv((int32_t)mouse_report->v + step);
+        dragscroll_decay_cross_axis(&dragscroll_state.buffer_x, DRAGSCROLL_AXIS_X);
+    } else {
+        return false;
     }
 
     return true;
@@ -191,8 +262,6 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
 #    endif
 
         dragscroll_state.last_motion_time = now;
-    } else if (dragscroll_state.locked_axis != DRAGSCROLL_AXIS_NONE && timer_elapsed32(dragscroll_state.last_motion_time) > NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS) {
-        dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
     }
 
     mouse_report.x = 0;
@@ -200,8 +269,10 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
 
     if (dragscroll_state.buffer_x != 0 || dragscroll_state.buffer_y != 0) {
         if (timer_elapsed32(dragscroll_state.last_motion_time) > CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS) {
-            reset_dragscroll_mode();
-            return pd_mode_freeze_mouse();
+            dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
+            dragscroll_state.buffer_x    = 0;
+            dragscroll_state.buffer_y    = 0;
+            return mouse_report;
         }
     }
 
@@ -209,33 +280,12 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
         return mouse_report;
     }
 
-    if (!dragscroll_buffer_ready(dragscroll_state.buffer_x) && !dragscroll_buffer_ready(dragscroll_state.buffer_y)) {
+    uint32_t motion_age = timer_elapsed32(dragscroll_state.last_motion_time);
+    if (!dragscroll_refresh_axis_lock(had_motion, motion_age)) {
         return mouse_report;
     }
 
-    dragscroll_refresh_axis_lock();
-
-    bool emitted = false;
-    if (dragscroll_state.locked_axis == DRAGSCROLL_AXIS_X) {
-        emitted = dragscroll_emit_axis(&mouse_report, true);
-        if (emitted) {
-            dragscroll_decay_cross_axis(&dragscroll_state.buffer_y);
-        }
-    } else if (dragscroll_state.locked_axis == DRAGSCROLL_AXIS_Y) {
-        emitted = dragscroll_emit_axis(&mouse_report, false);
-        if (emitted) {
-            dragscroll_decay_cross_axis(&dragscroll_state.buffer_x);
-        }
-    } else {
-        if (dragscroll_buffer_ready(dragscroll_state.buffer_x)) {
-            emitted = dragscroll_emit_axis(&mouse_report, true) || emitted;
-        }
-        if (dragscroll_buffer_ready(dragscroll_state.buffer_y)) {
-            emitted = dragscroll_emit_axis(&mouse_report, false) || emitted;
-        }
-    }
-
-    if (emitted) {
+    if (dragscroll_emit_locked_axis(&mouse_report)) {
         dragscroll_state.last_scroll_time = now;
     }
 

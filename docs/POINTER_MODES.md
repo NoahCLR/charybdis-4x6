@@ -60,8 +60,8 @@ While active:
 - the cursor stays frozen
 - trackball motion is routed through the shared local dragscroll handler
 - forward / backward motion becomes vertical scrolling
-- the handler keeps a short axis lock so sideways gestures do not immediately
-  leak vertical residue
+- the handler uses a sticky single-axis gesture model, so near-diagonal motion
+  waits for one axis to win instead of emitting both axes together
 - horizontal motion can still contribute to horizontal scroll when the host
   surface accepts horizontal wheel input
 
