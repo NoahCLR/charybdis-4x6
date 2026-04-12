@@ -78,6 +78,8 @@ authored profile built on top of those systems, start with
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c). Those
 show the current concrete configuration of layers, combos, `key_behaviors[]`,
 VIA macro defaults, hardcoded macros, and pointing-mode entry gestures.
+If you want the maintainer-facing runtime map for the handled-key engine,
+start with [`docs/KEY_RUNTIME.md`](./docs/KEY_RUNTIME.md).
 
 There is also a small VIA bridge in
 [`via layouts/via_to_qmk_layout.py`](<./via layouts/via_to_qmk_layout.py>).

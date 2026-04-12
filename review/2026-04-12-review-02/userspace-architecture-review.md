@@ -1,0 +1,437 @@
+# Userspace Architecture Review
+
+Date: 2026-04-12
+
+Status: new review created after
+[2026-04-12-review-01](../2026-04-12-review-01/userspace-architecture-review.md).
+This pass reassesses the repo after the handled-key, pd-mode lifecycle,
+runtime-debug, and held-repeat follow-up work already recorded there.
+
+Scope: software architecture, structure, and long-term extensibility inside
+this repo only. Hardware concerns are intentionally out of scope.
+
+## Executive Summary
+
+The codebase is in a good architectural place for a fixed board. The major
+foundations are correct and worth preserving:
+
+- the authored/runtime split between
+  [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
+  [`noah_keymap.h`](../../users/noah/noah_keymap.h),
+  [`noah_keymap_ids.h`](../../users/noah/noah_keymap_ids.h), and
+  [`noah_runtime.h`](../../users/noah/noah_runtime.h)
+- the source-manifest build surface in
+  [`source_manifest.mk`](../../users/noah/source_manifest.mk)
+- manifest-driven pd-mode identity in
+  [`pd_mode_manifest.h`](../../users/noah/lib/pointing/pd_mode_manifest.h)
+- the staged RGB renderer in
+  [`rgb_runtime.c`](../../users/noah/lib/rgb/rgb_runtime.c)
+- unusually strong host coverage, compile gates, and authored-profile
+  validation
+
+The remaining architectural risks are narrower now. They are no longer broad
+"the repo needs structure" problems. They are specific cross-cutting seams
+where policy still leaks across modules:
+
+1. action emission still carries hidden key-runtime mutation policy
+2. pd-mode lifecycle extensibility is still partly registry-owned instead of
+   definition-owned
+3. the handled-key effect model is improved, but still exposed through several
+   overlapping interface layers
+4. the scenario harness still mirrors runtime contracts instead of consuming
+   them directly
+
+The recommendation is not a rewrite and not a plugin framework. The right
+next move is to keep the current data-driven design and tighten those seams.
+
+## Architecture And Separation Of Concerns
+
+### What is working well
+
+- `keymap.c` is still a real authored-data unit, not a runtime spillover file.
+- `hooks.c` and `runtime_init.c` keep QMK entry points narrow and explicit.
+- `qmk_contract.*` and `qmk_via_contract.*` still isolate fork-specific QMK
+  assumptions correctly.
+- Ownership concerns have real homes:
+  - `layer_ownership.c`
+  - `keyboard_mod_ownership.c`
+  - `held_action.c`
+  - `held_repeat.c`
+- The key runtime now has a shared effect vocabulary and a shared runtime
+  snapshot surface. That is materially better than the architecture captured
+  in older reviews.
+
+### Main remaining concern: output paths still mutate key-runtime state
+
+`action_dispatch()` in
+[`action_dispatch.c`](../../users/noah/lib/action/action_dispatch.c)
+still calls `key_runtime_activate_pending_fallback_hold()` before it emits a
+tap. That means "dispatch an action" is not a pure output operation. It can
+retroactively change active handled-key state.
+
+That same fallback-hold activation is also called directly in
+[`pd_mode_handlers.c`](../../users/noah/lib/pointing/pd_mode_handlers.c)
+before synthetic taps and shortcuts. So the policy is not even fully
+centralized in one dispatch helper; multiple output paths must remember to
+participate in key-runtime mutation rules.
+
+That is the strongest remaining hidden dependency in the codebase.
+
+## Modularity And Extensibility
+
+### Easy today
+
+- adding new authored `key_behaviors[]` rows
+- adding layers
+- adding combos that stay within userspace ownership rules
+- adding ordinary pd modes through the manifest/handler path
+- adding RGB overlays that fit the current stage compositor
+
+### Expensive today
+
+- adding a new source of emitted actions without accidentally changing hold
+  semantics
+- adding an unusual pd mode whose lifecycle side effects do not fit the shared
+  trait set
+- extending the handled-key reducer with another effect type or another stage
+  without updating several interface layers
+- expanding high-level scenario testing across subsystems without duplicating
+  more runtime contracts
+
+### Why new key behaviors still scale well
+
+The authored path remains coherent:
+
+- schema in
+  [`key_behavior.h`](../../users/noah/lib/key/key_behavior.h)
+- lookup in
+  [`key_behavior_lookup.c`](../../users/noah/lib/key/key_behavior_lookup.c)
+- validation in
+  [`keymap_validation.c`](../../users/noah/lib/key/keymap_validation.c)
+  and the dedicated host validation runners
+
+For this board, that is the right extensibility shape. Complexity stays on the
+runtime side while the authoring surface remains declarative.
+
+### Why unusual pd modes still scale less well than ordinary ones
+
+The repo now has lifecycle hooks, which was the correct direction. But the
+hooks are still defined in
+[`pd_mode_registry.c`](../../users/noah/lib/pointing/pd_mode_registry.c),
+selected by a central `switch`, and composed with central trait checks.
+
+That means:
+
+- normal modes are data-driven
+- exceptional modes are still registry-owned
+
+This is manageable with six modes. It becomes the next growth bottleneck if
+the mode set gains more specialized gesture or modifier behavior.
+
+## Abstractions And Interfaces
+
+### Strong abstractions
+
+- `noah_keymap.h` vs `noah_runtime.h`
+- `noah_keymap_ids.h`
+- `pd_mode_manifest.h`
+- `runtime_debug.h`
+- `source_manifest.mk`
+- the RGB stage interfaces
+
+These abstractions are meaningful. They describe real ownership boundaries.
+
+### Remaining leaky abstraction: the handled-key effect surface still has three names
+
+The runtime now has one shared executable effect type in
+[`key_runtime_effect.h`](../../users/noah/lib/key/key_runtime_effect.h),
+which is good. But the public surfaces around it still require a maintainer to
+understand:
+
+- effect requests in
+  [`key_runtime_slot_effect.h`](../../users/noah/lib/key/key_runtime_slot_effect.h)
+- slot results in
+  [`key_runtime_slot_result.h`](../../users/noah/lib/key/key_runtime_slot_result.h)
+- transition-plan aliases in
+  [`key_runtime_transition.h`](../../users/noah/lib/key/key_runtime_transition.h)
+
+Those are lighter-weight than the earlier architecture, but they still make
+the reducer/executor seam feel more layered than it really is.
+
+### Remaining abstraction leak: handled keys are partly resolved and partly raw
+
+`handled_key_view_t` now carries resolved semantics, which is an improvement.
+But it also still exposes the underlying `key_behavior_view_t`, and some
+callers still inspect `key.behavior.handled` directly instead of consuming a
+fully stable resolved surface.
+
+That is not a functional bug. It is an interface-stability issue: maintainers
+can still reach through the abstraction instead of staying on the resolved
+meaning layer.
+
+## Code Organization And Structure
+
+### Repo layout is good
+
+The top-level split remains easy to explain:
+
+- keymap-authored data in `keyboards/.../keymaps/noah/`
+- reusable runtime under `users/noah/lib/`
+- targeted host verification in `tests/host/`
+- human-facing docs under `README.md` and `docs/`
+
+That is a strong base.
+
+### The main organization issue is still discoverability inside the key runtime
+
+The key runtime is smaller and cleaner than it used to be, but it is still
+hard to learn as one flow. A maintainer has to jump across:
+
+- `key_runtime_process.c`
+- `key_runtime_preflight.c`
+- `key_runtime_transition.c`
+- `key_runtime_slot_step.c`
+- `key_runtime_slot_policy.c`
+- `key_runtime_slot_release_reduce.c`
+- `key_runtime_slot_scan_reduce.c`
+- `key_runtime_slot_pending_multi_tap.c`
+
+Those files are not individually too large. The problem is that the conceptual
+story is still hidden behind implementation-stage names.
+
+### PD-mode handler organization is the next likely friction point
+
+[`pd_mode_handlers.c`](../../users/noah/lib/pointing/pd_mode_handlers.c)
+holds all mode-local state, thresholds, and helper behavior in one file. That
+works with the current mode count, but it means a new mode still adds:
+
+- more file-local static state
+- more mode-specific helper functions
+- more merge pressure in one translation unit
+
+For a repo that is otherwise disciplined about ownership, that is one of the
+few places that still feels centralized by convenience rather than by concept.
+
+## State Management And Flow
+
+### What is strong
+
+- board-sized runtime slots keyed by physical position are correct for this
+  fixed board
+- `runtime_shared_state_t` is a better central state home than the older
+  scattered globals
+- `runtime_debug.h` now gives tests one aggregate snapshot/reset seam
+
+### Remaining state issue: debug state is aggregated, but execution policy is still distributed
+
+The runtime can now snapshot its state. That is a real improvement. But the
+policy that decides when state changes still lives in multiple output and mode
+paths:
+
+- `action_dispatch.c`
+- `pd_mode_handlers.c`
+- `key_runtime_transition.c`
+- `held_repeat.c`
+
+So the codebase has improved state observability more than it has improved
+state transition locality.
+
+## Scalability Of The Design
+
+### What will scale well
+
+- more authored data
+- more validation rules
+- more RGB stages
+- modestly more pd modes
+- more host test binaries
+
+### What will create debt fastest
+
+- more special-case action emitters
+- more unusual pd modes that require central registry edits
+- more effect types that force request/result/transition alias updates
+- more scenario harness logic that re-stubs production interfaces
+
+### Important non-issue: linear scans
+
+Linear scans in behavior lookup, pd-mode lookup, and board-sized slot tables
+are acceptable here. The board is fixed. The main scalability risk is
+conceptual drift, not lookup cost.
+
+## Testing And Debuggability
+
+### Current posture is strong
+
+This repo is already better tested than most keyboard firmware projects:
+
+- the host suite covers ownership, pd modes, split sync, handled-key runtime,
+  macros, validation, RGB, and compile gates
+- `runtime_debug.h` gives tests a shared reset/snapshot seam
+- real-profile validation protects the authored configuration surface
+
+### Main remaining testability issue
+
+[`key_runtime_scenario_harness.h`](../../tests/host/key_runtime_scenario_harness.h)
+and
+[`key_runtime_scenario_harness.c`](../../tests/host/key_runtime_scenario_harness.c)
+still define their own effect enum, their own effect recorder, and their own
+partial runtime reset behavior.
+
+That creates two maintenance costs:
+
+1. production runtime contracts can change without the scenario harness
+   changing with them
+2. higher-level tests cannot naturally see the same effect/state surfaces that
+   production code now exposes through `key_runtime_effect.h` and
+   `runtime_debug.h`
+
+## Findings
+
+### 1. High: action emission is still a hidden state-transition surface
+
+Evidence:
+
+- `action_dispatch()` activates fallback holds before tapping
+- pd-mode tap helpers do the same thing directly before synthetic taps or
+  shortcuts
+- repeat scheduling also reuses `action_dispatch()`
+
+Impact:
+
+- a new action emitter can accidentally change key-runtime semantics
+- output code is harder to reason about because it is not only output code
+- tests and future simulators need to know about runtime mutation policy that
+  is not visible in the function name
+
+Recommendation:
+
+- make the emission policy explicit with one output-intent surface instead of
+  burying it inside `action_dispatch()` or re-implementing it in pd handlers
+
+Suggested direction:
+
+```c
+typedef struct {
+    bool settle_pending_fallback_holds;
+    bool preserve_keyboard_mod_state;
+} noah_emit_policy_t;
+
+void noah_emit_tap(uint16_t action, noah_emit_policy_t policy);
+```
+
+That lets callers state whether they are normal key-runtime effects,
+pd-handler synthetic taps, or special shortcut paths without relying on hidden
+coupling.
+
+### 2. Medium-High: pd-mode lifecycle extensibility is still partly central
+
+Evidence:
+
+- manifest rows own the normal mode definition path
+- lifecycle hooks are selected in `pd_mode_registry.c`
+- unusual mode wiring still depends on the central registry switch
+- all mode-local handlers and state still accumulate in `pd_mode_handlers.c`
+
+Impact:
+
+- ordinary modes remain easy to add
+- unusual modes still require core-runtime edits
+- the registry becomes the place where special behavior knowledge accumulates
+
+Recommendation:
+
+- move lifecycle hooks into the mode definition row itself so the registry only
+  executes data it already owns
+- split mode-local handlers/state into per-mode files once another bespoke mode
+  lands
+
+Suggested direction:
+
+```c
+typedef struct {
+    pd_mode_mask_t                   mode_flag;
+    uint16_t                         keycode;
+    uint16_t                         lock_action;
+    pd_mode_handler_t                handler;
+    pd_mode_key_handler_t            key_handler;
+    pd_mode_reset_fn_t               reset;
+    uint16_t                         dpi;
+    pd_mode_traits_t                 traits;
+    const pd_mode_lifecycle_hooks_t *lifecycle;
+} pd_mode_def_t;
+```
+
+That keeps the current static model, but removes the registry switch as the
+next extensibility choke point.
+
+### 3. Medium: the handled-key effect model still exposes overlapping protocol layers
+
+Evidence:
+
+- `key_runtime_slot_effect.h` defines request kinds
+- `key_runtime_slot_result.h` aliases executable effects again
+- `key_runtime_transition.h` aliases the same effect type a second time
+
+Impact:
+
+- adding one new effect still requires touching several effect-facing headers
+- the reducer/executor flow is harder to explain than the real runtime model
+- names suggest more translation layers than actually exist
+
+Recommendation:
+
+- keep one executable effect type
+- rename the request layer to make it clear it is only a reducer-local builder
+- stop re-exporting transition-specific aliases for the same effect enum
+
+The architecture is close here; the remaining work is mostly interface cleanup,
+not a redesign.
+
+### 4. Medium: the scenario harness still mirrors runtime contracts instead of consuming them
+
+Evidence:
+
+- custom scenario effect enum in `key_runtime_scenario_harness.h`
+- manual `noah_runtime_shared_state` reset in `key_runtime_scenario_harness.c`
+- custom stubs for action dispatch, held actions, layer ownership, and pd-mode
+  lock effects
+
+Impact:
+
+- tests can drift away from production effect contracts
+- integration scenarios become more expensive to expand across subsystems
+- the strongest debug surface (`runtime_debug.h`) is not the default scenario
+  harness surface
+
+Recommendation:
+
+- rebuild the scenario harness around shared runtime contracts:
+  - `key_runtime_effect_t`
+  - `noah_runtime_reset_for_test()`
+  - optional typed effect observers in the transition executor
+
+That would let higher-level tests use the same state/effect vocabulary as the
+runtime instead of maintaining a test-only dialect.
+
+## Concrete Next Steps
+
+1. Introduce one explicit action-emission API and route `action_dispatch()`,
+   pd-mode synthetic taps, and repeat emission through it.
+2. Extend the pd-mode definition row with an optional lifecycle hook pointer,
+   then delete the `pd_mode_lifecycle_mode_hooks()` switch.
+3. Rename and narrow the handled-key request/result interfaces so there is one
+   obvious executable effect vocabulary.
+4. Add one maintainer-facing runtime doc under `docs/` that explains:
+   - handled-key press/release/scan flow
+   - where reducer policy lives
+   - where executable effects are queued and run
+5. Rebuild the scenario harness on shared runtime debug/effect surfaces before
+   adding another major integration scenario family.
+
+## Overall Judgment
+
+This userspace is already structurally strong for a fixed Charybdis board.
+The next wins are not broad framework changes. They are targeted seam
+cleanups that make the current design easier to extend without central files
+quietly becoming policy magnets.

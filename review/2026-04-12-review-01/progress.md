@@ -95,6 +95,13 @@ Completed in this pass:
     boundary directly
   - updated explicit host runners and host stubs that previously assumed
     repeat start/tick lived in `held_action.c`
+- Implemented the permanent maintainer doc follow-up from this review:
+  - added `docs/KEY_RUNTIME.md` as the stable maintainer-facing map for the
+    handled-key resolver, slot reducer, effect plan, and runtime ownership
+    boundaries
+  - linked that doc from `README.md` and `docs/INTERACTION_MODEL.md` so the
+    runtime map now lives in the normal docs surface instead of only in the
+    time-scoped review folder
 
 Verification run in this pass:
 
@@ -145,5 +152,4 @@ Workspace scope:
 
 Recommended next implementation work:
 
-1. Write one permanent maintainer doc for the key runtime so the reducer/effect
-   flow is documented outside the time-scoped review folders.
+1. No remaining follow-up items are required to close this review pass.

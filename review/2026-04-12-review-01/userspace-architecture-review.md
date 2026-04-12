@@ -264,11 +264,14 @@ The docs set is good for users and for profile authoring:
 
 - [`README.md`](../../README.md)
 - [`docs/INTERACTION_MODEL.md`](../../docs/INTERACTION_MODEL.md)
+- [`docs/KEY_RUNTIME.md`](../../docs/KEY_RUNTIME.md)
 - [`docs/ADDING_PD_MODE.md`](../../docs/ADDING_PD_MODE.md)
 
-What is still missing is one stable maintainer-facing runtime map for the
-handled-key engine. The review docs are useful, but they are time-scoped and
-not the main discoverability surface.
+This review originally identified one remaining docs gap: a stable
+maintainer-facing runtime map for the handled-key engine. That gap is now
+covered by [`docs/KEY_RUNTIME.md`](../../docs/KEY_RUNTIME.md), so the review
+notes no longer have to act as the primary discoverability surface for the
+runtime flow.
 
 ## State Management And Flow
 

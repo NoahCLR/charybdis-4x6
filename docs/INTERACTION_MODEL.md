@@ -5,7 +5,8 @@ This document explains the shared interaction semantics supported by the
 
 It does not describe the current physical layout, exact bindings, or
 profile-specific timing tweaks. For Noah's current authored profile, see
-[KEYMAP.md](./KEYMAP.md).
+[KEYMAP.md](./KEYMAP.md). For the maintainer-facing runtime map behind these
+semantics, see [KEY_RUNTIME.md](./KEY_RUNTIME.md).
 
 ## What The Engine Adds
 
@@ -217,6 +218,7 @@ For the full RGB authoring model, render order, and configuration surface, see
 ## Related Docs
 
 - [README.md](../README.md): top-level overview of the shared userspace
+- [KEY_RUNTIME.md](./KEY_RUNTIME.md): maintainer-facing handled-key runtime map
 - [KEYMAP.md](./KEYMAP.md): Noah's current concrete profile choices
 - [POINTER_MODES.md](./POINTER_MODES.md): raw pointing-device mode behavior
 - [RGB_CONFIG.md](./RGB_CONFIG.md): RGB authoring and render order
