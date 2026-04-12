@@ -7,6 +7,8 @@
 
 #include "quantum_keycodes.h"
 
+#define NOAH_RUNTIME_TEST_COMPAT_OVERLAY 1
+
 #define PROGMEM
 
 #define ARRAY_SIZE(arr_) (sizeof(arr_) / sizeof((arr_)[0]))

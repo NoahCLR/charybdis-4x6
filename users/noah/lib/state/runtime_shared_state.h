@@ -59,8 +59,9 @@ typedef struct {
 // multi-tap chain that still owns this physical key position after release.
 typedef struct {
     uint16_t timer;
-    // The anonymous unions preserve the existing flat designated initializers
-    // while giving the runtime named owner/binding/timing/lifecycle groups.
+#ifdef NOAH_RUNTIME_TEST_COMPAT_OVERLAY
+    // Host fixtures still use flat designated initializers; keep that overlay
+    // limited to host builds so production code only sees the grouped model.
     union {
         struct {
             uint16_t keycode;
@@ -95,6 +96,12 @@ typedef struct {
         };
         key_runtime_slot_timing_state_t timing;
     };
+#else
+    key_runtime_slot_owner_state_t     owner;
+    key_runtime_slot_lifecycle_state_t lifecycle;
+    key_runtime_slot_binding_state_t   binding;
+    key_runtime_slot_timing_state_t    timing;
+#endif
     multi_tap_t pending_multi_tap;
 } active_key_state_t;
 
@@ -108,16 +115,29 @@ typedef struct {
     bool     long_hold_level;
 } key_runtime_feedback_state_t;
 
-#define ACTIVE_KEY_STATE_INIT                           \
-    {                                                   \
-        .keycode             = KC_NO,                   \
-        .phase               = KEY_RUNTIME_SLOT_PHASE_IDLE, \
-        .held_action_keycode = KC_NO,                   \
-        .tap_hold_term       = CUSTOM_TAP_HOLD_TERM,    \
-        .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM, \
-        .multi_tap_term      = CUSTOM_MULTI_TAP_TERM,   \
-        .pending_multi_tap   = {0},                     \
-    }
+#ifdef NOAH_RUNTIME_TEST_COMPAT_OVERLAY
+#    define ACTIVE_KEY_STATE_INIT                        \
+        {                                                \
+            .keycode             = KC_NO,                \
+            .phase               = KEY_RUNTIME_SLOT_PHASE_IDLE, \
+            .held_action_keycode = KC_NO,                \
+            .tap_hold_term       = CUSTOM_TAP_HOLD_TERM, \
+            .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM, \
+            .multi_tap_term      = CUSTOM_MULTI_TAP_TERM, \
+            .pending_multi_tap   = {0},                  \
+        }
+#else
+#    define ACTIVE_KEY_STATE_INIT                        \
+        {                                                \
+            .owner.keycode             = KC_NO,          \
+            .lifecycle.phase           = KEY_RUNTIME_SLOT_PHASE_IDLE, \
+            .lifecycle.held_action_keycode = KC_NO,      \
+            .timing.tap_hold_term      = CUSTOM_TAP_HOLD_TERM, \
+            .timing.longer_hold_term   = CUSTOM_LONGER_HOLD_TERM, \
+            .timing.multi_tap_term     = CUSTOM_MULTI_TAP_TERM, \
+            .pending_multi_tap         = {0},            \
+        }
+#endif
 
 typedef struct {
     key_runtime_slot_state_t     slots_by_position[KEY_RUNTIME_SLOT_TABLE_CAPACITY];

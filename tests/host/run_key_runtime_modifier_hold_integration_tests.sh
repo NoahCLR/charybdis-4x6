@@ -21,6 +21,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/action/owned_keycode.c" \
     "$ROOT/users/noah/lib/key/key_runtime.c" \
     "$ROOT/users/noah/lib/key/key_runtime_admission.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_slot_policy.c" \
+    "$ROOT/users/noah/lib/key/key_runtime_slot_pending_multi_tap.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_result.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot_step.c" \
     "$ROOT/users/noah/lib/key/key_runtime_slot.c" \

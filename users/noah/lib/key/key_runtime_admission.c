@@ -22,7 +22,7 @@ active_key_state_t *key_runtime_first_active_slot(void) {
 active_key_state_t *key_runtime_find_slot_by_position(keypos_t key_pos) {
     active_key_state_t *slot = key_runtime_slot_for_position(key_pos);
 
-    if (key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->key_pos, key_pos)) {
+    if (key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) {
         return slot;
     }
 

@@ -2,7 +2,7 @@
 
 Date: 2026-04-11
 
-Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, explicit handled-key slot lifecycle phase plus hold-strategy state, a shared slot-result surface between slot reduction and `key_runtime_transition.c`, a reducer-style `key_runtime_slot_step(...)` seam, a consolidated reducer implementation in `key_runtime_slot_step.c`, phase-local active scan and active release handling, explicit local pending-multi-tap release/scan handling, explicit handled-press context/outcome handling, reducer-owned lifecycle effect transitions that removed `key_runtime_slot_effect.c` from the runtime build surface, a position-indexed handled-key slot table that removed the fixed two-slot overlap ceiling, grouped handled-key slot owner/lifecycle/binding/timing subrecords in shared state, and explicit event/phase handler tables inside `key_runtime_slot_step.c`; the remaining recommendations below focus on what is still architecturally open after those changes.
+Status: active review created after [review-01](../2026-04-11-review-01/userspace-architecture-review.md). Follow-up work has already landed for the shared source manifest, the first structured key-runtime scenario harness, a dedicated key-runtime admission boundary, explicit handled-key slot lifecycle phase plus hold-strategy state, a shared slot-result surface between slot reduction and `key_runtime_transition.c`, a reducer-style `key_runtime_slot_step(...)` seam, a consolidated reducer implementation in `key_runtime_slot_step.c`, phase-local active scan and active release handling, explicit local pending-multi-tap release/scan handling, explicit handled-press context/outcome handling, reducer-owned lifecycle effect transitions that removed `key_runtime_slot_effect.c` from the runtime build surface, a position-indexed handled-key slot table that removed the fixed two-slot overlap ceiling, grouped handled-key slot owner/lifecycle/binding/timing subrecords in shared state, explicit event/phase handler tables inside `key_runtime_slot_step.c`, a test-only flat slot-state overlay for host fixtures, and dedicated internal reducer-policy homes for lifecycle effects and pending multi-tap handling; the remaining recommendations below focus on what is still architecturally open after those changes.
 
 Scope: the `noah` userspace in this repo only. This review ignores hardware changes and evaluates software structure, boundaries, state flow, extension cost, and verification surfaces.
 
@@ -21,12 +21,12 @@ The main architectural risk is now concentrated in one area: the handled-key
 runtime. The old single-active-key bottleneck is gone, and the follow-up work
 has already improved the surrounding structure by splitting admission policy
 into its own module, adding a scenario-level host harness, moving to explicit
-slot lifecycle phase and hold-strategy state, and consolidating handled press,
-release, scan, interrupt, and flush reduction behind one slot-step seam. The
-runtime now has one reducer-style slot-step API, one reducer implementation
-file, explicit handled-press context/outcome flow, and reducer-owned lifecycle
-effect transitions. That is a much better architecture than the earlier helper
-pile, but it is still not yet a smaller explicit phase/event FSM core, and the
+slot lifecycle phase and hold-strategy state, consolidating handled press,
+release, scan, interrupt, and flush reduction behind one slot-step seam,
+limiting the flat slot-state overlay to host fixtures, and extracting
+lifecycle-effect plus pending-multi-tap policy into dedicated internal helper
+modules. That is a much better architecture than the earlier helper pile, but
+it is still not yet a smaller explicit phase/event FSM core, and the
 handled-key engine is still the place most likely to fight the next real
 feature.
 
@@ -108,6 +108,8 @@ The strongest remaining architectural smell is in the key runtime:
 - [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
 - [`users/noah/lib/key/key_runtime_slot_effect.h`](../../users/noah/lib/key/key_runtime_slot_effect.h)
 - [`users/noah/lib/key/key_runtime.c`](../../users/noah/lib/key/key_runtime.c)
+- [`users/noah/lib/key/key_runtime_slot_policy.c`](../../users/noah/lib/key/key_runtime_slot_policy.c)
+- [`users/noah/lib/key/key_runtime_slot_pending_multi_tap.c`](../../users/noah/lib/key/key_runtime_slot_pending_multi_tap.c)
 - [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
 - [`users/noah/lib/key/key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h)
 - [`users/noah/lib/key/key_runtime_slot.c`](../../users/noah/lib/key/key_runtime_slot.c)
@@ -150,10 +152,13 @@ What is good now:
   [`runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h),
   so runtime code no longer has to treat the handled-key slot as one
   undifferentiated flat record
+- the flat compatibility overlay is now limited to host fixtures through
+  `NOAH_RUNTIME_TEST_COMPAT_OVERLAY`, so production builds only see the
+  grouped slot-state model
 - pending multi-tap release and pending multi-tap scan now also reduce through
-  named local contexts and resolutions inside
-  [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
-  instead of ad hoc resolve-then-patch logic
+  a named internal helper module in
+  [`key_runtime_slot_pending_multi_tap.c`](../../users/noah/lib/key/key_runtime_slot_pending_multi_tap.c)
+  instead of ad hoc resolve-then-patch logic inside the main reducer file
 - handled press now reduces through explicit local press contexts and named
   outcomes inside
   [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
@@ -164,6 +169,11 @@ What is good now:
 - press-begin, release-resolution, and most lifecycle effect planning no
   longer sit behind separate runtime modules; they now live directly inside the
   slot reducer
+- release-hold selection, fallback-hold activation, interrupt policy, flush
+  behavior, threshold-hold dispatch, and long-hold promotion now have a named
+  internal home in
+  [`key_runtime_slot_policy.c`](../../users/noah/lib/key/key_runtime_slot_policy.c)
+  instead of remaining as one larger helper pile inside the reducer
 - active slot lifecycle state now has explicit `phase` and `hold_strategy`
   fields instead of the older hold/strategy boolean combination
 - fallback hold activation outside the reducer now has a small dedicated
@@ -177,26 +187,28 @@ What is good now:
 What is still expensive:
 
 - `active_key_state_t` is now grouped into owner/lifecycle/binding/timing
-  subrecords, but the compatibility overlay still leaves a broader mutable
-  surface than a final reducer-owned model should expose
+  subrecords, and production builds only see that grouped model, but the
+  host-only compatibility overlay still means fixtures can lean on a broader
+  flat field surface than the long-term reducer model should expose
 - [`key_runtime_state.h`](../../users/noah/lib/key/key_runtime_state.h) exposes a
   narrower storage-oriented surface plus shared slot helpers
 - one public slot event/result model now exists, and one reducer
   implementation now exists in `key_runtime_slot_step.c`, but the reducer is
-  still large and still depends on several local helper families instead of one
-  smaller fully phase-local FSM core
+  still large even after moving lifecycle-effect and pending-multi-tap policy
+  into named internal helpers
 - the transition layer no longer knows the press/release/scan-specific local
   structs, and those extra structs are gone; the remaining fragmentation is now
   in implementation logic rather than in cross-module result protocols
-- the shared slot-result helper layer is now small, and the reducer entry
-  point is unified, but the underlying phase transitions still do not share a
-  tighter phase/event state-machine surface
+- the reducer now coordinates smaller internal policy surfaces, but the
+  underlying phase transitions still do not share one tighter phase/event
+  state-machine surface
 
 Why this matters:
 
 - adding one new hold mode or one new interrupt rule is still likely to touch
   storage, reducer-local helper paths, transition planning, and tests in
-  several files
+  several files, even if some of those policy families now have better named
+  homes
 - invalid or surprising state combinations are constrained more clearly than
   before, but still rely partly on reducer conventions instead of one smaller
   typed transition table
@@ -327,7 +339,7 @@ Leaky abstractions:
 
 - the key runtime reducer is still larger than the lifecycle concept it is
   trying to model
-- `active_key_state_t` is grouped more clearly now, but the compatibility
+- `active_key_state_t` is grouped more clearly now, but the host-only fixture
   overlay still exposes more mutable storage detail than the long-term reducer
   model should expose
 
@@ -343,8 +355,9 @@ Needs attention:
 
 - `key_runtime_slot_step.c` is still too large to be the final long-term home
   of handled-key lifecycle policy
-- `active_key_state_t` now reads more clearly, but it still carries more
-  mutable lifecycle detail than a tighter long-term reducer model should expose
+- `active_key_state_t` now reads more clearly in production code, but the
+  host-only flat fixture overlay should eventually go away once tests move to
+  the grouped shape
 
 ### State management and flow
 
@@ -355,10 +368,11 @@ Positive:
 
 Risk:
 
-- slot phase and event dispatch are explicit now, but effect planning and
-  pending-multi-tap helper paths still have to stay in sync by convention
-- interrupt and flush policy are still encoded in reducer logic rather than a
-  smaller policy surface
+- slot phase and event dispatch are explicit now, and effect planning plus
+  pending-multi-tap handling have named internal homes, but the reducer and
+  those helper modules still have to stay in sync by convention
+- interrupt and flush policy no longer live as anonymous local reducer helpers,
+  but they are still policy conventions rather than one smaller typed FSM core
 
 ### Scalability of the design
 
@@ -408,6 +422,12 @@ The first major reducer step is now done:
   [`key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
 - slot state is grouped into named owner/lifecycle/binding/timing subrecords in
   [`runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
+- production builds now see only that grouped slot-state model; the flat
+  compatibility overlay is limited to host fixtures
+- lifecycle-effect policy now has a small named internal home in
+  [`key_runtime_slot_policy.c`](../../users/noah/lib/key/key_runtime_slot_policy.c)
+- pending multi-tap release/scan policy now has a named internal home in
+  [`key_runtime_slot_pending_multi_tap.c`](../../users/noah/lib/key/key_runtime_slot_pending_multi_tap.c)
 
 The remaining goal is to make the reducer implementation itself look more like
 an explicit phase/event FSM core.
@@ -466,8 +486,8 @@ The remaining guidance is to keep that boundary explicit:
 - keep whole-table scans centralized to the places that actually need them
 - keep new runtime code on the named owner/lifecycle/binding/timing groups
   instead of drifting back to one flat slot record everywhere
-- treat the compatibility overlay and remaining reducer size, not slot
-  capacity, as the next handled-key simplification targets
+- treat the host-only compatibility overlay and remaining reducer size, not
+  slot capacity, as the next handled-key simplification targets
 
 ### Recommendation 3: promote pd-mode traits into a small policy object before the next unusual mode
 
@@ -516,9 +536,10 @@ internal shape of the handled-key engine. The manifest deduplication, scenario
 harness, admission split, reducer seam, phase/hold-strategy extraction,
 phase-local release and scan handling, explicit pending multi-tap handling,
 explicit handled-press outcomes, reducer-owned lifecycle effect transitions,
-grouped slot subrecords, and explicit phase/event dispatch tables were the
-right moves. The position-indexed slot table was the other major structural
-fix. The remaining handled-key work is now narrower: either stop here with a
-much better reducer and storage surface, or later keep shrinking
-`key_runtime_slot_step.c` and the slot-state compatibility overlay toward a
-smaller explicit FSM core.
+grouped slot subrecords, a host-only compatibility overlay, dedicated internal
+slot-policy and pending-multi-tap helper modules, and explicit phase/event
+dispatch tables were the right moves. The position-indexed slot table was the
+other major structural fix. The remaining handled-key work is now narrower:
+either stop here with a much better reducer and storage surface, or later keep
+shrinking `key_runtime_slot_step.c` and eventually remove the host-only flat
+fixture overlay in favor of a smaller explicit FSM core.

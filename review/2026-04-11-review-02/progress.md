@@ -199,6 +199,80 @@ Verification result:
 - full host suite passed
 - firmware build passed
 
+## 2026-04-12 Test-Only Overlay And Internal Slot Policy Split
+
+Completed in this pass:
+
+- Limited the flat handled-key slot-state compatibility overlay in
+  [`users/noah/lib/state/runtime_shared_state.h`](../../users/noah/lib/state/runtime_shared_state.h)
+  to host fixtures only through `NOAH_RUNTIME_TEST_COMPAT_OVERLAY`, so
+  production builds now see only the grouped `owner`, `lifecycle`, `binding`,
+  and `timing` subrecords.
+- Added a dedicated internal lifecycle-policy module:
+  - [`users/noah/lib/key/key_runtime_slot_policy.h`](../../users/noah/lib/key/key_runtime_slot_policy.h)
+  - [`users/noah/lib/key/key_runtime_slot_policy.c`](../../users/noah/lib/key/key_runtime_slot_policy.c)
+- Moved hold/release/flush/interrupt effect decisions into that module,
+  including:
+  - release hold-action selection
+  - fallback-hold activation
+  - interrupt-on-other-press policy
+  - immediate-hold commit
+  - flush behavior
+  - threshold-hold firing
+  - long-hold promotion
+- Added a dedicated internal pending-multi-tap reducer helper module:
+  - [`users/noah/lib/key/key_runtime_slot_pending_multi_tap.h`](../../users/noah/lib/key/key_runtime_slot_pending_multi_tap.h)
+  - [`users/noah/lib/key/key_runtime_slot_pending_multi_tap.c`](../../users/noah/lib/key/key_runtime_slot_pending_multi_tap.c)
+- Moved pending multi-tap release and scan handling out of
+  [`users/noah/lib/key/key_runtime_slot_step.c`](../../users/noah/lib/key/key_runtime_slot_step.c)
+  into that helper module so the main reducer no longer owns that full policy
+  pile directly.
+- Rewired the main reducer to consume those named internal helpers while
+  keeping the public slot-step and slot-result contracts unchanged.
+- Updated the canonical userspace source manifest in
+  [`users/noah/source_manifest.mk`](../../users/noah/source_manifest.mk) and
+  the affected host runners so the new helper modules participate in both
+  firmware builds and host-only link steps.
+- Fixed the last production-only flat slot-field references in:
+  - [`users/noah/lib/key/key_runtime_admission.c`](../../users/noah/lib/key/key_runtime_admission.c)
+  - [`users/noah/lib/key/key_runtime_press.c`](../../users/noah/lib/key/key_runtime_press.c)
+- Updated
+  [`userspace-architecture-review.md`](./userspace-architecture-review.md) so
+  the active review reflects the new helper boundaries and the now-test-only
+  compatibility overlay.
+
+Why this pass landed now:
+
+- it directly attacks the remaining handled-key review findings without
+  reopening the slot-storage rewrite
+- it makes production slot state stricter while keeping host fixtures stable
+- it gives lifecycle effects and pending multi-tap handling named internal
+  homes, narrowing what is still truly part of the main reducer
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Verification result:
+
+- targeted slot, admission, transition, feedback, preflight, scenario, and
+  integration tests passed
+- feature-gate compile checks passed
+- full host suite passed
+- firmware build passed
+- diff cleanliness checks passed
+
 ## 2026-04-12 Grouped Slot State And Explicit Reducer Dispatch
 
 Completed in this pass:

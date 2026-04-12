@@ -17,7 +17,8 @@
 bool key_runtime_process_handled_key_press(uint16_t keycode, keyrecord_t *record, handled_key_view_t key) {
     active_key_state_t          *slot = key_runtime_select_slot_for_press(record->event.key);
     key_runtime_transition_plan_t plan;
-    bool                          active_held_action_survives_flush = slot->held_action_keycode == KC_NO || held_action_survives_flush(slot->key_pos, slot->held_action_keycode);
+    bool                          active_held_action_survives_flush =
+        slot->lifecycle.held_action_keycode == KC_NO || held_action_survives_flush(slot->owner.key_pos, slot->lifecycle.held_action_keycode);
 
     key_runtime_transition_plan_init(&plan);
     bool handled = key_runtime_transition_handled_key_press(slot, keycode, record->event.key, key, active_held_action_survives_flush, &plan);
