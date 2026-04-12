@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/key_runtime_admission.h"
 #include "users/noah/lib/key/key_runtime_state.h"
@@ -330,7 +331,8 @@ bool action_dispatch_is_layer_lock(uint16_t action) {
     return action == TEST_LAYER_LOCK_ACTION;
 }
 
-void action_dispatch(uint16_t action) {
+void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
+    (void)policy;
     test_log_call(TEST_CALL_DISPATCH_ACTION, action, test_keypos(0, 0), 0, false, (delayed_action_mods_t){0});
 }
 

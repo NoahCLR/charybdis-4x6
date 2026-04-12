@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/delayed_action.h"
 #include "users/noah/lib/key/key_runtime_process.h"
@@ -172,8 +173,9 @@ bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
     return false;
 }
 
-void action_dispatch(uint16_t action) {
+void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     (void)action;
+    (void)policy;
 }
 
 void pointer_layer_policy_note_action(uint16_t action, bool pressed) {

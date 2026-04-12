@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/held_action.h"
 #include "users/noah/lib/key/held_repeat.h"
@@ -147,6 +148,11 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
 
 void action_dispatch(uint16_t action) {
     (void)action;
+}
+
+void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
+    (void)action;
+    (void)policy;
 }
 
 void pointer_layer_policy_note_action(uint16_t action, bool pressed) {

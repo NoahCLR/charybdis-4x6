@@ -325,6 +325,11 @@ void action_dispatch(uint16_t action) {
     });
 }
 
+void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
+    (void)policy;
+    action_dispatch(action);
+}
+
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

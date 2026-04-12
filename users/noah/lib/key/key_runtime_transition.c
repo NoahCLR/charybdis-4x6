@@ -74,7 +74,7 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 
         switch (effect->kind) {
             case KEY_RUNTIME_TRANSITION_EFFECT_DISPATCH_ACTION:
-                action_dispatch(effect->data.action);
+                noah_emit_action_tap(effect->data.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
                 break;
             case KEY_RUNTIME_TRANSITION_EFFECT_HELD_ACTION_REGISTER:
                 held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);

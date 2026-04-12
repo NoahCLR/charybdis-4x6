@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/delayed_action.h"
@@ -228,8 +229,9 @@ bool action_dispatch_is_layer_lock(uint16_t action) {
     return false;
 }
 
-void action_dispatch(uint16_t action) {
+void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     (void)action;
+    (void)policy;
 }
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {

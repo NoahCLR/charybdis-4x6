@@ -44,6 +44,21 @@ where policy still leaks across modules:
 The recommendation is not a rewrite and not a plugin framework. The right
 next move is to keep the current data-driven design and tighten those seams.
 
+## Status Update After Initial Implementation
+
+The first follow-up item from this review has now landed in the repo:
+
+- explicit emission helpers now live in
+  `users/noah/lib/action/action_dispatch.*`
+- handled-key transitions, direct lock taps, held-repeat dispatch,
+  delayed-action replay, and pd-mode tap helpers now use that explicit surface
+- pd-mode helpers no longer call fallback-hold activation directly
+
+`action_dispatch()` still exists as a compatibility wrapper with the
+historical runtime-default policy, but it is no longer the only intended
+output seam. The remaining implementation priority now starts with pd-mode
+lifecycle ownership and the scenario harness rebuild.
+
 ## Architecture And Separation Of Concerns
 
 ### What is working well
@@ -288,7 +303,7 @@ That creates two maintenance costs:
 
 ## Findings
 
-### 1. High: action emission is still a hidden state-transition surface
+### 1. High at review time: action emission was a hidden state-transition surface
 
 Evidence:
 
@@ -323,6 +338,11 @@ void noah_emit_tap(uint16_t action, noah_emit_policy_t policy);
 That lets callers state whether they are normal key-runtime effects,
 pd-handler synthetic taps, or special shortcut paths without relying on hidden
 coupling.
+
+Follow-up status:
+
+- resolved in the first implementation slice recorded in
+  [progress.md](./progress.md)
 
 ### 2. Medium-High: pd-mode lifecycle extensibility is still partly central
 
@@ -416,17 +436,15 @@ runtime instead of maintaining a test-only dialect.
 
 ## Concrete Next Steps
 
-1. Introduce one explicit action-emission API and route `action_dispatch()`,
-   pd-mode synthetic taps, and repeat emission through it.
-2. Extend the pd-mode definition row with an optional lifecycle hook pointer,
+1. Extend the pd-mode definition row with an optional lifecycle hook pointer,
    then delete the `pd_mode_lifecycle_mode_hooks()` switch.
-3. Rename and narrow the handled-key request/result interfaces so there is one
+2. Rename and narrow the handled-key request/result interfaces so there is one
    obvious executable effect vocabulary.
-4. Add one maintainer-facing runtime doc under `docs/` that explains:
+3. Add one maintainer-facing runtime doc under `docs/` that explains:
    - handled-key press/release/scan flow
    - where reducer policy lives
    - where executable effects are queued and run
-5. Rebuild the scenario harness on shared runtime debug/effect surfaces before
+4. Rebuild the scenario harness on shared runtime debug/effect surfaces before
    adding another major integration scenario family.
 
 ## Overall Judgment

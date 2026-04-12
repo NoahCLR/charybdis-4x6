@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/pointing/pd_mode_handlers.h"
+#include "users/noah/lib/state/keyboard_mod_state.h"
 
 #define TEST_MAX_CALLS 8
 
@@ -171,6 +173,33 @@ void tap_code16(uint16_t keycode) {
         .oneshot        = fake_oneshot_mods,
         .oneshot_locked = fake_oneshot_locked_mods,
     };
+}
+
+void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
+    if (policy.settle_pending_fallback_holds) {
+        key_runtime_activate_pending_fallback_hold();
+    }
+
+    if (policy.preserve_keyboard_mod_state) {
+        test_fail("pd_mode synthetic tap should not preserve mod state internally", __FILE__, __LINE__);
+    }
+
+    noah_dispatch_synthetic_qmk_tap(keycode);
+}
+
+void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
+    if (policy.settle_pending_fallback_holds) {
+        key_runtime_activate_pending_fallback_hold();
+    }
+
+    if (policy.preserve_keyboard_mod_state) {
+        keyboard_mod_state_t saved = keyboard_mod_state_suspend();
+        tap_code16(keycode);
+        keyboard_mod_state_apply(saved);
+        return;
+    }
+
+    tap_code16(keycode);
 }
 
 void keyboard_mod_ownership_register(uint16_t keycode) {

@@ -41,6 +41,7 @@ These files are the core map of the runtime:
 | [`key_runtime_slot_scan_reduce.c`](../users/noah/lib/key/key_runtime_slot_scan_reduce.c) | Scan-time threshold logic |
 | [`key_runtime_slot_pending_multi_tap.c`](../users/noah/lib/key/key_runtime_slot_pending_multi_tap.c) | Deferred multi-tap ownership after release |
 | [`key_runtime_effect.h`](../users/noah/lib/key/key_runtime_effect.h), [`key_runtime_slot_result.c`](../users/noah/lib/key/key_runtime_slot_result.c), and [`key_runtime_transition.c`](../users/noah/lib/key/key_runtime_transition.c) | Shared runtime effect vocabulary, request expansion, plan batching, and effect execution |
+| [`action_dispatch.c`](../users/noah/lib/action/action_dispatch.c) and [`keyboard_mod_state.c`](../users/noah/lib/state/keyboard_mod_state.c) | Explicit output-intent helpers for authored action taps, synthetic QMK taps, and literal taps that may need fallback-hold settlement or temporary modifier suspension |
 | [`held_action.c`](../users/noah/lib/key/held_action.c), [`held_repeat.c`](../users/noah/lib/key/held_repeat.c), [`layer_ownership.c`](../users/noah/lib/state/layer_ownership.c), and [`keyboard_mod_ownership.c`](../users/noah/lib/state/keyboard_mod_ownership.c) | Long-lived ownership registries touched by runtime effects |
 | [`runtime_debug.c`](../users/noah/lib/state/runtime_debug.c) | Aggregate runtime snapshot and test reset surface |
 
@@ -216,9 +217,13 @@ These are the easiest runtime rules to break by accident:
   policy from raw authored data.
 - Feedback and debug readers should prefer cached slot semantic metadata over
   re-running handled-key resolution against mutable slot state.
-- `action_dispatch()` is not a pure output leaf. It calls
-  `key_runtime_activate_pending_fallback_hold()` before tapping the action, so
-  adding a new dispatch path can change runtime state.
+- New emitters should prefer the explicit helpers in
+  [`action_dispatch.h`](../users/noah/lib/action/action_dispatch.h) so they
+  state whether they settle pending fallback holds or preserve keyboard mod
+  state.
+- `action_dispatch()` now exists as the compatibility wrapper for the
+  runtime-default authored tap path. New code should not treat it as the only
+  output seam.
 - Slot reset should flow through `key_runtime_slot_reset()` or
   `runtime_shared_state_reset()` so default timing and semantic sentinels stay
   valid.
@@ -251,6 +256,10 @@ If you are changing one of these categories, start here:
   [`key_runtime_slot_result.c`](../users/noah/lib/key/key_runtime_slot_result.c),
   and
   [`key_runtime_transition.c`](../users/noah/lib/key/key_runtime_transition.c)
+- output-emission policy:
+  [`action_dispatch.h`](../users/noah/lib/action/action_dispatch.h),
+  [`action_dispatch.c`](../users/noah/lib/action/action_dispatch.c), and
+  [`keyboard_mod_state.c`](../users/noah/lib/state/keyboard_mod_state.c)
 - new hidden runtime state:
   either [`runtime_shared_state.h`](../users/noah/lib/state/runtime_shared_state.h)
   or one explicit ownership module plus

@@ -38,6 +38,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/key_runtime_slot.c" \
     "$ROOT/users/noah/lib/key/key_runtime_transition.c" \
     "$ROOT/users/noah/lib/key/multi_tap_engine.c" \
+    "$ROOT/users/noah/lib/state/keyboard_mod_state.c" \
     "$ROOT/users/noah/lib/state/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/runtime_shared_state.c" \
     -o "$BIN"

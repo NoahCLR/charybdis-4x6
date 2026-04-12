@@ -87,7 +87,7 @@ bool key_runtime_process_direct_action_key(uint16_t keycode, keyrecord_t *record
 
     if (record->event.pressed) {
         key_runtime_trace_record("preflight:direct_action_dispatch", keycode, record);
-        action_dispatch(keycode);
+        noah_emit_action_tap(keycode, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
     }
 
     return true;

@@ -97,7 +97,7 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
         return;
     }
 
-    action_dispatch(action);
+    noah_emit_action_tap(action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
 
     int16_t slot = held_repeat_find_slot_for_key(key_pos);
     if (slot < 0) {
@@ -133,7 +133,7 @@ void held_repeat_tick(void) {
 
         while (timer_elapsed(held_repeats[i].last_fire_time) >= held_repeats[i].interval_ms) {
             held_repeats[i].last_fire_time = (uint16_t)(held_repeats[i].last_fire_time + held_repeats[i].interval_ms);
-            action_dispatch(held_repeats[i].action);
+            noah_emit_action_tap(held_repeats[i].action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
         }
     }
 }

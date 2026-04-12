@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/key_behavior.h"
 #include "users/noah/lib/key/held_action.h"
@@ -108,6 +109,14 @@ uint16_t timer_elapsed(uint16_t last) {
 }
 
 void action_dispatch(uint16_t action) {
+    CHECK(tap_call_count < ARRAY_SIZE(tap_calls));
+    tap_calls[tap_call_count++] = (tap_call_t){
+        .action = action,
+    };
+}
+
+void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
+    (void)policy;
     CHECK(tap_call_count < ARRAY_SIZE(tap_calls));
     tap_calls[tap_call_count++] = (tap_call_t){
         .action = action,

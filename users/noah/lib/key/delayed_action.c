@@ -21,7 +21,7 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
 
     keyboard_mod_state_apply(mods);
 
-    action_dispatch(action);
+    noah_emit_action_tap(action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
 
     keyboard_mod_state_apply(saved);
 }

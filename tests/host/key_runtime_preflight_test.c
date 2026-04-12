@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/key_runtime_process.h"
 #include "users/noah/lib/key/key_runtime_state.h"
@@ -194,8 +195,9 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
     return suppress_default;
 }
 
-void action_dispatch(uint16_t action) {
+void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     (void)action;
+    (void)policy;
 }
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
