@@ -8,35 +8,18 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "delayed_action.h"
-#include "handled_key.h"
-#include "key_runtime_slot_effect.h"
+#include "key_runtime_effect.h"
 
-#define KEY_RUNTIME_SLOT_RESULT_CAPACITY 6
+#define KEY_RUNTIME_SLOT_RESULT_CAPACITY 8
 
-typedef enum {
-    KEY_RUNTIME_SLOT_RESULT_EFFECT_NONE = 0,
-    KEY_RUNTIME_SLOT_RESULT_EFFECT_SLOT_EFFECT_REQUEST,
-    KEY_RUNTIME_SLOT_RESULT_EFFECT_DELAYED_ACTION,
-    KEY_RUNTIME_SLOT_RESULT_EFFECT_LAYER_PRESS,
-    KEY_RUNTIME_SLOT_RESULT_EFFECT_LAYER_RELEASE,
-    KEY_RUNTIME_SLOT_RESULT_EFFECT_PD_MODE_LOCK_TAP,
-} key_runtime_slot_result_effect_kind_t;
+typedef key_runtime_effect_kind_t key_runtime_slot_result_effect_kind_t;
+typedef key_runtime_effect_t      key_runtime_slot_result_effect_t;
 
-typedef struct {
-    key_runtime_slot_result_effect_kind_t kind;
-    keypos_t                              key_pos;
-    union {
-        key_runtime_slot_effect_request_t slot_effect_request;
-        struct {
-            uint16_t              action;
-            delayed_action_mods_t mods;
-            uint8_t               repeat_count;
-        } delayed_action;
-        uint8_t       layer;
-        pd_mode_mask_t pd_mode;
-    } data;
-} key_runtime_slot_result_effect_t;
+#define KEY_RUNTIME_SLOT_RESULT_EFFECT_NONE KEY_RUNTIME_EFFECT_NONE
+#define KEY_RUNTIME_SLOT_RESULT_EFFECT_DELAYED_ACTION KEY_RUNTIME_EFFECT_DELAYED_ACTION
+#define KEY_RUNTIME_SLOT_RESULT_EFFECT_LAYER_PRESS KEY_RUNTIME_EFFECT_LAYER_PRESS
+#define KEY_RUNTIME_SLOT_RESULT_EFFECT_LAYER_RELEASE KEY_RUNTIME_EFFECT_LAYER_RELEASE
+#define KEY_RUNTIME_SLOT_RESULT_EFFECT_PD_MODE_LOCK_TAP KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP
 
 typedef struct {
     bool                             handled;

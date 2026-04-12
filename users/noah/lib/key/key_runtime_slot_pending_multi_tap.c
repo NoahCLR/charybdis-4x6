@@ -42,7 +42,7 @@ typedef enum {
 typedef struct {
     active_key_state_t  *slot;
     uint16_t             keycode;
-    key_behavior_view_t  behavior;
+    handled_key_view_t   key;
     uint16_t             elapsed;
     keypos_t             key_pos;
     delayed_action_mods_t mods;
@@ -60,11 +60,11 @@ typedef struct {
     delayed_action_mods_t                                mods;
 } key_runtime_slot_pending_multi_tap_release_resolution_t;
 
-static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pending_multi_tap_release_context(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior, uint16_t elapsed) {
+static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pending_multi_tap_release_context(active_key_state_t *slot, uint16_t keycode, handled_key_view_t key, uint16_t elapsed) {
     key_runtime_slot_pending_multi_tap_release_context_t context = {
         .slot     = slot,
         .keycode  = keycode,
-        .behavior = behavior,
+        .key      = key,
         .elapsed  = elapsed,
     };
     multi_tap_t *slot_multi_tap;
@@ -124,8 +124,8 @@ static key_runtime_slot_pending_multi_tap_release_resolution_t key_runtime_slot_
     };
 }
 
-key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(active_key_state_t *slot, uint16_t keycode, key_behavior_view_t behavior, uint16_t elapsed) {
-    key_runtime_slot_pending_multi_tap_release_context_t    context    = key_runtime_slot_pending_multi_tap_release_context(slot, keycode, behavior, elapsed);
+key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(active_key_state_t *slot, uint16_t keycode, handled_key_view_t key, uint16_t elapsed) {
+    key_runtime_slot_pending_multi_tap_release_context_t    context    = key_runtime_slot_pending_multi_tap_release_context(slot, keycode, key, elapsed);
     key_runtime_slot_pending_multi_tap_release_resolution_t resolution = key_runtime_slot_pending_multi_tap_release_resolve(&context);
     key_runtime_slot_result_t                               result     = {0};
 
@@ -155,7 +155,7 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(acti
             break;
     }
 
-    if (behavior.is_momentary_layer) {
+    if (handled_key_is_momentary_layer(context.key)) {
         key_runtime_slot_result_push_layer_release(&result, context.key_pos);
     }
 

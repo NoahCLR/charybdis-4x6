@@ -7,6 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include "key_runtime_slot_effect.h"
 #include "key_runtime_slot_result.h"
 
 bool key_runtime_slot_result_request_has_effect(key_runtime_slot_effect_request_t request);

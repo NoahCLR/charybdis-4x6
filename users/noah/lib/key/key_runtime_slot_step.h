@@ -31,9 +31,9 @@ typedef struct {
             bool               active_held_action_survives_flush;
         } handled_press;
         struct {
-            uint16_t            keycode;
-            keypos_t            key_pos;
-            key_behavior_view_t behavior;
+            uint16_t           keycode;
+            keypos_t           key_pos;
+            handled_key_view_t key;
         } handled_release;
         struct {
             keypos_t other_key_pos;

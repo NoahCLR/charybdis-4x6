@@ -29,14 +29,46 @@ Completed in this pass:
     behavior
   - distributed runtime state making higher-level debugging and test reset
     setup more manual than necessary
+- Implemented the first handled-key follow-up slice from this review:
+  - expanded `handled_key_view_t` into a richer resolved handled-key surface
+    with resolved tap, hold, long-hold, hold strategy, timing, layer,
+    pd-mode, and capability flags
+  - moved handled-key press context and handled-release reduction to consume
+    that resolved object instead of re-deriving key semantics from raw
+    `key_behavior_view_t`
+  - threaded the resolved handled-key release shape through pending multi-tap
+    release handling and transition planning
+  - updated the affected host harnesses for the richer handled-key contract
+- Implemented the second handled-key follow-up slice from this review:
+  - added one shared runtime effect vocabulary in
+    `users/noah/lib/key/key_runtime_effect.h`
+  - changed `key_runtime_slot_result_t` to store executable runtime effects
+    directly instead of storing a second slot-result-only effect protocol
+  - moved slot-result request expansion into `key_runtime_slot_result.c` so
+    reducers now emit the same effect shape that the transition plan executes
+  - simplified `key_runtime_transition.c` to queue and execute shared runtime
+    effects instead of translating slot-result effects into another enum/union
+  - updated slot-runtime host assertions to validate the direct shared effect
+    ordering and payloads
 
 Verification run in this pass:
 
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
 Verification result:
 
+- targeted handled-key host tests passed
+- feature-gate compile tests passed
 - full host suite passed
 - firmware build passed
 
@@ -47,10 +79,9 @@ Workspace scope:
 
 Recommended next implementation work:
 
-1. Introduce a richer `resolved_handled_key_t` so handled-key semantics stop
-   being re-derived across multiple runtime modules.
-2. Collapse the handled-key slot result and transition plan toward one shared
-   effect vocabulary.
-3. Add a small pd-mode lifecycle policy seam before the next unusual mode
+1. Decide whether the remaining feedback/debug surfaces should read resolved
+   handled-key state directly from the resolver or from cached slot metadata
+   before the next handled-key refactor.
+2. Add a small pd-mode lifecycle policy seam before the next unusual mode
    pushes more central trait branches into the registry.
-4. Add one shared runtime snapshot/reset surface for debugging and host tests.
+3. Add one shared runtime snapshot/reset surface for debugging and host tests.

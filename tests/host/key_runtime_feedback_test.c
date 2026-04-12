@@ -46,9 +46,11 @@ static key_runtime_slot_result_t test_step_handled_release(active_key_state_t *s
     return key_runtime_slot_step(slot, (key_runtime_slot_event_t){
                                            .kind                = KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE,
                                            .data.handled_release = {
-                                               .keycode  = keycode,
-                                               .key_pos  = key_pos,
-                                               .behavior = behavior,
+                                               .keycode = keycode,
+                                               .key_pos = key_pos,
+                                               .key     = {
+                                                   .behavior = behavior,
+                                               },
                                            },
                                        });
 }
@@ -114,6 +116,10 @@ hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
     return key.behavior.single.hold;
 }
 
+hold_behavior_t handled_key_long_hold(handled_key_view_t key) {
+    return key.behavior.single.long_hold;
+}
+
 uint16_t handled_key_tap_action(handled_key_view_t key) {
     return key.behavior.single.tap.action;
 }
@@ -126,6 +132,44 @@ bool handled_key_uses_fallback_hold(handled_key_view_t key) {
 bool handled_key_uses_implicit_hold(handled_key_view_t key) {
     (void)key;
     return false;
+}
+
+key_runtime_slot_hold_strategy_t handled_key_hold_strategy(handled_key_view_t key) {
+    (void)key;
+    return KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
+}
+
+uint16_t handled_key_tap_hold_term(handled_key_view_t key) {
+    return key.behavior.tap_hold_term;
+}
+
+uint16_t handled_key_longer_hold_term(handled_key_view_t key) {
+    return key.behavior.longer_hold_term;
+}
+
+uint16_t handled_key_multi_tap_term(handled_key_view_t key) {
+    return key.behavior.multi_tap_term;
+}
+
+uint8_t handled_key_layer(handled_key_view_t key) {
+    return key.behavior.is_momentary_layer ? behavior_get_layer(key.behavior.keycode) : UINT8_MAX;
+}
+
+pd_mode_mask_t handled_key_pd_mode(handled_key_view_t key) {
+    (void)key;
+    return 0;
+}
+
+bool handled_key_has_multi_tap(handled_key_view_t key) {
+    return key.behavior.has_multi_tap;
+}
+
+bool handled_key_is_momentary_layer(handled_key_view_t key) {
+    return key.behavior.is_momentary_layer;
+}
+
+bool handled_key_is_layer_tap(handled_key_view_t key) {
+    return key.behavior.is_layer_tap;
 }
 
 bool pd_mode_locked(pd_mode_mask_t mode) {
