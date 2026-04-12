@@ -446,8 +446,8 @@ static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
 static void test_slave_pointer_mode_overlay_uses_remote_display_state(void) {
     test_reset();
 
-    fake_is_master                   = false;
-    layer_state                      = (layer_state_t)1u << LAYER_SYM;
+    fake_is_master                          = false;
+    layer_state                             = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.pd_mode_flags = PD_MODE_VOLUME;
 
     CHECK(render_output());
@@ -607,13 +607,13 @@ static void test_slave_timeout_window_renders_without_live_auto_mouse_active_fla
 static void test_slave_locked_pd_mode_clamps_remote_automouse_progress(void) {
     test_reset();
 
-    fake_is_master                               = false;
-    ws2812_leds[0]                               = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
-    ws2812_leds[1]                               = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
-    test_keymap[LAYER_POINTER][0][0]             = 0x0040u;
-    test_keymap[LAYER_POINTER][0][1]             = 0x0041u;
-    layer_state                                  = (layer_state_t)1u << LAYER_POINTER;
-    split_runtime_sync_remote.automouse_progress = AUTOMOUSE_RGB_ACTIVE_SPAN / 2u;
+    fake_is_master                                 = false;
+    ws2812_leds[0]                                 = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[1]                                 = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
+    test_keymap[LAYER_POINTER][0][0]               = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1]               = 0x0041u;
+    layer_state                                    = (layer_state_t)1u << LAYER_POINTER;
+    split_runtime_sync_remote.automouse_progress   = AUTOMOUSE_RGB_ACTIVE_SPAN / 2u;
     split_runtime_sync_remote.pd_mode_locked_flags = PD_MODE_VOLUME;
 
     CHECK(render_output());

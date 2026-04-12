@@ -29,15 +29,15 @@ typedef void (*pd_mode_reset_t)(void);
 typedef struct pd_mode_lifecycle_hooks pd_mode_lifecycle_hooks_t;
 
 typedef struct {
-    pd_mode_mask_t        mode_flag;
-    uint16_t              keycode;     // keycode that activates this mode (KC_NO = none)
-    uint16_t              lock_action; // generated as <MODE_KEYCODE>_LOCK and toggles persistent mode lock
-    pd_mode_handler_t     handler;     // NULL = mode has no pointer-motion transform
-    pd_mode_key_handler_t key_handler; // optional key-event interception while mode is active
-    pd_mode_reset_t       reset;       // called on deactivation (NULL = no-op)
-    uint16_t              dpi;         // pointer CPI while this mode is active (0 = use normal pointer DPI)
-    pd_mode_traits_t      traits;      // manifest-defined policy flags consumed by registry/pointer policy
-    const pd_mode_lifecycle_hooks_t *lifecycle; // optional activate/deactivate/lock/unlock side effects owned by this definition row
+    pd_mode_mask_t                   mode_flag;
+    uint16_t                         keycode;     // keycode that activates this mode (KC_NO = none)
+    uint16_t                         lock_action; // generated as <MODE_KEYCODE>_LOCK and toggles persistent mode lock
+    pd_mode_handler_t                handler;     // NULL = mode has no pointer-motion transform
+    pd_mode_key_handler_t            key_handler; // optional key-event interception while mode is active
+    pd_mode_reset_t                  reset;       // called on deactivation (NULL = no-op)
+    uint16_t                         dpi;         // pointer CPI while this mode is active (0 = use normal pointer DPI)
+    pd_mode_traits_t                 traits;      // manifest-defined policy flags consumed by registry/pointer policy
+    const pd_mode_lifecycle_hooks_t *lifecycle;   // optional activate/deactivate/lock/unlock side effects owned by this definition row
 } pd_mode_def_t;
 
 _Static_assert(PD_MODE_KEYCODE_COUNT == PD_MODE_COUNT, "pd-mode keycode count in custom_keycodes enum doesn't match PD_MODE_COUNT — keep the pd-mode keycode block dense and update both together");

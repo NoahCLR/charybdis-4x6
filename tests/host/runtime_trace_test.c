@@ -21,9 +21,9 @@ static bool     fake_sniping_enabled;
 static uint16_t fake_default_dpi;
 static uint16_t fake_last_cpi;
 
-static int8_t           rpc_registered_id;
-static slave_callback_t rpc_registered_callback;
-static uint8_t          rpc_send_count;
+static int8_t                      rpc_registered_id;
+static slave_callback_t            rpc_registered_callback;
+static uint8_t                     rpc_send_count;
 static split_runtime_sync_packet_t rpc_last_packet;
 
 layer_state_t layer_state;
@@ -52,17 +52,17 @@ static uint16_t test_pack_keypos(keypos_t key_pos) {
 }
 
 static void test_reset_stubs(void) {
-    fake_time32              = 1000u;
-    fake_is_master           = true;
-    fake_dragscroll_enabled  = false;
-    fake_sniping_enabled     = false;
-    fake_default_dpi         = 800u;
-    fake_last_cpi            = 0u;
-    rpc_registered_id        = -1;
-    rpc_registered_callback  = NULL;
-    rpc_send_count           = 0u;
-    rpc_last_packet          = (split_runtime_sync_packet_t){0};
-    layer_state              = 0;
+    fake_time32             = 1000u;
+    fake_is_master          = true;
+    fake_dragscroll_enabled = false;
+    fake_sniping_enabled    = false;
+    fake_default_dpi        = 800u;
+    fake_last_cpi           = 0u;
+    rpc_registered_id       = -1;
+    rpc_registered_callback = NULL;
+    rpc_send_count          = 0u;
+    rpc_last_packet         = (split_runtime_sync_packet_t){0};
+    layer_state             = 0;
 
     runtime_shared_state_reset(&noah_runtime_shared_state);
     noah_runtime_trace_reset();
@@ -90,7 +90,7 @@ void layer_on(uint8_t layer) {
 }
 
 void layer_off(uint8_t layer) {
-    layer_state &= (layer_state_t)~((layer_state_t)1u << layer);
+    layer_state &= (layer_state_t) ~((layer_state_t)1u << layer);
 }
 
 bool charybdis_get_pointer_dragscroll_enabled(void) {
@@ -235,7 +235,7 @@ static void test_key_runtime_and_layer_ownership_share_one_trace_buffer(void) {
 
 static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     noah_runtime_trace_snapshot_t snapshot;
-    split_runtime_sync_packet_t packet = {
+    split_runtime_sync_packet_t   packet = {
         .pd_mode_flags        = PD_MODE_ZOOM,
         .pd_mode_locked_flags = PD_MODE_ZOOM,
         .key_preview_layer    = UINT8_MAX,

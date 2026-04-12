@@ -42,13 +42,13 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 }
 
 static void test_reset_stubs(void) {
-    fake_time                = 1000;
-    fake_mods                = 0;
-    fake_weak_mods           = 0;
-    fake_oneshot_mods        = 0;
-    fake_oneshot_locked_mods = 0;
+    fake_time                  = 1000;
+    fake_mods                  = 0;
+    fake_weak_mods             = 0;
+    fake_oneshot_mods          = 0;
+    fake_oneshot_locked_mods   = 0;
     send_keyboard_report_count = 0;
-    layer_state              = 0;
+    layer_state                = 0;
 }
 
 uint16_t timer_read(void) {
@@ -68,7 +68,7 @@ void layer_on(uint8_t layer) {
 }
 
 void layer_off(uint8_t layer) {
-    layer_state &= (layer_state_t)~((layer_state_t)1u << layer);
+    layer_state &= (layer_state_t) ~((layer_state_t)1u << layer);
 }
 
 uint8_t get_mods(void) {
@@ -169,9 +169,9 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    noah_runtime_shared_state.key.feedback.active                = true;
-    noah_runtime_shared_state.pd.local_active_flags              = PD_MODE_VOLUME;
-    noah_runtime_shared_state.pd.remote_display_active_flags     = PD_MODE_ARROW;
+    noah_runtime_shared_state.key.feedback.active                    = true;
+    noah_runtime_shared_state.pd.local_active_flags                  = PD_MODE_VOLUME;
+    noah_runtime_shared_state.pd.remote_display_active_flags         = PD_MODE_ARROW;
     noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_C;
 
     layer_ownership_set_lock_state(3, true);
@@ -234,9 +234,9 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    noah_runtime_shared_state.key.feedback.active                = true;
-    noah_runtime_shared_state.pd.local_locked_flags              = PD_MODE_ARROW;
-    noah_runtime_shared_state.pd.remote_display_locked_flags     = PD_MODE_VOLUME;
+    noah_runtime_shared_state.key.feedback.active                    = true;
+    noah_runtime_shared_state.pd.local_locked_flags                  = PD_MODE_ARROW;
+    noah_runtime_shared_state.pd.remote_display_locked_flags         = PD_MODE_VOLUME;
     noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_V;
 
     layer_ownership_set_lock_state(1, true);

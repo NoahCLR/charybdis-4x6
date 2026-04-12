@@ -17,7 +17,7 @@
 #include "key_runtime_slot_result_internal.h"
 
 static key_runtime_slot_result_t key_runtime_slot_step_interrupt(active_key_state_t *slot, keypos_t other_key_pos) {
-    key_runtime_slot_result_t        result  = {0};
+    key_runtime_slot_result_t    result  = {0};
     key_runtime_effect_builder_t builder = key_runtime_slot_policy_interrupt_on_other_press(slot, other_key_pos);
 
     if (!key_runtime_slot_result_builder_has_effect(builder)) {
@@ -45,20 +45,11 @@ static key_runtime_slot_result_t key_runtime_slot_step_pending_multi_tap_flush(a
 typedef key_runtime_slot_result_t (*key_runtime_slot_step_event_handler_t)(active_key_state_t *slot, const key_runtime_slot_event_t *event);
 
 static key_runtime_slot_result_t key_runtime_slot_step_handle_event_handled_press(active_key_state_t *slot, const key_runtime_slot_event_t *event) {
-    return key_runtime_slot_reduce_handled_press(
-        slot,
-        event->data.handled_press.keycode,
-        event->data.handled_press.key_pos,
-        event->data.handled_press.key,
-        event->data.handled_press.active_held_action_survives_flush);
+    return key_runtime_slot_reduce_handled_press(slot, event->data.handled_press.keycode, event->data.handled_press.key_pos, event->data.handled_press.key, event->data.handled_press.active_held_action_survives_flush);
 }
 
 static key_runtime_slot_result_t key_runtime_slot_step_handle_event_handled_release(active_key_state_t *slot, const key_runtime_slot_event_t *event) {
-    return key_runtime_slot_reduce_handled_release(
-        slot,
-        event->data.handled_release.keycode,
-        event->data.handled_release.key_pos,
-        event->data.handled_release.key);
+    return key_runtime_slot_reduce_handled_release(slot, event->data.handled_release.keycode, event->data.handled_release.key_pos, event->data.handled_release.key);
 }
 
 static key_runtime_slot_result_t key_runtime_slot_step_handle_event_active_scan(active_key_state_t *slot, const key_runtime_slot_event_t *event) {
@@ -81,13 +72,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_handle_event_pending_mult
 }
 
 static const key_runtime_slot_step_event_handler_t key_runtime_slot_step_event_handlers[] = {
-    [KEY_RUNTIME_SLOT_EVENT_NONE]                   = NULL,
-    [KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS]          = key_runtime_slot_step_handle_event_handled_press,
-    [KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE]        = key_runtime_slot_step_handle_event_handled_release,
-    [KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN]            = key_runtime_slot_step_handle_event_active_scan,
-    [KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN] = key_runtime_slot_step_handle_event_pending_multi_tap_scan,
-    [KEY_RUNTIME_SLOT_EVENT_INTERRUPT]              = key_runtime_slot_step_handle_event_interrupt,
-    [KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH] = key_runtime_slot_step_handle_event_pending_multi_tap_flush,
+    [KEY_RUNTIME_SLOT_EVENT_NONE] = NULL, [KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS] = key_runtime_slot_step_handle_event_handled_press, [KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE] = key_runtime_slot_step_handle_event_handled_release, [KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN] = key_runtime_slot_step_handle_event_active_scan, [KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN] = key_runtime_slot_step_handle_event_pending_multi_tap_scan, [KEY_RUNTIME_SLOT_EVENT_INTERRUPT] = key_runtime_slot_step_handle_event_interrupt, [KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH] = key_runtime_slot_step_handle_event_pending_multi_tap_flush,
 };
 
 key_runtime_slot_result_t key_runtime_slot_step(active_key_state_t *slot, key_runtime_slot_event_t event) {

@@ -6,12 +6,12 @@
 
 #include "users/noah/noah_runtime.h"
 
-void          eeconfig_init_user(void);
-bool          get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
-bool          process_record_user(uint16_t keycode, keyrecord_t *record);
-void          matrix_scan_user(void);
-void          keyboard_post_init_user(void);
-layer_state_t layer_state_set_user(layer_state_t state);
+void           eeconfig_init_user(void);
+bool           get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
+bool           process_record_user(uint16_t keycode, keyrecord_t *record);
+void           matrix_scan_user(void);
+void           keyboard_post_init_user(void);
+layer_state_t  layer_state_set_user(layer_state_t state);
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report);
 void           pointing_device_init_user(void);
 bool           is_mouse_record_user(uint16_t keycode, keyrecord_t *record);
@@ -225,8 +225,8 @@ static keyrecord_t test_record(uint8_t row, uint8_t col, bool pressed) {
 static void test_weak_defaults_delegate_to_noah_helpers(void) {
     test_reset();
 
-    keyrecord_t record          = test_record(1, 2, true);
-    layer_state_t input_state   = 0x00000012u;
+    keyrecord_t    record       = test_record(1, 2, true);
+    layer_state_t  input_state  = 0x00000012u;
     report_mouse_t input_report = {.x = 1, .y = -2, .h = 3, .v = -4, .buttons = 5};
 
     noah_hook_stub_state.hold_return_value          = true;
@@ -281,8 +281,8 @@ static void test_weak_defaults_delegate_to_noah_helpers(void) {
 static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     test_reset();
 
-    keyrecord_t record          = test_record(4, 5, false);
-    layer_state_t input_state   = 0x00000021u;
+    keyrecord_t    record       = test_record(4, 5, false);
+    layer_state_t  input_state  = 0x00000021u;
     report_mouse_t input_report = {.x = 10, .y = 11, .h = 12, .v = 13, .buttons = 14};
 
     noah_hook_stub_state.hold_return_value          = false;
@@ -292,14 +292,14 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     noah_hook_stub_state.mouse_record_return_value  = false;
     noah_hook_stub_state.rgb_return_value           = false;
 
-    hook_override_state.hold_force_true          = true;
-    hook_override_state.process_keep_processing  = false;
-    hook_override_state.layer_state_extra_bits   = 0x00000080u;
-    hook_override_state.pointing_task_x_delta    = 6;
-    hook_override_state.pointing_task_y_delta    = -3;
+    hook_override_state.hold_force_true             = true;
+    hook_override_state.process_keep_processing     = false;
+    hook_override_state.layer_state_extra_bits      = 0x00000080u;
+    hook_override_state.pointing_task_x_delta       = 6;
+    hook_override_state.pointing_task_y_delta       = -3;
     hook_override_state.pointing_task_extra_buttons = 0x20u;
-    hook_override_state.mouse_record_force_true  = true;
-    hook_override_state.rgb_force_true           = true;
+    hook_override_state.mouse_record_force_true     = true;
+    hook_override_state.rgb_force_true              = true;
 
     eeconfig_init_user();
     CHECK(hook_override_state.eeconfig_calls == 1);
@@ -335,12 +335,12 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     CHECK(noah_hook_stub_state.pointing_task_calls == 1);
     CHECK(report_mouse_equal(noah_hook_stub_state.pointing_task_input, input_report));
     CHECK(report_mouse_equal(chained_report, (report_mouse_t){
-                                               .x       = 7,
-                                               .y       = -1,
-                                               .h       = 3,
-                                               .v       = 4,
-                                               .buttons = 0x25,
-                                           }));
+                                                 .x       = 7,
+                                                 .y       = -1,
+                                                 .h       = 3,
+                                                 .v       = 4,
+                                                 .buttons = 0x25,
+                                             }));
 
     pointing_device_init_user();
     CHECK(hook_override_state.pointing_init_calls == 1);

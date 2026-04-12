@@ -47,48 +47,48 @@ void key_runtime_slot_result_push_builder_if_present(key_runtime_slot_result_t *
 
     if (builder.release_owned_state) {
         key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                               .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
-                                               .data.key_pos = key_pos,
-                                           });
+                                                 .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+                                                 .data.key_pos = key_pos,
+                                             });
     }
 
     switch (builder.kind) {
         case KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION:
             key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                                   .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
-                                                   .data.action = builder.action,
-                                               });
+                                                     .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+                                                     .data.action = builder.action,
+                                                 });
             break;
         case KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER:
             key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                                   .kind = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
-                                                   .data.held_action =
-                                                       {
-                                                           .key_pos = key_pos,
-                                                           .action  = builder.action,
-                                                       },
-                                               });
+                                                     .kind = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
+                                                     .data.held_action =
+                                                         {
+                                                             .key_pos = key_pos,
+                                                             .action  = builder.action,
+                                                         },
+                                                 });
             break;
         case KEY_RUNTIME_EFFECT_BUILDER_HELD_UNREGISTER:
             key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                                   .kind = KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER,
-                                                   .data.held_action =
-                                                       {
-                                                           .key_pos = key_pos,
-                                                           .action  = builder.action,
-                                                       },
-                                               });
+                                                     .kind = KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER,
+                                                     .data.held_action =
+                                                         {
+                                                             .key_pos = key_pos,
+                                                             .action  = builder.action,
+                                                         },
+                                                 });
             break;
         case KEY_RUNTIME_EFFECT_BUILDER_REPEAT_START:
             key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                                   .kind = KEY_RUNTIME_EFFECT_REPEAT_START,
-                                                   .data.repeat =
-                                                       {
-                                                           .key_pos   = key_pos,
-                                                           .action    = builder.action,
-                                                           .repeat_hz = builder.repeat_hz,
-                                                       },
-                                               });
+                                                     .kind = KEY_RUNTIME_EFFECT_REPEAT_START,
+                                                     .data.repeat =
+                                                         {
+                                                             .key_pos   = key_pos,
+                                                             .action    = builder.action,
+                                                             .repeat_hz = builder.repeat_hz,
+                                                         },
+                                                 });
             break;
         case KEY_RUNTIME_EFFECT_BUILDER_NONE:
         default:
@@ -97,9 +97,9 @@ void key_runtime_slot_result_push_builder_if_present(key_runtime_slot_result_t *
 
     if (builder.feedback_pulse) {
         key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                               .kind                 = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-                                               .data.long_hold_level = builder.feedback_long_hold_level,
-                                           });
+                                                 .kind                 = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
+                                                 .data.long_hold_level = builder.feedback_long_hold_level,
+                                             });
     }
 }
 
@@ -108,10 +108,11 @@ void key_runtime_slot_result_push_dispatch_action(key_runtime_slot_result_t *res
         return;
     }
 
-    key_runtime_slot_result_push_builder_if_present(result, key_pos, (key_runtime_effect_builder_t){
-                                                                    .kind   = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION,
-                                                                    .action = action,
-                                                                });
+    key_runtime_slot_result_push_builder_if_present(result, key_pos,
+                                                    (key_runtime_effect_builder_t){
+                                                        .kind   = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION,
+                                                        .action = action,
+                                                    });
 }
 
 void key_runtime_slot_result_push_delayed_action(key_runtime_slot_result_t *result, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
@@ -120,32 +121,32 @@ void key_runtime_slot_result_push_delayed_action(key_runtime_slot_result_t *resu
     }
 
     key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                           .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
-                                           .data.delayed_action =
-                                               {
-                                                   .action       = action,
-                                                   .mods         = mods,
-                                                   .repeat_count = repeat_count,
-                                               },
-                                       });
+                                             .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
+                                             .data.delayed_action =
+                                                 {
+                                                     .action       = action,
+                                                     .mods         = mods,
+                                                     .repeat_count = repeat_count,
+                                                 },
+                                         });
 }
 
 void key_runtime_slot_result_push_layer_press(key_runtime_slot_result_t *result, keypos_t key_pos, uint8_t layer) {
     key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                           .kind = KEY_RUNTIME_EFFECT_LAYER_PRESS,
-                                           .data.layer_press =
-                                               {
-                                                   .key_pos = key_pos,
-                                                   .layer   = layer,
-                                               },
-                                       });
+                                             .kind = KEY_RUNTIME_EFFECT_LAYER_PRESS,
+                                             .data.layer_press =
+                                                 {
+                                                     .key_pos = key_pos,
+                                                     .layer   = layer,
+                                                 },
+                                         });
 }
 
 void key_runtime_slot_result_push_layer_release(key_runtime_slot_result_t *result, keypos_t key_pos) {
     key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                           .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
-                                           .data.key_pos = key_pos,
-                                       });
+                                             .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
+                                             .data.key_pos = key_pos,
+                                         });
 }
 
 void key_runtime_slot_result_push_pd_mode_lock_tap(key_runtime_slot_result_t *result, pd_mode_mask_t mode) {
@@ -154,7 +155,7 @@ void key_runtime_slot_result_push_pd_mode_lock_tap(key_runtime_slot_result_t *re
     }
 
     key_runtime_slot_result_push(result, (key_runtime_effect_t){
-                                           .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
-                                           .data.pd_mode = mode,
-                                       });
+                                             .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+                                             .data.pd_mode = mode,
+                                         });
 }

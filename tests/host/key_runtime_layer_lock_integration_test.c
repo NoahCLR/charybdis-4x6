@@ -13,11 +13,11 @@
 #include "users/noah/noah_runtime.h"
 
 enum {
-    TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,
-    TEST_ALT_ACTION    = SAFE_RANGE + 0x71,
+    TEST_MULTI_TAP_KEY       = SAFE_RANGE + 0x70,
+    TEST_ALT_ACTION          = SAFE_RANGE + 0x71,
     TEST_FOREIGN_RELEASE_KEY = 0x0004u,
-    TEST_NUM_LAYER     = 1,
-    TEST_OTHER_LAYER   = 2,
+    TEST_NUM_LAYER           = 1,
+    TEST_OTHER_LAYER         = 2,
 };
 
 layer_state_t layer_state;
@@ -405,7 +405,7 @@ static void test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle(void
 }
 
 static void test_thumb_cycle_release_still_clears_slot_when_layer_change_resolves_to_other_keycode(void) {
-    keypos_t             key_pos = test_keypos(4, 2);
+    keypos_t            key_pos = test_keypos(4, 2);
     active_key_state_t *slot    = key_runtime_slot_for_position(key_pos);
 
     test_reset_state();

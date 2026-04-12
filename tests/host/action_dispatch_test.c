@@ -46,19 +46,19 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset_stubs(void) {
-    fake_mods                    = 0;
-    fake_weak_mods               = 0;
-    fake_oneshot_mods            = 0;
-    fake_oneshot_locked_mods     = 0;
-    send_keyboard_report_count   = 0;
+    fake_mods                      = 0;
+    fake_weak_mods                 = 0;
+    fake_oneshot_mods              = 0;
+    fake_oneshot_locked_mods       = 0;
+    send_keyboard_report_count     = 0;
     fallback_hold_activation_count = 0;
-    fallback_hold_active         = false;
-    action_tap_call              = (tap_call_t){0};
-    synthetic_qmk_tap_call       = (tap_call_t){0};
-    literal_tap_call             = (tap_call_t){0};
-    action_tap_call_count        = 0;
-    synthetic_qmk_tap_call_count = 0;
-    literal_tap_call_count       = 0;
+    fallback_hold_active           = false;
+    action_tap_call                = (tap_call_t){0};
+    synthetic_qmk_tap_call         = (tap_call_t){0};
+    literal_tap_call               = (tap_call_t){0};
+    action_tap_call_count          = 0;
+    synthetic_qmk_tap_call_count   = 0;
+    literal_tap_call_count         = 0;
 
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         layer_locked_state[layer] = false;

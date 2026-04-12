@@ -18,10 +18,10 @@ typedef enum {
 } key_runtime_slot_release_outcome_t;
 
 typedef struct {
-    bool                          release_owned_state;
+    bool                               release_owned_state;
     key_runtime_slot_release_outcome_t outcome;
-    uint16_t                      action;
-    pd_mode_mask_t                pd_mode_lock_tap;
+    uint16_t                           action;
+    pd_mode_mask_t                     pd_mode_lock_tap;
 } key_runtime_slot_release_resolution_t;
 
 typedef struct {
@@ -115,13 +115,7 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_ta
     }
 
     if (hold_sends_on_release(context->released_key.binding.hold)) {
-        return key_runtime_slot_release_resolution_action(
-            context,
-            key_runtime_slot_policy_select_release_hold_action(
-                context->elapsed,
-                context->released_key.binding.hold.action,
-                context->released_key.binding.long_hold,
-                context->released_key.timing.longer_hold_term));
+        return key_runtime_slot_release_resolution_action(context, key_runtime_slot_policy_select_release_hold_action(context->elapsed, context->released_key.binding.hold.action, context->released_key.binding.long_hold, context->released_key.timing.longer_hold_term));
     }
 
     if (hold_sends_on_release(context->released_key.binding.long_hold) && context->elapsed >= context->released_key.timing.longer_hold_term) {
@@ -160,13 +154,7 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_re
         return (key_runtime_slot_release_resolution_t){0};
     }
 
-    return key_runtime_slot_release_resolution_action(
-        context,
-        key_runtime_slot_policy_select_release_hold_action(
-            context->elapsed,
-            context->released_key.binding.hold.action,
-            context->released_key.binding.long_hold,
-            context->released_key.timing.longer_hold_term));
+    return key_runtime_slot_release_resolution_action(context, key_runtime_slot_policy_select_release_hold_action(context->elapsed, context->released_key.binding.hold.action, context->released_key.binding.long_hold, context->released_key.timing.longer_hold_term));
 }
 
 static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_hold_phase(const key_runtime_slot_release_context_t *context) {
@@ -184,12 +172,7 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_ho
 typedef key_runtime_slot_release_resolution_t (*key_runtime_slot_release_phase_resolver_t)(const key_runtime_slot_release_context_t *context);
 
 static const key_runtime_slot_release_phase_resolver_t key_runtime_slot_release_phase_resolvers[] = {
-    [KEY_RUNTIME_SLOT_PHASE_IDLE]                 = key_runtime_slot_release_resolution_base,
-    [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW]           = key_runtime_slot_release_resolve_tap_window,
-    [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW]    = key_runtime_slot_release_resolve_press_held_window,
-    [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = key_runtime_slot_release_resolve_release_hold_pending,
-    [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE]     = key_runtime_slot_release_resolve_hold_phase,
-    [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE]        = key_runtime_slot_release_resolve_hold_phase,
+    [KEY_RUNTIME_SLOT_PHASE_IDLE] = key_runtime_slot_release_resolution_base, [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW] = key_runtime_slot_release_resolve_tap_window, [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW] = key_runtime_slot_release_resolve_press_held_window, [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = key_runtime_slot_release_resolve_release_hold_pending, [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE] = key_runtime_slot_release_resolve_hold_phase, [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE] = key_runtime_slot_release_resolve_hold_phase,
 };
 
 static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(active_key_state_t released_key, handled_key_view_t key, uint16_t elapsed) {
@@ -198,7 +181,7 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(ac
         .key          = key,
         .elapsed      = elapsed,
     };
-    key_runtime_slot_phase_t                 phase    = key_runtime_slot_phase(&released_key);
+    key_runtime_slot_phase_t                  phase    = key_runtime_slot_phase(&released_key);
     key_runtime_slot_release_phase_resolver_t resolver = key_runtime_slot_release_phase_resolvers[phase];
 
     context.quick_tap            = key_runtime_slot_release_is_quick_tap(&context);
@@ -229,9 +212,10 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_stat
 
     key_runtime_slot_release_resolution_t resolution = key_runtime_slot_resolve_release(released_key, key, elapsed);
     if (resolution.release_owned_state) {
-        key_runtime_slot_result_push_builder_if_present(&result, released_key.owner.key_pos, (key_runtime_effect_builder_t){
-                                                                                    .release_owned_state = true,
-                                                                                });
+        key_runtime_slot_result_push_builder_if_present(&result, released_key.owner.key_pos,
+                                                        (key_runtime_effect_builder_t){
+                                                            .release_owned_state = true,
+                                                        });
     }
 
     switch (resolution.outcome) {

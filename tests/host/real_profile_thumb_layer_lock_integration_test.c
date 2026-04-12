@@ -86,14 +86,14 @@ static uint16_t test_resolve_keycode(keypos_t key_pos) {
 }
 
 static void test_press_resolved(keypos_t key_pos) {
-    keyrecord_t record = test_record(key_pos, true);
+    keyrecord_t record  = test_record(key_pos, true);
     uint16_t    keycode = test_resolve_keycode(key_pos);
 
     CHECK(!noah_process_record_user(keycode, &record));
 }
 
 static void test_release_resolved(keypos_t key_pos) {
-    keyrecord_t record = test_record(key_pos, false);
+    keyrecord_t record  = test_record(key_pos, false);
     uint16_t    keycode = test_resolve_keycode(key_pos);
 
     CHECK(!noah_process_record_user(keycode, &record));
@@ -516,7 +516,7 @@ uint8_t key_feedback_preview_layer(void) {
 void split_runtime_sync(void) {}
 
 static void test_left_thumb_double_tap_hold_toggles_num_layer(void) {
-    keypos_t key_pos = test_left_thumb_pos();
+    keypos_t key_pos      = test_left_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();
@@ -534,7 +534,7 @@ static void test_left_thumb_double_tap_hold_toggles_num_layer(void) {
 }
 
 static void test_right_thumb_double_tap_hold_toggles_num_layer(void) {
-    keypos_t key_pos = test_right_thumb_pos();
+    keypos_t key_pos      = test_right_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();

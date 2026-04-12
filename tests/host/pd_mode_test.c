@@ -20,12 +20,12 @@ static uint16_t current_cpi;
 static uint16_t cpi_set_count;
 static uint16_t default_dpi;
 
-static bool sniping_enabled;
-static bool auto_mouse_toggle_enabled;
-static bool auto_mouse_enabled;
-static bool auto_mouse_active;
-static bool fake_is_master;
-static int8_t auto_mouse_key_tracker;
+static bool    sniping_enabled;
+static bool    auto_mouse_toggle_enabled;
+static bool    auto_mouse_enabled;
+static bool    auto_mouse_active;
+static bool    fake_is_master;
+static int8_t  auto_mouse_key_tracker;
 static uint8_t auto_mouse_layer;
 static uint8_t auto_mouse_toggle_count;
 static uint8_t auto_mouse_layer_off_count;
@@ -271,7 +271,6 @@ static void test_registry_metadata_matches_manifest(void) {
     CHECK(arrow_mode->lifecycle == NULL);
     CHECK(pd_mode_lookup(PD_MODE_DRAGSCROLL)->lifecycle != NULL);
     CHECK(pd_mode_lookup(PD_MODE_PINCH)->lifecycle != NULL);
-
 }
 
 static void test_trait_queries_match_manifest_policy(void) {
@@ -401,9 +400,9 @@ static void test_apply_active_dpi_respects_pointer_state(void) {
     CHECK(cpi_set_count >= 1);
 
     pd_mode_deactivate(PD_MODE_DRAGSCROLL);
-    cpi_set_count    = 0;
-    current_cpi      = 7777;
-    sniping_enabled  = true;
+    cpi_set_count   = 0;
+    current_cpi     = 7777;
+    sniping_enabled = true;
     pd_mode_apply_active_dpi();
     CHECK(current_cpi == 7777);
     CHECK(cpi_set_count == 0);

@@ -135,10 +135,10 @@ typedef struct {
     uint16_t   keycode;
 } keyrecord_t;
 
-#define MAKE_KEYEVENT(row_, col_, pressed_) \
-    ((keyevent_t){                          \
+#define MAKE_KEYEVENT(row_, col_, pressed_)        \
+    ((keyevent_t){                                 \
         .key     = {.row = (row_), .col = (col_)}, \
-        .pressed = (pressed_),             \
+        .pressed = (pressed_),                     \
     })
 
 #define IS_NOEVENT(event_) (false)
@@ -169,17 +169,17 @@ typedef struct {
     uint16_t dummy;
 } combo_t;
 
-uint16_t timer_read(void);
-uint16_t timer_elapsed(uint16_t last);
-uint32_t timer_read32(void);
-uint32_t timer_elapsed32(uint32_t last);
-bool     is_keyboard_master(void);
-void     eeconfig_update_user(uint32_t value);
-bool     process_record_user(uint16_t keycode, keyrecord_t *record);
-bool     process_record(keyrecord_t *record);
+uint16_t         timer_read(void);
+uint16_t         timer_elapsed(uint16_t last);
+uint32_t         timer_read32(void);
+uint32_t         timer_elapsed32(uint32_t last);
+bool             is_keyboard_master(void);
+void             eeconfig_update_user(uint32_t value);
+bool             process_record_user(uint16_t keycode, keyrecord_t *record);
+bool             process_record(keyrecord_t *record);
 typedef uint16_t action_t;
-action_t action_for_keycode(uint16_t keycode);
-void     process_action(keyrecord_t *record, action_t action);
+action_t         action_for_keycode(uint16_t keycode);
+void             process_action(keyrecord_t *record, action_t action);
 
 extern layer_state_t layer_state;
 bool                 layer_state_cmp(layer_state_t state, uint8_t layer);

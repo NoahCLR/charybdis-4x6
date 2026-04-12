@@ -21,7 +21,7 @@ bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
-    active_key_state_t *release_slot = NULL;
+    active_key_state_t *release_slot    = NULL;
     uint16_t            runtime_keycode = keycode;
 
     key_runtime_trace_record("process:entry", keycode, record);

@@ -91,8 +91,8 @@ static const pd_mode_lifecycle_hooks_t pd_mode_pinch_lifecycle_hooks = {
     .on_activate   = pinch_mode_register_command,
     .on_deactivate = pinch_mode_unregister_command,
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    .on_lock       = scroll_mode_lock_attach_auto_mouse,
-    .on_unlock     = scroll_mode_lock_detach_auto_mouse,
+    .on_lock   = scroll_mode_lock_attach_auto_mouse,
+    .on_unlock = scroll_mode_lock_detach_auto_mouse,
 #endif
 };
 

@@ -20,10 +20,11 @@ enum {
 };
 
 static const uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS] = {
-    [LAYER_BASE] = {
-        [0][0] = TEST_PRESENT_KEY,
-        [0][1] = TEST_RAW_LAYER_ACTION,
-    },
+    [LAYER_BASE] =
+        {
+            [0][0] = TEST_PRESENT_KEY,
+            [0][1] = TEST_RAW_LAYER_ACTION,
+        },
 };
 
 static const uint16_t combo_outputs[] = {
@@ -37,9 +38,9 @@ const key_behavior_t key_behaviors[] = {
     {.keycode = TEST_DEAD_KEY},
 };
 
-const uint8_t        key_behavior_count       = ARRAY_SIZE(key_behaviors);
+const uint8_t         key_behavior_count         = ARRAY_SIZE(key_behaviors);
 const uint16_t *const noah_combo_output_keycodes = combo_outputs;
-const uint8_t        noah_combo_output_count  = ARRAY_SIZE(combo_outputs);
+const uint8_t         noah_combo_output_count    = ARRAY_SIZE(combo_outputs);
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);

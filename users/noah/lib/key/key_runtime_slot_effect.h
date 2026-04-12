@@ -17,10 +17,10 @@ typedef enum {
 } key_runtime_effect_builder_kind_t;
 
 typedef struct {
-    bool                            release_owned_state;
-    bool                            feedback_pulse;
-    bool                            feedback_long_hold_level;
+    bool                              release_owned_state;
+    bool                              feedback_pulse;
+    bool                              feedback_long_hold_level;
     key_runtime_effect_builder_kind_t kind;
-    uint16_t                        action;
-    uint16_t                        repeat_hz;
+    uint16_t                          action;
+    uint16_t                          repeat_hz;
 } key_runtime_effect_builder_t;

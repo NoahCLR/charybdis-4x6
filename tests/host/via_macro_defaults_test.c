@@ -40,8 +40,8 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 static void test_reset_state(void) {
     memset(macro_buffer, 0, sizeof(macro_buffer));
-    fake_via_eeprom_valid          = true;
-    rgb_invalidate_count           = 0;
+    fake_via_eeprom_valid           = true;
+    rgb_invalidate_count            = 0;
     dynamic_keymap_set_buffer_calls = 0;
 }
 

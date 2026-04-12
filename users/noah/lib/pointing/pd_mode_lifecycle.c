@@ -99,8 +99,8 @@ void pd_mode_activate(pd_mode_mask_t mode) {
 }
 
 void pd_mode_deactivate(pd_mode_mask_t mode) {
-    bool                was_active = pd_mode_local_active(mode);
-    const pd_mode_def_t *def       = pd_mode_lookup(mode);
+    bool                 was_active = pd_mode_local_active(mode);
+    const pd_mode_def_t *def        = pd_mode_lookup(mode);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     bool was_any_mode_active = pd_any_local_mode_active();
 #endif

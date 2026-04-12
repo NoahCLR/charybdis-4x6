@@ -88,12 +88,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_active_scan_hold_phase(ac
 typedef key_runtime_slot_result_t (*key_runtime_slot_step_active_scan_phase_handler_t)(active_key_state_t *slot, uint16_t elapsed);
 
 static const key_runtime_slot_step_active_scan_phase_handler_t key_runtime_slot_step_active_scan_phase_handlers[] = {
-    [KEY_RUNTIME_SLOT_PHASE_IDLE]                 = NULL,
-    [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW]           = key_runtime_slot_step_active_scan_tap_window,
-    [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW]    = key_runtime_slot_step_active_scan_press_held_window,
-    [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = key_runtime_slot_step_active_scan_hold_phase,
-    [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE]     = key_runtime_slot_step_active_scan_hold_phase,
-    [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE]        = NULL,
+    [KEY_RUNTIME_SLOT_PHASE_IDLE] = NULL, [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW] = key_runtime_slot_step_active_scan_tap_window, [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW] = key_runtime_slot_step_active_scan_press_held_window, [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = key_runtime_slot_step_active_scan_hold_phase, [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE] = key_runtime_slot_step_active_scan_hold_phase, [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE] = NULL,
 };
 
 key_runtime_slot_result_t key_runtime_slot_reduce_active_scan(active_key_state_t *slot) {
@@ -110,8 +105,8 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_scan(active_key_state_t
         return (key_runtime_slot_result_t){0};
     }
 
-    uint16_t                                     elapsed = timer_elapsed(slot->timer);
-    key_runtime_slot_phase_t                     phase   = key_runtime_slot_phase(slot);
+    uint16_t                                          elapsed = timer_elapsed(slot->timer);
+    key_runtime_slot_phase_t                          phase   = key_runtime_slot_phase(slot);
     key_runtime_slot_step_active_scan_phase_handler_t handler = key_runtime_slot_step_active_scan_phase_handlers[phase];
 
     return handler ? handler(slot, elapsed) : (key_runtime_slot_result_t){0};

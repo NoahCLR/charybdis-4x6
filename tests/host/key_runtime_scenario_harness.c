@@ -35,18 +35,18 @@ typedef struct {
     pd_mode_mask_t mode;
 } key_runtime_scenario_pd_mode_entry_t;
 
-static uint16_t                                   key_runtime_scenario_time;
-static bool                                       key_runtime_scenario_hold_survives_flush;
-static key_runtime_scenario_behavior_entry_t      key_runtime_scenario_behaviors[KEY_RUNTIME_SCENARIO_MAX_BEHAVIORS];
-static uint8_t                                    key_runtime_scenario_behavior_count;
-static key_runtime_scenario_step_entry_t          key_runtime_scenario_steps[KEY_RUNTIME_SCENARIO_MAX_STEPS];
-static uint8_t                                    key_runtime_scenario_step_entry_count;
-static key_runtime_scenario_pd_mode_entry_t       key_runtime_scenario_pd_modes[KEY_RUNTIME_SCENARIO_MAX_PD_MODES];
-static uint8_t                                    key_runtime_scenario_pd_mode_count;
-static layer_state_t                              key_runtime_scenario_locked_layers;
-static pd_mode_mask_t                             key_runtime_scenario_pd_locked_modes;
-static key_runtime_scenario_effect_t              key_runtime_scenario_effects[KEY_RUNTIME_SCENARIO_MAX_EFFECTS];
-static uint8_t                                    key_runtime_scenario_effect_count_value;
+static uint16_t                              key_runtime_scenario_time;
+static bool                                  key_runtime_scenario_hold_survives_flush;
+static key_runtime_scenario_behavior_entry_t key_runtime_scenario_behaviors[KEY_RUNTIME_SCENARIO_MAX_BEHAVIORS];
+static uint8_t                               key_runtime_scenario_behavior_count;
+static key_runtime_scenario_step_entry_t     key_runtime_scenario_steps[KEY_RUNTIME_SCENARIO_MAX_STEPS];
+static uint8_t                               key_runtime_scenario_step_entry_count;
+static key_runtime_scenario_pd_mode_entry_t  key_runtime_scenario_pd_modes[KEY_RUNTIME_SCENARIO_MAX_PD_MODES];
+static uint8_t                               key_runtime_scenario_pd_mode_count;
+static layer_state_t                         key_runtime_scenario_locked_layers;
+static pd_mode_mask_t                        key_runtime_scenario_pd_locked_modes;
+static key_runtime_scenario_effect_t         key_runtime_scenario_effects[KEY_RUNTIME_SCENARIO_MAX_EFFECTS];
+static uint8_t                               key_runtime_scenario_effect_count_value;
 
 layer_state_t layer_state;
 
@@ -120,8 +120,8 @@ void key_runtime_scenario_add_behavior_view(key_behavior_view_t behavior) {
     }
 
     key_runtime_scenario_behaviors[key_runtime_scenario_behavior_count++] = (key_runtime_scenario_behavior_entry_t){
-        .keycode   = behavior.keycode,
-        .behavior  = behavior,
+        .keycode  = behavior.keycode,
+        .behavior = behavior,
     };
 }
 
@@ -453,43 +453,47 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind                = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
-        .data.delayed_action = {
-            .action       = action,
-            .mods         = mods,
-            .repeat_count = 1,
-        },
+        .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
+        .data.delayed_action =
+            {
+                .action       = action,
+                .mods         = mods,
+                .repeat_count = 1,
+            },
     });
 }
 
 void held_action_register(keypos_t key_pos, uint16_t action) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind             = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
-        .data.held_action = {
-            .key_pos = key_pos,
-            .action  = action,
-        },
+        .kind = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
+        .data.held_action =
+            {
+                .key_pos = key_pos,
+                .action  = action,
+            },
     });
 }
 
 void held_action_unregister(keypos_t key_pos, uint16_t action) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind             = KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER,
-        .data.held_action = {
-            .key_pos = key_pos,
-            .action  = action,
-        },
+        .kind = KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER,
+        .data.held_action =
+            {
+                .key_pos = key_pos,
+                .action  = action,
+            },
     });
 }
 
 void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind        = KEY_RUNTIME_EFFECT_REPEAT_START,
-        .data.repeat = {
-            .key_pos   = key_pos,
-            .action    = action,
-            .repeat_hz = repeat_hz,
-        },
+        .kind = KEY_RUNTIME_EFFECT_REPEAT_START,
+        .data.repeat =
+            {
+                .key_pos   = key_pos,
+                .action    = action,
+                .repeat_hz = repeat_hz,
+            },
     });
 }
 
@@ -516,11 +520,12 @@ bool held_modifier_release_owned_by_key(keypos_t key_pos) {
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind             = KEY_RUNTIME_EFFECT_LAYER_PRESS,
-        .data.layer_press = {
-            .key_pos = key_pos,
-            .layer   = layer,
-        },
+        .kind = KEY_RUNTIME_EFFECT_LAYER_PRESS,
+        .data.layer_press =
+            {
+                .key_pos = key_pos,
+                .layer   = layer,
+            },
     });
 }
 

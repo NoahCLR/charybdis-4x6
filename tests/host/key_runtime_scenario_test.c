@@ -8,20 +8,20 @@
 #include "users/noah/noah_keymap_ids.h"
 
 enum {
-    TEST_FALLBACK_KEY = 0x0004u,
-    TEST_OTHER_KEY    = 0x0005u,
-    TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,
-    TEST_TAP_ACTION    = SAFE_RANGE + 0x71,
-    TEST_ALT_ACTION    = SAFE_RANGE + 0x72,
-    TEST_HOLD_KEY      = SAFE_RANGE + 0x73,
-    TEST_HOLD_ACTION   = SAFE_RANGE + 0x74,
-    TEST_HOLD_KEY_TWO  = SAFE_RANGE + 0x75,
-    TEST_HOLD_KEY_THREE = SAFE_RANGE + 0x76,
-    TEST_HOLD_ACTION_TWO = SAFE_RANGE + 0x77,
+    TEST_FALLBACK_KEY      = 0x0004u,
+    TEST_OTHER_KEY         = 0x0005u,
+    TEST_MULTI_TAP_KEY     = SAFE_RANGE + 0x70,
+    TEST_TAP_ACTION        = SAFE_RANGE + 0x71,
+    TEST_ALT_ACTION        = SAFE_RANGE + 0x72,
+    TEST_HOLD_KEY          = SAFE_RANGE + 0x73,
+    TEST_HOLD_ACTION       = SAFE_RANGE + 0x74,
+    TEST_HOLD_KEY_TWO      = SAFE_RANGE + 0x75,
+    TEST_HOLD_KEY_THREE    = SAFE_RANGE + 0x76,
+    TEST_HOLD_ACTION_TWO   = SAFE_RANGE + 0x77,
     TEST_HOLD_ACTION_THREE = SAFE_RANGE + 0x78,
-    TEST_PD_MODE_KEY = SAFE_RANGE + 0x79,
-    TEST_NUM_LAYER = 1,
-    TEST_OTHER_LAYER = 2,
+    TEST_PD_MODE_KEY       = SAFE_RANGE + 0x79,
+    TEST_NUM_LAYER         = 1,
+    TEST_OTHER_LAYER       = 2,
 };
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -54,9 +54,10 @@ static void test_configure_multi_tap_key(void) {
             },
     });
 
-    key_runtime_scenario_add_behavior_step(TEST_MULTI_TAP_KEY, 2, (key_behavior_step_t){
-        .tap = TAP_SENDS(TEST_ALT_ACTION),
-    });
+    key_runtime_scenario_add_behavior_step(TEST_MULTI_TAP_KEY, 2,
+                                           (key_behavior_step_t){
+                                               .tap = TAP_SENDS(TEST_ALT_ACTION),
+                                           });
 }
 
 static void test_configure_multi_tap_lock_key(uint16_t layer_lock_action) {
@@ -74,10 +75,11 @@ static void test_configure_multi_tap_lock_key(uint16_t layer_lock_action) {
             },
     });
 
-    key_runtime_scenario_add_behavior_step(TEST_MULTI_TAP_KEY, 2, (key_behavior_step_t){
-        .tap       = TAP_SENDS(TEST_ALT_ACTION),
-        .long_hold = TAP_AT_HOLD_THRESHOLD(layer_lock_action),
-    });
+    key_runtime_scenario_add_behavior_step(TEST_MULTI_TAP_KEY, 2,
+                                           (key_behavior_step_t){
+                                               .tap       = TAP_SENDS(TEST_ALT_ACTION),
+                                               .long_hold = TAP_AT_HOLD_THRESHOLD(layer_lock_action),
+                                           });
 }
 
 static void test_configure_multi_tap_hold_key(hold_behavior_t hold, hold_behavior_t long_hold) {
@@ -94,11 +96,12 @@ static void test_configure_multi_tap_hold_key(hold_behavior_t hold, hold_behavio
             },
     });
 
-    key_runtime_scenario_add_behavior_step(TEST_MULTI_TAP_KEY, 2, (key_behavior_step_t){
-        .tap       = TAP_SENDS(TEST_ALT_ACTION),
-        .hold      = hold,
-        .long_hold = long_hold,
-    });
+    key_runtime_scenario_add_behavior_step(TEST_MULTI_TAP_KEY, 2,
+                                           (key_behavior_step_t){
+                                               .tap       = TAP_SENDS(TEST_ALT_ACTION),
+                                               .hold      = hold,
+                                               .long_hold = long_hold,
+                                           });
 }
 
 static void test_configure_fallback_tap_key(uint16_t keycode, uint16_t tap_action) {
@@ -124,11 +127,12 @@ static void test_configure_immediate_hold_key(uint16_t keycode, uint16_t hold_ac
         .multi_tap_term   = 120,
         .single =
             {
-                .hold = {
-                    .present = true,
-                    .action  = hold_action,
-                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                },
+                .hold =
+                    {
+                        .present = true,
+                        .action  = hold_action,
+                        .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                    },
                 .long_hold = long_hold,
             },
     });
@@ -296,13 +300,7 @@ static void test_interrupt_other_press_activates_fallback_hold(void) {
 
 static void test_interrupted_layer_tap_with_intermediate_scan_releases_without_tap(void) {
     static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(LT(TEST_OTHER_LAYER, TEST_FALLBACK_KEY), 5, 0),
-        KEY_RUNTIME_SCENARIO_ADVANCE(60),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_OTHER_KEY, 5, 1),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_RELEASE(LT(TEST_OTHER_LAYER, TEST_FALLBACK_KEY), 5, 0),
+        KEY_RUNTIME_SCENARIO_PRESS(LT(TEST_OTHER_LAYER, TEST_FALLBACK_KEY), 5, 0), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_PRESS(TEST_OTHER_KEY, 5, 1), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(LT(TEST_OTHER_LAYER, TEST_FALLBACK_KEY), 5, 0),
     };
 
     key_runtime_scenario_reset();
@@ -322,11 +320,7 @@ static void test_interrupted_layer_tap_with_intermediate_scan_releases_without_t
 
 static void test_immediate_hold_promotes_long_hold_after_registration(void) {
     static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY, 0, 3),
-        KEY_RUNTIME_SCENARIO_ADVANCE(151),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(200),
-        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY, 0, 3), KEY_RUNTIME_SCENARIO_ADVANCE(151), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(200), KEY_RUNTIME_SCENARIO_SCAN(),
     };
 
     key_runtime_scenario_reset();
@@ -351,18 +345,7 @@ static void test_immediate_hold_promotes_long_hold_after_registration(void) {
 
 static void test_threshold_hold_then_long_hold_with_intermediate_scans_promotes_once(void) {
     static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 0, 4),
-        KEY_RUNTIME_SCENARIO_ADVANCE(100),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(60),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(100),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(100),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_HOLD_KEY_TWO, 0, 4),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 0, 4), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_HOLD_KEY_TWO, 0, 4),
     };
 
     key_runtime_scenario_reset();
@@ -410,25 +393,7 @@ static void test_third_press_preserves_existing_positions_and_uses_its_own_slot(
 
 static void test_double_tap_hold_can_toggle_same_layer_lock_twice(void) {
     static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2),
-        KEY_RUNTIME_SCENARIO_ADVANCE(120),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(240),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2),
-        KEY_RUNTIME_SCENARIO_ADVANCE(120),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(240),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2), KEY_RUNTIME_SCENARIO_ADVANCE(120), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(240), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2), KEY_RUNTIME_SCENARIO_ADVANCE(120), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(240), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2),
     };
 
     key_runtime_scenario_reset();
@@ -451,15 +416,7 @@ static void test_double_tap_hold_can_toggle_same_layer_lock_twice(void) {
 
 static void test_double_tap_threshold_hold_with_intermediate_scan_registers_once(void) {
     static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 1),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 1),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 1),
-        KEY_RUNTIME_SCENARIO_ADVANCE(100),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(60),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 1), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 1), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 1), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 1),
     };
 
     key_runtime_scenario_reset();
@@ -478,14 +435,7 @@ static void test_double_tap_threshold_hold_with_intermediate_scan_registers_once
 
 static void test_repeat_hold_with_intermediate_scans_starts_once_and_releases_once(void) {
     static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_THREE, 6, 0),
-        KEY_RUNTIME_SCENARIO_ADVANCE(100),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(60),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(100),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_HOLD_KEY_THREE, 6, 0),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_THREE, 6, 0), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_HOLD_KEY_THREE, 6, 0),
     };
 
     key_runtime_scenario_reset();
@@ -531,14 +481,7 @@ static void test_pd_mode_quick_tap_with_intermediate_scan_toggles_once(void) {
 
 static void test_pd_mode_hold_with_intermediate_scan_does_not_toggle_lock(void) {
     static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 6, 2),
-        KEY_RUNTIME_SCENARIO_ADVANCE(100),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(60),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 6, 2),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 6, 2), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 6, 2),
     };
 
     key_runtime_scenario_reset();

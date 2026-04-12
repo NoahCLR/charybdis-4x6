@@ -112,20 +112,7 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_reuse_pending_mul
     }
 
     if (key_runtime_slot_pending_multi_tap_pending_hold(context->slot) || context->needs_layer_press) {
-        key_runtime_effect_builder_t begin_builder = key_runtime_slot_begin_press(
-            context->slot,
-            context->keycode,
-            context->key_pos,
-            context->key,
-            KC_NO,
-            hold_behavior_none(),
-            hold_behavior_none(),
-            context->tap_hold_term,
-            context->longer_hold_term,
-            context->multi_tap_term,
-            key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-            KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
-            false);
+        key_runtime_effect_builder_t begin_builder = key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, context->key, KC_NO, hold_behavior_none(), hold_behavior_none(), context->tap_hold_term, context->longer_hold_term, context->multi_tap_term, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT, false);
         key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, begin_builder);
     }
 
@@ -151,25 +138,12 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_begin_fresh(const
     }
 
     if (context->reclaim_active_slot) {
-        keypos_t reclaim_key_pos = context->slot->owner.key_pos;
+        keypos_t                     reclaim_key_pos = context->slot->owner.key_pos;
         key_runtime_effect_builder_t reclaim_builder = key_runtime_slot_policy_take_flush(context->slot, context->active_held_action_survives_flush);
         key_runtime_slot_result_push_builder_if_present(&result, reclaim_key_pos, reclaim_builder);
     }
 
-    key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, key_runtime_slot_begin_press(
-                                                        context->slot,
-                                                        context->keycode,
-                                                        context->key_pos,
-                                                        context->key,
-                                                        context->tap_action,
-                                                        context->hold,
-                                                        context->long_hold,
-                                                        context->tap_hold_term,
-                                                        context->longer_hold_term,
-                                                        context->multi_tap_term,
-                                                        key_runtime_slot_initial_press_phase(context->hold),
-                                                        context->hold_strategy,
-                                                        context->pd_mode && pd_mode_local_locked(context->pd_mode)));
+    key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, context->key, context->tap_action, context->hold, context->long_hold, context->tap_hold_term, context->longer_hold_term, context->multi_tap_term, key_runtime_slot_initial_press_phase(context->hold), context->hold_strategy, context->pd_mode && pd_mode_local_locked(context->pd_mode)));
     return result;
 }
 

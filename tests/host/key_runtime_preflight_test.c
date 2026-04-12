@@ -60,7 +60,7 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 }
 
 static void test_reset_state(void) {
-    noah_runtime_shared_state      = (runtime_shared_state_t){0};
+    noah_runtime_shared_state = (runtime_shared_state_t){0};
     test_set_active_slot_key_pos(test_keypos(0, 0));
     suppress_default               = false;
     tracked_physical_event         = false;
@@ -274,7 +274,7 @@ static void test_active_handled_release_bypasses_modifier_suppression(void) {
     keyrecord_t record = test_record(test_keypos(1, 2), false);
 
     test_reset_state();
-    suppress_default   = true;
+    suppress_default = true;
     test_set_active_slot_key_pos(record.event.key);
     active_key.owner.keycode = KC_RIGHT_ALT;
     active_key.owner.key_pos = record.event.key;
@@ -288,7 +288,7 @@ static void test_unrelated_release_stays_suppressed(void) {
     keypos_t    stored = test_keypos(1, 3);
 
     test_reset_state();
-    suppress_default   = true;
+    suppress_default = true;
     test_set_active_slot_key_pos(stored);
     active_key.owner.keycode = KC_RIGHT_ALT;
     active_key.owner.key_pos = stored;
@@ -302,7 +302,7 @@ static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
     keypos_t    stored = test_keypos(4, 4);
 
     test_reset_state();
-    suppress_default       = true;
+    suppress_default            = true;
     handled_key_stub_is_handled = true;
     test_set_active_slot_key_pos(stored);
     active_key.owner.keycode = KC_LEFT_CTRL;
@@ -333,7 +333,7 @@ static void test_handled_press_keeps_foreign_multi_tap_pending(void) {
     keyrecord_t record = test_record(test_keypos(3, 4), true);
 
     test_reset_state();
-    handled_key_stub_is_handled = true;
+    handled_key_stub_is_handled                                         = true;
     key_runtime_slot_for_position(test_keypos(3, 3))->pending_multi_tap = (multi_tap_t){
         .keycode = KC_RIGHT_ALT,
         .key_pos = test_keypos(3, 3),

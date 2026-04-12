@@ -53,7 +53,7 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 }
 
 static void test_reset_state(void) {
-    noah_runtime_shared_state                           = (runtime_shared_state_t){0};
+    noah_runtime_shared_state                         = (runtime_shared_state_t){0};
     *key_runtime_slot_for_position(test_keypos(1, 2)) = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
 
     fake_time          = 1000;
@@ -354,10 +354,10 @@ void reset_zoom_mode(void) {}
 void reset_arrow_mode(void) {}
 
 static void test_plain_pd_mode_key_activates_and_deactivates_through_process_record(void) {
-    keypos_t    key_pos        = test_keypos(1, 2);
-    keyrecord_t press_record   = test_record(key_pos, true);
-    keyrecord_t release_record = test_record(key_pos, false);
-    active_key_state_t *slot   = key_runtime_slot_for_position(key_pos);
+    keypos_t            key_pos        = test_keypos(1, 2);
+    keyrecord_t         press_record   = test_record(key_pos, true);
+    keyrecord_t         release_record = test_record(key_pos, false);
+    active_key_state_t *slot           = key_runtime_slot_for_position(key_pos);
 
     test_reset_state();
 

@@ -291,11 +291,11 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
 }
 
 static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifier, uint8_t expected_mask) {
-    handled_key_view_t key            = test_handled_key();
-    keypos_t           source_pos     = test_keypos(1, 1);
-    keyrecord_t        press_record   = test_record(source_pos, true);
-    keyrecord_t        release_record = test_record(source_pos, false);
-    active_key_state_t *slot          = key_runtime_slot_for_position(source_pos);
+    handled_key_view_t  key            = test_handled_key();
+    keypos_t            source_pos     = test_keypos(1, 1);
+    keyrecord_t         press_record   = test_record(source_pos, true);
+    keyrecord_t         release_record = test_record(source_pos, false);
+    active_key_state_t *slot           = key_runtime_slot_for_position(source_pos);
     multi_tap_t        *slot_multi_tap = key_runtime_multi_tap_for_slot(slot);
 
     integration_hold_modifier = modifier;

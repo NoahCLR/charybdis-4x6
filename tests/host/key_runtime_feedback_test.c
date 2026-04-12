@@ -9,7 +9,7 @@
 #include "users/noah/lib/key/key_runtime_state.h"
 
 enum {
-    TEST_MULTI_TAP_KEY    = SAFE_RANGE + 0x20,
+    TEST_MULTI_TAP_KEY      = SAFE_RANGE + 0x20,
     TEST_PENDING_TAP_ACTION = SAFE_RANGE + 0x21,
 };
 
@@ -46,12 +46,13 @@ static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior)
 
 static key_runtime_slot_result_t test_step_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_behavior_view_t behavior) {
     return key_runtime_slot_step(slot, (key_runtime_slot_event_t){
-                                           .kind                = KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE,
-                                           .data.handled_release = {
-                                               .keycode = keycode,
-                                               .key_pos = key_pos,
-                                               .key     = test_resolve_handled_key(behavior),
-                                           },
+                                           .kind = KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE,
+                                           .data.handled_release =
+                                               {
+                                                   .keycode = keycode,
+                                                   .key_pos = key_pos,
+                                                   .key     = test_resolve_handled_key(behavior),
+                                               },
                                        });
 }
 
@@ -219,8 +220,8 @@ static void test_repeat_hold_flashes_while_active(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .owner.keycode                    = KC_RIGHT_ALT,
-        .lifecycle.repeat_binding_active  = true,
+        .owner.keycode                   = KC_RIGHT_ALT,
+        .lifecycle.repeat_binding_active = true,
     };
 
     uint8_t flags = key_feedback_pack();
@@ -329,9 +330,9 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .owner.keycode          = TEST_MULTI_TAP_KEY,
-        .owner.key_pos          = pos,
-        .timing.tap_hold_term   = 120,
+        .owner.keycode           = TEST_MULTI_TAP_KEY,
+        .owner.key_pos           = pos,
+        .timing.tap_hold_term    = 120,
         .timing.longer_hold_term = 240,
         .pending_multi_tap =
             {
@@ -345,11 +346,7 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
             },
     };
 
-    release = test_step_handled_release(
-        test_default_slot(),
-        TEST_MULTI_TAP_KEY,
-        pos,
-        (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY});
+    release = test_step_handled_release(test_default_slot(), TEST_MULTI_TAP_KEY, pos, (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY});
 
     CHECK(release.handled);
     CHECK(release.count == 0);
@@ -368,12 +365,12 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
     };
 
     *test_other_slot() = (active_key_state_t){
-        .timer                    = (uint16_t)(fake_time - 150),
-        .owner.keycode            = KC_LEFT,
-        .timing.tap_hold_term     = 100,
-        .timing.longer_hold_term  = 300,
-        .binding.hold             = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
-        .binding.long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
+        .timer                   = (uint16_t)(fake_time - 150),
+        .owner.keycode           = KC_LEFT,
+        .timing.tap_hold_term    = 100,
+        .timing.longer_hold_term = 300,
+        .binding.hold            = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
+        .binding.long_hold       = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
     };
 
     uint8_t flags = key_feedback_pack();

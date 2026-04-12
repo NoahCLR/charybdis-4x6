@@ -93,9 +93,9 @@ enum custom_keycodes {
     NOAH_PD_MODE_LIST(NOAH_PD_MODE_KEYCODE)
 #undef NOAH_PD_MODE_KEYCODE
 #define NOAH_PD_MODE_LOCK_KEYCODE(name, keycode, handler, key_handler, reset, dpi, traits, lifecycle) keycode##_LOCK,
-    NOAH_PD_MODE_LIST(NOAH_PD_MODE_LOCK_KEYCODE)
+        NOAH_PD_MODE_LIST(NOAH_PD_MODE_LOCK_KEYCODE)
 #undef NOAH_PD_MODE_LOCK_KEYCODE
-    LAYER_LOCK_BASE,
+            LAYER_LOCK_BASE,
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
 
@@ -106,8 +106,8 @@ enum custom_keycodes {
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 #define NOAH_KEYMAP_SAFE_RANGE CUSTOM_KEYCODES_END
 
-extern const char *const     via_macro_payloads[VIA_MACRO_SLOT_COUNT];
-extern const char *const     hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT];
-extern const uint16_t *const noah_combo_output_keycodes;
-extern const uint8_t         noah_combo_output_count;
+extern const char *const      via_macro_payloads[VIA_MACRO_SLOT_COUNT];
+extern const char *const      hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT];
+extern const uint16_t *const  noah_combo_output_keycodes;
+extern const uint8_t          noah_combo_output_count;
 extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];

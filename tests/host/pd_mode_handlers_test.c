@@ -40,8 +40,8 @@ static uint8_t              synthetic_tap_call_count;
 static literal_tap_call_t literal_tap_calls[TEST_MAX_CALLS];
 static uint8_t            literal_tap_call_count;
 
-static uint8_t fallback_hold_activation_count;
-static bool    fallback_hold_active;
+static uint8_t  fallback_hold_activation_count;
+static bool     fallback_hold_active;
 static uint32_t fake_time32;
 
 static uint8_t  keyboard_mod_register_count;
@@ -253,9 +253,9 @@ static void test_dragscroll_horizontal_lock_filters_vertical_jitter(void) {
 
     fake_time32 = 1020u;
     report      = handle_dragscroll_mode((report_mouse_t){
-             .x = 80,
-             .y = 10,
-         });
+        .x = 80,
+        .y = 10,
+    });
     CHECK(report.x == 0);
     CHECK(report.y == 0);
     CHECK(report.h == 10);
@@ -263,9 +263,9 @@ static void test_dragscroll_horizontal_lock_filters_vertical_jitter(void) {
 
     fake_time32 = 1040u;
     report      = handle_dragscroll_mode((report_mouse_t){
-             .x = 8,
-             .y = 24,
-         });
+        .x = 8,
+        .y = 24,
+    });
     CHECK(report.h == 1);
     CHECK(report.v == 0);
 }
@@ -277,17 +277,17 @@ static void test_dragscroll_axis_lock_releases_after_pause(void) {
 
     fake_time32 = 1020u;
     report      = handle_dragscroll_mode((report_mouse_t){
-             .x = 64,
-             .y = 0,
-         });
+        .x = 64,
+        .y = 0,
+    });
     CHECK(report.h == 8);
     CHECK(report.v == 0);
 
     fake_time32 = 1085u;
     report      = handle_dragscroll_mode((report_mouse_t){
-             .x = 0,
-             .y = 64,
-         });
+        .x = 0,
+        .y = 64,
+    });
     CHECK(report.h == 0);
     CHECK(report.v == 8);
 }

@@ -49,9 +49,9 @@ static void key_runtime_slot_policy_clear_owned_hold(active_key_state_t *slot, k
     }
 
     if (slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
-        builder->release_owned_state           = true;
-        slot->lifecycle.held_action_keycode    = KC_NO;
-        slot->lifecycle.repeat_binding_active  = false;
+        builder->release_owned_state          = true;
+        slot->lifecycle.held_action_keycode   = KC_NO;
+        slot->lifecycle.repeat_binding_active = false;
     }
 }
 
@@ -135,28 +135,28 @@ key_runtime_effect_builder_t key_runtime_slot_policy_fire_hold_at_threshold(acti
     switch (key_runtime_slot_policy_hold_threshold_dispatch_kind(hold)) {
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP:
             key_runtime_slot_policy_clear_owned_hold(slot, &builder);
-            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
-            builder.action                = hold.action;
-            builder.feedback_pulse        = true;
+            builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
+            builder.action                   = hold.action;
+            builder.feedback_pulse           = true;
             builder.feedback_long_hold_level = false;
             key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
             return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_HELD:
             slot->lifecycle.held_action_keycode = hold.action;
             key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
-            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
-            builder.action                = hold.action;
-            builder.feedback_pulse        = key_runtime_slot_policy_hold_activation_needs_pulse(hold, pulse_momentary_layer_action);
+            builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
+            builder.action                   = hold.action;
+            builder.feedback_pulse           = key_runtime_slot_policy_hold_activation_needs_pulse(hold, pulse_momentary_layer_action);
             builder.feedback_long_hold_level = false;
             return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_REPEAT:
             key_runtime_slot_policy_clear_owned_hold(slot, &builder);
             slot->lifecycle.repeat_binding_active = true;
             key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
-            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_REPEAT_START;
-            builder.action                = hold.action;
-            builder.repeat_hz             = hold.repeat_hz;
-            builder.feedback_pulse        = true;
+            builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_REPEAT_START;
+            builder.action                   = hold.action;
+            builder.repeat_hz                = hold.repeat_hz;
+            builder.feedback_pulse           = true;
             builder.feedback_long_hold_level = false;
             return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_NONE:
@@ -177,26 +177,26 @@ key_runtime_effect_builder_t key_runtime_slot_policy_promote_to_long_hold(active
     switch (key_runtime_slot_policy_hold_threshold_dispatch_kind(long_hold)) {
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP:
             key_runtime_slot_commit_hold_phase(slot, true);
-            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
-            builder.action                = long_hold.action;
-            builder.feedback_pulse        = true;
+            builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
+            builder.action                   = long_hold.action;
+            builder.feedback_pulse           = true;
             builder.feedback_long_hold_level = true;
             return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_HELD:
             slot->lifecycle.held_action_keycode = long_hold.action;
             key_runtime_slot_commit_hold_phase(slot, true);
-            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
-            builder.action                = long_hold.action;
-            builder.feedback_pulse        = key_runtime_slot_policy_hold_activation_needs_pulse(long_hold, pulse_momentary_layer_action);
+            builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
+            builder.action                   = long_hold.action;
+            builder.feedback_pulse           = key_runtime_slot_policy_hold_activation_needs_pulse(long_hold, pulse_momentary_layer_action);
             builder.feedback_long_hold_level = true;
             return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_REPEAT:
             slot->lifecycle.repeat_binding_active = true;
             key_runtime_slot_commit_hold_phase(slot, true);
-            builder.kind                  = KEY_RUNTIME_EFFECT_BUILDER_REPEAT_START;
-            builder.action                = long_hold.action;
-            builder.repeat_hz             = long_hold.repeat_hz;
-            builder.feedback_pulse        = true;
+            builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_REPEAT_START;
+            builder.action                   = long_hold.action;
+            builder.repeat_hz                = long_hold.repeat_hz;
+            builder.feedback_pulse           = true;
             builder.feedback_long_hold_level = true;
             return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_NONE:

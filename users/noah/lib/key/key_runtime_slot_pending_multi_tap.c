@@ -40,17 +40,17 @@ typedef enum {
 } key_runtime_slot_pending_multi_tap_release_outcome_t;
 
 typedef struct {
-    active_key_state_t  *slot;
-    uint16_t             keycode;
-    handled_key_view_t   key;
-    uint16_t             elapsed;
-    keypos_t             key_pos;
+    active_key_state_t   *slot;
+    uint16_t              keycode;
+    handled_key_view_t    key;
+    uint16_t              elapsed;
+    keypos_t              key_pos;
     delayed_action_mods_t mods;
-    hold_behavior_t      hold;
-    hold_behavior_t      long_hold;
-    uint16_t             action;
-    uint8_t              repeat_count;
-    bool                 matched;
+    hold_behavior_t       hold;
+    hold_behavior_t       long_hold;
+    uint16_t              action;
+    uint8_t               repeat_count;
+    bool                  matched;
 } key_runtime_slot_pending_multi_tap_release_context_t;
 
 typedef struct {
@@ -62,10 +62,10 @@ typedef struct {
 
 static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pending_multi_tap_release_context(active_key_state_t *slot, uint16_t keycode, handled_key_view_t key, uint16_t elapsed) {
     key_runtime_slot_pending_multi_tap_release_context_t context = {
-        .slot     = slot,
-        .keycode  = keycode,
-        .key      = key,
-        .elapsed  = elapsed,
+        .slot    = slot,
+        .keycode = keycode,
+        .key     = key,
+        .elapsed = elapsed,
     };
     multi_tap_t *slot_multi_tap;
 
@@ -137,14 +137,16 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(acti
 
     switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE:
-            key_runtime_slot_result_push_builder_if_present(&result, context.key_pos, (key_runtime_effect_builder_t){
-                                                                                .kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER,
-                                                                                .action = resolution.action,
-                                                                            });
-            key_runtime_slot_result_push_builder_if_present(&result, context.key_pos, (key_runtime_effect_builder_t){
-                                                                                .kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_UNREGISTER,
-                                                                                .action = resolution.action,
-                                                                            });
+            key_runtime_slot_result_push_builder_if_present(&result, context.key_pos,
+                                                            (key_runtime_effect_builder_t){
+                                                                .kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER,
+                                                                .action = resolution.action,
+                                                            });
+            key_runtime_slot_result_push_builder_if_present(&result, context.key_pos,
+                                                            (key_runtime_effect_builder_t){
+                                                                .kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_UNREGISTER,
+                                                                .action = resolution.action,
+                                                            });
             break;
         case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION:
             key_runtime_slot_result_push_delayed_action(&result, resolution.action, resolution.mods, resolution.repeat_count);
@@ -200,7 +202,7 @@ static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pen
     if (hold_fires_at_threshold(slot_multi_tap->long_hold) && elapsed >= slot->timing.longer_hold_term) {
         resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD;
         resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, slot_multi_tap->long_hold.action);
-        resolution.effect_builder             = key_runtime_slot_policy_promote_to_long_hold(slot, slot->binding.long_hold, true);
+        resolution.effect_builder              = key_runtime_slot_policy_promote_to_long_hold(slot, slot->binding.long_hold, true);
         return resolution;
     }
 
@@ -210,13 +212,13 @@ static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pen
 
     resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD;
     resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, slot_multi_tap->hold.action);
-    resolution.effect_builder             = key_runtime_slot_policy_fire_hold_at_threshold(slot, slot_multi_tap->hold, slot->binding.long_hold, true);
+    resolution.effect_builder              = key_runtime_slot_policy_fire_hold_at_threshold(slot, slot_multi_tap->hold, slot->binding.long_hold, true);
     return resolution;
 }
 
 static key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_scan_hold(active_key_state_t *slot, multi_tap_t *slot_multi_tap, keypos_t key_pos, uint16_t elapsed) {
     key_runtime_slot_pending_multi_tap_scan_resolution_t resolution = key_runtime_slot_pending_multi_tap_scan_resolve(slot, slot_multi_tap, elapsed);
-    key_runtime_slot_result_t                           result      = {0};
+    key_runtime_slot_result_t                            result     = {0};
 
     if (resolution.outcome == KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_NONE) {
         return result;
@@ -257,7 +259,7 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_scan(active_
 
     if (key_runtime_slot_pending_multi_tap_expired(slot)) {
         key_runtime_slot_pending_multi_tap_flush_t flush = key_runtime_slot_take_pending_multi_tap_flush(slot);
-        result.handled = true;
+        result.handled                                   = true;
         key_runtime_slot_result_push_delayed_action(&result, flush.action, flush.mods, flush.repeat_count);
     }
 

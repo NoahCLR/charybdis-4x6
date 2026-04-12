@@ -17,8 +17,8 @@
 #include "../state/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
-    active_key_state_t *slot             = key_runtime_find_slot_by_position(record->event.key);
-    handled_key_view_t  handled_key      = handled_key_lookup(keycode);
+    active_key_state_t *slot              = key_runtime_find_slot_by_position(record->event.key);
+    handled_key_view_t  handled_key       = handled_key_lookup(keycode);
     bool                other_slot_active = false;
     bool                flush_multi_taps  = false;
 
