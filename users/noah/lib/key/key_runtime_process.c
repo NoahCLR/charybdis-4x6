@@ -21,6 +21,9 @@ bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    active_key_state_t *release_slot = NULL;
+    uint16_t            runtime_keycode = keycode;
+
     key_runtime_trace_record("process:entry", keycode, record);
 
     // Synthetic records are dispatched by the key_behavior action system to
@@ -37,15 +40,22 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
     key_runtime_trace_bool_result("process:preflight", keycode, record, true);
 
-    if (pd_mode_handle_key_event(keycode, record)) {
+    if (!record->event.pressed) {
+        release_slot = key_runtime_slot_for_position(record->event.key);
+        if (key_runtime_slot_active(release_slot)) {
+            runtime_keycode = release_slot->owner.keycode;
+        }
+    }
+
+    if (pd_mode_handle_key_event(runtime_keycode, record)) {
         key_runtime_trace_message("process:pd_mode_key_handler", "key event consumed by active pd mode");
         return false;
     }
 
-    handled_key_view_t key = handled_key_lookup(keycode);
+    handled_key_view_t key = handled_key_lookup(runtime_keycode);
     if (key.behavior.handled) {
-        bool handled = record->event.pressed ? key_runtime_process_handled_key_press(keycode, record, key) : key_runtime_process_handled_key_release(keycode, record, key);
-        key_runtime_trace_bool_result("process:handled_key", keycode, record, handled);
+        bool handled = record->event.pressed ? key_runtime_process_handled_key_press(runtime_keycode, record, key) : key_runtime_process_handled_key_release(runtime_keycode, record, key);
+        key_runtime_trace_bool_result("process:handled_key", runtime_keycode, record, handled);
         if (handled) {
             return false;
         }

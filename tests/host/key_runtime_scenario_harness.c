@@ -42,6 +42,7 @@ static key_runtime_scenario_step_entry_t          key_runtime_scenario_steps[KEY
 static uint8_t                                    key_runtime_scenario_step_entry_count;
 static key_runtime_scenario_pd_mode_entry_t       key_runtime_scenario_pd_modes[KEY_RUNTIME_SCENARIO_MAX_PD_MODES];
 static uint8_t                                    key_runtime_scenario_pd_mode_count;
+static layer_state_t                              key_runtime_scenario_locked_layers;
 static pd_mode_mask_t                             key_runtime_scenario_pd_locked_modes;
 static key_runtime_scenario_effect_t              key_runtime_scenario_effects[KEY_RUNTIME_SCENARIO_MAX_EFFECTS];
 static uint8_t                                    key_runtime_scenario_effect_count_value;
@@ -83,6 +84,7 @@ void key_runtime_scenario_reset(void) {
     key_runtime_scenario_behavior_count     = 0;
     key_runtime_scenario_step_entry_count   = 0;
     key_runtime_scenario_pd_mode_count      = 0;
+    key_runtime_scenario_locked_layers      = 0;
     key_runtime_scenario_pd_locked_modes    = 0;
     key_runtime_scenario_effect_count_value = 0;
 
@@ -175,6 +177,10 @@ void key_runtime_scenario_run(const key_runtime_scenario_step_t *steps, uint8_t 
                 break;
         }
     }
+}
+
+bool key_runtime_scenario_layer_locked(uint8_t layer) {
+    return layer < LAYER_COUNT && (key_runtime_scenario_locked_layers & ((layer_state_t)1u << layer)) != 0;
 }
 
 uint8_t key_runtime_scenario_effect_count(void) {
@@ -278,8 +284,7 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
 }
 
 bool action_dispatch_is_layer_lock(uint16_t action) {
-    (void)action;
-    return false;
+    return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
 }
 
 bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
@@ -301,8 +306,7 @@ bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
 }
 
 bool action_dispatch_layer_is_locked(uint8_t layer) {
-    (void)layer;
-    return false;
+    return key_runtime_scenario_layer_locked(layer);
 }
 
 noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
@@ -311,6 +315,10 @@ noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
 }
 
 void action_dispatch(uint16_t action) {
+    if (action_dispatch_is_layer_lock(action)) {
+        key_runtime_scenario_locked_layers ^= (layer_state_t)1u << (uint8_t)(action - LAYER_LOCK_BASE);
+    }
+
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind   = KEY_RUNTIME_SCENARIO_EFFECT_DISPATCH_ACTION,
         .action = action,

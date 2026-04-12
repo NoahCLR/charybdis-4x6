@@ -5,6 +5,7 @@
 
 #include "key_runtime_scenario_harness.h"
 #include "users/noah/lib/key/key_runtime_state.h"
+#include "users/noah/noah_keymap_ids.h"
 
 enum {
     TEST_FALLBACK_KEY = 0x0004u,
@@ -18,6 +19,8 @@ enum {
     TEST_HOLD_KEY_THREE = SAFE_RANGE + 0x76,
     TEST_HOLD_ACTION_TWO = SAFE_RANGE + 0x77,
     TEST_HOLD_ACTION_THREE = SAFE_RANGE + 0x78,
+    TEST_NUM_LAYER = 1,
+    TEST_OTHER_LAYER = 2,
 };
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -52,6 +55,27 @@ static void test_configure_multi_tap_key(void) {
 
     key_runtime_scenario_add_behavior_step(TEST_MULTI_TAP_KEY, 2, (key_behavior_step_t){
         .tap = TAP_SENDS(TEST_ALT_ACTION),
+    });
+}
+
+static void test_configure_multi_tap_lock_key(uint16_t layer_lock_action) {
+    key_runtime_scenario_add_behavior_view((key_behavior_view_t){
+        .keycode          = TEST_MULTI_TAP_KEY,
+        .handled          = true,
+        .has_multi_tap    = true,
+        .tap_hold_term    = 150,
+        .longer_hold_term = 350,
+        .multi_tap_term   = 120,
+        .single =
+            {
+                .tap  = TAP_SENDS(LOCK_LAYER(TEST_OTHER_LAYER)),
+                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_OTHER_LAYER)),
+            },
+    });
+
+    key_runtime_scenario_add_behavior_step(TEST_MULTI_TAP_KEY, 2, (key_behavior_step_t){
+        .tap       = TAP_SENDS(TEST_ALT_ACTION),
+        .long_hold = TAP_AT_HOLD_THRESHOLD(layer_lock_action),
     });
 }
 
@@ -256,6 +280,43 @@ static void test_third_press_preserves_existing_positions_and_uses_its_own_slot(
     CHECK(test_slot_state(2, 2)->owner.keycode == TEST_HOLD_KEY_THREE);
 }
 
+static void test_double_tap_hold_can_toggle_same_layer_lock_twice(void) {
+    static const key_runtime_scenario_step_t scenario[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(360),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 4, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(360),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 4, 2),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_multi_tap_lock_key(LOCK_LAYER(TEST_NUM_LAYER));
+    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
+
+    CHECK(key_runtime_scenario_effect_count() == 4);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_SCENARIO_EFFECT_DISPATCH_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->action == LOCK_LAYER(TEST_NUM_LAYER));
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_SCENARIO_EFFECT_FEEDBACK_PULSE);
+    CHECK(key_runtime_scenario_effect_at(1)->long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_SCENARIO_EFFECT_DISPATCH_ACTION);
+    CHECK(key_runtime_scenario_effect_at(2)->action == LOCK_LAYER(TEST_NUM_LAYER));
+    CHECK(key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_SCENARIO_EFFECT_FEEDBACK_PULSE);
+    CHECK(key_runtime_scenario_effect_at(3)->long_hold_level);
+    CHECK(!key_runtime_scenario_layer_locked(TEST_NUM_LAYER));
+    CHECK(!key_runtime_slot_has_pending_multi_tap(test_slot_state(4, 2)));
+    CHECK(test_slot_state(4, 2)->owner.keycode == KC_NO);
+}
+
 int main(void) {
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();
     test_momentary_layer_key_tracks_press_and_release_events();
@@ -264,6 +325,7 @@ int main(void) {
     test_interrupt_other_press_activates_fallback_hold();
     test_immediate_hold_promotes_long_hold_after_registration();
     test_third_press_preserves_existing_positions_and_uses_its_own_slot();
+    test_double_tap_hold_can_toggle_same_layer_lock_twice();
 
     puts("key_runtime_scenario host tests passed");
     return 0;

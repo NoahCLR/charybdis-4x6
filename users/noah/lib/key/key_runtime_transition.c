@@ -320,13 +320,22 @@ void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_tran
 }
 
 static bool key_runtime_transition_process_active_key_release(uint16_t keycode, keyrecord_t *record, key_behavior_view_t behavior, key_runtime_transition_plan_t *plan) {
-    key_runtime_transition_apply_slot_step(key_runtime_find_slot_by_position(record->event.key),
+    active_key_state_t *slot             = key_runtime_find_slot_by_position(record->event.key);
+    uint16_t            release_keycode  = keycode;
+    key_behavior_view_t release_behavior = behavior;
+
+    if (key_runtime_slot_active(slot) && slot->owner.keycode != keycode) {
+        release_keycode  = slot->owner.keycode;
+        release_behavior = handled_key_lookup(release_keycode).behavior;
+    }
+
+    key_runtime_transition_apply_slot_step(slot,
                                            (key_runtime_slot_event_t){
                                                .kind                = KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE,
                                                .data.handled_release = {
-                                                   .keycode  = keycode,
+                                                   .keycode  = release_keycode,
                                                    .key_pos  = record->event.key,
-                                                   .behavior = behavior,
+                                                   .behavior = release_behavior,
                                                },
                                            },
                                            plan);

@@ -90,6 +90,7 @@ void key_runtime_scenario_add_pd_mode(uint16_t keycode, pd_mode_mask_t mode);
 void key_runtime_scenario_set_pd_locked_modes(pd_mode_mask_t modes);
 void key_runtime_scenario_set_hold_survives_flush(bool survives_flush);
 void key_runtime_scenario_run(const key_runtime_scenario_step_t *steps, uint8_t step_count);
+bool key_runtime_scenario_layer_locked(uint8_t layer);
 
 uint8_t key_runtime_scenario_effect_count(void);
 const key_runtime_scenario_effect_t *key_runtime_scenario_effect_at(uint8_t index);

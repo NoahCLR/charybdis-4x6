@@ -199,6 +199,63 @@ Verification result:
 - full host suite passed
 - firmware build passed
 
+## 2026-04-12 Position-Owned Release Routing For Layer-Changing Holds
+
+Completed in this pass:
+
+- Fixed handled-key release routing in
+  [`users/noah/lib/key/key_runtime_process.c`](../../users/noah/lib/key/key_runtime_process.c)
+  so release events are owned by the active slot at that physical position,
+  even when the currently resolved keycode has changed because a hold action
+  changed the layer while the key was still down.
+- Tightened
+  [`users/noah/lib/key/key_runtime_transition.c`](../../users/noah/lib/key/key_runtime_transition.c)
+  so release reduction only falls back to a fresh `handled_key_lookup(...)`
+  when the current release keycode actually differs from the slot owner;
+  same-key transition tests and direct handled-release callers keep their
+  authored test behavior overrides.
+- Added a dedicated end-to-end regression in
+  [`tests/host/key_runtime_layer_lock_integration_test.c`](../../tests/host/key_runtime_layer_lock_integration_test.c)
+  plus runner
+  [`tests/host/run_key_runtime_layer_lock_integration_tests.sh`](../../tests/host/run_key_runtime_layer_lock_integration_tests.sh)
+  for thumb-style double-tap long-hold layer locking, including the failure
+  mode where the final release resolves to a different keycode after the
+  layer change.
+- Added the new layer-lock integration runner to
+  [`tests/host/run_all_host_tests.sh`](../../tests/host/run_all_host_tests.sh).
+- Kept the simpler scenario-level double-toggle regression in
+  [`tests/host/key_runtime_scenario_test.c`](../../tests/host/key_runtime_scenario_test.c)
+  and updated the harness so layer-lock actions toggle local scenario state.
+
+Why this pass landed now:
+
+- post-refactor hardware testing showed thumb-key long-hold feedback firing
+  consistently while the actual layer lock was inconsistent
+- that symptom pointed away from hold detection and toward release/action
+  ownership after the long-hold dispatch
+- the runtime had a real blind spot here: a handled key could change layers
+  while held, then release under a different resolved keycode and bypass or
+  mis-route the handled release path
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Verification result:
+
+- targeted transition, scenario, layer-lock integration, modifier-hold
+  integration, and pd-mode integration tests passed
+- full host suite passed
+- firmware build passed
+- worktree diff is whitespace-clean
+
 ## 2026-04-12 Grouped Fixture Migration And Release/Scan Reducer Split
 
 Completed in this pass:
