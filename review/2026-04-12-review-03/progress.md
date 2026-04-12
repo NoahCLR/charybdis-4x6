@@ -306,4 +306,32 @@ Next steps:
 - tune only the `NOAH_DRAGSCROLL_*` constants if the feel still needs work;
   keep the single-axis gesture model intact unless on-device behavior exposes a
   real regression
+
+Follow-up implementation completed after the dragscroll behavior rewrite:
+
+- Corrected the local dragscroll lock-refresh logic so ambiguous near-diagonal
+  continuation frames keep the existing axis lock instead of dropping to an
+  unlocked state with no output.
+- Added a direct host regression that reproduces the “wobble mid-gesture”
+  case and asserts that horizontal dragscroll stays horizontal rather than
+  stuttering through a dead frame.
+
+Verification run for the dragscroll wobble fix:
+
+- `git status --short`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- re-flash and verify whether the remaining “unnatural” feel was primarily the
+  old lock-drop stutter or whether the per-axis thresholds/divisors still need
+  tuning after that fix
  

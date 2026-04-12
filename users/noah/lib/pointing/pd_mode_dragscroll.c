@@ -218,8 +218,10 @@ static bool dragscroll_refresh_axis_lock(bool had_motion, uint32_t motion_age) {
         }
     }
 
-    dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
-    return false;
+    // Keep the current lock through ambiguous wobble. Releasing here makes the
+    // gesture stutter whenever the user briefly moves near-diagonal without
+    // actually intending to switch axes.
+    return true;
 }
 
 static bool dragscroll_emit_locked_axis(report_mouse_t *mouse_report) {

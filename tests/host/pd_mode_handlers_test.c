@@ -337,6 +337,28 @@ static void test_dragscroll_opposite_axis_does_not_steal_active_lock(void) {
     CHECK(report.v == 0);
 }
 
+static void test_dragscroll_ambiguous_wobble_keeps_existing_lock(void) {
+    test_reset_stubs();
+
+    report_mouse_t report;
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 18,
+        .y = 1,
+    });
+    CHECK(report.h == 3);
+    CHECK(report.v == 0);
+
+    fake_time32 = 1040u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 7,
+        .y = 7,
+    });
+    CHECK(report.h == 1);
+    CHECK(report.v == 0);
+}
+
 static void test_dragscroll_lock_releases_after_pause_and_switches_axes_cleanly(void) {
     test_reset_stubs();
 
@@ -547,6 +569,7 @@ int main(void) {
     test_dragscroll_vertical_lock_filters_horizontal_jitter();
     test_dragscroll_near_diagonal_motion_waits_for_dominant_axis();
     test_dragscroll_opposite_axis_does_not_steal_active_lock();
+    test_dragscroll_ambiguous_wobble_keeps_existing_lock();
     test_dragscroll_lock_releases_after_pause_and_switches_axes_cleanly();
     test_dragscroll_uses_different_horizontal_and_vertical_divisors();
     test_dragscroll_cross_axis_decay_prevents_residual_leakage();
