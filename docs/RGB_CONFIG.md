@@ -218,6 +218,10 @@ The tier decides the color:
 - `.hold` surfaces use `hold_active_color`
 - `.long_hold` surfaces use `long_hold_active_color`
 
+Pending momentary-layer previews are a separate overlay path. They reuse the
+previewed layer's authored layer color and any matching layer LED groups
+instead of these three feedback colors.
+
 The helper decides the RGB behavior shape:
 
 - `TAP_AT_HOLD_THRESHOLD(...)`: pulse once when that tier commits
@@ -249,8 +253,9 @@ the flash-phase bit used to keep both halves in sync.
    only the LEDs owned by that layer's non-transparent keys
 2. if the auto-mouse layer is active, that layer stage is blended toward its
    destination state instead of being painted as a fixed separate gradient
-3. per-layer preview overlay, if one is active and that layer has a nonzero
-   solid color
+3. per-layer preview overlay for a pending momentary-layer hold, if
+   `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on and that previewed layer has a
+   nonzero solid color
 4. the first active pointing-device mode color on the right half
 5. per-mode LED groups
 6. the key-behavior feedback overlay on both halves
@@ -341,6 +346,8 @@ Edit the three designated initializer rows in
 ### Disable the key-behavior overlay
 
 Comment out `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+That also disables the preview-layer overlay used for pending momentary-layer
+holds.
 
 ### Disable the auto-mouse gradient
 

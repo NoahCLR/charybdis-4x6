@@ -112,18 +112,18 @@ Some keys then grow higher-tap behavior:
 - double tap `8` -> previous track
 - hold the second tap of `8` -> keep previous-track held
 
-The punctuation row follows the same pattern on hold:
+The base-layer punctuation keys follow the same pattern on hold:
 
 - `-` -> `_`
-- `=` -> `+`
 - `[` -> `{`
 - `]` -> `}`
 - `\` -> `|`
-- `` ` `` -> `~`
 - `;` -> `:`
 - `'` -> `"`
 - `,` -> `<`
 - `.` -> `>`
+
+`~` is currently on `KC_ESC` double tap rather than on a dedicated grave key.
 
 ### Thumbs
 

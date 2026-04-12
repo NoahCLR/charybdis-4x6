@@ -24,7 +24,7 @@ If you hand this task to an agent, give it this exact job:
 2. If the mode needs runtime behavior, add handler/reset declarations in [`users/noah/lib/pointing/pd_mode_handlers.h`](../users/noah/lib/pointing/pd_mode_handlers.h), implement them in a new per-mode file under [`users/noah/lib/pointing/`](../users/noah/lib/pointing/), and wire that file into [`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk).
 3. Expose the mode through at least one physical path in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), either directly in `keymaps[][]` or indirectly from another key behavior or combo. Add a `key_behaviors[]` row only if the mode itself needs custom taps or higher-tap behavior.
 4. Add an RGB color in [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
-5. Update user-facing docs if the mode changes real behavior in a meaningful way.
+5. Update user-facing docs if the mode changes real behavior in a meaningful way, including [`README.md`](../README.md) when the shared capability summary changes.
 6. Run the matching host tests and compile gates for the files you touched.
 7. Finish with `sh tests/host/run_all_host_tests.sh` and then `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
 
@@ -307,6 +307,8 @@ specific LED subset highlighted.
 
 If the new mode is meant to be used, not just prototyped, also update:
 
+- [README.md](../README.md) if the shared mode roster or user-facing capability
+  summary changed
 - [POINTER_MODES.md](./POINTER_MODES.md) for user-facing behavior
 - [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) if the mode introduces a new shared interaction pattern
 - [KEYMAP.md](./KEYMAP.md) if the current profile gives that mode concrete taps,

@@ -303,6 +303,11 @@ trace ring buffer in
 [`runtime_trace.h`](../users/noah/lib/state/runtime_trace.h) is included in
 the aggregate debug snapshot and reset with the rest of the runtime.
 
+If you also want the verbose console-side key-runtime trace strings, enable
+`NOAH_KEY_RUNTIME_TRACE_ENABLE` with `CONSOLE_ENABLE`. That surface lives in
+[`key_runtime_trace.c`](../users/noah/lib/key/key_runtime_trace.c) and
+complements the shared ring buffer instead of replacing it.
+
 The scenario harness in
 [`tests/host/key_runtime_scenario_harness.h`](../tests/host/key_runtime_scenario_harness.h)
 and
@@ -326,6 +331,15 @@ The most relevant host checks for the runtime are:
 - `sh tests/host/run_key_runtime_scenario_tests.sh`
 - `sh tests/host/run_runtime_debug_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
+
+If you changed shared trace/debug plumbing, also run:
+
+- `sh tests/host/run_runtime_trace_tests.sh`
+
+If you changed output-emission policy or direct-action lifecycle wiring, also run:
+
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
 
 When runtime wiring or behavior changes, finish with:
 

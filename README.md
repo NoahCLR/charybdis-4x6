@@ -374,9 +374,9 @@ independently toggled in the keymap
   much timeout remains before the pointer layer clears
 - **Key-behavior feedback** (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`): the
   key-behavior engine projects its state into the RGB overlay on both halves:
-  multi-tap pending, hold pending, trigger pulses, and active held non-layer
-  actions. Held layer-switch actions pulse once when they activate, then let
-  the layer color take over
+  multi-tap pending, pending momentary-layer previews, hold pending, trigger
+  pulses, and active held non-layer actions. Held layer-switch actions pulse
+  once when they activate, then let the layer color take over
 
 Both overlays are purely additive. With both disabled, `rgb_config.c` still
 provides full layer and pointer-mode color feedback. With both enabled, the
@@ -397,6 +397,8 @@ customization does not need low-level changes.
 
 These docs are the next place to look:
 
+- [`docs/KEY_RUNTIME.md`](./docs/KEY_RUNTIME.md): maintainer-facing handled-key
+  runtime map, test surfaces, and tracing/debug notes
 - [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md): tap, hold, and
   multi-tap engine semantics
 - [`docs/KEYMAP.md`](./docs/KEYMAP.md): current concrete profile choices,

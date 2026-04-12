@@ -204,6 +204,8 @@ Shared semantics:
 
 - multi-tap pending can show a brief pending color while the engine waits for
   more taps
+- pending momentary-layer holds can preview the target layer's authored color
+  and LED groups before that layer actually commits
 - unresolved hold windows can show the hold color while the action is still
   pending
 - threshold-fired hold or longer-hold actions can pulse once when they fire
