@@ -124,6 +124,11 @@ bool is_pd_mode_lock_action(uint16_t action) {
     return false;
 }
 
+pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+    (void)keycode;
+    return 0;
+}
+
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
     (void)action;
     return NULL;

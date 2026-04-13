@@ -631,12 +631,18 @@ Current status:
   action-dispatch surface
 - moved action lifecycle and direct-action preflight routing onto that
   descriptor instead of repeating raw-keycode classification at each branch
+- moved key-runtime slot policy, feedback, and pending multi-tap action-policy
+  checks onto the descriptor surface too
 - kept the older boolean helper predicates as compatibility wrappers so the
   rest of the repo can migrate incrementally
 - intentionally left qmk-behavior classification behind the existing helper
   seam for now because several host harnesses stub that classification directly
-- slot policy, feedback, and a few runtime helpers still re-check raw action
-  meaning and should be the next descriptor migration targets
+- also kept `layer lock`, `raw layer action`, and `macro` classification
+  available through the existing helper seams because several lightweight host
+  harnesses still stub those names directly
+- remaining migration work is now mostly about deciding which of those legacy
+  helper seams should stay public compatibility wrappers and which should be
+  folded completely into the descriptor internals later
 
 ### Recommendation 3: move key-runtime storage types under key/runtime
 

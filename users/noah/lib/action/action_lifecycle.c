@@ -42,7 +42,7 @@ static bool noah_action_handle_one_shot_press(noah_action_desc_t desc) {
         return true;
     }
 
-    if (desc.is_macro && noah_qmk_contract_try_play_via_macro(desc.action)) {
+    if (noah_qmk_contract_try_play_via_macro(desc.action)) {
         return true;
     }
 

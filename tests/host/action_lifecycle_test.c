@@ -128,6 +128,10 @@ bool is_pd_mode_lock_action(uint16_t action) {
     return action == ARROW_MODE_LOCK;
 }
 
+pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+    return keycode == ARROW_MODE ? PD_MODE_ARROW : 0;
+}
+
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
     return action == ARROW_MODE_LOCK ? &test_pd_mode_def : NULL;
 }

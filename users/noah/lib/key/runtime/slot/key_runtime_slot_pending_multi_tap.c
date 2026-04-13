@@ -22,6 +22,7 @@ static void key_runtime_slot_pending_multi_tap_clear_active_state(active_key_sta
 
 static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const active_key_state_t *slot, hold_behavior_t hold, uint16_t action, uint8_t repeat_count, uint16_t elapsed) {
     handled_key_view_t interaction = key_runtime_slot_interaction(slot);
+    noah_action_desc_t desc;
 
     if (!slot || !hold.present || repeat_count != 1 || elapsed < interaction.tap_hold_term) {
         return false;
@@ -31,7 +32,8 @@ static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const
         return false;
     }
 
-    return noah_action_hold_kind(hold.action) != NOAH_ACTION_HOLD_KIND_PRESS_ONLY;
+    desc = noah_action_describe(hold.action);
+    return !noah_action_desc_is_press_only(desc);
 }
 
 typedef enum {
@@ -181,7 +183,7 @@ static bool key_runtime_slot_pending_multi_tap_hold_elapsed(const active_key_sta
 }
 
 static bool key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(const active_key_state_t *slot, uint16_t action) {
-    return slot && is_layer_key(slot->owner.keycode) && action_dispatch_is_layer_lock(action);
+    return slot && is_layer_key(slot->owner.keycode) && noah_action_describe(action).is_layer_lock;
 }
 
 typedef enum {

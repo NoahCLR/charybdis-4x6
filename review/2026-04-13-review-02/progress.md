@@ -273,3 +273,64 @@ Next steps:
   meaning from raw keycodes
 - decide whether qmk-behavior classification should move fully into the
   descriptor once the host harness stubs are consolidated enough to support it
+
+## 2026-04-13: Recommendation 2 continued
+
+Completed in this pass:
+
+- Moved the key-runtime slot policy layer onto `noah_action_desc_t` for the
+  remaining hold-threshold and pulse decisions that still reclassified raw
+  action keycodes.
+- Moved key-runtime feedback onto the descriptor surface for held-action layer
+  and pd-mode classification instead of mixing direct raw-keycode tests with
+  the new descriptor path.
+- Moved the pending multi-tap release/scan policy checks that still depended on
+  raw action classification onto the descriptor surface too.
+- Adjusted the lightweight host harnesses so the shared inline descriptor can
+  still rely on the existing classifier seams (`layer lock`, `macro`,
+  `raw layer action`, `qmk behavior`, `pd lock`, `pd mode`) without forcing the
+  runtime tests to link the full action-dispatch module.
+- Preserved the previous VIA macro contract by keeping
+  `noah_qmk_contract_try_play_via_macro()` unconditional inside lifecycle tap
+  handling while leaving the broader descriptor migration intact.
+
+Contracts touched:
+
+- `users/noah/lib/action/action_dispatch.[ch]`
+- `users/noah/lib/action/action_lifecycle.c`
+- `users/noah/lib/key/runtime/key_runtime_feedback.c`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_policy.c`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c`
+- `tests/host/action_dispatch_test.c`
+- `tests/host/action_lifecycle_test.c`
+- `tests/host/key_runtime_feedback_test.c`
+- `tests/host/key_runtime_modifier_hold_integration_test.c`
+- `tests/host/key_runtime_preflight_test.c`
+- `tests/host/key_runtime_slot_test.c`
+- `tests/host/key_runtime_transition_test.c`
+- `tests/host/via_macro_action_lifecycle_test.c`
+
+Verification run in this pass:
+
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- decide whether to move `layer lock`, `raw layer action`, and `macro`
+  classification fully into the descriptor internals once the remaining host
+  harness stubs are consolidated enough to stop depending on those helper seams
+- continue recommendation 2 by migrating any remaining runtime helper code that
+  still consults `noah_action_hold_kind()` or direct action predicates where a
+  descriptor is now the clearer contract

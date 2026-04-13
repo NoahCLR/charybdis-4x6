@@ -178,6 +178,16 @@ bool action_dispatch_is_layer_lock(uint16_t keycode) {
     return false;
 }
 
+bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+bool action_dispatch_is_macro(uint16_t action) {
+    (void)action;
+    return false;
+}
+
 bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
     (void)action;
     return false;

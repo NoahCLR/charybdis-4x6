@@ -33,11 +33,11 @@ static void noah_emit_run(uint16_t keycode, noah_emit_tap_fn_t emit, noah_emit_p
 }
 
 bool action_dispatch_is_layer_lock(uint16_t action) {
-    return noah_action_describe(action).is_layer_lock;
+    return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
 }
 
 bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return noah_action_describe(action).is_raw_qmk_layer_action;
+    return IS_QK_TO(action) || IS_QK_MOMENTARY(action) || IS_QK_DEF_LAYER(action) || IS_QK_TOGGLE_LAYER(action) || IS_QK_ONE_SHOT_LAYER(action) || IS_QK_LAYER_TAP_TOGGLE(action) || IS_QK_LAYER_MOD(action) || IS_QK_LAYER_TAP(action);
 }
 
 bool action_dispatch_is_layer_action(uint16_t action) {
@@ -45,7 +45,7 @@ bool action_dispatch_is_layer_action(uint16_t action) {
 }
 
 bool action_dispatch_is_macro(uint16_t action) {
-    return noah_action_describe(action).is_macro;
+    return (action >= MACRO_0 && action <= MACRO_15) || IS_QK_MACRO(action);
 }
 
 bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {

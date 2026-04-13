@@ -157,9 +157,14 @@ bool is_pd_mode_lock_action(uint16_t action) {
     return action == ARROW_MODE_LOCK;
 }
 
+pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+    return keycode == ARROW_MODE ? PD_MODE_ARROW : 0;
+}
+
 static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t layer_lock   = noah_action_describe(LOCK_LAYER(2));
     noah_action_desc_t momentary    = noah_action_describe(MO(3));
+    noah_action_desc_t pd_key       = noah_action_describe(ARROW_MODE);
     noah_action_desc_t pd_lock      = noah_action_describe(ARROW_MODE_LOCK);
     noah_action_desc_t macro_action = noah_action_describe(MACRO_0);
     noah_action_desc_t custom       = noah_action_describe(NOAH_KEYMAP_SAFE_RANGE + 1);
@@ -174,6 +179,9 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(momentary.is_raw_qmk_layer_action);
     CHECK(momentary.layer == 3);
     CHECK(noah_action_desc_requires_per_key_hold(momentary));
+
+    CHECK(pd_key.pd_mode == PD_MODE_ARROW);
+    CHECK(noah_action_desc_is_pd_mode_action(pd_key));
 
     CHECK(pd_lock.is_pd_mode_lock);
     CHECK(noah_action_desc_is_press_only(pd_lock));

@@ -69,6 +69,7 @@ uint8_t key_feedback_preview_layer(void) {
 static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     uint8_t flags = 0;
     handled_key_view_t interaction;
+    noah_action_desc_t held_action_desc;
 
     if (!key_runtime_slot_active(slot)) {
         return flags;
@@ -89,9 +90,11 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     }
 
     if (slot->lifecycle.held_action_keycode != KC_NO) {
+        held_action_desc = noah_action_describe(slot->lifecycle.held_action_keycode);
+
         // Held layer and pd-mode actions do not keep a hold overlay once they
         // are active; the layer or pd-mode color itself is the feedback.
-        if (action_dispatch_is_layer_action(slot->lifecycle.held_action_keycode) || pd_mode_for_keycode(slot->lifecycle.held_action_keycode)) {
+        if (noah_action_desc_is_layer_action(held_action_desc) || noah_action_desc_is_pd_mode_action(held_action_desc)) {
             return flags;
         }
 

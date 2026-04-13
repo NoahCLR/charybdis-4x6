@@ -15,15 +15,19 @@ typedef enum {
 } key_runtime_slot_policy_hold_threshold_dispatch_t;
 
 static key_runtime_slot_policy_hold_threshold_dispatch_t key_runtime_slot_policy_hold_threshold_dispatch_kind(hold_behavior_t hold) {
+    noah_action_desc_t desc;
+
     if (!hold.present) {
         return KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_NONE;
     }
+
+    desc = noah_action_describe(hold.action);
 
     switch (hold.mode) {
         case HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD:
             return KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP;
         case HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE:
-            return noah_action_hold_kind(hold.action) == NOAH_ACTION_HOLD_KIND_PRESS_ONLY ? KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP : KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_HELD;
+            return noah_action_desc_is_press_only(desc) ? KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP : KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_HELD;
         case HOLD_BEHAVIOR_REPEAT_WHILE_HELD:
             return KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_REPEAT;
         default:
@@ -32,11 +36,13 @@ static key_runtime_slot_policy_hold_threshold_dispatch_t key_runtime_slot_policy
 }
 
 static bool key_runtime_slot_policy_hold_activation_needs_pulse(hold_behavior_t hold, bool pulse_momentary_layer_action) {
-    if (action_dispatch_is_layer_lock(hold.action)) {
+    noah_action_desc_t desc = noah_action_describe(hold.action);
+
+    if (desc.is_layer_lock) {
         return true;
     }
 
-    if (IS_QK_MOMENTARY(hold.action)) {
+    if (desc.is_owned_momentary_layer) {
         return pulse_momentary_layer_action;
     }
 

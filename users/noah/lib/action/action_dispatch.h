@@ -33,10 +33,14 @@ typedef struct {
 #define NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS ((noah_emit_policy_t){.settle_pending_fallback_holds = true, .preserve_keyboard_mod_state = true})
 
 bool action_dispatch_is_qmk_behavior_keycode(uint16_t action);
+bool action_dispatch_is_layer_lock(uint16_t action);
+bool action_dispatch_is_raw_qmk_layer_action(uint16_t action);
+bool action_dispatch_is_macro(uint16_t action);
 
 typedef struct {
     uint16_t action;
     uint8_t  layer;
+    pd_mode_mask_t pd_mode;
     bool     is_layer_lock;
     bool     is_raw_qmk_layer_action;
     bool     is_macro;
@@ -47,14 +51,18 @@ typedef struct {
 } noah_action_desc_t;
 
 static inline noah_action_desc_t noah_action_describe(uint16_t action) {
+    bool is_layer_lock = action_dispatch_is_layer_lock(action);
+    bool is_raw_qmk_layer_action = action_dispatch_is_raw_qmk_layer_action(action);
+    bool is_macro = action_dispatch_is_macro(action);
     bool is_owned_momentary_layer = IS_QK_MOMENTARY(action);
 
     return (noah_action_desc_t){
         .action                  = action,
-        .layer                   = is_owned_momentary_layer ? QK_MOMENTARY_GET_LAYER(action) : (action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT ? (uint8_t)(action - LAYER_LOCK_BASE) : UINT8_MAX),
-        .is_layer_lock           = action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT,
-        .is_raw_qmk_layer_action = IS_QK_TO(action) || is_owned_momentary_layer || IS_QK_DEF_LAYER(action) || IS_QK_TOGGLE_LAYER(action) || IS_QK_ONE_SHOT_LAYER(action) || IS_QK_LAYER_TAP_TOGGLE(action) || IS_QK_LAYER_MOD(action) || IS_QK_LAYER_TAP(action),
-        .is_macro                = (action >= MACRO_0 && action <= MACRO_15) || IS_QK_MACRO(action),
+        .layer                   = is_owned_momentary_layer ? QK_MOMENTARY_GET_LAYER(action) : (is_layer_lock && action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT ? (uint8_t)(action - LAYER_LOCK_BASE) : UINT8_MAX),
+        .pd_mode                 = pd_mode_for_keycode(action),
+        .is_layer_lock           = is_layer_lock,
+        .is_raw_qmk_layer_action = is_raw_qmk_layer_action,
+        .is_macro                = is_macro,
         .is_qmk_behavior_keycode = action_dispatch_is_qmk_behavior_keycode(action),
         .is_keymap_custom        = action >= NOAH_KEYMAP_SAFE_RANGE,
         .is_pd_mode_lock         = is_pd_mode_lock_action(action),
@@ -74,10 +82,11 @@ static inline bool noah_action_desc_requires_per_key_hold(noah_action_desc_t des
     return desc.is_owned_momentary_layer;
 }
 
-bool action_dispatch_is_layer_lock(uint16_t action);
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action);
+static inline bool noah_action_desc_is_pd_mode_action(noah_action_desc_t desc) {
+    return desc.pd_mode != 0;
+}
+
 bool action_dispatch_is_layer_action(uint16_t action);
-bool action_dispatch_is_macro(uint16_t action);
 bool action_dispatch_is_qmk_behavior_keycode(uint16_t action);
 bool action_dispatch_layer_is_locked(uint8_t layer);
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy);
