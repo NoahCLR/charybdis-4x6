@@ -56,50 +56,132 @@ static inline bool noah_action_keycode_is_qmk_behavior(uint16_t action) {
     return IS_QK_ONE_SHOT_MOD(action) || IS_QK_MOD_TAP(action);
 }
 
+typedef enum {
+    NOAH_ACTION_KIND_LITERAL = 0,
+    NOAH_ACTION_KIND_LAYER_LOCK,
+    NOAH_ACTION_KIND_LAYER_HOLD,
+    NOAH_ACTION_KIND_LAYER_TAP,
+    NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION,
+    NOAH_ACTION_KIND_MACRO,
+    NOAH_ACTION_KIND_QMK_BEHAVIOR,
+    NOAH_ACTION_KIND_KEYMAP_CUSTOM,
+    NOAH_ACTION_KIND_PD_MODE_HOLD,
+    NOAH_ACTION_KIND_PD_MODE_LOCK,
+} noah_action_kind_t;
+
+typedef enum {
+    NOAH_ACTION_CAP_PRESS_ONLY         = (1u << 0),
+    NOAH_ACTION_CAP_REQUIRES_KEY_OWNER = (1u << 1),
+    NOAH_ACTION_CAP_LAYER_AFFECTING    = (1u << 2),
+    NOAH_ACTION_CAP_PD_MODE_AFFECTING  = (1u << 3),
+} noah_action_cap_t;
+
 typedef struct {
-    uint16_t action;
-    uint8_t  layer;
+    noah_action_kind_t kind;
+    uint16_t           action;
+    uint16_t           caps;
+    uint8_t            layer;
     pd_mode_mask_t pd_mode;
-    bool     is_layer_lock;
-    bool     is_raw_qmk_layer_action;
-    bool     is_layer_tap;
-    bool     is_macro;
-    bool     is_qmk_behavior_keycode;
-    bool     is_keymap_custom;
-    bool     is_pd_mode_lock;
-    bool     is_owned_momentary_layer;
 } noah_action_desc_t;
 
 static inline noah_action_desc_t noah_action_describe(uint16_t action) {
-    bool is_layer_lock           = noah_action_keycode_is_layer_lock(action);
+    bool is_layer_lock            = noah_action_keycode_is_layer_lock(action);
     bool is_owned_momentary_layer = noah_action_keycode_is_owned_momentary_layer(action);
-    bool is_layer_tap            = noah_action_keycode_is_layer_tap(action);
+    bool is_layer_tap             = noah_action_keycode_is_layer_tap(action);
+    bool is_macro                 = noah_action_keycode_is_macro(action);
+    bool is_qmk_behavior          = noah_action_keycode_is_qmk_behavior(action);
+    bool is_keymap_custom         = action >= NOAH_KEYMAP_SAFE_RANGE;
+    bool is_pd_mode_lock          = is_pd_mode_lock_action(action);
+    pd_mode_mask_t pd_mode        = pd_mode_for_keycode(action);
+    noah_action_kind_t kind       = NOAH_ACTION_KIND_LITERAL;
+    uint16_t           caps       = 0;
+    uint8_t            layer      = UINT8_MAX;
+
+    if (is_layer_lock) {
+        kind  = NOAH_ACTION_KIND_LAYER_LOCK;
+        caps |= NOAH_ACTION_CAP_PRESS_ONLY | NOAH_ACTION_CAP_LAYER_AFFECTING;
+        layer = (uint8_t)(action - LAYER_LOCK_BASE);
+    } else if (is_owned_momentary_layer) {
+        kind  = NOAH_ACTION_KIND_LAYER_HOLD;
+        caps |= NOAH_ACTION_CAP_REQUIRES_KEY_OWNER | NOAH_ACTION_CAP_LAYER_AFFECTING;
+        layer = QK_MOMENTARY_GET_LAYER(action);
+    } else if (is_layer_tap) {
+        kind  = NOAH_ACTION_KIND_LAYER_TAP;
+        caps |= NOAH_ACTION_CAP_LAYER_AFFECTING;
+        layer = QK_LAYER_TAP_GET_LAYER(action);
+    } else if (noah_action_keycode_is_raw_qmk_layer_action(action)) {
+        kind = NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION;
+        caps |= NOAH_ACTION_CAP_LAYER_AFFECTING;
+    } else if (is_pd_mode_lock) {
+        kind = NOAH_ACTION_KIND_PD_MODE_LOCK;
+        caps |= NOAH_ACTION_CAP_PRESS_ONLY | NOAH_ACTION_CAP_PD_MODE_AFFECTING;
+    } else if (pd_mode != 0) {
+        kind = NOAH_ACTION_KIND_PD_MODE_HOLD;
+        caps |= NOAH_ACTION_CAP_PD_MODE_AFFECTING;
+    } else if (is_macro) {
+        kind = NOAH_ACTION_KIND_MACRO;
+        caps |= NOAH_ACTION_CAP_PRESS_ONLY;
+    } else if (is_qmk_behavior) {
+        kind = NOAH_ACTION_KIND_QMK_BEHAVIOR;
+    } else if (is_keymap_custom) {
+        kind = NOAH_ACTION_KIND_KEYMAP_CUSTOM;
+    }
 
     return (noah_action_desc_t){
-        .action                   = action,
-        .layer                    = is_owned_momentary_layer ? QK_MOMENTARY_GET_LAYER(action) : (is_layer_tap ? QK_LAYER_TAP_GET_LAYER(action) : (is_layer_lock ? (uint8_t)(action - LAYER_LOCK_BASE) : UINT8_MAX)),
-        .pd_mode                  = pd_mode_for_keycode(action),
-        .is_layer_lock            = is_layer_lock,
-        .is_raw_qmk_layer_action  = noah_action_keycode_is_raw_qmk_layer_action(action),
-        .is_layer_tap             = is_layer_tap,
-        .is_macro                 = noah_action_keycode_is_macro(action),
-        .is_qmk_behavior_keycode  = noah_action_keycode_is_qmk_behavior(action),
-        .is_keymap_custom         = action >= NOAH_KEYMAP_SAFE_RANGE,
-        .is_pd_mode_lock          = is_pd_mode_lock_action(action),
-        .is_owned_momentary_layer = is_owned_momentary_layer,
+        .kind   = kind,
+        .action = action,
+        .caps   = caps,
+        .layer  = layer,
+        .pd_mode = pd_mode,
     };
 }
 
+static inline bool noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability) {
+    return (desc.caps & (uint16_t)capability) != 0;
+}
+
+static inline bool noah_action_desc_is_layer_lock(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_LAYER_LOCK;
+}
+
+static inline bool noah_action_desc_is_owned_momentary_layer(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_LAYER_HOLD;
+}
+
+static inline bool noah_action_desc_is_layer_tap(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_LAYER_TAP;
+}
+
+static inline bool noah_action_desc_is_raw_qmk_layer_action(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_LAYER_HOLD || desc.kind == NOAH_ACTION_KIND_LAYER_TAP || desc.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION;
+}
+
+static inline bool noah_action_desc_is_macro(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_MACRO;
+}
+
+static inline bool noah_action_desc_is_qmk_behavior_keycode(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_QMK_BEHAVIOR;
+}
+
+static inline bool noah_action_desc_is_keymap_custom(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_KEYMAP_CUSTOM;
+}
+
+static inline bool noah_action_desc_is_pd_mode_lock(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_PD_MODE_LOCK;
+}
+
 static inline bool noah_action_desc_is_layer_action(noah_action_desc_t desc) {
-    return desc.is_layer_lock || desc.is_raw_qmk_layer_action;
+    return noah_action_desc_has_capability(desc, NOAH_ACTION_CAP_LAYER_AFFECTING);
 }
 
 static inline bool noah_action_desc_is_press_only(noah_action_desc_t desc) {
-    return desc.is_layer_lock || desc.is_pd_mode_lock || desc.is_macro;
+    return noah_action_desc_has_capability(desc, NOAH_ACTION_CAP_PRESS_ONLY);
 }
 
 static inline bool noah_action_desc_requires_per_key_hold(noah_action_desc_t desc) {
-    return desc.is_owned_momentary_layer;
+    return noah_action_desc_has_capability(desc, NOAH_ACTION_CAP_REQUIRES_KEY_OWNER);
 }
 
 static inline bool noah_action_desc_requires_owned_dispatch(noah_action_desc_t desc) {
@@ -111,7 +193,7 @@ static inline bool noah_action_desc_uses_shared_hold(noah_action_desc_t desc) {
 }
 
 static inline bool noah_action_desc_is_pd_mode_action(noah_action_desc_t desc) {
-    return desc.pd_mode != 0;
+    return noah_action_desc_has_capability(desc, NOAH_ACTION_CAP_PD_MODE_AFFECTING);
 }
 
 bool action_dispatch_layer_is_locked(uint8_t layer);

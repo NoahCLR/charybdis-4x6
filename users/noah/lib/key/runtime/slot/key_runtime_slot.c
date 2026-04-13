@@ -89,18 +89,6 @@ bool key_runtime_slot_owns_key_position(const active_key_state_t *slot, keypos_t
     return (key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) || (key_runtime_slot_has_pending_multi_tap(slot) && key_runtime_keypos_equal(slot->pending_multi_tap.key_pos, key_pos));
 }
 
-static uint8_t key_runtime_slot_preview_layer_from_binding(hold_behavior_t hold, key_runtime_slot_hold_strategy_t hold_strategy) {
-    if (hold_strategy != KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT) {
-        return UINT8_MAX;
-    }
-
-    if (!hold.present || hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || !IS_QK_MOMENTARY(hold.action)) {
-        return UINT8_MAX;
-    }
-
-    return QK_MOMENTARY_GET_LAYER(hold.action);
-}
-
 handled_key_view_t key_runtime_slot_interaction(const active_key_state_t *slot) {
     if (!slot) {
         return (handled_key_view_t){
@@ -115,14 +103,14 @@ handled_key_view_t key_runtime_slot_interaction(const active_key_state_t *slot) 
 }
 
 uint8_t key_runtime_slot_preview_layer_hint(const active_key_state_t *slot) {
-    handled_key_view_t interaction;
+    handled_key_interaction_policy_t policy;
 
     if (!slot) {
         return UINT8_MAX;
     }
 
-    interaction = key_runtime_slot_interaction(slot);
-    return key_runtime_slot_preview_layer_from_binding(interaction.hold, interaction.hold_strategy);
+    policy = handled_key_resolve_policy(key_runtime_slot_interaction(slot));
+    return policy.hold.preview_layer;
 }
 
 bool key_runtime_slot_has_pending_multi_tap(const active_key_state_t *slot) {

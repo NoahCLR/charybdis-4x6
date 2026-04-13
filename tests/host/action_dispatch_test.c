@@ -173,43 +173,48 @@ static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t custom       = noah_action_describe(NOAH_KEYMAP_SAFE_RANGE + 1);
     noah_action_desc_t literal      = noah_action_describe(KC_C);
 
-    CHECK(layer_lock.is_layer_lock);
+    CHECK(layer_lock.kind == NOAH_ACTION_KIND_LAYER_LOCK);
     CHECK(layer_lock.layer == 2);
+    CHECK(noah_action_desc_has_capability(layer_lock, NOAH_ACTION_CAP_LAYER_AFFECTING));
     CHECK(noah_action_desc_is_press_only(layer_lock));
     CHECK(noah_action_desc_is_layer_action(layer_lock));
 
-    CHECK(momentary.is_owned_momentary_layer);
-    CHECK(momentary.is_raw_qmk_layer_action);
+    CHECK(momentary.kind == NOAH_ACTION_KIND_LAYER_HOLD);
+    CHECK(noah_action_desc_is_raw_qmk_layer_action(momentary));
     CHECK(momentary.layer == 3);
     CHECK(noah_action_desc_requires_per_key_hold(momentary));
 
-    CHECK(layer_tap.is_layer_tap);
-    CHECK(layer_tap.is_raw_qmk_layer_action);
+    CHECK(layer_tap.kind == NOAH_ACTION_KIND_LAYER_TAP);
+    CHECK(noah_action_desc_is_raw_qmk_layer_action(layer_tap));
     CHECK(layer_tap.layer == 4);
-    CHECK(!layer_tap.is_owned_momentary_layer);
+    CHECK(!noah_action_desc_is_owned_momentary_layer(layer_tap));
 
-    CHECK(layer_jump.is_raw_qmk_layer_action);
-    CHECK(!layer_jump.is_owned_momentary_layer);
-    CHECK(!layer_jump.is_layer_tap);
+    CHECK(layer_jump.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
+    CHECK(noah_action_desc_is_raw_qmk_layer_action(layer_jump));
+    CHECK(!noah_action_desc_is_owned_momentary_layer(layer_jump));
+    CHECK(!noah_action_desc_is_layer_tap(layer_jump));
 
-    CHECK(qmk_behavior.is_qmk_behavior_keycode);
-    CHECK(!qmk_behavior.is_raw_qmk_layer_action);
+    CHECK(qmk_behavior.kind == NOAH_ACTION_KIND_QMK_BEHAVIOR);
+    CHECK(!noah_action_desc_is_raw_qmk_layer_action(qmk_behavior));
 
     CHECK(pd_key.pd_mode == PD_MODE_ARROW);
+    CHECK(pd_key.kind == NOAH_ACTION_KIND_PD_MODE_HOLD);
     CHECK(noah_action_desc_is_pd_mode_action(pd_key));
 
-    CHECK(pd_lock.is_pd_mode_lock);
+    CHECK(pd_lock.kind == NOAH_ACTION_KIND_PD_MODE_LOCK);
     CHECK(noah_action_desc_is_press_only(pd_lock));
+    CHECK(noah_action_desc_has_capability(pd_lock, NOAH_ACTION_CAP_PD_MODE_AFFECTING));
 
-    CHECK(macro_action.is_macro);
+    CHECK(macro_action.kind == NOAH_ACTION_KIND_MACRO);
     CHECK(noah_action_desc_is_press_only(macro_action));
 
-    CHECK(custom.is_keymap_custom);
+    CHECK(custom.kind == NOAH_ACTION_KIND_KEYMAP_CUSTOM);
 
-    CHECK(!literal.is_layer_lock);
-    CHECK(!literal.is_raw_qmk_layer_action);
-    CHECK(!literal.is_macro);
-    CHECK(!literal.is_keymap_custom);
+    CHECK(literal.kind == NOAH_ACTION_KIND_LITERAL);
+    CHECK(!noah_action_desc_is_layer_lock(literal));
+    CHECK(!noah_action_desc_is_raw_qmk_layer_action(literal));
+    CHECK(!noah_action_desc_is_macro(literal));
+    CHECK(!noah_action_desc_is_keymap_custom(literal));
 }
 
 static void test_action_dispatch_keeps_runtime_default_policy(void) {

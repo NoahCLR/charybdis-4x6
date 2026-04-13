@@ -64,7 +64,7 @@ static bool handled_key_uses_fallback_hold_behavior(key_behavior_view_t behavior
     }
 
     desc = noah_action_describe(behavior.keycode);
-    if (desc.is_qmk_behavior_keycode) {
+    if (noah_action_desc_is_qmk_behavior_keycode(desc)) {
         return false;
     }
 

@@ -216,7 +216,7 @@ static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior)
     bool               implicit = mode != 0;
     bool               fallback = false;
 
-    if (!behavior.is_momentary_layer && behavior.keycode < SAFE_RANGE && !desc.is_qmk_behavior_keycode && !behavior.single.hold.present && !behavior.single.long_hold.present) {
+    if (!behavior.is_momentary_layer && behavior.keycode < SAFE_RANGE && !noah_action_desc_is_qmk_behavior_keycode(desc) && !behavior.single.hold.present && !behavior.single.long_hold.present) {
         fallback = behavior.single.tap.present || behavior.has_multi_tap;
     }
 

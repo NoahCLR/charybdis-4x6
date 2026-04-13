@@ -14,35 +14,28 @@ typedef enum {
     KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_REPEAT,
 } key_runtime_slot_policy_hold_threshold_dispatch_t;
 
-static key_runtime_slot_policy_hold_threshold_dispatch_t key_runtime_slot_policy_hold_threshold_dispatch_kind(hold_behavior_t hold) {
-    noah_action_desc_t desc;
-
-    if (!hold.present) {
-        return KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_NONE;
-    }
-
-    desc = noah_action_describe(hold.action);
-
-    switch (hold.mode) {
-        case HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD:
+static key_runtime_slot_policy_hold_threshold_dispatch_t key_runtime_slot_policy_hold_threshold_dispatch_kind(handled_key_hold_contract_t contract) {
+    switch (contract.threshold) {
+        case HANDLED_KEY_HOLD_THRESHOLD_DISPATCH:
             return KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP;
-        case HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE:
-            return noah_action_desc_is_press_only(desc) ? KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP : KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_HELD;
-        case HOLD_BEHAVIOR_REPEAT_WHILE_HELD:
+        case HANDLED_KEY_HOLD_THRESHOLD_REGISTER_HELD:
+            return KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_HELD;
+        case HANDLED_KEY_HOLD_THRESHOLD_REPEAT:
             return KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_REPEAT;
+        case HANDLED_KEY_HOLD_THRESHOLD_NONE:
         default:
             return KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_NONE;
     }
 }
 
-static bool key_runtime_slot_policy_hold_activation_needs_pulse(hold_behavior_t hold, bool pulse_momentary_layer_action) {
+static bool key_runtime_slot_policy_hold_activation_needs_pulse(hold_behavior_t hold, handled_key_hold_contract_t contract, bool pulse_momentary_layer_action) {
     noah_action_desc_t desc = noah_action_describe(hold.action);
 
-    if (desc.is_layer_lock) {
+    if (contract.threshold == HANDLED_KEY_HOLD_THRESHOLD_DISPATCH) {
         return true;
     }
 
-    if (desc.is_owned_momentary_layer) {
+    if (noah_action_desc_is_owned_momentary_layer(desc)) {
         return pulse_momentary_layer_action;
     }
 
@@ -134,34 +127,34 @@ key_runtime_effect_builder_t key_runtime_slot_policy_take_flush(active_key_state
     return builder;
 }
 
-key_runtime_effect_builder_t key_runtime_slot_policy_fire_hold_at_threshold(active_key_state_t *slot, hold_behavior_t hold, hold_behavior_t long_hold, bool pulse_momentary_layer_action) {
+key_runtime_effect_builder_t key_runtime_slot_policy_fire_hold_at_threshold(active_key_state_t *slot, hold_behavior_t hold, handled_key_hold_contract_t contract, bool completes_hold, bool pulse_momentary_layer_action) {
     key_runtime_effect_builder_t builder = {0};
 
     if (!slot) {
         return builder;
     }
 
-    switch (key_runtime_slot_policy_hold_threshold_dispatch_kind(hold)) {
+    switch (key_runtime_slot_policy_hold_threshold_dispatch_kind(contract)) {
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP:
             key_runtime_slot_policy_clear_owned_hold(slot, &builder);
             builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
             builder.action                   = hold.action;
             builder.feedback_pulse           = true;
             builder.feedback_long_hold_level = false;
-            key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
+            key_runtime_slot_commit_hold_phase(slot, completes_hold);
             return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_HELD:
             slot->lifecycle.held_action_keycode = hold.action;
-            key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
+            key_runtime_slot_commit_hold_phase(slot, completes_hold);
             builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
             builder.action                   = hold.action;
-            builder.feedback_pulse           = key_runtime_slot_policy_hold_activation_needs_pulse(hold, pulse_momentary_layer_action);
+            builder.feedback_pulse           = key_runtime_slot_policy_hold_activation_needs_pulse(hold, contract, pulse_momentary_layer_action);
             builder.feedback_long_hold_level = false;
             return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_REPEAT:
             key_runtime_slot_policy_clear_owned_hold(slot, &builder);
             slot->lifecycle.repeat_binding_active = true;
-            key_runtime_slot_commit_hold_phase(slot, !long_hold.present);
+            key_runtime_slot_commit_hold_phase(slot, completes_hold);
             builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_REPEAT_START;
             builder.action                   = hold.action;
             builder.repeat_hz                = hold.repeat_hz;
@@ -174,7 +167,7 @@ key_runtime_effect_builder_t key_runtime_slot_policy_fire_hold_at_threshold(acti
     }
 }
 
-key_runtime_effect_builder_t key_runtime_slot_policy_promote_to_long_hold(active_key_state_t *slot, hold_behavior_t long_hold, bool pulse_momentary_layer_action) {
+key_runtime_effect_builder_t key_runtime_slot_policy_promote_to_long_hold(active_key_state_t *slot, hold_behavior_t long_hold, handled_key_hold_contract_t contract, bool pulse_momentary_layer_action) {
     key_runtime_effect_builder_t builder = {0};
 
     if (!slot) {
@@ -183,7 +176,7 @@ key_runtime_effect_builder_t key_runtime_slot_policy_promote_to_long_hold(active
 
     key_runtime_slot_policy_clear_owned_hold(slot, &builder);
 
-    switch (key_runtime_slot_policy_hold_threshold_dispatch_kind(long_hold)) {
+    switch (key_runtime_slot_policy_hold_threshold_dispatch_kind(contract)) {
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_TAP:
             key_runtime_slot_commit_hold_phase(slot, true);
             builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
@@ -196,7 +189,7 @@ key_runtime_effect_builder_t key_runtime_slot_policy_promote_to_long_hold(active
             key_runtime_slot_commit_hold_phase(slot, true);
             builder.kind                     = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
             builder.action                   = long_hold.action;
-            builder.feedback_pulse           = key_runtime_slot_policy_hold_activation_needs_pulse(long_hold, pulse_momentary_layer_action);
+            builder.feedback_pulse           = key_runtime_slot_policy_hold_activation_needs_pulse(long_hold, contract, pulse_momentary_layer_action);
             builder.feedback_long_hold_level = true;
             return builder;
         case KEY_RUNTIME_SLOT_POLICY_HOLD_THRESHOLD_DISPATCH_REPEAT:

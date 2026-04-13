@@ -20,9 +20,8 @@ static void key_runtime_slot_pending_multi_tap_clear_active_state(active_key_sta
     slot->pending_multi_tap       = pending_multi_tap;
 }
 
-static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const active_key_state_t *slot, hold_behavior_t hold, uint16_t action, uint8_t repeat_count, uint16_t elapsed) {
+static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const active_key_state_t *slot, handled_key_hold_contract_t contract, hold_behavior_t hold, uint16_t action, uint8_t repeat_count, uint16_t elapsed) {
     handled_key_view_t interaction = key_runtime_slot_interaction(slot);
-    noah_action_desc_t desc;
 
     if (!slot || !hold.present || repeat_count != 1 || elapsed < interaction.tap_hold_term) {
         return false;
@@ -32,8 +31,7 @@ static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const
         return false;
     }
 
-    desc = noah_action_describe(hold.action);
-    return !noah_action_desc_is_press_only(desc);
+    return contract.release_uses_held_lifecycle;
 }
 
 typedef enum {
@@ -52,6 +50,7 @@ typedef struct {
     delayed_action_mods_t mods;
     hold_behavior_t       hold;
     hold_behavior_t       long_hold;
+    handled_key_interaction_policy_t policy;
     uint16_t              action;
     uint8_t               repeat_count;
     bool                  matched;
@@ -88,12 +87,13 @@ static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pen
     context.mods      = delayed_action_mods_from_multi_tap(slot_multi_tap);
     context.hold      = interaction.hold;
     context.long_hold = interaction.long_hold;
+    context.policy    = handled_key_resolve_policy(interaction);
     context.action    = key_runtime_slot_resolve_pending_multi_tap_hold(slot, &context.repeat_count);
     context.matched   = true;
 
-    if (!context.hold.present && hold_sends_on_release(context.long_hold) && elapsed >= interaction.longer_hold_term) {
+    if (!context.hold.present && context.policy.long_hold.dispatches_on_release && elapsed >= interaction.longer_hold_term) {
         context.action = context.long_hold.action;
-    } else if (hold_sends_on_release(context.hold) && context.repeat_count == 1 && context.action == context.hold.action) {
+    } else if (context.policy.hold.dispatches_on_release && context.repeat_count == 1 && context.action == context.hold.action) {
         context.action = key_runtime_slot_policy_select_release_hold_action(elapsed, context.hold.action, context.long_hold, interaction.longer_hold_term);
     }
 
@@ -109,7 +109,7 @@ static key_runtime_slot_pending_multi_tap_release_resolution_t key_runtime_slot_
         return (key_runtime_slot_pending_multi_tap_release_resolution_t){0};
     }
 
-    if (key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(context->slot, context->hold, context->action, context->repeat_count, context->elapsed)) {
+    if (key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(context->slot, context->policy.hold, context->hold, context->action, context->repeat_count, context->elapsed)) {
         return (key_runtime_slot_pending_multi_tap_release_resolution_t){
             .outcome = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
             .action  = context->action,
@@ -177,13 +177,14 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(acti
 }
 
 static bool key_runtime_slot_pending_multi_tap_hold_elapsed(const active_key_state_t *slot, uint16_t elapsed) {
-    handled_key_view_t interaction = key_runtime_slot_interaction(slot);
+    handled_key_view_t               interaction = key_runtime_slot_interaction(slot);
+    handled_key_interaction_policy_t policy      = handled_key_resolve_policy(interaction);
 
-    return slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && hold_fires_at_threshold(interaction.hold) && elapsed >= interaction.tap_hold_term;
+    return slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && handled_key_hold_contract_fires_at_threshold(policy.hold) && elapsed >= interaction.tap_hold_term;
 }
 
 static bool key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(const active_key_state_t *slot, uint16_t action) {
-    return slot && is_layer_key(slot->owner.keycode) && noah_action_describe(action).is_layer_lock;
+    return slot && is_layer_key(slot->owner.keycode) && noah_action_desc_is_layer_lock(noah_action_describe(action));
 }
 
 typedef enum {
@@ -200,18 +201,20 @@ typedef struct {
 
 static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pending_multi_tap_scan_resolve(active_key_state_t *slot, uint16_t elapsed) {
     key_runtime_slot_pending_multi_tap_scan_resolution_t resolution = {0};
-    handled_key_view_t                                   interaction;
+    handled_key_view_t               interaction;
+    handled_key_interaction_policy_t policy;
 
     if (!slot) {
         return resolution;
     }
 
     interaction = key_runtime_slot_interaction(slot);
+    policy      = handled_key_resolve_policy(interaction);
 
-    if (hold_fires_at_threshold(interaction.long_hold) && elapsed >= interaction.longer_hold_term) {
+    if (handled_key_hold_contract_fires_at_threshold(policy.long_hold) && elapsed >= interaction.longer_hold_term) {
         resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD;
         resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, interaction.long_hold.action);
-        resolution.effect_builder              = key_runtime_slot_policy_promote_to_long_hold(slot, interaction.long_hold, true);
+        resolution.effect_builder              = key_runtime_slot_policy_promote_to_long_hold(slot, interaction.long_hold, policy.long_hold, true);
         return resolution;
     }
 
@@ -221,7 +224,7 @@ static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pen
 
     resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD;
     resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, interaction.hold.action);
-    resolution.effect_builder              = key_runtime_slot_policy_fire_hold_at_threshold(slot, interaction.hold, interaction.long_hold, true);
+    resolution.effect_builder              = key_runtime_slot_policy_fire_hold_at_threshold(slot, interaction.hold, policy.hold, !interaction.long_hold.present, true);
     return resolution;
 }
 

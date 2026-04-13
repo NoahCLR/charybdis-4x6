@@ -55,6 +55,20 @@ static uint8_t key_feedback_preview_layer_for_slot(const active_key_state_t *slo
     return key_runtime_slot_preview_layer_hint(slot);
 }
 
+static handled_key_hold_contract_t key_feedback_registered_hold_contract(handled_key_view_t interaction, handled_key_interaction_policy_t policy, uint16_t held_action, bool long_hold_reached) {
+    if (long_hold_reached && interaction.long_hold.present && held_action == interaction.long_hold.action) {
+        return policy.long_hold;
+    }
+
+    if (interaction.hold.present && held_action == interaction.hold.action) {
+        return policy.hold;
+    }
+
+    return (handled_key_hold_contract_t){
+        .keeps_registered_feedback = handled_key_hold_action_keeps_registered_feedback(noah_action_describe(held_action)),
+    };
+}
+
 uint8_t key_feedback_preview_layer(void) {
     for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
         uint8_t layer = key_feedback_preview_layer_for_slot(key_runtime_slot_at(index));
@@ -68,14 +82,15 @@ uint8_t key_feedback_preview_layer(void) {
 
 static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     uint8_t flags = 0;
-    handled_key_view_t interaction;
-    noah_action_desc_t held_action_desc;
+    handled_key_view_t               interaction;
+    handled_key_interaction_policy_t policy;
 
     if (!key_runtime_slot_active(slot)) {
         return flags;
     }
 
     interaction = key_runtime_slot_interaction(slot);
+    policy = handled_key_resolve_policy(interaction);
     uint16_t elapsed           = timer_elapsed(slot->timer);
     bool     long_hold_reached = interaction.long_hold.present && elapsed >= interaction.longer_hold_term;
 
@@ -90,11 +105,11 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     }
 
     if (slot->lifecycle.held_action_keycode != KC_NO) {
-        held_action_desc = noah_action_describe(slot->lifecycle.held_action_keycode);
+        handled_key_hold_contract_t active_contract = key_feedback_registered_hold_contract(interaction, policy, slot->lifecycle.held_action_keycode, long_hold_reached);
 
         // Held layer and pd-mode actions do not keep a hold overlay once they
         // are active; the layer or pd-mode color itself is the feedback.
-        if (noah_action_desc_is_layer_action(held_action_desc) || noah_action_desc_is_pd_mode_action(held_action_desc)) {
+        if (!active_contract.keeps_registered_feedback) {
             return flags;
         }
 
@@ -125,7 +140,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
         return flags;
     }
 
-    if (long_hold_reached && hold_sends_on_release(interaction.long_hold)) {
+    if (long_hold_reached && policy.long_hold.keeps_pending_feedback) {
         // TAP_ON_RELEASE_AFTER_HOLD keeps feedback visible because the action
         // is still pending until release.
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
@@ -142,7 +157,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     // not keep a hold color latched after the threshold. Only an authored
     // normal hold tier keeps the pending hold color before it resolves;
     // long-hold-only surfaces stay quiet until the long-hold tier commits.
-    if (key_runtime_slot_allows_tap_release(slot) && elapsed >= interaction.tap_hold_term && interaction.hold.present) {
+    if (key_runtime_slot_allows_tap_release(slot) && elapsed >= interaction.tap_hold_term && (handled_key_hold_contract_fires_at_threshold(policy.hold) || policy.hold.keeps_pending_feedback)) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
     }
 

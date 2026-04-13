@@ -46,11 +46,11 @@ static bool key_behavior_has_multi_tap_in_config(const key_behavior_t *config) {
 static bool key_behavior_keycode_supported(uint16_t keycode) {
     noah_action_desc_t desc = noah_action_describe(keycode);
 
-    if (!desc.is_raw_qmk_layer_action) {
+    if (!noah_action_desc_is_raw_qmk_layer_action(desc)) {
         return true;
     }
 
-    return desc.is_owned_momentary_layer || desc.is_layer_tap;
+    return noah_action_desc_is_owned_momentary_layer(desc) || noah_action_desc_is_layer_tap(desc);
 }
 
 static bool key_behavior_action_supported(uint16_t action, hold_behavior_mode_t hold_mode) {
@@ -60,11 +60,11 @@ static bool key_behavior_action_supported(uint16_t action, hold_behavior_mode_t 
     // rejects raw QMK layer actions here, because layer ownership is the one
     // area where bypassing userspace is always incorrect. Held QK_MODS actions
     // remain supported and are decomposed by the shared owned_keycode.c helper.
-    if (!desc.is_raw_qmk_layer_action) {
+    if (!noah_action_desc_is_raw_qmk_layer_action(desc)) {
         return true;
     }
 
-    return desc.is_owned_momentary_layer && hold_mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE;
+    return noah_action_desc_is_owned_momentary_layer(desc) && hold_mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE;
 }
 
 static void key_behavior_log_invalid_keycode(uint8_t index, uint16_t keycode) {
@@ -129,7 +129,7 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     const key_behavior_t *config    = key_behavior_config_lookup(keycode);
     noah_action_desc_t    desc      = noah_action_describe(keycode);
-    bool                  custom_lt = desc.is_layer_tap && config;
+    bool                  custom_lt = noah_action_desc_is_layer_tap(desc) && config;
 
     uint16_t tap_term = CUSTOM_TAP_HOLD_TERM;
     if (config && config->tap_hold_term) {
@@ -144,8 +144,8 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .config             = config,
         .keycode            = keycode,
-        .handled            = config || desc.is_owned_momentary_layer || noah_action_desc_is_pd_mode_action(desc),
-        .is_momentary_layer = desc.is_owned_momentary_layer || custom_lt,
+        .handled            = config || noah_action_desc_is_owned_momentary_layer(desc) || desc.pd_mode != 0,
+        .is_momentary_layer = noah_action_desc_is_owned_momentary_layer(desc) || custom_lt,
         .is_layer_tap       = custom_lt,
         .has_multi_tap      = key_behavior_has_multi_tap_in_config(config),
         .tap_hold_term      = tap_term,

@@ -11,6 +11,7 @@ enum {
     TEST_AUTHORED_LAYER_TAP = LT(2, TEST_LAYER_TAP_KEY),
     TEST_BARE_LAYER_TAP     = LT(3, TEST_LAYER_TAP_KEY),
     TEST_PD_MODE_KEY        = SAFE_RANGE + 0x0Fu,
+    TEST_PD_MODE_LOCK_KEY   = SAFE_RANGE + 0x11u,
     TEST_TAP_ACTION         = SAFE_RANGE + 0x10,
 };
 
@@ -43,8 +44,7 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
 }
 
 bool is_pd_mode_lock_action(uint16_t action) {
-    (void)action;
-    return false;
+    return action == TEST_PD_MODE_LOCK_KEY;
 }
 
 static void test_bare_lt_falls_back_to_qmk(void) {
@@ -87,6 +87,14 @@ static void test_plain_pd_mode_key_is_handled_without_authored_behavior(void) {
     CHECK(!behavior.single.long_hold.present);
 }
 
+static void test_pd_mode_lock_stays_out_of_handled_key_runtime(void) {
+    key_behavior_view_t behavior = key_behavior_lookup(TEST_PD_MODE_LOCK_KEY);
+
+    CHECK(!behavior.handled);
+    CHECK(!behavior.is_momentary_layer);
+    CHECK(!behavior.is_layer_tap);
+}
+
 static void test_repeat_rate_validation_helper_enforces_supported_range(void) {
     CHECK(!hold_repeat_rate_valid(0));
     CHECK(hold_repeat_rate_valid(1));
@@ -99,6 +107,7 @@ int main(void) {
     test_authored_lt_uses_custom_runtime();
     test_momentary_layer_stays_handled();
     test_plain_pd_mode_key_is_handled_without_authored_behavior();
+    test_pd_mode_lock_stays_out_of_handled_key_runtime();
     test_repeat_rate_validation_helper_enforces_supported_range();
 
     puts("key_behavior_lookup host tests passed");

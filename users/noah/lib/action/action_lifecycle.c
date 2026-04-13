@@ -29,12 +29,12 @@ static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
 }
 
 static bool noah_action_handle_one_shot_press(noah_action_desc_t desc) {
-    if (desc.is_layer_lock) {
+    if (noah_action_desc_is_layer_lock(desc)) {
         layer_ownership_toggle_lock_state(desc.layer);
         return true;
     }
 
-    if (desc.is_pd_mode_lock) {
+    if (noah_action_desc_is_pd_mode_lock(desc)) {
         const pd_mode_def_t *def = pd_mode_lock_action_lookup(desc.action);
         if (def && pd_mode_toggle_lock_state(def->mode_flag)) {
             split_runtime_sync();
@@ -56,17 +56,17 @@ void noah_action_tap(uint16_t action) {
         return;
     }
 
-    if (desc.is_raw_qmk_layer_action) {
+    if (noah_action_desc_is_raw_qmk_layer_action(desc)) {
         noah_action_log_unsupported_layer_action(desc);
         return;
     }
 
-    if (desc.is_keymap_custom) {
+    if (noah_action_desc_is_keymap_custom(desc)) {
         noah_dispatch_synthetic_tap(action);
         return;
     }
 
-    if (desc.is_qmk_behavior_keycode) {
+    if (noah_action_desc_is_qmk_behavior_keycode(desc)) {
         noah_dispatch_synthetic_qmk_tap(action);
         return;
     }
@@ -87,22 +87,22 @@ void noah_action_press(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    if (desc.is_owned_momentary_layer) {
+    if (noah_action_desc_is_owned_momentary_layer(desc)) {
         layer_ownership_momentary_press(key_pos, desc.layer);
         return;
     }
 
-    if (desc.is_raw_qmk_layer_action) {
+    if (noah_action_desc_is_raw_qmk_layer_action(desc)) {
         noah_action_log_unsupported_layer_action(desc);
         return;
     }
 
-    if (desc.is_qmk_behavior_keycode) {
+    if (noah_action_desc_is_qmk_behavior_keycode(desc)) {
         noah_dispatch_synthetic_qmk_record(action, true, 0);
         return;
     }
 
-    if (desc.is_keymap_custom) {
+    if (noah_action_desc_is_keymap_custom(desc)) {
         noah_dispatch_synthetic_record(action, true);
         return;
     }
@@ -128,22 +128,22 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    if (desc.is_owned_momentary_layer) {
+    if (noah_action_desc_is_owned_momentary_layer(desc)) {
         layer_ownership_momentary_release(key_pos);
         return;
     }
 
-    if (desc.is_raw_qmk_layer_action) {
+    if (noah_action_desc_is_raw_qmk_layer_action(desc)) {
         noah_action_log_unsupported_layer_action(desc);
         return;
     }
 
-    if (desc.is_qmk_behavior_keycode) {
+    if (noah_action_desc_is_qmk_behavior_keycode(desc)) {
         noah_dispatch_synthetic_qmk_record(action, false, 0);
         return;
     }
 
-    if (desc.is_keymap_custom) {
+    if (noah_action_desc_is_keymap_custom(desc)) {
         noah_dispatch_synthetic_record(action, false);
         return;
     }

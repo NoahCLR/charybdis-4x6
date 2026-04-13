@@ -332,7 +332,7 @@ bool action_dispatch_layer_is_locked(uint8_t layer) {
 void action_dispatch(uint16_t action) {
     noah_action_desc_t desc = noah_action_describe(action);
 
-    if (desc.is_layer_lock) {
+    if (noah_action_desc_is_layer_lock(desc)) {
         key_runtime_scenario_locked_layers ^= (layer_state_t)1u << desc.layer;
     }
 
