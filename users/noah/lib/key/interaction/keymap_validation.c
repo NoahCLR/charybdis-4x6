@@ -14,13 +14,7 @@
 #include "keymap_validation.h"
 
 static bool keymap_layer_action_supported(uint16_t keycode) {
-    noah_action_desc_t desc = noah_action_describe(keycode);
-
-    if (!noah_action_desc_is_raw_qmk_layer_action(desc)) {
-        return true;
-    }
-
-    return noah_action_desc_is_owned_momentary_layer(desc) || noah_action_desc_is_layer_tap(desc);
+    return noah_action_desc_supported_as_behavior_keycode(noah_action_describe(keycode));
 }
 
 static void log_invalid_keymap_layer_action(uint8_t layer, uint8_t row, uint8_t col, uint16_t keycode) {

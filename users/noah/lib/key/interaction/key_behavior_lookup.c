@@ -44,27 +44,18 @@ static bool key_behavior_has_multi_tap_in_config(const key_behavior_t *config) {
 }
 
 static bool key_behavior_keycode_supported(uint16_t keycode) {
-    noah_action_desc_t desc = noah_action_describe(keycode);
-
-    if (!noah_action_desc_is_raw_qmk_layer_action(desc)) {
-        return true;
-    }
-
-    return noah_action_desc_is_owned_momentary_layer(desc) || noah_action_desc_is_layer_tap(desc);
+    return noah_action_desc_supported_as_behavior_keycode(noah_action_describe(keycode));
 }
 
 static bool key_behavior_action_supported(uint16_t action, hold_behavior_mode_t hold_mode) {
-    noah_action_desc_t desc = noah_action_describe(action);
+    noah_action_desc_t           desc = noah_action_describe(action);
+    noah_action_authored_use_t authored_use = NOAH_ACTION_AUTHORED_USE_TAP;
 
-    // All non-layer actions stay valid authored surfaces. The runtime only
-    // rejects raw QMK layer actions here, because layer ownership is the one
-    // area where bypassing userspace is always incorrect. Held QK_MODS actions
-    // remain supported and are decomposed by the shared owned_keycode.c helper.
-    if (!noah_action_desc_is_raw_qmk_layer_action(desc)) {
-        return true;
+    if (hold_mode != HOLD_BEHAVIOR_NONE) {
+        authored_use = hold_mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE ? NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD : NOAH_ACTION_AUTHORED_USE_HOLD_OTHER;
     }
 
-    return noah_action_desc_is_owned_momentary_layer(desc) && hold_mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE;
+    return noah_action_desc_supported_as_authored_action(desc, authored_use);
 }
 
 static void key_behavior_log_invalid_keycode(uint8_t index, uint16_t keycode) {

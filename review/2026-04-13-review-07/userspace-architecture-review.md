@@ -2,9 +2,9 @@
 
 Date: 2026-04-13
 
-Status: review only. This folder captures a fresh architecture audit of the
-current shipped userspace. Implementation follow-ups, if any, should be logged
-in [progress.md](./progress.md).
+Status: architecture review plus the first action-contract follow-up logged in
+[progress.md](./progress.md). This file now reflects the current
+post-follow-up architecture rather than only the review-open state.
 
 Scope:
 
@@ -31,8 +31,8 @@ The main long-term cost is no longer "the runtime is mysterious." The main
 cost is "adding a new capability still means editing core dispatch and state
 modules." The remaining extensibility bottlenecks are:
 
-1. action semantics are still centrally hard-coded and replayed by multiple
-   consumers
+1. action semantics are now partly centralized in the descriptor contract, but
+   lifecycle behavior is still centrally branched
 2. pd-mode precedence and remote-display semantics still depend partly on
    manifest order and shared policy helpers instead of explicit mode-owned
    descriptors
@@ -43,6 +43,18 @@ modules." The remaining extensibility bottlenecks are:
 The right direction is evolutionary, not a rewrite. Keep the current
 state-machine approach for the key runtime. Refactor the extension seams around
 descriptor tables, smaller ownership registries, and shared source adapters.
+
+Implementation status after follow-ups in this review folder:
+
+- reduced: `noah_action_desc_t` now owns authored-surface support and direct
+  press-consumption queries, so key-behavior validation, keymap validation,
+  and preflight no longer open-code those rules
+- still open: action tap/press/release behavior is still centrally branched in
+  `action_lifecycle.c` instead of being mode-owned or ops-owned
+- open: pd-mode identity and remote-display semantics still rely on implicit
+  registry-order precedence
+- open: key-runtime cross-key coordination still uses whole-table sweeps
+- open: the macro subsystem still lacks a shared source/cache abstraction
 
 ## Areas That Are Solid
 
@@ -64,13 +76,20 @@ descriptor tables, smaller ownership registries, and shared source adapters.
 
 ### High Priority
 
-#### 1. Action semantics are still centrally hard-coded and replayed by multiple consumers
+#### 1. Action semantics are now partly centralized, but lifecycle behavior is still centrally branched
+
+Status:
+
+- Reduced in the first action-contract follow-up. The descriptor now caches
+  authored-surface and direct-press capability queries. The broader action-ops
+  split is still open.
 
 References:
 
-- `users/noah/lib/action/action_dispatch.h:35-137`
+- `users/noah/lib/action/action_dispatch.h`
 - `users/noah/lib/action/action_lifecycle.c:30-154`
-- `users/noah/lib/key/interaction/key_behavior_lookup.c:56-68`
+- `users/noah/lib/key/interaction/key_behavior_lookup.c:47-61`
+- `users/noah/lib/key/interaction/keymap_validation.c:16-18`
 - `users/noah/lib/key/runtime/key_runtime_preflight.c:83-95`
 - `users/noah/lib/key/interaction/handled_key.c:55-76`
 
@@ -78,9 +97,11 @@ Why this matters:
 
 - `noah_action_describe(...)` is the canonical action classifier, but it is
   not yet the canonical action behavior interface.
-- The classification rules in `action_dispatch.h` are reinterpreted by
-  `action_lifecycle.c`, key-behavior validation, handled-key fallback logic,
-  and preflight direct-action handling.
+- The first follow-up removed the easiest duplication: authored-surface
+  support and direct-action consumption now come from the descriptor contract
+  instead of being re-derived in validation and preflight callers.
+- The classification rules are still reinterpreted by `action_lifecycle.c`
+  and handled-key fallback logic.
 - Adding a genuinely new action kind or capability still means editing several
   core modules instead of introducing one new implementation unit.
 
@@ -88,10 +109,12 @@ Where the coupling shows up:
 
 - `action_dispatch.h` decides what an action *is*.
 - `action_lifecycle.c` decides how that action taps, presses, and releases.
-- `key_behavior_lookup.c` separately decides whether that action is legal in
-  authored tap/hold data.
-- `key_runtime_preflight.c` separately decides whether that action bypasses the
-  slot runtime as a direct press-only action.
+- `key_behavior_lookup.c` and `keymap_validation.c` now consume the shared
+  authored-surface capability instead of reconstructing their own raw-layer
+  exceptions.
+- `key_runtime_preflight.c` now consumes the shared
+  `consumes_direct_press` capability instead of hand-maintaining the
+  layer-lock/pd-lock special case.
 - `handled_key.c` separately decides fallback-hold and implicit-hold behavior
   based on the same action vocabulary.
 
@@ -107,12 +130,12 @@ Why this is the main extensibility bottleneck:
 
 Recommended direction:
 
-- Keep `noah_action_desc_t`, but make it point at an action-ops surface that
-  owns validation and lifecycle behavior.
+- Keep the new descriptor-owned capability contract and extend it into an
+  action-ops surface that owns lifecycle behavior too.
 - `noah_action_describe(...)` should become "classify once, dispatch through
   ops" rather than "classify once, then let each caller branch again."
-- Give preflight a capability query such as `consumes_direct_press` instead of
-  hand-maintaining the layer-lock/pd-lock special case.
+- The next step is not another capability bit. The next step is moving
+  tap/press/release branching out of `action_lifecycle.c`.
 
 Example shape:
 
@@ -402,8 +425,10 @@ different adapters over the same runtime model instead of adjacent systems.
 
 ## Concrete Refactoring Sequence
 
-1. Introduce action ops behind `noah_action_desc_t`, then migrate existing
-   action kinds one by one.
+1. In progress: `noah_action_desc_t` now owns authored-surface and
+   direct-press capability queries. Next, introduce action ops behind that
+   descriptor and migrate tap/press/release behavior one action kind at a
+   time.
 2. Make pd-mode display precedence explicit in the sync/state contract and move
    remaining mode-specific lifecycle/policy ownership out of registry core.
 3. Add explicit key-runtime registries for active and pending slots, while

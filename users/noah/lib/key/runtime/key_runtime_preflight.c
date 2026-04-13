@@ -83,7 +83,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
 bool key_runtime_process_direct_action_key(uint16_t keycode, keyrecord_t *record) {
     noah_action_desc_t desc = noah_action_describe(keycode);
 
-    if (!(noah_action_desc_is_layer_lock(desc) || noah_action_desc_is_pd_mode_lock(desc))) {
+    if (!noah_action_desc_consumes_direct_press(desc)) {
         return false;
     }
 

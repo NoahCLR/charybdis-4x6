@@ -178,43 +178,85 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_has_capability(layer_lock, NOAH_ACTION_CAP_LAYER_AFFECTING));
     CHECK(noah_action_desc_is_press_only(layer_lock));
     CHECK(noah_action_desc_is_layer_action(layer_lock));
+    CHECK(noah_action_desc_supported_as_behavior_keycode(layer_lock));
+    CHECK(noah_action_desc_supported_as_authored_action(layer_lock, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(layer_lock, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_action_desc_supported_as_authored_action(layer_lock, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(noah_action_desc_consumes_direct_press(layer_lock));
 
     CHECK(momentary.kind == NOAH_ACTION_KIND_LAYER_HOLD);
     CHECK(noah_action_desc_is_raw_qmk_layer_action(momentary));
     CHECK(momentary.layer == 3);
     CHECK(noah_action_desc_requires_per_key_hold(momentary));
+    CHECK(noah_action_desc_supported_as_behavior_keycode(momentary));
+    CHECK(!noah_action_desc_supported_as_authored_action(momentary, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(momentary, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(!noah_action_desc_supported_as_authored_action(momentary, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(!noah_action_desc_consumes_direct_press(momentary));
 
     CHECK(layer_tap.kind == NOAH_ACTION_KIND_LAYER_TAP);
     CHECK(noah_action_desc_is_raw_qmk_layer_action(layer_tap));
     CHECK(layer_tap.layer == 4);
     CHECK(!noah_action_desc_is_owned_momentary_layer(layer_tap));
+    CHECK(noah_action_desc_supported_as_behavior_keycode(layer_tap));
+    CHECK(!noah_action_desc_supported_as_authored_action(layer_tap, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(!noah_action_desc_supported_as_authored_action(layer_tap, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(!noah_action_desc_supported_as_authored_action(layer_tap, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
 
     CHECK(layer_jump.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
     CHECK(noah_action_desc_is_raw_qmk_layer_action(layer_jump));
     CHECK(!noah_action_desc_is_owned_momentary_layer(layer_jump));
     CHECK(!noah_action_desc_is_layer_tap(layer_jump));
+    CHECK(!noah_action_desc_supported_as_behavior_keycode(layer_jump));
+    CHECK(!noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(!noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(!noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
 
     CHECK(qmk_behavior.kind == NOAH_ACTION_KIND_QMK_BEHAVIOR);
     CHECK(!noah_action_desc_is_raw_qmk_layer_action(qmk_behavior));
+    CHECK(noah_action_desc_supported_as_behavior_keycode(qmk_behavior));
+    CHECK(noah_action_desc_supported_as_authored_action(qmk_behavior, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(qmk_behavior, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_action_desc_supported_as_authored_action(qmk_behavior, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
 
     CHECK(pd_key.pd_mode == PD_MODE_ARROW);
     CHECK(pd_key.kind == NOAH_ACTION_KIND_PD_MODE_HOLD);
     CHECK(noah_action_desc_is_pd_mode_action(pd_key));
+    CHECK(noah_action_desc_supported_as_behavior_keycode(pd_key));
+    CHECK(noah_action_desc_supported_as_authored_action(pd_key, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(pd_key, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_action_desc_supported_as_authored_action(pd_key, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(!noah_action_desc_consumes_direct_press(pd_key));
 
     CHECK(pd_lock.kind == NOAH_ACTION_KIND_PD_MODE_LOCK);
     CHECK(noah_action_desc_is_press_only(pd_lock));
     CHECK(noah_action_desc_has_capability(pd_lock, NOAH_ACTION_CAP_PD_MODE_AFFECTING));
+    CHECK(noah_action_desc_consumes_direct_press(pd_lock));
 
     CHECK(macro_action.kind == NOAH_ACTION_KIND_MACRO);
     CHECK(noah_action_desc_is_press_only(macro_action));
+    CHECK(noah_action_desc_supported_as_behavior_keycode(macro_action));
+    CHECK(noah_action_desc_supported_as_authored_action(macro_action, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(macro_action, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_action_desc_supported_as_authored_action(macro_action, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(!noah_action_desc_consumes_direct_press(macro_action));
 
     CHECK(custom.kind == NOAH_ACTION_KIND_KEYMAP_CUSTOM);
+    CHECK(noah_action_desc_supported_as_behavior_keycode(custom));
+    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
 
     CHECK(literal.kind == NOAH_ACTION_KIND_LITERAL);
     CHECK(!noah_action_desc_is_layer_lock(literal));
     CHECK(!noah_action_desc_is_raw_qmk_layer_action(literal));
     CHECK(!noah_action_desc_is_macro(literal));
     CHECK(!noah_action_desc_is_keymap_custom(literal));
+    CHECK(noah_action_desc_supported_as_behavior_keycode(literal));
+    CHECK(noah_action_desc_supported_as_authored_action(literal, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(literal, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_action_desc_supported_as_authored_action(literal, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(!noah_action_desc_consumes_direct_press(literal));
 }
 
 static void test_action_dispatch_keeps_runtime_default_policy(void) {

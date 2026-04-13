@@ -79,3 +79,81 @@ Next steps:
   rules do not require more whole-table sweeps
 - add a shared macro source/cache abstraction over hardcoded, VIA-default, and
   live VIA-backed macro payloads
+
+### Action contract first pass
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the in-flight review
+  folder plus the new action/runtime changes for this follow-up.
+- Extended `users/noah/lib/action/action_dispatch.h` so
+  `noah_action_desc_t` now caches:
+  - authored key-behavior keycode support
+  - authored tap support
+  - authored press-and-hold support
+  - authored non-press-and-hold hold support
+  - direct-press consumption for preflight-owned actions
+- Switched `users/noah/lib/key/interaction/key_behavior_lookup.c` to use the
+  shared descriptor-owned authored-surface helpers instead of re-deriving raw
+  layer-action exceptions locally.
+- Switched `users/noah/lib/key/interaction/keymap_validation.c` to use the same
+  descriptor-owned behavior-keycode support contract for keymap layer-action
+  validation.
+- Switched `users/noah/lib/key/runtime/key_runtime_preflight.c` to use the new
+  `noah_action_desc_consumes_direct_press(...)` capability instead of keeping a
+  separate layer-lock / pd-mode-lock special case.
+- Expanded `tests/host/action_dispatch_test.c` so the new descriptor contract
+  is asserted directly for:
+  - layer locks
+  - owned momentary layers
+  - layer taps
+  - unsupported raw layer actions
+  - qmk behavior keycodes
+  - pd-mode hold and lock actions
+  - macros, keymap custom actions, and literals
+
+Contracts touched in this pass:
+
+- shared action descriptor now owns authored-surface support for validation
+  callers
+- shared action descriptor now owns direct-press consumption for preflight
+  callers
+- lifecycle dispatch behavior remains unchanged; this pass narrows the
+  remaining action refactor to tap/press/release execution ownership
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_keymap_validation_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted action, key-behavior, keymap-validation, and preflight suites passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes in this pass touched:
+  - `users/noah/lib/action/action_dispatch.h`
+  - `users/noah/lib/key/interaction/key_behavior_lookup.c`
+  - `users/noah/lib/key/interaction/keymap_validation.c`
+  - `users/noah/lib/key/runtime/key_runtime_preflight.c`
+  - `tests/host/action_dispatch_test.c`
+  - this review folder
+
+Next steps:
+
+- move action tap/press/release branching out of `action_lifecycle.c` and onto
+  an action-ops surface behind `noah_action_desc_t`
+- after that lands, re-check whether handled-key fallback and implicit-hold
+  logic should consume action-owned helpers instead of inspecting action kinds
+  directly
