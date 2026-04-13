@@ -197,6 +197,45 @@ bool is_keyboard_master(void) {
     return fake_is_master;
 }
 
+pd_mode_snapshot_t pd_mode_snapshot(void) {
+    pd_mode_snapshot_t snapshot = {
+        .local.active_flags         = fake_pd_active_flags,
+        .local.locked_flags         = fake_pd_locked_flags,
+        .local.first_active_index   = PD_MODE_COUNT,
+        .local.first_locked_index   = PD_MODE_COUNT,
+        .display.active_flags       = test_display_active_flags(),
+        .display.locked_flags       = test_display_locked_flags(),
+        .display.first_active_index = PD_MODE_COUNT,
+        .display.first_locked_index = PD_MODE_COUNT,
+    };
+
+    for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
+        pd_mode_mask_t mode = pd_modes[index].mode_flag;
+
+        if ((snapshot.local.active_flags & mode) != 0 && snapshot.local.first_active_index == PD_MODE_COUNT) {
+            snapshot.local.first_active_index = index;
+            snapshot.local.first_active_mode  = mode;
+        }
+
+        if ((snapshot.local.locked_flags & mode) != 0 && snapshot.local.first_locked_index == PD_MODE_COUNT) {
+            snapshot.local.first_locked_index = index;
+            snapshot.local.first_locked_mode  = mode;
+        }
+
+        if ((snapshot.display.active_flags & mode) != 0 && snapshot.display.first_active_index == PD_MODE_COUNT) {
+            snapshot.display.first_active_index = index;
+            snapshot.display.first_active_mode  = mode;
+        }
+
+        if ((snapshot.display.locked_flags & mode) != 0 && snapshot.display.first_locked_index == PD_MODE_COUNT) {
+            snapshot.display.first_locked_index = index;
+            snapshot.display.first_locked_mode  = mode;
+        }
+    }
+
+    return snapshot;
+}
+
 int rgb_matrix_led_index(int index) {
     if (index < 0 || index >= RGB_MATRIX_LED_COUNT) {
         return -1;

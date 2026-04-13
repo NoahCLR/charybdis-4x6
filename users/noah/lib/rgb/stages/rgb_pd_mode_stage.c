@@ -44,8 +44,9 @@ void rgb_runtime_pd_mode_stage_post_init(void) {
 }
 
 bool rgb_runtime_pd_mode_stage_render(uint8_t led_min, uint8_t led_max) {
-    bool    painted     = false;
-    uint8_t active_mode = pd_mode_first_display_active_index();
+    pd_mode_snapshot_t snapshot    = pd_mode_snapshot();
+    bool               painted     = false;
+    uint8_t            active_mode = snapshot.display.first_active_index;
 
     if (active_mode < PD_MODE_COUNT) {
         rgb_set_right_half(pd_mode_rgb[active_mode], led_min, led_max);
@@ -53,7 +54,7 @@ bool rgb_runtime_pd_mode_stage_render(uint8_t led_min, uint8_t led_max) {
     }
 
     for (uint8_t group = 0; group < pd_mode_led_group_count; group++) {
-        if (!pd_mode_display_active(pd_mode_led_groups[group].pointing_mode)) {
+        if ((snapshot.display.active_flags & pd_mode_led_groups[group].pointing_mode) == 0) {
             continue;
         }
 

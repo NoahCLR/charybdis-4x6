@@ -710,6 +710,10 @@ Current status:
 - split-sync storage still transports raw active/locked flags, but display and
   policy consumers now read those through the same snapshot-backed projection
   as local state
+- the remaining runtime/UI consumers (`pd_runtime.c` and
+  `rgb_pd_mode_stage.c`) now also read the snapshot directly, so the
+  snapshot-backed helper projections are compatibility surface rather than the
+  internal source of truth
 
 ### Recommendation 5: split the macro DSL implementation
 

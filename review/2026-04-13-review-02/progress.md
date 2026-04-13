@@ -611,9 +611,37 @@ Verification run in this pass:
 
 Next steps:
 
-- move on to recommendation 5 unless you want to migrate the remaining
-  read-only pd-mode consumers (`pd_runtime.c`, `rgb_pd_mode_stage.c`) from the
-  delegating helpers to the snapshot directly
+- move on to recommendation 5
+
+## 2026-04-13: Recommendation 4 final cleanup landed
+
+Completed in this pass:
+
+- Migrated the remaining production pd-mode readers onto `pd_mode_snapshot()`
+  directly:
+  `pointing/runtime/pd_runtime.c` and `rgb/stages/rgb_pd_mode_stage.c`.
+- Kept the RGB host harness lightweight by adding a test-local
+  `pd_mode_snapshot()` stub in `tests/host/rgb_layer_render_test.c` instead of
+  pulling the full runtime shared-state singleton into a render-only test.
+- Updated the RGB render runner to match that harness shape.
+
+Contracts touched:
+
+- `users/noah/lib/pointing/runtime/pd_runtime.c`
+- `users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`
+- `tests/host/rgb_layer_render_test.c`
+- `tests/host/run_rgb_layer_render_tests.sh`
+
+Verification run in this pass:
+
+- `git diff --check`
+- `sh tests/host/run_hook_chaining_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `rg -n "pd_mode_first_local_active_index\\(|pd_mode_first_display_active_index\\(|pd_any_active_mode_has_trait\\(|pd_mode_display_active\\(" users/noah/lib/pointing users/noah/lib/rgb users/noah/lib/state -g '!**/*.h'`
+
+Next steps:
+
+- move on to recommendation 5
 
 ## 2026-04-13: Recommendation 3 include cleanup landed
 
