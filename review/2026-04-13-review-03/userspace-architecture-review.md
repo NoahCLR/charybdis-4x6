@@ -21,23 +21,17 @@ Implementation status update:
 - Recommendation 4 has landed: hardcoded authored macros now compile into a
   cached execution IR, while VIA default seeding stays on the encoded-string
   path.
-- Recommendation 5 has its first implementation slice: the key-runtime
-  scenario harness now exposes semantic builders for handled-key and pd-mode
-  setup plus a runtime-debug snapshot helper, and scenario tests have started
-  moving onto that seam.
-- Recommendation 5 has a second implementation slice: process-record-driven
-  integration tests now share a small semantic step/snapshot harness instead
-  of rebuilding records, time advancement, and slot reads inline.
-- Recommendation 5 has a third implementation slice: direct handled-key
-  integration tests can now use the same shared harness for multi-tap handled
-  key setup, direct handled press/release driving, time advancement, and
-  snapshot-based assertions.
-- Recommendation 5 has a fourth implementation slice: real-profile
-  process-record integration tests can now use the same shared helper for
-  explicit resolved-key dispatch, timing, scan control, and snapshot-based
-  assertions without giving up real keymap resolution.
-- The remaining open recommendation area is pushing more integration coverage
-  onto those semantic builders beyond the current scenario-level slice.
+- Recommendation 5 has landed: scenario-level, process-record-driven,
+  direct handled-key, and real-profile integration coverage now share semantic
+  builders and snapshot-based assertions instead of rebuilding those fixture
+  mechanics inline.
+- Intentional white-box exceptions remain in low-level ownership and hook
+  tests such as `key_runtime_slot_test.c`, `key_runtime_transition_test.c`,
+  `key_runtime_preflight_test.c`, `pd_mode_handlers_test.c`, and
+  `hook_chaining_test.c`; those tests still own storage- or hook-local
+  behavior directly and are not the target of Recommendation 5.
+- There are no remaining open recommendation areas in this review; further
+  cleanup is optional rather than a missing architectural seam.
 
 Scope:
 

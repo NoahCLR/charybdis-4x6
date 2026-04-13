@@ -564,9 +564,54 @@ Workspace scope:
 
 Next steps:
 
-- Recommendation 5 is now mostly a matter of incremental cleanup rather than
-  missing semantic harness coverage.
-- If more cleanup is wanted, focus on smaller remaining integration fixtures
-  that still duplicate timing or read-side state setup, but there is no longer
-  an obvious large migration target comparable to the earlier scenario,
-  pd-mode, layer-lock, modifier-hold, or real-profile runners.
+- Recommendation 5 is effectively landed. Any further cleanup here is
+  optional polish rather than outstanding architecture work.
+- If more cleanup is wanted later, focus on small local fixture simplification
+  rather than new semantic test infrastructure.
+
+### Implementation Pass: Recommendation 5 Closure Audit
+
+Completed in this pass:
+
+- Audited the remaining host tests that still matched the old raw-fixture
+  patterns after the earlier Recommendation 5 slices.
+- Confirmed that the remaining matches are intentionally white-box tests for
+  low-level ownership or hook-local behavior rather than integration fixtures
+  that still need semantic-builder migration:
+  - `tests/host/key_runtime_slot_test.c`
+  - `tests/host/key_runtime_transition_test.c`
+  - `tests/host/key_runtime_preflight_test.c`
+  - `tests/host/pd_mode_handlers_test.c`
+  - `tests/host/hook_chaining_test.c`
+- Closed Recommendation 5 in the review because the integration-shaped
+  coverage now has the intended semantic seams:
+  - scenario-level builders
+  - process-record integration helpers
+  - direct handled-key integration helpers
+  - `runtime_debug.h`-shaped read-side assertions
+  - real-profile integration helpers that preserve live keymap resolution
+- Updated the review header so the current recommendation set is now fully
+  landed and no open recommendation areas remain in this review.
+
+Contracts touched in this pass:
+
+- active review status and closure record:
+  `review/2026-04-13-review-03/userspace-architecture-review.md`,
+  `review/2026-04-13-review-03/progress.md`
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes stayed inside `charybdis-4x6/review/2026-04-13-review-03/`
+
+Next steps:
+
+- This review’s recommendation set is complete.
+- Open a new review only if a distinct new architecture bottleneck appears or
+  if you want a fresh assessment after a later round of feature work.
