@@ -68,13 +68,15 @@ uint8_t key_feedback_preview_layer(void) {
 
 static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     uint8_t flags = 0;
+    handled_key_view_t interaction;
 
     if (!key_runtime_slot_active(slot)) {
         return flags;
     }
 
+    interaction = key_runtime_slot_interaction(slot);
     uint16_t elapsed           = timer_elapsed(slot->timer);
-    bool     long_hold_reached = slot->binding.long_hold.present && elapsed >= slot->timing.longer_hold_term;
+    bool     long_hold_reached = interaction.long_hold.present && elapsed >= interaction.longer_hold_term;
 
     if (key_runtime_slot_uses_implicit_hold(slot)) {
         return flags;
@@ -120,7 +122,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
         return flags;
     }
 
-    if (long_hold_reached && hold_sends_on_release(slot->binding.long_hold)) {
+    if (long_hold_reached && hold_sends_on_release(interaction.long_hold)) {
         // TAP_ON_RELEASE_AFTER_HOLD keeps feedback visible because the action
         // is still pending until release.
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
@@ -137,7 +139,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     // not keep a hold color latched after the threshold. Only an authored
     // normal hold tier keeps the pending hold color before it resolves;
     // long-hold-only surfaces stay quiet until the long-hold tier commits.
-    if (key_runtime_slot_allows_tap_release(slot) && elapsed >= slot->timing.tap_hold_term && slot->binding.hold.present) {
+    if (key_runtime_slot_allows_tap_release(slot) && elapsed >= interaction.tap_hold_term && interaction.hold.present) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
     }
 

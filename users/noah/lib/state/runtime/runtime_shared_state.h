@@ -10,8 +10,10 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "../../key/interaction/handled_key.h"
 #include "../../key/interaction/key_behavior.h"
 #include "../../key/interaction/multi_tap_engine.h"
+#include "../../key/runtime/key_runtime_types.h"
 #include "../../pointing/defs/pd_mode_flags.h"
 
 typedef enum {
@@ -22,12 +24,6 @@ typedef enum {
     KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
     KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
 } key_runtime_slot_phase_t;
-
-typedef enum {
-    KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT = 0,
-    KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT,
-    KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
-} key_runtime_slot_hold_strategy_t;
 
 typedef struct {
     uint16_t keycode;
@@ -65,12 +61,18 @@ typedef struct {
     pd_mode_mask_t pd_mode;
 } key_runtime_slot_semantic_state_t;
 
+typedef struct {
+    bool               valid;
+    handled_key_view_t view;
+} key_runtime_slot_interaction_state_t;
+
 // One handled-key runtime slot: active press/hold state plus any deferred
 // multi-tap chain that still owns this physical key position after release.
 typedef struct {
     uint16_t                           timer;
     key_runtime_slot_owner_state_t     owner;
     key_runtime_slot_lifecycle_state_t lifecycle;
+    key_runtime_slot_interaction_state_t interaction;
     key_runtime_slot_binding_state_t   binding;
     key_runtime_slot_timing_state_t    timing;
     key_runtime_slot_semantic_state_t  semantic;
@@ -92,6 +94,7 @@ typedef struct {
         .owner.keycode                 = KC_NO,                       \
         .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_IDLE, \
         .lifecycle.held_action_keycode = KC_NO,                       \
+        .interaction.view.layer        = UINT8_MAX,                   \
         .timing.tap_hold_term          = CUSTOM_TAP_HOLD_TERM,        \
         .timing.longer_hold_term       = CUSTOM_LONGER_HOLD_TERM,     \
         .timing.multi_tap_term         = CUSTOM_MULTI_TAP_TERM,       \

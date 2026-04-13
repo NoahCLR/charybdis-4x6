@@ -430,7 +430,20 @@ static void test_slot_track_preserves_pending_multi_tap(void) {
     CHECK(key_runtime_slot_advance_pending_multi_tap(slot, TEST_MULTI_TAP_KEY) == KC_NO);
     CHECK(key_runtime_slot_pending_multi_tap_pending_hold(slot));
 
-    key_runtime_slot_track(slot, TEST_MULTI_TAP_KEY, pos, KC_NO, hold_behavior_none(), hold_behavior_none(), 120, 240, 150, KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
+    key_runtime_slot_track(slot, TEST_MULTI_TAP_KEY, pos,
+                           (handled_key_view_t){
+                               .tap_action       = KC_NO,
+                               .tap_repeat_count = 0,
+                               .hold             = hold_behavior_none(),
+                               .long_hold        = hold_behavior_none(),
+                               .hold_strategy    = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+                               .tap_hold_term    = 120,
+                               .longer_hold_term = 240,
+                               .multi_tap_term   = 150,
+                               .layer            = UINT8_MAX,
+                               .flags            = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP,
+                           },
+                           KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(slot->owner.keycode == TEST_MULTI_TAP_KEY);
     CHECK(slot->pending_multi_tap.count == 3);

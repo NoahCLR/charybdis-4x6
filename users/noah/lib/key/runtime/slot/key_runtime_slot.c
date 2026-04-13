@@ -101,7 +101,74 @@ static uint8_t key_runtime_slot_preview_layer_from_binding(hold_behavior_t hold,
     return QK_MOMENTARY_GET_LAYER(hold.action);
 }
 
+static uint16_t key_runtime_slot_interaction_flags_from_legacy_state(const active_key_state_t *slot) {
+    uint16_t flags = HANDLED_KEY_FLAG_HANDLED;
+
+    if (!slot) {
+        return 0;
+    }
+
+    if (slot->semantic.has_multi_tap) {
+        flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    }
+    if (slot->semantic.is_momentary_layer) {
+        flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER;
+    }
+    if (slot->semantic.is_layer_tap) {
+        flags |= HANDLED_KEY_FLAG_LAYER_TAP;
+    }
+    if (slot->lifecycle.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT) {
+        flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
+    }
+    if (slot->lifecycle.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK) {
+        flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+    }
+
+    return flags;
+}
+
+static handled_key_view_t key_runtime_slot_interaction_from_legacy_state(const active_key_state_t *slot) {
+    handled_key_view_t interaction = {
+        .tap_action       = slot ? slot->binding.tap_action : KC_NO,
+        .tap_repeat_count = (slot && slot->binding.tap_action != KC_NO) ? 1 : 0,
+        .hold             = slot ? slot->binding.hold : hold_behavior_none(),
+        .long_hold        = slot ? slot->binding.long_hold : hold_behavior_none(),
+        .hold_strategy    = slot ? slot->lifecycle.hold_strategy : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+        .tap_hold_term    = slot ? slot->timing.tap_hold_term : CUSTOM_TAP_HOLD_TERM,
+        .longer_hold_term = slot ? slot->timing.longer_hold_term : CUSTOM_LONGER_HOLD_TERM,
+        .multi_tap_term   = slot ? slot->timing.multi_tap_term : CUSTOM_MULTI_TAP_TERM,
+        .layer            = (slot && slot->semantic.layer != 0) ? slot->semantic.layer : UINT8_MAX,
+        .pd_mode          = slot ? slot->semantic.pd_mode : 0,
+        .step_present     = slot && (slot->binding.tap_action != KC_NO || slot->binding.hold.present || slot->binding.long_hold.present),
+        .has_more_taps    = false,
+        .tap_resolves_on_press = false,
+        .flags            = key_runtime_slot_interaction_flags_from_legacy_state(slot),
+    };
+
+    if (slot && slot->semantic.valid) {
+        interaction.layer = slot->semantic.layer;
+    }
+
+    return interaction;
+}
+
+handled_key_view_t key_runtime_slot_interaction(const active_key_state_t *slot) {
+    if (!slot) {
+        return (handled_key_view_t){
+            .layer = UINT8_MAX,
+        };
+    }
+
+    if (slot->interaction.valid) {
+        return slot->interaction.view;
+    }
+
+    return key_runtime_slot_interaction_from_legacy_state(slot);
+}
+
 uint8_t key_runtime_slot_preview_layer_hint(const active_key_state_t *slot) {
+    handled_key_view_t interaction;
+
     if (!slot) {
         return UINT8_MAX;
     }
@@ -110,7 +177,8 @@ uint8_t key_runtime_slot_preview_layer_hint(const active_key_state_t *slot) {
         return slot->semantic.preview_layer;
     }
 
-    return key_runtime_slot_preview_layer_from_binding(slot->binding.hold, slot->lifecycle.hold_strategy);
+    interaction = key_runtime_slot_interaction(slot);
+    return key_runtime_slot_preview_layer_from_binding(interaction.hold, interaction.hold_strategy);
 }
 
 bool key_runtime_slot_has_pending_multi_tap(const active_key_state_t *slot) {
@@ -267,23 +335,37 @@ void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes
     slot->lifecycle.phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
 }
 
-void key_runtime_slot_apply_handled_metadata(active_key_state_t *slot, handled_key_view_t key) {
+static void key_runtime_slot_sync_interaction_mirrors(active_key_state_t *slot, handled_key_view_t key) {
     if (!slot) {
         return;
     }
 
+    slot->interaction = (key_runtime_slot_interaction_state_t){
+        .valid = true,
+        .view  = key,
+    };
+    slot->binding = (key_runtime_slot_binding_state_t){
+        .tap_action = key.tap_action,
+        .hold       = key.hold,
+        .long_hold  = key.long_hold,
+    };
+    slot->timing = (key_runtime_slot_timing_state_t){
+        .tap_hold_term    = key.tap_hold_term,
+        .longer_hold_term = key.longer_hold_term,
+        .multi_tap_term   = key.multi_tap_term,
+    };
     slot->semantic = (key_runtime_slot_semantic_state_t){
         .valid              = true,
         .has_multi_tap      = handled_key_has_multi_tap(key),
         .is_momentary_layer = handled_key_is_momentary_layer(key),
         .is_layer_tap       = handled_key_is_layer_tap(key),
         .layer              = handled_key_layer(key),
-        .preview_layer      = key_runtime_slot_preview_layer_from_binding(slot->binding.hold, slot->lifecycle.hold_strategy),
+        .preview_layer      = key_runtime_slot_preview_layer_from_binding(key.hold, key.hold_strategy),
         .pd_mode            = handled_key_pd_mode(key),
     };
 }
 
-void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
+void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t interaction, key_runtime_slot_phase_t phase) {
     if (!slot) {
         return;
     }
@@ -298,20 +380,10 @@ void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t
             {
                 .phase               = phase,
                 .held_action_keycode = KC_NO,
-                .hold_strategy       = hold_strategy,
-            },
-        .binding =
-            {
-                .tap_action = tap_action,
-                .hold       = hold,
-                .long_hold  = long_hold,
-            },
-        .timing =
-            {
-                .tap_hold_term    = tap_hold_term,
-                .longer_hold_term = longer_hold_term,
-                .multi_tap_term   = multi_tap_term,
+                .hold_strategy       = interaction.hold_strategy,
             },
         .pending_multi_tap = pending_multi_tap,
     };
+
+    key_runtime_slot_sync_interaction_mirrors(slot, interaction);
 }

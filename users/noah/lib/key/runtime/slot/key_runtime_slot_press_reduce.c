@@ -15,15 +15,35 @@ static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavi
     return hold_registers_on_press(hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
 }
 
+static handled_key_view_t key_runtime_slot_press_interaction(handled_key_view_t key, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_hold_strategy_t hold_strategy) {
+    key.tap_action       = tap_action;
+    key.tap_repeat_count = tap_action == KC_NO ? 0 : 1;
+    key.hold             = hold;
+    key.long_hold        = long_hold;
+    key.hold_strategy    = hold_strategy;
+    key.tap_hold_term    = tap_hold_term;
+    key.longer_hold_term = longer_hold_term;
+    key.multi_tap_term   = multi_tap_term;
+    key.flags &= (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD);
+    if (hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT) {
+        key.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
+    }
+    if (hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK) {
+        key.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+    }
+    return key;
+}
+
 static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
     key_runtime_effect_builder_t builder = {0};
+    handled_key_view_t          interaction;
 
     if (!slot) {
         return builder;
     }
 
-    key_runtime_slot_track(slot, keycode, key_pos, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, phase, hold_strategy);
-    key_runtime_slot_apply_handled_metadata(slot, key);
+    interaction = key_runtime_slot_press_interaction(key, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, hold_strategy);
+    key_runtime_slot_track(slot, keycode, key_pos, interaction, phase);
     slot->lifecycle.pd_mode_was_locked_on_press = pd_mode_was_locked_on_press;
 
     if (hold_registers_on_press(hold)) {

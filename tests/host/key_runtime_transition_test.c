@@ -130,8 +130,21 @@ static void active_key_reset(void) {
 }
 
 static void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
+    handled_key_view_t interaction = {
+        .tap_action       = tap_action,
+        .tap_repeat_count = tap_action == KC_NO ? 0 : 1,
+        .hold             = hold,
+        .long_hold        = long_hold,
+        .hold_strategy    = hold_strategy,
+        .tap_hold_term    = tap_hold_term,
+        .longer_hold_term = longer_hold_term,
+        .multi_tap_term   = multi_tap_term,
+        .layer            = UINT8_MAX,
+        .flags            = HANDLED_KEY_FLAG_HANDLED,
+    };
+
     test_set_default_slot_key_pos(key_pos);
-    key_runtime_slot_track(test_default_slot(), keycode, key_pos, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, phase, hold_strategy);
+    key_runtime_slot_track(test_default_slot(), keycode, key_pos, interaction, phase);
 }
 
 #define active_key (*test_default_slot())

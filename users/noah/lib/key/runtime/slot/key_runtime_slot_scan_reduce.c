@@ -23,32 +23,38 @@ static key_runtime_slot_result_t key_runtime_slot_result_from_effect_builders(ke
 }
 
 static bool key_runtime_slot_active_scan_should_mark_release_hold_pending(active_key_state_t active_key_state, uint16_t elapsed) {
+    handled_key_view_t interaction = key_runtime_slot_interaction(&active_key_state);
+
     if (key_runtime_slot_phase(&active_key_state) != KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW) {
         return false;
     }
 
-    if (hold_sends_on_release(active_key_state.binding.hold) && elapsed >= active_key_state.timing.tap_hold_term) {
+    if (hold_sends_on_release(interaction.hold) && elapsed >= interaction.tap_hold_term) {
         return true;
     }
 
-    return !active_key_state.binding.hold.present && hold_sends_on_release(active_key_state.binding.long_hold) && elapsed >= active_key_state.timing.longer_hold_term;
+    return !interaction.hold.present && hold_sends_on_release(interaction.long_hold) && elapsed >= interaction.longer_hold_term;
 }
 
 static key_runtime_slot_result_t key_runtime_slot_step_active_scan_tap_window(active_key_state_t *slot, uint16_t elapsed) {
+    handled_key_view_t interaction;
+
     if (!slot) {
         return (key_runtime_slot_result_t){0};
     }
 
-    if (key_runtime_slot_uses_fallback_hold(slot) && slot->lifecycle.held_action_keycode == KC_NO && elapsed >= slot->timing.tap_hold_term) {
+    interaction = key_runtime_slot_interaction(slot);
+
+    if (key_runtime_slot_uses_fallback_hold(slot) && slot->lifecycle.held_action_keycode == KC_NO && elapsed >= interaction.tap_hold_term) {
         return key_runtime_slot_result_from_effect_builders(slot->owner.key_pos, (key_runtime_effect_builder_t){0}, key_runtime_slot_policy_activate_pending_fallback_hold(slot));
     }
 
-    if (hold_fires_at_threshold(slot->binding.long_hold) && elapsed >= slot->timing.longer_hold_term) {
-        return key_runtime_slot_result_from_effect_builders(slot->owner.key_pos, (key_runtime_effect_builder_t){0}, key_runtime_slot_policy_promote_to_long_hold(slot, slot->binding.long_hold, false));
+    if (hold_fires_at_threshold(interaction.long_hold) && elapsed >= interaction.longer_hold_term) {
+        return key_runtime_slot_result_from_effect_builders(slot->owner.key_pos, (key_runtime_effect_builder_t){0}, key_runtime_slot_policy_promote_to_long_hold(slot, interaction.long_hold, false));
     }
 
-    if (hold_fires_at_threshold(slot->binding.hold) && elapsed >= slot->timing.tap_hold_term) {
-        return key_runtime_slot_result_from_effect_builders(slot->owner.key_pos, (key_runtime_effect_builder_t){0}, key_runtime_slot_policy_fire_hold_at_threshold(slot, slot->binding.hold, slot->binding.long_hold, false));
+    if (hold_fires_at_threshold(interaction.hold) && elapsed >= interaction.tap_hold_term) {
+        return key_runtime_slot_result_from_effect_builders(slot->owner.key_pos, (key_runtime_effect_builder_t){0}, key_runtime_slot_policy_fire_hold_at_threshold(slot, interaction.hold, interaction.long_hold, false));
     }
 
     if (key_runtime_slot_active_scan_should_mark_release_hold_pending(*slot, elapsed)) {
@@ -61,28 +67,38 @@ static key_runtime_slot_result_t key_runtime_slot_step_active_scan_tap_window(ac
 static key_runtime_slot_result_t key_runtime_slot_step_active_scan_press_held_window(active_key_state_t *slot, uint16_t elapsed) {
     key_runtime_effect_builder_t immediate_hold_builder = {0};
     key_runtime_effect_builder_t effect_builder         = {0};
+    handled_key_view_t           interaction;
 
     if (!slot) {
         return (key_runtime_slot_result_t){0};
     }
 
-    if (elapsed >= slot->timing.tap_hold_term) {
-        immediate_hold_builder = key_runtime_slot_policy_commit_immediate_hold(slot, !key_runtime_slot_uses_implicit_hold(slot), !slot->binding.long_hold.present);
+    interaction = key_runtime_slot_interaction(slot);
+
+    if (elapsed >= interaction.tap_hold_term) {
+        immediate_hold_builder = key_runtime_slot_policy_commit_immediate_hold(slot, !key_runtime_slot_uses_implicit_hold(slot), !interaction.long_hold.present);
     }
 
-    if (hold_fires_at_threshold(slot->binding.long_hold) && elapsed >= slot->timing.longer_hold_term) {
-        effect_builder = key_runtime_slot_policy_promote_to_long_hold(slot, slot->binding.long_hold, false);
+    if (hold_fires_at_threshold(interaction.long_hold) && elapsed >= interaction.longer_hold_term) {
+        effect_builder = key_runtime_slot_policy_promote_to_long_hold(slot, interaction.long_hold, false);
     }
 
     return key_runtime_slot_result_from_effect_builders(slot->owner.key_pos, immediate_hold_builder, effect_builder);
 }
 
 static key_runtime_slot_result_t key_runtime_slot_step_active_scan_hold_phase(active_key_state_t *slot, uint16_t elapsed) {
-    if (!(slot && hold_fires_at_threshold(slot->binding.long_hold) && elapsed >= slot->timing.longer_hold_term)) {
+    handled_key_view_t interaction;
+
+    if (!slot) {
         return (key_runtime_slot_result_t){0};
     }
 
-    return key_runtime_slot_result_from_effect_builders(slot->owner.key_pos, (key_runtime_effect_builder_t){0}, key_runtime_slot_policy_promote_to_long_hold(slot, slot->binding.long_hold, false));
+    interaction = key_runtime_slot_interaction(slot);
+    if (!(hold_fires_at_threshold(interaction.long_hold) && elapsed >= interaction.longer_hold_term)) {
+        return (key_runtime_slot_result_t){0};
+    }
+
+    return key_runtime_slot_result_from_effect_builders(slot->owner.key_pos, (key_runtime_effect_builder_t){0}, key_runtime_slot_policy_promote_to_long_hold(slot, interaction.long_hold, false));
 }
 
 typedef key_runtime_slot_result_t (*key_runtime_slot_step_active_scan_phase_handler_t)(active_key_state_t *slot, uint16_t elapsed);

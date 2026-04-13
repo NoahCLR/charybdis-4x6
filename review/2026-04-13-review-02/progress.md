@@ -108,3 +108,62 @@ Next steps:
   handled-key state
 - start recommendation 2 so action meaning stops being rediscovered from raw
   keycodes across runtime, feedback, and policy modules
+
+## 2026-04-13: Recommendation 1 continued
+
+Completed in this pass:
+
+- Broke the handled-key/runtime-state type dependency by moving
+  `key_runtime_slot_hold_strategy_t` into a small shared runtime header.
+- Added an active-slot interaction cache so `active_key_state_t` now stores a
+  resolved handled-key snapshot alongside the older mirror fields.
+- Changed `key_runtime_slot_track(...)` to seed that resolved interaction
+  snapshot directly instead of splitting press setup across separate
+  `track(...)` and metadata application paths.
+- Moved the active-slot reducers and readers onto the new interaction
+  contract, including:
+  - active release
+  - active scan
+  - pending multi-tap release/scan
+  - flush policy
+  - key feedback
+- Kept `binding`, `timing`, and `semantic` as synchronized compatibility
+  mirrors for this pass, and added a legacy fallback path so existing manual
+  host fixtures still execute through the new runtime contract while the test
+  surface catches up.
+
+Contracts touched:
+
+- `users/noah/lib/key/runtime/key_runtime_types.h`
+- `users/noah/lib/state/runtime/runtime_shared_state.h`
+- `users/noah/lib/key/runtime/key_runtime_state.h`
+- `users/noah/lib/key/runtime/key_runtime_feedback.c`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot.[ch]`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_policy.[ch]`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_scan_reduce.c`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- remove the remaining compatibility mirrors once host fixtures and debug
+  surfaces no longer rely on `binding`, `timing`, and `semantic`
+- fold more static key metadata into the slot-cached interaction contract so
+  active release no longer needs a legacy event-key merge path
+- start recommendation 2 after recommendation 1 no longer depends on the old
+  mirror state

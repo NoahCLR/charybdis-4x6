@@ -8,7 +8,7 @@
 #pragma once
 
 #include "../../pointing/defs/pd_mode_flags.h"
-#include "../../state/runtime/runtime_shared_state.h"
+#include "../runtime/key_runtime_types.h"
 #include "key_behavior.h"
 
 typedef struct {

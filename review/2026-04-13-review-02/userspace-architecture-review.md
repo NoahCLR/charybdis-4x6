@@ -599,8 +599,12 @@ Current status:
 - cached resolved later-tap semantics in `multi_tap_t`
 - removed pending multi-tap release/scan dependence on direct
   `key_behavior_step_lookup()` re-resolution
-- still mixing first-tap active-slot binding data with the newer interaction
-  contract, so the centralization is only partial
+- active slots now cache a resolved interaction snapshot and the main runtime
+  readers consume that snapshot instead of the older split binding/timing
+  contract
+- `binding`, `timing`, and `semantic` still exist as synchronized
+  compatibility mirrors, so the centralization is materially better but still
+  not complete
 
 ### Recommendation 2: introduce typed action descriptors
 

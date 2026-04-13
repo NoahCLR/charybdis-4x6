@@ -106,19 +106,22 @@ key_runtime_effect_builder_t key_runtime_slot_policy_commit_immediate_hold(activ
 
 key_runtime_effect_builder_t key_runtime_slot_policy_take_flush(active_key_state_t *slot, bool active_held_action_survives_flush) {
     key_runtime_effect_builder_t builder = {0};
+    handled_key_view_t           interaction;
 
     if (!key_runtime_slot_active(slot)) {
         return builder;
     }
+
+    interaction = key_runtime_slot_interaction(slot);
 
     if (!key_runtime_slot_allows_tap_release(slot) || slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
         if (slot->lifecycle.held_action_keycode != KC_NO && !active_held_action_survives_flush) {
             builder.kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_UNREGISTER;
             builder.action = slot->lifecycle.held_action_keycode;
         }
-    } else if (!is_layer_key(slot->owner.keycode) && slot->binding.tap_action != KC_NO) {
+    } else if (!is_layer_key(slot->owner.keycode) && interaction.tap_action != KC_NO) {
         builder.kind   = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
-        builder.action = slot->binding.tap_action;
+        builder.action = interaction.tap_action;
     }
 
     key_runtime_slot_reset(slot);
