@@ -509,9 +509,14 @@ Implementation update:
 - integration coverage in the pd-mode, layer-lock, and modifier-hold suites
   now consumes those semantic helpers instead of reading slot owner/lifecycle
   fields directly
-- the remaining work here is now mostly write-side staging: `runtime_debug`
-  fixtures still write raw shared state directly when they could stage state
-  through builders or subsystem entry points before taking a snapshot
+- `runtime_debug_test.c` now stages cross-subsystem snapshot state through
+  the real pd-mode controller, key-feedback pulse entrypoint, and key-runtime
+  slot tracking helpers instead of writing `noah_runtime_shared_state`
+  directly
+- the remaining direct slot/storage coupling is now concentrated in low-level
+  slot, preflight, transition, admission, and feedback tests where storage
+  layout is the contract under test, rather than in broader integration or
+  debug fixtures
 
 ## Testing And Debuggability
 
@@ -541,9 +546,10 @@ more about surface choice:
 
 ## Recommended Refactor Order
 
-Finding 6 is the main remaining structural follow-up:
+All six findings from this review are now structurally landed.
 
-1. Keep shifting higher-level tests toward semantic builders and richer traces.
+The next review should open only when there is a new architecture theme to
+evaluate, rather than to finish tails from this one.
 
 ## Bottom Line
 

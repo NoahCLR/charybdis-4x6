@@ -1226,3 +1226,58 @@ Next steps:
   `noah_runtime_shared_state` staging
 - then decide whether the remaining high-level integration fixtures need more
   scenario/builders, or whether Finding 6 is narrow enough to close
+
+### Implementation pass: runtime-debug semantic staging and Finding 6 closure
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Updated
+  `tests/host/runtime_debug_test.c`
+  so the cross-subsystem snapshot fixture no longer seeds
+  `noah_runtime_shared_state` directly for key feedback, pd-mode state, or the
+  tracked active slot.
+- Staged key feedback through `key_feedback_pulse_arm(...)`, local/remote
+  pd-mode state through `pd_mode_apply_command(...)` and
+  `pd_mode_apply_remote_snapshot(...)`, and active slot state through
+  `key_runtime_slot_track(...)`.
+- Moved the pd-mode snapshot logic in that test back onto the real
+  `users/noah/lib/pointing/runtime/pd_mode_snapshot.c` module, keeping only
+  the minimal test-local registry/lifecycle stubs needed by
+  `pd_mode_state.c`.
+- Removed the remaining redundant high-level direct slot reset in
+  `tests/host/pd_mode_key_runtime_integration_test.c`.
+- Rechecked the remaining raw storage hits in `tests/host/`; they are now
+  confined to low-level slot/preflight/transition/admission/feedback tests
+  where storage layout is the contract under test.
+- Updated the active review so Finding 6 now treats the higher-level host-test
+  boundary cleanup as landed, which closes the final open finding from this
+  review.
+
+Contracts touched in this pass:
+
+- `key_feedback_pulse_arm(...)`
+- `pd_mode_apply_command(...)`
+- `pd_mode_apply_remote_snapshot(...)`
+- `key_runtime_slot_track(...)`
+- `pd_mode_snapshot()`
+- `run_runtime_debug_tests.sh`
+
+Verification run in this pass:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- treat Findings 1-6 as landed in this review
+- open a new review only when there is a new architecture topic, not to finish
+  tails from `2026-04-13-review-04`

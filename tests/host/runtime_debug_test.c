@@ -7,6 +7,10 @@
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/ownership/held_repeat.h"
+#include "users/noah/lib/key/runtime/key_runtime_feedback.h"
+#include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 
 enum {
@@ -38,6 +42,21 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
     return (keypos_t){
         .row = row,
         .col = col,
+    };
+}
+
+static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, uint8_t tap_count) {
+    return (handled_key_resolution_t){
+        .keycode          = keycode,
+        .tap_count        = tap_count,
+        .step             = {.tap = TAP_SENDS(keycode)},
+        .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+        .layer            = UINT8_MAX,
+        .pd_mode          = 0,
+        .has_more_taps    = false,
+        .flags            = HANDLED_KEY_FLAG_HANDLED,
     };
 }
 
@@ -119,6 +138,14 @@ void clear_oneshot_locked_mods(void) {
     fake_oneshot_locked_mods = 0;
 }
 
+handled_key_resolution_t handled_key_lookup(uint16_t keycode) {
+    return test_handled_key_resolution(keycode, 1);
+}
+
+handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
+    return test_handled_key_resolution(keycode, tap_count);
+}
+
 hold_behavior_t handled_key_resolution_hold(handled_key_resolution_t key) {
     return key.step.hold;
 }
@@ -155,6 +182,15 @@ bool handled_key_resolution_uses_implicit_hold(handled_key_resolution_t key) {
     return false;
 }
 
+delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
+    return (delayed_action_mods_t){
+        .real           = mt->saved_mods,
+        .weak           = mt->saved_weak_mods,
+        .oneshot        = mt->saved_oneshot_mods,
+        .oneshot_locked = mt->saved_oneshot_locked_mods,
+    };
+}
+
 void add_mods(uint8_t mods) {
     fake_mods |= mods;
 }
@@ -167,14 +203,90 @@ void send_keyboard_report(void) {
     send_keyboard_report_count++;
 }
 
+static uint8_t test_pd_mode_index(pd_mode_mask_t mode) {
+    switch (mode) {
+        case PD_MODE_VOLUME:
+            return PD_MODE_INDEX_VOLUME;
+        case PD_MODE_ARROW:
+            return PD_MODE_INDEX_ARROW;
+        default:
+            return PD_MODE_COUNT;
+    }
+}
+
+const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
+    [PD_MODE_INDEX_VOLUME] = {
+        .mode_flag    = PD_MODE_VOLUME,
+        .keycode      = VOLUME_MODE,
+        .lock_action  = VOLUME_MODE_LOCK,
+    },
+    [PD_MODE_INDEX_ARROW] = {
+        .mode_flag    = PD_MODE_ARROW,
+        .keycode      = ARROW_MODE,
+        .lock_action  = ARROW_MODE_LOCK,
+    },
+};
+
+const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode) {
+    uint8_t index = test_pd_mode_index(mode);
+    return index < PD_MODE_COUNT ? &pd_modes[index] : NULL;
+}
+
+const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+    for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
+        if (pd_modes[index].lock_action == action) {
+            return &pd_modes[index];
+        }
+    }
+
+    return NULL;
+}
+
 bool is_pd_mode_lock_action(uint16_t action) {
-    (void)action;
-    return false;
+    return pd_mode_lock_action_lookup(action) != NULL;
+}
+
+bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
+    const pd_mode_def_t *def = pd_mode_lookup(mode);
+    return def != NULL && (def->traits & trait) == trait;
+}
+
+bool pd_any_active_mode_has_trait(pd_mode_traits_t trait) {
+    return pd_mode_has_trait(pd_mode_local_active_snapshot(), trait);
+}
+
+bool is_keyboard_master(void) {
+    return true;
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    (void)keycode;
+    if (keycode == VOLUME_MODE) {
+        return PD_MODE_VOLUME;
+    }
+
+    if (keycode == ARROW_MODE) {
+        return PD_MODE_ARROW;
+    }
+
     return 0;
+}
+
+void pd_mode_transition_activate(pd_mode_mask_t mode) {
+    pd_mode_set(mode);
+}
+
+void pd_mode_transition_deactivate(pd_mode_mask_t mode) {
+    pd_mode_clear(mode);
+}
+
+void pd_mode_transition_lock(pd_mode_mask_t mode) {
+    pd_mode_set_locked(mode);
+    pd_mode_set(mode);
+}
+
+void pd_mode_transition_unlock(pd_mode_mask_t mode) {
+    pd_mode_clear_locked(mode);
+    pd_mode_clear(mode);
 }
 
 void noah_action_press(keypos_t key_pos, uint16_t action) {
@@ -201,8 +313,23 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     (void)pressed;
 }
 
+static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
+    active_key_state_t *slot = NULL;
+
+    CHECK(key_pos.row == 0);
+    CHECK(key_pos.col == 0);
+    slot = key_runtime_slot_at(0);
+    CHECK(slot != NULL);
+    key_runtime_slot_track(slot,
+                           keycode,
+                           key_pos,
+                           key_runtime_slot_interaction_from_resolution(test_handled_key_resolution(keycode, 1)),
+                           KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+}
+
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_debug_snapshot_t snapshot;
+    keypos_t                      active_key = test_keypos(0, 0);
     keypos_t                      layer_key  = test_keypos(1, 2);
     keypos_t                      action_key = test_keypos(3, 4);
     keypos_t                      repeat_key = test_keypos(5, 6);
@@ -210,26 +337,14 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    noah_runtime_shared_state.key.feedback.active                    = true;
-    noah_runtime_shared_state.pd.local_active_mode                   = PD_MODE_VOLUME;
-    noah_runtime_shared_state.pd.remote_display_active_mode          = PD_MODE_ARROW;
-    noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_C;
-    noah_runtime_shared_state.key.slots_by_position[0].interaction.valid = true;
-    noah_runtime_shared_state.key.slots_by_position[0].interaction.view = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
-        .keycode          = KC_C,
-        .tap_count        = 1,
-        .step =
-            {
-                .tap = TAP_SENDS(KC_C),
-            },
-        .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-        .layer            = UINT8_MAX,
-        .pd_mode          = 0,
-        .has_more_taps    = false,
-        .flags            = HANDLED_KEY_FLAG_HANDLED,
+    key_feedback_pulse_arm(false);
+    (void)pd_mode_apply_command((pd_mode_command_t){
+        .kind = PD_MODE_COMMAND_ACTIVATE,
+        .mode = PD_MODE_VOLUME,
     });
+    pd_mode_apply_remote_snapshot(PD_MODE_ARROW, 0);
+    test_stage_active_slot(KC_C, active_key);
+    noah_runtime_trace_reset();
 
     layer_ownership_set_lock_state(3, true);
     layer_ownership_momentary_press(layer_key, 2);
@@ -289,14 +404,18 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
 
 static void test_reset_clears_all_runtime_surfaces(void) {
     noah_runtime_debug_snapshot_t snapshot;
+    keypos_t                      active_key = test_keypos(0, 0);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    noah_runtime_shared_state.key.feedback.active                    = true;
-    noah_runtime_shared_state.pd.local_locked_mode                   = PD_MODE_ARROW;
-    noah_runtime_shared_state.pd.remote_display_locked_mode          = PD_MODE_VOLUME;
-    noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_V;
+    key_feedback_pulse_arm(true);
+    (void)pd_mode_apply_command((pd_mode_command_t){
+        .kind = PD_MODE_COMMAND_LOCK,
+        .mode = PD_MODE_ARROW,
+    });
+    pd_mode_apply_remote_snapshot(PD_MODE_VOLUME, PD_MODE_VOLUME);
+    test_stage_active_slot(KC_V, active_key);
 
     layer_ownership_set_lock_state(1, true);
     held_action_register(test_keypos(0, 1), TEST_ACTION);

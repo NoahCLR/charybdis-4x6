@@ -42,7 +42,6 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 
 static void test_reset_state(void) {
     runtime_shared_state_reset(&noah_runtime_shared_state);
-    *key_runtime_slot_for_position(test_keypos(1, 2)) = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
 
     fake_time          = 1000;
     current_cpi        = 0;
