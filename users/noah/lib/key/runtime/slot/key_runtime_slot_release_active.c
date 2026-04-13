@@ -24,6 +24,23 @@ typedef struct {
     pd_mode_mask_t                     pd_mode_lock_tap;
 } key_runtime_slot_release_resolution_t;
 
+typedef enum {
+    KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_NONE = 0,
+    KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY,
+    KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION,
+} key_runtime_slot_release_hold_action_mode_t;
+
+typedef struct {
+    bool                                       buffered_base_tap_dispatches_tap;
+    bool                                       quick_tap_dispatches_tap;
+    bool                                       pd_mode_lock_tap_allowed;
+    bool                                       quick_immediate_hold_dispatches_tap;
+    bool                                       checks_fallback_hold_suppression;
+    key_runtime_slot_release_hold_action_mode_t hold_action_mode;
+    bool                                       long_hold_dispatches_action;
+    bool                                       nonquick_release_dispatches_tap;
+} key_runtime_slot_release_phase_contract_t;
+
 typedef struct {
     active_key_state_t                released_key;
     key_runtime_slot_interaction_t    interaction;
@@ -94,63 +111,15 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolution
     return resolution;
 }
 
-static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_tap_window(const key_runtime_slot_release_context_t *context) {
-    if (!context) {
-        return (key_runtime_slot_release_resolution_t){0};
-    }
-
-    if (context->buffered_base_tap) {
-        return key_runtime_slot_release_resolution_tap(context);
-    }
-
-    if (context->quick_tap) {
-        if (context->lock_tap_mode) {
-            return key_runtime_slot_release_resolution_pd_mode_lock_tap(context);
-        }
-
-        return key_runtime_slot_release_resolution_tap(context);
-    }
-
-    if (context->contract.fallback_hold_suppresses_nonquick_release) {
-        return key_runtime_slot_release_resolution_base(context);
-    }
-
-    if (context->contract.release_hold_action != KC_NO) {
-        return key_runtime_slot_release_resolution_action(context, key_runtime_slot_release_contract_select_hold_action(context->contract, context->elapsed, context->interaction.binding.longer_hold_term));
-    }
-
-    if (context->contract.release_long_hold_action != KC_NO && context->elapsed >= context->interaction.binding.longer_hold_term) {
-        return key_runtime_slot_release_resolution_action(context, context->contract.release_long_hold_action);
-    }
-
-    if (context->contract.nonquick_release_dispatches_tap) {
-        return key_runtime_slot_release_resolution_tap(context);
-    }
-
-    return key_runtime_slot_release_resolution_base(context);
+static bool key_runtime_slot_release_has_primary_hold_action(const key_runtime_slot_release_context_t *context) {
+    return context && context->contract.release_hold_action != KC_NO;
 }
 
-static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_press_held_window(const key_runtime_slot_release_context_t *context) {
-    if (!context) {
-        return (key_runtime_slot_release_resolution_t){0};
-    }
-
-    if (context->lock_tap_mode) {
-        return key_runtime_slot_release_resolution_pd_mode_lock_tap(context);
-    }
-
-    if (context->quick_immediate_hold) {
-        return key_runtime_slot_release_resolution_tap(context);
-    }
-
-    if (context->contract.release_long_hold_action != KC_NO && context->elapsed >= context->interaction.binding.longer_hold_term) {
-        return key_runtime_slot_release_resolution_action(context, context->contract.release_long_hold_action);
-    }
-
-    return key_runtime_slot_release_resolution_base(context);
+static bool key_runtime_slot_release_can_select_hold_action(const key_runtime_slot_release_context_t *context) {
+    return context && (context->contract.release_hold_action != KC_NO || context->contract.release_long_hold_action != KC_NO);
 }
 
-static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_release_hold_pending(const key_runtime_slot_release_context_t *context) {
+static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolution_selected_hold_action(const key_runtime_slot_release_context_t *context) {
     if (!context) {
         return (key_runtime_slot_release_resolution_t){0};
     }
@@ -158,22 +127,92 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_re
     return key_runtime_slot_release_resolution_action(context, key_runtime_slot_release_contract_select_hold_action(context->contract, context->elapsed, context->interaction.binding.longer_hold_term));
 }
 
-static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_hold_phase(const key_runtime_slot_release_context_t *context) {
+static bool key_runtime_slot_release_long_hold_ready(const key_runtime_slot_release_context_t *context) {
+    return context && context->contract.release_long_hold_action != KC_NO && context->elapsed >= context->interaction.binding.longer_hold_term;
+}
+
+static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_phase_contract(const key_runtime_slot_release_context_t *context,
+                                                                                              key_runtime_slot_release_phase_contract_t phase_contract) {
     if (!context) {
         return (key_runtime_slot_release_resolution_t){0};
     }
 
-    if (context->contract.release_long_hold_action != KC_NO && context->elapsed >= context->interaction.binding.longer_hold_term) {
+    if (phase_contract.buffered_base_tap_dispatches_tap && context->buffered_base_tap) {
+        return key_runtime_slot_release_resolution_tap(context);
+    }
+
+    if (phase_contract.quick_tap_dispatches_tap && context->quick_tap) {
+        if (phase_contract.pd_mode_lock_tap_allowed && context->lock_tap_mode) {
+            return key_runtime_slot_release_resolution_pd_mode_lock_tap(context);
+        }
+
+        return key_runtime_slot_release_resolution_tap(context);
+    }
+
+    if (phase_contract.pd_mode_lock_tap_allowed && context->lock_tap_mode) {
+        return key_runtime_slot_release_resolution_pd_mode_lock_tap(context);
+    }
+
+    if (phase_contract.quick_immediate_hold_dispatches_tap && context->quick_immediate_hold) {
+        return key_runtime_slot_release_resolution_tap(context);
+    }
+
+    if (phase_contract.checks_fallback_hold_suppression && context->contract.fallback_hold_suppresses_nonquick_release) {
+        return key_runtime_slot_release_resolution_base(context);
+    }
+
+    switch (phase_contract.hold_action_mode) {
+        case KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY:
+            if (key_runtime_slot_release_has_primary_hold_action(context)) {
+                return key_runtime_slot_release_resolution_selected_hold_action(context);
+            }
+            break;
+        case KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION:
+            if (key_runtime_slot_release_can_select_hold_action(context)) {
+                return key_runtime_slot_release_resolution_selected_hold_action(context);
+            }
+            break;
+        case KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_NONE:
+        default:
+            break;
+    }
+
+    if (phase_contract.long_hold_dispatches_action && key_runtime_slot_release_long_hold_ready(context)) {
         return key_runtime_slot_release_resolution_action(context, context->contract.release_long_hold_action);
+    }
+
+    if (phase_contract.nonquick_release_dispatches_tap && context->contract.nonquick_release_dispatches_tap) {
+        return key_runtime_slot_release_resolution_tap(context);
     }
 
     return key_runtime_slot_release_resolution_base(context);
 }
 
-typedef key_runtime_slot_release_resolution_t (*key_runtime_slot_release_phase_resolver_t)(const key_runtime_slot_release_context_t *context);
-
-static const key_runtime_slot_release_phase_resolver_t key_runtime_slot_release_phase_resolvers[] = {
-    [KEY_RUNTIME_SLOT_PHASE_IDLE] = key_runtime_slot_release_resolution_base, [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW] = key_runtime_slot_release_resolve_tap_window, [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW] = key_runtime_slot_release_resolve_press_held_window, [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = key_runtime_slot_release_resolve_release_hold_pending, [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE] = key_runtime_slot_release_resolve_hold_phase, [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE] = key_runtime_slot_release_resolve_hold_phase,
+static const key_runtime_slot_release_phase_contract_t key_runtime_slot_release_phase_contracts[] = {
+    [KEY_RUNTIME_SLOT_PHASE_IDLE]                 = {0},
+    [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW]          = {
+        .buffered_base_tap_dispatches_tap    = true,
+        .quick_tap_dispatches_tap            = true,
+        .pd_mode_lock_tap_allowed            = true,
+        .checks_fallback_hold_suppression    = true,
+        .hold_action_mode                    = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY,
+        .long_hold_dispatches_action         = true,
+        .nonquick_release_dispatches_tap     = true,
+    },
+    [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW]  = {
+        .pd_mode_lock_tap_allowed            = true,
+        .quick_immediate_hold_dispatches_tap = true,
+        .long_hold_dispatches_action         = true,
+    },
+    [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = {
+        .hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION,
+    },
+    [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE]  = {
+        .long_hold_dispatches_action = true,
+    },
+    [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE]     = {
+        .long_hold_dispatches_action = true,
+    },
 };
 
 static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(active_key_state_t released_key, uint16_t elapsed) {
@@ -184,15 +223,15 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(ac
         .contract     = key_runtime_slot_release_contract(interaction),
         .elapsed      = elapsed,
     };
-    key_runtime_slot_phase_t                  phase    = key_runtime_slot_phase(&released_key);
-    key_runtime_slot_release_phase_resolver_t resolver = key_runtime_slot_release_phase_resolvers[phase];
+    key_runtime_slot_phase_t phase = key_runtime_slot_phase(&released_key);
+    key_runtime_slot_release_phase_contract_t phase_contract = key_runtime_slot_release_phase_contracts[phase];
 
     context.quick_tap            = key_runtime_slot_release_is_quick_tap(&context);
     context.quick_immediate_hold = context.contract.quick_release_of_immediate_hold_dispatches_tap && key_runtime_slot_allows_tap_release(&released_key) && context.quick_tap;
     context.buffered_base_tap    = key_runtime_slot_release_is_buffered_base_tap(&context);
     context.lock_tap_mode        = key_runtime_slot_locked_pd_mode_tap_mode(&context);
 
-    return resolver ? resolver(&context) : key_runtime_slot_release_resolution_base(&context);
+    return key_runtime_slot_release_resolve_phase_contract(&context, phase_contract);
 }
 
 static void key_runtime_slot_release_apply_tap(key_runtime_slot_result_t *result, active_key_state_t *slot, uint16_t keycode, keypos_t key_pos,

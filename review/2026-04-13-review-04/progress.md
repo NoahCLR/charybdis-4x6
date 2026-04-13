@@ -653,6 +653,8 @@ Verification run in this pass:
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
 Workspace scope:
 
@@ -666,3 +668,52 @@ Next steps:
 - then decide whether the next Finding 2 slice should move more branch
   selection into the cached release contract or into small phase-specific
   helpers
+
+### Implementation pass: release phase-contract table
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Replaced the bespoke active-release phase resolver matrix in
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c`
+  with a compact typed phase-contract table plus one generic interpreter for
+  buffered tap, quick tap, pd-mode quick lock, fallback suppression,
+  release-hold selection, long-hold takeover, and nonquick tap dispatch.
+- Kept the cached release contract and tap contract unchanged at the outer
+  seam, but moved the remaining phase selection logic out of dedicated
+  per-phase resolver functions and into data-shaped phase policy.
+- Updated
+  `docs/KEY_RUNTIME.md`
+  and the active review so the maintainer-facing description now reflects that
+  release routing uses typed phase contracts rather than one bespoke resolver
+  per slot phase.
+
+Contracts touched in this pass:
+
+- `key_runtime_slot_release_phase_contract_t`
+- `key_runtime_slot_release_resolve_phase_contract(...)`
+- `key_runtime_slot_reduce_active_release(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- decide whether the next Finding 2 slice should move more branch
+  selection into the cached release contract or continue shrinking the generic
+  phase interpreter
+- if the generic interpreter stays, consider pushing long-hold takeover and
+  hold-action selection into tiny shared helpers so scan and release keep
+  converging on one semantic vocabulary
