@@ -73,6 +73,11 @@ void key_runtime_integration_scan(void) {
     noah_key_runtime_scan();
 }
 
+bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed) {
+    keyrecord_t record = key_runtime_integration_record(key_pos, pressed);
+    return noah_process_record_user(keycode, &record);
+}
+
 void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_step_t *steps, uint8_t step_count) {
     if (!time || !steps) {
         return;
@@ -81,13 +86,11 @@ void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_s
     for (uint8_t index = 0; index < step_count; index++) {
         switch (steps[index].kind) {
             case KEY_RUNTIME_INTEGRATION_STEP_PRESS: {
-                keyrecord_t record = key_runtime_integration_record(steps[index].data.key_event.key_pos, true);
-                (void)noah_process_record_user(steps[index].data.key_event.keycode, &record);
+                (void)key_runtime_integration_process_record(steps[index].data.key_event.keycode, steps[index].data.key_event.key_pos, true);
                 break;
             }
             case KEY_RUNTIME_INTEGRATION_STEP_RELEASE: {
-                keyrecord_t record = key_runtime_integration_record(steps[index].data.key_event.key_pos, false);
-                (void)noah_process_record_user(steps[index].data.key_event.keycode, &record);
+                (void)key_runtime_integration_process_record(steps[index].data.key_event.keycode, steps[index].data.key_event.key_pos, false);
                 break;
             }
             case KEY_RUNTIME_INTEGRATION_STEP_ADVANCE_MS:

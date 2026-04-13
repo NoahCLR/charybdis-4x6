@@ -510,3 +510,63 @@ Next steps:
   shared semantic helpers.
 - At this point the remaining work is cleanup and coverage-shape tightening
   rather than a missing major architectural seam.
+
+### Implementation Pass: Real-Profile Integration Helpers
+
+Completed in this pass:
+
+- Extended the shared integration helper again in:
+  - `tests/host/key_runtime_integration_harness.h`
+  - `tests/host/key_runtime_integration_harness.c`
+- The helper now also covers explicit process-record driving for dynamically
+  resolved keycodes:
+  - `key_runtime_integration_process_record(...)`
+- This keeps real-profile integration tests on the real keymap resolution
+  path while still sharing the same helper surface for:
+  - process-record dispatch
+  - time advancement
+  - scan control
+  - `runtime_debug.h`-shaped read-side assertions
+- Migrated
+  `tests/host/real_profile_thumb_layer_lock_integration_test.c`
+  onto the shared helper:
+  - resolved key presses / releases now route through the shared integration
+    process-record helper instead of building `keyrecord_t` inline
+  - timing and scan steps now use the shared advance / scan helpers
+  - post-cycle layer-lock assertions now read through integration snapshots
+    instead of only checking live global layer state directly
+- Updated
+  `tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  so the shared helper is compiled into that runner.
+
+Contracts touched in this pass:
+
+- shared explicit process-record integration helper:
+  `tests/host/key_runtime_integration_harness.h`,
+  `tests/host/key_runtime_integration_harness.c`
+- real-profile thumb layer-lock integration coverage:
+  `tests/host/real_profile_thumb_layer_lock_integration_test.c`,
+  `tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes stayed inside `charybdis-4x6/tests/host/` and the active review
+  folder
+
+Next steps:
+
+- Recommendation 5 is now mostly a matter of incremental cleanup rather than
+  missing semantic harness coverage.
+- If more cleanup is wanted, focus on smaller remaining integration fixtures
+  that still duplicate timing or read-side state setup, but there is no longer
+  an obvious large migration target comparable to the earlier scenario,
+  pd-mode, layer-lock, modifier-hold, or real-profile runners.

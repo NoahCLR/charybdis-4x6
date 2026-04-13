@@ -30,6 +30,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     -include "$ROOT/tests/host/include/noah_compile_config.h" \
+    "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/real_profile_thumb_layer_lock_integration_test.c" \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \

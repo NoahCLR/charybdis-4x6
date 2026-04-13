@@ -32,6 +32,10 @@ Implementation status update:
   integration tests can now use the same shared harness for multi-tap handled
   key setup, direct handled press/release driving, time advancement, and
   snapshot-based assertions.
+- Recommendation 5 has a fourth implementation slice: real-profile
+  process-record integration tests can now use the same shared helper for
+  explicit resolved-key dispatch, timing, scan control, and snapshot-based
+  assertions without giving up real keymap resolution.
 - The remaining open recommendation area is pushing more integration coverage
   onto those semantic builders beyond the current scenario-level slice.
 

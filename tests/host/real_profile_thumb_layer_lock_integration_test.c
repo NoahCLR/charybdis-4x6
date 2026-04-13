@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "key_runtime_integration_harness.h"
 #include "print.h"
 #include "transactions.h"
 #include "users/noah/lib/action/action_dispatch.h"
@@ -45,18 +46,16 @@ static keypos_t test_right_thumb_pos(void) {
     return (keypos_t){.row = 6, .col = 3};
 }
 
-static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
-    return (keyrecord_t){
-        .event =
-            {
-                .key     = key_pos,
-                .pressed = pressed,
-            },
-    };
-}
-
 static uint16_t test_layer_mask(uint8_t layer) {
     return (uint16_t)((layer_state_t)1u << layer);
+}
+
+static bool test_snapshot_layer_active(const noah_runtime_debug_snapshot_t *snapshot, uint8_t layer) {
+    return snapshot != NULL && layer < LAYER_COUNT && (snapshot->layer_ownership.applied_layer_state & ((layer_state_t)1u << layer)) != 0;
+}
+
+static bool test_snapshot_layer_locked(const noah_runtime_debug_snapshot_t *snapshot, uint8_t layer) {
+    return snapshot != NULL && layer < LAYER_COUNT && (snapshot->layer_ownership.locked_mask & ((layer_state_t)1u << layer)) != 0;
 }
 
 static uint8_t test_highest_active_layer(void) {
@@ -87,28 +86,26 @@ static uint16_t test_resolve_keycode(keypos_t key_pos) {
 }
 
 static void test_press_resolved(keypos_t key_pos) {
-    keyrecord_t record  = test_record(key_pos, true);
     uint16_t    keycode = test_resolve_keycode(key_pos);
 
-    CHECK(!noah_process_record_user(keycode, &record));
+    CHECK(!key_runtime_integration_process_record(keycode, key_pos, true));
 }
 
 static void test_release_resolved(keypos_t key_pos) {
-    keyrecord_t record  = test_record(key_pos, false);
     uint16_t    keycode = test_resolve_keycode(key_pos);
 
-    CHECK(!noah_process_record_user(keycode, &record));
+    CHECK(!key_runtime_integration_process_record(keycode, key_pos, false));
 }
 
 static void test_run_double_tap_hold_cycle(keypos_t key_pos, uint16_t hold_ms) {
     test_press_resolved(key_pos);
     test_release_resolved(key_pos);
 
-    fake_time = (uint16_t)(fake_time + 40);
+    key_runtime_integration_advance(&fake_time, 40);
     test_press_resolved(key_pos);
 
-    fake_time = (uint16_t)(fake_time + hold_ms);
-    noah_key_runtime_scan();
+    key_runtime_integration_advance(&fake_time, hold_ms);
+    key_runtime_integration_scan();
 
     test_release_resolved(key_pos);
 }
@@ -117,14 +114,14 @@ static void test_run_double_tap_hold_cycle_with_intermediate_scan(keypos_t key_p
     test_press_resolved(key_pos);
     test_release_resolved(key_pos);
 
-    fake_time = (uint16_t)(fake_time + 40);
+    key_runtime_integration_advance(&fake_time, 40);
     test_press_resolved(key_pos);
 
-    fake_time = (uint16_t)(fake_time + pre_threshold_scan_ms);
-    noah_key_runtime_scan();
+    key_runtime_integration_advance(&fake_time, pre_threshold_scan_ms);
+    key_runtime_integration_scan();
 
-    fake_time = (uint16_t)(fake_time + hold_ms);
-    noah_key_runtime_scan();
+    key_runtime_integration_advance(&fake_time, hold_ms);
+    key_runtime_integration_scan();
 
     test_release_resolved(key_pos);
 }
@@ -519,52 +516,61 @@ void split_runtime_sync(void) {}
 static void test_left_thumb_double_tap_hold_toggles_num_layer(void) {
     keypos_t key_pos      = test_left_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+    noah_runtime_debug_snapshot_t snapshot = {0};
 
     test_reset_state();
 
     CHECK(test_resolve_keycode(key_pos) == base_keycode);
     test_run_double_tap_hold_cycle(key_pos, 401);
-    CHECK(layer_ownership_is_locked(LAYER_NUM));
-    CHECK(layer_state_cmp(layer_state, LAYER_NUM));
+    key_runtime_integration_debug_snapshot(&snapshot);
+    CHECK(test_snapshot_layer_locked(&snapshot, LAYER_NUM));
+    CHECK(test_snapshot_layer_active(&snapshot, LAYER_NUM));
     CHECK(test_resolve_keycode(key_pos) == base_keycode);
 
-    fake_time = (uint16_t)(fake_time + 40);
+    key_runtime_integration_advance(&fake_time, 40);
     test_run_double_tap_hold_cycle(key_pos, 401);
-    CHECK(!layer_ownership_is_locked(LAYER_NUM));
-    CHECK(!layer_state_cmp(layer_state, LAYER_NUM));
+    key_runtime_integration_debug_snapshot(&snapshot);
+    CHECK(!test_snapshot_layer_locked(&snapshot, LAYER_NUM));
+    CHECK(!test_snapshot_layer_active(&snapshot, LAYER_NUM));
 }
 
 static void test_right_thumb_double_tap_hold_toggles_num_layer(void) {
     keypos_t key_pos      = test_right_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+    noah_runtime_debug_snapshot_t snapshot = {0};
 
     test_reset_state();
 
     CHECK(test_resolve_keycode(key_pos) == base_keycode);
     test_run_double_tap_hold_cycle(key_pos, 401);
-    CHECK(layer_ownership_is_locked(LAYER_NUM));
-    CHECK(layer_state_cmp(layer_state, LAYER_NUM));
+    key_runtime_integration_debug_snapshot(&snapshot);
+    CHECK(test_snapshot_layer_locked(&snapshot, LAYER_NUM));
+    CHECK(test_snapshot_layer_active(&snapshot, LAYER_NUM));
     CHECK(test_resolve_keycode(key_pos) == base_keycode);
 
-    fake_time = (uint16_t)(fake_time + 40);
+    key_runtime_integration_advance(&fake_time, 40);
     test_run_double_tap_hold_cycle(key_pos, 401);
-    CHECK(!layer_ownership_is_locked(LAYER_NUM));
-    CHECK(!layer_state_cmp(layer_state, LAYER_NUM));
+    key_runtime_integration_debug_snapshot(&snapshot);
+    CHECK(!test_snapshot_layer_locked(&snapshot, LAYER_NUM));
+    CHECK(!test_snapshot_layer_active(&snapshot, LAYER_NUM));
 }
 
 static void test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle(void) {
     keypos_t key_pos = test_right_thumb_pos();
+    noah_runtime_debug_snapshot_t snapshot = {0};
 
     test_reset_state();
 
     test_run_double_tap_hold_cycle_with_intermediate_scan(key_pos, 120, 281);
-    CHECK(layer_ownership_is_locked(LAYER_NUM));
-    CHECK(layer_state_cmp(layer_state, LAYER_NUM));
+    key_runtime_integration_debug_snapshot(&snapshot);
+    CHECK(test_snapshot_layer_locked(&snapshot, LAYER_NUM));
+    CHECK(test_snapshot_layer_active(&snapshot, LAYER_NUM));
 
-    fake_time = (uint16_t)(fake_time + 40);
+    key_runtime_integration_advance(&fake_time, 40);
     test_run_double_tap_hold_cycle_with_intermediate_scan(key_pos, 120, 281);
-    CHECK(!layer_ownership_is_locked(LAYER_NUM));
-    CHECK(!layer_state_cmp(layer_state, LAYER_NUM));
+    key_runtime_integration_debug_snapshot(&snapshot);
+    CHECK(!test_snapshot_layer_locked(&snapshot, LAYER_NUM));
+    CHECK(!test_snapshot_layer_active(&snapshot, LAYER_NUM));
 }
 
 int main(void) {
