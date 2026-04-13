@@ -451,3 +451,68 @@ Next steps:
   projections only and avoid introducing any new production callers
 - move on to recommendation 3, since recommendation 2 is now structurally
   complete and production action classification is descriptor-owned
+
+## 2026-04-13: Recommendation 2 compatibility cleanup
+
+Completed in this pass:
+
+- Removed the remaining exported compatibility classifier layer from
+  `action_dispatch.[ch]`. The older `action_dispatch_is_*()` helpers no longer
+  exist as a public API; action classification is descriptor-owned only.
+- Removed `noah_action_hold_kind()` and its enum from `action_lifecycle.[ch]`.
+  Hold/dispatch-shape classification now lives entirely on the descriptor
+  helper surface.
+- Reworked the remaining host assertions and harness code to use
+  `noah_action_describe(...)`, `noah_action_desc_is_*()`, and the inline
+  keycode-family helpers directly instead of rebuilding or stubbing the removed
+  wrapper API by name.
+- Cleaned the last test-local fallback-hold reconstruction path in
+  `key_runtime_slot_test.c` so it now asks the descriptor whether a keycode is
+  a qmk-behavior action instead of consulting a removed wrapper symbol.
+
+Contracts touched:
+
+- `users/noah/lib/action/action_dispatch.[ch]`
+- `users/noah/lib/action/action_lifecycle.[ch]`
+- `tests/host/action_lifecycle_test.c`
+- `tests/host/held_action_test.c`
+- `tests/host/key_behavior_lookup_test.c`
+- `tests/host/key_behavior_validation_test.c`
+- `tests/host/key_runtime_admission_test.c`
+- `tests/host/key_runtime_feedback_test.c`
+- `tests/host/key_runtime_modifier_hold_integration_test.c`
+- `tests/host/key_runtime_preflight_test.c`
+- `tests/host/key_runtime_scenario_harness.c`
+- `tests/host/key_runtime_slot_test.c`
+- `tests/host/key_runtime_transition_test.c`
+- `tests/host/pd_mode_key_runtime_integration_test.c`
+- `tests/host/real_profile_validation_test.c`
+- `tests/host/runtime_debug_test.c`
+- `tests/host/via_macro_action_lifecycle_test.c`
+
+Verification run in this pass:
+
+- `git diff --check`
+- `rg -n "action_dispatch_is_layer_action\\(|action_dispatch_is_layer_lock\\(|action_dispatch_is_raw_qmk_layer_action\\(|action_dispatch_is_macro\\(|action_dispatch_is_qmk_behavior_keycode\\(|noah_action_hold_kind\\(" users/noah/lib tests/host`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- start recommendation 3 without carrying the removed compatibility action
+  contracts into the runtime-storage refactor

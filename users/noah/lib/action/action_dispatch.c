@@ -32,26 +32,6 @@ static void noah_emit_run(uint16_t keycode, noah_emit_tap_fn_t emit, noah_emit_p
     }
 }
 
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    return noah_action_keycode_is_layer_lock(action);
-}
-
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return noah_action_keycode_is_raw_qmk_layer_action(action);
-}
-
-bool action_dispatch_is_layer_action(uint16_t action) {
-    return noah_action_desc_is_layer_action(noah_action_describe(action));
-}
-
-bool action_dispatch_is_macro(uint16_t action) {
-    return noah_action_keycode_is_macro(action);
-}
-
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
-    return noah_action_keycode_is_qmk_behavior(action);
-}
-
 bool action_dispatch_layer_is_locked(uint8_t layer) {
     return layer_ownership_is_locked(layer);
 }

@@ -56,11 +56,6 @@ static inline bool noah_action_keycode_is_qmk_behavior(uint16_t action) {
     return IS_QK_ONE_SHOT_MOD(action) || IS_QK_MOD_TAP(action);
 }
 
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action);
-bool action_dispatch_is_layer_lock(uint16_t action);
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action);
-bool action_dispatch_is_macro(uint16_t action);
-
 typedef struct {
     uint16_t action;
     uint8_t  layer;
@@ -119,7 +114,6 @@ static inline bool noah_action_desc_is_pd_mode_action(noah_action_desc_t desc) {
     return desc.pd_mode != 0;
 }
 
-bool action_dispatch_is_layer_action(uint16_t action);
 bool action_dispatch_layer_is_locked(uint8_t layer);
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy);
 void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy);

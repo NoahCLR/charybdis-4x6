@@ -374,36 +374,9 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     return pd_toggle_result;
 }
 
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    (void)action;
-    return NOAH_ACTION_HOLD_KIND_SHARED;
-}
-
-bool action_dispatch_is_layer_action(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
-bool action_dispatch_is_macro(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 bool is_pd_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
-}
-
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
 }
 
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {

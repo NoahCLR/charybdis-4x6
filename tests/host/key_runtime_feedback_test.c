@@ -90,29 +90,6 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 3;
 }
 
-bool action_dispatch_is_layer_action(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
-bool action_dispatch_is_macro(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 bool is_pd_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
@@ -224,11 +201,6 @@ bool handled_key_is_layer_tap(handled_key_view_t key) {
 bool pd_mode_local_locked(pd_mode_mask_t mode) {
     (void)mode;
     return false;
-}
-
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    (void)action;
-    return NOAH_ACTION_HOLD_KIND_SHARED;
 }
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {

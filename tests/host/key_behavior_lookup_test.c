@@ -38,10 +38,6 @@ const key_behavior_t key_behaviors[] = {
 
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     return keycode == TEST_PD_MODE_KEY ? 1u : 0u;
 }

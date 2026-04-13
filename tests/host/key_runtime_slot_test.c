@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/noah_keymap_ids.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_effect.h"
@@ -187,25 +188,7 @@ bool pd_mode_local_locked(pd_mode_mask_t mode) {
     return (test_pd_locked_modes & mode) != 0;
 }
 
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
-}
-
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
-bool action_dispatch_is_macro(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 bool is_pd_mode_lock_action(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
     (void)action;
     return false;
 }
@@ -227,11 +210,12 @@ static bool test_handled_key_uses_buffered_modifier_single_step(key_behavior_vie
 }
 
 static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior) {
-    pd_mode_mask_t mode     = pd_mode_for_keycode(behavior.keycode);
-    bool           implicit = mode != 0;
-    bool           fallback = false;
+    noah_action_desc_t desc     = noah_action_describe(behavior.keycode);
+    pd_mode_mask_t     mode     = pd_mode_for_keycode(behavior.keycode);
+    bool               implicit = mode != 0;
+    bool               fallback = false;
 
-    if (!behavior.is_momentary_layer && behavior.keycode < SAFE_RANGE && !action_dispatch_is_qmk_behavior_keycode(behavior.keycode) && !behavior.single.hold.present && !behavior.single.long_hold.present) {
+    if (!behavior.is_momentary_layer && behavior.keycode < SAFE_RANGE && !desc.is_qmk_behavior_keycode && !behavior.single.hold.present && !behavior.single.long_hold.present) {
         fallback = behavior.single.tap.present || behavior.has_multi_tap;
     }
 
@@ -293,11 +277,6 @@ handled_key_view_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_co
     key.tap_resolves_on_press = fires_on_press;
 
     return key;
-}
-
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    (void)action;
-    return NOAH_ACTION_HOLD_KIND_SHARED;
 }
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {

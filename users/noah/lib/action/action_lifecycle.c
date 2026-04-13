@@ -49,20 +49,6 @@ static bool noah_action_handle_one_shot_press(noah_action_desc_t desc) {
     return macro_dispatch(desc.action);
 }
 
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    noah_action_desc_t desc = noah_action_describe(action);
-
-    if (noah_action_desc_is_press_only(desc)) {
-        return NOAH_ACTION_HOLD_KIND_PRESS_ONLY;
-    }
-
-    if (noah_action_desc_requires_per_key_hold(desc)) {
-        return NOAH_ACTION_HOLD_KIND_PER_KEY;
-    }
-
-    return NOAH_ACTION_HOLD_KIND_SHARED;
-}
-
 void noah_action_tap(uint16_t action) {
     noah_action_desc_t desc = noah_action_describe(action);
 

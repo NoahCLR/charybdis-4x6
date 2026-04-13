@@ -638,8 +638,8 @@ Current status:
   ownership dispatch all consume descriptor semantics instead of rediscovering
   action meaning from raw keycodes
 - the older exported `action_dispatch_is_*()` helpers and
-  `noah_action_hold_kind()` remain only as compatibility projections over the
-  descriptor, not as an independent second system
+  `noah_action_hold_kind()` have been removed, so there is no longer a public
+  parallel classifier surface alongside the descriptor
 - the host harness now has real encodable test surfaces for unsupported raw
   layer actions and supported qmk-behavior actions, so the canonical
   descriptor is validated against actual action families rather than

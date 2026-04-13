@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap_ids.h"
@@ -209,14 +210,14 @@ void unregister_code16(uint16_t keycode) {
     unregister_code16_call.keycode = keycode;
 }
 
-static void test_hold_kind_classifies_actions(void) {
+static void test_descriptor_classifies_dispatch_shapes(void) {
     test_reset_stubs();
 
-    CHECK(noah_action_hold_kind(LOCK_LAYER(3)) == NOAH_ACTION_HOLD_KIND_PRESS_ONLY);
-    CHECK(noah_action_hold_kind(ARROW_MODE_LOCK) == NOAH_ACTION_HOLD_KIND_PRESS_ONLY);
-    CHECK(noah_action_hold_kind(MACRO_0) == NOAH_ACTION_HOLD_KIND_PRESS_ONLY);
-    CHECK(noah_action_hold_kind(MO(2)) == NOAH_ACTION_HOLD_KIND_PER_KEY);
-    CHECK(noah_action_hold_kind(KC_C) == NOAH_ACTION_HOLD_KIND_SHARED);
+    CHECK(noah_action_desc_is_press_only(noah_action_describe(LOCK_LAYER(3))));
+    CHECK(noah_action_desc_is_press_only(noah_action_describe(ARROW_MODE_LOCK)));
+    CHECK(noah_action_desc_is_press_only(noah_action_describe(MACRO_0)));
+    CHECK(noah_action_desc_requires_per_key_hold(noah_action_describe(MO(2))));
+    CHECK(noah_action_desc_uses_shared_hold(noah_action_describe(KC_C)));
 }
 
 static void test_tap_handles_layer_lock_and_pd_lock(void) {
@@ -423,7 +424,7 @@ static void test_release_ignores_raw_layer_actions(void) {
 }
 
 int main(void) {
-    test_hold_kind_classifies_actions();
+    test_descriptor_classifies_dispatch_shapes();
     test_tap_handles_layer_lock_and_pd_lock();
     test_tap_routes_macro_custom_qmk_and_plain_actions();
     test_tap_ignores_raw_layer_actions();

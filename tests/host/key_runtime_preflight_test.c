@@ -173,26 +173,6 @@ void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_tran
     plan->count++;
 }
 
-bool action_dispatch_is_layer_lock(uint16_t keycode) {
-    (void)keycode;
-    return false;
-}
-
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_macro(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 bool is_pd_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
@@ -278,11 +258,6 @@ pd_mode_mask_t handled_key_pd_mode(handled_key_view_t key) {
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
-}
-
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    (void)action;
-    return NOAH_ACTION_HOLD_KIND_SHARED;
 }
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {

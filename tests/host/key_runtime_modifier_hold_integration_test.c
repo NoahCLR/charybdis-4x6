@@ -210,31 +210,6 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 3;
 }
 
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_macro(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_layer_action(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 bool is_pd_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
@@ -288,11 +263,6 @@ void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
 bool layer_ownership_momentary_release(keypos_t key_pos) {
     (void)key_pos;
     return false;
-}
-
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    (void)action;
-    return NOAH_ACTION_HOLD_KIND_SHARED;
 }
 
 void noah_action_press(keypos_t key_pos, uint16_t action) {

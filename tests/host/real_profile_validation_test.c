@@ -43,10 +43,6 @@ int uprintf(const char *fmt, ...) {
     return written;
 }
 
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_modes[i].keycode == keycode) {

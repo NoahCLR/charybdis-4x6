@@ -121,19 +121,9 @@ bool pd_mode_local_locked(pd_mode_mask_t mode) {
     return false;
 }
 
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 bool is_layer_key(uint16_t keycode) {
     (void)keycode;
     return false;
-}
-
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    (void)action;
-    return NOAH_ACTION_HOLD_KIND_SHARED;
 }
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {

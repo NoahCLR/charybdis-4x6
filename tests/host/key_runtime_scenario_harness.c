@@ -325,40 +325,15 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
     return false;
 }
 
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
-}
-
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
-bool action_dispatch_is_layer_action(uint16_t action) {
-    return action_dispatch_is_raw_qmk_layer_action(action) || action_dispatch_is_layer_lock(action);
-}
-
-bool action_dispatch_is_macro(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 bool action_dispatch_layer_is_locked(uint8_t layer) {
     return key_runtime_scenario_layer_locked(layer);
 }
 
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    (void)action;
-    return NOAH_ACTION_HOLD_KIND_SHARED;
-}
-
 void action_dispatch(uint16_t action) {
-    if (action_dispatch_is_layer_lock(action)) {
-        key_runtime_scenario_locked_layers ^= (layer_state_t)1u << (uint8_t)(action - LAYER_LOCK_BASE);
+    noah_action_desc_t desc = noah_action_describe(action);
+
+    if (desc.is_layer_lock) {
+        key_runtime_scenario_locked_layers ^= (layer_state_t)1u << desc.layer;
     }
 
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){

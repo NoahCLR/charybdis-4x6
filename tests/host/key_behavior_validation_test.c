@@ -39,11 +39,6 @@ int uprintf(const char *fmt, ...) {
     return written;
 }
 
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;

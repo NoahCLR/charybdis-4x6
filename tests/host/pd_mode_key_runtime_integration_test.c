@@ -154,25 +154,6 @@ void wait_ms(uint16_t ms) {
     (void)ms;
 }
 
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
-bool action_dispatch_is_macro(uint16_t action) {
-    (void)action;
-    return false;
-}
-
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     (void)action;
     (void)policy;
