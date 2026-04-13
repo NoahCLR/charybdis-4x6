@@ -220,6 +220,7 @@ uint16_t         timer_read(void);
 uint16_t         timer_elapsed(uint16_t last);
 uint32_t         timer_read32(void);
 uint32_t         timer_elapsed32(uint32_t last);
+uint32_t         last_input_activity_elapsed(void);
 bool             is_keyboard_master(void);
 void             eeconfig_update_user(uint32_t value);
 bool             process_record_user(uint16_t keycode, keyrecord_t *record);

@@ -55,6 +55,17 @@ enum charybdis_keymap_layers {
 // Tuning for the scroll hardware itself lives in users/noah/config.h.
 #    define CHARYBDIS_DRAGSCROLL_DPI 100
 
+// Temporary console trace for diagnosing idle sensor noise that can keep the
+// RGB timeout from ever expiring. Prints one line at the start of each motion
+// burst and stays silent while reports are all zero.
+#    define NOAH_POINTING_MOTION_TRACE_ENABLE
+#    define NOAH_POINTING_MOTION_TRACE_RATE_LIMIT_MS 250
+// Ignore tiny no-button reports after a quiet period so sensor noise does not
+// keep RGB awake or slowly drift into auto-mouse activation.
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS 1000
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX 2
+
 // Per-mode pointer DPI. Each mode can optionally override the normal pointer
 // DPI while it is active. Sniping always takes priority when active.
 // Dragscroll and pinch are excluded — the shared local dragscroll handler
@@ -100,8 +111,9 @@ enum charybdis_keymap_layers {
 #    define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
 // Minimum ms between LED updates — higher reduces CPU load, lowers animation smoothness.
 #    define RGB_MATRIX_LED_FLUSH_LIMIT 32
-// Turn off LEDs after this many ms of inactivity (requires SPLIT_ACTIVITY_ENABLE).
-#    define RGB_MATRIX_TIMEOUT 900000
+// Temporary verification timeout: 10 seconds makes it easy to confirm whether
+// the idle-noise filter now allows RGB sleep to trigger as expected.
+#    define RGB_MATRIX_TIMEOUT 10000
 
 // Key-behavior feedback overlay.
 // Shows multi-tap progress and hold-threshold colors on individual keys.
