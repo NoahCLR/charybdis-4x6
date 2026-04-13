@@ -323,9 +323,8 @@ void reset_zoom_mode(void) {}
 void reset_arrow_mode(void) {}
 
 static void test_plain_pd_mode_key_activates_and_deactivates_through_process_record(void) {
-    keypos_t                         key_pos       = test_keypos(1, 2);
-    noah_runtime_debug_snapshot_t    snapshot      = {0};
-    const active_key_state_t        *slot          = NULL;
+    keypos_t                      key_pos  = test_keypos(1, 2);
+    noah_runtime_debug_snapshot_t snapshot = {0};
     const key_runtime_integration_step_t press_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
     };
@@ -342,24 +341,20 @@ static void test_plain_pd_mode_key_activates_and_deactivates_through_process_rec
 
     key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
     key_runtime_integration_debug_snapshot(&snapshot);
-    slot = key_runtime_integration_snapshot_slot(&snapshot, key_pos);
-    CHECK(slot != NULL);
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);
-    CHECK(slot->owner.keycode == VOLUME_MODE);
-    CHECK(slot->lifecycle.held_action_keycode == VOLUME_MODE);
+    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == VOLUME_MODE);
+    CHECK(key_runtime_integration_snapshot_slot_held_action_keycode(&snapshot, key_pos) == VOLUME_MODE);
     CHECK(split_sync_count >= 1);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
     key_runtime_integration_debug_snapshot(&snapshot);
-    slot = key_runtime_integration_snapshot_slot(&snapshot, key_pos);
-    CHECK(slot != NULL);
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(!pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);
-    CHECK(slot->owner.keycode == KC_NO);
-    CHECK(slot->lifecycle.held_action_keycode == KC_NO);
+    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == KC_NO);
+    CHECK(key_runtime_integration_snapshot_slot_held_action_keycode(&snapshot, key_pos) == KC_NO);
     CHECK(reset_volume_count == 1);
     CHECK(current_cpi == default_dpi);
 }

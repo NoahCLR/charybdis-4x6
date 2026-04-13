@@ -1,7 +1,5 @@
 #include "key_runtime_integration_harness.h"
 
-#include <string.h>
-
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/noah_runtime.h"
 
@@ -41,6 +39,21 @@ __attribute__((weak)) void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ow
     }
 
     *out = (keyboard_mod_ownership_debug_snapshot_t){0};
+}
+
+__attribute__((weak)) void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (noah_runtime_debug_snapshot_t){0};
+    out->core = noah_runtime_shared_state;
+
+    layer_ownership_debug_snapshot(&out->layer_ownership);
+    held_action_debug_snapshot(&out->held_actions);
+    held_repeat_debug_snapshot(&out->held_repeats);
+    keyboard_mod_ownership_debug_snapshot(&out->keyboard_mod_ownership);
+    noah_runtime_trace_snapshot(&out->trace);
 }
 
 static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed) {
@@ -128,20 +141,49 @@ void key_runtime_integration_debug_snapshot(noah_runtime_debug_snapshot_t *out) 
         return;
     }
 
-    memset(out, 0, sizeof(*out));
-    out->core = noah_runtime_shared_state;
-
-    layer_ownership_debug_snapshot(&out->layer_ownership);
-    held_action_debug_snapshot(&out->held_actions);
-    held_repeat_debug_snapshot(&out->held_repeats);
-    keyboard_mod_ownership_debug_snapshot(&out->keyboard_mod_ownership);
-    noah_runtime_trace_snapshot(&out->trace);
+    noah_runtime_debug_snapshot(out);
 }
 
-const active_key_state_t *key_runtime_integration_snapshot_slot(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+static const active_key_state_t *key_runtime_integration_snapshot_slot(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
     if (!snapshot || !key_runtime_integration_slot_position_is_valid(key_pos)) {
         return NULL;
     }
 
     return &snapshot->core.key.slots_by_position[key_runtime_integration_slot_table_index(key_pos)];
+}
+
+uint16_t key_runtime_integration_snapshot_slot_owner_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    const active_key_state_t *slot = key_runtime_integration_snapshot_slot(snapshot, key_pos);
+
+    return slot ? slot->owner.keycode : KC_NO;
+}
+
+uint16_t key_runtime_integration_snapshot_slot_held_action_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    const active_key_state_t *slot = key_runtime_integration_snapshot_slot(snapshot, key_pos);
+
+    return slot ? slot->lifecycle.held_action_keycode : KC_NO;
+}
+
+uint8_t key_runtime_integration_snapshot_slot_pending_multi_tap_count(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    const active_key_state_t *slot = key_runtime_integration_snapshot_slot(snapshot, key_pos);
+
+    return slot ? slot->pending_multi_tap.count : 0;
+}
+
+bool key_runtime_integration_snapshot_slot_pending_multi_tap_holding(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    const active_key_state_t *slot = key_runtime_integration_snapshot_slot(snapshot, key_pos);
+
+    return slot != NULL && slot->pending_multi_tap.pending_hold;
+}
+
+bool key_runtime_integration_snapshot_slot_has_pending_multi_tap(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    const active_key_state_t *slot = key_runtime_integration_snapshot_slot(snapshot, key_pos);
+
+    return slot != NULL && key_runtime_slot_has_pending_multi_tap(slot);
+}
+
+bool key_runtime_integration_snapshot_slot_hold_is_complete(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    const active_key_state_t *slot = key_runtime_integration_snapshot_slot(snapshot, key_pos);
+
+    return slot != NULL && key_runtime_slot_hold_is_complete(slot);
 }

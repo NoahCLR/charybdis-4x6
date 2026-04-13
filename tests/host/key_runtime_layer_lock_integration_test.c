@@ -403,28 +403,23 @@ static void test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle(void
 }
 
 static void test_thumb_cycle_release_still_clears_slot_when_layer_change_resolves_to_other_keycode(void) {
-    keypos_t                      key_pos   = test_keypos(4, 2);
-    noah_runtime_debug_snapshot_t snapshot  = {0};
-    const active_key_state_t     *slot      = NULL;
+    keypos_t                      key_pos  = test_keypos(4, 2);
+    noah_runtime_debug_snapshot_t snapshot = {0};
 
     test_reset_state();
 
     test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(key_pos, TEST_FOREIGN_RELEASE_KEY);
     key_runtime_integration_debug_snapshot(&snapshot);
-    slot = key_runtime_integration_snapshot_slot(&snapshot, key_pos);
-    CHECK(slot != NULL);
     CHECK(test_snapshot_layer_locked(&snapshot, TEST_NUM_LAYER));
     CHECK(test_snapshot_layer_active(&snapshot, TEST_NUM_LAYER));
-    CHECK(slot->owner.keycode == KC_NO);
+    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == KC_NO);
 
     fake_time = (uint16_t)(fake_time + 40);
     test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(key_pos, TEST_FOREIGN_RELEASE_KEY);
     key_runtime_integration_debug_snapshot(&snapshot);
-    slot = key_runtime_integration_snapshot_slot(&snapshot, key_pos);
-    CHECK(slot != NULL);
     CHECK(!test_snapshot_layer_locked(&snapshot, TEST_NUM_LAYER));
     CHECK(!test_snapshot_layer_active(&snapshot, TEST_NUM_LAYER));
-    CHECK(slot->owner.keycode == KC_NO);
+    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == KC_NO);
 }
 
 static void test_double_tap_hold_with_prethreshold_scan_toggles_num_layer_only_once(void) {

@@ -53,14 +53,9 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
     };
 }
 
-static active_key_state_t test_snapshot_slot(keypos_t key_pos) {
-    noah_runtime_debug_snapshot_t snapshot = {0};
-    const active_key_state_t     *slot     = NULL;
-
-    key_runtime_integration_debug_snapshot(&snapshot);
-    slot = key_runtime_integration_snapshot_slot(&snapshot, key_pos);
-    CHECK(slot != NULL);
-    return *slot;
+static void test_snapshot_capture(noah_runtime_debug_snapshot_t *snapshot) {
+    CHECK(snapshot != NULL);
+    key_runtime_integration_debug_snapshot(snapshot);
 }
 
 static uint8_t test_snapshot_real_mods(void) {
@@ -275,8 +270,8 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
 
 static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifier, uint8_t expected_mask) {
     handled_key_resolution_t key  = key_runtime_integration_multi_tap_handled_key(TEST_MULTI_TAP_KEY, 120, 240, 150);
-    keypos_t           source_pos = test_keypos(1, 1);
-    active_key_state_t slot       = {0};
+    keypos_t                      source_pos = test_keypos(1, 1);
+    noah_runtime_debug_snapshot_t snapshot   = {0};
 
     integration_hold_modifier = modifier;
     integration_expected_mask = expected_mask;
@@ -284,30 +279,30 @@ static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifie
 
     CHECK(key_runtime_integration_process_handled_press(TEST_MULTI_TAP_KEY, source_pos, key));
     CHECK(key_runtime_integration_process_handled_release(TEST_MULTI_TAP_KEY, source_pos, key));
-    slot = test_snapshot_slot(source_pos);
-    CHECK(slot.pending_multi_tap.count == 1);
+    test_snapshot_capture(&snapshot);
+    CHECK(key_runtime_integration_snapshot_slot_pending_multi_tap_count(&snapshot, source_pos) == 1);
     CHECK(get_mods() == 0);
 
     key_runtime_integration_advance(&fake_time, 40);
     CHECK(key_runtime_integration_process_handled_press(TEST_MULTI_TAP_KEY, source_pos, key));
     CHECK(key_runtime_integration_process_handled_release(TEST_MULTI_TAP_KEY, source_pos, key));
-    slot = test_snapshot_slot(source_pos);
-    CHECK(slot.pending_multi_tap.count == 2);
+    test_snapshot_capture(&snapshot);
+    CHECK(key_runtime_integration_snapshot_slot_pending_multi_tap_count(&snapshot, source_pos) == 2);
     CHECK(get_mods() == 0);
 
     key_runtime_integration_advance(&fake_time, 40);
     CHECK(key_runtime_integration_process_handled_press(TEST_MULTI_TAP_KEY, source_pos, key));
-    slot = test_snapshot_slot(source_pos);
-    CHECK(slot.pending_multi_tap.pending_hold);
-    CHECK(slot.owner.keycode == TEST_MULTI_TAP_KEY);
+    test_snapshot_capture(&snapshot);
+    CHECK(key_runtime_integration_snapshot_slot_pending_multi_tap_holding(&snapshot, source_pos));
+    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, source_pos) == TEST_MULTI_TAP_KEY);
     CHECK(get_mods() == 0);
 
     key_runtime_integration_advance(&fake_time, 130);
     key_runtime_integration_scan();
 
-    slot = test_snapshot_slot(source_pos);
-    CHECK(!slot.pending_multi_tap.pending_hold);
-    CHECK(slot.lifecycle.held_action_keycode == modifier);
+    test_snapshot_capture(&snapshot);
+    CHECK(!key_runtime_integration_snapshot_slot_pending_multi_tap_holding(&snapshot, source_pos));
+    CHECK(key_runtime_integration_snapshot_slot_held_action_keycode(&snapshot, source_pos) == modifier);
     CHECK((test_snapshot_real_mods() & integration_expected_mask) != 0);
     CHECK((get_mods() & integration_expected_mask) != 0);
     CHECK(send_keyboard_report_count == 1);
@@ -321,10 +316,10 @@ static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifie
     CHECK((last_unregistered_mods & integration_expected_mask) != 0);
 
     CHECK(key_runtime_integration_process_handled_release(TEST_MULTI_TAP_KEY, source_pos, key));
-    slot = test_snapshot_slot(source_pos);
+    test_snapshot_capture(&snapshot);
     CHECK((test_snapshot_real_mods() & integration_expected_mask) == 0);
     CHECK((get_mods() & integration_expected_mask) == 0);
-    CHECK(slot.owner.keycode == KC_NO);
+    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, source_pos) == KC_NO);
     CHECK(send_keyboard_report_count == 2);
 
     CHECK(owned_keycode_register(TEST_CHORD_KEY));

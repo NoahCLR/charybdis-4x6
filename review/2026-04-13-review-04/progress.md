@@ -1165,3 +1165,64 @@ Next steps:
 - likely next targets are `runtime_debug_test.c` and the remaining
   key-runtime integration fixtures that still reset or mutate storage
   directly
+
+### Implementation pass: integration-harness semantic snapshot helpers
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Narrowed
+  `tests/host/key_runtime_integration_harness.h`
+  and
+  `tests/host/key_runtime_integration_harness.c`
+  so the shared integration harness no longer exports a raw
+  `active_key_state_t *` snapshot seam to higher-level tests.
+- Switched the harness snapshot path to the shared
+  `noah_runtime_debug_snapshot(...)` entry point, with a local weak fallback so
+  integration runners that do not link `runtime_debug.c` still use the same
+  aggregate snapshot contract.
+- Added semantic integration-slot helpers for owner keycode, held-action
+  keycode, pending multi-tap count/state, and hold completion.
+- Updated
+  `tests/host/key_runtime_modifier_hold_integration_test.c`,
+  `tests/host/key_runtime_layer_lock_integration_test.c`, and
+  `tests/host/pd_mode_key_runtime_integration_test.c`
+  so their higher-level assertions now consume those semantic helpers instead
+  of reading `active_key_state_t` owner/lifecycle/pending-multi-tap fields
+  directly through a snapshot slot pointer.
+- Updated the active review so Finding 6 now reflects that the shared
+  integration harness read-side leak is closed, while write-side staging in
+  `runtime_debug_test.c` remains the main open tail.
+
+Contracts touched in this pass:
+
+- removal of public `key_runtime_integration_snapshot_slot(...)`
+- `key_runtime_integration_debug_snapshot(...)`
+- `key_runtime_integration_snapshot_slot_owner_keycode(...)`
+- `key_runtime_integration_snapshot_slot_held_action_keycode(...)`
+- `key_runtime_integration_snapshot_slot_pending_multi_tap_count(...)`
+- `key_runtime_integration_snapshot_slot_pending_multi_tap_holding(...)`
+- `key_runtime_integration_snapshot_slot_has_pending_multi_tap(...)`
+- `key_runtime_integration_snapshot_slot_hold_is_complete(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- continue Finding 6 by converting `runtime_debug_test.c` away from direct
+  `noah_runtime_shared_state` staging
+- then decide whether the remaining high-level integration fixtures need more
+  scenario/builders, or whether Finding 6 is narrow enough to close

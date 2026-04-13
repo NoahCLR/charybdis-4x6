@@ -502,9 +502,16 @@ Implementation update:
 - scenario-level slot assertions now have semantic helpers for owner keycode,
   held-action keycode, pending multi-tap state, and hold completion instead of
   reaching through live slot storage directly
-- the remaining work here is broader than the scenario harness: several
-  integration and debug fixtures still write raw shared state or access slots
-  directly when they could move to builders plus debug snapshots
+- the shared key-runtime integration harness now routes snapshot reads through
+  semantic slot helpers for owner keycode, held-action keycode, pending
+  multi-tap count/state, and hold completion instead of exporting raw
+  `active_key_state_t *` to higher-level tests
+- integration coverage in the pd-mode, layer-lock, and modifier-hold suites
+  now consumes those semantic helpers instead of reading slot owner/lifecycle
+  fields directly
+- the remaining work here is now mostly write-side staging: `runtime_debug`
+  fixtures still write raw shared state directly when they could stage state
+  through builders or subsystem entry points before taking a snapshot
 
 ## Testing And Debuggability
 
