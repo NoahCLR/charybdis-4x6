@@ -153,6 +153,42 @@ void tap_code16(uint16_t keycode) {
     literal_tap_call_count++;
 }
 
+bool is_pd_mode_lock_action(uint16_t action) {
+    return action == ARROW_MODE_LOCK;
+}
+
+static void test_action_descriptor_classifies_common_actions(void) {
+    noah_action_desc_t layer_lock   = noah_action_describe(LOCK_LAYER(2));
+    noah_action_desc_t momentary    = noah_action_describe(MO(3));
+    noah_action_desc_t pd_lock      = noah_action_describe(ARROW_MODE_LOCK);
+    noah_action_desc_t macro_action = noah_action_describe(MACRO_0);
+    noah_action_desc_t custom       = noah_action_describe(NOAH_KEYMAP_SAFE_RANGE + 1);
+    noah_action_desc_t literal      = noah_action_describe(KC_C);
+
+    CHECK(layer_lock.is_layer_lock);
+    CHECK(layer_lock.layer == 2);
+    CHECK(noah_action_desc_is_press_only(layer_lock));
+    CHECK(noah_action_desc_is_layer_action(layer_lock));
+
+    CHECK(momentary.is_owned_momentary_layer);
+    CHECK(momentary.is_raw_qmk_layer_action);
+    CHECK(momentary.layer == 3);
+    CHECK(noah_action_desc_requires_per_key_hold(momentary));
+
+    CHECK(pd_lock.is_pd_mode_lock);
+    CHECK(noah_action_desc_is_press_only(pd_lock));
+
+    CHECK(macro_action.is_macro);
+    CHECK(noah_action_desc_is_press_only(macro_action));
+
+    CHECK(custom.is_keymap_custom);
+
+    CHECK(!literal.is_layer_lock);
+    CHECK(!literal.is_raw_qmk_layer_action);
+    CHECK(!literal.is_macro);
+    CHECK(!literal.is_keymap_custom);
+}
+
 static void test_action_dispatch_keeps_runtime_default_policy(void) {
     test_reset_stubs();
 
@@ -220,6 +256,7 @@ static void test_literal_emit_can_suspend_and_restore_mods(void) {
 }
 
 int main(void) {
+    test_action_descriptor_classifies_common_actions();
     test_action_dispatch_keeps_runtime_default_policy();
     test_explicit_action_emit_can_skip_fallback_hold_settlement();
     test_synthetic_qmk_emit_settles_fallback_hold_without_touching_mod_state();

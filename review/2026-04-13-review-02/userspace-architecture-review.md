@@ -625,6 +625,19 @@ Expected payoff:
 - easier new action kinds
 - less QMK encoding leakage into business logic
 
+Current status:
+
+- landed an initial `noah_action_desc_t` descriptor on the existing
+  action-dispatch surface
+- moved action lifecycle and direct-action preflight routing onto that
+  descriptor instead of repeating raw-keycode classification at each branch
+- kept the older boolean helper predicates as compatibility wrappers so the
+  rest of the repo can migrate incrementally
+- intentionally left qmk-behavior classification behind the existing helper
+  seam for now because several host harnesses stub that classification directly
+- slot policy, feedback, and a few runtime helpers still re-check raw action
+  meaning and should be the next descriptor migration targets
+
 ### Recommendation 3: move key-runtime storage types under key/runtime
 
 Do as a boundary cleanup after 1 and 2 start landing.

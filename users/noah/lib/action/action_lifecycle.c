@@ -20,45 +20,43 @@
 #include "../state/ownership/layer_ownership.h"
 #include "../state/runtime/split_runtime_sync.h"
 
-static bool noah_action_is_owned_momentary_layer(uint16_t action) {
-    return IS_QK_MOMENTARY(action);
-}
-
-static void noah_action_log_unsupported_layer_action(uint16_t action) {
+static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported raw QMK layer action 0x%04X; use LOCK_LAYER(...) for persistent changes or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned momentary holds\n", (unsigned int)action);
+    uprintf("Unsupported raw QMK layer action 0x%04X; use LOCK_LAYER(...) for persistent changes or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned momentary holds\n", (unsigned int)desc.action);
 #else
-    (void)action;
+    (void)desc;
 #endif
 }
 
-static bool noah_action_handle_one_shot_press(uint16_t action) {
-    if (action_dispatch_is_layer_lock(action)) {
-        layer_ownership_toggle_lock_state((uint8_t)(action - LAYER_LOCK_BASE));
+static bool noah_action_handle_one_shot_press(noah_action_desc_t desc) {
+    if (desc.is_layer_lock) {
+        layer_ownership_toggle_lock_state(desc.layer);
         return true;
     }
 
-    if (is_pd_mode_lock_action(action)) {
-        const pd_mode_def_t *def = pd_mode_lock_action_lookup(action);
+    if (desc.is_pd_mode_lock) {
+        const pd_mode_def_t *def = pd_mode_lock_action_lookup(desc.action);
         if (def && pd_mode_toggle_lock_state(def->mode_flag)) {
             split_runtime_sync();
         }
         return true;
     }
 
-    if (noah_qmk_contract_try_play_via_macro(action)) {
+    if (desc.is_macro && noah_qmk_contract_try_play_via_macro(desc.action)) {
         return true;
     }
 
-    return macro_dispatch(action);
+    return macro_dispatch(desc.action);
 }
 
 noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    if (action_dispatch_is_layer_lock(action) || is_pd_mode_lock_action(action) || action_dispatch_is_macro(action)) {
+    noah_action_desc_t desc = noah_action_describe(action);
+
+    if (noah_action_desc_is_press_only(desc)) {
         return NOAH_ACTION_HOLD_KIND_PRESS_ONLY;
     }
 
-    if (noah_action_is_owned_momentary_layer(action)) {
+    if (noah_action_desc_requires_per_key_hold(desc)) {
         return NOAH_ACTION_HOLD_KIND_PER_KEY;
     }
 
@@ -66,21 +64,23 @@ noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
 }
 
 void noah_action_tap(uint16_t action) {
-    if (noah_action_handle_one_shot_press(action)) {
+    noah_action_desc_t desc = noah_action_describe(action);
+
+    if (noah_action_handle_one_shot_press(desc)) {
         return;
     }
 
-    if (action_dispatch_is_raw_qmk_layer_action(action)) {
-        noah_action_log_unsupported_layer_action(action);
+    if (desc.is_raw_qmk_layer_action) {
+        noah_action_log_unsupported_layer_action(desc);
         return;
     }
 
-    if (action >= NOAH_KEYMAP_SAFE_RANGE) {
+    if (desc.is_keymap_custom) {
         noah_dispatch_synthetic_tap(action);
         return;
     }
 
-    if (action_dispatch_is_qmk_behavior_keycode(action)) {
+    if (desc.is_qmk_behavior_keycode) {
         noah_dispatch_synthetic_qmk_tap(action);
         return;
     }
@@ -91,7 +91,9 @@ void noah_action_tap(uint16_t action) {
 }
 
 void noah_action_press(keypos_t key_pos, uint16_t action) {
-    if (noah_action_handle_one_shot_press(action)) {
+    noah_action_desc_t desc = noah_action_describe(action);
+
+    if (noah_action_handle_one_shot_press(desc)) {
         return;
     }
 
@@ -99,22 +101,22 @@ void noah_action_press(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    if (noah_action_is_owned_momentary_layer(action)) {
-        layer_ownership_momentary_press(key_pos, QK_MOMENTARY_GET_LAYER(action));
+    if (desc.is_owned_momentary_layer) {
+        layer_ownership_momentary_press(key_pos, desc.layer);
         return;
     }
 
-    if (action_dispatch_is_raw_qmk_layer_action(action)) {
-        noah_action_log_unsupported_layer_action(action);
+    if (desc.is_raw_qmk_layer_action) {
+        noah_action_log_unsupported_layer_action(desc);
         return;
     }
 
-    if (action_dispatch_is_qmk_behavior_keycode(action)) {
+    if (desc.is_qmk_behavior_keycode) {
         noah_dispatch_synthetic_qmk_record(action, true, 0);
         return;
     }
 
-    if (action >= NOAH_KEYMAP_SAFE_RANGE) {
+    if (desc.is_keymap_custom) {
         noah_dispatch_synthetic_record(action, true);
         return;
     }
@@ -130,7 +132,9 @@ void noah_action_press(keypos_t key_pos, uint16_t action) {
 }
 
 void noah_action_release(keypos_t key_pos, uint16_t action) {
-    if (noah_action_hold_kind(action) == NOAH_ACTION_HOLD_KIND_PRESS_ONLY) {
+    noah_action_desc_t desc = noah_action_describe(action);
+
+    if (noah_action_desc_is_press_only(desc)) {
         return;
     }
 
@@ -138,22 +142,22 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    if (noah_action_is_owned_momentary_layer(action)) {
+    if (desc.is_owned_momentary_layer) {
         layer_ownership_momentary_release(key_pos);
         return;
     }
 
-    if (action_dispatch_is_raw_qmk_layer_action(action)) {
-        noah_action_log_unsupported_layer_action(action);
+    if (desc.is_raw_qmk_layer_action) {
+        noah_action_log_unsupported_layer_action(desc);
         return;
     }
 
-    if (action_dispatch_is_qmk_behavior_keycode(action)) {
+    if (desc.is_qmk_behavior_keycode) {
         noah_dispatch_synthetic_qmk_record(action, false, 0);
         return;
     }
 
-    if (action >= NOAH_KEYMAP_SAFE_RANGE) {
+    if (desc.is_keymap_custom) {
         noah_dispatch_synthetic_record(action, false);
         return;
     }

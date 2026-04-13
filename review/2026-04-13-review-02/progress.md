@@ -221,3 +221,55 @@ Next steps:
   keycodes across runtime, feedback, and policy modules
 - use the now-single interaction contract as the migration base for typed action
   descriptors instead of adding another parallel metadata seam
+
+## 2026-04-13: Recommendation 2 started
+
+Completed in this pass:
+
+- Introduced a first typed action-descriptor surface on
+  `users/noah/lib/action/action_dispatch.h` so callers can classify authored
+  actions through `noah_action_desc_t` instead of re-checking raw keycodes in
+  multiple modules.
+- Re-based the existing action-dispatch predicate helpers on that descriptor
+  surface where it was safe to do so, keeping the old boolean helper API intact
+  for compatibility.
+- Migrated `action_lifecycle.c` to resolve one descriptor per action and route
+  tap/press/release behavior from that descriptor instead of repeatedly
+  branching on raw keycode tests.
+- Migrated direct-action preflight dispatch to use the descriptor for
+  layer-lock and pd-lock routing.
+- Added direct host coverage for descriptor classification in the action
+  dispatch test harness.
+- Kept qmk-behavior classification behind the existing
+  `action_dispatch_is_qmk_behavior_keycode()` seam for now so the lightweight
+  host harnesses that intentionally stub that classification still compile and
+  exercise behavior without needing a broader test rewrite.
+
+Contracts touched:
+
+- `users/noah/lib/action/action_dispatch.[ch]`
+- `users/noah/lib/action/action_lifecycle.c`
+- `users/noah/lib/key/runtime/key_runtime_preflight.c`
+- `tests/host/action_dispatch_test.c`
+- `tests/host/key_runtime_preflight_test.c`
+
+Verification run in this pass:
+
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- migrate the remaining action-policy callers onto the descriptor surface,
+  especially key-runtime slot policy and feedback paths that still infer action
+  meaning from raw keycodes
+- decide whether qmk-behavior classification should move fully into the
+  descriptor once the host harness stubs are consolidated enough to support it
