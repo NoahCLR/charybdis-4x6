@@ -40,16 +40,17 @@ These files are the core map of the runtime:
 | File | Responsibility |
 | --- | --- |
 | [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h) and [`handled_key.c`](../users/noah/lib/key/interaction/handled_key.c) | Resolve a keycode into an authored `handled_key_resolution_t` branch record: keycode, selected tap-count step, timing, layer/pd metadata, and structural flags |
+| [`key_runtime_interaction.h`](../users/noah/lib/key/runtime/key_runtime_interaction.h) | Materialize authored handled-key resolution into the slot-owned `key_runtime_slot_interaction_t` contract: cached binding, hold strategy, release semantics, and preview/feedback policy |
 | [`runtime_shared_state.h`](../users/noah/lib/state/runtime/runtime_shared_state.h) | Own the central slot storage and explicit pd-mode runtime selection state |
 | [`key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c) | `process_record_user` entry flow and top-level branching |
 | [`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c) | Physical-event preflight, modifier suppression, active-slot interrupts, and pending-multi-tap flushing |
 | [`key_runtime_press.c`](../users/noah/lib/key/runtime/key_runtime_press.c), [`key_runtime_release.c`](../users/noah/lib/key/runtime/key_runtime_release.c), and [`key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c) | Outer orchestration for press, release, and scan passes |
-| [`key_runtime_slot_step.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_step.c), [`key_runtime_slot_press_reduce.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c), [`key_runtime_slot_release_reduce.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_reduce.c), and [`key_runtime_slot_release_active.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c) | Slot-event router plus the narrower press and release reducers it delegates to |
+| [`key_runtime_slot_step.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_step.c), [`key_runtime_slot_press_reduce.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c), [`key_runtime_slot_release_reduce.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_reduce.c), [`key_runtime_slot_release_active.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c), and [`key_runtime_slot_release_resolver.h`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_resolver.h) | Slot-event router plus the narrower press and release reducers it delegates to, including the shared release-decision helper consumed by active-slot and pending-multi-tap paths |
 | [`key_runtime_slot_policy.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_policy.c) | Threshold and hold-policy helpers that mutate slot state and request effects |
 | [`key_runtime_slot_scan_reduce.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_scan_reduce.c) | Scan-time threshold logic |
 | [`key_runtime_slot_pending_multi_tap.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c) | Deferred multi-tap ownership after release |
 | [`key_runtime_effect.h`](../users/noah/lib/key/runtime/effects/key_runtime_effect.h), [`key_runtime_effect_queue.h`](../users/noah/lib/key/runtime/effects/key_runtime_effect_queue.h), [`key_runtime_slot_result.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_result.c), and [`key_runtime_transition.c`](../users/noah/lib/key/runtime/key_runtime_transition.c) | Shared runtime effect vocabulary, shared queue field layout, request expansion, plan batching, and effect execution |
-| [`action_dispatch.c`](../users/noah/lib/action/action_dispatch.c) and [`keyboard_mod_state.c`](../users/noah/lib/state/runtime/keyboard_mod_state.c) | Explicit output-intent helpers for authored action taps, synthetic QMK taps, and literal taps that may need fallback-hold settlement or temporary modifier suspension |
+| [`action_dispatch.h`](../users/noah/lib/action/action_dispatch.h), [`action_dispatch.c`](../users/noah/lib/action/action_dispatch.c), [`action_lifecycle.c`](../users/noah/lib/action/action_lifecycle.c), [`owned_keycode.c`](../users/noah/lib/action/owned_keycode.c), and [`keyboard_mod_state.c`](../users/noah/lib/state/runtime/keyboard_mod_state.c) | Action classification, lifecycle dispatch, overlap-safe literal key ownership, and explicit output-intent helpers for authored taps, synthetic QMK taps, and temporary modifier suspension |
 | [`held_action.c`](../users/noah/lib/key/ownership/held_action.c), [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c), [`layer_ownership.c`](../users/noah/lib/state/ownership/layer_ownership.c), and [`keyboard_mod_ownership.c`](../users/noah/lib/state/ownership/keyboard_mod_ownership.c) | Long-lived ownership registries touched by runtime effects |
 | [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), [`runtime_debug.c`](../users/noah/lib/state/runtime/runtime_debug.c), [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h), and [`runtime_trace.c`](../users/noah/lib/state/runtime/runtime_trace.c) | Aggregate runtime snapshot and test reset surface, plus the optional shared trace ring buffer used for cross-subsystem debugging |
 
@@ -131,6 +132,11 @@ That release path is intentionally split now:
   cleanup
 - [`key_runtime_slot_release_active.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c)
   resolves the active-slot tap vs hold vs pd-mode-lock outcome
+
+Shared tap-vs-hold-vs-pd-lock semantics now live in
+[`key_runtime_slot_release_resolver.h`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_resolver.h).
+The active-slot and pending-multi-tap release paths are adapters around that
+one decision surface rather than parallel release engines.
 
 ### 5. Scan
 
@@ -229,7 +235,8 @@ Two size limits are worth knowing when debugging overflow:
 - slot results hold up to `8` effects
 - transition plans hold up to `16` effects
 
-Both surfaces expose `overflowed` rather than reallocating.
+Both surfaces expose `overflowed` rather than reallocating, and the host test
+surface now fails fast if either queue overflows.
 
 ## Important Invariants
 
@@ -239,13 +246,17 @@ These are the easiest runtime rules to break by accident:
   keycode mapping.
 - `handled_key_resolution_t` is the authored handled-key resolution contract,
   while `key_runtime_slot_interaction_t` is the slot-owned cached interaction
-  contract. Keep that boundary explicit instead of re-deriving policy from raw
-  authored data or from mutable slot state.
+  contract. Keep that boundary explicit and prefer
+  [`key_runtime_slot_materialize(...)`](../users/noah/lib/key/runtime/key_runtime_interaction.h)
+  or
+  [`key_runtime_slot_interaction_from_resolution(...)`](../users/noah/lib/key/runtime/key_runtime_interaction.h)
+  when you need a synthetic slot interaction instead of re-deriving release or
+  hold policy by hand.
 - `key_runtime_slot_interaction(...)` and
   `key_runtime_slot_cached_interaction(...)` both expose the slot-owned
-  interaction contract. Test/debug seams that need an authored-resolution-like
-  value should build that locally instead of reaching back through a public
-  runtime-header conversion helper.
+  interaction contract. Test/debug seams that need a slot-shaped value should
+  prefer the materialization helpers above instead of open-coding interaction
+  fields.
 - Feedback and debug readers should prefer cached slot semantic metadata over
   re-running handled-key resolution against mutable slot state.
 - New emitters should prefer the explicit helpers in
@@ -271,6 +282,8 @@ If you are changing one of these categories, start here:
 - resolved handled-key semantics:
   [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h) and
   [`handled_key.c`](../users/noah/lib/key/interaction/handled_key.c)
+- slot interaction materialization and cached release semantics:
+  [`key_runtime_interaction.h`](../users/noah/lib/key/runtime/key_runtime_interaction.h)
 - outer event orchestration:
   [`key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c),
   [`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c),
@@ -283,6 +296,7 @@ If you are changing one of these categories, start here:
   [`key_runtime_slot_policy.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_policy.c),
   [`key_runtime_slot_release_reduce.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_reduce.c),
   [`key_runtime_slot_release_active.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c),
+  [`key_runtime_slot_release_resolver.h`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_resolver.h),
   [`key_runtime_slot_scan_reduce.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_scan_reduce.c),
   and
   [`key_runtime_slot_pending_multi_tap.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c)
@@ -294,12 +308,17 @@ If you are changing one of these categories, start here:
   [`key_runtime_transition.c`](../users/noah/lib/key/runtime/key_runtime_transition.c)
 - output-emission policy:
   [`action_dispatch.h`](../users/noah/lib/action/action_dispatch.h),
-  [`action_dispatch.c`](../users/noah/lib/action/action_dispatch.c), and
+  [`action_dispatch.c`](../users/noah/lib/action/action_dispatch.c),
+  [`action_lifecycle.c`](../users/noah/lib/action/action_lifecycle.c),
+  [`owned_keycode.c`](../users/noah/lib/action/owned_keycode.c), and
   [`keyboard_mod_state.c`](../users/noah/lib/state/runtime/keyboard_mod_state.c)
 - new hidden runtime state:
   either [`runtime_shared_state.h`](../users/noah/lib/state/runtime/runtime_shared_state.h)
   or one explicit ownership module plus
   [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h)
+- new runtime translation units or build wiring:
+  [`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk) plus
+  `sh tests/host/run_feature_gate_compile_tests.sh`
 - cross-subsystem runtime tracing:
   [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h),
   [`runtime_trace.c`](../users/noah/lib/state/runtime/runtime_trace.c), and
@@ -342,6 +361,7 @@ The most relevant host checks for the runtime are:
 
 - `sh tests/host/run_key_runtime_admission_tests.sh`
 - `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
 - `sh tests/host/run_key_runtime_transition_tests.sh`
 - `sh tests/host/run_key_runtime_preflight_tests.sh`
 - `sh tests/host/run_key_runtime_feedback_tests.sh`
@@ -358,6 +378,7 @@ If you changed shared trace/debug plumbing, also run:
 
 If you changed output-emission policy or direct-action lifecycle wiring, also run:
 
+- `sh tests/host/run_owned_keycode_tests.sh`
 - `sh tests/host/run_action_dispatch_tests.sh`
 - `sh tests/host/run_action_lifecycle_tests.sh`
 

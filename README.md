@@ -115,7 +115,8 @@ If you want to adapt this userspace, these are the main files to touch first:
 | [`users/noah/lib/pointing/runtime/`](./users/noah/lib/pointing/runtime/) | shared pd-mode runtime machinery: registry materialization, lifecycle transitions, active/locked state, and runtime dispatch |
 | [`users/noah/lib/pointing/policy/`](./users/noah/lib/pointing/policy/) | pointer-policy glue that keeps layer ownership aligned with pd-mode state |
 | [`users/noah/lib/pointing/modes/`](./users/noah/lib/pointing/modes/) | mode-owned pointing behavior: motion transforms, key interception, shared mode helpers, and mode-specific lifecycle glue such as `PINCH_MODE` |
-| [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, sensor/report settings, local dragscroll tuning, and low-level QMK overrides |
+| [`users/noah/source_manifest.mk`](./users/noah/source_manifest.mk) | canonical userspace source inventory for firmware builds and host compile gates; add new shared translation units here |
+| [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, idle-noise suppression, sensor/report settings, local dragscroll tuning, and low-level QMK overrides |
 
 In other words:
 
@@ -125,6 +126,7 @@ In other words:
 - if you want to add a layer, update the layer enum in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h); `LAYER_COUNT` is the sentinel last value and should stay last
 - if you want to add a shared custom keycode surface, start in [`noah_keymap_ids.h`](./users/noah/noah_keymap_ids.h)
 - if you want to add a shared pointing-device mode, start in [`pd_mode_manifest.h`](./users/noah/lib/pointing/defs/pd_mode_manifest.h) and the matching mode-owned files under [`users/noah/lib/pointing/modes/`](./users/noah/lib/pointing/modes/)
+- if you add a new shared userspace `.c` file, wire it into [`users/noah/source_manifest.mk`](./users/noah/source_manifest.mk) in the same pass
 - if you want to change board plumbing, start in [`users/noah/config.h`](./users/noah/config.h)
 
 ## Layer Model And VIA

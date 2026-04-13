@@ -470,6 +470,7 @@ For normal pd-mode work in this repo, the usual verification set is:
 
 - `sh tests/host/run_pd_mode_tests.sh`
 - `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
 - `sh tests/host/run_pointer_layer_policy_tests.sh`
 - `sh tests/host/run_split_runtime_sync_tests.sh`
 

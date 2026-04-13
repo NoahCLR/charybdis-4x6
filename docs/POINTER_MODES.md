@@ -106,6 +106,9 @@ While active:
 - the cursor stays frozen
 - dominant horizontal motion emits left / right arrow taps
 - dominant vertical motion emits up / down arrow taps
+- horizontal arrow taps keep held modifiers such as `Alt` intact
+- vertical arrow taps temporarily mask held `Alt` modifiers so up / down stay
+  plain
 
 It also remaps mouse buttons while active:
 

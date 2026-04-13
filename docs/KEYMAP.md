@@ -34,7 +34,7 @@ trackball control get packed into the right side and the thumbs.
 | --- | --- | --- |
 | `LAYER_BASE` | default typing layer | QWERTY, home-row layer access, custom thumbs, number-row symbol holds, signature `Esc`, `Enter`, `Shift`, and `Right Alt` behaviors |
 | `LAYER_NUM` | right-hand numpad layer | numpad on the right half, `MO(LAYER_NAV)` retained on the left side for fast access back into navigation |
-| `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, a few macOS-oriented shortcuts on the lower left |
+| `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, and a lower-left shortcut cluster anchored by five VIA macros |
 | `LAYER_NAV` | navigation, media, system control, mouse buttons | arrow cluster, media, volume, brightness, direct macOS shortcuts, mouse buttons, `DRAGSCROLL`, and current auto-sniping |
 | `LAYER_POINTER` | auto-mouse pointer surface | `BRIGHTNESS_MODE`, `PINCH_MODE`, `VOLUME_MODE`, `DRAGSCROLL`, mouse buttons, and `LT(LAYER_NUM, KC_SPC)` on the thumb cluster |
 
@@ -253,7 +253,8 @@ This layer mixes symbols and board-control tools:
 - `[` `]` on the right home row
 - `{` `}` on the lower right
 - quote variants on the right edge
-- a few macOS-oriented shortcuts and `VIA_MACRO_5` on the lower left
+- a lower-left shortcut cluster built around `VIA_MACRO_5`, `VIA_MACRO_4`,
+  `VIA_MACRO_3`, `VIA_MACRO_8`, and `VIA_MACRO_9`
 
 This makes it feel like a symbols layer first, but with a small system-control
 cluster attached.
