@@ -30,6 +30,9 @@ next Finding 2 slice then replaced the bespoke phase-resolver matrix in
 drives one generic release-phase interpreter. The next slice after that moved
 primary release-hold selection and long-hold takeover onto a shared cached
 release-hold contract that both active release and pending multi-tap now use.
+The final Finding 2 slice then moved the phase-contract table itself onto the
+cached release contract, so the release reducer now selects a cached
+phase-policy view instead of owning a local phase-policy table.
 Later the same day, the pd-mode exclusivity follow-up also landed: runtime
 storage and snapshots now expose explicit selected active/locked mode identity
 for local and display state. Compatibility bitmasks now survive only as
@@ -304,9 +307,12 @@ Implementation update:
 - primary release-hold selection and long-hold takeover now live behind a
   shared cached release-hold contract, and pending multi-tap reuses that same
   helper instead of a separate slot-policy selector
-- the remaining gap is that the phase interpreter still owns the branch
-  ordering itself even though phase selection and hold selection are now
-  data-shaped
+- the phase-contract table itself now lives on the cached release contract, so
+  tap/hold/phase policy is consistently slot-owned instead of split between
+  cached interaction and reducer-local tables
+- the remaining work here is mostly observability and polish: if future
+  changes make release debugging noisy again, add typed decision trace events
+  rather than widening the contract again
 
 ### 3. PD-mode state used to advertise composition while the runtime enforced exclusivity
 

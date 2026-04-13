@@ -657,6 +657,8 @@ Verification run in this pass:
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
 Workspace scope:
 
@@ -780,3 +782,54 @@ Next steps:
 - if release behavior is stable enough structurally now, the next high-value
   move after that is probably Finding 4: split `compat/` into
   feature-owned surfaces
+
+### Implementation pass: cached release phase contracts
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Narrowed
+  `users/noah/lib/key/runtime/key_runtime_interaction.h`
+  so `key_runtime_slot_release_contract_t` now owns the phase-policy data
+  itself through cached per-phase release contracts instead of relying on a
+  local static phase table inside the active-release reducer.
+- Updated
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c`
+  so the reducer now selects phase policy from the cached release contract and
+  no longer owns a separate static phase-contract table.
+- Extended
+  `tests/host/key_runtime_slot_test.c`
+  to assert the cached phase-contract seam directly for tap-window and
+  release-hold-pending behavior.
+- Updated
+  `docs/KEY_RUNTIME.md`
+  and the active review so the maintainer-facing description now treats
+  tap/hold/phase release policy as fully slot-owned cached contract state.
+
+Contracts touched in this pass:
+
+- `key_runtime_slot_release_phase_contract_t`
+- `key_runtime_slot_release_phase_contracts_t`
+- `key_runtime_slot_release_contract_t.phases`
+- `key_runtime_slot_reduce_active_release(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- treat Finding 2 as structurally landed and choose between:
+  adding decision tracing for key-runtime release branches, or moving on to
+  Finding 4 and splitting `compat/` into feature-owned surfaces

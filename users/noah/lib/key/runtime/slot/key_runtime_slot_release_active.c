@@ -24,23 +24,6 @@ typedef struct {
     pd_mode_mask_t                     pd_mode_lock_tap;
 } key_runtime_slot_release_resolution_t;
 
-typedef enum {
-    KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_NONE = 0,
-    KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY,
-    KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION,
-} key_runtime_slot_release_hold_action_mode_t;
-
-typedef struct {
-    bool                                       buffered_base_tap_dispatches_tap;
-    bool                                       quick_tap_dispatches_tap;
-    bool                                       pd_mode_lock_tap_allowed;
-    bool                                       quick_immediate_hold_dispatches_tap;
-    bool                                       checks_fallback_hold_suppression;
-    key_runtime_slot_release_hold_action_mode_t hold_action_mode;
-    bool                                       long_hold_dispatches_action;
-    bool                                       nonquick_release_dispatches_tap;
-} key_runtime_slot_release_phase_contract_t;
-
 typedef struct {
     active_key_state_t                released_key;
     key_runtime_slot_interaction_t    interaction;
@@ -131,6 +114,24 @@ static bool key_runtime_slot_release_long_hold_ready(const key_runtime_slot_rele
     return context && key_runtime_slot_release_hold_contract_long_ready(context->contract.hold, context->elapsed, context->interaction.binding.longer_hold_term);
 }
 
+static key_runtime_slot_release_phase_contract_t key_runtime_slot_release_phase_contract(key_runtime_slot_release_contract_t contract, key_runtime_slot_phase_t phase) {
+    switch (phase) {
+        case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
+            return contract.phases.tap_window;
+        case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
+            return contract.phases.press_held_window;
+        case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
+            return contract.phases.release_hold_pending;
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
+            return contract.phases.hold_tier_active;
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE:
+            return contract.phases.hold_complete;
+        case KEY_RUNTIME_SLOT_PHASE_IDLE:
+        default:
+            return (key_runtime_slot_release_phase_contract_t){0};
+    }
+}
+
 static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_phase_contract(const key_runtime_slot_release_context_t *context,
                                                                                               key_runtime_slot_release_phase_contract_t phase_contract) {
     if (!context) {
@@ -187,34 +188,6 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_ph
 
     return key_runtime_slot_release_resolution_base(context);
 }
-
-static const key_runtime_slot_release_phase_contract_t key_runtime_slot_release_phase_contracts[] = {
-    [KEY_RUNTIME_SLOT_PHASE_IDLE]                 = {0},
-    [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW]          = {
-        .buffered_base_tap_dispatches_tap    = true,
-        .quick_tap_dispatches_tap            = true,
-        .pd_mode_lock_tap_allowed            = true,
-        .checks_fallback_hold_suppression    = true,
-        .hold_action_mode                    = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY,
-        .long_hold_dispatches_action         = true,
-        .nonquick_release_dispatches_tap     = true,
-    },
-    [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW]  = {
-        .pd_mode_lock_tap_allowed            = true,
-        .quick_immediate_hold_dispatches_tap = true,
-        .long_hold_dispatches_action         = true,
-    },
-    [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = {
-        .hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION,
-    },
-    [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE]  = {
-        .long_hold_dispatches_action = true,
-    },
-    [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE]     = {
-        .long_hold_dispatches_action = true,
-    },
-};
-
 static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(active_key_state_t released_key, uint16_t elapsed) {
     key_runtime_slot_interaction_t interaction = key_runtime_slot_cached_interaction(&released_key);
     key_runtime_slot_release_context_t context = {
@@ -224,7 +197,7 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(ac
         .elapsed      = elapsed,
     };
     key_runtime_slot_phase_t phase = key_runtime_slot_phase(&released_key);
-    key_runtime_slot_release_phase_contract_t phase_contract = key_runtime_slot_release_phase_contracts[phase];
+    key_runtime_slot_release_phase_contract_t phase_contract = key_runtime_slot_release_phase_contract(context.contract, phase);
 
     context.quick_tap            = key_runtime_slot_release_is_quick_tap(&context);
     context.quick_immediate_hold = context.contract.quick_release_of_immediate_hold_dispatches_tap && key_runtime_slot_allows_tap_release(&released_key) && context.quick_tap;

@@ -564,6 +564,9 @@ static void test_take_active_release_starts_pending_multi_tap_chain(void) {
     CHECK(slot->interaction.view.release.tap.outcome == KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP);
     CHECK(slot->interaction.view.release.tap.action == TEST_SINGLE_ACTION);
     CHECK(slot->interaction.view.release.tap.repeat_count == 1);
+    CHECK(slot->interaction.view.release.phases.tap_window.quick_tap_dispatches_tap);
+    CHECK(slot->interaction.view.release.phases.tap_window.pd_mode_lock_tap_allowed);
+    CHECK(slot->interaction.view.release.phases.tap_window.hold_action_mode == KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY);
 
     result = test_step_handled_release(slot, TEST_MULTI_TAP_KEY, pos,
                                        (key_behavior_view_t){
@@ -671,6 +674,7 @@ static void test_take_active_release_release_hold_pending_dispatches_release_hol
     };
     CHECK(slot->interaction.view.release.hold.primary_action == TEST_HOLD_ACTION);
     CHECK(slot->interaction.view.release.hold.long_action == KC_NO);
+    CHECK(slot->interaction.view.release.phases.release_hold_pending.hold_action_mode == KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION);
 
     result = test_step_handled_release(slot, TEST_ACTIVE_KEY, pos,
                                        (key_behavior_view_t){

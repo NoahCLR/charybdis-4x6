@@ -27,9 +27,35 @@ typedef struct {
     uint16_t long_action;
 } key_runtime_slot_release_hold_contract_t;
 
+typedef enum {
+    KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_NONE = 0,
+    KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY,
+    KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION,
+} key_runtime_slot_release_hold_action_mode_t;
+
+typedef struct {
+    bool                                        buffered_base_tap_dispatches_tap;
+    bool                                        quick_tap_dispatches_tap;
+    bool                                        pd_mode_lock_tap_allowed;
+    bool                                        quick_immediate_hold_dispatches_tap;
+    bool                                        checks_fallback_hold_suppression;
+    key_runtime_slot_release_hold_action_mode_t hold_action_mode;
+    bool                                        long_hold_dispatches_action;
+    bool                                        nonquick_release_dispatches_tap;
+} key_runtime_slot_release_phase_contract_t;
+
+typedef struct {
+    key_runtime_slot_release_phase_contract_t tap_window;
+    key_runtime_slot_release_phase_contract_t press_held_window;
+    key_runtime_slot_release_phase_contract_t release_hold_pending;
+    key_runtime_slot_release_phase_contract_t hold_tier_active;
+    key_runtime_slot_release_phase_contract_t hold_complete;
+} key_runtime_slot_release_phase_contracts_t;
+
 typedef struct {
     key_runtime_slot_release_tap_contract_t tap;
     key_runtime_slot_release_hold_contract_t hold;
+    key_runtime_slot_release_phase_contracts_t phases;
     pd_mode_mask_t                          quick_tap_pd_mode_lock;
     bool                                    suppress_tap_on_layer_interrupt;
     bool                                    buffered_base_tap_dispatches_tap;
@@ -116,10 +142,44 @@ static inline key_runtime_slot_release_hold_contract_t key_runtime_slot_release_
     };
 }
 
+static inline key_runtime_slot_release_phase_contracts_t key_runtime_slot_release_phase_contracts_build(void) {
+    return (key_runtime_slot_release_phase_contracts_t){
+        .tap_window =
+            {
+                .buffered_base_tap_dispatches_tap = true,
+                .quick_tap_dispatches_tap         = true,
+                .pd_mode_lock_tap_allowed         = true,
+                .checks_fallback_hold_suppression = true,
+                .hold_action_mode                 = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY,
+                .long_hold_dispatches_action      = true,
+                .nonquick_release_dispatches_tap  = true,
+            },
+        .press_held_window =
+            {
+                .pd_mode_lock_tap_allowed            = true,
+                .quick_immediate_hold_dispatches_tap = true,
+                .long_hold_dispatches_action         = true,
+            },
+        .release_hold_pending =
+            {
+                .hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION,
+            },
+        .hold_tier_active =
+            {
+                .long_hold_dispatches_action = true,
+            },
+        .hold_complete =
+            {
+                .long_hold_dispatches_action = true,
+            },
+    };
+}
+
 static inline key_runtime_slot_release_contract_t key_runtime_slot_release_contract_build(key_runtime_slot_interaction_t interaction) {
     return (key_runtime_slot_release_contract_t){
         .tap                                          = key_runtime_slot_release_tap_contract_build(interaction),
         .hold                                         = key_runtime_slot_release_hold_contract_build(interaction),
+        .phases                                       = key_runtime_slot_release_phase_contracts_build(),
         .quick_tap_pd_mode_lock                       = interaction.pd_mode,
         .suppress_tap_on_layer_interrupt              = (interaction.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0,
         .buffered_base_tap_dispatches_tap             = (interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0 && interaction.binding.tap_action == KC_NO,
