@@ -655,6 +655,8 @@ Verification run in this pass:
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
 Workspace scope:
 
@@ -717,3 +719,64 @@ Next steps:
 - if the generic interpreter stays, consider pushing long-hold takeover and
   hold-action selection into tiny shared helpers so scan and release keep
   converging on one semantic vocabulary
+
+### Implementation pass: shared release-hold contract
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Narrowed
+  `users/noah/lib/key/runtime/key_runtime_interaction.h`
+  so `key_runtime_slot_release_contract_t` now carries a typed
+  `key_runtime_slot_release_hold_contract_t` for primary release-hold action
+  and long-hold takeover selection.
+- Updated
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c`
+  so active release now reads hold-action availability and long-hold takeover
+  through that shared cached hold contract instead of directly through loose
+  `release_hold_action` / `release_long_hold_action` fields.
+- Updated
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c`
+  so pending multi-tap release reuses the same cached release-hold selection
+  helper instead of the older `key_runtime_slot_policy_select_release_hold_action(...)`
+  path.
+- Removed the old slot-policy-specific release-hold selector from
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_policy.[ch]`.
+- Extended
+  `tests/host/key_runtime_slot_test.c`
+  to assert the new cached hold-contract seam directly for release-hold and
+  long-hold takeover behavior.
+- Updated
+  `docs/KEY_RUNTIME.md`
+  and the active review so the maintainer-facing description now matches the
+  shared release-hold contract shape.
+
+Contracts touched in this pass:
+
+- `key_runtime_slot_release_hold_contract_t`
+- `key_runtime_slot_release_hold_contract_select_action(...)`
+- `key_runtime_slot_release_contract_t.hold`
+- pending multi-tap release hold selection
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- decide whether the next Finding 2 slice should push more of the generic
+  phase ordering into cached contracts or stop after adding decision tracing
+- if release behavior is stable enough structurally now, the next high-value
+  move after that is probably Finding 4: split `compat/` into
+  feature-owned surfaces

@@ -49,8 +49,8 @@ typedef struct {
     bool                  is_momentary_layer;
     delayed_action_mods_t mods;
     hold_behavior_t       hold;
-    hold_behavior_t       long_hold;
     handled_key_interaction_policy_t policy;
+    key_runtime_slot_release_contract_t release_contract;
     uint16_t              action;
     uint8_t               repeat_count;
     bool                  matched;
@@ -86,15 +86,15 @@ static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pen
     context.is_momentary_layer = key_runtime_slot_interaction_is_momentary_layer(interaction);
     context.mods      = delayed_action_mods_from_multi_tap(slot_multi_tap);
     context.hold      = interaction.binding.hold;
-    context.long_hold = interaction.binding.long_hold;
     context.policy    = interaction.policy;
+    context.release_contract = key_runtime_slot_release_contract(interaction);
     context.action    = key_runtime_slot_resolve_pending_multi_tap_hold(slot, &context.repeat_count);
     context.matched   = true;
 
-    if (!context.hold.present && context.policy.long_hold.dispatches_on_release && elapsed >= interaction.binding.longer_hold_term) {
-        context.action = context.long_hold.action;
-    } else if (context.policy.hold.dispatches_on_release && context.repeat_count == 1 && context.action == context.hold.action) {
-        context.action = key_runtime_slot_policy_select_release_hold_action(elapsed, context.hold.action, context.long_hold, interaction.binding.longer_hold_term);
+    if (context.repeat_count == 1 && key_runtime_slot_release_hold_contract_has_any_action(context.release_contract.hold)) {
+        if ((!context.hold.present && context.action == KC_NO) || (context.policy.hold.dispatches_on_release && context.action == context.hold.action)) {
+            context.action = key_runtime_slot_release_hold_contract_select_action(context.release_contract.hold, elapsed, interaction.binding.longer_hold_term);
+        }
     }
 
     return context;

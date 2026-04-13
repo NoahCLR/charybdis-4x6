@@ -23,9 +23,13 @@ typedef struct {
 } key_runtime_slot_release_tap_contract_t;
 
 typedef struct {
+    uint16_t primary_action;
+    uint16_t long_action;
+} key_runtime_slot_release_hold_contract_t;
+
+typedef struct {
     key_runtime_slot_release_tap_contract_t tap;
-    uint16_t                                release_hold_action;
-    uint16_t                                release_long_hold_action;
+    key_runtime_slot_release_hold_contract_t hold;
     pd_mode_mask_t                          quick_tap_pd_mode_lock;
     bool                                    suppress_tap_on_layer_interrupt;
     bool                                    buffered_base_tap_dispatches_tap;
@@ -105,11 +109,17 @@ static inline key_runtime_slot_release_tap_contract_t key_runtime_slot_release_t
     return (key_runtime_slot_release_tap_contract_t){0};
 }
 
+static inline key_runtime_slot_release_hold_contract_t key_runtime_slot_release_hold_contract_build(key_runtime_slot_interaction_t interaction) {
+    return (key_runtime_slot_release_hold_contract_t){
+        .primary_action = interaction.policy.hold.dispatches_on_release ? interaction.binding.hold.action : KC_NO,
+        .long_action    = interaction.policy.long_hold.dispatches_on_release ? interaction.binding.long_hold.action : KC_NO,
+    };
+}
+
 static inline key_runtime_slot_release_contract_t key_runtime_slot_release_contract_build(key_runtime_slot_interaction_t interaction) {
     return (key_runtime_slot_release_contract_t){
         .tap                                          = key_runtime_slot_release_tap_contract_build(interaction),
-        .release_hold_action                          = interaction.policy.hold.dispatches_on_release ? interaction.binding.hold.action : KC_NO,
-        .release_long_hold_action                     = interaction.policy.long_hold.dispatches_on_release ? interaction.binding.long_hold.action : KC_NO,
+        .hold                                         = key_runtime_slot_release_hold_contract_build(interaction),
         .quick_tap_pd_mode_lock                       = interaction.pd_mode,
         .suppress_tap_on_layer_interrupt              = (interaction.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0,
         .buffered_base_tap_dispatches_tap             = (interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0 && interaction.binding.tap_action == KC_NO,
@@ -195,10 +205,26 @@ static inline key_runtime_slot_release_contract_t key_runtime_slot_release_contr
     return interaction.release;
 }
 
-static inline uint16_t key_runtime_slot_release_contract_select_hold_action(key_runtime_slot_release_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    if (contract.release_long_hold_action != KC_NO && elapsed >= longer_hold_term) {
-        return contract.release_long_hold_action;
+static inline bool key_runtime_slot_release_hold_contract_has_primary_action(key_runtime_slot_release_hold_contract_t contract) {
+    return contract.primary_action != KC_NO;
+}
+
+static inline bool key_runtime_slot_release_hold_contract_has_any_action(key_runtime_slot_release_hold_contract_t contract) {
+    return contract.primary_action != KC_NO || contract.long_action != KC_NO;
+}
+
+static inline bool key_runtime_slot_release_hold_contract_long_ready(key_runtime_slot_release_hold_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
+    return contract.long_action != KC_NO && elapsed >= longer_hold_term;
+}
+
+static inline uint16_t key_runtime_slot_release_hold_contract_select_action(key_runtime_slot_release_hold_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
+    if (key_runtime_slot_release_hold_contract_long_ready(contract, elapsed, longer_hold_term)) {
+        return contract.long_action;
     }
 
-    return contract.release_hold_action;
+    return contract.primary_action;
+}
+
+static inline uint16_t key_runtime_slot_release_contract_select_hold_action(key_runtime_slot_release_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
+    return key_runtime_slot_release_hold_contract_select_action(contract.hold, elapsed, longer_hold_term);
 }

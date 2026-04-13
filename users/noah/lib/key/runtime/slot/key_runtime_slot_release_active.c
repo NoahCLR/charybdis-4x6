@@ -112,11 +112,11 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolution
 }
 
 static bool key_runtime_slot_release_has_primary_hold_action(const key_runtime_slot_release_context_t *context) {
-    return context && context->contract.release_hold_action != KC_NO;
+    return context && key_runtime_slot_release_hold_contract_has_primary_action(context->contract.hold);
 }
 
 static bool key_runtime_slot_release_can_select_hold_action(const key_runtime_slot_release_context_t *context) {
-    return context && (context->contract.release_hold_action != KC_NO || context->contract.release_long_hold_action != KC_NO);
+    return context && key_runtime_slot_release_hold_contract_has_any_action(context->contract.hold);
 }
 
 static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolution_selected_hold_action(const key_runtime_slot_release_context_t *context) {
@@ -128,7 +128,7 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolution
 }
 
 static bool key_runtime_slot_release_long_hold_ready(const key_runtime_slot_release_context_t *context) {
-    return context && context->contract.release_long_hold_action != KC_NO && context->elapsed >= context->interaction.binding.longer_hold_term;
+    return context && key_runtime_slot_release_hold_contract_long_ready(context->contract.hold, context->elapsed, context->interaction.binding.longer_hold_term);
 }
 
 static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_phase_contract(const key_runtime_slot_release_context_t *context,
@@ -178,7 +178,7 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_ph
     }
 
     if (phase_contract.long_hold_dispatches_action && key_runtime_slot_release_long_hold_ready(context)) {
-        return key_runtime_slot_release_resolution_action(context, context->contract.release_long_hold_action);
+        return key_runtime_slot_release_resolution_action(context, context->contract.hold.long_action);
     }
 
     if (phase_contract.nonquick_release_dispatches_tap && context->contract.nonquick_release_dispatches_tap) {

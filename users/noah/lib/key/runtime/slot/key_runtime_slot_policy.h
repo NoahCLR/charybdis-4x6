@@ -11,7 +11,6 @@
 #include "key_runtime_slot_effect.h"
 #include "../key_runtime_state.h"
 
-uint16_t                     key_runtime_slot_policy_select_release_hold_action(uint16_t elapsed, uint16_t hold_action, hold_behavior_t long_hold, uint16_t longer_hold_term);
 key_runtime_effect_builder_t key_runtime_slot_policy_activate_pending_fallback_hold(active_key_state_t *slot);
 key_runtime_effect_builder_t key_runtime_slot_policy_interrupt_on_other_press(active_key_state_t *slot, keypos_t other_key_pos);
 key_runtime_effect_builder_t key_runtime_slot_policy_commit_immediate_hold(active_key_state_t *slot, bool needs_feedback, bool completes_hold);

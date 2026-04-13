@@ -54,14 +54,6 @@ static void key_runtime_slot_policy_clear_owned_hold(active_key_state_t *slot, k
     }
 }
 
-uint16_t key_runtime_slot_policy_select_release_hold_action(uint16_t elapsed, uint16_t hold_action, hold_behavior_t long_hold, uint16_t longer_hold_term) {
-    if (hold_sends_on_release(long_hold) && elapsed >= longer_hold_term) {
-        return long_hold.action;
-    }
-
-    return hold_action;
-}
-
 key_runtime_effect_builder_t key_runtime_slot_policy_activate_pending_fallback_hold(active_key_state_t *slot) {
     key_runtime_effect_builder_t builder = {0};
 

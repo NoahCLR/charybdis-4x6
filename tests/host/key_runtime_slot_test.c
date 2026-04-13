@@ -669,6 +669,8 @@ static void test_take_active_release_release_hold_pending_dispatches_release_hol
         .interaction.valid    = true,
         .interaction.view     = test_cached_interaction(KC_NO, HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_HOLD_ACTION)), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
+    CHECK(slot->interaction.view.release.hold.primary_action == TEST_HOLD_ACTION);
+    CHECK(slot->interaction.view.release.hold.long_action == KC_NO);
 
     result = test_step_handled_release(slot, TEST_ACTIVE_KEY, pos,
                                        (key_behavior_view_t){
@@ -1019,6 +1021,8 @@ static void test_take_pending_multi_tap_hold_release_prefers_release_long_hold_a
                 .long_hold     = TAP_ON_RELEASE_AFTER_HOLD(TEST_SINGLE_ACTION),
             },
     };
+    CHECK(slot->interaction.view.release.hold.primary_action == TEST_HOLD_ACTION);
+    CHECK(slot->interaction.view.release.hold.long_action == TEST_SINGLE_ACTION);
 
     release = test_step_handled_release(slot, TEST_MULTI_TAP_KEY, pos, (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY});
 
