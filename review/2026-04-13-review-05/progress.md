@@ -153,3 +153,62 @@ Next steps:
 
 - keep moving higher-level tests toward semantic harness helpers where that
   reduces storage-coupling noise without weakening low-level reducer coverage
+
+### Implementation pass: semantic release matrix coverage
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-05/` implementation log.
+- Added a new end-to-end semantic release matrix suite in
+  `tests/host/key_runtime_release_matrix_test.c`
+  built on the scenario harness instead of raw slot layout mutation.
+- Covered cross-path release semantics for active single-key release and final
+  pending-multi-tap release across:
+  - primary release-hold actions
+  - long-only release-hold actions
+  - primary-vs-long release selection after `longer_hold_term`
+  - threshold hold followed by release-resolved long hold
+  - held lifecycle followed by release-resolved long hold
+- Added pending-only edge coverage for the two cases that are not directly
+  cross-path equivalent:
+  - quick release preserving a still-open multi-tap chain
+  - no-scan pending hold release synthesizing held register/unregister
+- Wired the new suite into
+  `tests/host/run_key_runtime_release_matrix_tests.sh`
+  and the full host runner so release semantics are part of the default
+  verification surface.
+
+Contracts touched in this pass:
+
+- semantic equivalence between active release and pending multi-tap release
+  for release-time hold resolution
+- pending multi-tap quick-release chain preservation
+- pending multi-tap no-scan held-lifecycle fallback
+- full-suite host runner coverage for release matrix verification
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- release-matrix host suite passed
+- existing key-runtime scenario suite passed
+- full host suite passed with the release-matrix runner wired in
+- firmware build passed
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- extend the same semantic-matrix approach to other stateful runtime seams
+  where path coverage is decent but cross-product semantic coverage is still
+  thin
