@@ -10,8 +10,8 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../interaction/handled_key.h"
 #include "../interaction/multi_tap_engine.h"
+#include "key_runtime_interaction.h"
 #include "key_runtime_types.h"
 
 typedef enum {
@@ -38,7 +38,7 @@ typedef struct {
 
 typedef struct {
     bool               valid;
-    handled_key_view_t view;
+    key_runtime_slot_interaction_t view;
 } key_runtime_slot_interaction_state_t;
 
 // One handled-key runtime slot: active press/hold state plus any deferred
@@ -66,10 +66,7 @@ typedef struct {
         .owner.keycode                 = KC_NO,                       \
         .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_IDLE, \
         .lifecycle.held_action_keycode = KC_NO,                       \
-        .interaction.view.tap_hold_term = CUSTOM_TAP_HOLD_TERM,       \
-        .interaction.view.longer_hold_term = CUSTOM_LONGER_HOLD_TERM, \
-        .interaction.view.multi_tap_term = CUSTOM_MULTI_TAP_TERM,     \
-        .interaction.view.layer        = UINT8_MAX,                   \
+        .interaction.view             = key_runtime_slot_interaction_default(), \
         .pending_multi_tap             = {0},                         \
     }
 

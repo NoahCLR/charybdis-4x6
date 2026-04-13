@@ -179,13 +179,13 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_shared_state.pd.remote_display_active_flags         = PD_MODE_ARROW;
     noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_C;
     noah_runtime_shared_state.key.slots_by_position[0].interaction.valid = true;
-    noah_runtime_shared_state.key.slots_by_position[0].interaction.view = (handled_key_view_t){
+    noah_runtime_shared_state.key.slots_by_position[0].interaction.view = key_runtime_slot_interaction_from_handled_key((handled_key_view_t){
         .tap_action    = KC_C,
         .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
         .layer         = UINT8_MAX,
         .pd_mode       = 0,
         .flags         = HANDLED_KEY_FLAG_HANDLED,
-    };
+    });
 
     layer_ownership_set_lock_state(3, true);
     layer_ownership_momentary_press(layer_key, 2);

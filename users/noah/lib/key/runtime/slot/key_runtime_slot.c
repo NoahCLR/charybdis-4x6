@@ -57,11 +57,11 @@ key_runtime_slot_phase_t key_runtime_slot_phase(const active_key_state_t *slot) 
 }
 
 bool key_runtime_slot_uses_implicit_hold(const active_key_state_t *slot) {
-    return slot != NULL && key_runtime_slot_interaction(slot).hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
+    return slot != NULL && key_runtime_slot_interaction_uses_implicit_hold(key_runtime_slot_cached_interaction(slot));
 }
 
 bool key_runtime_slot_uses_fallback_hold(const active_key_state_t *slot) {
-    return slot != NULL && key_runtime_slot_interaction(slot).hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
+    return slot != NULL && key_runtime_slot_interaction_uses_fallback_hold(key_runtime_slot_cached_interaction(slot));
 }
 
 bool key_runtime_slot_allows_tap_release(const active_key_state_t *slot) {
@@ -89,28 +89,27 @@ bool key_runtime_slot_owns_key_position(const active_key_state_t *slot, keypos_t
     return (key_runtime_slot_active(slot) && key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) || (key_runtime_slot_has_pending_multi_tap(slot) && key_runtime_keypos_equal(slot->pending_multi_tap.key_pos, key_pos));
 }
 
-handled_key_view_t key_runtime_slot_interaction(const active_key_state_t *slot) {
+key_runtime_slot_interaction_t key_runtime_slot_cached_interaction(const active_key_state_t *slot) {
     if (!slot) {
-        return (handled_key_view_t){
-            .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-            .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-            .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-            .layer = UINT8_MAX,
-        };
+        return key_runtime_slot_interaction_default();
     }
 
     return slot->interaction.view;
 }
 
+handled_key_view_t key_runtime_slot_interaction(const active_key_state_t *slot) {
+    return key_runtime_slot_interaction_to_handled_key_view(key_runtime_slot_cached_interaction(slot));
+}
+
 uint8_t key_runtime_slot_preview_layer_hint(const active_key_state_t *slot) {
-    handled_key_interaction_policy_t policy;
+    key_runtime_slot_interaction_t interaction;
 
     if (!slot) {
         return UINT8_MAX;
     }
 
-    policy = handled_key_resolve_policy(key_runtime_slot_interaction(slot));
-    return policy.hold.preview_layer;
+    interaction = key_runtime_slot_cached_interaction(slot);
+    return interaction.policy.hold.preview_layer;
 }
 
 bool key_runtime_slot_has_pending_multi_tap(const active_key_state_t *slot) {
@@ -271,7 +270,7 @@ void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes
     slot->lifecycle.phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
 }
 
-static void key_runtime_slot_set_interaction(active_key_state_t *slot, handled_key_view_t key) {
+static void key_runtime_slot_set_interaction(active_key_state_t *slot, key_runtime_slot_interaction_t key) {
     if (!slot) {
         return;
     }
@@ -282,7 +281,7 @@ static void key_runtime_slot_set_interaction(active_key_state_t *slot, handled_k
     };
 }
 
-void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t interaction, key_runtime_slot_phase_t phase) {
+void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_runtime_slot_interaction_t interaction, key_runtime_slot_phase_t phase) {
     if (!slot) {
         return;
     }

@@ -43,6 +43,10 @@ static void test_reset_state(void) {
     fake_time = 0;
 }
 
+static key_runtime_slot_interaction_t test_cached_interaction(handled_key_view_t key) {
+    return key_runtime_slot_interaction_from_handled_key(key);
+}
+
 static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior);
 
 static key_runtime_slot_result_t test_step_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_behavior_view_t behavior) {
@@ -242,13 +246,13 @@ static void test_fallback_hold_has_no_hold_feedback(void) {
         .owner.keycode                 = KC_RIGHT_ALT,
         .lifecycle.held_action_keycode = KC_RIGHT_ALT,
         .interaction.valid             = true,
-        .interaction.view              = {
+        .interaction.view              = test_cached_interaction((handled_key_view_t){
             .tap_action    = KC_NO,
             .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
             .layer         = UINT8_MAX,
             .pd_mode       = 0,
             .flags         = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_FALLBACK_HOLD,
-        },
+        }),
     };
 
     uint8_t flags = key_feedback_pack();
@@ -261,7 +265,7 @@ static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) 
     active_key = (active_key_state_t){
         .owner.keycode           = KC_RIGHT_ALT,
         .interaction.valid       = true,
-        .interaction.view        = {
+        .interaction.view        = test_cached_interaction((handled_key_view_t){
             .tap_action    = KC_NO,
             .hold =
                 {
@@ -274,7 +278,7 @@ static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) 
             .layer         = UINT8_MAX,
             .pd_mode       = 0,
             .flags         = HANDLED_KEY_FLAG_HANDLED,
-        },
+        }),
     };
 
     CHECK(key_feedback_preview_layer() == 3);
@@ -286,7 +290,7 @@ static void test_cached_preview_layer_metadata_is_used_when_present(void) {
     active_key = (active_key_state_t){
         .owner.keycode           = KC_RIGHT_ALT,
         .interaction.valid       = true,
-        .interaction.view        = {
+        .interaction.view        = test_cached_interaction((handled_key_view_t){
             .tap_action    = KC_NO,
             .hold =
                 {
@@ -299,7 +303,7 @@ static void test_cached_preview_layer_metadata_is_used_when_present(void) {
             .layer         = UINT8_MAX,
             .pd_mode       = 0,
             .flags         = HANDLED_KEY_FLAG_HANDLED,
-        },
+        }),
     };
 
     CHECK(key_feedback_preview_layer() == 4);
@@ -365,13 +369,13 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
         .owner.keycode      = TEST_MULTI_TAP_KEY,
         .owner.key_pos      = pos,
         .interaction.valid  = true,
-        .interaction.view   = {
+        .interaction.view   = test_cached_interaction((handled_key_view_t){
             .tap_action    = TEST_PENDING_TAP_ACTION,
             .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
             .tap_hold_term = 120,
             .longer_hold_term = 240,
             .flags         = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP,
-        },
+        }),
         .pending_multi_tap =
             {
                 .keycode          = TEST_MULTI_TAP_KEY,
@@ -408,7 +412,7 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
         .timer                 = (uint16_t)(fake_time - 150),
         .owner.keycode         = KC_LEFT,
         .interaction.valid     = true,
-        .interaction.view      = {
+        .interaction.view      = test_cached_interaction((handled_key_view_t){
             .tap_action    = KC_NO,
             .hold          = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
             .long_hold     = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
@@ -416,7 +420,7 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
             .tap_hold_term = 100,
             .longer_hold_term = 300,
             .flags         = HANDLED_KEY_FLAG_HANDLED,
-        },
+        }),
     };
 
     uint8_t flags = key_feedback_pack();

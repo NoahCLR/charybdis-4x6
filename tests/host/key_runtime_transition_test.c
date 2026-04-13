@@ -109,23 +109,23 @@ static void test_set_default_slot_key_pos(keypos_t key_pos) {
     test_default_slot_key_pos = key_pos;
 }
 
-static handled_key_view_t test_cached_interaction(uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
-    return (handled_key_view_t){
-        .tap_action           = tap_action,
-        .tap_repeat_count     = tap_action == KC_NO ? 0 : 1,
-        .hold                 = hold,
-        .long_hold            = long_hold,
-        .hold_strategy        = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
-        .tap_hold_term        = tap_hold_term,
-        .longer_hold_term     = longer_hold_term,
-        .multi_tap_term       = multi_tap_term,
-        .layer                = UINT8_MAX,
-        .pd_mode              = 0,
-        .step_present         = tap_action != KC_NO || hold.present || long_hold.present,
-        .has_more_taps        = false,
+static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
+    return key_runtime_slot_interaction_from_handled_key((handled_key_view_t){
+        .tap_action            = tap_action,
+        .tap_repeat_count      = tap_action == KC_NO ? 0 : 1,
+        .hold                  = hold,
+        .long_hold             = long_hold,
+        .hold_strategy         = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+        .tap_hold_term         = tap_hold_term,
+        .longer_hold_term      = longer_hold_term,
+        .multi_tap_term        = multi_tap_term,
+        .layer                 = UINT8_MAX,
+        .pd_mode               = 0,
+        .step_present          = tap_action != KC_NO || hold.present || long_hold.present,
+        .has_more_taps         = false,
         .tap_resolves_on_press = false,
-        .flags                = HANDLED_KEY_FLAG_HANDLED,
-    };
+        .flags                 = HANDLED_KEY_FLAG_HANDLED,
+    });
 }
 
 #define HOLD_LIT(expr) ((hold_behavior_t)expr)
@@ -152,7 +152,7 @@ static void active_key_reset(void) {
 }
 
 static void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
-    handled_key_view_t interaction = {
+    key_runtime_slot_interaction_t interaction = key_runtime_slot_interaction_from_handled_key((handled_key_view_t){
         .tap_action       = tap_action,
         .tap_repeat_count = tap_action == KC_NO ? 0 : 1,
         .hold             = hold,
@@ -163,7 +163,7 @@ static void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_ac
         .multi_tap_term   = multi_tap_term,
         .layer            = UINT8_MAX,
         .flags            = HANDLED_KEY_FLAG_HANDLED,
-    };
+    });
 
     test_set_default_slot_key_pos(key_pos);
     key_runtime_slot_track(test_default_slot(), keycode, key_pos, interaction, phase);
@@ -733,6 +733,7 @@ static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
         .interaction.view        = test_cached_interaction(KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
     active_key.interaction.view.hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
+    active_key.interaction.view.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_interrupt_active_key_on_other_press(&plan);
@@ -1404,6 +1405,7 @@ static void test_scan_commits_implicit_hold_without_feedback(void) {
                                                                }, hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
     active_key.interaction.view.hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
+    active_key.interaction.view.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1543,13 +1545,13 @@ static void test_interrupt_plan_overflow_sets_flag_and_logs_once(void) {
             .owner.key_pos           = key_pos,
             .lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
             .interaction.valid       = true,
-            .interaction.view        = {
+            .interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_view_t){
                 .tap_action    = KC_NO,
                 .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
                 .layer         = UINT8_MAX,
                 .pd_mode       = 0,
                 .flags         = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_FALLBACK_HOLD,
-            },
+            }),
         };
     }
 

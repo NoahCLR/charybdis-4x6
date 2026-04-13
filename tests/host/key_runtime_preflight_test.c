@@ -318,13 +318,13 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
     active_key.owner.key_pos           = stored;
     active_key.lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
     active_key.interaction.valid       = true;
-    active_key.interaction.view        = (handled_key_view_t){
+    active_key.interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_view_t){
         .tap_action    = KC_NO,
         .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
         .layer         = UINT8_MAX,
         .pd_mode       = 0,
         .flags         = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_FALLBACK_HOLD,
-    };
+    });
 
     CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(tracked_physical_event);

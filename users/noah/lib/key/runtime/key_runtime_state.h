@@ -42,6 +42,7 @@ bool                                       key_runtime_slot_hold_is_complete(con
 bool                                       key_runtime_slot_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos);
 bool                                       key_runtime_slot_owns_key_position(const active_key_state_t *slot, keypos_t key_pos);
 uint8_t                                    key_runtime_slot_preview_layer_hint(const active_key_state_t *slot);
+key_runtime_slot_interaction_t             key_runtime_slot_cached_interaction(const active_key_state_t *slot);
 handled_key_view_t                         key_runtime_slot_interaction(const active_key_state_t *slot);
 bool                                       key_runtime_slot_has_pending_multi_tap(const active_key_state_t *slot);
 bool                                       key_runtime_slot_pending_multi_tap_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos);
@@ -64,4 +65,4 @@ void                                       key_runtime_slot_set_release_hold_pen
 void                                       key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes_hold);
 
 void key_runtime_slot_reset(active_key_state_t *slot);
-void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t interaction, key_runtime_slot_phase_t phase);
+void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_runtime_slot_interaction_t interaction, key_runtime_slot_phase_t phase);

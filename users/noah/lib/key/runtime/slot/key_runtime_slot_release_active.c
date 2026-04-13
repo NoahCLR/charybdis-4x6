@@ -26,16 +26,16 @@ typedef struct {
 
 typedef struct {
     active_key_state_t released_key;
-    handled_key_view_t interaction;
-    uint16_t           elapsed;
-    bool               quick_tap;
-    bool               quick_immediate_hold;
-    bool               buffered_base_tap;
-    pd_mode_mask_t     lock_tap_mode;
+    key_runtime_slot_interaction_t interaction;
+    uint16_t                       elapsed;
+    bool                           quick_tap;
+    bool                           quick_immediate_hold;
+    bool                           buffered_base_tap;
+    pd_mode_mask_t                 lock_tap_mode;
 } key_runtime_slot_release_context_t;
 
 static bool key_runtime_slot_release_is_interrupted_layer_tap(const key_runtime_slot_release_context_t *context) {
-    return context && handled_key_is_momentary_layer(context->interaction) && context->released_key.lifecycle.layer_interrupted;
+    return context && key_runtime_slot_interaction_is_momentary_layer(context->interaction) && context->released_key.lifecycle.layer_interrupted;
 }
 
 static bool key_runtime_slot_release_is_buffered_base_tap(const key_runtime_slot_release_context_t *context) {
@@ -51,7 +51,7 @@ static pd_mode_mask_t key_runtime_slot_locked_pd_mode_tap_mode(const key_runtime
         return 0;
     }
 
-    pd_mode_mask_t mode = handled_key_pd_mode(context->interaction);
+    pd_mode_mask_t mode = context->interaction.pd_mode;
     if (!mode) {
         return 0;
     }
@@ -122,7 +122,7 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_ta
         return key_runtime_slot_release_resolution_action(context, context->interaction.long_hold.action);
     }
 
-    if (!handled_key_is_momentary_layer(context->interaction) && context->interaction.tap_action != KC_NO) {
+    if (!key_runtime_slot_interaction_is_momentary_layer(context->interaction) && context->interaction.tap_action != KC_NO) {
         return key_runtime_slot_release_resolution_tap(context);
     }
 
@@ -175,8 +175,8 @@ static const key_runtime_slot_release_phase_resolver_t key_runtime_slot_release_
     [KEY_RUNTIME_SLOT_PHASE_IDLE] = key_runtime_slot_release_resolution_base, [KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW] = key_runtime_slot_release_resolve_tap_window, [KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW] = key_runtime_slot_release_resolve_press_held_window, [KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING] = key_runtime_slot_release_resolve_release_hold_pending, [KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE] = key_runtime_slot_release_resolve_hold_phase, [KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE] = key_runtime_slot_release_resolve_hold_phase,
 };
 
-static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(active_key_state_t released_key, handled_key_view_t key, uint16_t elapsed) {
-    handled_key_view_t interaction = key_runtime_slot_interaction(&released_key);
+static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(active_key_state_t released_key, uint16_t elapsed) {
+    key_runtime_slot_interaction_t interaction = key_runtime_slot_cached_interaction(&released_key);
     key_runtime_slot_release_context_t context = {
         .released_key = released_key,
         .interaction  = interaction,
@@ -185,7 +185,6 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(ac
     key_runtime_slot_phase_t                  phase    = key_runtime_slot_phase(&released_key);
     key_runtime_slot_release_phase_resolver_t resolver = key_runtime_slot_release_phase_resolvers[phase];
 
-    (void)key;
     context.quick_tap            = key_runtime_slot_release_is_quick_tap(&context);
     context.quick_immediate_hold = hold_registers_on_press(interaction.hold) && key_runtime_slot_allows_tap_release(&released_key) && context.quick_tap;
     context.buffered_base_tap    = key_runtime_slot_release_is_buffered_base_tap(&context);
@@ -196,7 +195,7 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(ac
 
 key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_state_t *slot, uint16_t keycode, handled_key_view_t key) {
     key_runtime_slot_result_t result = {0};
-    handled_key_view_t        interaction;
+    key_runtime_slot_interaction_t interaction;
 
     if (!slot || slot->owner.keycode == KC_NO) {
         return result;
@@ -204,17 +203,17 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_stat
 
     active_key_state_t released_key = *slot;
     uint16_t           elapsed      = timer_elapsed(released_key.timer);
-    interaction                    = key_runtime_slot_interaction(&released_key);
+    interaction                    = key_runtime_slot_cached_interaction(&released_key);
 
     result.handled = true;
 
-    if (handled_key_is_momentary_layer(interaction)) {
+    if (key_runtime_slot_interaction_is_momentary_layer(interaction)) {
         key_runtime_slot_result_push_layer_release(&result, released_key.owner.key_pos);
     }
 
     key_runtime_slot_reset(slot);
 
-    key_runtime_slot_release_resolution_t resolution = key_runtime_slot_resolve_release(released_key, key, elapsed);
+    key_runtime_slot_release_resolution_t resolution = key_runtime_slot_resolve_release(released_key, elapsed);
     if (resolution.release_owned_state) {
         key_runtime_slot_result_push_builder_if_present(&result, released_key.owner.key_pos,
                                                         (key_runtime_effect_builder_t){
@@ -224,7 +223,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_stat
 
     switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP:
-            if (handled_key_has_multi_tap(interaction)) {
+            if ((interaction.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0) {
                 uint8_t first_tap_repeat_count = interaction.tap_action == KC_NO ? 0 : 1;
                 key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.owner.key_pos, interaction.tap_action, first_tap_repeat_count, interaction.tap_hold_term, interaction.multi_tap_term, interaction.has_more_taps);
             } else if (interaction.tap_action != KC_NO) {

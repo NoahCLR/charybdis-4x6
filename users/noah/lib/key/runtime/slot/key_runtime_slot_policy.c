@@ -105,13 +105,13 @@ key_runtime_effect_builder_t key_runtime_slot_policy_commit_immediate_hold(activ
 
 key_runtime_effect_builder_t key_runtime_slot_policy_take_flush(active_key_state_t *slot, bool active_held_action_survives_flush) {
     key_runtime_effect_builder_t builder = {0};
-    handled_key_view_t           interaction;
+    key_runtime_slot_interaction_t interaction;
 
     if (!key_runtime_slot_active(slot)) {
         return builder;
     }
 
-    interaction = key_runtime_slot_interaction(slot);
+    interaction = key_runtime_slot_cached_interaction(slot);
 
     if (!key_runtime_slot_allows_tap_release(slot) || slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
         if (slot->lifecycle.held_action_keycode != KC_NO && !active_held_action_survives_flush) {

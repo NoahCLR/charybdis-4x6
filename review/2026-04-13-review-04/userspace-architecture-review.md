@@ -2,11 +2,16 @@
 
 Date: 2026-04-13
 
-Status: new review created after
+Status: active review created after
 [2026-04-13-review-03](../2026-04-13-review-03/userspace-architecture-review.md).
 This pass reviews the current live userspace after the earlier contract cleanup
 work. Hardware is treated as fixed; this review is only about software
 architecture, structure, and long-term extensibility.
+
+Implementation update later the same day: the first slice of Finding 1 has
+landed. Active slot storage now uses `key_runtime_slot_interaction_t` as the
+slot-owned cached interaction contract, with a compatibility wrapper still
+exposing `handled_key_view_t` where older call sites need it.
 
 This review is intentionally not a repeat of the earlier action-family,
 pd-mode write-controller, macro IR, and test-harness recommendations. Those
@@ -136,6 +141,17 @@ Recommended direction:
 - keep `handled_key_lookup_*()` as the immutable authored-resolution seam
 - create a narrower slot contract that owns the chosen tap-count branch and the
   normalized hold/release policy for this physical press
+
+Implementation update:
+
+- the first slice of this recommendation is now in place:
+  `active_key_state_t` stores `key_runtime_slot_interaction_t`, and reducers
+  read it through `key_runtime_slot_cached_interaction(...)`
+- cached hold policy now lives with the slot interaction contract instead of
+  being recomputed at every feedback/scan consumer
+- the remaining gap is that `key_runtime_slot_interaction_t` still mirrors too
+  much of `handled_key_view_t`; authored resolution is not yet a separate,
+  explicit object
 
 Example shape:
 
