@@ -6,7 +6,8 @@
 
 #include "pd_mode_internal.h"
 #include "pd_mode_registry_internal.h"
-#include "../../compat/qmk_contract.h"
+#include "../../compat/qmk_auto_mouse_contract.h"
+#include "../../compat/qmk_pointing_contract.h"
 #include "../../state/runtime/runtime_trace.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE

@@ -18,7 +18,7 @@
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
 #        include "../../rgb/automouse/rgb_automouse.h"
 #    endif
-#    include "../../compat/qmk_contract.h"
+#    include "../../compat/qmk_auto_mouse_contract.h"
 #    include "runtime_trace.h"
 #    include "split_runtime_sync.h"
 #    include "transactions.h" // QMK

@@ -975,3 +975,72 @@ Next steps:
 
 - treat Findings 1, 2, and 3 as landed
 - move on to Finding 4 and split `compat/` into feature-owned surfaces
+
+### Implementation pass: feature-owned compat seams
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Split the broad `users/noah/lib/compat/qmk_contract.h` surface into
+  feature-owned headers:
+  - `qmk_via_playback_contract.h`
+  - `qmk_via_storage_contract.h`
+  - `qmk_pointing_contract.h`
+  - `qmk_auto_mouse_contract.h`
+  - `qmk_mod_contract.h`
+- Narrowed
+  `users/noah/lib/compat/qmk_contract.h`
+  and
+  `users/noah/lib/compat/qmk_via_contract.h`
+  into compatibility umbrellas so old include paths still exist without
+  remaining the default feature-facing surface.
+- Updated the compat translation units so each `.c` file now includes the
+  narrow header it actually owns:
+  - `qmk_contract.c` -> VIA playback
+  - `qmk_via_contract.c` -> VIA storage
+  - `qmk_mod_contract.c` -> modifier override seam
+- Moved feature callers onto the narrow headers:
+  - action lifecycle -> VIA playback
+  - pd runtime / pd lifecycle -> pointing and auto-mouse
+  - pd registry / pointer layer policy / split runtime sync / RGB automouse
+    -> auto-mouse
+  - VIA macro defaults -> VIA storage
+- Updated the active review so Finding 4 now reflects the landed split instead
+  of leaving it as a recommendation.
+
+Contracts touched in this pass:
+
+- `noah_qmk_contract_try_play_via_macro(...)`
+- `noah_qmk_via_macro_seed_capacity(...)`
+- `noah_qmk_via_command_effects(...)`
+- `noah_qmk_contract_pointer_*`
+- `noah_qmk_contract_auto_mouse_*`
+- `register_mods(...)`
+- `unregister_mods(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_via_macro_defaults_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- treat Finding 4 as landed
+- move on to Finding 5 and unify macro semantics around one canonical repo
+  command model with VIA as a codec boundary

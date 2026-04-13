@@ -13,7 +13,7 @@
 #include "action_dispatch.h"
 #include "owned_keycode.h"
 #include "synthetic_record.h"
-#include "../compat/qmk_contract.h"
+#include "../compat/qmk_via_playback_contract.h"
 #include "../macro/macro_dispatch.h"
 #include "../pointing/defs/pd_modes.h"
 #include "../pointing/policy/pointer_layer_policy.h"

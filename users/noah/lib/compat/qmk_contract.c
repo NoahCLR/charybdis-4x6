@@ -2,7 +2,7 @@
 // QMK Contract Compatibility
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "qmk_contract.h"
+#include "qmk_via_playback_contract.h"
 
 #ifdef VIA_ENABLE
 #    include "dynamic_keymap.h"

@@ -1,18 +1,15 @@
 // ────────────────────────────────────────────────────────────────────────────
-// QMK Contract Compatibility Umbrella
+// QMK VIA Playback Contract Compatibility
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Backward-compatible umbrella include for this userspace's narrower QMK
-// compatibility seams. New code should include the feature-owned headers
-// directly instead of depending on this aggregate surface.
-//
-// See:
-//   - qmk_via_playback_contract.h
-//   - qmk_pointing_contract.h
-//   - qmk_auto_mouse_contract.h
+// Centralizes this userspace's dependence on the current fork's VIA dynamic
+// macro playback encoding.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "qmk_auto_mouse_contract.h"
-#include "qmk_pointing_contract.h"
-#include "qmk_via_playback_contract.h"
+#include QMK_KEYBOARD_H // IWYU pragma: keep
+
+#include <stdbool.h>
+#include <stdint.h>
+
+bool noah_qmk_contract_try_play_via_macro(uint16_t action);

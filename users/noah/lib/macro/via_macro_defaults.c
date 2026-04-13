@@ -8,7 +8,7 @@
 
 #    include "noah_keymap_ids.h"
 #    include "macro_payload.h"
-#    include "../compat/qmk_via_contract.h"
+#    include "../compat/qmk_via_storage_contract.h"
 #    include "../rgb/core/rgb_runtime.h"
 
 #    ifdef CONSOLE_ENABLE

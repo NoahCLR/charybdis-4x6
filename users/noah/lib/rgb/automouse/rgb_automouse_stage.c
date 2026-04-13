@@ -9,7 +9,7 @@
 #    include "rgb_automouse.h"
 #    include "../core/rgb_helpers.h"
 #    include "../stages/rgb_layer_stage.h"
-#    include "../../compat/qmk_contract.h"
+#    include "../../compat/qmk_auto_mouse_contract.h"
 
 #    if defined(RGB_MATRIX_WS2812)
 #        include "ws2812.h" // QMK driver buffer access

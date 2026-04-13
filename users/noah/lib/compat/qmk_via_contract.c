@@ -2,7 +2,7 @@
 // QMK VIA Contract Compatibility
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "qmk_via_contract.h"
+#include "qmk_via_storage_contract.h"
 
 #ifdef VIA_ENABLE
 

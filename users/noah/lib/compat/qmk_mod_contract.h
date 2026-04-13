@@ -1,18 +1,13 @@
 // ────────────────────────────────────────────────────────────────────────────
-// QMK Contract Compatibility Umbrella
+// QMK Modifier Contract Compatibility
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Backward-compatible umbrella include for this userspace's narrower QMK
-// compatibility seams. New code should include the feature-owned headers
-// directly instead of depending on this aggregate surface.
-//
-// See:
-//   - qmk_via_playback_contract.h
-//   - qmk_pointing_contract.h
-//   - qmk_auto_mouse_contract.h
+// Declares this userspace's intentional override of QMK's register_mods() and
+// unregister_mods() symbols so modifier ownership remains centralized.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "qmk_auto_mouse_contract.h"
-#include "qmk_pointing_contract.h"
-#include "qmk_via_playback_contract.h"
+#include QMK_KEYBOARD_H // IWYU pragma: keep
+
+void register_mods(uint8_t mods);
+void unregister_mods(uint8_t mods);

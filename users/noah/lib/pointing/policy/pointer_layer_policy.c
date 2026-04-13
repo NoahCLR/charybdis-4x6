@@ -6,7 +6,7 @@
 
 #include "../defs/pd_modes.h"
 #include "pointer_layer_policy.h"
-#include "../../compat/qmk_contract.h"
+#include "../../compat/qmk_auto_mouse_contract.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static inline bool pointer_layer_policy_is_layer_hold_key(uint16_t keycode) {

@@ -6,7 +6,8 @@
 
 #include "../defs/pd_modes.h"
 #include "../policy/pointer_layer_policy.h"
-#include "../../compat/qmk_contract.h"
+#include "../../compat/qmk_auto_mouse_contract.h"
+#include "../../compat/qmk_pointing_contract.h"
 
 #if defined(POINTING_DEVICE_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 void noah_pointing_device_init_user(void) {

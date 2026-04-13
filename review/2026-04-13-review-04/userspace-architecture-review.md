@@ -380,45 +380,41 @@ Derived traits now come from the selected active mode definition row. The only
 flag-shaped compatibility surface left here is the command/split-sync
 transport seam, which is the right place for it.
 
-### 4. `compat/` is valuable, but its boundaries are still too broad
+### 4. `compat/` now has feature-owned seams, which is the right long-term shape
 
-The repo already moved fork-specific assumptions into `users/noah/lib/compat/`,
-which is good. The remaining issue is that one compatibility surface still
-mixes unrelated domains:
+The repo already had the right instinct here: keep fork-specific assumptions in
+`users/noah/lib/compat/` instead of scattering them through runtime modules.
+That structure is now materially tighter than it was at the start of this
+review:
 
-- `qmk_contract.h` exposes VIA playback, Charybdis pointer DPI/sniping, and
-  auto-mouse APIs
-- `qmk_via_contract.h` separately owns VIA EEPROM/command plumbing
-- `qmk_mod_contract.c` is another distinct compatibility seam again
+- `qmk_via_playback_contract.h` owns the forked VIA dynamic-macro playback seam
+- `qmk_via_storage_contract.h` owns VIA EEPROM/command classification
+- `qmk_pointing_contract.h` owns Charybdis pointer DPI/sniping helpers
+- `qmk_auto_mouse_contract.h` owns fork-specific auto-mouse helpers
+- `qmk_mod_contract.h` names the modifier symbol-override seam explicitly
+- `qmk_contract.h` and `qmk_via_contract.h` are now compatibility umbrellas
+  instead of the normal include path for feature code
 
-This means "QMK contract" currently names several different kinds of coupling:
-
-- forked dynamic-macro playback
-- pointing-device fork helpers
-- auto-mouse internals
-- modifier symbol override behavior
+That means "QMK contract" no longer hides several different kinds of coupling
+behind one broad header. Feature code now includes the boundary it actually
+depends on.
 
 Why this matters:
 
-- future QMK-fork updates will be harder to localize
-- feature owners have to know too much about a generic compat bucket
-- compatibility review becomes less discoverable than the runtime itself
+- future QMK-fork updates are easier to localize and review
+- feature owners no longer need to know about unrelated compat helpers
+- compatibility drift is more discoverable than it was when the broad umbrella
+  header was the default surface
 
-Recommended direction:
+The important design constraint now is to keep this split honest:
 
-- split the compatibility layer by owning subsystem
-- keep a small umbrella only if you still want a single include path
+- new VIA playback work should stay on `qmk_via_playback_contract.h`
+- new VIA storage/reset work should stay on `qmk_via_storage_contract.h`
+- new pointing or auto-mouse coupling should not be re-added to
+  `qmk_contract.h`
 
-Suggested split:
-
-- `compat/qmk_via_playback_contract.h`
-- `compat/qmk_via_storage_contract.h`
-- `compat/qmk_pointing_contract.h`
-- `compat/qmk_auto_mouse_contract.h`
-- `compat/qmk_mod_contract.h`
-
-That would make upstream/fork drift easier to audit and keep feature code from
-depending on unrelated compat helpers by accident.
+That is the right shape for future fork auditing without forcing a larger
+runtime rewrite.
 
 ### 5. Macro semantics still cross two partially separate execution models
 
@@ -513,19 +509,11 @@ more about surface choice:
 
 ## Recommended Refactor Order
 
-1. Split authored handled-key resolution from slot-owned interaction state.
-   This has the best payoff because it simplifies release logic, feedback, and
-   future behavior growth at the same time.
-2. Extract a typed release contract from the current release matrix.
-   That will make new hold/release behaviors cheaper to add and easier to test.
-3. Make pd-mode exclusivity explicit in the public state model.
-   That removes hidden "first active" priority assumptions from the rest of the
-   pointing stack.
-4. Break `compat/` into feature-owned compatibility surfaces.
-   This is lower risk than runtime refactors and improves discoverability fast.
-5. Move macro semantics toward one canonical command model and treat VIA as a
+Findings 1 through 4 are now landed enough that the remaining order is:
+
+1. Move macro semantics toward one canonical command model and treat VIA as a
    codec boundary.
-6. Keep shifting higher-level tests toward semantic builders and richer traces.
+2. Keep shifting higher-level tests toward semantic builders and richer traces.
 
 ## Bottom Line
 

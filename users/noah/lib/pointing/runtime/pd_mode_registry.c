@@ -8,7 +8,7 @@
 #include "../defs/pd_mode_manifest.h"
 #include "pd_mode_internal.h"
 #include "pd_mode_registry_internal.h"
-#include "../../compat/qmk_contract.h"
+#include "../../compat/qmk_auto_mouse_contract.h"
 
 #include "../modes/pd_mode_handlers.h"
 

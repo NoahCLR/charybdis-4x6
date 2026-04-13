@@ -2,7 +2,7 @@
 // QMK Modifier Contract Compatibility
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // IWYU pragma: keep
+#include "qmk_mod_contract.h"
 
 #include "../state/ownership/keyboard_mod_ownership.h"
 
