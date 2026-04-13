@@ -613,6 +613,51 @@ Next steps:
 
 - move on to recommendation 5
 
+## 2026-04-13: Recommendation 5 landed
+
+Completed in this pass:
+
+- Split the old 797-line `users/noah/lib/macro/macro_payload.c` monolith into
+  a stable façade plus focused implementation modules:
+  - `macro_payload_keycodes.c`: DSL keycode lexicon and lookup
+  - `macro_payload_parse.c`: command parsing and payload visitor walk
+  - `macro_payload_run.c`: playback/runtime execution
+  - `macro_payload_encode.c`: QMK send-string encoding
+- Kept `macro_payload.h` as the public surface and reduced
+  `macro_payload.c` to a small façade for validate/play entry points.
+- Added `macro_payload_internal.h` so shared DSL command types and visitor
+  contracts live in one internal header instead of being re-declared across
+  files.
+- Wired the new modules into the shared userspace source manifest and the
+  direct macro payload host runner.
+- Preserved the existing DSL behavior and VIA-facing contract while making the
+  implementation easier to extend by responsibility.
+
+Contracts touched:
+
+- `users/noah/lib/macro/macro_payload.c`
+- `users/noah/lib/macro/macro_payload_internal.h`
+- `users/noah/lib/macro/macro_payload_keycodes.c`
+- `users/noah/lib/macro/macro_payload_parse.c`
+- `users/noah/lib/macro/macro_payload_run.c`
+- `users/noah/lib/macro/macro_payload_encode.c`
+- `users/noah/source_manifest.mk`
+- `tests/host/run_macro_payload_tests.sh`
+
+Verification run in this pass:
+
+- `git diff --check`
+- `sh tests/host/run_macro_payload_tests.sh`
+- `sh tests/host/run_via_macro_defaults_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Next steps:
+
+- full host suite and firmware compile on the split macro implementation
+
 ## 2026-04-13: Recommendation 4 final cleanup landed
 
 Completed in this pass:

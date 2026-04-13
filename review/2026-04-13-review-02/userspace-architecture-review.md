@@ -729,6 +729,18 @@ Expected payoff:
 - easier future commands
 - lower cognitive load when editing macro behavior
 
+Current status:
+
+- landed the split implementation while keeping `macro_payload.h` as the
+  stable public façade
+- `macro_payload.c` is now a small entry-point wrapper instead of owning the
+  lexicon, parser, runtime executor, and encoder itself
+- the DSL is now separated by responsibility:
+  `macro_payload_keycodes.c`, `macro_payload_parse.c`,
+  `macro_payload_run.c`, and `macro_payload_encode.c`
+- shared command/visitor types now live in one internal header instead of
+  being trapped inside a single translation unit
+
 ## Suggested Refactor Order
 
 1. Introduce `resolved_interaction_view_t` without changing authored behavior.

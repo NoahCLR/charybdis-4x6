@@ -40,6 +40,10 @@ NOAH_COMMON_SOURCES := \
     lib/action/owned_keycode.c \
     lib/macro/macro_dispatch.c \
     lib/macro/macro_payload.c \
+    lib/macro/macro_payload_keycodes.c \
+    lib/macro/macro_payload_parse.c \
+    lib/macro/macro_payload_run.c \
+    lib/macro/macro_payload_encode.c \
     lib/macro/via_macro_defaults.c \
     lib/key/interaction/multi_tap_engine.c \
     lib/key/runtime/key_runtime_feedback.c \
