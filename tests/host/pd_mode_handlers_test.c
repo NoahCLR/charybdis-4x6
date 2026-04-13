@@ -467,6 +467,102 @@ static void test_dragscroll_reset_clears_buffers_and_lock_state(void) {
     CHECK(report.v == 2);
 }
 
+static void test_volume_mode_emits_discrete_steps_and_resets_on_direction_change(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+
+    report = handle_volume_mode((report_mouse_t){
+        .y = 60,
+    });
+    CHECK(report.x == 0);
+    CHECK(report.y == 0);
+    CHECK(synthetic_tap_call_count == 1);
+    CHECK(synthetic_tap_calls[0].keycode == KC_AUDIO_VOL_DOWN);
+    CHECK(synthetic_tap_calls[0].fallback_hold_active);
+
+    test_clear_logs();
+
+    report = handle_volume_mode((report_mouse_t){
+        .y = -60,
+    });
+    CHECK(report.x == 0);
+    CHECK(report.y == 0);
+    CHECK(synthetic_tap_call_count == 1);
+    CHECK(synthetic_tap_calls[0].keycode == KC_AUDIO_VOL_UP);
+    CHECK(synthetic_tap_calls[0].fallback_hold_active);
+
+    test_clear_logs();
+
+    report = handle_volume_mode((report_mouse_t){
+        .y = 120,
+    });
+    CHECK(report.x == 0);
+    CHECK(report.y == 0);
+    CHECK(synthetic_tap_call_count == 2);
+    CHECK(synthetic_tap_calls[0].keycode == KC_AUDIO_VOL_DOWN);
+    CHECK(synthetic_tap_calls[1].keycode == KC_AUDIO_VOL_DOWN);
+}
+
+static void test_brightness_mode_emits_discrete_steps_and_resets_on_direction_change(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+
+    report = handle_brightness_mode((report_mouse_t){
+        .y = 60,
+    });
+    CHECK(report.x == 0);
+    CHECK(report.y == 0);
+    CHECK(synthetic_tap_call_count == 1);
+    CHECK(synthetic_tap_calls[0].keycode == KC_BRID);
+    CHECK(synthetic_tap_calls[0].fallback_hold_active);
+
+    test_clear_logs();
+
+    report = handle_brightness_mode((report_mouse_t){
+        .y = -60,
+    });
+    CHECK(report.x == 0);
+    CHECK(report.y == 0);
+    CHECK(synthetic_tap_call_count == 1);
+    CHECK(synthetic_tap_calls[0].keycode == KC_BRIU);
+    CHECK(synthetic_tap_calls[0].fallback_hold_active);
+}
+
+static void test_zoom_mode_emits_discrete_steps_and_resets_on_direction_change(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+
+    report = handle_zoom_mode((report_mouse_t){
+        .y = 80,
+    });
+    CHECK(report.x == 0);
+    CHECK(report.y == 0);
+    CHECK(synthetic_tap_call_count == 1);
+    CHECK(synthetic_tap_calls[0].keycode == G(KC_MINS));
+    CHECK(synthetic_tap_calls[0].fallback_hold_active);
+
+    test_clear_logs();
+
+    report = handle_zoom_mode((report_mouse_t){
+        .y = -80,
+    });
+    CHECK(report.x == 0);
+    CHECK(report.y == 0);
+    report = handle_zoom_mode((report_mouse_t){
+        .y = -80,
+    });
+    CHECK(report.x == 0);
+    CHECK(report.y == 0);
+    CHECK(synthetic_tap_call_count == 2);
+    CHECK(synthetic_tap_calls[0].keycode == G(KC_EQL));
+    CHECK(synthetic_tap_calls[1].keycode == G(KC_EQL));
+    CHECK(synthetic_tap_calls[0].fallback_hold_active);
+    CHECK(synthetic_tap_calls[1].fallback_hold_active);
+}
+
 static void test_horizontal_arrow_tap_preserves_mod_state(void) {
     test_reset_stubs();
 
@@ -574,6 +670,9 @@ int main(void) {
     test_dragscroll_uses_different_horizontal_and_vertical_divisors();
     test_dragscroll_cross_axis_decay_prevents_residual_leakage();
     test_dragscroll_reset_clears_buffers_and_lock_state();
+    test_volume_mode_emits_discrete_steps_and_resets_on_direction_change();
+    test_brightness_mode_emits_discrete_steps_and_resets_on_direction_change();
+    test_zoom_mode_emits_discrete_steps_and_resets_on_direction_change();
     test_horizontal_arrow_tap_preserves_mod_state();
     test_vertical_arrow_tap_masks_alt_and_restores_mod_state();
     test_arrow_mode_selection_button_holds_and_releases_shift();

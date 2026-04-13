@@ -212,3 +212,73 @@ Next steps:
 - extend the same semantic-matrix approach to other stateful runtime seams
   where path coverage is decent but cross-product semantic coverage is still
   thin
+
+### Implementation pass: RGB and pd-mode behavioral coverage
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-05/` implementation log.
+- Extended
+  `tests/host/rgb_layer_render_test.c`
+  with higher-level behavioral assertions for:
+  - the documented stage order between preview overlays, pd-mode right-half
+    overlays, pd-mode LED groups, and key-behavior feedback
+  - `MULTI_TAP_PENDING` feedback repainting both halves after lower RGB stages
+  - `HOLD_PENDING` feedback repainting both halves after lower RGB stages
+- Extended
+  `tests/host/pd_mode_handlers_test.c`
+  with raw human-facing behavior tests for `VOLUME_MODE`,
+  `BRIGHTNESS_MODE`, and `ZOOM_MODE`, including discrete threshold stepping,
+  opposite-direction behavior, and direction-change reset semantics.
+- Extended
+  `tests/host/pd_mode_key_runtime_integration_test.c`
+  with authored entry-path coverage for pd modes:
+  - authored single-press rows preserving the default momentary pd-mode hold
+  - authored hold actions that momentarily activate a pd mode while held
+  - authored double-tap lock behavior for a pd-mode key
+  - authored second-press hold branching into a different pd mode
+- Tightened the pd-mode integration harness so delayed and tapped actions flow
+  through `action_dispatch(...)`, which lets the host suite assert the real
+  user-visible result of multi-tap lock actions instead of only internal slot
+  state.
+
+Contracts touched in this pass:
+
+- RGB stage-order contract described in `docs/RGB_CONFIG.md`
+- RGB consumption of `KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING` and
+  `KEY_FEEDBACK_FLAG_HOLD_PENDING`
+- raw threshold/step semantics for volume, brightness, and zoom pd handlers
+- authored pd-mode entry-path equivalence through key-runtime integration
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted RGB and pd-mode behavioral suites passed
+- neighboring pd-mode policy and split-sync suites passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- add one full-scene slave-side RGB assertion that combines remote preview,
+  remote pd-mode display state, and remote key-feedback state in a single
+  rendered frame
+- consider a small pd-runtime task-user suite so active-mode pointer dispatch
+  is asserted at the same behavioral level as the raw handler tests

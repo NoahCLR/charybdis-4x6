@@ -39,6 +39,7 @@ static uint8_t        fake_auto_mouse_layer   = LAYER_POINTER;
 static uint16_t       fake_auto_mouse_elapsed = 0;
 static bool           fake_auto_mouse_active  = true;
 static bool           fake_is_master          = true;
+static uint8_t        fake_feedback_flags     = 0;
 static pd_mode_mask_t fake_pd_active_mode     = 0;
 static pd_mode_mask_t fake_pd_locked_mode     = 0;
 
@@ -185,6 +186,7 @@ static void test_reset(void) {
     fake_auto_mouse_elapsed   = 0;
     fake_auto_mouse_active    = true;
     fake_is_master            = true;
+    fake_feedback_flags       = 0;
     fake_pd_active_mode       = 0;
     fake_pd_locked_mode       = 0;
     split_runtime_sync_remote = (split_runtime_sync_packet_t){
@@ -272,7 +274,7 @@ uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t colu
 }
 
 uint8_t key_feedback_pack(void) {
-    return 0;
+    return fake_feedback_flags;
 }
 
 uint8_t key_feedback_preview_layer(void) {
@@ -477,6 +479,62 @@ static void test_slave_feedback_uses_remote_flags_and_flash_phase(void) {
     CHECK(render_output());
     check_led(0, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
     check_led(7, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
+}
+
+static void test_render_order_preview_then_pd_mode_then_pd_group(void) {
+    test_reset();
+
+    test_keymap[LAYER_NUM][0][0] = 0x0020u;
+    test_keymap[LAYER_NUM][1][0] = 0x0021u;
+    test_keymap[LAYER_NUM][1][2] = 0x0022u;
+    layer_state                  = (layer_state_t)1u << LAYER_SYM;
+    fake_preview_layer           = LAYER_NUM;
+    fake_pd_active_mode          = PD_MODE_VOLUME;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
+}
+
+static void test_multi_tap_pending_feedback_overrides_preview_and_pd_mode(void) {
+    test_reset();
+
+    test_keymap[LAYER_NUM][0][0] = 0x0020u;
+    test_keymap[LAYER_NUM][1][0] = 0x0021u;
+    test_keymap[LAYER_NUM][1][2] = 0x0022u;
+    layer_state                  = (layer_state_t)1u << LAYER_SYM;
+    fake_preview_layer           = LAYER_NUM;
+    fake_feedback_flags          = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+    fake_pd_active_mode          = PD_MODE_VOLUME;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+}
+
+static void test_hold_pending_feedback_overrides_preview_and_pd_mode(void) {
+    test_reset();
+
+    test_keymap[LAYER_NUM][0][0] = 0x0020u;
+    test_keymap[LAYER_NUM][1][0] = 0x0021u;
+    test_keymap[LAYER_NUM][1][2] = 0x0022u;
+    layer_state                  = (layer_state_t)1u << LAYER_SYM;
+    fake_preview_layer           = LAYER_NUM;
+    fake_feedback_flags          = KEY_FEEDBACK_FLAG_HOLD_PENDING;
+    fake_pd_active_mode          = PD_MODE_VOLUME;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.hold_active_color));
+    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.hold_active_color));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.hold_active_color));
+    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.hold_active_color));
 }
 
 static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
@@ -850,6 +908,9 @@ int main(void) {
     test_preview_layer_overlays_existing_active_layers();
     test_slave_preview_layer_uses_remote_sync_state();
     test_slave_feedback_uses_remote_flags_and_flash_phase();
+    test_render_order_preview_then_pd_mode_then_pd_group();
+    test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();
+    test_hold_pending_feedback_overrides_preview_and_pd_mode();
     test_pointer_mode_overlay_paints_right_half_and_groups();
     test_slave_pointer_mode_overlay_uses_remote_display_state();
     test_automouse_uses_configured_target_layer();
