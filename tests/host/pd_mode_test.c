@@ -290,8 +290,8 @@ static void test_trait_queries_match_manifest_policy(void) {
     CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_PREFER_TYPING_LAYER));
     CHECK(!pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
     CHECK(snapshot.local.active_flags == PD_MODE_ARROW);
-    CHECK(snapshot.local.first_active_mode == PD_MODE_ARROW);
-    CHECK(snapshot.local.first_active_index == PD_MODE_INDEX_ARROW);
+    CHECK(snapshot.local.active_mode == PD_MODE_ARROW);
+    CHECK(snapshot.local.active_index == PD_MODE_INDEX_ARROW);
     CHECK((snapshot.local.active_traits & PD_MODE_TRAIT_PREFER_TYPING_LAYER) != 0);
     CHECK(snapshot.display.active_flags == PD_MODE_ARROW);
 
@@ -300,8 +300,8 @@ static void test_trait_queries_match_manifest_policy(void) {
     CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
     CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND));
     CHECK(snapshot.local.active_flags == PD_MODE_PINCH);
-    CHECK(snapshot.local.first_active_mode == PD_MODE_PINCH);
-    CHECK(snapshot.local.first_active_index == PD_MODE_INDEX_PINCH);
+    CHECK(snapshot.local.active_mode == PD_MODE_PINCH);
+    CHECK(snapshot.local.active_index == PD_MODE_INDEX_PINCH);
     CHECK((snapshot.local.active_traits & PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED) != 0);
     CHECK((snapshot.local.active_traits & PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND) != 0);
 
@@ -321,7 +321,6 @@ static void test_apply_remote_snapshot_keeps_only_one_effective_mode(void) {
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(pd_mode_display_active_snapshot() == PD_MODE_ARROW);
     CHECK(pd_mode_display_locked_snapshot() == PD_MODE_ARROW);
-    CHECK(pd_mode_first_display_active_index() == PD_MODE_INDEX_ARROW);
     CHECK(pd_mode_display_active(PD_MODE_ARROW));
     CHECK(pd_mode_display_locked(PD_MODE_ARROW));
     CHECK(!pd_mode_display_locked(PD_MODE_VOLUME));
@@ -329,13 +328,13 @@ static void test_apply_remote_snapshot_keeps_only_one_effective_mode(void) {
     CHECK(!pd_mode_local_active(PD_MODE_ARROW));
     CHECK(!pd_mode_local_locked(PD_MODE_ARROW));
     CHECK(snapshot.local.active_flags == 0);
-    CHECK(snapshot.local.first_active_index == PD_MODE_COUNT);
+    CHECK(snapshot.local.active_index == PD_MODE_COUNT);
     CHECK(snapshot.display.active_flags == PD_MODE_ARROW);
     CHECK(snapshot.display.locked_flags == PD_MODE_ARROW);
-    CHECK(snapshot.display.first_active_mode == PD_MODE_ARROW);
-    CHECK(snapshot.display.first_locked_mode == PD_MODE_ARROW);
-    CHECK(snapshot.display.first_active_index == PD_MODE_INDEX_ARROW);
-    CHECK(snapshot.display.first_locked_index == PD_MODE_INDEX_ARROW);
+    CHECK(snapshot.display.active_mode == PD_MODE_ARROW);
+    CHECK(snapshot.display.locked_mode == PD_MODE_ARROW);
+    CHECK(snapshot.display.active_index == PD_MODE_INDEX_ARROW);
+    CHECK(snapshot.display.locked_index == PD_MODE_INDEX_ARROW);
     CHECK((snapshot.display.active_traits & PD_MODE_TRAIT_PREFER_TYPING_LAYER) != 0);
 }
 

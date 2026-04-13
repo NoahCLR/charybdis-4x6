@@ -9,8 +9,12 @@
 #include "../../state/runtime/runtime_trace.h"
 #include "pd_mode_internal.h"
 
+#define PD_MODE_LOCAL_ACTIVE_MODE (noah_runtime_shared_state.pd.local_active_mode)
+#define PD_MODE_LOCAL_LOCKED_MODE (noah_runtime_shared_state.pd.local_locked_mode)
 #define PD_MODE_LOCAL_ACTIVE_FLAGS (noah_runtime_shared_state.pd.local_active_flags)
 #define PD_MODE_LOCAL_LOCKED_FLAGS (noah_runtime_shared_state.pd.local_locked_flags)
+#define PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE (noah_runtime_shared_state.pd.remote_display_active_mode)
+#define PD_MODE_REMOTE_DISPLAY_LOCKED_MODE (noah_runtime_shared_state.pd.remote_display_locked_mode)
 #define PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS (noah_runtime_shared_state.pd.remote_display_active_flags)
 #define PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS (noah_runtime_shared_state.pd.remote_display_locked_flags)
 
@@ -25,35 +29,39 @@ static pd_mode_mask_t pd_mode_first_snapshot_match(pd_mode_mask_t flags) {
 }
 
 static bool pd_mode_snapshot_view_changed(pd_mode_snapshot_view_t before, pd_mode_snapshot_view_t after) {
-    return before.active_flags != after.active_flags || before.locked_flags != after.locked_flags;
+    return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode;
+}
+
+static void pd_mode_sync_local_state(void) {
+    PD_MODE_LOCAL_ACTIVE_FLAGS = PD_MODE_LOCAL_ACTIVE_MODE;
+    PD_MODE_LOCAL_LOCKED_FLAGS = PD_MODE_LOCAL_LOCKED_MODE;
+}
+
+static void pd_mode_sync_remote_display_state(void) {
+    PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS = PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE;
+    PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS = PD_MODE_REMOTE_DISPLAY_LOCKED_MODE;
 }
 
 static bool pd_mode_apply_unlock_other_locks(pd_mode_mask_t keep_mode) {
-    bool changed = false;
+    pd_mode_mask_t locked_mode = PD_MODE_LOCAL_LOCKED_MODE;
 
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        pd_mode_mask_t mode = pd_modes[i].mode_flag;
-        if (mode != keep_mode && pd_mode_local_locked(mode)) {
-            pd_mode_transition_unlock(mode);
-            changed = true;
-        }
+    if (locked_mode != 0 && locked_mode != keep_mode) {
+        pd_mode_transition_unlock(locked_mode);
+        return true;
     }
 
-    return changed;
+    return false;
 }
 
 static bool pd_mode_apply_deactivate_other_unlocked(pd_mode_mask_t keep_mode) {
-    bool changed = false;
+    pd_mode_mask_t active_mode = PD_MODE_LOCAL_ACTIVE_MODE;
 
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        pd_mode_mask_t mode = pd_modes[i].mode_flag;
-        if (mode != keep_mode && pd_mode_local_active(mode) && !pd_mode_local_locked(mode)) {
-            pd_mode_transition_deactivate(mode);
-            changed = true;
-        }
+    if (active_mode != 0 && active_mode != keep_mode && active_mode != PD_MODE_LOCAL_LOCKED_MODE) {
+        pd_mode_transition_deactivate(active_mode);
+        return true;
     }
 
-    return changed;
+    return false;
 }
 
 static bool pd_mode_apply_activate_mode(pd_mode_mask_t mode) {
@@ -117,10 +125,11 @@ static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_flags, p
     // mirrored UI matches the local exclusivity invariant.
     pd_mode_mask_t locked_mode = pd_mode_first_snapshot_match(locked_flags);
     pd_mode_mask_t active_mode = locked_mode ? locked_mode : pd_mode_first_snapshot_match(active_flags);
-    bool           changed     = PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS != active_mode || PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS != locked_mode;
+    bool           changed     = PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE != active_mode || PD_MODE_REMOTE_DISPLAY_LOCKED_MODE != locked_mode;
 
-    PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS = locked_mode;
-    PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS = active_mode;
+    PD_MODE_REMOTE_DISPLAY_LOCKED_MODE = locked_mode;
+    PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE = active_mode;
+    pd_mode_sync_remote_display_state();
     noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT, active_mode, locked_mode);
     return changed;
 }
@@ -143,19 +152,27 @@ static void pd_mode_apply_result_finish(pd_mode_apply_result_t *result, bool spl
 }
 
 void pd_mode_set(pd_mode_mask_t mode) {
-    PD_MODE_LOCAL_ACTIVE_FLAGS |= mode;
+    PD_MODE_LOCAL_ACTIVE_MODE = mode;
+    pd_mode_sync_local_state();
 }
 
 void pd_mode_clear(pd_mode_mask_t mode) {
-    PD_MODE_LOCAL_ACTIVE_FLAGS &= (pd_mode_mask_t)~mode;
+    if (PD_MODE_LOCAL_ACTIVE_MODE == mode) {
+        PD_MODE_LOCAL_ACTIVE_MODE = 0;
+        pd_mode_sync_local_state();
+    }
 }
 
 void pd_mode_set_locked(pd_mode_mask_t mode) {
-    PD_MODE_LOCAL_LOCKED_FLAGS |= mode;
+    PD_MODE_LOCAL_LOCKED_MODE = mode;
+    pd_mode_sync_local_state();
 }
 
 void pd_mode_clear_locked(pd_mode_mask_t mode) {
-    PD_MODE_LOCAL_LOCKED_FLAGS &= (pd_mode_mask_t)~mode;
+    if (PD_MODE_LOCAL_LOCKED_MODE == mode) {
+        PD_MODE_LOCAL_LOCKED_MODE = 0;
+        pd_mode_sync_local_state();
+    }
 }
 
 pd_mode_mask_t pd_mode_local_active_snapshot(void) {
@@ -175,35 +192,35 @@ pd_mode_mask_t pd_mode_display_locked_snapshot(void) {
 }
 
 bool pd_mode_local_active(pd_mode_mask_t mode) {
-    return (PD_MODE_LOCAL_ACTIVE_FLAGS & mode) != 0;
+    return mode != 0 && PD_MODE_LOCAL_ACTIVE_MODE == mode;
 }
 
 bool pd_mode_local_locked(pd_mode_mask_t mode) {
-    return (PD_MODE_LOCAL_LOCKED_FLAGS & mode) != 0;
+    return mode != 0 && PD_MODE_LOCAL_LOCKED_MODE == mode;
 }
 
 bool pd_mode_display_active(pd_mode_mask_t mode) {
-    return (pd_mode_snapshot().display.active_flags & mode) != 0;
+    return mode != 0 && pd_mode_snapshot().display.active_mode == mode;
 }
 
 bool pd_mode_display_locked(pd_mode_mask_t mode) {
-    return (pd_mode_snapshot().display.locked_flags & mode) != 0;
+    return mode != 0 && pd_mode_snapshot().display.locked_mode == mode;
 }
 
 bool pd_any_local_mode_active(void) {
-    return PD_MODE_LOCAL_ACTIVE_FLAGS != 0;
+    return PD_MODE_LOCAL_ACTIVE_MODE != 0;
 }
 
 bool pd_any_local_mode_locked(void) {
-    return PD_MODE_LOCAL_LOCKED_FLAGS != 0;
+    return PD_MODE_LOCAL_LOCKED_MODE != 0;
 }
 
 bool pd_any_display_mode_active(void) {
-    return pd_mode_snapshot().display.active_flags != 0;
+    return pd_mode_snapshot().display.active_mode != 0;
 }
 
 bool pd_any_display_mode_locked(void) {
-    return pd_mode_snapshot().display.locked_flags != 0;
+    return pd_mode_snapshot().display.locked_mode != 0;
 }
 
 pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
@@ -336,5 +353,9 @@ bool pd_mode_handle_keycode_release(uint16_t keycode) {
 
 #undef PD_MODE_LOCAL_ACTIVE_FLAGS
 #undef PD_MODE_LOCAL_LOCKED_FLAGS
+#undef PD_MODE_LOCAL_ACTIVE_MODE
+#undef PD_MODE_LOCAL_LOCKED_MODE
+#undef PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE
+#undef PD_MODE_REMOTE_DISPLAY_LOCKED_MODE
 #undef PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS
 #undef PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS

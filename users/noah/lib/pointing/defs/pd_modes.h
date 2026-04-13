@@ -89,8 +89,6 @@ bool pd_mode_handle_keycode_release(uint16_t keycode);
 
 bool           pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record);
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode);
-uint8_t        pd_mode_first_local_active_index(void);
-uint8_t        pd_mode_first_display_active_index(void);
 
 // Apply the active mode's DPI, or restore Charybdis's normal pointer DPI if no
 // mode with a custom DPI is active. Dragscroll-like modes use the shared local

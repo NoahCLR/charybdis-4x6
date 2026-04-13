@@ -14,8 +14,12 @@
 #include "../../pointing/defs/pd_mode_flags.h"
 
 typedef struct {
+    pd_mode_mask_t local_active_mode;
+    pd_mode_mask_t local_locked_mode;
     pd_mode_mask_t local_active_flags;
     pd_mode_mask_t local_locked_flags;
+    pd_mode_mask_t remote_display_active_mode;
+    pd_mode_mask_t remote_display_locked_mode;
     pd_mode_mask_t remote_display_active_flags;
     pd_mode_mask_t remote_display_locked_flags;
 } pd_mode_runtime_shared_state_t;

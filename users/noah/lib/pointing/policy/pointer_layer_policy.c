@@ -22,7 +22,7 @@ static inline bool pointer_layer_policy_active_mode_prefers_typing_layer(pd_mode
 }
 
 static inline bool pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored(pd_mode_snapshot_t snapshot) {
-    return snapshot.local.active_flags != 0 && (snapshot.local.active_traits & PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED) != 0;
+    return snapshot.local.active_mode != 0 && (snapshot.local.active_traits & PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED) != 0;
 }
 
 static bool pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(uint16_t keycode) {

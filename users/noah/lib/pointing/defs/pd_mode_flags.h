@@ -44,11 +44,11 @@ _Static_assert(PD_MODE_COUNT <= (sizeof(pd_mode_mask_t) * 8u), "PD_MODE_COUNT ex
 typedef struct {
     pd_mode_mask_t   active_flags;
     pd_mode_mask_t   locked_flags;
-    pd_mode_mask_t   first_active_mode;
-    pd_mode_mask_t   first_locked_mode;
+    pd_mode_mask_t   active_mode;
+    pd_mode_mask_t   locked_mode;
     pd_mode_traits_t active_traits;
-    uint8_t          first_active_index;
-    uint8_t          first_locked_index;
+    uint8_t          active_index;
+    uint8_t          locked_index;
 } pd_mode_snapshot_view_t;
 
 typedef struct {

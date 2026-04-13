@@ -132,14 +132,6 @@ bool pd_any_active_mode_has_trait(pd_mode_traits_t trait) {
     return (pd_mode_snapshot().local.active_traits & trait) == trait;
 }
 
-uint8_t pd_mode_first_local_active_index(void) {
-    return pd_mode_snapshot().local.first_active_index;
-}
-
-uint8_t pd_mode_first_display_active_index(void) {
-    return pd_mode_snapshot().display.first_active_index;
-}
-
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode) return pd_modes[i].mode_flag;

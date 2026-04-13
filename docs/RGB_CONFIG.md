@@ -262,7 +262,7 @@ the flash-phase bit used to keep both halves in sync.
 3. per-layer preview overlay for a pending momentary-layer hold, if
    `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on and that previewed layer has a
    nonzero solid color
-4. the first active pointing-device mode color on the right half
+4. the active pointing-device mode color on the right half
 5. per-mode LED groups
 6. the key-behavior feedback overlay on both halves
 

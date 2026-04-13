@@ -50,6 +50,7 @@ static void pd_mode_auto_mouse_deactivate(pd_mode_mask_t mode, bool was_any_mode
 
 void pd_mode_apply_active_dpi(void) {
     pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+    const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
 
     if ((snapshot.local.active_traits & PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND) != 0) {
         pointing_device_set_cpi(noah_qmk_contract_pointer_dragscroll_dpi());
@@ -61,8 +62,8 @@ void pd_mode_apply_active_dpi(void) {
         return;
     }
 
-    if (snapshot.local.first_active_index < PD_MODE_COUNT && pd_modes[snapshot.local.first_active_index].dpi != 0) {
-        pointing_device_set_cpi(pd_modes[snapshot.local.first_active_index].dpi);
+    if (active_mode && active_mode->dpi != 0) {
+        pointing_device_set_cpi(active_mode->dpi);
         return;
     }
 
@@ -143,13 +144,10 @@ void pd_mode_transition_unlock(pd_mode_mask_t mode) {
 
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+    const pd_mode_def_t *def    = pd_mode_lookup(snapshot.local.active_mode);
 
-    if (snapshot.local.first_active_index < PD_MODE_COUNT) {
-        const pd_mode_def_t *def = &pd_modes[snapshot.local.first_active_index];
-
-        if (def->key_handler && def->key_handler(keycode, record)) {
-            return true;
-        }
+    if (def && def->key_handler && def->key_handler(keycode, record)) {
+        return true;
     }
 
     return false;

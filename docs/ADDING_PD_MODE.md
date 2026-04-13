@@ -423,12 +423,13 @@ This is the actual control path for pd modes:
 5. [`users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`](../users/noah/lib/pointing/runtime/pd_mode_lifecycle.c) owns activate / deactivate /
    lock / unlock transitions, exclusivity, shared auto-mouse policy, DPI
    application, and active-mode key interception.
-6. [`users/noah/lib/pointing/runtime/pd_runtime.c`](../users/noah/lib/pointing/runtime/pd_runtime.c) calls the first active
-   handler in `pd_modes[]`.
+6. [`users/noah/lib/pointing/runtime/pd_runtime.c`](../users/noah/lib/pointing/runtime/pd_runtime.c) calls the
+   selected active mode's handler from `pd_modes[]`.
 7. [`users/noah/lib/pointing/policy/pointer_layer_policy.c`](../users/noah/lib/pointing/policy/pointer_layer_policy.c) keeps the configured
    auto-mouse target layer alive while modes are active or locked.
 8. [`users/noah/lib/state/runtime/split_runtime_sync.c`](../users/noah/lib/state/runtime/split_runtime_sync.c) mirrors active and locked
-   flags to the other half, and [`pd_mode_state.c`](../users/noah/lib/pointing/runtime/pd_mode_state.c)
+   mode identity through compatibility flags to the other half, and
+   [`pd_mode_state.c`](../users/noah/lib/pointing/runtime/pd_mode_state.c)
    exposes those as display-state queries for UI consumers.
 9. [`users/noah/lib/rgb/core/rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c) orchestrates stage order, and
    [`users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/stages/rgb_pd_mode_stage.c) renders the mode overlay on the right half.

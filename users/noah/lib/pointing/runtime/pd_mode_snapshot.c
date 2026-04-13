@@ -12,30 +12,32 @@
 #include "../defs/pd_modes.h"
 #include "../../state/runtime/runtime_shared_state.h"
 
-static pd_mode_snapshot_view_t pd_mode_snapshot_build_view(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
-    pd_mode_snapshot_view_t view = {
-        .active_flags       = active_flags,
-        .locked_flags       = locked_flags,
-        .first_active_index = PD_MODE_COUNT,
-        .first_locked_index = PD_MODE_COUNT,
-    };
+static uint8_t pd_mode_snapshot_mode_index(pd_mode_mask_t mode) {
+    if (mode == 0) {
+        return PD_MODE_COUNT;
+    }
 
     for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
-        pd_mode_mask_t mode = pd_modes[index].mode_flag;
-
-        if ((active_flags & mode) != 0) {
-            if (view.first_active_index == PD_MODE_COUNT) {
-                view.first_active_index = index;
-                view.first_active_mode  = mode;
-            }
-
-            view.active_traits |= pd_modes[index].traits;
+        if (pd_modes[index].mode_flag == mode) {
+            return index;
         }
+    }
 
-        if ((locked_flags & mode) != 0 && view.first_locked_index == PD_MODE_COUNT) {
-            view.first_locked_index = index;
-            view.first_locked_mode  = mode;
-        }
+    return PD_MODE_COUNT;
+}
+
+static pd_mode_snapshot_view_t pd_mode_snapshot_build_view(pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode) {
+    pd_mode_snapshot_view_t view = {
+        .active_flags  = active_mode,
+        .locked_flags  = locked_mode,
+        .active_mode   = active_mode,
+        .locked_mode   = locked_mode,
+        .active_index  = pd_mode_snapshot_mode_index(active_mode),
+        .locked_index  = pd_mode_snapshot_mode_index(locked_mode),
+    };
+
+    if (view.active_index < PD_MODE_COUNT) {
+        view.active_traits = pd_modes[view.active_index].traits;
     }
 
     return view;
@@ -44,13 +46,13 @@ static pd_mode_snapshot_view_t pd_mode_snapshot_build_view(pd_mode_mask_t active
 pd_mode_snapshot_t pd_mode_snapshot(void) {
     pd_mode_snapshot_t snapshot;
 
-    snapshot.local = pd_mode_snapshot_build_view(noah_runtime_shared_state.pd.local_active_flags, noah_runtime_shared_state.pd.local_locked_flags);
+    snapshot.local = pd_mode_snapshot_build_view(noah_runtime_shared_state.pd.local_active_mode, noah_runtime_shared_state.pd.local_locked_mode);
 
     if (is_keyboard_master()) {
         snapshot.display = snapshot.local;
         return snapshot;
     }
 
-    snapshot.display = pd_mode_snapshot_build_view(noah_runtime_shared_state.pd.remote_display_active_flags, noah_runtime_shared_state.pd.remote_display_locked_flags);
+    snapshot.display = pd_mode_snapshot_build_view(noah_runtime_shared_state.pd.remote_display_active_mode, noah_runtime_shared_state.pd.remote_display_locked_mode);
     return snapshot;
 }

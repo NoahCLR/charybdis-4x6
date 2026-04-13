@@ -31,9 +31,10 @@ bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 #ifdef POINTING_DEVICE_ENABLE
     pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+    const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
 
-    if (snapshot.local.first_active_index < PD_MODE_COUNT && pd_modes[snapshot.local.first_active_index].handler) {
-        return pd_modes[snapshot.local.first_active_index].handler(mouse_report);
+    if (active_mode && active_mode->handler) {
+        return active_mode->handler(mouse_report);
     }
 
     return mouse_report;

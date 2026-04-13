@@ -92,20 +92,23 @@ bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {
     pd_mode_snapshot_t snapshot = {
-        .local.active_flags       = fake_active_modes,
-        .local.first_active_index = PD_MODE_COUNT,
-        .local.first_locked_index = PD_MODE_COUNT,
-        .display.first_active_index = PD_MODE_COUNT,
-        .display.first_locked_index = PD_MODE_COUNT,
+        .local.active_flags = fake_active_modes,
+        .local.active_mode  = fake_active_modes,
+        .local.active_index = PD_MODE_COUNT,
+        .local.locked_index = PD_MODE_COUNT,
+        .display.active_mode = fake_active_modes,
+        .display.active_flags = fake_active_modes,
+        .display.active_index = PD_MODE_COUNT,
+        .display.locked_index = PD_MODE_COUNT,
     };
 
     for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
         pd_mode_mask_t mode = (pd_mode_mask_t)1u << index;
 
         if ((fake_active_modes & mode) != 0) {
-            if (snapshot.local.first_active_index == PD_MODE_COUNT) {
-                snapshot.local.first_active_index = index;
-                snapshot.local.first_active_mode  = mode;
+            if (snapshot.local.active_index == PD_MODE_COUNT) {
+                snapshot.local.active_index = index;
+                snapshot.local.active_mode  = mode;
             }
 
             if (pd_mode_has_trait(mode, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)) {

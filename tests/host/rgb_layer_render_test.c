@@ -199,37 +199,41 @@ bool is_keyboard_master(void) {
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {
     pd_mode_snapshot_t snapshot = {
-        .local.active_flags         = fake_pd_active_flags,
-        .local.locked_flags         = fake_pd_locked_flags,
-        .local.first_active_index   = PD_MODE_COUNT,
-        .local.first_locked_index   = PD_MODE_COUNT,
-        .display.active_flags       = test_display_active_flags(),
-        .display.locked_flags       = test_display_locked_flags(),
-        .display.first_active_index = PD_MODE_COUNT,
-        .display.first_locked_index = PD_MODE_COUNT,
+        .local.active_flags   = fake_pd_active_flags,
+        .local.locked_flags   = fake_pd_locked_flags,
+        .local.active_mode    = fake_pd_active_flags,
+        .local.locked_mode    = fake_pd_locked_flags,
+        .local.active_index   = PD_MODE_COUNT,
+        .local.locked_index   = PD_MODE_COUNT,
+        .display.active_flags = test_display_active_flags(),
+        .display.locked_flags = test_display_locked_flags(),
+        .display.active_mode  = test_display_active_flags(),
+        .display.locked_mode  = test_display_locked_flags(),
+        .display.active_index = PD_MODE_COUNT,
+        .display.locked_index = PD_MODE_COUNT,
     };
 
     for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
         pd_mode_mask_t mode = pd_modes[index].mode_flag;
 
-        if ((snapshot.local.active_flags & mode) != 0 && snapshot.local.first_active_index == PD_MODE_COUNT) {
-            snapshot.local.first_active_index = index;
-            snapshot.local.first_active_mode  = mode;
+        if ((snapshot.local.active_flags & mode) != 0 && snapshot.local.active_index == PD_MODE_COUNT) {
+            snapshot.local.active_index = index;
+            snapshot.local.active_mode  = mode;
         }
 
-        if ((snapshot.local.locked_flags & mode) != 0 && snapshot.local.first_locked_index == PD_MODE_COUNT) {
-            snapshot.local.first_locked_index = index;
-            snapshot.local.first_locked_mode  = mode;
+        if ((snapshot.local.locked_flags & mode) != 0 && snapshot.local.locked_index == PD_MODE_COUNT) {
+            snapshot.local.locked_index = index;
+            snapshot.local.locked_mode  = mode;
         }
 
-        if ((snapshot.display.active_flags & mode) != 0 && snapshot.display.first_active_index == PD_MODE_COUNT) {
-            snapshot.display.first_active_index = index;
-            snapshot.display.first_active_mode  = mode;
+        if ((snapshot.display.active_flags & mode) != 0 && snapshot.display.active_index == PD_MODE_COUNT) {
+            snapshot.display.active_index = index;
+            snapshot.display.active_mode  = mode;
         }
 
-        if ((snapshot.display.locked_flags & mode) != 0 && snapshot.display.first_locked_index == PD_MODE_COUNT) {
-            snapshot.display.first_locked_index = index;
-            snapshot.display.first_locked_mode  = mode;
+        if ((snapshot.display.locked_flags & mode) != 0 && snapshot.display.locked_index == PD_MODE_COUNT) {
+            snapshot.display.locked_index = index;
+            snapshot.display.locked_mode  = mode;
         }
     }
 
@@ -312,7 +316,7 @@ pd_mode_mask_t pd_mode_display_active_snapshot(void) {
     return test_display_active_flags();
 }
 
-uint8_t pd_mode_first_display_active_index(void) {
+uint8_t pd_mode_display_active_index(void) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
         if (pd_mode_display_active(pd_modes[i].mode_flag)) {
             return i;

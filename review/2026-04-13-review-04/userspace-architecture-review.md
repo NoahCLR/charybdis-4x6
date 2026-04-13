@@ -23,6 +23,12 @@ contract. The active-release reducer executes that typed release contract
 instead of reconstructing release semantics from raw hold flags, and runtime
 consumers no longer treat cached slot interaction as a stored authored
 resolution object.
+Later the same day, the pd-mode exclusivity follow-up also landed: runtime
+storage and snapshots now expose explicit selected active/locked mode identity
+for local and display state, while the older bitmask fields remain as
+compatibility mirrors of those selected modes. Pointer handling, DPI
+selection, RGB pd-mode rendering, and pointer-layer policy now read explicit
+active mode identity instead of routing through `first_active_*` readers.
 
 This review is intentionally not a repeat of the earlier action-family,
 pd-mode write-controller, macro IR, and test-harness recommendations. Those
@@ -286,21 +292,21 @@ Implementation update:
   branch choreography even though the contract is now cached when the press or
   tap-count branch resolves
 
-### 3. PD-mode state still advertises composition while the runtime enforces exclusivity
+### 3. PD-mode state used to advertise composition while the runtime enforced exclusivity
 
-The pd-mode subsystem has a clean command controller, but its state model still
-suggests "many active modes can coexist" even though the runtime mostly
-enforces "one effective active mode, one effective lock":
+The pd-mode subsystem had a clean command controller, but its state model used
+to suggest "many active modes can coexist" even though the runtime mostly
+enforced "one effective active mode, one effective lock":
 
-- the public read model uses `pd_mode_mask_t active_flags` and
-  `locked_flags`
-- snapshots compute `first_active_index` and `first_locked_index`
+- the public read model exposed `pd_mode_mask_t active_flags` and
+  `locked_flags` as if they were the primary invariant
+- snapshots computed `first_active_index` and `first_locked_index`
 - `pd_mode_apply_activate_mode(...)` and `pd_mode_apply_lock_mode(...)` clear
   other active/locked modes first
 - pointer handling, DPI selection, key interception, and RGB rendering all
-  prefer the first active mode
+  preferred the first active mode
 
-This mismatch shows up in several places:
+That mismatch showed up in several places:
 
 - the representation is a flag set
 - the controller is exclusive
@@ -313,30 +319,41 @@ Why this matters:
   less obvious than it should be
 - "first active index" becomes de facto control flow in several modules
 
-Recommended direction:
+Implementation update:
 
-- make exclusivity explicit in the public state model unless true composition
-  is a planned feature
-- prefer a typed active/locked mode identity over generic active bitmasks
-- if multiple simultaneous modes are intentionally desirable later, encode that
-  as a manifest-level arbitration model rather than as accidental bitmask
-  freedom
+- runtime shared state now carries explicit selected mode identity for
+  `local_active_mode`, `local_locked_mode`, `remote_display_active_mode`, and
+  `remote_display_locked_mode`, with the older `*_flags` fields kept as
+  compatibility mirrors
+- `pd_mode_snapshot_view_t` now exposes `active_mode`, `locked_mode`,
+  `active_index`, and `locked_index` instead of `first_active_*`
+- `pd_mode_state.c` now orchestrates exclusivity around one selected active
+  mode and one selected lock instead of walking bitmask-shaped local state
+- `pd_runtime.c`, `pd_mode_lifecycle.c`, `rgb_pd_mode_stage.c`, and
+  `pointer_layer_policy.c` now use explicit selected mode identity instead of
+  "first active" routing
+- split sync still sends compatibility flags, but the remote apply path now
+  collapses them immediately into one selected display mode and one selected
+  display lock
 
-For the current design, a simpler state shape would fit the real invariant
-better:
+The current design now matches the simpler state shape this review called for:
 
 ```c
 typedef struct {
-    pd_mode_id_t local_active;
-    pd_mode_id_t local_locked;
-    pd_mode_id_t display_active;
-    pd_mode_id_t display_locked;
-} pd_mode_state_t;
+    pd_mode_mask_t active_flags;   // compatibility mirror of active_mode
+    pd_mode_mask_t locked_flags;   // compatibility mirror of locked_mode
+    pd_mode_mask_t active_mode;
+    pd_mode_mask_t locked_mode;
+    pd_mode_traits_t active_traits;
+    uint8_t active_index;
+    uint8_t locked_index;
+} pd_mode_snapshot_view_t;
 ```
 
-Derived traits can still be computed from the selected mode definition row.
-That would remove the need for several "first active" readers and make the
-control-plane contract more honest.
+Derived traits now come from the selected active mode definition row. The
+remaining cleanup here is mostly compatibility debt: the bitmask mirror fields
+still exist because split sync and some debug/test surfaces have not been
+narrowed further yet.
 
 ### 4. `compat/` is valuable, but its boundaries are still too broad
 

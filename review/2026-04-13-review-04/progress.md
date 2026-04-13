@@ -486,3 +486,76 @@ Next steps:
 - after that, move to the next architecture review target: making pd-mode
   exclusivity explicit in the public state model and splitting the remaining
   compatibility seams by owning subsystem
+
+### Implementation pass: explicit pd-mode selection state
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Changed
+  `users/noah/lib/state/runtime/runtime_shared_state.h`
+  so pd-mode runtime storage now carries explicit selected-mode fields for
+  `local_active_mode`, `local_locked_mode`, `remote_display_active_mode`, and
+  `remote_display_locked_mode`, while the older `*_flags` fields remain as
+  compatibility mirrors.
+- Changed
+  `users/noah/lib/pointing/defs/pd_mode_flags.h`
+  so `pd_mode_snapshot_view_t` now exposes `active_mode`, `locked_mode`,
+  `active_index`, and `locked_index` instead of the older `first_active_*`
+  / `first_locked_*` names.
+- Simplified
+  `users/noah/lib/pointing/runtime/pd_mode_state.c`
+  around the explicit selected-mode storage so activate / deactivate / lock /
+  unlock orchestration now operates on one selected active mode and one
+  selected lock instead of walking bitmask-shaped local state.
+- Updated
+  `users/noah/lib/pointing/runtime/pd_mode_snapshot.c`
+  to build the public snapshot view from explicit selected-mode storage, with
+  compatibility flags derived from those selected modes.
+- Moved the main pd-mode consumers off the old "first active" contract:
+  `pd_runtime.c`, `pd_mode_lifecycle.c`, `rgb_pd_mode_stage.c`, and
+  `pointer_layer_policy.c` now use explicit selected-mode identity.
+- Removed the unused `pd_mode_first_local_active_index(...)` /
+  `pd_mode_first_display_active_index(...)` registry helpers.
+- Updated the pd-mode, pointer-layer-policy, RGB layer render, split-sync, and
+  related host stubs to synthesize snapshots with explicit active/locked mode
+  identity.
+- Updated the active review and maintainer docs so the written architecture now
+  describes pd-mode exclusivity as explicit runtime state instead of a
+  manifest-order "first active" convention.
+
+Contracts touched in this pass:
+
+- `pd_mode_runtime_shared_state_t`
+- `pd_mode_snapshot_view_t`
+- `pd_mode_apply_command(...)`
+- `pd_mode_snapshot(...)`
+- pd-mode consumers in lifecycle/runtime/pointer-policy/RGB
+
+Verification run in this pass:
+
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- continue shrinking the pd-mode compatibility mirrors so `active_flags` /
+  `locked_flags` become clearly derived transport/debug surfaces instead of
+  looking like primary control state
+- then return to Finding 2 and split more of the remaining key-runtime release
+  hotspot into small typed helpers
+- after that, move to the next architecture review target: splitting the
+  remaining compatibility seams by owning subsystem
