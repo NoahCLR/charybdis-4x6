@@ -67,6 +67,7 @@ typedef enum {
     NOAH_ACTION_KIND_KEYMAP_CUSTOM,
     NOAH_ACTION_KIND_PD_MODE_HOLD,
     NOAH_ACTION_KIND_PD_MODE_LOCK,
+    NOAH_ACTION_KIND_COUNT,
 } noah_action_kind_t;
 
 typedef enum {

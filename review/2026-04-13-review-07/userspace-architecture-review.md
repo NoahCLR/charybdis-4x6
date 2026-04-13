@@ -31,8 +31,8 @@ The main long-term cost is no longer "the runtime is mysterious." The main
 cost is "adding a new capability still means editing core dispatch and state
 modules." The remaining extensibility bottlenecks are:
 
-1. action semantics are now partly centralized in the descriptor contract, but
-   lifecycle behavior is still centrally branched
+1. action semantics are substantially more centralized now; the remaining
+   coupling is in handled-key policy inference rather than lifecycle dispatch
 2. pd-mode precedence and remote-display semantics still depend partly on
    manifest order and shared policy helpers instead of explicit mode-owned
    descriptors
@@ -46,11 +46,13 @@ descriptor tables, smaller ownership registries, and shared source adapters.
 
 Implementation status after follow-ups in this review folder:
 
-- reduced: `noah_action_desc_t` now owns authored-surface support and direct
-  press-consumption queries, so key-behavior validation, keymap validation,
-  and preflight no longer open-code those rules
-- still open: action tap/press/release behavior is still centrally branched in
-  `action_lifecycle.c` instead of being mode-owned or ops-owned
+- reduced further: `noah_action_desc_t` now owns authored-surface support and
+  direct press-consumption queries, and `action_lifecycle.c` now routes
+  tap/press/release through a kind-owned ops table instead of one large branch
+  tree
+- still open: handled-key fallback and implicit-hold policy still inspect
+  action kinds directly instead of consuming narrower action-owned policy
+  helpers
 - open: pd-mode identity and remote-display semantics still rely on implicit
   registry-order precedence
 - open: key-runtime cross-key coordination still uses whole-table sweeps
@@ -76,18 +78,19 @@ Implementation status after follow-ups in this review folder:
 
 ### High Priority
 
-#### 1. Action semantics are now partly centralized, but lifecycle behavior is still centrally branched
+#### 1. Action semantics are mostly centralized now, but handled-key policy still inspects action kinds directly
 
 Status:
 
-- Reduced in the first action-contract follow-up. The descriptor now caches
-  authored-surface and direct-press capability queries. The broader action-ops
-  split is still open.
+- Reduced further in the action-contract follow-ups. The descriptor now caches
+  authored-surface and direct-press capability queries, and lifecycle dispatch
+  now routes through a kind-owned ops table. The main remaining coupling is in
+  handled-key fallback/implicit-hold policy.
 
 References:
 
 - `users/noah/lib/action/action_dispatch.h`
-- `users/noah/lib/action/action_lifecycle.c:30-154`
+- `users/noah/lib/action/action_lifecycle.c`
 - `users/noah/lib/key/interaction/key_behavior_lookup.c:47-61`
 - `users/noah/lib/key/interaction/keymap_validation.c:16-18`
 - `users/noah/lib/key/runtime/key_runtime_preflight.c:83-95`
@@ -100,15 +103,19 @@ Why this matters:
 - The first follow-up removed the easiest duplication: authored-surface
   support and direct-action consumption now come from the descriptor contract
   instead of being re-derived in validation and preflight callers.
-- The classification rules are still reinterpreted by `action_lifecycle.c`
-  and handled-key fallback logic.
+- The second follow-up moved tap/press/release behavior onto a kind-owned ops
+  table inside `action_lifecycle.c`, so lifecycle dispatch is no longer one
+  large action-kind branch tree.
+- The main remaining semantic coupling is handled-key fallback and
+  implicit-hold inference.
 - Adding a genuinely new action kind or capability still means editing several
   core modules instead of introducing one new implementation unit.
 
 Where the coupling shows up:
 
 - `action_dispatch.h` decides what an action *is*.
-- `action_lifecycle.c` decides how that action taps, presses, and releases.
+- `action_lifecycle.c` now owns a smaller action-ops table keyed by action
+  kind instead of one large tap/press/release branch tree.
 - `key_behavior_lookup.c` and `keymap_validation.c` now consume the shared
   authored-surface capability instead of reconstructing their own raw-layer
   exceptions.
@@ -130,12 +137,13 @@ Why this is the main extensibility bottleneck:
 
 Recommended direction:
 
-- Keep the new descriptor-owned capability contract and extend it into an
-  action-ops surface that owns lifecycle behavior too.
-- `noah_action_describe(...)` should become "classify once, dispatch through
-  ops" rather than "classify once, then let each caller branch again."
-- The next step is not another capability bit. The next step is moving
-  tap/press/release branching out of `action_lifecycle.c`.
+- Keep the descriptor-owned capability contract and the new action-ops table.
+- Treat the remaining action work as policy cleanup, not dispatch cleanup:
+  decide whether handled-key fallback and implicit-hold inference should use
+  narrower action-owned helpers instead of direct kind checks.
+- Avoid expanding the capability bitset further unless a new caller truly
+  needs shared metadata; the current shape is now good enough for the existing
+  validation, preflight, and lifecycle consumers.
 
 Example shape:
 
@@ -425,10 +433,10 @@ different adapters over the same runtime model instead of adjacent systems.
 
 ## Concrete Refactoring Sequence
 
-1. In progress: `noah_action_desc_t` now owns authored-surface and
-   direct-press capability queries. Next, introduce action ops behind that
-   descriptor and migrate tap/press/release behavior one action kind at a
-   time.
+1. Completed first pass: `noah_action_desc_t` now owns authored-surface and
+   direct-press capability queries, and lifecycle dispatch now routes through a
+   kind-owned action-ops table. Next, decide whether handled-key policy should
+   consume narrower action-owned helpers instead of direct kind checks.
 2. Make pd-mode display precedence explicit in the sync/state contract and move
    remaining mode-specific lifecycle/policy ownership out of registry core.
 3. Add explicit key-runtime registries for active and pending slots, while

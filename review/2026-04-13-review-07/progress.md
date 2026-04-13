@@ -157,3 +157,66 @@ Next steps:
 - after that lands, re-check whether handled-key fallback and implicit-hold
   logic should consume action-owned helpers instead of inspecting action kinds
   directly
+
+### Action ops execution pass
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the in-flight review
+  folder plus the action-contract changes already present in the worktree.
+- Added `NOAH_ACTION_KIND_COUNT` in
+  `users/noah/lib/action/action_dispatch.h` so action-kind-owned tables can be
+  indexed explicitly.
+- Reworked `users/noah/lib/action/action_lifecycle.c` so tap/press/release
+  execution now routes through a `noah_action_ops_t` table keyed by
+  `noah_action_kind_t` instead of one large branch tree in each top-level
+  action function.
+- Kept the existing one-shot press path intact as the compatibility shim for:
+  - layer locks
+  - pd-mode lock taps
+  - macro / VIA playback taps
+- Preserved the existing behavior contracts for:
+  - unsupported raw layer actions logging and early no-op behavior
+  - owned momentary layer press/release ownership
+  - QMK behavior synthetic dispatch
+  - keymap custom synthetic dispatch
+  - literal / pd-mode fallback press and release behavior
+
+Contracts touched in this pass:
+
+- action lifecycle dispatch is now owned by a kind-indexed ops table rather
+  than repeated tap/press/release branching
+- descriptor-owned capability queries from the previous pass remain the shared
+  contract for validation and preflight callers
+- handled-key fallback and implicit-hold policy remain unchanged in this pass
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted action, preflight, and key-behavior lookup suites passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes in this pass touched:
+  - `users/noah/lib/action/action_dispatch.h`
+  - `users/noah/lib/action/action_lifecycle.c`
+  - this review folder
+
+Next steps:
+
+- decide whether handled-key fallback and implicit-hold logic should consume
+  narrower action-owned policy helpers instead of direct kind checks
+- if that coupling stays acceptable, move on to the next architecture item:
+  pd-mode explicit identity / precedence in the sync and policy contract
