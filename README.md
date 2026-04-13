@@ -112,6 +112,7 @@ If you want to adapt this userspace, these are the main files to touch first:
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, RGB overlay toggles (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE`), auto-mouse target layer and timeout, auto-sniping, dragscroll DPI, and other keymap-facing behavior |
 | [`users/noah/noah_keymap_ids.h`](./users/noah/noah_keymap_ids.h) | shared layer ids, hardcoded macro keycodes, generated pd-mode and layer-lock keycode ranges, and the `NOAH_KEYMAP_SAFE_RANGE` boundary for keymap-local keycodes |
 | [`users/noah/lib/pointing/pd_mode_manifest.h`](./users/noah/lib/pointing/pd_mode_manifest.h) | shared pd-mode definitions: mode keycodes, generated lock keycodes, handlers, DPI metadata, and manifest traits |
+| [`users/noah/lib/pointing/modes/`](./users/noah/lib/pointing/modes/) | mode-owned pointing behavior: motion transforms, key interception, shared mode helpers, and mode-specific lifecycle glue such as `PINCH_MODE` |
 | [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, sensor/report settings, local dragscroll tuning, and low-level QMK overrides |
 
 In other words:
@@ -121,7 +122,7 @@ In other words:
 - if you want to change how the keyboard feels, start in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 - if you want to add a layer, update the layer enum in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h); `LAYER_COUNT` is the sentinel last value and should stay last
 - if you want to add a shared custom keycode surface, start in [`noah_keymap_ids.h`](./users/noah/noah_keymap_ids.h)
-- if you want to add a shared pointing-device mode, start in [`pd_mode_manifest.h`](./users/noah/lib/pointing/pd_mode_manifest.h)
+- if you want to add a shared pointing-device mode, start in [`pd_mode_manifest.h`](./users/noah/lib/pointing/pd_mode_manifest.h) and the matching mode-owned files under [`users/noah/lib/pointing/modes/`](./users/noah/lib/pointing/modes/)
 - if you want to change board plumbing, start in [`users/noah/config.h`](./users/noah/config.h)
 
 ## Layer Model And VIA

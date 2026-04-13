@@ -5,7 +5,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../action/action_dispatch.h"
+#include "../../action/action_dispatch.h"
 
 typedef void (*pd_mode_tap_fn_t)(uint16_t keycode);
 

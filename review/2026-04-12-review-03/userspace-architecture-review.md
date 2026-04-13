@@ -231,19 +231,23 @@ other mirrored consumers.
 ### Improved abstraction: pd-mode implementations now follow per-mode ownership
 
 Follow-up work on 2026-04-12 split the former
-`pd_mode_handlers.c` monolith into per-mode translation units:
+`pd_mode_handlers.c` monolith into per-mode translation units, and the latest
+folder tune now groups those mode-owned files under
+[`users/noah/lib/pointing/modes/`](../../users/noah/lib/pointing/modes/):
 
-- [`pd_mode_dragscroll.c`](../../users/noah/lib/pointing/pd_mode_dragscroll.c)
-- [`pd_mode_volume.c`](../../users/noah/lib/pointing/pd_mode_volume.c)
-- [`pd_mode_brightness.c`](../../users/noah/lib/pointing/pd_mode_brightness.c)
-- [`pd_mode_zoom.c`](../../users/noah/lib/pointing/pd_mode_zoom.c)
-- [`pd_mode_arrow.c`](../../users/noah/lib/pointing/pd_mode_arrow.c)
+- [`pd_mode_dragscroll.c`](../../users/noah/lib/pointing/modes/pd_mode_dragscroll.c)
+- [`pd_mode_volume.c`](../../users/noah/lib/pointing/modes/pd_mode_volume.c)
+- [`pd_mode_brightness.c`](../../users/noah/lib/pointing/modes/pd_mode_brightness.c)
+- [`pd_mode_zoom.c`](../../users/noah/lib/pointing/modes/pd_mode_zoom.c)
+- [`pd_mode_arrow.c`](../../users/noah/lib/pointing/modes/pd_mode_arrow.c)
+- [`pd_mode_pinch.c`](../../users/noah/lib/pointing/modes/pd_mode_pinch.c)
 
 Shared vertical-axis behavior now lives in
-[`pd_mode_handler_common.h`](../../users/noah/lib/pointing/pd_mode_handler_common.h),
-while dragscroll state stays isolated in `pd_mode_dragscroll.c` and
-arrow-mode-specific state and key interception stay isolated in
-`pd_mode_arrow.c`.
+[`pd_mode_handler_common.h`](../../users/noah/lib/pointing/modes/pd_mode_handler_common.h),
+while dragscroll state stays isolated in `pd_mode_dragscroll.c`, arrow-mode-
+specific state and key interception stay isolated in `pd_mode_arrow.c`, and
+pinch-specific modifier lifecycle glue now stays with `pd_mode_pinch.c`
+instead of bleeding back into the registry core.
 
 ## 4. Code Organization And Structure
 

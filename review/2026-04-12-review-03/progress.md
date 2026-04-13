@@ -231,7 +231,7 @@ Review status:
 Follow-up implementation completed after the final review follow-up:
 
 - Moved the dragscroll motion transform into
-  `users/noah/lib/pointing/pd_mode_dragscroll.c` so `DRAGSCROLL` and
+  `users/noah/lib/pointing/modes/pd_mode_dragscroll.c` so `DRAGSCROLL` and
   `PINCH_MODE` now use the same repo-owned handler instead of the upstream
   Charybdis keyboard dragscroll implementation.
 - Rewired the pd-mode manifest so both scroll-like modes share the local
@@ -265,7 +265,7 @@ Next steps:
 
 Follow-up implementation completed after the local dragscroll migration:
 
-- Reworked `users/noah/lib/pointing/pd_mode_dragscroll.c` into an explicit
+- Reworked `users/noah/lib/pointing/modes/pd_mode_dragscroll.c` into an explicit
   single-axis gesture state machine with signed per-axis buffers,
   start-vs-sustain dominance checks, timeout-based lock release, and
   cross-axis decay so dragscroll no longer emits simultaneous horizontal and
@@ -334,4 +334,37 @@ Next steps:
 - re-flash and verify whether the remaining “unnatural” feel was primarily the
   old lock-drop stutter or whether the per-axis thresholds/divisors still need
   tuning after that fix
- 
+
+Follow-up implementation completed for the pointing-folder tune:
+
+- Tuned the pointing folder structure by moving the mode-owned edit surface
+  into `users/noah/lib/pointing/modes/`, keeping the pointing core files
+  focused on manifest/state/lifecycle/runtime policy instead of mixing them
+  with per-mode handlers.
+- Moved `pd_mode_handlers.h`, `pd_mode_handler_common.h`, and the per-mode
+  handler translation units into that new folder, then added
+  `users/noah/lib/pointing/modes/pd_mode_pinch.c` so `PINCH_MODE` lifecycle
+  glue lives with the other mode-owned behavior instead of inside
+  `pd_mode_registry.c`.
+- Updated the pointing source manifest, direct host runners, maintainer docs,
+  and this review so the build surface and contributor guidance match the new
+  folder layout.
+
+Verification run for the pointing-folder tune:
+
+- `git status --short`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- keep future pd-mode motion handlers, key interception, and mode-specific
+  lifecycle glue under `users/noah/lib/pointing/modes/` unless a change is
+  truly shared pointing-core policy

@@ -40,11 +40,11 @@
 //     and other shared registry/pointer policy. Prefer adding a new trait when
 //     multiple modes share the same policy.
 //   LIFECYCLE:
-//     Optional registry-owned lifecycle hook object selected by this
-//     definition row. Use NULL when the mode needs no custom activate,
-//     deactivate, lock, or unlock side effects beyond shared trait policy.
-//     This keeps unusual modes definition-owned instead of adding another
-//     central registry switch.
+//     Optional lifecycle hook object selected by this definition row. Prefer
+//     mode-owned hook objects for mode-specific activate / deactivate / lock /
+//     unlock side effects, and keep registry-owned objects for genuinely
+//     shared policy. Use NULL when the mode needs no custom lifecycle work
+//     beyond shared trait policy.
 //
 // Example:
 //   PDM(MY_NEW_MODE, MY_NEW_MODE_KEY,

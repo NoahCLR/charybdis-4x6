@@ -3,7 +3,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Public cross-module interface for the pd-mode system.
-// Implementations are split across pd_mode_registry.c and pd_mode_state.c.
+// Runtime ownership is split across registry/state/lifecycle core files, with
+// mode-owned behavior under pointing/modes/.
 //
 // Non-pointing modules that only need mode flag constants or read-only state
 // queries should include pd_mode_flags.h instead of this header.

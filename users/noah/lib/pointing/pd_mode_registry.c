@@ -9,16 +9,8 @@
 #include "pd_mode_internal.h"
 #include "pd_mode_registry_internal.h"
 #include "../compat/qmk_contract.h"
-#include "../state/keyboard_mod_ownership.h"
 
-#include "pd_mode_handlers.h"
-
-struct pd_mode_lifecycle_hooks {
-    void (*on_activate)(pd_mode_mask_t mode);
-    void (*on_deactivate)(pd_mode_mask_t mode);
-    void (*on_lock)(pd_mode_mask_t mode);
-    void (*on_unlock)(pd_mode_mask_t mode);
-};
+#include "modes/pd_mode_handlers.h"
 
 static inline bool pd_mode_registry_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
     const pd_mode_def_t *def = pd_mode_lookup(mode);
@@ -28,7 +20,7 @@ static inline bool pd_mode_registry_has_trait(pd_mode_mask_t mode, pd_mode_trait
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static bool scroll_mode_auto_mouse_owned = false;
 
-static void scroll_mode_lock_attach_auto_mouse(pd_mode_mask_t mode) {
+void pd_mode_scroll_lock_attach_auto_mouse(pd_mode_mask_t mode) {
     (void)mode;
 
     if (noah_qmk_contract_auto_mouse_toggle_enabled()) {
@@ -40,7 +32,7 @@ static void scroll_mode_lock_attach_auto_mouse(pd_mode_mask_t mode) {
     scroll_mode_auto_mouse_owned = true;
 }
 
-static void scroll_mode_lock_detach_auto_mouse(pd_mode_mask_t mode) {
+void pd_mode_scroll_lock_detach_auto_mouse(pd_mode_mask_t mode) {
     (void)mode;
 
     if (scroll_mode_auto_mouse_owned && noah_qmk_contract_auto_mouse_toggle_enabled()) {
@@ -51,50 +43,14 @@ static void scroll_mode_lock_detach_auto_mouse(pd_mode_mask_t mode) {
 }
 
 static const pd_mode_lifecycle_hooks_t pd_mode_auto_mouse_lock_toggle_hooks = {
-    .on_lock   = scroll_mode_lock_attach_auto_mouse,
-    .on_unlock = scroll_mode_lock_detach_auto_mouse,
+    .on_lock   = pd_mode_scroll_lock_attach_auto_mouse,
+    .on_unlock = pd_mode_scroll_lock_detach_auto_mouse,
 };
 
 #    define PD_MODE_LIFECYCLE_AUTO_MOUSE_LOCK (&pd_mode_auto_mouse_lock_toggle_hooks)
 #else
 #    define PD_MODE_LIFECYCLE_AUTO_MOUSE_LOCK NULL
 #endif
-
-static bool pinch_command_registered = false;
-
-static void pinch_mode_register_command(pd_mode_mask_t mode) {
-    (void)mode;
-
-    if (pinch_command_registered) {
-        return;
-    }
-
-    // Pinch mode owns a logical GUI hold for trackpad gestures. Keep that on the
-    // same real-mod ownership path as the rest of the custom runtime instead of
-    // advertising it as a transient weak modifier.
-    keyboard_mod_ownership_register(KC_LEFT_GUI);
-    pinch_command_registered = true;
-}
-
-static void pinch_mode_unregister_command(pd_mode_mask_t mode) {
-    (void)mode;
-
-    if (!pinch_command_registered) {
-        return;
-    }
-
-    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
-    pinch_command_registered = false;
-}
-
-static const pd_mode_lifecycle_hooks_t pd_mode_pinch_lifecycle_hooks = {
-    .on_activate   = pinch_mode_register_command,
-    .on_deactivate = pinch_mode_unregister_command,
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    .on_lock   = scroll_mode_lock_attach_auto_mouse,
-    .on_unlock = scroll_mode_lock_detach_auto_mouse,
-#endif
-};
 
 #define PD_MODE_LIFECYCLE_PINCH (&pd_mode_pinch_lifecycle_hooks)
 
