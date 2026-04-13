@@ -17,6 +17,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/key_runtime_modifier_hold_integration_test.c" \
     "$ROOT/users/noah/lib/action/owned_keycode.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key.c" \

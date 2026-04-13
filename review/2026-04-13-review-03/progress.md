@@ -451,3 +451,62 @@ Next steps:
 - The strongest remaining candidate is
   `tests/host/key_runtime_modifier_hold_integration_test.c`, which still
   open-codes multi-tap press/release timing and direct slot inspection.
+
+### Implementation Pass: Direct Handled-Key Integration Helpers
+
+Completed in this pass:
+
+- Extended the shared integration helper in:
+  - `tests/host/key_runtime_integration_harness.h`
+  - `tests/host/key_runtime_integration_harness.c`
+- The harness now covers both process-record-driven and direct handled-key
+  integration cases:
+  - `key_runtime_integration_advance(...)`
+  - `key_runtime_integration_scan()`
+  - `key_runtime_integration_multi_tap_handled_key(...)`
+  - `key_runtime_integration_process_handled_press(...)`
+  - `key_runtime_integration_process_handled_release(...)`
+- Kept the helper read-side oriented by continuing to use the same
+  `runtime_debug.h`-shaped snapshot access for post-step assertions.
+- Migrated `tests/host/key_runtime_modifier_hold_integration_test.c` onto that
+  helper:
+  - multi-tap handled-key setup now uses a semantic builder instead of
+    reworking `handled_key_lookup(...)` inline
+  - direct handled press/release calls now route through one shared helper
+  - time advancement and scan triggering now use the shared semantic helpers
+  - post-step slot / mod-state assertions now read through the integration
+    snapshot seam instead of relying only on live slot pointers
+- Updated
+  `tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  so the shared harness is compiled into that runner.
+
+Contracts touched in this pass:
+
+- shared direct handled-key integration helpers:
+  `tests/host/key_runtime_integration_harness.h`,
+  `tests/host/key_runtime_integration_harness.c`
+- modifier-hold integration coverage:
+  `tests/host/key_runtime_modifier_hold_integration_test.c`,
+  `tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes stayed inside `charybdis-4x6/tests/host/` and the active review
+  folder
+
+Next steps:
+
+- Continue Recommendation 5 by migrating any remaining integration fixtures
+  that still hand-build records, timing, or slot reads instead of using the
+  shared semantic helpers.
+- At this point the remaining work is cleanup and coverage-shape tightening
+  rather than a missing major architectural seam.

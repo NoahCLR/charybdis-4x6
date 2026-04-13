@@ -28,6 +28,10 @@ Implementation status update:
 - Recommendation 5 has a second implementation slice: process-record-driven
   integration tests now share a small semantic step/snapshot harness instead
   of rebuilding records, time advancement, and slot reads inline.
+- Recommendation 5 has a third implementation slice: direct handled-key
+  integration tests can now use the same shared harness for multi-tap handled
+  key setup, direct handled press/release driving, time advancement, and
+  snapshot-based assertions.
 - The remaining open recommendation area is pushing more integration coverage
   onto those semantic builders beyond the current scenario-level slice.
 

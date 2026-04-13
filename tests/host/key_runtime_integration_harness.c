@@ -5,6 +5,12 @@
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/noah_runtime.h"
 
+__attribute__((weak)) bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return true;
+}
+
 __attribute__((weak)) void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
     if (!out) {
         return;
@@ -55,6 +61,18 @@ static uint16_t key_runtime_integration_slot_table_index(keypos_t key_pos) {
     return (uint16_t)((uint16_t)key_pos.row * (uint16_t)MATRIX_COLS + (uint16_t)key_pos.col);
 }
 
+void key_runtime_integration_advance(uint16_t *time, uint16_t advance_ms) {
+    if (!time) {
+        return;
+    }
+
+    *time = (uint16_t)(*time + advance_ms);
+}
+
+void key_runtime_integration_scan(void) {
+    noah_key_runtime_scan();
+}
+
 void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_step_t *steps, uint8_t step_count) {
     if (!time || !steps) {
         return;
@@ -73,13 +91,33 @@ void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_s
                 break;
             }
             case KEY_RUNTIME_INTEGRATION_STEP_ADVANCE_MS:
-                *time = (uint16_t)(*time + steps[index].data.advance_ms);
+                key_runtime_integration_advance(time, steps[index].data.advance_ms);
                 break;
             case KEY_RUNTIME_INTEGRATION_STEP_SCAN:
-                noah_key_runtime_scan();
+                key_runtime_integration_scan();
                 break;
         }
     }
+}
+
+handled_key_view_t key_runtime_integration_multi_tap_handled_key(uint16_t keycode, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
+    handled_key_view_t key = handled_key_lookup(keycode);
+
+    key.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    key.tap_hold_term    = tap_hold_term;
+    key.longer_hold_term = longer_hold_term;
+    key.multi_tap_term   = multi_tap_term;
+    return key;
+}
+
+bool key_runtime_integration_process_handled_press(uint16_t keycode, keypos_t key_pos, handled_key_view_t key) {
+    keyrecord_t record = key_runtime_integration_record(key_pos, true);
+    return key_runtime_process_handled_key_press(keycode, &record, key);
+}
+
+bool key_runtime_integration_process_handled_release(uint16_t keycode, keypos_t key_pos, handled_key_view_t key) {
+    keyrecord_t record = key_runtime_integration_record(key_pos, false);
+    return key_runtime_process_handled_key_release(keycode, &record, key);
 }
 
 void key_runtime_integration_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
