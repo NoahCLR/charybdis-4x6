@@ -36,18 +36,13 @@ typedef struct {
     bool                     layer_interrupted;
 } key_runtime_slot_lifecycle_state_t;
 
-typedef struct {
-    bool               valid;
-    key_runtime_slot_interaction_t view;
-} key_runtime_slot_interaction_state_t;
-
 // One handled-key runtime slot: active press/hold state plus any deferred
 // multi-tap chain that still owns this physical key position after release.
 typedef struct {
     uint16_t                           timer;
     key_runtime_slot_owner_state_t     owner;
     key_runtime_slot_lifecycle_state_t lifecycle;
-    key_runtime_slot_interaction_state_t interaction;
+    key_runtime_slot_interaction_t     interaction;
     multi_tap_t                        pending_multi_tap;
 } active_key_state_t;
 
@@ -66,7 +61,7 @@ typedef struct {
         .owner.keycode                 = KC_NO,                       \
         .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_IDLE, \
         .lifecycle.held_action_keycode = KC_NO,                       \
-        .interaction.view             = key_runtime_slot_interaction_default(), \
+        .interaction                    = key_runtime_slot_interaction_default(), \
         .pending_multi_tap             = {0},                         \
     }
 

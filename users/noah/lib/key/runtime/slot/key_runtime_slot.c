@@ -94,7 +94,7 @@ key_runtime_slot_interaction_t key_runtime_slot_cached_interaction(const active_
         return key_runtime_slot_interaction_default();
     }
 
-    return slot->interaction.view;
+    return slot->interaction;
 }
 
 key_runtime_slot_interaction_t key_runtime_slot_interaction(const active_key_state_t *slot) {
@@ -281,10 +281,7 @@ static void key_runtime_slot_set_interaction(active_key_state_t *slot, key_runti
         return;
     }
 
-    slot->interaction = (key_runtime_slot_interaction_state_t){
-        .valid = true,
-        .view  = key,
-    };
+    slot->interaction = key;
 }
 
 void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_runtime_slot_interaction_t interaction, key_runtime_slot_phase_t phase) {

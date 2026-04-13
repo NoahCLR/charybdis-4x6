@@ -351,8 +351,7 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
     active_key.owner.keycode           = KC_RIGHT_ALT;
     active_key.owner.key_pos           = stored;
     active_key.lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
-    active_key.interaction.valid       = true;
-    active_key.interaction.view        = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
+    active_key.interaction             = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
         .keycode          = KC_RIGHT_ALT,
         .tap_count        = 1,
         .step =

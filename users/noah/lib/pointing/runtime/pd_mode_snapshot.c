@@ -4,7 +4,7 @@
 //
 // Central computed view of pd-mode runtime state. This is the read-only
 // contract for consumers that need effective local/display state plus derived
-// policy metadata such as active traits and first active mode selection.
+// policy metadata such as active traits and selected mode identity.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep

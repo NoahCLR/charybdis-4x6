@@ -39,8 +39,8 @@ static uint8_t        fake_auto_mouse_layer   = LAYER_POINTER;
 static uint16_t       fake_auto_mouse_elapsed = 0;
 static bool           fake_auto_mouse_active  = true;
 static bool           fake_is_master          = true;
-static pd_mode_mask_t fake_pd_active_flags    = 0;
-static pd_mode_mask_t fake_pd_locked_flags    = 0;
+static pd_mode_mask_t fake_pd_active_mode     = 0;
+static pd_mode_mask_t fake_pd_locked_mode     = 0;
 
 ws2812_led_t                ws2812_leds[WS2812_LED_COUNT];
 split_runtime_sync_packet_t split_runtime_sync_remote = {
@@ -136,17 +136,36 @@ static rgb_t rgb_blend(rgb_t start, rgb_t end, uint8_t amount) {
     };
 }
 
-static pd_mode_mask_t test_display_active_flags(void) {
-    return fake_is_master ? fake_pd_active_flags : split_runtime_sync_remote.pd_mode_flags;
+static pd_mode_mask_t test_snapshot_mode(pd_mode_mask_t flags) {
+    if (flags == 0) {
+        return 0;
+    }
+
+    for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
+        if ((flags & pd_modes[index].mode_flag) != 0) {
+            return pd_modes[index].mode_flag;
+        }
+    }
+
+    return 0;
 }
 
-static pd_mode_mask_t test_display_locked_flags(void) {
-    return fake_is_master ? fake_pd_locked_flags : split_runtime_sync_remote.pd_mode_locked_flags;
+static pd_mode_mask_t test_display_locked_mode(void) {
+    return fake_is_master ? fake_pd_locked_mode : test_snapshot_mode(split_runtime_sync_remote.pd_mode_locked_flags);
+}
+
+static pd_mode_mask_t test_display_active_mode(void) {
+    if (fake_is_master) {
+        return fake_pd_active_mode;
+    }
+
+    pd_mode_mask_t locked_mode = test_display_locked_mode();
+    return locked_mode ? locked_mode : test_snapshot_mode(split_runtime_sync_remote.pd_mode_flags);
 }
 
 static uint8_t automouse_blend_amount_from_elapsed(uint16_t elapsed) {
     uint16_t progress = automouse_rgb_progress(elapsed);
-    if (test_display_locked_flags() != 0) {
+    if (test_display_locked_mode() != 0) {
         progress = 0;
     }
     if (progress > AUTOMOUSE_RGB_ACTIVE_SPAN) {
@@ -166,8 +185,8 @@ static void test_reset(void) {
     fake_auto_mouse_elapsed   = 0;
     fake_auto_mouse_active    = true;
     fake_is_master            = true;
-    fake_pd_active_flags      = 0;
-    fake_pd_locked_flags      = 0;
+    fake_pd_active_mode       = 0;
+    fake_pd_locked_mode       = 0;
     split_runtime_sync_remote = (split_runtime_sync_packet_t){
         .key_preview_layer = UINT8_MAX,
     };
@@ -199,12 +218,12 @@ bool is_keyboard_master(void) {
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {
     pd_mode_snapshot_t snapshot = {
-        .local.active_mode    = fake_pd_active_flags,
-        .local.locked_mode    = fake_pd_locked_flags,
+        .local.active_mode    = fake_pd_active_mode,
+        .local.locked_mode    = fake_pd_locked_mode,
         .local.active_index   = PD_MODE_COUNT,
         .local.locked_index   = PD_MODE_COUNT,
-        .display.active_mode  = test_display_active_flags(),
-        .display.locked_mode  = test_display_locked_flags(),
+        .display.active_mode  = test_display_active_mode(),
+        .display.locked_mode  = test_display_locked_mode(),
         .display.active_index = PD_MODE_COUNT,
         .display.locked_index = PD_MODE_COUNT,
     };
@@ -212,24 +231,20 @@ pd_mode_snapshot_t pd_mode_snapshot(void) {
     for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
         pd_mode_mask_t mode = pd_modes[index].mode_flag;
 
-        if ((fake_pd_active_flags & mode) != 0 && snapshot.local.active_index == PD_MODE_COUNT) {
+        if (fake_pd_active_mode == mode) {
             snapshot.local.active_index = index;
-            snapshot.local.active_mode  = mode;
         }
 
-        if ((fake_pd_locked_flags & mode) != 0 && snapshot.local.locked_index == PD_MODE_COUNT) {
+        if (fake_pd_locked_mode == mode) {
             snapshot.local.locked_index = index;
-            snapshot.local.locked_mode  = mode;
         }
 
-        if ((test_display_active_flags() & mode) != 0 && snapshot.display.active_index == PD_MODE_COUNT) {
+        if (test_display_active_mode() == mode) {
             snapshot.display.active_index = index;
-            snapshot.display.active_mode  = mode;
         }
 
-        if ((test_display_locked_flags() & mode) != 0 && snapshot.display.locked_index == PD_MODE_COUNT) {
+        if (test_display_locked_mode() == mode) {
             snapshot.display.locked_index = index;
-            snapshot.display.locked_mode  = mode;
         }
     }
 
@@ -277,39 +292,39 @@ bool is_auto_mouse_active(void) {
 }
 
 bool pd_any_local_mode_locked(void) {
-    return fake_pd_locked_flags != 0;
+    return fake_pd_locked_mode != 0;
 }
 
 bool pd_mode_local_active(pd_mode_mask_t mode) {
-    return (fake_pd_active_flags & mode) != 0;
+    return mode != 0 && fake_pd_active_mode == mode;
 }
 
 bool pd_mode_local_locked(pd_mode_mask_t mode) {
-    return (fake_pd_locked_flags & mode) != 0;
+    return mode != 0 && fake_pd_locked_mode == mode;
 }
 
 bool pd_any_local_mode_active(void) {
-    return fake_pd_active_flags != 0;
+    return fake_pd_active_mode != 0;
 }
 
 pd_mode_mask_t pd_mode_local_active_snapshot(void) {
-    return fake_pd_active_flags;
+    return fake_pd_active_mode;
 }
 
 pd_mode_mask_t pd_mode_local_locked_snapshot(void) {
-    return fake_pd_locked_flags;
+    return fake_pd_locked_mode;
 }
 
 bool pd_any_display_mode_locked(void) {
-    return test_display_locked_flags() != 0;
+    return test_display_locked_mode() != 0;
 }
 
 bool pd_mode_display_active(pd_mode_mask_t mode) {
-    return (test_display_active_flags() & mode) != 0;
+    return mode != 0 && test_display_active_mode() == mode;
 }
 
 pd_mode_mask_t pd_mode_display_active_snapshot(void) {
-    return test_display_active_flags();
+    return test_display_active_mode();
 }
 
 uint8_t pd_mode_display_active_index(void) {
@@ -468,7 +483,7 @@ static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
     test_reset();
 
     layer_state          = (layer_state_t)1u << LAYER_SYM;
-    fake_pd_active_flags = PD_MODE_VOLUME;
+    fake_pd_active_mode = PD_MODE_VOLUME;
 
     CHECK(render_output());
 
@@ -658,7 +673,7 @@ static void test_slave_locked_pd_mode_clamps_remote_automouse_progress(void) {
     CHECK(render_output());
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
-    check_led(1, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+    check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
     check_led(2, (rgb_t){0, 0, 0});
 }
 

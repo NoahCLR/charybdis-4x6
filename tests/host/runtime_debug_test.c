@@ -364,8 +364,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(snapshot.core.pd.local_active_mode == PD_MODE_VOLUME);
     CHECK(snapshot.core.pd.remote_display_active_mode == PD_MODE_ARROW);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_C);
-    CHECK(snapshot.core.key.slots_by_position[0].interaction.valid);
-    CHECK(snapshot.core.key.slots_by_position[0].interaction.view.binding.tap_action == KC_C);
+    CHECK(snapshot.core.key.slots_by_position[0].interaction.binding.tap_action == KC_C);
 
     CHECK(snapshot.layer_ownership.applied_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
     CHECK(snapshot.layer_ownership.locked_mask == ((layer_state_t)1u << 3));
@@ -433,7 +432,7 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(snapshot.core.pd.remote_display_active_mode == 0);
     CHECK(snapshot.core.pd.remote_display_locked_mode == 0);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_NO);
-    CHECK(!snapshot.core.key.slots_by_position[0].interaction.valid);
+    CHECK(snapshot.core.key.slots_by_position[0].interaction.binding.tap_action == KC_NO);
 
     CHECK(snapshot.layer_ownership.applied_layer_state == 0);
     CHECK(snapshot.layer_ownership.locked_mask == 0);

@@ -46,6 +46,8 @@ typedef struct {
     active_key_state_t   *slot;
     uint16_t              keycode;
     uint16_t              elapsed;
+    uint16_t              tap_hold_term;
+    uint16_t              longer_hold_term;
     keypos_t              key_pos;
     bool                  is_momentary_layer;
     delayed_action_mods_t mods;
@@ -84,6 +86,8 @@ static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pen
 
     interaction = key_runtime_slot_cached_interaction(slot);
     context.key_pos   = slot->owner.key_pos;
+    context.tap_hold_term = interaction.binding.tap_hold_term;
+    context.longer_hold_term = interaction.binding.longer_hold_term;
     context.is_momentary_layer = key_runtime_slot_interaction_is_momentary_layer(interaction);
     context.mods      = delayed_action_mods_from_multi_tap(slot_multi_tap);
     context.hold      = interaction.binding.hold;
@@ -92,9 +96,16 @@ static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pen
     context.action    = key_runtime_slot_resolve_pending_multi_tap_hold(slot, &context.repeat_count);
     context.matched   = true;
 
-    if (context.repeat_count == 1 && key_runtime_slot_release_hold_contract_has_any_action(context.release_contract.hold)) {
-        if ((!context.hold.present && context.action == KC_NO) || (context.policy.hold.dispatches_on_release && context.action == context.hold.action)) {
-            context.action = key_runtime_slot_release_hold_contract_select_action(context.release_contract.hold, elapsed, interaction.binding.longer_hold_term);
+    if (key_runtime_slot_release_hold_contract_has_any_action(context.release_contract.hold)) {
+        bool release_hold_pending = context.policy.hold.dispatches_on_release ? elapsed >= context.tap_hold_term
+                                                                               : !context.hold.present && context.policy.long_hold.dispatches_on_release &&
+                                                                                     elapsed >= context.longer_hold_term;
+
+        if (release_hold_pending) {
+            context.action = key_runtime_slot_release_hold_contract_select_action(context.release_contract.hold, elapsed, context.longer_hold_term);
+            if (context.action != KC_NO) {
+                context.repeat_count = 1;
+            }
         }
     }
 
