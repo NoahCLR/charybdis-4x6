@@ -244,10 +244,82 @@ Workspace scope:
 
 Next steps:
 
-- Recommendation 4 remains open: add macro IR for static authored macros so
-  hardcoded macros stop paying runtime parse / reinterpret cost.
 - Recommendation 5 remains open: move more integration fixtures onto semantic
   builders so storage layout stops acting like a public test API.
 - The resolved hold-policy work can still be pushed further upward into more
   semantic test helpers, but the major remaining architectural gap is now in
-  macro execution and fixture shape rather than pd-mode write ownership.
+  fixture shape rather than pd-mode write ownership.
+
+### Implementation Pass: Hardcoded Macro IR
+
+Completed in this pass:
+
+- Landed Recommendation 4 from the review by introducing a compact execution
+  IR for hardcoded authored macros in `users/noah/lib/macro/macro_payload.h`:
+  - `macro_payload_ir_t`
+  - `macro_payload_compile(...)`
+  - `macro_payload_play_ir(...)`
+- Kept the authored string DSL as the source format and preserved the
+  parser-based validation / encoding contract for other macro consumers:
+  - `macro_payload_validate(...)` still accepts payloads without depending on
+    IR cache capacity
+  - `macro_payload_encode_write(...)` continues to serve VIA EEPROM seeding
+- Added IR compilation in `users/noah/lib/macro/macro_payload_parse.c` with a
+  compact bytecode shape for:
+  - text spans
+  - delays
+  - key down / key up
+  - tap lists
+- Added IR playback in `users/noah/lib/macro/macro_payload_run.c` so runtime
+  execution can consume the compiled representation directly instead of
+  reparsing source strings.
+- Reworked `users/noah/lib/macro/macro_dispatch.c` to cache compiled
+  hardcoded macro IR per slot:
+  - empty slots still short-circuit as valid
+  - valid authored slots compile once and replay cached IR on later dispatches
+  - compile or playback failure still invalidates the slot and logs it
+- Left `users/noah/lib/macro/via_macro_defaults.c` on the existing
+  string-validation and encode-write path so VIA default macro seeding keeps
+  its current storage contract.
+- Added host coverage for both the IR seam and the dispatch cache contract:
+  - `tests/host/macro_payload_test.c`
+  - `tests/host/macro_dispatch_test.c`
+  - `tests/host/run_macro_dispatch_tests.sh`
+  - `tests/host/run_all_host_tests.sh`
+
+Contracts touched in this pass:
+
+- macro execution IR contract:
+  `users/noah/lib/macro/macro_payload.h`
+- macro IR compilation:
+  `users/noah/lib/macro/macro_payload_parse.c`
+- macro IR playback:
+  `users/noah/lib/macro/macro_payload_run.c`
+- hardcoded macro dispatch/cache boundary:
+  `users/noah/lib/macro/macro_dispatch.c`
+- macro host coverage:
+  `tests/host/macro_payload_test.c`,
+  `tests/host/macro_dispatch_test.c`,
+  `tests/host/run_macro_dispatch_tests.sh`,
+  `tests/host/run_all_host_tests.sh`
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_macro_dispatch_tests.sh`
+- `sh tests/host/run_macro_payload_tests.sh`
+- `sh tests/host/run_via_macro_defaults_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- code changes stayed inside `charybdis-4x6/`
+
+Next steps:
+
+- Recommendation 5 remains open: move more integration fixtures onto semantic
+  builders so storage layout stops acting like a public test API.
+- If hardcoded macros grow substantially, consider whether the fixed-capacity
+  IR cache should stay runtime-allocated or move toward build-time generation.

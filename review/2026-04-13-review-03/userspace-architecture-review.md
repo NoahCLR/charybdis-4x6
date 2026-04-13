@@ -18,8 +18,11 @@ Implementation status update:
 - Recommendation 3 has its first implementation slice: slot / feedback /
   pending-multi-tap hold policy now consumes a shared resolved interaction
   contract.
-- The remaining open recommendation areas are macro IR and shifting more host
-  integration coverage onto semantic builders.
+- Recommendation 4 has landed: hardcoded authored macros now compile into a
+  cached execution IR, while VIA default seeding stays on the encoded-string
+  path.
+- The remaining open recommendation area is shifting more host integration
+  coverage onto semantic builders.
 
 Scope:
 

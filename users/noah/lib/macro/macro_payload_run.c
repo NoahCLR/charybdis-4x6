@@ -9,33 +9,53 @@ static void macro_payload_wait_interval(void) {
     wait_ms(TAP_CODE_DELAY);
 }
 
+static bool macro_payload_run_delay(uint16_t delay_ms) {
+    wait_ms(delay_ms);
+    macro_payload_wait_interval();
+    return true;
+}
+
+static bool macro_payload_run_key_down(uint8_t keycode) {
+    (void)owned_keycode_register(keycode);
+    macro_payload_wait_interval();
+    return true;
+}
+
+static bool macro_payload_run_key_up(uint8_t keycode) {
+    (void)owned_keycode_unregister(keycode);
+    macro_payload_wait_interval();
+    return true;
+}
+
+static bool macro_payload_run_tap_list(const uint8_t *keycodes, uint8_t count) {
+    if (!keycodes || count == 0) {
+        return false;
+    }
+
+    for (uint8_t i = 0; i + 1 < count; i++) {
+        (void)owned_keycode_register(keycodes[i]);
+    }
+
+    (void)owned_keycode_tap(keycodes[count - 1]);
+
+    for (uint8_t i = count - 1; i > 0; i--) {
+        (void)owned_keycode_unregister(keycodes[i - 1]);
+    }
+
+    macro_payload_wait_interval();
+    return true;
+}
+
 static bool macro_payload_run_command(const macro_payload_command_t *command) {
     switch (command->kind) {
         case MACRO_PAYLOAD_COMMAND_DELAY:
-            wait_ms(command->delay_ms);
-            macro_payload_wait_interval();
-            return true;
+            return macro_payload_run_delay(command->delay_ms);
         case MACRO_PAYLOAD_COMMAND_KEY_DOWN:
-            (void)owned_keycode_register(command->keycode);
-            macro_payload_wait_interval();
-            return true;
+            return macro_payload_run_key_down(command->keycode);
         case MACRO_PAYLOAD_COMMAND_KEY_UP:
-            (void)owned_keycode_unregister(command->keycode);
-            macro_payload_wait_interval();
-            return true;
+            return macro_payload_run_key_up(command->keycode);
         case MACRO_PAYLOAD_COMMAND_TAP_LIST:
-            for (uint8_t i = 0; i + 1 < command->tap_list.count; i++) {
-                (void)owned_keycode_register(command->tap_list.keycodes[i]);
-            }
-
-            (void)owned_keycode_tap(command->tap_list.keycodes[command->tap_list.count - 1]);
-
-            for (uint8_t i = command->tap_list.count - 1; i > 0; i--) {
-                (void)owned_keycode_unregister(command->tap_list.keycodes[i - 1]);
-            }
-
-            macro_payload_wait_interval();
-            return true;
+            return macro_payload_run_tap_list(command->tap_list.keycodes, command->tap_list.count);
     }
 
     return false;
@@ -54,4 +74,80 @@ static bool macro_payload_visit_command_run(const macro_payload_command_t *comma
 
 bool macro_payload_run(const char *payload) {
     return macro_payload_visit(payload, macro_payload_visit_text_send_char, macro_payload_visit_command_run, NULL);
+}
+
+bool macro_payload_play_ir(const macro_payload_ir_t *ir) {
+    const uint8_t *cursor;
+    const uint8_t *end;
+
+    if (!ir) {
+        return false;
+    }
+
+    cursor = ir->bytes;
+    end    = ir->bytes + ir->length;
+
+    while (cursor < end) {
+        macro_payload_ir_opcode_t opcode = (macro_payload_ir_opcode_t)(*cursor++);
+
+        switch (opcode) {
+            case MACRO_PAYLOAD_IR_OP_TEXT: {
+                uint8_t text_length = 0;
+
+                if (cursor >= end) {
+                    return false;
+                }
+
+                text_length = *cursor++;
+                if ((size_t)(end - cursor) < text_length) {
+                    return false;
+                }
+
+                for (uint8_t i = 0; i < text_length; i++) {
+                    send_char((char)cursor[i]);
+                }
+
+                cursor += text_length;
+                break;
+            }
+            case MACRO_PAYLOAD_IR_OP_DELAY:
+                if ((size_t)(end - cursor) < 2u) {
+                    return false;
+                }
+                if (!macro_payload_run_delay((uint16_t)cursor[0] | ((uint16_t)cursor[1] << 8))) {
+                    return false;
+                }
+                cursor += 2;
+                break;
+            case MACRO_PAYLOAD_IR_OP_KEY_DOWN:
+                if (cursor >= end || !macro_payload_run_key_down(*cursor++)) {
+                    return false;
+                }
+                break;
+            case MACRO_PAYLOAD_IR_OP_KEY_UP:
+                if (cursor >= end || !macro_payload_run_key_up(*cursor++)) {
+                    return false;
+                }
+                break;
+            case MACRO_PAYLOAD_IR_OP_TAP_LIST: {
+                uint8_t count = 0;
+
+                if (cursor >= end) {
+                    return false;
+                }
+
+                count = *cursor++;
+                if ((size_t)(end - cursor) < count || !macro_payload_run_tap_list(cursor, count)) {
+                    return false;
+                }
+
+                cursor += count;
+                break;
+            }
+            default:
+                return false;
+        }
+    }
+
+    return cursor == end;
 }

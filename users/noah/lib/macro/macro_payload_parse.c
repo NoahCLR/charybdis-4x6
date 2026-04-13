@@ -3,6 +3,69 @@
 
 #include "macro_payload_internal.h"
 
+static void macro_payload_ir_reset(macro_payload_ir_t *ir) {
+    if (ir) {
+        ir->length = 0;
+    }
+}
+
+static bool macro_payload_ir_write_byte(macro_payload_ir_t *ir, uint8_t byte) {
+    if (!ir || ir->length >= sizeof(ir->bytes)) {
+        return false;
+    }
+
+    ir->bytes[ir->length++] = byte;
+    return true;
+}
+
+static bool macro_payload_ir_write_text(macro_payload_ir_t *ir, const char *text, size_t length) {
+    while (length > 0) {
+        uint8_t chunk = length > UINT8_MAX ? UINT8_MAX : (uint8_t)length;
+
+        if (!macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_TEXT) || !macro_payload_ir_write_byte(ir, chunk)) {
+            return false;
+        }
+
+        for (uint8_t i = 0; i < chunk; i++) {
+            if (!macro_payload_ir_write_byte(ir, (uint8_t)text[i])) {
+                return false;
+            }
+        }
+
+        text += chunk;
+        length -= chunk;
+    }
+
+    return true;
+}
+
+static bool macro_payload_ir_write_command(macro_payload_ir_t *ir, const macro_payload_command_t *command) {
+    switch (command->kind) {
+        case MACRO_PAYLOAD_COMMAND_DELAY:
+            return macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_DELAY) &&
+                   macro_payload_ir_write_byte(ir, (uint8_t)(command->delay_ms & 0xFFu)) &&
+                   macro_payload_ir_write_byte(ir, (uint8_t)(command->delay_ms >> 8));
+        case MACRO_PAYLOAD_COMMAND_KEY_DOWN:
+            return macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_KEY_DOWN) && macro_payload_ir_write_byte(ir, command->keycode);
+        case MACRO_PAYLOAD_COMMAND_KEY_UP:
+            return macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_KEY_UP) && macro_payload_ir_write_byte(ir, command->keycode);
+        case MACRO_PAYLOAD_COMMAND_TAP_LIST:
+            if (!command->tap_list.count || !macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_TAP_LIST) || !macro_payload_ir_write_byte(ir, command->tap_list.count)) {
+                return false;
+            }
+
+            for (uint8_t i = 0; i < command->tap_list.count; i++) {
+                if (!macro_payload_ir_write_byte(ir, command->tap_list.keycodes[i])) {
+                    return false;
+                }
+            }
+
+            return true;
+    }
+
+    return false;
+}
+
 static bool macro_payload_is_space(char c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
@@ -162,6 +225,56 @@ bool macro_payload_visit(const char *payload, macro_payload_text_visitor_t visit
         }
 
         cursor++;
+    }
+
+    return true;
+}
+
+bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
+    const char *cursor     = payload;
+    const char *text_start = payload;
+
+    if (!payload || !ir) {
+        return false;
+    }
+
+    macro_payload_ir_reset(ir);
+
+    while (*cursor) {
+        if (*cursor == '{') {
+            const char             *command_start = cursor + 1;
+            const char             *command_end   = command_start;
+            macro_payload_command_t command       = {0};
+
+            if (!macro_payload_ir_write_text(ir, text_start, (size_t)(cursor - text_start))) {
+                macro_payload_ir_reset(ir);
+                return false;
+            }
+
+            while (*command_end && *command_end != '}') {
+                command_end++;
+            }
+            if (*command_end != '}' || !macro_payload_parse_command(command_start, command_end, &command) || !macro_payload_ir_write_command(ir, &command)) {
+                macro_payload_ir_reset(ir);
+                return false;
+            }
+
+            cursor     = command_end + 1;
+            text_start = cursor;
+            continue;
+        }
+
+        if (*cursor == '}' || (uint8_t)*cursor > 0x7F) {
+            macro_payload_ir_reset(ir);
+            return false;
+        }
+
+        cursor++;
+    }
+
+    if (!macro_payload_ir_write_text(ir, text_start, (size_t)(cursor - text_start))) {
+        macro_payload_ir_reset(ir);
+        return false;
     }
 
     return true;

@@ -123,6 +123,53 @@ static void test_play_runs_text_chords_and_delays_in_order(void) {
     CHECK(test_ops[11].value == 'Z');
 }
 
+static void test_compile_and_play_ir_runs_without_reparsing_source(void) {
+    macro_payload_ir_t ir = {0};
+
+    CHECK(macro_payload_compile("A{KC_LCTL,KC_C}{25}{+KC_LSFT}{-KC_LSFT}Z", &ir));
+    CHECK(ir.length > 0);
+
+    test_reset_stubs();
+
+    CHECK(macro_payload_play_ir(&ir));
+    CHECK(test_op_count == 12);
+
+    CHECK(test_ops[0].kind == TEST_OP_SEND_CHAR);
+    CHECK(test_ops[0].value == 'A');
+    CHECK(test_ops[1].kind == TEST_OP_REGISTER);
+    CHECK(test_ops[1].value == TEST_SEND_STRING_U8(X_LEFT_CTRL));
+    CHECK(test_ops[2].kind == TEST_OP_TAP);
+    CHECK(test_ops[2].value == TEST_SEND_STRING_U8(X_C));
+    CHECK(test_ops[3].kind == TEST_OP_UNREGISTER);
+    CHECK(test_ops[3].value == TEST_SEND_STRING_U8(X_LEFT_CTRL));
+    CHECK(test_ops[4].kind == TEST_OP_WAIT);
+    CHECK(test_ops[4].value == TAP_CODE_DELAY);
+    CHECK(test_ops[5].kind == TEST_OP_WAIT);
+    CHECK(test_ops[5].value == 25);
+    CHECK(test_ops[6].kind == TEST_OP_WAIT);
+    CHECK(test_ops[6].value == TAP_CODE_DELAY);
+    CHECK(test_ops[7].kind == TEST_OP_REGISTER);
+    CHECK(test_ops[7].value == TEST_SEND_STRING_U8(X_LEFT_SHIFT));
+    CHECK(test_ops[8].kind == TEST_OP_WAIT);
+    CHECK(test_ops[8].value == TAP_CODE_DELAY);
+    CHECK(test_ops[9].kind == TEST_OP_UNREGISTER);
+    CHECK(test_ops[9].value == TEST_SEND_STRING_U8(X_LEFT_SHIFT));
+    CHECK(test_ops[10].kind == TEST_OP_WAIT);
+    CHECK(test_ops[10].value == TAP_CODE_DELAY);
+    CHECK(test_ops[11].kind == TEST_OP_SEND_CHAR);
+    CHECK(test_ops[11].value == 'Z');
+}
+
+static void test_compile_rejects_invalid_payloads(void) {
+    static const char non_ascii_payload[] = {'A', (char)0x80, '\0'};
+    macro_payload_ir_t ir                 = {0};
+
+    CHECK(!macro_payload_compile("{KC_A", &ir));
+    CHECK(ir.length == 0);
+    CHECK(!macro_payload_compile(non_ascii_payload, &ir));
+    CHECK(ir.length == 0);
+}
+
 static void test_encode_emits_expected_qmk_sequence(void) {
     uint8_t  buffer[32] = {0};
     uint16_t written    = 0;
@@ -148,6 +195,8 @@ int main(void) {
     test_validate_accepts_mixed_payload();
     test_validate_rejects_invalid_payloads();
     test_play_runs_text_chords_and_delays_in_order();
+    test_compile_and_play_ir_runs_without_reparsing_source();
+    test_compile_rejects_invalid_payloads();
     test_encode_emits_expected_qmk_sequence();
     test_encode_fails_when_buffer_is_too_small();
 
