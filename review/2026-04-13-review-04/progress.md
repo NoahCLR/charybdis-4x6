@@ -559,3 +559,53 @@ Next steps:
   hotspot into small typed helpers
 - after that, move to the next architecture review target: splitting the
   remaining compatibility seams by owning subsystem
+
+### Implementation pass: derived pd-mode compatibility flags only
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Removed the stored pd-mode compatibility mirrors from
+  `users/noah/lib/state/runtime/runtime_shared_state.h` so shared runtime
+  state now stores only explicit selected local/display mode identity.
+- Simplified `users/noah/lib/pointing/runtime/pd_mode_state.c` so local
+  split-sync snapshots derive directly from selected mode identity instead of
+  synchronizing stored `*_flags` mirrors alongside the primary state.
+- Updated `tests/host/runtime_debug_test.c` so the runtime-debug surface now
+  treats explicit pd-mode selection state as the authoritative shared-state
+  contract.
+- Updated maintainer and review docs so the written architecture now describes
+  `active_flags` / `locked_flags` as derived snapshot/transport output instead
+  of stored runtime control state.
+
+Contracts touched in this pass:
+
+- `pd_mode_runtime_shared_state_t`
+- `pd_mode_local_active_snapshot(...)`
+- `pd_mode_local_locked_snapshot(...)`
+- `noah_runtime_debug_snapshot_t.core.pd`
+
+Verification run in this pass:
+
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- return to Finding 2 and split more of the remaining key-runtime release
+  hotspot into small typed helpers
+- after that, decide whether the remaining flag-shaped pd-mode snapshot view
+  should stay as the long-term split/debug contract or be narrowed further

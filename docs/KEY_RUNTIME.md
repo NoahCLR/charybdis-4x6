@@ -40,7 +40,7 @@ These files are the core map of the runtime:
 | File | Responsibility |
 | --- | --- |
 | [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h) and [`handled_key.c`](../users/noah/lib/key/interaction/handled_key.c) | Resolve a keycode into an authored `handled_key_resolution_t` branch record: keycode, selected tap-count step, timing, layer/pd metadata, and structural flags |
-| [`runtime_shared_state.h`](../users/noah/lib/state/runtime/runtime_shared_state.h) | Own the central slot storage and pd-mode runtime flags |
+| [`runtime_shared_state.h`](../users/noah/lib/state/runtime/runtime_shared_state.h) | Own the central slot storage and explicit pd-mode runtime selection state |
 | [`key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c) | `process_record_user` entry flow and top-level branching |
 | [`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c) | Physical-event preflight, modifier suppression, active-slot interrupts, and pending-multi-tap flushing |
 | [`key_runtime_press.c`](../users/noah/lib/key/runtime/key_runtime_press.c), [`key_runtime_release.c`](../users/noah/lib/key/runtime/key_runtime_release.c), and [`key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c) | Outer orchestration for press, release, and scan passes |

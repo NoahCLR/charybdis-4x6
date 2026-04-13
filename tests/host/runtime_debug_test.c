@@ -211,8 +211,8 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_reset_for_test();
 
     noah_runtime_shared_state.key.feedback.active                    = true;
-    noah_runtime_shared_state.pd.local_active_flags                  = PD_MODE_VOLUME;
-    noah_runtime_shared_state.pd.remote_display_active_flags         = PD_MODE_ARROW;
+    noah_runtime_shared_state.pd.local_active_mode                   = PD_MODE_VOLUME;
+    noah_runtime_shared_state.pd.remote_display_active_mode          = PD_MODE_ARROW;
     noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_C;
     noah_runtime_shared_state.key.slots_by_position[0].interaction.valid = true;
     noah_runtime_shared_state.key.slots_by_position[0].interaction.view = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
@@ -246,8 +246,8 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_debug_snapshot(&snapshot);
 
     CHECK(snapshot.core.key.feedback.active);
-    CHECK(snapshot.core.pd.local_active_flags == PD_MODE_VOLUME);
-    CHECK(snapshot.core.pd.remote_display_active_flags == PD_MODE_ARROW);
+    CHECK(snapshot.core.pd.local_active_mode == PD_MODE_VOLUME);
+    CHECK(snapshot.core.pd.remote_display_active_mode == PD_MODE_ARROW);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_C);
     CHECK(snapshot.core.key.slots_by_position[0].interaction.valid);
     CHECK(snapshot.core.key.slots_by_position[0].interaction.view.binding.tap_action == KC_C);
@@ -294,8 +294,8 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     noah_runtime_reset_for_test();
 
     noah_runtime_shared_state.key.feedback.active                    = true;
-    noah_runtime_shared_state.pd.local_locked_flags                  = PD_MODE_ARROW;
-    noah_runtime_shared_state.pd.remote_display_locked_flags         = PD_MODE_VOLUME;
+    noah_runtime_shared_state.pd.local_locked_mode                   = PD_MODE_ARROW;
+    noah_runtime_shared_state.pd.remote_display_locked_mode          = PD_MODE_VOLUME;
     noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_V;
 
     layer_ownership_set_lock_state(1, true);
@@ -309,10 +309,10 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     noah_runtime_debug_snapshot(&snapshot);
 
     CHECK(!snapshot.core.key.feedback.active);
-    CHECK(snapshot.core.pd.local_active_flags == 0);
-    CHECK(snapshot.core.pd.local_locked_flags == 0);
-    CHECK(snapshot.core.pd.remote_display_active_flags == 0);
-    CHECK(snapshot.core.pd.remote_display_locked_flags == 0);
+    CHECK(snapshot.core.pd.local_active_mode == 0);
+    CHECK(snapshot.core.pd.local_locked_mode == 0);
+    CHECK(snapshot.core.pd.remote_display_active_mode == 0);
+    CHECK(snapshot.core.pd.remote_display_locked_mode == 0);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_NO);
     CHECK(!snapshot.core.key.slots_by_position[0].interaction.valid);
 

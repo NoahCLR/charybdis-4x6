@@ -25,8 +25,9 @@ consumers no longer treat cached slot interaction as a stored authored
 resolution object.
 Later the same day, the pd-mode exclusivity follow-up also landed: runtime
 storage and snapshots now expose explicit selected active/locked mode identity
-for local and display state, while the older bitmask fields remain as
-compatibility mirrors of those selected modes. Pointer handling, DPI
+for local and display state. Compatibility bitmasks now survive only as
+derived snapshot and split-sync transport fields instead of shared control
+state. Pointer handling, DPI
 selection, RGB pd-mode rendering, and pointer-layer policy now read explicit
 active mode identity instead of routing through `first_active_*` readers.
 
@@ -69,8 +70,8 @@ The next scaling risks are no longer "everything is tangled together". They are
   resolution accessor surface used by tests/debug helpers
 - release behavior is more structured now, but one reducer is still the main
   hotspot for cross-feature release choreography
-- pd modes are represented as composable bitmasks even though the runtime
-  enforces one effective active mode and one effective lock
+- pd modes now store explicit selection state, but their public
+  snapshot/transport surface is still flag-shaped in a few places
 - compatibility boundaries still mix unrelated fork assumptions
 - macro semantics still cross two partially separate execution models
 - the test suite is excellent, but too much higher-level coverage still treats
@@ -323,8 +324,7 @@ Implementation update:
 
 - runtime shared state now carries explicit selected mode identity for
   `local_active_mode`, `local_locked_mode`, `remote_display_active_mode`, and
-  `remote_display_locked_mode`, with the older `*_flags` fields kept as
-  compatibility mirrors
+  `remote_display_locked_mode`
 - `pd_mode_snapshot_view_t` now exposes `active_mode`, `locked_mode`,
   `active_index`, and `locked_index` instead of `first_active_*`
 - `pd_mode_state.c` now orchestrates exclusivity around one selected active
@@ -335,6 +335,8 @@ Implementation update:
 - split sync still sends compatibility flags, but the remote apply path now
   collapses them immediately into one selected display mode and one selected
   display lock
+- local split-sync snapshot helpers now derive compatibility flags from the
+  selected local mode identity instead of reading stored mirror fields
 
 The current design now matches the simpler state shape this review called for:
 
@@ -351,9 +353,9 @@ typedef struct {
 ```
 
 Derived traits now come from the selected active mode definition row. The
-remaining cleanup here is mostly compatibility debt: the bitmask mirror fields
-still exist because split sync and some debug/test surfaces have not been
-narrowed further yet.
+remaining cleanup here is mostly transport/debug debt: the flag-shaped view is
+still useful for split-sync packets and snapshot consumers, but it no longer
+pretends to be primary runtime storage.
 
 ### 4. `compat/` is valuable, but its boundaries are still too broad
 
