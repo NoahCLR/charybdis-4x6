@@ -13,6 +13,7 @@
 
 typedef struct {
     uint16_t                         tap_action;
+    uint8_t                          tap_repeat_count;
     hold_behavior_t                  hold;
     hold_behavior_t                  long_hold;
     key_runtime_slot_hold_strategy_t hold_strategy;
@@ -21,6 +22,9 @@ typedef struct {
     uint16_t                         multi_tap_term;
     uint8_t                          layer;
     pd_mode_mask_t                   pd_mode;
+    bool                             step_present;
+    bool                             has_more_taps;
+    bool                             tap_resolves_on_press;
     uint16_t                         flags;
 } handled_key_view_t;
 
@@ -34,6 +38,7 @@ typedef enum {
 } handled_key_flag_t;
 
 handled_key_view_t               handled_key_lookup(uint16_t keycode);
+handled_key_view_t               handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count);
 bool                             handled_key_is_handled(handled_key_view_t key);
 bool                             handled_key_uses_implicit_hold(handled_key_view_t key);
 bool                             handled_key_uses_fallback_hold(handled_key_view_t key);
@@ -44,6 +49,7 @@ hold_behavior_t                  handled_key_single_hold(handled_key_view_t key)
 hold_behavior_t                  handled_key_long_hold(handled_key_view_t key);
 key_runtime_slot_hold_strategy_t handled_key_hold_strategy(handled_key_view_t key);
 uint16_t                         handled_key_tap_action(handled_key_view_t key);
+uint8_t                          handled_key_tap_repeat_count(handled_key_view_t key);
 uint16_t                         handled_key_tap_hold_term(handled_key_view_t key);
 uint16_t                         handled_key_longer_hold_term(handled_key_view_t key);
 uint16_t                         handled_key_multi_tap_term(handled_key_view_t key);

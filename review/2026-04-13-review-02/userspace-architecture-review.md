@@ -580,7 +580,7 @@ What would improve it further:
 
 ### Recommendation 1: centralize interaction resolution
 
-Do next.
+Started on 2026-04-13.
 
 Goal:
 
@@ -592,6 +592,15 @@ Expected payoff:
 - easier new behavior families
 - less multi-tap special-case code
 - cleaner feedback/runtime contract
+
+Current status:
+
+- landed a tap-count-aware handled-key resolver
+- cached resolved later-tap semantics in `multi_tap_t`
+- removed pending multi-tap release/scan dependence on direct
+  `key_behavior_step_lookup()` re-resolution
+- still mixing first-tap active-slot binding data with the newer interaction
+  contract, so the centralization is only partial
 
 ### Recommendation 2: introduce typed action descriptors
 

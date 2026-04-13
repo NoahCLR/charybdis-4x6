@@ -221,7 +221,8 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_stat
     switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP:
             if (handled_key_has_multi_tap(key)) {
-                key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.owner.key_pos, released_key.binding.tap_action, released_key.timing.tap_hold_term, released_key.timing.multi_tap_term);
+                uint8_t first_tap_repeat_count = released_key.binding.tap_action == KC_NO ? 0 : 1;
+                key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.owner.key_pos, released_key.binding.tap_action, first_tap_repeat_count, released_key.timing.tap_hold_term, released_key.timing.multi_tap_term, key.has_more_taps);
             } else if (released_key.binding.tap_action != KC_NO) {
                 key_runtime_slot_result_push_dispatch_action(&result, released_key.owner.key_pos, released_key.binding.tap_action);
             }

@@ -13,7 +13,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_sta
 
     if (slot) {
         uint16_t elapsed = timer_elapsed(slot->timer);
-        result           = key_runtime_slot_pending_multi_tap_handle_release(slot, keycode, key, elapsed);
+        result           = key_runtime_slot_pending_multi_tap_handle_release(slot, keycode, elapsed);
         if (result.handled) {
             return result;
         }

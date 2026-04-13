@@ -51,9 +51,9 @@ active_key_state_t                        *key_runtime_slot_for_multi_tap(const 
 bool                                       key_runtime_multi_tap_slot_active(const multi_tap_t *mt);
 multi_tap_t                               *key_runtime_first_active_multi_tap(void);
 multi_tap_t                               *key_runtime_find_multi_tap_by_position(keypos_t key_pos);
-void                                       key_runtime_slot_begin_pending_multi_tap(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term);
+void                                       key_runtime_slot_begin_pending_multi_tap(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, uint16_t tap_hold_term, uint16_t multi_tap_term, bool has_more_taps);
 uint16_t                                   key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, uint16_t keycode);
-uint16_t                                   key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slot, uint16_t keycode, uint8_t *repeat_count);
+uint16_t                                   key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slot, uint8_t *repeat_count);
 key_runtime_slot_pending_multi_tap_flush_t key_runtime_slot_take_pending_multi_tap_flush(active_key_state_t *slot);
 void                                       key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot);
 bool                                       key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot);

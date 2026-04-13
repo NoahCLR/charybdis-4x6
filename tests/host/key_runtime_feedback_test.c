@@ -116,6 +116,7 @@ uint8_t behavior_get_layer(uint16_t keycode) {
 static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior) {
     return (handled_key_view_t){
         .tap_action       = behavior.single.tap.action,
+        .tap_repeat_count = behavior.single.tap.action == KC_NO ? 0 : 1,
         .hold             = behavior.single.hold,
         .long_hold        = behavior.single.long_hold,
         .hold_strategy    = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
@@ -124,8 +125,21 @@ static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior)
         .multi_tap_term   = behavior.multi_tap_term,
         .layer            = behavior.is_momentary_layer ? behavior_get_layer(behavior.keycode) : UINT8_MAX,
         .pd_mode          = 0,
+        .step_present     = behavior.single.tap.present || behavior.single.hold.present || behavior.single.long_hold.present,
+        .has_more_taps    = behavior.has_multi_tap,
+        .tap_resolves_on_press = false,
         .flags            = (behavior.has_multi_tap ? HANDLED_KEY_FLAG_MULTI_TAP : 0) | (behavior.is_momentary_layer ? HANDLED_KEY_FLAG_MOMENTARY_LAYER : 0) | (behavior.is_layer_tap ? HANDLED_KEY_FLAG_LAYER_TAP : 0),
     };
+}
+
+handled_key_view_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
+    (void)tap_count;
+    key_behavior_view_t behavior = (key_behavior_view_t){
+        .keycode       = keycode,
+        .has_multi_tap = keycode == TEST_MULTI_TAP_KEY,
+    };
+
+    return test_resolve_handled_key(behavior);
 }
 
 hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
@@ -336,13 +350,15 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
         .timing.longer_hold_term = 240,
         .pending_multi_tap =
             {
-                .keycode       = TEST_MULTI_TAP_KEY,
-                .key_pos       = pos,
-                .timer         = (uint16_t)(fake_time - 50),
-                .count         = 2,
-                .pending_hold  = true,
-                .tap_action    = TEST_PENDING_TAP_ACTION,
-                .tap_hold_term = 120,
+                .keycode          = TEST_MULTI_TAP_KEY,
+                .key_pos          = pos,
+                .timer            = (uint16_t)(fake_time - 50),
+                .count            = 2,
+                .pending_hold     = true,
+                .tap_action       = TEST_PENDING_TAP_ACTION,
+                .tap_repeat_count = 1,
+                .has_more_taps    = true,
+                .tap_hold_term    = 120,
             },
     };
 

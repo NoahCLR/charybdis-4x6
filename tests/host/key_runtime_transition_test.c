@@ -449,9 +449,11 @@ static void test_flush_multi_tap_prefers_exact_step_tap(void) {
                            });
 
     multi_tap = (multi_tap_t){
-        .keycode       = TEST_MULTI_TAP_KEY,
-        .count         = 2,
-        .single_action = TEST_FALLBACK_TAP_ACTION,
+        .keycode          = TEST_MULTI_TAP_KEY,
+        .count            = 2,
+        .single_action    = TEST_FALLBACK_TAP_ACTION,
+        .tap_action       = TEST_MULTI_STEP_ACTION,
+        .tap_repeat_count = 1,
     };
 
     key_runtime_transition_plan_init(&plan);
@@ -1120,6 +1122,7 @@ static void test_release_pending_multi_tap_hold_registers_then_unregisters_held_
         .owner.key_pos           = record.event.key,
         .timing.tap_hold_term    = 120,
         .timing.longer_hold_term = 240,
+        .binding.hold            = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD),
     };
 
     multi_tap = (multi_tap_t){
@@ -1186,19 +1189,27 @@ static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_laye
         .owner.key_pos           = record.event.key,
         .timing.tap_hold_term    = 120,
         .timing.longer_hold_term = 240,
+        .binding.long_hold       = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
+        .semantic.valid          = true,
+        .semantic.has_multi_tap  = true,
+        .semantic.is_momentary_layer = true,
+        .semantic.layer          = 2,
+        .semantic.preview_layer  = 2,
     };
 
     multi_tap = (multi_tap_t){
-        .keycode        = MO(2),
-        .key_pos        = record.event.key,
-        .timer          = (uint16_t)(fake_time - 50),
-        .count          = 2,
-        .pending_hold   = true,
-        .tap_action     = TEST_MULTI_STEP_ACTION,
-        .single_action  = TEST_FALLBACK_TAP_ACTION,
-        .tap_hold_term  = 120,
-        .multi_tap_term = 150,
-        .long_hold      = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
+        .keycode          = MO(2),
+        .key_pos          = record.event.key,
+        .timer            = (uint16_t)(fake_time - 50),
+        .count            = 2,
+        .pending_hold     = true,
+        .tap_action       = TEST_MULTI_STEP_ACTION,
+        .tap_repeat_count = 1,
+        .single_action    = TEST_FALLBACK_TAP_ACTION,
+        .has_more_taps    = true,
+        .tap_hold_term    = 120,
+        .multi_tap_term   = 150,
+        .long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
     };
 
     key_runtime_transition_plan_init(&release_plan);
@@ -1233,6 +1244,7 @@ static void test_scan_promotes_pending_multi_tap_hold(void) {
         .owner.key_pos           = test_keypos(6, 2),
         .timing.tap_hold_term    = 120,
         .timing.longer_hold_term = 240,
+        .binding.hold            = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD),
     };
 
     multi_tap = (multi_tap_t){
@@ -1471,6 +1483,7 @@ static void test_scan_pending_multi_tap_long_hold_releases_layer_before_lock(voi
         .owner.key_pos           = test_keypos(6, 5),
         .timing.tap_hold_term    = 120,
         .timing.longer_hold_term = 240,
+        .binding.long_hold       = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
     };
 
     multi_tap = (multi_tap_t){

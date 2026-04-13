@@ -51,9 +51,11 @@ typedef struct {
     keypos_t        key_pos;        // physical key that owns the current tap sequence
     uint16_t        timer;          // when the current pending window started
     uint8_t         count;          // taps counted so far (0 = idle)
-    uint16_t        single_action;  // what to send if count stays at 1
+    uint16_t        single_action;  // resolved tap action for the first tap count
     bool            pending_hold;   // true = waiting to see if final tap is held
-    uint16_t        tap_action;     // action to fire on quick release during pending_hold
+    uint16_t        tap_action;     // resolved tap action for the current tap count
+    uint8_t         tap_repeat_count;
+    bool            has_more_taps;
     uint16_t        tap_hold_term;  // resolved tap-vs-hold threshold for this key
     uint16_t        multi_tap_term; // max gap between consecutive taps
     hold_behavior_t hold;           // hold tier for the current tap count
@@ -71,7 +73,7 @@ bool multi_tap_expired(const multi_tap_t *mt);
 bool multi_tap_hold_elapsed(const multi_tap_t *mt);
 bool multi_tap_matches(const multi_tap_t *mt, uint16_t keycode, keypos_t key_pos);
 
-void     multi_tap_begin(multi_tap_t *mt, uint16_t keycode, keypos_t key_pos, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term);
-void     multi_tap_flush(multi_tap_t *mt, key_behavior_step_t (*lookup)(uint16_t, uint8_t), void (*dispatch)(uint16_t, const multi_tap_t *));
-uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t keycode, key_behavior_step_t (*lookup)(uint16_t, uint8_t), bool (*has_more)(uint16_t, uint8_t));
-uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint16_t keycode, bool (*has_more)(uint16_t, uint8_t), uint8_t *repeat_count);
+void     multi_tap_begin(multi_tap_t *mt, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, uint16_t tap_hold_term, uint16_t multi_tap_term, bool has_more_taps);
+void     multi_tap_flush(multi_tap_t *mt, void (*dispatch)(uint16_t, const multi_tap_t *));
+uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t tap_action, uint8_t tap_repeat_count, bool has_more_taps, bool tap_resolves_on_press, hold_behavior_t hold, hold_behavior_t long_hold);
+uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint8_t *repeat_count);

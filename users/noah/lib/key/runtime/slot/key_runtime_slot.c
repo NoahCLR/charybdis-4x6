@@ -189,12 +189,12 @@ multi_tap_t *key_runtime_find_multi_tap_by_position(keypos_t key_pos) {
     return NULL;
 }
 
-void key_runtime_slot_begin_pending_multi_tap(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t single_action, uint16_t tap_hold_term, uint16_t multi_tap_term) {
+void key_runtime_slot_begin_pending_multi_tap(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, uint16_t tap_hold_term, uint16_t multi_tap_term, bool has_more_taps) {
     if (!slot) {
         return;
     }
 
-    multi_tap_begin(&slot->pending_multi_tap, keycode, key_pos, single_action, tap_hold_term, multi_tap_term);
+    multi_tap_begin(&slot->pending_multi_tap, keycode, key_pos, tap_action, tap_repeat_count, tap_hold_term, multi_tap_term, has_more_taps);
 }
 
 uint16_t key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, uint16_t keycode) {
@@ -202,10 +202,12 @@ uint16_t key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, ui
         return KC_NO;
     }
 
-    return multi_tap_advance(&slot->pending_multi_tap, keycode, key_behavior_step_lookup, key_behavior_has_more_taps);
+    handled_key_view_t key = handled_key_lookup_tap_count(keycode, (uint8_t)(slot->pending_multi_tap.count + 1u));
+
+    return multi_tap_advance(&slot->pending_multi_tap, key.tap_action, key.tap_repeat_count, key.has_more_taps, key.tap_resolves_on_press, key.hold, key.long_hold);
 }
 
-uint16_t key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slot, uint16_t keycode, uint8_t *repeat_count) {
+uint16_t key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slot, uint8_t *repeat_count) {
     if (!slot) {
         if (repeat_count) {
             *repeat_count = 0;
@@ -213,7 +215,7 @@ uint16_t key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slo
         return KC_NO;
     }
 
-    return multi_tap_resolve_hold(&slot->pending_multi_tap, keycode, key_behavior_has_more_taps, repeat_count);
+    return multi_tap_resolve_hold(&slot->pending_multi_tap, repeat_count);
 }
 
 key_runtime_slot_pending_multi_tap_flush_t key_runtime_slot_take_pending_multi_tap_flush(active_key_state_t *slot) {
@@ -227,30 +229,8 @@ key_runtime_slot_pending_multi_tap_flush_t key_runtime_slot_take_pending_multi_t
     flush.handled = true;
     flush.mods    = delayed_action_mods_from_multi_tap(mt);
 
-    if (mt->pending_hold) {
-        if (mt->tap_action != KC_NO) {
-            flush.action       = mt->tap_action;
-            flush.repeat_count = 1;
-        } else {
-            flush.action       = mt->single_action;
-            flush.repeat_count = mt->count;
-        }
-        key_runtime_slot_reset_pending_multi_tap(slot);
-        return flush;
-    }
-
-    if (mt->count >= 2) {
-        key_behavior_step_t step = key_behavior_step_lookup(mt->keycode, mt->count);
-        if (step.tap.present && step.tap.action != KC_NO) {
-            flush.action       = step.tap.action;
-            flush.repeat_count = 1;
-            key_runtime_slot_reset_pending_multi_tap(slot);
-            return flush;
-        }
-    }
-
-    flush.action       = mt->single_action;
-    flush.repeat_count = mt->count;
+    flush.action       = mt->tap_repeat_count > 0 ? mt->tap_action : mt->single_action;
+    flush.repeat_count = mt->tap_repeat_count > 0 ? mt->tap_repeat_count : mt->count;
     key_runtime_slot_reset_pending_multi_tap(slot);
     return flush;
 }

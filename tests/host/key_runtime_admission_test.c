@@ -75,6 +75,12 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return false;
 }
 
+handled_key_view_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
+    (void)keycode;
+    (void)tap_count;
+    return (handled_key_view_t){0};
+}
+
 bool handled_key_has_multi_tap(handled_key_view_t key) {
     (void)key;
     return false;

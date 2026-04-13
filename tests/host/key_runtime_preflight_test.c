@@ -226,6 +226,11 @@ handled_key_view_t handled_key_lookup(uint16_t keycode) {
     };
 }
 
+handled_key_view_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
+    (void)tap_count;
+    return handled_key_lookup(keycode);
+}
+
 bool handled_key_is_handled(handled_key_view_t key) {
     return (key.flags & HANDLED_KEY_FLAG_HANDLED) != 0;
 }
