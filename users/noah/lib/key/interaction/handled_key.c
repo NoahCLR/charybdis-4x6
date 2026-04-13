@@ -184,14 +184,14 @@ static bool handled_key_tap_resolves_on_press(key_behavior_step_t step, uint8_t 
     return tap_count > 1 && key_behavior_step_present(step) && !step.hold.present && !step.long_hold.present && !has_more_taps;
 }
 
-handled_key_view_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
+handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
     key_behavior_view_t behavior = key_behavior_lookup(keycode);
     key_behavior_step_t step     = tap_count <= 1 ? behavior.single : key_behavior_step_lookup(keycode, tap_count);
     uint16_t            tap      = handled_key_tap_action_behavior(behavior, step, tap_count);
     bool                more     = key_behavior_has_more_taps(keycode, tap_count);
     bool                present  = key_behavior_step_present(step);
 
-    return (handled_key_view_t){
+    return (handled_key_resolution_t){
         .tap_action       = tap,
         .tap_repeat_count = handled_key_tap_repeat_count_behavior(behavior, step, tap_count, tap),
         .hold             = handled_key_hold_behavior(behavior, step, tap_count),
@@ -209,7 +209,7 @@ handled_key_view_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_co
     };
 }
 
-handled_key_view_t handled_key_lookup(uint16_t keycode) {
+handled_key_resolution_t handled_key_lookup(uint16_t keycode) {
     return handled_key_lookup_tap_count(keycode, 1);
 }
 

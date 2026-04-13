@@ -52,9 +52,9 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
         return false;
     }
 
-    handled_key_view_t key = handled_key_lookup(runtime_keycode);
-    if (handled_key_is_handled(key)) {
-        bool handled = record->event.pressed ? key_runtime_process_handled_key_press(runtime_keycode, record, key) : key_runtime_process_handled_key_release(runtime_keycode, record, key);
+    handled_key_resolution_t resolution = handled_key_lookup(runtime_keycode);
+    if (handled_key_is_handled(resolution)) {
+        bool handled = record->event.pressed ? key_runtime_process_handled_key_press(runtime_keycode, record, resolution) : key_runtime_process_handled_key_release(runtime_keycode, record, resolution);
         key_runtime_trace_bool_result("process:handled_key", runtime_keycode, record, handled);
         if (handled) {
             return false;

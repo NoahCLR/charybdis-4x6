@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Handled Key View
+// Handled Key Resolution
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Runtime helpers that adapt authored key_behavior rows into a fully resolved
@@ -27,7 +27,9 @@ typedef struct {
     bool                             has_more_taps;
     bool                             tap_resolves_on_press;
     uint16_t                         flags;
-} handled_key_view_t;
+} handled_key_resolution_t;
+
+typedef handled_key_resolution_t handled_key_view_t;
 
 typedef enum {
     HANDLED_KEY_FLAG_HANDLED         = (1u << 0),
@@ -76,8 +78,8 @@ static inline bool handled_key_hold_action_keeps_registered_feedback(noah_action
     return !(noah_action_desc_is_layer_action(desc) || noah_action_desc_is_pd_mode_action(desc));
 }
 
-static inline uint8_t handled_key_hold_preview_layer(handled_key_view_t key, hold_behavior_t hold, noah_action_desc_t desc) {
-    if (key.hold_strategy != KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT) {
+static inline uint8_t handled_key_hold_preview_layer(handled_key_resolution_t resolution, hold_behavior_t hold, noah_action_desc_t desc) {
+    if (resolution.hold_strategy != KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT) {
         return UINT8_MAX;
     }
 
@@ -88,7 +90,7 @@ static inline uint8_t handled_key_hold_preview_layer(handled_key_view_t key, hol
     return desc.layer;
 }
 
-static inline handled_key_hold_contract_t handled_key_hold_contract_for_behavior(handled_key_view_t key, hold_behavior_t hold) {
+static inline handled_key_hold_contract_t handled_key_hold_contract_for_behavior(handled_key_resolution_t resolution, hold_behavior_t hold) {
     handled_key_hold_contract_t contract = {
         .preview_layer = UINT8_MAX,
     };
@@ -99,8 +101,8 @@ static inline handled_key_hold_contract_t handled_key_hold_contract_for_behavior
 
     noah_action_desc_t desc = noah_action_describe(hold.action);
 
-    contract.release_layer_before_action = (key.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0 && noah_action_desc_is_layer_lock(desc);
-    contract.preview_layer               = handled_key_hold_preview_layer(key, hold, desc);
+    contract.release_layer_before_action = (resolution.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0 && noah_action_desc_is_layer_lock(desc);
+    contract.preview_layer               = handled_key_hold_preview_layer(resolution, hold, desc);
 
     switch (hold.mode) {
         case HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE:
@@ -128,15 +130,15 @@ static inline handled_key_hold_contract_t handled_key_hold_contract_for_behavior
     }
 }
 
-static inline handled_key_interaction_policy_t handled_key_resolve_policy(handled_key_view_t key) {
+static inline handled_key_interaction_policy_t handled_key_resolve_policy(handled_key_resolution_t resolution) {
     return (handled_key_interaction_policy_t){
-        .hold      = handled_key_hold_contract_for_behavior(key, key.hold),
-        .long_hold = handled_key_hold_contract_for_behavior(key, key.long_hold),
+        .hold      = handled_key_hold_contract_for_behavior(resolution, resolution.hold),
+        .long_hold = handled_key_hold_contract_for_behavior(resolution, resolution.long_hold),
     };
 }
 
-handled_key_view_t               handled_key_lookup(uint16_t keycode);
-handled_key_view_t               handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count);
+handled_key_resolution_t         handled_key_lookup(uint16_t keycode);
+handled_key_resolution_t         handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count);
 bool                             handled_key_is_handled(handled_key_view_t key);
 bool                             handled_key_uses_implicit_hold(handled_key_view_t key);
 bool                             handled_key_uses_fallback_hold(handled_key_view_t key);

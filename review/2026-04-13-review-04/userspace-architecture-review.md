@@ -11,10 +11,11 @@ architecture, structure, and long-term extensibility.
 Implementation update later the same day: the first slice of Finding 1 and the
 first slice of Finding 2 have landed. Active slot storage now uses
 `key_runtime_slot_interaction_t` as the slot-owned cached interaction contract,
-with a compatibility wrapper still exposing `handled_key_view_t` where older
-call sites need it. The active-release reducer now also executes a typed
-release contract derived from that interaction instead of reconstructing all
-release semantics directly from raw hold flags.
+and authored lookup now has an explicit `handled_key_resolution_t` name with
+`handled_key_view_t` kept only as a compatibility typedef while older call
+sites migrate. The active-release reducer now also executes a typed release
+contract derived from that interaction instead of reconstructing all release
+semantics directly from raw hold flags.
 
 This review is intentionally not a repeat of the earlier action-family,
 pd-mode write-controller, macro IR, and test-harness recommendations. Those
@@ -150,11 +151,16 @@ Implementation update:
 - the first slice of this recommendation is now in place:
   `active_key_state_t` stores `key_runtime_slot_interaction_t`, and reducers
   read it through `key_runtime_slot_cached_interaction(...)`
+- authored handled-key lookup is now explicitly named
+  `handled_key_resolution_t`
 - cached hold policy now lives with the slot interaction contract instead of
   being recomputed at every feedback/scan consumer
-- the remaining gap is that `key_runtime_slot_interaction_t` still mirrors too
-  much of `handled_key_view_t`; authored resolution is not yet a separate,
-  explicit object
+- `key_runtime_slot_interaction_t` now carries an explicit `.resolution`
+  object, but the compatibility typedef and direct-field compatibility are
+  still present while callers migrate
+- the remaining gap is that authored/runtime boundaries still expose
+  `handled_key_view_t` in several runtime and test surfaces, so the authored
+  lookup type is not yet the only obvious API
 
 Example shape:
 

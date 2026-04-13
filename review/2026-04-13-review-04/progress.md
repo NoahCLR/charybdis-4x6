@@ -157,10 +157,57 @@ Workspace scope:
 - no sibling workspace folders were edited
 - all changes are confined to `charybdis-4x6/`
 
+### Implementation pass: explicit handled-key resolution type
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Renamed the authored handled-key lookup struct in
+  `users/noah/lib/key/interaction/handled_key.h`
+  to `handled_key_resolution_t` and kept `handled_key_view_t` as a
+  compatibility typedef while call sites migrate.
+- Updated handled-key lookup and policy helpers to use the explicit resolution
+  type as the authored lookup surface.
+- Reshaped
+  `users/noah/lib/key/runtime/key_runtime_interaction.h`
+  so `key_runtime_slot_interaction_t` carries an explicit
+  `.resolution` object plus cached policy, rather than only mirroring the
+  authored fields as unnamed runtime-owned state.
+- Moved process-record wiring in
+  `users/noah/lib/key/runtime/key_runtime_process.c`
+  to name the authored lookup result as `handled_key_resolution_t`.
+
+Contracts touched in this pass:
+
+- `handled_key_resolution_t`
+- `handled_key_lookup(...)`
+- `handled_key_lookup_tap_count(...)`
+- `key_runtime_slot_interaction_t.resolution`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
 Next steps:
 
-- continue finding 1 by splitting authored handled-key resolution from the
-  remaining fields still mirrored into `key_runtime_slot_interaction_t`
+- continue finding 1 by migrating runtime/process/host surfaces off the
+  `handled_key_view_t` compatibility typedef and onto
+  `handled_key_resolution_t`
 - if release-contract work continues, move contract construction earlier so the
   slot interaction can cache release semantics at press/tap-branch resolution
 - after that, make pd-mode exclusivity explicit in the public state model and
