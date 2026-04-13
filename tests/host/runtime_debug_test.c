@@ -131,9 +131,34 @@ void send_keyboard_report(void) {
     send_keyboard_report_count++;
 }
 
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
+bool action_dispatch_is_layer_lock(uint16_t action) {
     (void)action;
-    return NOAH_ACTION_HOLD_KIND_SHARED;
+    return false;
+}
+
+bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+bool action_dispatch_is_macro(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+bool is_pd_mode_lock_action(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+    (void)keycode;
+    return 0;
 }
 
 void noah_action_press(keypos_t key_pos, uint16_t action) {

@@ -10,11 +10,12 @@
 #include "users/noah/lib/key/ownership/held_repeat.h"
 
 enum {
-    TEST_SHARED_ACTION     = SAFE_RANGE + 0x40,
-    TEST_SECOND_ACTION     = SAFE_RANGE + 0x41,
-    TEST_PER_KEY_ACTION    = SAFE_RANGE + 0x42,
-    TEST_PRESS_ONLY_ACTION = SAFE_RANGE + 0x43,
+    TEST_SHARED_ACTION = SAFE_RANGE + 0x40,
+    TEST_SECOND_ACTION = SAFE_RANGE + 0x41,
 };
+
+#define TEST_PER_KEY_ACTION MO(2)
+#define TEST_PRESS_ONLY_ACTION LOCK_LAYER(3)
 
 typedef struct {
     keypos_t key_pos;
@@ -73,15 +74,33 @@ static void test_reset_stubs(void) {
     fake_time                 = 1000;
 }
 
-noah_action_hold_kind_t noah_action_hold_kind(uint16_t action) {
-    switch (action) {
-        case TEST_PER_KEY_ACTION:
-            return NOAH_ACTION_HOLD_KIND_PER_KEY;
-        case TEST_PRESS_ONLY_ACTION:
-            return NOAH_ACTION_HOLD_KIND_PRESS_ONLY;
-        default:
-            return NOAH_ACTION_HOLD_KIND_SHARED;
-    }
+bool action_dispatch_is_layer_lock(uint16_t action) {
+    return action == TEST_PRESS_ONLY_ACTION;
+}
+
+bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+bool action_dispatch_is_macro(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+bool is_pd_mode_lock_action(uint16_t action) {
+    (void)action;
+    return false;
+}
+
+pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+    (void)keycode;
+    return 0;
 }
 
 void noah_action_press(keypos_t key_pos, uint16_t action) {

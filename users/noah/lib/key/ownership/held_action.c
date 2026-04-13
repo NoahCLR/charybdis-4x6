@@ -8,6 +8,7 @@
 #    include "print.h"
 #endif
 
+#include "../../action/action_dispatch.h"
 #include "../../action/action_lifecycle.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "held_action.h"
@@ -55,7 +56,7 @@ static bool held_action_is_pure_modifier(uint16_t action) {
 }
 
 static bool held_action_requires_per_key_dispatch(uint16_t action) {
-    return noah_action_hold_kind(action) != NOAH_ACTION_HOLD_KIND_SHARED;
+    return noah_action_desc_requires_owned_dispatch(noah_action_describe(action));
 }
 
 static void held_action_log_binding_overflow(const char *kind, keypos_t key_pos, uint16_t action) {

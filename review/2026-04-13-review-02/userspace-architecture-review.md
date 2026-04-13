@@ -633,6 +633,8 @@ Current status:
   descriptor instead of repeating raw-keycode classification at each branch
 - moved key-runtime slot policy, feedback, and pending multi-tap action-policy
   checks onto the descriptor surface too
+- moved held-action ownership dispatch decisions onto descriptor helpers too,
+  so ownership no longer needs to ask lifecycle for hold-kind classification
 - kept the older boolean helper predicates as compatibility wrappers so the
   rest of the repo can migrate incrementally
 - intentionally left qmk-behavior classification behind the existing helper
@@ -641,8 +643,9 @@ Current status:
   available through the existing helper seams because several lightweight host
   harnesses still stub those names directly
 - remaining migration work is now mostly about deciding which of those legacy
-  helper seams should stay public compatibility wrappers and which should be
-  folded completely into the descriptor internals later
+  helper seams plus `noah_action_hold_kind()` should stay public compatibility
+  wrappers and which should be folded completely into the descriptor internals
+  later
 
 ### Recommendation 3: move key-runtime storage types under key/runtime
 

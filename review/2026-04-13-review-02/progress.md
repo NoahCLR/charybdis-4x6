@@ -334,3 +334,45 @@ Next steps:
 - continue recommendation 2 by migrating any remaining runtime helper code that
   still consults `noah_action_hold_kind()` or direct action predicates where a
   descriptor is now the clearer contract
+
+## 2026-04-13: Recommendation 2 ownership follow-up
+
+Completed in this pass:
+
+- Added descriptor helpers for shared-vs-owned dispatch semantics so action
+  ownership code can ask the action descriptor directly whether a hold uses
+  shared dispatch.
+- Moved `held_action.c` off the lifecycle hold-kind query for ownership
+  refcount decisions. The ownership layer now depends on the action descriptor
+  instead of re-entering lifecycle to classify dispatch mode.
+- Reworked the held-action host test to model per-key and press-only behavior
+  with real action shapes (`MO(...)` and `LOCK_LAYER(...)`) instead of a fake
+  lifecycle-only hold-kind stub.
+- Filled in the remaining runtime-debug host harness classifier shims so the
+  full host suite can link `held_action.c` through the new descriptor path.
+
+Contracts touched:
+
+- `users/noah/lib/action/action_dispatch.h`
+- `users/noah/lib/key/ownership/held_action.c`
+- `tests/host/held_action_test.c`
+- `tests/host/runtime_debug_test.c`
+
+Verification run in this pass:
+
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- decide whether `noah_action_hold_kind()` should remain as a public lifecycle
+  compatibility wrapper or collapse into a thin helper around the descriptor
+  semantics everywhere
+- continue recommendation 2 by removing any remaining production callers that
+  still need lifecycle-owned action classification instead of descriptor-owned
+  action classification

@@ -82,6 +82,14 @@ static inline bool noah_action_desc_requires_per_key_hold(noah_action_desc_t des
     return desc.is_owned_momentary_layer;
 }
 
+static inline bool noah_action_desc_requires_owned_dispatch(noah_action_desc_t desc) {
+    return noah_action_desc_is_press_only(desc) || noah_action_desc_requires_per_key_hold(desc);
+}
+
+static inline bool noah_action_desc_uses_shared_hold(noah_action_desc_t desc) {
+    return !noah_action_desc_requires_owned_dispatch(desc);
+}
+
 static inline bool noah_action_desc_is_pd_mode_action(noah_action_desc_t desc) {
     return desc.pd_mode != 0;
 }
