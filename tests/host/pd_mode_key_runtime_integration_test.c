@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
@@ -10,7 +11,6 @@
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
-#include "users/noah/noah_runtime.h"
 
 const key_behavior_t key_behaviors[1]   = {0};
 const uint8_t        key_behavior_count = 0;
@@ -38,18 +38,6 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
         .row = row,
         .col = col,
     };
-}
-
-static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
-    keyrecord_t record = {
-        .event =
-            {
-                .key     = key_pos,
-                .pressed = pressed,
-            },
-    };
-
-    return record;
 }
 
 static void test_reset_state(void) {
@@ -335,10 +323,16 @@ void reset_zoom_mode(void) {}
 void reset_arrow_mode(void) {}
 
 static void test_plain_pd_mode_key_activates_and_deactivates_through_process_record(void) {
-    keypos_t            key_pos        = test_keypos(1, 2);
-    keyrecord_t         press_record   = test_record(key_pos, true);
-    keyrecord_t         release_record = test_record(key_pos, false);
-    active_key_state_t *slot           = key_runtime_slot_for_position(key_pos);
+    keypos_t                         key_pos       = test_keypos(1, 2);
+    noah_runtime_debug_snapshot_t    snapshot      = {0};
+    const active_key_state_t        *slot          = NULL;
+    const key_runtime_integration_step_t press_steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+    };
 
     test_reset_state();
 
@@ -346,7 +340,10 @@ static void test_plain_pd_mode_key_activates_and_deactivates_through_process_rec
     CHECK(pd_mode_for_keycode(VOLUME_MODE) == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active_snapshot() == 0);
 
-    CHECK(!noah_process_record_user(VOLUME_MODE, &press_record));
+    key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
+    key_runtime_integration_debug_snapshot(&snapshot);
+    slot = key_runtime_integration_snapshot_slot(&snapshot, key_pos);
+    CHECK(slot != NULL);
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);
@@ -354,9 +351,10 @@ static void test_plain_pd_mode_key_activates_and_deactivates_through_process_rec
     CHECK(slot->lifecycle.held_action_keycode == VOLUME_MODE);
     CHECK(split_sync_count >= 1);
 
-    fake_time += 10;
-
-    CHECK(!noah_process_record_user(VOLUME_MODE, &release_record));
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    key_runtime_integration_debug_snapshot(&snapshot);
+    slot = key_runtime_integration_snapshot_slot(&snapshot, key_pos);
+    CHECK(slot != NULL);
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(!pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);

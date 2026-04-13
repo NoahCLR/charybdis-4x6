@@ -19,6 +19,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/pd_mode_key_runtime_integration_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
@@ -42,6 +43,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/key/runtime/key_runtime_press.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_process.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_release.c" \
+    "$ROOT/users/noah/lib/key/runtime/key_runtime_scan.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_transition.c" \
     "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \

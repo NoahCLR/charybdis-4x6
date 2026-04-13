@@ -25,6 +25,9 @@ Implementation status update:
   scenario harness now exposes semantic builders for handled-key and pd-mode
   setup plus a runtime-debug snapshot helper, and scenario tests have started
   moving onto that seam.
+- Recommendation 5 has a second implementation slice: process-record-driven
+  integration tests now share a small semantic step/snapshot harness instead
+  of rebuilding records, time advancement, and slot reads inline.
 - The remaining open recommendation area is pushing more integration coverage
   onto those semantic builders beyond the current scenario-level slice.
 

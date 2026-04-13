@@ -384,3 +384,70 @@ Next steps:
 - Keep `key_runtime_slot_test.c` and `key_runtime_transition_test.c` white-box
   where they are exercising true slot/transition storage ownership, and focus
   the next migration work on higher-level integration seams.
+
+### Implementation Pass: Process-Record Integration Helpers
+
+Completed in this pass:
+
+- Landed the next Recommendation 5 slice by adding a small shared semantic
+  harness for process-record-driven integration tests:
+  - `tests/host/key_runtime_integration_harness.h`
+  - `tests/host/key_runtime_integration_harness.c`
+- The new helper centralizes the common integration fixture mechanics that had
+  been repeated across several tests:
+  - semantic press / release / advance / scan steps
+  - public snapshot access in the `runtime_debug.h` shape
+  - slot lookup against the snapshot instead of live post-run slot pointers
+- Migrated `tests/host/pd_mode_key_runtime_integration_test.c` onto that
+  helper:
+  - process-record steps now run through one semantic harness
+  - slot lifecycle assertions now read through the integration snapshot helper
+    instead of storing a live slot pointer across the interaction
+- Migrated `tests/host/key_runtime_layer_lock_integration_test.c` onto the
+  same helper:
+  - thumb-like double-tap hold cycles now run through semantic step sequences
+  - layer-lock and slot-clear assertions now read from integration snapshots
+    instead of open-coded record driving and direct live-state checks after
+    the fact
+- Kept the helper intentionally small and read-side only:
+  - it does not replace the scenario harness
+  - it does not try to own authored behavior setup
+  - it simply removes duplicated process-record fixture mechanics from
+    integration tests that are still exercising real runtime modules
+- Updated the corresponding test runners so the shared helper is compiled in:
+  - `tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+
+Contracts touched in this pass:
+
+- process-record integration harness:
+  `tests/host/key_runtime_integration_harness.h`,
+  `tests/host/key_runtime_integration_harness.c`
+- pd-mode key-runtime integration coverage:
+  `tests/host/pd_mode_key_runtime_integration_test.c`,
+  `tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- layer-lock integration coverage:
+  `tests/host/key_runtime_layer_lock_integration_test.c`,
+  `tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes stayed inside `charybdis-4x6/tests/host/` and the active review
+  folder
+
+Next steps:
+
+- Continue Recommendation 5 by migrating additional process-record-driven
+  integration tests that still hand-build key events or hold onto live slot
+  pointers across interactions.
+- The strongest remaining candidate is
+  `tests/host/key_runtime_modifier_hold_integration_test.c`, which still
+  open-codes multi-tap press/release timing and direct slot inspection.
