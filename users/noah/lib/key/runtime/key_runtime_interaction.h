@@ -24,18 +24,25 @@ typedef struct {
 } key_runtime_slot_release_contract_t;
 
 typedef struct {
-    uint16_t       tap_action;
-    uint8_t        tap_repeat_count;
+    uint16_t        keycode;
+    uint8_t         tap_count;
+    key_behavior_step_t step;
+} key_runtime_slot_selection_t;
+
+typedef struct {
+    uint16_t        tap_action;
+    uint8_t         tap_repeat_count;
     hold_behavior_t hold;
     hold_behavior_t long_hold;
-    uint16_t       tap_hold_term;
-    uint16_t       longer_hold_term;
-    uint16_t       multi_tap_term;
-    bool           has_more_taps;
-    bool           tap_resolves_on_press;
+    uint16_t        tap_hold_term;
+    uint16_t        longer_hold_term;
+    uint16_t        multi_tap_term;
+    bool            has_more_taps;
+    bool            tap_resolves_on_press;
 } key_runtime_slot_binding_t;
 
 typedef struct {
+    key_runtime_slot_selection_t     selection;
     key_runtime_slot_binding_t       binding;
     key_runtime_slot_hold_strategy_t hold_strategy;
     uint8_t                          layer;
@@ -45,17 +52,25 @@ typedef struct {
     key_runtime_slot_release_contract_t release;
 } key_runtime_slot_interaction_t;
 
+static inline key_runtime_slot_selection_t key_runtime_slot_selection_from_resolution(handled_key_resolution_t resolution) {
+    return (key_runtime_slot_selection_t){
+        .keycode   = resolution.keycode,
+        .tap_count = resolution.tap_count,
+        .step      = resolution.step,
+    };
+}
+
 static inline key_runtime_slot_binding_t key_runtime_slot_binding_from_resolution(handled_key_resolution_t resolution) {
     return (key_runtime_slot_binding_t){
-        .tap_action            = resolution.tap_action,
-        .tap_repeat_count      = resolution.tap_repeat_count,
-        .hold                  = resolution.hold,
-        .long_hold             = resolution.long_hold,
+        .tap_action            = handled_key_resolution_tap_action(resolution),
+        .tap_repeat_count      = handled_key_resolution_tap_repeat_count(resolution),
+        .hold                  = handled_key_resolution_hold(resolution),
+        .long_hold             = handled_key_resolution_long_hold(resolution),
         .tap_hold_term         = resolution.tap_hold_term,
         .longer_hold_term      = resolution.longer_hold_term,
         .multi_tap_term        = resolution.multi_tap_term,
         .has_more_taps         = resolution.has_more_taps,
-        .tap_resolves_on_press = resolution.tap_resolves_on_press,
+        .tap_resolves_on_press = handled_key_resolution_tap_resolves_on_press(resolution),
     };
 }
 
@@ -99,34 +114,38 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
 
 static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_resolution(handled_key_resolution_t resolution) {
     key_runtime_slot_interaction_t interaction = {
+        .selection     = key_runtime_slot_selection_from_resolution(resolution),
         .binding       = key_runtime_slot_binding_from_resolution(resolution),
-        .hold_strategy = resolution.hold_strategy,
+        .hold_strategy = handled_key_resolution_hold_strategy(resolution),
         .layer         = resolution.layer,
         .pd_mode       = resolution.pd_mode,
         .flags         = resolution.flags,
-        .policy        = handled_key_resolve_policy(resolution),
     };
 
+    if (handled_key_resolution_uses_implicit_hold(resolution)) {
+        interaction.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
+    }
+    if (handled_key_resolution_uses_fallback_hold(resolution)) {
+        interaction.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+    }
+
+    interaction.policy  = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
     interaction.release = key_runtime_slot_release_contract_build(interaction);
     return interaction;
 }
 
 static inline handled_key_resolution_t key_runtime_slot_interaction_to_resolution(key_runtime_slot_interaction_t interaction) {
     return (handled_key_resolution_t){
-        .tap_action            = interaction.binding.tap_action,
-        .tap_repeat_count      = interaction.binding.tap_repeat_count,
-        .hold                  = interaction.binding.hold,
-        .long_hold             = interaction.binding.long_hold,
-        .hold_strategy         = interaction.hold_strategy,
+        .keycode               = interaction.selection.keycode,
+        .tap_count             = interaction.selection.tap_count,
+        .step                  = interaction.selection.step,
         .tap_hold_term         = interaction.binding.tap_hold_term,
         .longer_hold_term      = interaction.binding.longer_hold_term,
         .multi_tap_term        = interaction.binding.multi_tap_term,
         .layer                 = interaction.layer,
         .pd_mode               = interaction.pd_mode,
-        .step_present          = interaction.binding.tap_action != KC_NO || interaction.binding.hold.present || interaction.binding.long_hold.present,
         .has_more_taps         = interaction.binding.has_more_taps,
-        .tap_resolves_on_press = interaction.binding.tap_resolves_on_press,
-        .flags                 = interaction.flags,
+        .flags                 = interaction.flags & (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD),
     };
 }
 

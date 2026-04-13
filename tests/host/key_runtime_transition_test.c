@@ -111,19 +111,20 @@ static void test_set_default_slot_key_pos(keypos_t key_pos) {
 
 static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
     return key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
-        .tap_action            = tap_action,
-        .tap_repeat_count      = tap_action == KC_NO ? 0 : 1,
-        .hold                  = hold,
-        .long_hold             = long_hold,
-        .hold_strategy         = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+        .keycode               = TEST_NEW_KEY,
+        .tap_count             = 1,
+        .step =
+            {
+                .tap       = tap_action == KC_NO ? tap_behavior_none() : (tap_behavior_t)TAP_SENDS(tap_action),
+                .hold      = hold,
+                .long_hold = long_hold,
+            },
         .tap_hold_term         = tap_hold_term,
         .longer_hold_term      = longer_hold_term,
         .multi_tap_term        = multi_tap_term,
         .layer                 = UINT8_MAX,
         .pd_mode               = 0,
-        .step_present          = tap_action != KC_NO || hold.present || long_hold.present,
         .has_more_taps         = false,
-        .tap_resolves_on_press = false,
         .flags                 = HANDLED_KEY_FLAG_HANDLED,
     });
 }
@@ -162,17 +163,31 @@ static void active_key_reset(void) {
 
 static void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
     key_runtime_slot_interaction_t interaction = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
-        .tap_action       = tap_action,
-        .tap_repeat_count = tap_action == KC_NO ? 0 : 1,
-        .hold             = hold,
-        .long_hold        = long_hold,
-        .hold_strategy    = hold_strategy,
+        .keycode          = keycode,
+        .tap_count        = 1,
+        .step =
+            {
+                .tap       = tap_action == KC_NO ? tap_behavior_none() : (tap_behavior_t)TAP_SENDS(tap_action),
+                .hold      = hold,
+                .long_hold = long_hold,
+            },
         .tap_hold_term    = tap_hold_term,
         .longer_hold_term = longer_hold_term,
         .multi_tap_term   = multi_tap_term,
         .layer            = UINT8_MAX,
+        .pd_mode          = 0,
+        .has_more_taps    = false,
         .flags            = HANDLED_KEY_FLAG_HANDLED,
     });
+
+    if (hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK) {
+        interaction.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+    } else if (hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT) {
+        interaction.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
+    }
+    interaction.hold_strategy = hold_strategy;
+    interaction.policy        = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
+    interaction.release       = key_runtime_slot_release_contract_build(interaction);
 
     test_set_default_slot_key_pos(key_pos);
     key_runtime_slot_track(test_default_slot(), keycode, key_pos, interaction, phase);
@@ -202,15 +217,12 @@ static void test_handled_key_enable_multi_tap(handled_key_resolution_t *key) {
 }
 
 static void test_handled_key_enable_modifier_multi_tap(handled_key_resolution_t *key) {
-    key->flags |= HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_FALLBACK_HOLD;
-    key->hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
-    key->tap_action    = KC_NO;
+    key->flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    key->step.tap = (tap_behavior_t)TAP_SENDS(KC_NO);
 }
 
 static void test_handled_key_set_fallback_tap(handled_key_resolution_t *key, uint16_t action) {
-    key->flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
-    key->hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
-    key->tap_action    = action;
+    key->step.tap = (tap_behavior_t)TAP_SENDS(action);
 }
 
 static void test_handled_key_set_layer_contract(handled_key_resolution_t *key, uint8_t layer, bool layer_tap, uint16_t tap_action) {
@@ -220,8 +232,8 @@ static void test_handled_key_set_layer_contract(handled_key_resolution_t *key, u
     } else {
         key->flags &= (uint16_t)~HANDLED_KEY_FLAG_LAYER_TAP;
     }
-    key->layer      = layer;
-    key->tap_action = tap_action;
+    key->layer = layer;
+    key->step.tap = tap_action == KC_NO ? tap_behavior_none() : (tap_behavior_t)TAP_SENDS(tap_action);
 }
 
 static void test_log_call(test_call_kind_t kind, uint16_t action, keypos_t key_pos, uint8_t layer, bool long_hold_level, delayed_action_mods_t mods) {
@@ -743,9 +755,21 @@ static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
         .interaction.valid       = true,
         .interaction.view        = test_cached_interaction(KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
-    handled_key_resolution_t fallback_resolution = key_runtime_slot_interaction_to_resolution(active_key.interaction.view);
-    fallback_resolution.hold_strategy            = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
-    fallback_resolution.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+    handled_key_resolution_t fallback_resolution = {
+        .keycode          = TEST_PLAIN_KEY,
+        .tap_count        = 1,
+        .step =
+            {
+                .tap = TAP_SENDS(KC_NO),
+            },
+        .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+        .layer            = UINT8_MAX,
+        .pd_mode          = 0,
+        .has_more_taps    = false,
+        .flags            = HANDLED_KEY_FLAG_HANDLED,
+    };
     test_set_cached_interaction(test_default_slot(), fallback_resolution);
 
     key_runtime_transition_plan_init(&plan);
@@ -837,9 +861,21 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
         .interaction.view            = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
         .lifecycle.layer_interrupted = true,
     };
-    handled_key_resolution_t interrupted_layer_resolution = key_runtime_slot_interaction_to_resolution(active_key.interaction.view);
-    interrupted_layer_resolution.layer                    = 2;
-    interrupted_layer_resolution.flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
+    handled_key_resolution_t interrupted_layer_resolution = {
+        .keycode          = layer_tap_keycode,
+        .tap_count        = 1,
+        .step =
+            {
+                .tap = TAP_SENDS(TEST_FALLBACK_TAP_ACTION),
+            },
+        .tap_hold_term    = 150,
+        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+        .layer            = 2,
+        .pd_mode          = 0,
+        .has_more_taps    = false,
+        .flags            = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP,
+    };
     test_set_cached_interaction(test_default_slot(), interrupted_layer_resolution);
 
     key_runtime_transition_plan_init(&plan);
@@ -947,7 +983,7 @@ static void test_press_on_different_position_preserves_existing_active_state(voi
     test_reset_stubs();
     active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
 
-    key.hold = (hold_behavior_t){
+    key.step.hold = (hold_behavior_t){
         .present = true,
         .action  = TEST_IMMEDIATE_HOLD,
         .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
@@ -991,7 +1027,7 @@ static void test_press_on_third_position_keeps_existing_positions_active(void) {
         .lifecycle.held_action_keycode = TEST_PLAIN_KEY,
     };
 
-    key.hold = (hold_behavior_t){
+    key.step.hold = (hold_behavior_t){
         .present = true,
         .action  = TEST_IMMEDIATE_HOLD,
         .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
@@ -1099,7 +1135,7 @@ static void test_press_on_new_position_preserves_existing_pending_multi_tap(void
         .single_action = TEST_FALLBACK_TAP_ACTION,
     };
 
-    key.hold = (hold_behavior_t){
+    key.step.hold = (hold_behavior_t){
         .present = true,
         .action  = TEST_IMMEDIATE_HOLD,
         .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
@@ -1235,10 +1271,21 @@ static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_laye
         .interaction.valid    = true,
         .interaction.view     = test_cached_interaction(KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
     };
-    handled_key_resolution_t layered_multi_tap_resolution = key_runtime_slot_interaction_to_resolution(active_key.interaction.view);
-    layered_multi_tap_resolution.flags |= HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER;
-    layered_multi_tap_resolution.has_more_taps = true;
-    layered_multi_tap_resolution.layer         = 2;
+    handled_key_resolution_t layered_multi_tap_resolution = {
+        .keycode          = MO(2),
+        .tap_count        = 1,
+        .step =
+            {
+                .long_hold = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
+            },
+        .tap_hold_term    = 120,
+        .longer_hold_term = 240,
+        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+        .layer            = 2,
+        .pd_mode          = 0,
+        .has_more_taps    = true,
+        .flags            = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER,
+    };
     test_set_cached_interaction(test_default_slot(), layered_multi_tap_resolution);
 
     multi_tap = (multi_tap_t){
@@ -1423,9 +1470,18 @@ static void test_scan_commits_implicit_hold_without_feedback(void) {
                                                                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
                                                                }, hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
-    handled_key_resolution_t implicit_hold_resolution = key_runtime_slot_interaction_to_resolution(active_key.interaction.view);
-    implicit_hold_resolution.hold_strategy            = KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
-    implicit_hold_resolution.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
+    handled_key_resolution_t implicit_hold_resolution = {
+        .keycode          = TEST_PD_MODE_KEY,
+        .tap_count        = 1,
+        .step             = key_behavior_step_none(),
+        .tap_hold_term    = 120,
+        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+        .layer            = UINT8_MAX,
+        .pd_mode          = PD_MODE_VOLUME,
+        .has_more_taps    = false,
+        .flags            = HANDLED_KEY_FLAG_HANDLED,
+    };
     test_set_cached_interaction(test_default_slot(), implicit_hold_resolution);
 
     key_runtime_transition_plan_init(&plan);
@@ -1567,11 +1623,19 @@ static void test_interrupt_plan_overflow_sets_flag_and_logs_once(void) {
             .lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
             .interaction.valid       = true,
             .interaction.view        = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
-                .tap_action    = KC_NO,
-                .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
-                .layer         = UINT8_MAX,
-                .pd_mode       = 0,
-                .flags         = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_FALLBACK_HOLD,
+                .keycode          = TEST_PLAIN_KEY,
+                .tap_count        = 1,
+                .step =
+                    {
+                        .tap = TAP_SENDS(KC_NO),
+                    },
+                .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+                .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+                .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+                .layer            = UINT8_MAX,
+                .pd_mode          = 0,
+                .has_more_taps    = false,
+                .flags            = HANDLED_KEY_FLAG_HANDLED,
             }),
         };
     }

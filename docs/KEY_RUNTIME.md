@@ -39,7 +39,7 @@ These files are the core map of the runtime:
 
 | File | Responsibility |
 | --- | --- |
-| [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h) and [`handled_key.c`](../users/noah/lib/key/interaction/handled_key.c) | Resolve a keycode into a fully interpreted `handled_key_resolution_t` with tap, hold, long-hold, timing, layer, pd-mode, and flags |
+| [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h) and [`handled_key.c`](../users/noah/lib/key/interaction/handled_key.c) | Resolve a keycode into an authored `handled_key_resolution_t` branch record: keycode, selected tap-count step, timing, layer/pd metadata, and structural flags |
 | [`runtime_shared_state.h`](../users/noah/lib/state/runtime/runtime_shared_state.h) | Own the central slot storage and pd-mode runtime flags |
 | [`key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c) | `process_record_user` entry flow and top-level branching |
 | [`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c) | Physical-event preflight, modifier suppression, active-slot interrupts, and pending-multi-tap flushing |
@@ -163,8 +163,9 @@ The main fields are:
   hold strategy, pd-mode lock state on press, and whether a layer hold was
   interrupted by another key
 - `interaction`: cached `key_runtime_slot_interaction_t`, which owns the
-  active press's slot-owned branch record plus cached hold/release policy and
-  release semantics used by feedback, scan, and release reducers
+  active press's authored branch selection plus slot-owned binding,
+  cached hold policy, and cached release semantics used by feedback, scan,
+  and release reducers
 - `pending_multi_tap`: deferred tap-chain state that remains after release
 
 The phase enum is small but important:
@@ -239,6 +240,11 @@ These are the easiest runtime rules to break by accident:
   while `key_runtime_slot_interaction_t` is the slot-owned cached interaction
   contract. Keep that boundary explicit instead of re-deriving policy from raw
   authored data or from mutable slot state.
+- `key_runtime_slot_interaction(...)` and
+  `key_runtime_slot_cached_interaction(...)` both expose the slot-owned
+  interaction contract. If you need an authored-resolution reconstruction for a
+  test or debug snapshot, use
+  `key_runtime_slot_interaction_to_resolution(...)` intentionally.
 - Feedback and debug readers should prefer cached slot semantic metadata over
   re-running handled-key resolution against mutable slot state.
 - New emitters should prefer the explicit helpers in

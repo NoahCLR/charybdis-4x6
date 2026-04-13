@@ -408,3 +408,81 @@ Next steps:
   helpers
 - after that, make pd-mode exclusivity explicit in the public state model and
   split the remaining compatibility seams by owning subsystem
+
+### Implementation pass: authored-resolution narrowing and slot interaction API cleanup
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Narrowed `handled_key_resolution_t` in
+  `users/noah/lib/key/interaction/handled_key.h` so authored lookup now stores
+  keycode, tap-count branch selection, chosen authored step, timing, layer/pd
+  metadata, and structural flags instead of cached tap action, tap repeat
+  count, hold behavior, and hold strategy.
+- Moved the remaining derived tap/hold semantics behind
+  `handled_key_resolution_*` accessors in
+  `users/noah/lib/key/interaction/handled_key.c` and updated
+  `key_runtime_slot_interaction_from_resolution(...)` to build slot-owned
+  binding/policy/release state from that slimmer authored contract.
+- Added explicit authored branch selection storage to
+  `key_runtime_slot_interaction_t` through
+  `key_runtime_slot_selection_t`, so the slot contract now caches both the
+  authored branch snapshot and the derived slot binding without reverting to a
+  full stored authored resolution object.
+- Reworked
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c`
+  so press-time overrides now mutate the slot-owned interaction contract rather
+  than widening `handled_key_resolution_t` again.
+- Changed `key_runtime_slot_interaction(...)` in
+  `users/noah/lib/key/runtime/key_runtime_state.h` /
+  `users/noah/lib/key/runtime/slot/key_runtime_slot.c` to return the slot-owned
+  `key_runtime_slot_interaction_t` directly. Tests that want an authored
+  reconstruction now have to call
+  `key_runtime_slot_interaction_to_resolution(...)` explicitly.
+- Updated the key-runtime host harnesses and stubs to either construct the
+  slimmer authored resolution shape directly or inspect cached slot binding
+  through the slot interaction contract where they really mean "live slot
+  semantics".
+- Updated `docs/KEY_RUNTIME.md` and the active review so the maintainer docs
+  now describe authored resolution as a branch-selection contract and slot
+  interaction as the live per-press semantic cache.
+
+Contracts touched in this pass:
+
+- `handled_key_resolution_t`
+- `handled_key_resolution_*` accessor family
+- `key_runtime_slot_selection_t`
+- `key_runtime_slot_interaction_t`
+- `key_runtime_slot_interaction(...)`
+- `key_runtime_slot_interaction_to_resolution(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- keep shrinking the remaining test/debug compatibility seam around
+  `key_runtime_slot_interaction_to_resolution(...)` so authored reconstruction
+  stays explicit instead of becoming a de facto slot API again
+- continue Finding 2 by splitting more of the remaining release hotspot into
+  small typed helpers now that press-time and slot-time semantics are cleaner
+- after that, move to the next architecture review target: making pd-mode
+  exclusivity explicit in the public state model and splitting the remaining
+  compatibility seams by owning subsystem

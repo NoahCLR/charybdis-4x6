@@ -11,15 +11,18 @@ architecture, structure, and long-term extensibility.
 Implementation update later the same day: the first slice of Finding 1 and the
 first slice of Finding 2 have landed, followed by the authored/runtime seam
 migration, the removal of the last public handled-key compatibility alias, the
-removal of the slot interaction's anonymous direct-field mirror, and a narrower
-slot-owned branch contract. Active slot storage now uses
-`key_runtime_slot_interaction_t` as the slot-owned cached interaction contract,
-while authored lookup stays on the outer seam as `handled_key_resolution_t`
-with `handled_key_resolution_*` accessors. The slot interaction now caches a
-slot-owned branch record, cached hold policy, and a cached release contract.
-The active-release reducer executes that typed release contract instead of
-reconstructing release semantics from raw hold flags, and runtime consumers no
-longer treat cached slot interaction as a stored authored resolution object.
+removal of the slot interaction's anonymous direct-field mirror, a narrower
+slot-owned branch contract, and a thinner authored handled-key resolution.
+Active slot storage now uses `key_runtime_slot_interaction_t` as the slot-owned
+cached interaction contract, while authored lookup stays on the outer seam as
+`handled_key_resolution_t` with `handled_key_resolution_*` accessors. The
+authored resolution now carries keycode, tap-count branch selection, authored
+step data, timing, layer/pd metadata, and structural flags; the slot
+interaction owns the live binding, cached hold policy, and cached release
+contract. The active-release reducer executes that typed release contract
+instead of reconstructing release semantics from raw hold flags, and runtime
+consumers no longer treat cached slot interaction as a stored authored
+resolution object.
 
 This review is intentionally not a repeat of the earlier action-family,
 pd-mode write-controller, macro IR, and test-harness recommendations. Those
@@ -55,9 +58,9 @@ architectural properties that many firmware repos never reach:
 The next scaling risks are no longer "everything is tangled together". They are
 "one contract is carrying too many meanings" risks:
 
-- the handled-key resolution/interaction boundary has improved materially, but
-  the authored resolution object still carries more derived runtime semantics
-  than ideal
+- the handled-key resolution/interaction boundary is now much healthier, but
+  there is still cleanup left around the reconstruction bridge and the
+  resolution accessor surface used by tests/debug helpers
 - release behavior is more structured now, but one reducer is still the main
   hotspot for cross-feature release choreography
 - pd modes are represented as composable bitmasks even though the runtime
@@ -113,63 +116,62 @@ refactors realistic instead of aspirational.
 
 ## Findings
 
-### 1. The handled-key resolution/interaction seam still carries too many meanings
+### 1. The handled-key resolution/interaction seam was the main architectural leak, and the core split is now landed
 
-The handled-key contract is more normalized than it used to be, but one seam is
-still doing too much:
+The handled-key contract is materially better than it was at the start of this
+review:
 
 - `handled_key_lookup_tap_count(...)` builds `handled_key_resolution_t` from
   authored config in `handled_key.c`
-- `handled_key_resolution_t` still carries runtime-facing policy flags and
-  derived hold semantics in `handled_key.h`
-- `key_runtime_slot_press_interaction(...)` still derives a large amount of
-  slot behavior directly from that one type in `key_runtime_slot_press_reduce.c`
-- feedback, scan, and release code still depend on many fields that originate
-  as authored-resolution output even though slot interaction is now narrower
+- `handled_key_resolution_t` now carries the authored branch record: keycode,
+  tap-count selection, chosen authored step, timing, layer/pd metadata, and
+  structural flags
+- `key_runtime_slot_interaction_t` now owns the slot-time contract:
+  branch selection snapshot, normalized binding, cached hold policy, and
+  cached release semantics
+- `key_runtime_slot_press_interaction(...)` mutates the slot-owned interaction
+  contract instead of widening the authored resolution object again
+- feedback, scan, and release consumers now read slot semantics from cached
+  slot interaction instead of treating cached slot state as a stored authored
+  resolution object
 
-This means one struct currently represents:
-
-- authored lookup output
-- derived per-press hold/tap semantics
-- feedback/release-policy metadata
-
-That is a leaky abstraction. A future behavior family will tend to add another
-field or another flag to `handled_key_resolution_t`, then teach lookup, slot press,
-scan, release, feedback, and tests how to interpret it.
+That removes the main leaky abstraction. A future behavior family no longer has
+to widen one "resolution means everything" struct just to participate in slot
+policy.
 
 Why this matters:
 
 - it raises the cost of adding new key behavior families
-- it still makes the meaning of a handled-key resolution/context value partly
+- it made the meaning of a handled-key resolution/context value partly
   phase-dependent
-- it encourages feature policy to spread through flags instead of through
+- it encouraged feature policy to spread through flags instead of through
   narrower contracts
 
 Recommended direction:
 
-- split authored resolution from slot-owned interaction state
 - keep `handled_key_lookup_*()` as the immutable authored-resolution seam
-- create a narrower slot contract that owns the chosen tap-count branch and the
-  normalized hold/release policy for this physical press
+- keep `key_runtime_slot_interaction_t` as the only slot-owned semantic cache
+- continue shrinking compatibility bridges that reconstruct authored
+  resolution-like values from slot interaction for tests/debug use
 
 Implementation update:
 
-- the first slice of this recommendation is now in place:
-  `active_key_state_t` stores `key_runtime_slot_interaction_t`, and reducers
+- `active_key_state_t` stores `key_runtime_slot_interaction_t`, and reducers
   read it through `key_runtime_slot_cached_interaction(...)`
-- authored handled-key lookup is now explicitly named
-  `handled_key_resolution_t`
+- authored handled-key lookup is explicitly named `handled_key_resolution_t`
 - cached hold policy now lives with the slot interaction contract instead of
   being recomputed at every feedback/scan consumer
 - `key_runtime_slot_interaction_t` no longer stores the full authored
-  resolution object; it now caches a slot-owned branch record plus semantic
-  fields, policy, and release contract
-- runtime/process/host seams now name authored lookup output as
-  `handled_key_resolution_t` directly
-- the remaining gap is that `handled_key_resolution_t` still carries a large
-  amount of derived runtime-facing semantics, so the slot-owned contract is
-  clearer than before but the authored branch record is still doing multiple
-  jobs
+  resolution object; it now caches branch selection, slot binding, policy, and
+  release contract
+- `handled_key_resolution_t` now carries authored branch data instead of stored
+  runtime hold strategy, tap action, and release-policy decisions
+- `key_runtime_slot_interaction(...)` now returns the slot-owned interaction
+  contract directly; tests that need authored reconstruction must call
+  `key_runtime_slot_interaction_to_resolution(...)` intentionally
+- the remaining gap is mostly at the edges: the reconstruction bridge and some
+  host fixtures still synthesize authored resolutions directly to set up slot
+  state
 
 Example shape:
 
@@ -178,25 +180,36 @@ typedef struct {
     uint16_t            keycode;
     uint8_t             tap_count;
     key_behavior_step_t step;
-    uint16_t            default_tap_action;
-    bool                has_more_taps;
-    bool                is_layer_surface;
+    uint16_t            tap_hold_term;
+    uint16_t            longer_hold_term;
+    uint16_t            multi_tap_term;
+    uint8_t             layer;
     pd_mode_mask_t      pd_mode;
+    bool                has_more_taps;
+    uint16_t            flags;
 } handled_key_resolution_t;
 
 typedef struct {
-    key_runtime_slot_binding_t        binding;
-    key_runtime_slot_hold_strategy_t  hold_strategy;
-    uint8_t                           layer;
-    pd_mode_mask_t                    pd_mode;
-    uint16_t                          flags;
-    handled_key_interaction_policy_t  policy;
+    uint16_t             keycode;
+    uint8_t              tap_count;
+    key_behavior_step_t  step;
+} key_runtime_slot_selection_t;
+
+typedef struct {
+    key_runtime_slot_selection_t       selection;
+    key_runtime_slot_binding_t         binding;
+    key_runtime_slot_hold_strategy_t   hold_strategy;
+    uint8_t                            layer;
+    pd_mode_mask_t                     pd_mode;
+    uint16_t                           flags;
+    handled_key_interaction_policy_t   policy;
     key_runtime_slot_release_contract_t release;
 } key_runtime_slot_interaction_t;
 ```
 
-That would make the slot model clearer and keep feedback/release code from
-depending on "whatever the cached handled-key resolution happens to mean at this phase".
+That is now close to the actual runtime shape. The main follow-up is to keep
+debug/test seams from drifting back toward "synthetic resolution as the default
+slot view".
 
 ### 2. Release behavior is narrower, but still concentrated in one hotspot
 

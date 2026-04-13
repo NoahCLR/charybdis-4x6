@@ -43,7 +43,7 @@ bool                                       key_runtime_slot_matches(const active
 bool                                       key_runtime_slot_owns_key_position(const active_key_state_t *slot, keypos_t key_pos);
 uint8_t                                    key_runtime_slot_preview_layer_hint(const active_key_state_t *slot);
 key_runtime_slot_interaction_t             key_runtime_slot_cached_interaction(const active_key_state_t *slot);
-handled_key_resolution_t                   key_runtime_slot_interaction(const active_key_state_t *slot);
+key_runtime_slot_interaction_t             key_runtime_slot_interaction(const active_key_state_t *slot);
 bool                                       key_runtime_slot_has_pending_multi_tap(const active_key_state_t *slot);
 bool                                       key_runtime_slot_pending_multi_tap_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos);
 bool                                       key_runtime_slot_pending_multi_tap_pending_hold(const active_key_state_t *slot);

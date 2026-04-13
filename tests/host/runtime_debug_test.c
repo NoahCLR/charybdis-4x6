@@ -119,6 +119,42 @@ void clear_oneshot_locked_mods(void) {
     fake_oneshot_locked_mods = 0;
 }
 
+hold_behavior_t handled_key_resolution_hold(handled_key_resolution_t key) {
+    return key.step.hold;
+}
+
+hold_behavior_t handled_key_resolution_long_hold(handled_key_resolution_t key) {
+    return key.step.long_hold;
+}
+
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t key) {
+    (void)key;
+    return KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
+}
+
+uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
+    return key.step.tap.present ? key.step.tap.action : KC_NO;
+}
+
+uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t key) {
+    return handled_key_resolution_tap_action(key) == KC_NO ? 0 : 1;
+}
+
+bool handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t key) {
+    (void)key;
+    return false;
+}
+
+bool handled_key_resolution_uses_fallback_hold(handled_key_resolution_t key) {
+    (void)key;
+    return false;
+}
+
+bool handled_key_resolution_uses_implicit_hold(handled_key_resolution_t key) {
+    (void)key;
+    return false;
+}
+
 void add_mods(uint8_t mods) {
     fake_mods |= mods;
 }
@@ -180,11 +216,19 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_C;
     noah_runtime_shared_state.key.slots_by_position[0].interaction.valid = true;
     noah_runtime_shared_state.key.slots_by_position[0].interaction.view = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
-        .tap_action    = KC_C,
-        .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
-        .layer         = UINT8_MAX,
-        .pd_mode       = 0,
-        .flags         = HANDLED_KEY_FLAG_HANDLED,
+        .keycode          = KC_C,
+        .tap_count        = 1,
+        .step =
+            {
+                .tap = TAP_SENDS(KC_C),
+            },
+        .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+        .layer            = UINT8_MAX,
+        .pd_mode          = 0,
+        .has_more_taps    = false,
+        .flags            = HANDLED_KEY_FLAG_HANDLED,
     });
 
     layer_ownership_set_lock_state(3, true);

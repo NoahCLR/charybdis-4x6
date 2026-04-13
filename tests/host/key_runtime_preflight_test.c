@@ -246,6 +246,40 @@ bool handled_key_resolution_is_layer_tap(handled_key_resolution_t key) {
     return false;
 }
 
+hold_behavior_t handled_key_resolution_hold(handled_key_resolution_t key) {
+    return key.step.hold;
+}
+
+hold_behavior_t handled_key_resolution_long_hold(handled_key_resolution_t key) {
+    return key.step.long_hold;
+}
+
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t key) {
+    return key.tap_count == 1 && key.keycode < SAFE_RANGE && key.step.tap.present && !key.step.hold.present && !key.step.long_hold.present ? KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
+}
+
+uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
+    return key.step.tap.present ? key.step.tap.action : KC_NO;
+}
+
+uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t key) {
+    return handled_key_resolution_tap_action(key) == KC_NO ? 0 : 1;
+}
+
+bool handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t key) {
+    (void)key;
+    return false;
+}
+
+bool handled_key_resolution_uses_fallback_hold(handled_key_resolution_t key) {
+    return handled_key_resolution_hold_strategy(key) == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
+}
+
+bool handled_key_resolution_uses_implicit_hold(handled_key_resolution_t key) {
+    (void)key;
+    return false;
+}
+
 uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
     (void)key;
     return UINT8_MAX;
@@ -319,11 +353,19 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
     active_key.lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
     active_key.interaction.valid       = true;
     active_key.interaction.view        = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
-        .tap_action    = KC_NO,
-        .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
-        .layer         = UINT8_MAX,
-        .pd_mode       = 0,
-        .flags         = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_FALLBACK_HOLD,
+        .keycode          = KC_RIGHT_ALT,
+        .tap_count        = 1,
+        .step =
+            {
+                .tap = TAP_SENDS(KC_NO),
+            },
+        .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+        .layer            = UINT8_MAX,
+        .pd_mode          = 0,
+        .has_more_taps    = false,
+        .flags            = HANDLED_KEY_FLAG_HANDLED,
     });
 
     CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));

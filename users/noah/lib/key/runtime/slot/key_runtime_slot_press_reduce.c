@@ -16,22 +16,27 @@ static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavi
 }
 
 static key_runtime_slot_interaction_t key_runtime_slot_press_interaction(handled_key_resolution_t resolution, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_hold_strategy_t hold_strategy) {
-    resolution.tap_action       = tap_action;
-    resolution.tap_repeat_count = tap_action == KC_NO ? 0 : 1;
-    resolution.hold             = hold;
-    resolution.long_hold        = long_hold;
-    resolution.hold_strategy    = hold_strategy;
-    resolution.tap_hold_term    = tap_hold_term;
-    resolution.longer_hold_term = longer_hold_term;
-    resolution.multi_tap_term   = multi_tap_term;
-    resolution.flags &= (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD);
+    key_runtime_slot_interaction_t interaction = key_runtime_slot_interaction_from_resolution(resolution);
+
+    interaction.binding.tap_action       = tap_action;
+    interaction.binding.tap_repeat_count = tap_action == KC_NO ? 0 : 1;
+    interaction.binding.hold             = hold;
+    interaction.binding.long_hold        = long_hold;
+    interaction.binding.tap_hold_term    = tap_hold_term;
+    interaction.binding.longer_hold_term = longer_hold_term;
+    interaction.binding.multi_tap_term   = multi_tap_term;
+    interaction.hold_strategy            = hold_strategy;
+    interaction.flags &= (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD);
     if (hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT) {
-        resolution.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
+        interaction.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
     }
     if (hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK) {
-        resolution.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+        interaction.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
     }
-    return key_runtime_slot_interaction_from_resolution(resolution);
+
+    interaction.policy  = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
+    interaction.release = key_runtime_slot_release_contract_build(interaction);
+    return interaction;
 }
 
 static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
@@ -133,7 +138,20 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_reuse_pending_mul
 
     if (key_runtime_slot_pending_multi_tap_pending_hold(context->slot) || context->needs_layer_press) {
         handled_key_resolution_t current_tap = key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? handled_key_lookup_tap_count(context->keycode, context->slot->pending_multi_tap.count) : context->resolution;
-        key_runtime_effect_builder_t begin_builder = key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, current_tap, KC_NO, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.hold : hold_behavior_none(), key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.long_hold : hold_behavior_none(), key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.tap_hold_term : context->tap_hold_term, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.longer_hold_term : context->longer_hold_term, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.multi_tap_term : context->multi_tap_term, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.hold_strategy : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT, false);
+        bool                     pending_hold = key_runtime_slot_pending_multi_tap_pending_hold(context->slot);
+        key_runtime_effect_builder_t begin_builder = key_runtime_slot_begin_press(context->slot,
+                                                                                 context->keycode,
+                                                                                 context->key_pos,
+                                                                                 current_tap,
+                                                                                 KC_NO,
+                                                                                 pending_hold ? handled_key_resolution_hold(current_tap) : hold_behavior_none(),
+                                                                                 pending_hold ? handled_key_resolution_long_hold(current_tap) : hold_behavior_none(),
+                                                                                 pending_hold ? current_tap.tap_hold_term : context->tap_hold_term,
+                                                                                 pending_hold ? current_tap.longer_hold_term : context->longer_hold_term,
+                                                                                 pending_hold ? current_tap.multi_tap_term : context->multi_tap_term,
+                                                                                 pending_hold ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+                                                                                 pending_hold ? handled_key_resolution_hold_strategy(current_tap) : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+                                                                                 false);
         key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, begin_builder);
     }
 
