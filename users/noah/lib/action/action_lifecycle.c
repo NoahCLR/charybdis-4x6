@@ -11,14 +11,14 @@
 #endif
 
 #include "action_dispatch.h"
-#include "macro_dispatch.h"
 #include "owned_keycode.h"
 #include "synthetic_record.h"
 #include "../compat/qmk_contract.h"
-#include "../pointing/pd_modes.h"
-#include "../pointing/pointer_layer_policy.h"
-#include "../state/layer_ownership.h"
-#include "../state/split_runtime_sync.h"
+#include "../macro/macro_dispatch.h"
+#include "../pointing/defs/pd_modes.h"
+#include "../pointing/policy/pointer_layer_policy.h"
+#include "../state/ownership/layer_ownership.h"
+#include "../state/runtime/split_runtime_sync.h"
 
 static bool noah_action_is_owned_momentary_layer(uint16_t action) {
     return IS_QK_MOMENTARY(action);

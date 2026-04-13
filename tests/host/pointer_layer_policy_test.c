@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "users/noah/lib/pointing/pd_modes.h"
-#include "users/noah/lib/pointing/pointer_layer_policy.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
 
 static bool           fake_auto_mouse_toggle;
 static int8_t         fake_auto_mouse_key_tracker;

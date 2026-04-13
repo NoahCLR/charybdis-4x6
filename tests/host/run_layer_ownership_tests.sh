@@ -19,7 +19,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/layer_ownership_test.c" \
-    "$ROOT/users/noah/lib/state/layer_ownership.c" \
+    "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     -o "$BIN"
 
 "$BIN"

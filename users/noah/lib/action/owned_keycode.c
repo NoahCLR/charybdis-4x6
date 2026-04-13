@@ -4,8 +4,8 @@
 
 #include "owned_keycode.h"
 
-#include "../pointing/pointer_layer_policy.h"
-#include "../state/keyboard_mod_ownership.h"
+#include "../pointing/policy/pointer_layer_policy.h"
+#include "../state/ownership/keyboard_mod_ownership.h"
 
 static bool owned_keycode_is_modded(uint16_t keycode) {
     return IS_QK_MODS(keycode);

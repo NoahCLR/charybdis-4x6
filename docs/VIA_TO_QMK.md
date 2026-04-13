@@ -99,7 +99,7 @@ Important cases:
   `S_D_RMOD`
 - `CUSTOM(64 + n)` maps into this userspace custom-keycode range
 - shared pd-mode keycodes are loaded from
-  [`pd_mode_manifest.h`](../users/noah/lib/pointing/pd_mode_manifest.h)
+  [`pd_mode_manifest.h`](../users/noah/lib/pointing/defs/pd_mode_manifest.h)
 - keymap-local custom keycodes are loaded from
   [`enum keymap_custom_keycodes`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - layer wrappers such as `MO(3)` or `LT(3,KC_F)` are rewritten back to the

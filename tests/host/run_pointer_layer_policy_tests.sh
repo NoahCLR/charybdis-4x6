@@ -25,7 +25,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/pointer_layer_policy_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
-    "$ROOT/users/noah/lib/pointing/pointer_layer_policy.c" \
+    "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     -o "$BIN"
 
 "$BIN"

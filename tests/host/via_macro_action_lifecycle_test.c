@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "users/noah/lib/action/action_lifecycle.h"
-#include "users/noah/lib/pointing/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "send_string.h"
 
 typedef enum {

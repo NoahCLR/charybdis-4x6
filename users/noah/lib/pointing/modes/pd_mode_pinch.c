@@ -8,8 +8,8 @@
 // registry core.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "../pd_mode_registry_internal.h"
-#include "../../state/keyboard_mod_ownership.h"
+#include "../runtime/pd_mode_registry_internal.h"
+#include "../../state/ownership/keyboard_mod_ownership.h"
 
 static bool pinch_command_registered = false;
 

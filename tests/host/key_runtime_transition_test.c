@@ -6,9 +6,9 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
-#include "users/noah/lib/key/key_runtime_admission.h"
-#include "users/noah/lib/key/key_runtime_state.h"
-#include "users/noah/lib/key/key_runtime_transition.h"
+#include "users/noah/lib/key/runtime/key_runtime_admission.h"
+#include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/key/runtime/key_runtime_transition.h"
 
 enum {
     TEST_PLAIN_KEY           = 0x0004,

@@ -12,7 +12,7 @@
 #include "quantum_keycodes.h"
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "lib/pointing/pd_mode_manifest.h"
+#include "lib/pointing/defs/pd_mode_manifest.h"
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
 //

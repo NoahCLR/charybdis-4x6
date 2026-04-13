@@ -25,11 +25,11 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/pd_mode_test.c" \
-    "$ROOT/users/noah/lib/pointing/pd_mode_registry.c" \
-    "$ROOT/users/noah/lib/pointing/pd_mode_lifecycle.c" \
-    "$ROOT/users/noah/lib/pointing/pd_mode_state.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
-    "$ROOT/users/noah/lib/state/runtime_shared_state.c" \
+    "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
     -o "$BIN"
 
 "$BIN"

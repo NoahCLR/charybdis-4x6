@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "users/noah/lib/pointing/pd_modes.h"
-#include "users/noah/lib/rgb/rgb_config_helpers.h"
-#include "users/noah/lib/rgb/rgb_validation.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/rgb/core/rgb_config_helpers.h"
+#include "users/noah/lib/rgb/core/rgb_validation.h"
 
 static char log_buffer[4096];
 

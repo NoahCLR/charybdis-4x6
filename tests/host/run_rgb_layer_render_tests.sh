@@ -37,15 +37,15 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_automouse_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_key_feedback_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_pd_mode_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_preview_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     -o "$BIN"
 
 "$BIN"
@@ -74,15 +74,15 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_automouse_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_key_feedback_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_pd_mode_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_preview_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     -o "$BIN_END_FILL_UNPAINTED"
 
 "$BIN_END_FILL_UNPAINTED"
@@ -111,15 +111,15 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_automouse.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_automouse_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_key_feedback_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_pd_mode_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_preview_stage.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     -o "$BIN_END_OVERRIDE"
 
 "$BIN_END_OVERRIDE"

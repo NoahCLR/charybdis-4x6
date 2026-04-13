@@ -10,12 +10,12 @@
 
 #include "noah_runtime.h"
 
-#include "lib/action/macro_dispatch.h"
-#include "lib/key/key_runtime_state.h"
-#include "lib/key/keymap_validation.h"
+#include "lib/macro/macro_dispatch.h"
+#include "lib/key/runtime/key_runtime_state.h"
+#include "lib/key/interaction/keymap_validation.h"
 #include "lib/macro/via_macro_defaults.h"
-#include "lib/rgb/rgb_runtime.h"
-#include "lib/state/split_runtime_sync.h"
+#include "lib/rgb/core/rgb_runtime.h"
+#include "lib/state/runtime/split_runtime_sync.h"
 
 void noah_eeconfig_init_user(void) {
 #if (EECONFIG_USER_DATA_SIZE) == 0

@@ -22,7 +22,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     -include "$ROOT/tests/host/include/noah_compile_config.h" \
     "$ROOT/tests/host/rgb_validation_test.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     -o "$BIN"
 
 "$BIN"

@@ -4,12 +4,12 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/action_dispatch.h"
-#include "users/noah/lib/key/handled_key.h"
-#include "users/noah/lib/key/held_action.h"
-#include "users/noah/lib/key/key_runtime_process.h"
-#include "users/noah/lib/key/key_runtime_state.h"
-#include "users/noah/lib/pointing/pd_modes.h"
-#include "users/noah/lib/state/runtime_debug.h"
+#include "users/noah/lib/key/interaction/handled_key.h"
+#include "users/noah/lib/key/ownership/held_action.h"
+#include "users/noah/lib/key/runtime/key_runtime_process.h"
+#include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/noah_runtime.h"
 
 enum {

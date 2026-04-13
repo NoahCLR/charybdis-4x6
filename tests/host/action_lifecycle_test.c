@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/action/action_lifecycle.h"
-#include "users/noah/lib/pointing/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap_ids.h"
 
 enum {

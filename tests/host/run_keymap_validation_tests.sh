@@ -21,8 +21,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     -include "$ROOT/tests/host/include/noah_compile_config.h" \
     "$ROOT/tests/host/keymap_validation_test.c" \
-    "$ROOT/users/noah/lib/key/key_behavior_lookup.c" \
-    "$ROOT/users/noah/lib/key/keymap_validation.c" \
+    "$ROOT/users/noah/lib/key/interaction/key_behavior_lookup.c" \
+    "$ROOT/users/noah/lib/key/interaction/keymap_validation.c" \
     -o "$BIN"
 
 "$BIN"

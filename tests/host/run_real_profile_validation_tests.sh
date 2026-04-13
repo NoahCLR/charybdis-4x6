@@ -30,10 +30,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/real_profile_validation_test.c" \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c" \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c" \
-    "$ROOT/users/noah/lib/key/key_behavior_lookup.c" \
-    "$ROOT/users/noah/lib/key/keymap_validation.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/rgb_validation.c" \
+    "$ROOT/users/noah/lib/key/interaction/key_behavior_lookup.c" \
+    "$ROOT/users/noah/lib/key/interaction/keymap_validation.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     -o "$BIN"
 
 "$BIN"

@@ -6,13 +6,13 @@
 
 #include "transactions.h"
 #include "users/noah/lib/action/action_dispatch.h"
-#include "users/noah/lib/key/key_runtime_trace.h"
-#include "users/noah/lib/pointing/pd_modes.h"
-#include "users/noah/lib/state/keyboard_mod_state.h"
-#include "users/noah/lib/state/layer_ownership.h"
-#include "users/noah/lib/state/runtime_shared_state.h"
-#include "users/noah/lib/state/runtime_trace.h"
-#include "users/noah/lib/state/split_runtime_sync.h"
+#include "users/noah/lib/key/runtime/key_runtime_trace.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/state/runtime/keyboard_mod_state.h"
+#include "users/noah/lib/state/ownership/layer_ownership.h"
+#include "users/noah/lib/state/runtime/runtime_shared_state.h"
+#include "users/noah/lib/state/runtime/runtime_trace.h"
+#include "users/noah/lib/state/runtime/split_runtime_sync.h"
 
 static uint32_t fake_time32;
 static bool     fake_is_master;

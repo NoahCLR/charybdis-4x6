@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "users/noah/lib/key/key_behavior_lookup.h"
-#include "users/noah/lib/pointing/pd_mode_flags.h"
+#include "users/noah/lib/key/interaction/key_behavior_lookup.h"
+#include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 
 static char log_buffer[1024];
 

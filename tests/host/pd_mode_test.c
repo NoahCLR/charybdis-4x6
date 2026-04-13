@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "users/noah/lib/pointing/pd_mode_internal.h"
-#include "users/noah/lib/state/runtime_shared_state.h"
-#include "users/noah/lib/state/split_runtime_sync.h"
+#include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
+#include "users/noah/lib/state/runtime/runtime_shared_state.h"
+#include "users/noah/lib/state/runtime/split_runtime_sync.h"
 
 #ifndef CHARYBDIS_DRAGSCROLL_DPI
 #    define CHARYBDIS_DRAGSCROLL_DPI 100

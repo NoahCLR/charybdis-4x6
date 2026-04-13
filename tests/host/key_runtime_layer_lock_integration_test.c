@@ -4,11 +4,11 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/action/action_dispatch.h"
-#include "users/noah/lib/key/delayed_action.h"
-#include "users/noah/lib/key/key_runtime_process.h"
-#include "users/noah/lib/key/key_runtime_state.h"
-#include "users/noah/lib/pointing/pd_modes.h"
-#include "users/noah/lib/state/layer_ownership.h"
+#include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/runtime/key_runtime_process.h"
+#include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/noah_keymap_ids.h"
 #include "users/noah/noah_runtime.h"
 

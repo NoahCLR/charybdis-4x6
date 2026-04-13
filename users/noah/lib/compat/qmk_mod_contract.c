@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../state/keyboard_mod_ownership.h"
+#include "../state/ownership/keyboard_mod_ownership.h"
 
 // This userspace intentionally overrides QMK's register_mods()/unregister_mods()
 // symbols on this fork so all modifier registration flows through the shared

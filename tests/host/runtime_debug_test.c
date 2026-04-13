@@ -5,9 +5,9 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
-#include "users/noah/lib/key/held_action.h"
-#include "users/noah/lib/key/held_repeat.h"
-#include "users/noah/lib/state/runtime_debug.h"
+#include "users/noah/lib/key/ownership/held_action.h"
+#include "users/noah/lib/key/ownership/held_repeat.h"
+#include "users/noah/lib/state/runtime/runtime_debug.h"
 
 enum {
     TEST_ACTION = SAFE_RANGE + 0x10,

@@ -7,8 +7,8 @@
 #if defined(POINTING_DEVICE_ENABLE)
 
 #    include "../../action/action_dispatch.h"
-#    include "../../state/keyboard_mod_ownership.h"
-#    include "../../state/keyboard_mod_state.h"
+#    include "../../state/ownership/keyboard_mod_ownership.h"
+#    include "../../state/runtime/keyboard_mod_state.h"
 #    include "pd_mode_handler_common.h"
 
 #    define ARROW_VERTICAL_MASKED_MODS (MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_RIGHT_ALT))

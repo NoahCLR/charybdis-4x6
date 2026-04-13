@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "users/noah/lib/state/keyboard_mod_ownership.h"
-#include "users/noah/lib/state/keyboard_mod_state.h"
+#include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
+#include "users/noah/lib/state/runtime/keyboard_mod_state.h"
 
 static uint8_t fake_mods;
 static uint8_t fake_weak_mods;

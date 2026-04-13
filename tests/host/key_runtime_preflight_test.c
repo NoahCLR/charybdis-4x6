@@ -5,9 +5,9 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
-#include "users/noah/lib/key/key_runtime_process.h"
-#include "users/noah/lib/key/key_runtime_state.h"
-#include "users/noah/lib/key/key_runtime_transition.h"
+#include "users/noah/lib/key/runtime/key_runtime_process.h"
+#include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/key/runtime/key_runtime_transition.h"
 
 static bool    suppress_default;
 static bool    tracked_physical_event;

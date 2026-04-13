@@ -8,9 +8,9 @@
 #include "print.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
-#include "users/noah/lib/key/keymap_validation.h"
-#include "users/noah/lib/pointing/pd_modes.h"
-#include "users/noah/lib/rgb/rgb_validation.h"
+#include "users/noah/lib/key/interaction/keymap_validation.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/rgb/core/rgb_validation.h"
 
 static char log_buffer[16384];
 

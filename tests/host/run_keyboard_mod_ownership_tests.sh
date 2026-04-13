@@ -19,8 +19,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/keyboard_mod_ownership_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_mod_contract.c" \
-    "$ROOT/users/noah/lib/state/keyboard_mod_ownership.c" \
-    "$ROOT/users/noah/lib/state/keyboard_mod_state.c" \
+    "$ROOT/users/noah/lib/state/ownership/keyboard_mod_ownership.c" \
+    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_state.c" \
     -o "$BIN"
 
 "$BIN"

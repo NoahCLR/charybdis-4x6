@@ -5,11 +5,11 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
-#include "users/noah/lib/key/delayed_action.h"
-#include "users/noah/lib/key/key_runtime_process.h"
-#include "users/noah/lib/key/key_runtime_state.h"
-#include "users/noah/lib/pointing/pd_modes.h"
-#include "users/noah/lib/state/runtime_shared_state.h"
+#include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/runtime/key_runtime_process.h"
+#include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "users/noah/noah_runtime.h"
 
 const key_behavior_t key_behaviors[1]   = {0};

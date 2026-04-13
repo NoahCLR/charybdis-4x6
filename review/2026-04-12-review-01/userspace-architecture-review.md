@@ -121,7 +121,7 @@ The authored path is coherent:
   [`key_behavior_lookup.c`](../../users/noah/lib/key/key_behavior_lookup.c) and
   [`keymap_validation.c`](../../users/noah/lib/key/keymap_validation.c)
 - materialization in
-  [`keymap_materialize.h`](../../users/noah/lib/keymap_materialize.h)
+  [`keymap_materialize.h`](../../users/noah/keymap_materialize.h)
 
 That is a good extensibility shape for a fixed board. It keeps complexity on
 the runtime side while the authoring surface remains declarative.

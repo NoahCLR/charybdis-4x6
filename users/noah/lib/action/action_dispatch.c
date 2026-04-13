@@ -7,9 +7,9 @@
 #include "noah_keymap_ids.h"
 #include "action_lifecycle.h"
 #include "synthetic_record.h"
-#include "../key/key_runtime_state.h"
-#include "../state/keyboard_mod_state.h"
-#include "../state/layer_ownership.h"
+#include "../key/runtime/key_runtime_state.h"
+#include "../state/runtime/keyboard_mod_state.h"
+#include "../state/ownership/layer_ownership.h"
 #include "action_dispatch.h"
 
 typedef void (*noah_emit_tap_fn_t)(uint16_t keycode);

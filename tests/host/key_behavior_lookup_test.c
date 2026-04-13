@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "users/noah/lib/pointing/pd_mode_flags.h"
-#include "users/noah/lib/key/key_behavior_lookup.h"
+#include "users/noah/lib/pointing/defs/pd_mode_flags.h"
+#include "users/noah/lib/key/interaction/key_behavior_lookup.h"
 
 enum {
     TEST_LAYER_TAP_KEY      = 0x04,

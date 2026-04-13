@@ -4,13 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "users/noah/lib/key/key_runtime_feedback.h"
-#include "users/noah/lib/pointing/pd_modes.h"
-#include "users/noah/lib/rgb/rgb_automouse.h"
-#include "users/noah/lib/rgb/rgb_config_helpers.h"
-#include "users/noah/lib/state/split_runtime_sync.h"
-#include "users/noah/lib/rgb/rgb_runtime.h"
-#include "users/noah/lib/rgb/rgb_helpers.h"
+#include "users/noah/lib/key/runtime/key_runtime_feedback.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/rgb/automouse/rgb_automouse.h"
+#include "users/noah/lib/rgb/core/rgb_config_helpers.h"
+#include "users/noah/lib/state/runtime/split_runtime_sync.h"
+#include "users/noah/lib/rgb/core/rgb_runtime.h"
+#include "users/noah/lib/rgb/core/rgb_helpers.h"
 #include "ws2812.h"
 
 #ifndef RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE

@@ -6,7 +6,7 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/pointing/modes/pd_mode_handlers.h"
-#include "users/noah/lib/state/keyboard_mod_state.h"
+#include "users/noah/lib/state/runtime/keyboard_mod_state.h"
 
 #define TEST_MAX_CALLS 8
 

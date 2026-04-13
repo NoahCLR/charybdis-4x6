@@ -7,8 +7,8 @@
 
 #include "print.h"
 #include "users/noah/noah_keymap.h"
-#include "users/noah/lib/key/keymap_validation.h"
-#include "users/noah/lib/pointing/pd_mode_flags.h"
+#include "users/noah/lib/key/interaction/keymap_validation.h"
+#include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 
 static char log_buffer[4096];
 

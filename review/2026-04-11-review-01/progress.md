@@ -25,7 +25,7 @@ Completed in this pass:
   - press/release/scan transition plans
   - per-effect execution inside the transition executor
 - Added a traced-build compile gate in `tests/host/run_feature_gate_compile_tests.sh`.
-- Materialized combo output metadata in `users/noah/lib/keymap_materialize.h` so authored combo outputs are available to shared validation code without depending on QMK combo internals.
+- Materialized combo output metadata in `users/noah/keymap_materialize.h` so authored combo outputs are available to shared validation code without depending on QMK combo internals.
 - Extended `users/noah/lib/key/keymap_validation.c` with profile-level checks for:
   - unreachable `key_behaviors[]` rows that are not referenced by `keymaps[][]` or combo outputs
   - invalid combo outputs that use raw QMK layer actions and would bypass userspace layer ownership

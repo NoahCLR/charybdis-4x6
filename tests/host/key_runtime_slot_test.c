@@ -4,11 +4,11 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/action/action_lifecycle.h"
-#include "users/noah/lib/key/key_runtime_slot_effect.h"
-#include "users/noah/lib/key/key_runtime_slot_result_internal.h"
-#include "users/noah/lib/key/key_runtime_slot_result.h"
-#include "users/noah/lib/key/key_runtime_slot_step.h"
-#include "users/noah/lib/key/key_runtime_state.h"
+#include "users/noah/lib/key/runtime/slot/key_runtime_slot_effect.h"
+#include "users/noah/lib/key/runtime/slot/key_runtime_slot_result_internal.h"
+#include "users/noah/lib/key/runtime/slot/key_runtime_slot_result.h"
+#include "users/noah/lib/key/runtime/slot/key_runtime_slot_step.h"
+#include "users/noah/lib/key/runtime/key_runtime_state.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x40,

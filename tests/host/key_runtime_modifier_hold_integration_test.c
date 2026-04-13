@@ -6,9 +6,9 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/owned_keycode.h"
-#include "users/noah/lib/key/delayed_action.h"
-#include "users/noah/lib/key/key_runtime_process.h"
-#include "users/noah/lib/key/key_runtime_state.h"
+#include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/runtime/key_runtime_process.h"
+#include "users/noah/lib/key/runtime/key_runtime_state.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,

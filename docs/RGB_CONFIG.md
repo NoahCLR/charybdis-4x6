@@ -16,29 +16,35 @@ If you want to change how the current profile looks, start there.
 
 If you want to change how RGB is rendered, look at:
 
-- [`users/noah/lib/rgb/rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c)
-- [`users/noah/lib/rgb/rgb_layer_stage.c`](../users/noah/lib/rgb/rgb_layer_stage.c)
-- [`users/noah/lib/rgb/rgb_automouse_stage.c`](../users/noah/lib/rgb/rgb_automouse_stage.c)
-- [`users/noah/lib/rgb/rgb_preview_stage.c`](../users/noah/lib/rgb/rgb_preview_stage.c)
-- [`users/noah/lib/rgb/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/rgb_pd_mode_stage.c)
-- [`users/noah/lib/rgb/rgb_key_feedback_stage.c`](../users/noah/lib/rgb/rgb_key_feedback_stage.c)
-- [`users/noah/lib/rgb/rgb_automouse.c`](../users/noah/lib/rgb/rgb_automouse.c)
-- [`users/noah/lib/rgb/rgb_helpers.h`](../users/noah/lib/rgb/rgb_helpers.h)
+- [`users/noah/lib/rgb/core/rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c)
+- [`users/noah/lib/rgb/stages/rgb_layer_stage.c`](../users/noah/lib/rgb/stages/rgb_layer_stage.c)
+- [`users/noah/lib/rgb/automouse/rgb_automouse_stage.c`](../users/noah/lib/rgb/automouse/rgb_automouse_stage.c)
+- [`users/noah/lib/rgb/stages/rgb_preview_stage.c`](../users/noah/lib/rgb/stages/rgb_preview_stage.c)
+- [`users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/stages/rgb_pd_mode_stage.c)
+- [`users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`](../users/noah/lib/rgb/stages/rgb_key_feedback_stage.c)
+- [`users/noah/lib/rgb/automouse/rgb_automouse.c`](../users/noah/lib/rgb/automouse/rgb_automouse.c)
+- [`users/noah/lib/rgb/core/rgb_helpers.h`](../users/noah/lib/rgb/core/rgb_helpers.h)
+
+`users/noah/lib/rgb/` is organized by edit surface:
+
+- `core/` for runtime orchestration, shared authored-config helpers, and validation
+- `automouse/` for the auto-mouse state and its gradient renderer
+- `stages/` for the remaining ordered render stages
 
 If you want to change the small helper surface used by `rgb_config.c`,
 look at:
 
-- [`users/noah/lib/rgb/rgb_config_helpers.h`](../users/noah/lib/rgb/rgb_config_helpers.h)
+- [`users/noah/lib/rgb/core/rgb_config_helpers.h`](../users/noah/lib/rgb/core/rgb_config_helpers.h)
 
 If you want to change what authored RGB data is considered valid, also look at:
 
-- [`users/noah/lib/rgb/rgb_validation.c`](../users/noah/lib/rgb/rgb_validation.c)
+- [`users/noah/lib/rgb/core/rgb_validation.c`](../users/noah/lib/rgb/core/rgb_validation.c)
 
 If you want to change what the key-behavior overlay means instead of how it is
 painted, also look at:
 
-- [`users/noah/lib/key/key_runtime_feedback.c`](../users/noah/lib/key/key_runtime_feedback.c)
-- [`users/noah/lib/key/key_runtime_scan.c`](../users/noah/lib/key/key_runtime_scan.c)
+- [`users/noah/lib/key/runtime/key_runtime_feedback.c`](../users/noah/lib/key/runtime/key_runtime_feedback.c)
+- [`users/noah/lib/key/runtime/key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c)
 
 ## HSV Quick Reference
 
@@ -241,12 +247,12 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keyma
 
 The master half computes the semantic feedback flags. On split boards, the
 slave receives those packed flags through
-[`split_runtime_sync`](../users/noah/lib/state/split_runtime_sync.c), including
+[`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c), including
 the flash-phase bit used to keep both halves in sync.
 
 ## Render Order
 
-[`rgb_runtime.c`](../users/noah/lib/rgb/rgb_runtime.c) applies RGB in a deliberate order:
+[`rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c) applies RGB in a deliberate order:
 
 1. active non-base layers compose from low to high:
    full-board layer colors wash the whole board, and mapped-only layers paint
@@ -271,7 +277,7 @@ Examples:
 
 ## The Helper Types
 
-[`users/noah/lib/rgb/rgb_helpers.h`](../users/noah/lib/rgb/rgb_helpers.h) defines the small config structs used by
+[`users/noah/lib/rgb/core/rgb_helpers.h`](../users/noah/lib/rgb/core/rgb_helpers.h) defines the small config structs used by
 [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c):
 
 - `pd_mode_color_t`
@@ -280,7 +286,7 @@ Examples:
 - `layer_led_group_t`
 - `pd_mode_led_group_t`
 
-[`users/noah/lib/rgb/rgb_config_helpers.h`](../users/noah/lib/rgb/rgb_config_helpers.h)
+[`users/noah/lib/rgb/core/rgb_config_helpers.h`](../users/noah/lib/rgb/core/rgb_config_helpers.h)
 defines the shared `HSV(...)`, `EXPORT_LAYER_LED_GROUPS(...)`, and
 `EXPORT_PD_MODE_LED_GROUPS(...)` helpers used by the authored config tables.
 

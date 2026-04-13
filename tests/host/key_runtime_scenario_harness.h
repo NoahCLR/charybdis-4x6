@@ -3,11 +3,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "users/noah/lib/key/delayed_action.h"
-#include "users/noah/lib/key/key_behavior_lookup.h"
-#include "users/noah/lib/key/key_runtime_effect.h"
-#include "users/noah/lib/pointing/pd_mode_flags.h"
-#include "users/noah/lib/state/runtime_shared_state.h"
+#include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/interaction/key_behavior_lookup.h"
+#include "users/noah/lib/key/runtime/effects/key_runtime_effect.h"
+#include "users/noah/lib/pointing/defs/pd_mode_flags.h"
+#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 typedef key_runtime_effect_t key_runtime_scenario_effect_t;
 

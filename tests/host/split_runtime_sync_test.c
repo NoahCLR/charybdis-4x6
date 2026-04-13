@@ -5,8 +5,8 @@
 #include <string.h>
 
 #include "transactions.h"
-#include "users/noah/lib/key/key_runtime_feedback.h"
-#include "users/noah/lib/state/split_runtime_sync.h"
+#include "users/noah/lib/key/runtime/key_runtime_feedback.h"
+#include "users/noah/lib/state/runtime/split_runtime_sync.h"
 
 static uint32_t       fake_time32;
 static bool           fake_is_master;
