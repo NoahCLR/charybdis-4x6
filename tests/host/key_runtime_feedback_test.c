@@ -249,7 +249,14 @@ static void test_fallback_hold_has_no_hold_feedback(void) {
     active_key = (active_key_state_t){
         .owner.keycode                 = KC_RIGHT_ALT,
         .lifecycle.held_action_keycode = KC_RIGHT_ALT,
-        .lifecycle.hold_strategy       = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
+        .interaction.valid             = true,
+        .interaction.view              = {
+            .tap_action    = KC_NO,
+            .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
+            .layer         = UINT8_MAX,
+            .pd_mode       = 0,
+            .flags         = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_FALLBACK_HOLD,
+        },
     };
 
     uint8_t flags = key_feedback_pack();
@@ -260,13 +267,22 @@ static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) 
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .owner.keycode = KC_RIGHT_ALT,
-        .binding.hold =
-            {
-                .present = true,
-                .action  = MO(3),
-                .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
-            },
+        .owner.keycode           = KC_RIGHT_ALT,
+        .interaction.valid       = true,
+        .interaction.view        = {
+            .tap_action    = KC_NO,
+            .hold =
+                {
+                    .present = true,
+                    .action  = MO(3),
+                    .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+                },
+            .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+            .tap_hold_term = 120,
+            .layer         = UINT8_MAX,
+            .pd_mode       = 0,
+            .flags         = HANDLED_KEY_FLAG_HANDLED,
+        },
     };
 
     CHECK(key_feedback_preview_layer() == 3);
@@ -276,12 +292,22 @@ static void test_cached_preview_layer_metadata_is_used_when_present(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .owner.keycode = KC_RIGHT_ALT,
-        .semantic =
-            {
-                .valid         = true,
-                .preview_layer = 4,
-            },
+        .owner.keycode           = KC_RIGHT_ALT,
+        .interaction.valid       = true,
+        .interaction.view        = {
+            .tap_action    = KC_NO,
+            .hold =
+                {
+                    .present = true,
+                    .action  = MO(4),
+                    .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+                },
+            .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+            .tap_hold_term = 120,
+            .layer         = UINT8_MAX,
+            .pd_mode       = 0,
+            .flags         = HANDLED_KEY_FLAG_HANDLED,
+        },
     };
 
     CHECK(key_feedback_preview_layer() == 4);
@@ -344,10 +370,16 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .owner.keycode           = TEST_MULTI_TAP_KEY,
-        .owner.key_pos           = pos,
-        .timing.tap_hold_term    = 120,
-        .timing.longer_hold_term = 240,
+        .owner.keycode      = TEST_MULTI_TAP_KEY,
+        .owner.key_pos      = pos,
+        .interaction.valid  = true,
+        .interaction.view   = {
+            .tap_action    = TEST_PENDING_TAP_ACTION,
+            .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+            .tap_hold_term = 120,
+            .longer_hold_term = 240,
+            .flags         = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP,
+        },
         .pending_multi_tap =
             {
                 .keycode          = TEST_MULTI_TAP_KEY,
@@ -381,12 +413,18 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
     };
 
     *test_other_slot() = (active_key_state_t){
-        .timer                   = (uint16_t)(fake_time - 150),
-        .owner.keycode           = KC_LEFT,
-        .timing.tap_hold_term    = 100,
-        .timing.longer_hold_term = 300,
-        .binding.hold            = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
-        .binding.long_hold       = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
+        .timer                 = (uint16_t)(fake_time - 150),
+        .owner.keycode         = KC_LEFT,
+        .interaction.valid     = true,
+        .interaction.view      = {
+            .tap_action    = KC_NO,
+            .hold          = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
+            .long_hold     = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
+            .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+            .tap_hold_term = 100,
+            .longer_hold_term = 300,
+            .flags         = HANDLED_KEY_FLAG_HANDLED,
+        },
     };
 
     uint8_t flags = key_feedback_pack();

@@ -93,23 +93,6 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolution
     return resolution;
 }
 
-static handled_key_view_t key_runtime_slot_release_interaction(active_key_state_t released_key, handled_key_view_t key) {
-    handled_key_view_t interaction = key_runtime_slot_interaction(&released_key);
-
-    if (released_key.interaction.valid) {
-        return interaction;
-    }
-
-    interaction.flags &= (uint16_t)~(HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
-    interaction.flags |= key.flags & (HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
-    interaction.layer            = key.layer;
-    interaction.pd_mode          = key.pd_mode;
-    interaction.has_more_taps    = key.has_more_taps;
-    interaction.step_present     = key.step_present;
-    interaction.tap_resolves_on_press = key.tap_resolves_on_press;
-    return interaction;
-}
-
 static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolve_tap_window(const key_runtime_slot_release_context_t *context) {
     if (!context) {
         return (key_runtime_slot_release_resolution_t){0};
@@ -193,7 +176,7 @@ static const key_runtime_slot_release_phase_resolver_t key_runtime_slot_release_
 };
 
 static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(active_key_state_t released_key, handled_key_view_t key, uint16_t elapsed) {
-    handled_key_view_t interaction = key_runtime_slot_release_interaction(released_key, key);
+    handled_key_view_t interaction = key_runtime_slot_interaction(&released_key);
     key_runtime_slot_release_context_t context = {
         .released_key = released_key,
         .interaction  = interaction,
@@ -221,7 +204,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_stat
 
     active_key_state_t released_key = *slot;
     uint16_t           elapsed      = timer_elapsed(released_key.timer);
-    interaction                    = key_runtime_slot_release_interaction(released_key, key);
+    interaction                    = key_runtime_slot_interaction(&released_key);
 
     result.handled = true;
 

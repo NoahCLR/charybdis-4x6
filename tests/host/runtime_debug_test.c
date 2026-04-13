@@ -173,6 +173,14 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_shared_state.pd.local_active_flags                  = PD_MODE_VOLUME;
     noah_runtime_shared_state.pd.remote_display_active_flags         = PD_MODE_ARROW;
     noah_runtime_shared_state.key.slots_by_position[0].owner.keycode = KC_C;
+    noah_runtime_shared_state.key.slots_by_position[0].interaction.valid = true;
+    noah_runtime_shared_state.key.slots_by_position[0].interaction.view = (handled_key_view_t){
+        .tap_action    = KC_C,
+        .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
+        .layer         = UINT8_MAX,
+        .pd_mode       = 0,
+        .flags         = HANDLED_KEY_FLAG_HANDLED,
+    };
 
     layer_ownership_set_lock_state(3, true);
     layer_ownership_momentary_press(layer_key, 2);
@@ -192,6 +200,8 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(snapshot.core.pd.local_active_flags == PD_MODE_VOLUME);
     CHECK(snapshot.core.pd.remote_display_active_flags == PD_MODE_ARROW);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_C);
+    CHECK(snapshot.core.key.slots_by_position[0].interaction.valid);
+    CHECK(snapshot.core.key.slots_by_position[0].interaction.view.tap_action == KC_C);
 
     CHECK(snapshot.layer_ownership.applied_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
     CHECK(snapshot.layer_ownership.locked_mask == ((layer_state_t)1u << 3));
@@ -255,8 +265,7 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(snapshot.core.pd.remote_display_active_flags == 0);
     CHECK(snapshot.core.pd.remote_display_locked_flags == 0);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_NO);
-    CHECK(snapshot.core.key.slots_by_position[0].timing.tap_hold_term == CUSTOM_TAP_HOLD_TERM);
-    CHECK(snapshot.core.key.slots_by_position[0].semantic.preview_layer == UINT8_MAX);
+    CHECK(!snapshot.core.key.slots_by_position[0].interaction.valid);
 
     CHECK(snapshot.layer_ownership.applied_layer_state == 0);
     CHECK(snapshot.layer_ownership.locked_mask == 0);

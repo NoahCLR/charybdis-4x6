@@ -602,9 +602,14 @@ Current status:
 - active slots now cache a resolved interaction snapshot and the main runtime
   readers consume that snapshot instead of the older split binding/timing
   contract
-- `binding`, `timing`, and `semantic` still exist as synchronized
-  compatibility mirrors, so the centralization is materially better but still
-  not complete
+- removed the old `binding`, `timing`, and `semantic` mirror state from
+  `active_key_state_t`
+- removed the legacy active-release merge path, so release-time semantics now
+  come from the slot-cached interaction contract rather than from partially
+  reconstructing state from the release event
+- migrated the remaining host fixtures and runtime-debug snapshot checks to the
+  slot-cached interaction contract, so the centralization is now complete for
+  recommendation 1
 
 ### Recommendation 2: introduce typed action descriptors
 

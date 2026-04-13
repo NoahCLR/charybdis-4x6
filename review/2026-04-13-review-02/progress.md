@@ -167,3 +167,57 @@ Next steps:
   active release no longer needs a legacy event-key merge path
 - start recommendation 2 after recommendation 1 no longer depends on the old
   mirror state
+
+## 2026-04-13: Recommendation 1 completed mirror removal
+
+Completed in this pass:
+
+- Removed the remaining active-slot compatibility mirrors from
+  `active_key_state_t`, so slot-owned interaction semantics now live only in
+  `interaction.view`.
+- Deleted the old `binding`, `timing`, and `semantic` storage from
+  `runtime_shared_state.h`, and removed the mirrored `hold_strategy` field from
+  slot lifecycle state.
+- Simplified `key_runtime_slot_interaction(...)` so it reads only the cached
+  interaction snapshot instead of reconstructing fallback views from split slot
+  fragments.
+- Removed the legacy active-release merge path that used release-event handled
+  key metadata to fill gaps in slot state. Active release now resolves from the
+  slot-cached interaction contract only.
+- Migrated the remaining host fixtures and runtime-debug expectations onto the
+  slot-cached interaction contract, including release, scan, feedback,
+  preflight, and snapshot coverage.
+- Updated a small number of release and multi-tap fixtures so they seed pd-mode,
+  layer, and multi-tap semantics on the active slot itself instead of expecting
+  release-time re-resolution to infer them later.
+
+Contracts touched:
+
+- `users/noah/lib/state/runtime/runtime_shared_state.h`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot.c`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c`
+- `tests/host/key_runtime_feedback_test.c`
+- `tests/host/key_runtime_preflight_test.c`
+- `tests/host/key_runtime_slot_test.c`
+- `tests/host/key_runtime_transition_test.c`
+- `tests/host/runtime_debug_test.c`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- start recommendation 2 so action meaning stops being rediscovered from raw
+  keycodes across runtime, feedback, and policy modules
+- use the now-single interaction contract as the migration base for typed action
+  descriptors instead of adding another parallel metadata seam

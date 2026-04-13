@@ -34,32 +34,9 @@ typedef struct {
     key_runtime_slot_phase_t         phase;
     uint16_t                         held_action_keycode;
     bool                             repeat_binding_active;
-    key_runtime_slot_hold_strategy_t hold_strategy;
     bool                             pd_mode_was_locked_on_press;
     bool                             layer_interrupted;
 } key_runtime_slot_lifecycle_state_t;
-
-typedef struct {
-    uint16_t        tap_action;
-    hold_behavior_t hold;
-    hold_behavior_t long_hold;
-} key_runtime_slot_binding_state_t;
-
-typedef struct {
-    uint16_t tap_hold_term;
-    uint16_t longer_hold_term;
-    uint16_t multi_tap_term;
-} key_runtime_slot_timing_state_t;
-
-typedef struct {
-    bool           valid;
-    bool           has_multi_tap;
-    bool           is_momentary_layer;
-    bool           is_layer_tap;
-    uint8_t        layer;
-    uint8_t        preview_layer;
-    pd_mode_mask_t pd_mode;
-} key_runtime_slot_semantic_state_t;
 
 typedef struct {
     bool               valid;
@@ -73,9 +50,6 @@ typedef struct {
     key_runtime_slot_owner_state_t     owner;
     key_runtime_slot_lifecycle_state_t lifecycle;
     key_runtime_slot_interaction_state_t interaction;
-    key_runtime_slot_binding_state_t   binding;
-    key_runtime_slot_timing_state_t    timing;
-    key_runtime_slot_semantic_state_t  semantic;
     multi_tap_t                        pending_multi_tap;
 } active_key_state_t;
 
@@ -94,12 +68,10 @@ typedef struct {
         .owner.keycode                 = KC_NO,                       \
         .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_IDLE, \
         .lifecycle.held_action_keycode = KC_NO,                       \
+        .interaction.view.tap_hold_term = CUSTOM_TAP_HOLD_TERM,       \
+        .interaction.view.longer_hold_term = CUSTOM_LONGER_HOLD_TERM, \
+        .interaction.view.multi_tap_term = CUSTOM_MULTI_TAP_TERM,     \
         .interaction.view.layer        = UINT8_MAX,                   \
-        .timing.tap_hold_term          = CUSTOM_TAP_HOLD_TERM,        \
-        .timing.longer_hold_term       = CUSTOM_LONGER_HOLD_TERM,     \
-        .timing.multi_tap_term         = CUSTOM_MULTI_TAP_TERM,       \
-        .semantic.layer                = UINT8_MAX,                   \
-        .semantic.preview_layer        = UINT8_MAX,                   \
         .pending_multi_tap             = {0},                         \
     }
 
