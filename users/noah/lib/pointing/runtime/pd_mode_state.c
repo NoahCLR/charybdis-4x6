@@ -165,11 +165,11 @@ pd_mode_mask_t pd_mode_local_locked_snapshot(void) {
 }
 
 pd_mode_mask_t pd_mode_display_active_snapshot(void) {
-    return pd_mode_snapshot().display.active_flags;
+    return pd_mode_snapshot().display.active_mode;
 }
 
 pd_mode_mask_t pd_mode_display_locked_snapshot(void) {
-    return pd_mode_snapshot().display.locked_flags;
+    return pd_mode_snapshot().display.locked_mode;
 }
 
 bool pd_mode_local_active(pd_mode_mask_t mode) {

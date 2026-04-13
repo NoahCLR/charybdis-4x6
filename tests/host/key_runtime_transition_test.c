@@ -129,13 +129,19 @@ static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_actio
     });
 }
 
-static void test_set_cached_interaction(active_key_state_t *slot, handled_key_resolution_t resolution) {
+static key_runtime_slot_interaction_t test_refresh_cached_interaction(key_runtime_slot_interaction_t interaction) {
+    interaction.policy  = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
+    interaction.release = key_runtime_slot_release_contract_build(interaction);
+    return interaction;
+}
+
+static void test_set_cached_interaction_view(active_key_state_t *slot, key_runtime_slot_interaction_t interaction) {
     if (!slot) {
         return;
     }
 
     slot->interaction.valid = true;
-    slot->interaction.view  = key_runtime_slot_interaction_from_resolution(resolution);
+    slot->interaction.view  = test_refresh_cached_interaction(interaction);
 }
 
 #define HOLD_LIT(expr) ((hold_behavior_t)expr)
@@ -565,9 +571,9 @@ static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
                                                                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
                                                                }, hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
-    handled_key_resolution_t pd_mode_resolution = key_runtime_slot_interaction_to_resolution(active_key.interaction.view);
-    pd_mode_resolution.pd_mode                  = PD_MODE_VOLUME;
-    test_set_cached_interaction(test_default_slot(), pd_mode_resolution);
+    key_runtime_slot_interaction_t pd_mode_interaction = active_key.interaction.view;
+    pd_mode_interaction.pd_mode                        = PD_MODE_VOLUME;
+    test_set_cached_interaction_view(test_default_slot(), pd_mode_interaction);
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_PD_MODE_KEY, &record, key, &plan));
@@ -758,22 +764,9 @@ static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
         .interaction.valid       = true,
         .interaction.view        = test_cached_interaction(KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
-    handled_key_resolution_t fallback_resolution = {
-        .keycode          = TEST_PLAIN_KEY,
-        .tap_count        = 1,
-        .step =
-            {
-                .tap = TAP_SENDS(KC_NO),
-            },
-        .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-        .layer            = UINT8_MAX,
-        .pd_mode          = 0,
-        .has_more_taps    = false,
-        .flags            = HANDLED_KEY_FLAG_HANDLED,
-    };
-    test_set_cached_interaction(test_default_slot(), fallback_resolution);
+    key_runtime_slot_interaction_t fallback_interaction = active_key.interaction.view;
+    fallback_interaction.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+    test_set_cached_interaction_view(test_default_slot(), fallback_interaction);
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_interrupt_active_key_on_other_press(&plan);
@@ -864,22 +857,11 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
         .interaction.view            = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
         .lifecycle.layer_interrupted = true,
     };
-    handled_key_resolution_t interrupted_layer_resolution = {
-        .keycode          = layer_tap_keycode,
-        .tap_count        = 1,
-        .step =
-            {
-                .tap = TAP_SENDS(TEST_FALLBACK_TAP_ACTION),
-            },
-        .tap_hold_term    = 150,
-        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-        .layer            = 2,
-        .pd_mode          = 0,
-        .has_more_taps    = false,
-        .flags            = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP,
-    };
-    test_set_cached_interaction(test_default_slot(), interrupted_layer_resolution);
+    key_runtime_slot_interaction_t interrupted_layer_interaction = active_key.interaction.view;
+    interrupted_layer_interaction.layer = 2;
+    interrupted_layer_interaction.flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
+    interrupted_layer_interaction.binding.tap_action = TEST_FALLBACK_TAP_ACTION;
+    test_set_cached_interaction_view(test_default_slot(), interrupted_layer_interaction);
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(layer_tap_keycode, &record, key, &plan));
@@ -1103,10 +1085,10 @@ static void test_release_on_other_position_starts_independent_multi_tap_chain(vo
         .interaction.valid     = true,
         .interaction.view      = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, 150),
     };
-    handled_key_resolution_t pending_tap_resolution = key_runtime_slot_interaction_to_resolution(released_slot->interaction.view);
-    pending_tap_resolution.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
-    pending_tap_resolution.has_more_taps            = true;
-    test_set_cached_interaction(released_slot, pending_tap_resolution);
+    key_runtime_slot_interaction_t pending_tap_interaction = released_slot->interaction.view;
+    pending_tap_interaction.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    pending_tap_interaction.binding.has_more_taps = true;
+    test_set_cached_interaction_view(released_slot, pending_tap_interaction);
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_MULTI_TAP_KEY, &record, key, &plan));
@@ -1274,22 +1256,11 @@ static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_laye
         .interaction.valid    = true,
         .interaction.view     = test_cached_interaction(KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
     };
-    handled_key_resolution_t layered_multi_tap_resolution = {
-        .keycode          = MO(2),
-        .tap_count        = 1,
-        .step =
-            {
-                .long_hold = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
-            },
-        .tap_hold_term    = 120,
-        .longer_hold_term = 240,
-        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-        .layer            = 2,
-        .pd_mode          = 0,
-        .has_more_taps    = true,
-        .flags            = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER,
-    };
-    test_set_cached_interaction(test_default_slot(), layered_multi_tap_resolution);
+    key_runtime_slot_interaction_t layered_multi_tap_interaction = active_key.interaction.view;
+    layered_multi_tap_interaction.layer = 2;
+    layered_multi_tap_interaction.flags |= HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER;
+    layered_multi_tap_interaction.binding.has_more_taps = true;
+    test_set_cached_interaction_view(test_default_slot(), layered_multi_tap_interaction);
 
     multi_tap = (multi_tap_t){
         .keycode          = MO(2),
@@ -1473,19 +1444,11 @@ static void test_scan_commits_implicit_hold_without_feedback(void) {
                                                                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
                                                                }, hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
-    handled_key_resolution_t implicit_hold_resolution = {
-        .keycode          = TEST_PD_MODE_KEY,
-        .tap_count        = 1,
-        .step             = key_behavior_step_none(),
-        .tap_hold_term    = 120,
-        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-        .layer            = UINT8_MAX,
-        .pd_mode          = PD_MODE_VOLUME,
-        .has_more_taps    = false,
-        .flags            = HANDLED_KEY_FLAG_HANDLED,
-    };
-    test_set_cached_interaction(test_default_slot(), implicit_hold_resolution);
+    key_runtime_slot_interaction_t implicit_hold_interaction = active_key.interaction.view;
+    implicit_hold_interaction.pd_mode                        = PD_MODE_VOLUME;
+    implicit_hold_interaction.hold_strategy                  = KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
+    implicit_hold_interaction.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
+    test_set_cached_interaction_view(test_default_slot(), implicit_hold_interaction);
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);

@@ -199,14 +199,10 @@ bool is_keyboard_master(void) {
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {
     pd_mode_snapshot_t snapshot = {
-        .local.active_flags   = fake_pd_active_flags,
-        .local.locked_flags   = fake_pd_locked_flags,
         .local.active_mode    = fake_pd_active_flags,
         .local.locked_mode    = fake_pd_locked_flags,
         .local.active_index   = PD_MODE_COUNT,
         .local.locked_index   = PD_MODE_COUNT,
-        .display.active_flags = test_display_active_flags(),
-        .display.locked_flags = test_display_locked_flags(),
         .display.active_mode  = test_display_active_flags(),
         .display.locked_mode  = test_display_locked_flags(),
         .display.active_index = PD_MODE_COUNT,
@@ -216,22 +212,22 @@ pd_mode_snapshot_t pd_mode_snapshot(void) {
     for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
         pd_mode_mask_t mode = pd_modes[index].mode_flag;
 
-        if ((snapshot.local.active_flags & mode) != 0 && snapshot.local.active_index == PD_MODE_COUNT) {
+        if ((fake_pd_active_flags & mode) != 0 && snapshot.local.active_index == PD_MODE_COUNT) {
             snapshot.local.active_index = index;
             snapshot.local.active_mode  = mode;
         }
 
-        if ((snapshot.local.locked_flags & mode) != 0 && snapshot.local.locked_index == PD_MODE_COUNT) {
+        if ((fake_pd_locked_flags & mode) != 0 && snapshot.local.locked_index == PD_MODE_COUNT) {
             snapshot.local.locked_index = index;
             snapshot.local.locked_mode  = mode;
         }
 
-        if ((snapshot.display.active_flags & mode) != 0 && snapshot.display.active_index == PD_MODE_COUNT) {
+        if ((test_display_active_flags() & mode) != 0 && snapshot.display.active_index == PD_MODE_COUNT) {
             snapshot.display.active_index = index;
             snapshot.display.active_mode  = mode;
         }
 
-        if ((snapshot.display.locked_flags & mode) != 0 && snapshot.display.locked_index == PD_MODE_COUNT) {
+        if ((test_display_locked_flags() & mode) != 0 && snapshot.display.locked_index == PD_MODE_COUNT) {
             snapshot.display.locked_index = index;
             snapshot.display.locked_mode  = mode;
         }

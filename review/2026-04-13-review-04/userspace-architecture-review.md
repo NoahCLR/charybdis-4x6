@@ -80,12 +80,14 @@ The next scaling risks are no longer "everything is tangled together". They are
 "one contract is carrying too many meanings" risks:
 
 - the handled-key resolution/interaction boundary is now much healthier, but
-  there is still cleanup left around the reconstruction bridge and the
-  resolution accessor surface used by tests/debug helpers
+  the remaining public bridge cleanup is now landed, so the main follow-up is
+  just to keep future tests from drifting back toward synthetic
+  resolution-first slot setup
 - release behavior is more structured now, but one reducer is still the main
   hotspot for cross-feature release choreography
-- pd modes now store explicit selection state, but their public
-  snapshot/transport surface is still flag-shaped in a few places
+- pd modes now store explicit selection state and their public snapshot view
+  matches that invariant; only command/transport seams still use flag-shaped
+  compatibility payloads
 - compatibility boundaries still mix unrelated fork assumptions
 - macro semantics still cross two partially separate execution models
 - the test suite is excellent, but too much higher-level coverage still treats
@@ -188,11 +190,10 @@ Implementation update:
 - `handled_key_resolution_t` now carries authored branch data instead of stored
   runtime hold strategy, tap action, and release-policy decisions
 - `key_runtime_slot_interaction(...)` now returns the slot-owned interaction
-  contract directly; tests that need authored reconstruction must call
-  `key_runtime_slot_interaction_to_resolution(...)` intentionally
-- the remaining gap is mostly at the edges: the reconstruction bridge and some
-  host fixtures still synthesize authored resolutions directly to set up slot
-  state
+  contract directly, with no public runtime-header helper that reconstructs an
+  authored resolution from slot state
+- the remaining cleanup here is mostly hygiene: keep new host fixtures from
+  synthesizing authored resolutions just to mutate slot-owned interaction state
 
 Example shape:
 
@@ -228,7 +229,7 @@ typedef struct {
 } key_runtime_slot_interaction_t;
 ```
 
-That is now close to the actual runtime shape. The main follow-up is to keep
+That is now the actual runtime shape. The main follow-up is simply to keep
 debug/test seams from drifting back toward "synthetic resolution as the default
 slot view".
 
@@ -367,8 +368,6 @@ The current design now matches the simpler state shape this review called for:
 
 ```c
 typedef struct {
-    pd_mode_mask_t active_flags;   // compatibility mirror of active_mode
-    pd_mode_mask_t locked_flags;   // compatibility mirror of locked_mode
     pd_mode_mask_t active_mode;
     pd_mode_mask_t locked_mode;
     pd_mode_traits_t active_traits;
@@ -377,10 +376,9 @@ typedef struct {
 } pd_mode_snapshot_view_t;
 ```
 
-Derived traits now come from the selected active mode definition row. The
-remaining cleanup here is mostly transport/debug debt: the flag-shaped view is
-still useful for split-sync packets and snapshot consumers, but it no longer
-pretends to be primary runtime storage.
+Derived traits now come from the selected active mode definition row. The only
+flag-shaped compatibility surface left here is the command/split-sync
+transport seam, which is the right place for it.
 
 ### 4. `compat/` is valuable, but its boundaries are still too broad
 

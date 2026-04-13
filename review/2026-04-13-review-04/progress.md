@@ -906,3 +906,72 @@ Next steps:
 - treat Finding 2 as landed enough to leave the release contract alone unless
   a concrete bug surfaces
 - move on to Finding 4 and split `compat/` into feature-owned surfaces
+
+### Implementation pass: tail cleanup for Findings 1 and 3
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Removed the last public slot-to-authored reconstruction helper from
+  `users/noah/lib/key/runtime/key_runtime_interaction.h`, so the runtime
+  header no longer exposes `key_runtime_slot_interaction_to_resolution(...)`
+  as a normal compatibility seam.
+- Updated
+  `tests/host/key_runtime_slot_test.c`
+  and
+  `tests/host/key_runtime_transition_test.c`
+  so the remaining slot-state fixtures mutate or refresh
+  `key_runtime_slot_interaction_t` directly instead of reconstructing a
+  synthetic `handled_key_resolution_t` just to write slot-owned state back.
+- Narrowed
+  `users/noah/lib/pointing/defs/pd_mode_flags.h`
+  and
+  `users/noah/lib/pointing/runtime/pd_mode_snapshot.c`
+  so `pd_mode_snapshot_view_t` now exposes only explicit selected mode
+  identity (`active_mode`, `locked_mode`, indexes, traits) and no longer
+  carries compatibility `active_flags` / `locked_flags`.
+- Updated
+  `users/noah/lib/pointing/runtime/pd_mode_state.c`
+  so the display snapshot helpers return explicit selected display mode
+  identity, leaving flag-shaped payloads only on the pd-mode command and
+  split-sync transport seams.
+- Updated the affected pd-mode, pointer-layer-policy, RGB-render, and runtime
+  host tests so their snapshot stubs and assertions match the explicit
+  selected-mode view.
+- Updated
+  `docs/KEY_RUNTIME.md`
+  and the active review so Finding 1 no longer describes the public
+  reconstruction bridge as an open gap and Finding 3 no longer describes the
+  public snapshot view as flag-shaped.
+
+Contracts touched in this pass:
+
+- `key_runtime_slot_interaction_t`
+- removal of `key_runtime_slot_interaction_to_resolution(...)`
+- `pd_mode_snapshot_view_t`
+- `pd_mode_display_active_snapshot(...)`
+- `pd_mode_display_locked_snapshot(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- treat Findings 1, 2, and 3 as landed
+- move on to Finding 4 and split `compat/` into feature-owned surfaces

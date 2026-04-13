@@ -289,17 +289,15 @@ static void test_trait_queries_match_manifest_policy(void) {
     snapshot = pd_mode_snapshot();
     CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_PREFER_TYPING_LAYER));
     CHECK(!pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
-    CHECK(snapshot.local.active_flags == PD_MODE_ARROW);
     CHECK(snapshot.local.active_mode == PD_MODE_ARROW);
     CHECK(snapshot.local.active_index == PD_MODE_INDEX_ARROW);
     CHECK((snapshot.local.active_traits & PD_MODE_TRAIT_PREFER_TYPING_LAYER) != 0);
-    CHECK(snapshot.display.active_flags == PD_MODE_ARROW);
+    CHECK(pd_mode_display_active_snapshot() == PD_MODE_ARROW);
 
     pd_mode_activate(PD_MODE_PINCH);
     snapshot = pd_mode_snapshot();
     CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED));
     CHECK(pd_any_active_mode_has_trait(PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND));
-    CHECK(snapshot.local.active_flags == PD_MODE_PINCH);
     CHECK(snapshot.local.active_mode == PD_MODE_PINCH);
     CHECK(snapshot.local.active_index == PD_MODE_INDEX_PINCH);
     CHECK((snapshot.local.active_traits & PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED) != 0);
@@ -327,10 +325,8 @@ static void test_apply_remote_snapshot_keeps_only_one_effective_mode(void) {
     CHECK(!pd_mode_display_active(PD_MODE_VOLUME));
     CHECK(!pd_mode_local_active(PD_MODE_ARROW));
     CHECK(!pd_mode_local_locked(PD_MODE_ARROW));
-    CHECK(snapshot.local.active_flags == 0);
+    CHECK(snapshot.local.active_mode == 0);
     CHECK(snapshot.local.active_index == PD_MODE_COUNT);
-    CHECK(snapshot.display.active_flags == PD_MODE_ARROW);
-    CHECK(snapshot.display.locked_flags == PD_MODE_ARROW);
     CHECK(snapshot.display.active_mode == PD_MODE_ARROW);
     CHECK(snapshot.display.locked_mode == PD_MODE_ARROW);
     CHECK(snapshot.display.active_index == PD_MODE_INDEX_ARROW);
@@ -396,10 +392,10 @@ static void test_apply_command_reports_before_after_and_sync_intent_for_key_pres
     CHECK(result.local_state_changed);
     CHECK(result.display_state_changed);
     CHECK(result.split_sync_required);
-    CHECK(result.before.local.active_flags == PD_MODE_ARROW);
-    CHECK(result.before.local.locked_flags == PD_MODE_ARROW);
-    CHECK(result.after.local.active_flags == PD_MODE_BRIGHTNESS);
-    CHECK(result.after.local.locked_flags == 0);
+    CHECK(result.before.local.active_mode == PD_MODE_ARROW);
+    CHECK(result.before.local.locked_mode == PD_MODE_ARROW);
+    CHECK(result.after.local.active_mode == PD_MODE_BRIGHTNESS);
+    CHECK(result.after.local.locked_mode == 0);
     CHECK(split_sync_count == 0);
     CHECK(reset_arrow_count == 1);
 }
@@ -420,10 +416,10 @@ static void test_apply_command_reports_display_only_remote_snapshot_change(void)
     CHECK(!result.local_state_changed);
     CHECK(result.display_state_changed);
     CHECK(!result.split_sync_required);
-    CHECK(result.before.local.active_flags == 0);
-    CHECK(result.after.local.active_flags == 0);
-    CHECK(result.after.display.active_flags == PD_MODE_ARROW);
-    CHECK(result.after.display.locked_flags == PD_MODE_ARROW);
+    CHECK(result.before.local.active_mode == 0);
+    CHECK(result.after.local.active_mode == 0);
+    CHECK(result.after.display.active_mode == PD_MODE_ARROW);
+    CHECK(result.after.display.locked_mode == PD_MODE_ARROW);
 }
 
 static void test_apply_command_release_reports_handled_without_sync_when_locked(void) {
@@ -441,8 +437,8 @@ static void test_apply_command_release_reports_handled_without_sync_when_locked(
     CHECK(result.handled);
     CHECK(!result.local_state_changed);
     CHECK(!result.split_sync_required);
-    CHECK(result.after.local.active_flags == PD_MODE_VOLUME);
-    CHECK(result.after.local.locked_flags == PD_MODE_VOLUME);
+    CHECK(result.after.local.active_mode == PD_MODE_VOLUME);
+    CHECK(result.after.local.locked_mode == PD_MODE_VOLUME);
 }
 
 static void test_handle_keycode_press_and_release_updates_state_and_syncs(void) {

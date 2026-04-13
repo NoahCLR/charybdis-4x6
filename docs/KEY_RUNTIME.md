@@ -243,9 +243,9 @@ These are the easiest runtime rules to break by accident:
   authored data or from mutable slot state.
 - `key_runtime_slot_interaction(...)` and
   `key_runtime_slot_cached_interaction(...)` both expose the slot-owned
-  interaction contract. If you need an authored-resolution reconstruction for a
-  test or debug snapshot, use
-  `key_runtime_slot_interaction_to_resolution(...)` intentionally.
+  interaction contract. Test/debug seams that need an authored-resolution-like
+  value should build that locally instead of reaching back through a public
+  runtime-header conversion helper.
 - Feedback and debug readers should prefer cached slot semantic metadata over
   re-running handled-key resolution against mutable slot state.
 - New emitters should prefer the explicit helpers in

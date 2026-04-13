@@ -234,21 +234,6 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_r
     return interaction;
 }
 
-static inline handled_key_resolution_t key_runtime_slot_interaction_to_resolution(key_runtime_slot_interaction_t interaction) {
-    return (handled_key_resolution_t){
-        .keycode               = interaction.selection.keycode,
-        .tap_count             = interaction.selection.tap_count,
-        .step                  = interaction.selection.step,
-        .tap_hold_term         = interaction.binding.tap_hold_term,
-        .longer_hold_term      = interaction.binding.longer_hold_term,
-        .multi_tap_term        = interaction.binding.multi_tap_term,
-        .layer                 = interaction.layer,
-        .pd_mode               = interaction.pd_mode,
-        .has_more_taps         = interaction.binding.has_more_taps,
-        .flags                 = interaction.flags & (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD),
-    };
-}
-
 static inline bool key_runtime_slot_interaction_uses_implicit_hold(key_runtime_slot_interaction_t interaction) {
     return (interaction.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) != 0;
 }

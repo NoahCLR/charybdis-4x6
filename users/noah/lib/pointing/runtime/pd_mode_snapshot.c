@@ -28,8 +28,6 @@ static uint8_t pd_mode_snapshot_mode_index(pd_mode_mask_t mode) {
 
 static pd_mode_snapshot_view_t pd_mode_snapshot_build_view(pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode) {
     pd_mode_snapshot_view_t view = {
-        .active_flags  = active_mode,
-        .locked_flags  = locked_mode,
         .active_mode   = active_mode,
         .locked_mode   = locked_mode,
         .active_index  = pd_mode_snapshot_mode_index(active_mode),

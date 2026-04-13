@@ -74,13 +74,19 @@ static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_actio
     });
 }
 
-static void test_set_cached_interaction(active_key_state_t *slot, handled_key_resolution_t resolution) {
+static key_runtime_slot_interaction_t test_refresh_cached_interaction(key_runtime_slot_interaction_t interaction) {
+    interaction.policy  = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
+    interaction.release = key_runtime_slot_release_contract_build(interaction);
+    return interaction;
+}
+
+static void test_set_cached_interaction_view(active_key_state_t *slot, key_runtime_slot_interaction_t interaction) {
     if (!slot) {
         return;
     }
 
     slot->interaction.valid = true;
-    slot->interaction.view  = key_runtime_slot_interaction_from_resolution(resolution);
+    slot->interaction.view  = test_refresh_cached_interaction(interaction);
 }
 
 #define HOLD_LIT(expr) ((hold_behavior_t)expr)
@@ -557,10 +563,10 @@ static void test_take_active_release_starts_pending_multi_tap_chain(void) {
         .interaction.valid     = true,
         .interaction.view      = test_cached_interaction(TEST_SINGLE_ACTION, hold_behavior_none(), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, 150),
     };
-    handled_key_resolution_t pending_multi_tap_resolution = key_runtime_slot_interaction_to_resolution(slot->interaction.view);
-    pending_multi_tap_resolution.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
-    pending_multi_tap_resolution.has_more_taps = true;
-    test_set_cached_interaction(slot, pending_multi_tap_resolution);
+    key_runtime_slot_interaction_t pending_multi_tap_interaction = slot->interaction.view;
+    pending_multi_tap_interaction.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    pending_multi_tap_interaction.binding.has_more_taps = true;
+    test_set_cached_interaction_view(slot, pending_multi_tap_interaction);
     CHECK(slot->interaction.view.release.tap.outcome == KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP);
     CHECK(slot->interaction.view.release.tap.action == TEST_SINGLE_ACTION);
     CHECK(slot->interaction.view.release.tap.repeat_count == 1);
@@ -640,9 +646,9 @@ static void test_take_active_release_maps_locked_pd_mode_tap(void) {
         .interaction.valid                     = true,
         .interaction.view                      = test_cached_interaction(TEST_SINGLE_ACTION, hold_behavior_none(), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
-    handled_key_resolution_t pd_mode_resolution = key_runtime_slot_interaction_to_resolution(slot->interaction.view);
-    pd_mode_resolution.pd_mode                  = PD_MODE_VOLUME;
-    test_set_cached_interaction(slot, pd_mode_resolution);
+    key_runtime_slot_interaction_t pd_mode_interaction = slot->interaction.view;
+    pd_mode_interaction.pd_mode                        = PD_MODE_VOLUME;
+    test_set_cached_interaction_view(slot, pd_mode_interaction);
 
     result = test_step_handled_release(slot, TEST_PD_MODE_KEY, pos,
                                        (key_behavior_view_t){
