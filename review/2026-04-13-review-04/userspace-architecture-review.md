@@ -10,16 +10,16 @@ architecture, structure, and long-term extensibility.
 
 Implementation update later the same day: the first slice of Finding 1 and the
 first slice of Finding 2 have landed, followed by the authored/runtime seam
-migration, the removal of the last public handled-key compatibility alias, and
-the removal of the slot interaction's anonymous direct-field mirror. Active
-slot storage now uses
+migration, the removal of the last public handled-key compatibility alias, the
+removal of the slot interaction's anonymous direct-field mirror, and a narrower
+slot-owned branch contract. Active slot storage now uses
 `key_runtime_slot_interaction_t` as the slot-owned cached interaction contract,
-and authored lookup now has an explicit `handled_key_resolution_t` surface with
-`handled_key_resolution_*` accessors and explicit slot conversion helpers. The
-active-release reducer now also executes a typed release contract derived from
-that interaction instead of reconstructing all release semantics directly from
-raw hold flags, and runtime consumers now read cached authored semantics
-through `interaction.resolution` instead of through a flat mirrored struct.
+while authored lookup stays on the outer seam as `handled_key_resolution_t`
+with `handled_key_resolution_*` accessors. The slot interaction now caches a
+slot-owned branch record, cached hold policy, and a cached release contract.
+The active-release reducer executes that typed release contract instead of
+reconstructing release semantics from raw hold flags, and runtime consumers no
+longer treat cached slot interaction as a stored authored resolution object.
 
 This review is intentionally not a repeat of the earlier action-family,
 pd-mode write-controller, macro IR, and test-harness recommendations. Those
@@ -55,10 +55,11 @@ architectural properties that many firmware repos never reach:
 The next scaling risks are no longer "everything is tangled together". They are
 "one contract is carrying too many meanings" risks:
 
-- the handled-key resolution/interaction boundary only recently split, and one
-  slot contract still carries more than one concern
-- release behavior is still resolved by a large feature matrix inside one
-  reducer instead of by a narrower release contract
+- the handled-key resolution/interaction boundary has improved materially, but
+  the authored resolution object still carries more derived runtime semantics
+  than ideal
+- release behavior is more structured now, but one reducer is still the main
+  hotspot for cross-feature release choreography
 - pd modes are represented as composable bitmasks even though the runtime
   enforces one effective active mode and one effective lock
 - compatibility boundaries still mix unrelated fork assumptions
@@ -121,15 +122,15 @@ still doing too much:
   authored config in `handled_key.c`
 - `handled_key_resolution_t` still carries runtime-facing policy flags and
   derived hold semantics in `handled_key.h`
-- `key_runtime_slot_press_interaction(...)` mutates that same type before
-  storing it into slot state in `key_runtime_slot_press_reduce.c`
-- feedback and scan reducers later consume the stored value as if it were the
-  stable slot interaction contract
+- `key_runtime_slot_press_interaction(...)` still derives a large amount of
+  slot behavior directly from that one type in `key_runtime_slot_press_reduce.c`
+- feedback, scan, and release code still depend on many fields that originate
+  as authored-resolution output even though slot interaction is now narrower
 
 This means one struct currently represents:
 
 - authored lookup output
-- per-press resolved interaction state
+- derived per-press hold/tap semantics
 - feedback/release-policy metadata
 
 That is a leaky abstraction. A future behavior family will tend to add another
@@ -160,8 +161,9 @@ Implementation update:
   `handled_key_resolution_t`
 - cached hold policy now lives with the slot interaction contract instead of
   being recomputed at every feedback/scan consumer
-- `key_runtime_slot_interaction_t` now carries an explicit `.resolution`
-  object, and the public `handled_key_view_t` alias has now been removed
+- `key_runtime_slot_interaction_t` no longer stores the full authored
+  resolution object; it now caches a slot-owned branch record plus semantic
+  fields, policy, and release contract
 - runtime/process/host seams now name authored lookup output as
   `handled_key_resolution_t` directly
 - the remaining gap is that `handled_key_resolution_t` still carries a large
@@ -183,21 +185,20 @@ typedef struct {
 } handled_key_resolution_t;
 
 typedef struct {
-    handled_key_resolution_t          resolution;
-    handled_key_interaction_policy_t  policy;
+    key_runtime_slot_binding_t        binding;
     key_runtime_slot_hold_strategy_t  hold_strategy;
-    uint16_t                          tap_action;
-    uint8_t                           tap_repeat_count;
-    uint16_t                          tap_hold_term;
-    uint16_t                          longer_hold_term;
-    uint16_t                          multi_tap_term;
+    uint8_t                           layer;
+    pd_mode_mask_t                    pd_mode;
+    uint16_t                          flags;
+    handled_key_interaction_policy_t  policy;
+    key_runtime_slot_release_contract_t release;
 } key_runtime_slot_interaction_t;
 ```
 
 That would make the slot model clearer and keep feedback/release code from
 depending on "whatever the cached handled-key resolution happens to mean at this phase".
 
-### 2. Release behavior is still a monolithic feature matrix
+### 2. Release behavior is narrower, but still concentrated in one hotspot
 
 `key_runtime_slot_release_active.c` is still the main place where cross-feature
 release semantics are reconstructed from:
@@ -268,9 +269,9 @@ Implementation update:
   lock, release-hold selection, and multi-tap buffering are now expressed
   through that contract instead of each branch reinterpreting raw interaction
   fields independently
-- the remaining gap is timing: the contract is still derived on demand from the
-  cached slot interaction at release time rather than being cached when the
-  press or tap-count branch resolves
+- the remaining gap is that the reducer still owns a lot of phase-specific
+  branch choreography even though the contract is now cached when the press or
+  tap-count branch resolves
 
 ### 3. PD-mode state still advertises composition while the runtime enforces exclusivity
 

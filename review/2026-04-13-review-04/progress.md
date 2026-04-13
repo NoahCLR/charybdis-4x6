@@ -344,12 +344,67 @@ Workspace scope:
 - no sibling workspace folders were edited
 - all changes are confined to `charybdis-4x6/`
 
+### Implementation pass: slot-owned branch contract and cached release semantics
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Narrowed
+  `users/noah/lib/key/runtime/key_runtime_interaction.h`
+  so `key_runtime_slot_interaction_t` no longer stores the full authored
+  `handled_key_resolution_t`. It now stores a slot-owned
+  `key_runtime_slot_binding_t`, top-level slot semantic fields
+  (`hold_strategy`, `layer`, `pd_mode`, `flags`), cached hold policy, and a
+  cached release contract.
+- Added press-time caching of `key_runtime_slot_release_contract_t` inside the
+  slot interaction contract so release reducers execute the cached contract
+  instead of reconstructing it from resolution fields at release time.
+- Updated release, feedback, scan, pending-multi-tap, and slot-policy
+  reducers to consume `interaction.binding`, cached semantic fields, and the
+  cached release contract.
+- Kept `key_runtime_slot_interaction_to_resolution(...)` as a reconstruction
+  helper for compatibility and host setup, then updated the transition/slot
+  host suites and runtime-debug assertions to work with the new slot-owned
+  branch shape.
+- Updated the maintainer/runtime review docs to describe cached interaction as
+  slot-owned binding plus cached policy/release semantics rather than a stored
+  authored resolution object.
+
+Contracts touched in this pass:
+
+- `key_runtime_slot_binding_t`
+- `key_runtime_slot_interaction_t`
+- `key_runtime_slot_release_contract_t`
+- `key_runtime_slot_release_contract(...)`
+- runtime consumers of `key_runtime_slot_cached_interaction(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
 Next steps:
 
 - continue finding 1 by deciding whether `handled_key_resolution_t` itself
-  should stay as the cached per-press authored branch contract or be narrowed
-  further into a smaller slot-owned branch record
-- if release-contract work continues, move contract construction earlier so the
-  slot interaction can cache release semantics at press/tap-branch resolution
+  should keep carrying derived runtime-facing policy flags/hold semantics or be
+  narrowed further toward authored branch selection only
+- decide whether the remaining
+  `key_runtime_slot_interaction_to_resolution(...)` compatibility helper should
+  stay for tests/debugging or be replaced with dedicated host/runtime snapshot
+  helpers
 - after that, make pd-mode exclusivity explicit in the public state model and
   split the remaining compatibility seams by owning subsystem

@@ -630,8 +630,8 @@ static void test_modifier_multi_tap_first_tap_is_buffered(void) {
     CHECK(active_key.owner.keycode == KC_RIGHT_ALT);
     CHECK(!key_runtime_slot_uses_implicit_hold(&active_key));
     CHECK(key_runtime_slot_uses_fallback_hold(&active_key));
-    CHECK(!active_key.interaction.view.resolution.hold.present);
-    CHECK(active_key.interaction.view.resolution.tap_action == KC_NO);
+    CHECK(!active_key.interaction.view.binding.hold.present);
+    CHECK(active_key.interaction.view.binding.tap_action == KC_NO);
 
     fake_time = (uint16_t)(fake_time + 50);
 
@@ -660,7 +660,7 @@ static void test_single_tap_override_activates_fallback_hold_at_threshold(void) 
 
     CHECK(plan.count == 0);
     CHECK(key_runtime_slot_uses_fallback_hold(&active_key));
-    CHECK(active_key.interaction.view.resolution.tap_action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(active_key.interaction.view.binding.tap_action == TEST_FALLBACK_TAP_ACTION);
     CHECK(active_key.lifecycle.held_action_keycode == KC_NO);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 10);
@@ -714,7 +714,7 @@ static void test_non_modifier_single_tap_override_activates_fallback_hold_at_thr
 
     CHECK(plan.count == 0);
     CHECK(key_runtime_slot_uses_fallback_hold(&active_key));
-    CHECK(active_key.interaction.view.resolution.tap_action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(active_key.interaction.view.binding.tap_action == TEST_FALLBACK_TAP_ACTION);
     CHECK(active_key.lifecycle.held_action_keycode == KC_NO);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 10);
@@ -960,7 +960,7 @@ static void test_press_on_different_position_preserves_existing_active_state(voi
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
     CHECK(plan.items[0].data.held_action.action == TEST_IMMEDIATE_HOLD);
     CHECK(active_key.owner.keycode == TEST_PREVIOUS_KEY);
-    CHECK(active_key.interaction.view.resolution.tap_action == TEST_PREVIOUS_TAP_ACTION);
+    CHECK(active_key.interaction.view.binding.tap_action == TEST_PREVIOUS_TAP_ACTION);
     CHECK(new_slot->owner.keycode == TEST_NEW_KEY);
     CHECK(new_slot->owner.key_pos.row == record.event.key.row);
     CHECK(new_slot->owner.key_pos.col == record.event.key.col);

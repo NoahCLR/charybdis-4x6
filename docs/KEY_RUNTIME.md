@@ -163,8 +163,8 @@ The main fields are:
   hold strategy, pd-mode lock state on press, and whether a layer hold was
   interrupted by another key
 - `interaction`: cached `key_runtime_slot_interaction_t`, which owns the
-  active press's `handled_key_resolution_t` branch plus cached hold/release
-  policy used by feedback, scan, and release reducers
+  active press's slot-owned branch record plus cached hold/release policy and
+  release semantics used by feedback, scan, and release reducers
 - `pending_multi_tap`: deferred tap-chain state that remains after release
 
 The phase enum is small but important:

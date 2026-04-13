@@ -118,9 +118,9 @@ key_runtime_effect_builder_t key_runtime_slot_policy_take_flush(active_key_state
             builder.kind   = KEY_RUNTIME_EFFECT_BUILDER_HELD_UNREGISTER;
             builder.action = slot->lifecycle.held_action_keycode;
         }
-    } else if (!is_layer_key(slot->owner.keycode) && interaction.resolution.tap_action != KC_NO) {
+    } else if (!is_layer_key(slot->owner.keycode) && interaction.binding.tap_action != KC_NO) {
         builder.kind   = KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION;
-        builder.action = interaction.resolution.tap_action;
+        builder.action = interaction.binding.tap_action;
     }
 
     key_runtime_slot_reset(slot);
