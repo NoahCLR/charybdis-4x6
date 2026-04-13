@@ -609,3 +609,60 @@ Next steps:
   hotspot into small typed helpers
 - after that, decide whether the remaining flag-shaped pd-mode snapshot view
   should stay as the long-term split/debug contract or be narrowed further
+
+### Implementation pass: typed tap release contract
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Narrowed
+  `users/noah/lib/key/runtime/key_runtime_interaction.h`
+  so `key_runtime_slot_release_contract_t` now carries a typed tap contract
+  with explicit `DISPATCH_ACTION` / `BUFFER_MULTI_TAP` outcomes instead of a
+  loose `tap_action` plus `buffers_multi_tap` pairing.
+- Updated
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c`
+  so active release now executes that typed tap contract through one helper
+  instead of re-materializing tap behavior inside the reducer switch.
+- Extended
+  `tests/host/key_runtime_slot_test.c`
+  and
+  `tests/host/key_runtime_transition_test.c`
+  to assert the new cached tap-contract seam directly for normal tap dispatch,
+  multi-tap buffering, and modifier multi-tap buffering with `KC_NO`.
+- Updated
+  `docs/KEY_RUNTIME.md`
+  and the active review so the maintainer-facing description matches the
+  narrower release-contract shape.
+
+Contracts touched in this pass:
+
+- `key_runtime_slot_release_tap_contract_t`
+- `key_runtime_slot_release_contract_t`
+- `key_runtime_slot_release_contract_build(...)`
+- `key_runtime_slot_reduce_active_release(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- keep shrinking the remaining phase-specific branch choreography inside
+  `key_runtime_slot_release_active.c`
+- then decide whether the next Finding 2 slice should move more branch
+  selection into the cached release contract or into small phase-specific
+  helpers

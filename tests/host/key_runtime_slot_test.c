@@ -561,6 +561,9 @@ static void test_take_active_release_starts_pending_multi_tap_chain(void) {
     pending_multi_tap_resolution.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
     pending_multi_tap_resolution.has_more_taps = true;
     test_set_cached_interaction(slot, pending_multi_tap_resolution);
+    CHECK(slot->interaction.view.release.tap.outcome == KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP);
+    CHECK(slot->interaction.view.release.tap.action == TEST_SINGLE_ACTION);
+    CHECK(slot->interaction.view.release.tap.repeat_count == 1);
 
     result = test_step_handled_release(slot, TEST_MULTI_TAP_KEY, pos,
                                        (key_behavior_view_t){
@@ -600,6 +603,8 @@ static void test_take_active_release_quick_immediate_hold_becomes_tap(void) {
                                                                    .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
                                                                }, hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
+    CHECK(slot->interaction.view.release.tap.outcome == KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION);
+    CHECK(slot->interaction.view.release.tap.action == TEST_SINGLE_ACTION);
 
     result = test_step_handled_release(slot, TEST_ACTIVE_KEY, pos,
                                        (key_behavior_view_t){

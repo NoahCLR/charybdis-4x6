@@ -195,6 +195,26 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(ac
     return resolver ? resolver(&context) : key_runtime_slot_release_resolution_base(&context);
 }
 
+static void key_runtime_slot_release_apply_tap(key_runtime_slot_result_t *result, active_key_state_t *slot, uint16_t keycode, keypos_t key_pos,
+                                               key_runtime_slot_interaction_t interaction, key_runtime_slot_release_contract_t contract) {
+    if (!(result && slot)) {
+        return;
+    }
+
+    switch (contract.tap.outcome) {
+        case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP:
+            key_runtime_slot_begin_pending_multi_tap(slot, keycode, key_pos, contract.tap.action, contract.tap.repeat_count, interaction.binding.tap_hold_term,
+                                                     interaction.binding.multi_tap_term, interaction.binding.has_more_taps);
+            return;
+        case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
+            key_runtime_slot_result_push_dispatch_action(result, key_pos, contract.tap.action);
+            return;
+        case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE:
+        default:
+            return;
+    }
+}
+
 key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_state_t *slot, uint16_t keycode) {
     key_runtime_slot_result_t result = {0};
     key_runtime_slot_interaction_t interaction;
@@ -227,12 +247,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_stat
 
     switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP:
-            if (contract.buffers_multi_tap) {
-                uint8_t first_tap_repeat_count = contract.tap_action == KC_NO ? 0 : 1;
-                key_runtime_slot_begin_pending_multi_tap(slot, keycode, released_key.owner.key_pos, contract.tap_action, first_tap_repeat_count, interaction.binding.tap_hold_term, interaction.binding.multi_tap_term, interaction.binding.has_more_taps);
-            } else if (contract.tap_action != KC_NO) {
-                key_runtime_slot_result_push_dispatch_action(&result, released_key.owner.key_pos, contract.tap_action);
-            }
+            key_runtime_slot_release_apply_tap(&result, slot, keycode, released_key.owner.key_pos, interaction, contract);
             return result;
         case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_ACTION:
             key_runtime_slot_result_push_dispatch_action(&result, released_key.owner.key_pos, resolution.action);

@@ -644,6 +644,9 @@ static void test_modifier_multi_tap_first_tap_is_buffered(void) {
     CHECK(key_runtime_slot_uses_fallback_hold(&active_key));
     CHECK(!active_key.interaction.view.binding.hold.present);
     CHECK(active_key.interaction.view.binding.tap_action == KC_NO);
+    CHECK(active_key.interaction.view.release.tap.outcome == KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP);
+    CHECK(active_key.interaction.view.release.tap.action == KC_NO);
+    CHECK(active_key.interaction.view.release.tap.repeat_count == 0);
 
     fake_time = (uint16_t)(fake_time + 50);
 

@@ -164,8 +164,8 @@ The main fields are:
   interrupted by another key
 - `interaction`: cached `key_runtime_slot_interaction_t`, which owns the
   active press's authored branch selection plus slot-owned binding,
-  cached hold policy, and cached release semantics used by feedback, scan,
-  and release reducers
+  cached hold policy, and cached release semantics including typed tap
+  materialization used by feedback, scan, and release reducers
 - `pending_multi_tap`: deferred tap-chain state that remains after release
 
 The phase enum is small but important:
