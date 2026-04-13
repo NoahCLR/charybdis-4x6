@@ -9,6 +9,7 @@
 #include "key_runtime_slot_policy.h"
 #include "key_runtime_slot_result_internal.h"
 
+#include "../key_runtime_trace.h"
 #include "../../../pointing/defs/pd_modes.h"
 
 static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavior_t hold) {
@@ -124,13 +125,16 @@ static key_runtime_slot_press_outcome_t key_runtime_slot_press_outcome_for_conte
 
 static key_runtime_slot_result_t key_runtime_slot_reduce_press_reuse_pending_multi_tap(const key_runtime_slot_press_context_t *context) {
     key_runtime_slot_result_t result = {0};
+    uint16_t                  action;
 
     if (!(context && context->slot)) {
         return result;
     }
 
     result.handled = true;
-    key_runtime_slot_result_push_dispatch_action(&result, context->key_pos, key_runtime_slot_advance_pending_multi_tap(context->slot, context->keycode));
+    action = key_runtime_slot_advance_pending_multi_tap(context->slot, context->keycode);
+    key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_PRESS_REUSE_CHAIN, context->slot->pending_multi_tap.count, action);
+    key_runtime_slot_result_push_dispatch_action(&result, context->key_pos, action);
 
     if (context->needs_layer_press) {
         key_runtime_slot_result_push_layer_press(&result, context->key_pos, context->layer);
@@ -169,6 +173,7 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_begin_fresh(const
 
     if (context->flush_pending_multi_tap) {
         key_runtime_slot_pending_multi_tap_flush_t flush = key_runtime_slot_take_pending_multi_tap_flush(context->slot);
+        key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_PRESS_FLUSH_CHAIN, flush.repeat_count, flush.action);
         key_runtime_slot_result_push_delayed_action(&result, flush.action, flush.mods, flush.repeat_count);
     }
 

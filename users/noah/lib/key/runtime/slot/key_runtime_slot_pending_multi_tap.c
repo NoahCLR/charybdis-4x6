@@ -9,6 +9,7 @@
 
 #include "../../../action/action_dispatch.h"
 #include "../../../action/action_lifecycle.h"
+#include "../key_runtime_trace.h"
 
 static void key_runtime_slot_pending_multi_tap_clear_active_state(active_key_state_t *slot) {
     if (!slot) {
@@ -142,6 +143,21 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(acti
     result.handled = true;
 
     switch (resolution.outcome) {
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION:
+            key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_RELEASE_DELAYED_ACTION, resolution.repeat_count, resolution.action);
+            break;
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE:
+            key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_RELEASE_HELD_LIFECYCLE, 0u, resolution.action);
+            break;
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN:
+            key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_RELEASE_PRESERVE_CHAIN, context.slot ? context.slot->pending_multi_tap.count : 0u, 0u);
+            break;
+        case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_NONE:
+        default:
+            break;
+    }
+
+    switch (resolution.outcome) {
         case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE:
             key_runtime_slot_result_push_builder_if_present(&result, context.key_pos,
                                                             (key_runtime_effect_builder_t){
@@ -264,6 +280,7 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_scan(active_
     if (key_runtime_slot_pending_multi_tap_expired(slot)) {
         key_runtime_slot_pending_multi_tap_flush_t flush = key_runtime_slot_take_pending_multi_tap_flush(slot);
         result.handled                                   = true;
+        key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_SCAN_EXPIRED_FLUSH, flush.repeat_count, flush.action);
         key_runtime_slot_result_push_delayed_action(&result, flush.action, flush.mods, flush.repeat_count);
     }
 

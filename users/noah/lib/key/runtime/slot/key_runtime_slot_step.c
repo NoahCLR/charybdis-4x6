@@ -16,6 +16,8 @@
 #include "key_runtime_slot_scan_reduce.h"
 #include "key_runtime_slot_result_internal.h"
 
+#include "../key_runtime_trace.h"
+
 static key_runtime_slot_result_t key_runtime_slot_step_interrupt(active_key_state_t *slot, keypos_t other_key_pos) {
     key_runtime_slot_result_t    result  = {0};
     key_runtime_effect_builder_t builder = key_runtime_slot_policy_interrupt_on_other_press(slot, other_key_pos);
@@ -38,6 +40,7 @@ static key_runtime_slot_result_t key_runtime_slot_step_pending_multi_tap_flush(a
     }
 
     result.handled = true;
+    key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_FLUSH_PENDING_CHAIN, flush.repeat_count, flush.action);
     key_runtime_slot_result_push_delayed_action(&result, flush.action, flush.mods, flush.repeat_count);
     return result;
 }

@@ -32,7 +32,11 @@ primary release-hold selection and long-hold takeover onto a shared cached
 release-hold contract that both active release and pending multi-tap now use.
 The final Finding 2 slice then moved the phase-contract table itself onto the
 cached release contract, so the release reducer now selects a cached
-phase-policy view instead of owning a local phase-policy table.
+phase-policy view instead of owning a local phase-policy table. The next
+debuggability slice then added typed key-runtime decision trace events for
+release resolution, hold-policy decisions, and pending multi-tap chain
+reuse/flush paths, so the shared runtime trace now records the state-machine
+choices that produce release effects instead of only the resulting plans.
 Later the same day, the pd-mode exclusivity follow-up also landed: runtime
 storage and snapshots now expose explicit selected active/locked mode identity
 for local and display state. Compatibility bitmasks now survive only as
@@ -485,38 +489,29 @@ Recommended direction:
 
 ## Testing And Debuggability
 
-Debuggability is already above average for firmware, but there is one clear
-gap: the trace surface records plans and executed effects, not enough of the
-decision path that produced them.
+Debuggability is already above average for firmware, and the biggest trace gap
+from the start of this review is now closed.
 
-Right now the trace surfaces tell you:
+The shared trace surface now records:
 
-- a plan existed
-- how many effects it contained
-- which effects executed
+- transition plans
+- executed effects
+- release-resolution decisions
+- hold-policy decisions
+- pending multi-tap reuse/flush decisions
 - pd-mode/layer/split-sync events
 
-They do not tell you enough about:
+That is the right level for this codebase: the ring buffer stays compact, but
+future key-runtime refactors no longer need to infer the release path only
+from downstream effects or from console-only strings.
 
-- which release strategy won
-- whether a hold contract promoted or downgraded
-- why a pd-mode quick-lock tap was or was not taken
-- why a pending multi-tap chain flushed vs reused
+The remaining testing/debuggability work is less about trace vocabulary and
+more about surface choice:
 
-Recommended direction:
-
-- add a small typed decision trace for key-runtime branch points
-- keep the existing ring buffer compact, but spend a few event ids on
-  high-value state-machine decisions
-
-Useful additions would be:
-
-- `NOAH_TRACE_KEY_RUNTIME_EVENT_RELEASE_RESOLUTION`
-- `NOAH_TRACE_KEY_RUNTIME_EVENT_HOLD_POLICY_DECISION`
-- `NOAH_TRACE_KEY_RUNTIME_EVENT_MULTI_TAP_DECISION`
-
-That would make future refactors much easier to verify without widening the
-console-only trace text surface.
+- keep moving higher-level tests toward scenario/builders plus
+  `noah_runtime_debug_snapshot(...)`
+- avoid treating raw shared-state layout as public API unless the test is
+  explicitly about storage
 
 ## Recommended Refactor Order
 

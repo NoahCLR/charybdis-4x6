@@ -319,6 +319,9 @@ ownership, and split sync, enable `NOAH_RUNTIME_TRACE_ENABLE`. The shared
 trace ring buffer in
 [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h) is included in
 the aggregate debug snapshot and reset with the rest of the runtime.
+That buffer now records not only transition plans and executed effects, but
+also typed key-runtime decision events for release resolution, hold-policy
+selection, and pending multi-tap reuse/flush decisions.
 
 If you also want the verbose console-side key-runtime trace strings, enable
 `NOAH_KEY_RUNTIME_TRACE_ENABLE` with `CONSOLE_ENABLE`. That surface lives in

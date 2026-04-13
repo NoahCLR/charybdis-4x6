@@ -302,10 +302,50 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     CHECK(snapshot.entries[8].b == PD_MODE_ZOOM);
 }
 
+static void test_key_runtime_decision_events_capture_release_hold_and_multi_tap_details(void) {
+    noah_runtime_trace_snapshot_t snapshot;
+
+    test_reset_stubs();
+
+    key_runtime_trace_release_resolution(KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING,
+                                         KEY_RUNTIME_TRACE_RELEASE_OUTCOME_ACTION,
+                                         KEY_RUNTIME_TRACE_RELEASE_FLAG_QUICK_TAP | KEY_RUNTIME_TRACE_RELEASE_FLAG_RELEASE_OWNED_STATE,
+                                         KC_C);
+    key_runtime_trace_hold_policy_decision(KEY_RUNTIME_TRACE_HOLD_POLICY_PROMOTE_LONG_HOLD,
+                                           KEY_RUNTIME_TRACE_HOLD_DISPATCH_HELD,
+                                           KEY_RUNTIME_TRACE_HOLD_POLICY_FLAG_COMPLETES_HOLD | KEY_RUNTIME_TRACE_HOLD_POLICY_FLAG_FEEDBACK_PULSE | KEY_RUNTIME_TRACE_HOLD_POLICY_FLAG_FEEDBACK_LONG,
+                                           KC_LEFT_CTRL);
+    key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_PRESS_FLUSH_CHAIN, 3u, KC_V);
+
+    snapshot = test_trace_snapshot();
+
+    CHECK(snapshot.count == 3u);
+
+    CHECK(snapshot.entries[0].kind == NOAH_TRACE_KEY_RUNTIME);
+    CHECK(snapshot.entries[0].event == NOAH_TRACE_KEY_RUNTIME_EVENT_RELEASE_RESOLUTION);
+    CHECK(snapshot.entries[0].a == key_runtime_trace_pack_release_resolution(KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING,
+                                                                             KEY_RUNTIME_TRACE_RELEASE_OUTCOME_ACTION,
+                                                                             KEY_RUNTIME_TRACE_RELEASE_FLAG_QUICK_TAP | KEY_RUNTIME_TRACE_RELEASE_FLAG_RELEASE_OWNED_STATE));
+    CHECK(snapshot.entries[0].b == KC_C);
+
+    CHECK(snapshot.entries[1].kind == NOAH_TRACE_KEY_RUNTIME);
+    CHECK(snapshot.entries[1].event == NOAH_TRACE_KEY_RUNTIME_EVENT_HOLD_POLICY_DECISION);
+    CHECK(snapshot.entries[1].a == key_runtime_trace_pack_hold_policy_decision(KEY_RUNTIME_TRACE_HOLD_POLICY_PROMOTE_LONG_HOLD,
+                                                                               KEY_RUNTIME_TRACE_HOLD_DISPATCH_HELD,
+                                                                               KEY_RUNTIME_TRACE_HOLD_POLICY_FLAG_COMPLETES_HOLD | KEY_RUNTIME_TRACE_HOLD_POLICY_FLAG_FEEDBACK_PULSE | KEY_RUNTIME_TRACE_HOLD_POLICY_FLAG_FEEDBACK_LONG));
+    CHECK(snapshot.entries[1].b == KC_LEFT_CTRL);
+
+    CHECK(snapshot.entries[2].kind == NOAH_TRACE_KEY_RUNTIME);
+    CHECK(snapshot.entries[2].event == NOAH_TRACE_KEY_RUNTIME_EVENT_MULTI_TAP_DECISION);
+    CHECK(snapshot.entries[2].a == key_runtime_trace_pack_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_PRESS_FLUSH_CHAIN, 3u));
+    CHECK(snapshot.entries[2].b == KC_V);
+}
+
 int main(void) {
     test_ring_buffer_retains_recent_tail_when_full();
     test_key_runtime_and_layer_ownership_share_one_trace_buffer();
     test_pd_mode_and_split_sync_events_share_one_trace_buffer();
+    test_key_runtime_decision_events_capture_release_hold_and_multi_tap_details();
 
     puts("runtime_trace host tests passed");
     return 0;

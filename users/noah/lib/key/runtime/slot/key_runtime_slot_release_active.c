@@ -8,6 +8,7 @@
 #include "key_runtime_slot_policy.h"
 #include "key_runtime_slot_result_internal.h"
 
+#include "../key_runtime_trace.h"
 #include "../../../action/action_lifecycle.h"
 
 typedef enum {
@@ -92,6 +93,71 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_release_resolution
     resolution.outcome                               = KEY_RUNTIME_SLOT_RELEASE_OUTCOME_PD_MODE_LOCK_TAP;
     resolution.pd_mode_lock_tap                      = context ? context->lock_tap_mode : 0;
     return resolution;
+}
+
+static key_runtime_trace_release_outcome_t key_runtime_slot_release_trace_outcome(key_runtime_slot_release_outcome_t outcome) {
+    switch (outcome) {
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP:
+            return KEY_RUNTIME_TRACE_RELEASE_OUTCOME_TAP;
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_ACTION:
+            return KEY_RUNTIME_TRACE_RELEASE_OUTCOME_ACTION;
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_PD_MODE_LOCK_TAP:
+            return KEY_RUNTIME_TRACE_RELEASE_OUTCOME_PD_MODE_LOCK_TAP;
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_NONE:
+        default:
+            return KEY_RUNTIME_TRACE_RELEASE_OUTCOME_NONE;
+    }
+}
+
+static uint16_t key_runtime_slot_release_trace_flags(const key_runtime_slot_release_context_t *context, key_runtime_slot_release_phase_contract_t phase_contract,
+                                                     key_runtime_slot_release_resolution_t resolution) {
+    uint16_t flags = 0;
+
+    if (!context) {
+        return flags;
+    }
+
+    if (key_runtime_slot_release_is_interrupted_layer_tap(context)) {
+        flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_INTERRUPTED_LAYER_TAP;
+    }
+    if (context->quick_tap) {
+        flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_QUICK_TAP;
+    }
+    if (context->quick_immediate_hold) {
+        flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_QUICK_IMMEDIATE_HOLD;
+    }
+    if (context->buffered_base_tap) {
+        flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_BUFFERED_BASE_TAP;
+    }
+    if (context->lock_tap_mode) {
+        flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_LOCK_TAP_AVAILABLE;
+    }
+    if (resolution.release_owned_state) {
+        flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_RELEASE_OWNED_STATE;
+    }
+    if (phase_contract.checks_fallback_hold_suppression && context->contract.fallback_hold_suppresses_nonquick_release && !context->quick_tap && resolution.outcome == KEY_RUNTIME_SLOT_RELEASE_OUTCOME_NONE) {
+        flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_FALLBACK_SUPPRESSED;
+    }
+
+    return flags;
+}
+
+static uint16_t key_runtime_slot_release_trace_detail(const key_runtime_slot_release_context_t *context, key_runtime_slot_release_resolution_t resolution) {
+    if (!context) {
+        return 0;
+    }
+
+    switch (resolution.outcome) {
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_TAP:
+            return context->contract.tap.action;
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_ACTION:
+            return resolution.action;
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_PD_MODE_LOCK_TAP:
+            return resolution.pd_mode_lock_tap;
+        case KEY_RUNTIME_SLOT_RELEASE_OUTCOME_NONE:
+        default:
+            return 0;
+    }
 }
 
 static bool key_runtime_slot_release_has_primary_hold_action(const key_runtime_slot_release_context_t *context) {
@@ -204,7 +270,12 @@ static key_runtime_slot_release_resolution_t key_runtime_slot_resolve_release(ac
     context.buffered_base_tap    = key_runtime_slot_release_is_buffered_base_tap(&context);
     context.lock_tap_mode        = key_runtime_slot_locked_pd_mode_tap_mode(&context);
 
-    return key_runtime_slot_release_resolve_phase_contract(&context, phase_contract);
+    key_runtime_slot_release_resolution_t resolution = key_runtime_slot_release_resolve_phase_contract(&context, phase_contract);
+
+    key_runtime_trace_release_resolution(phase, key_runtime_slot_release_trace_outcome(resolution.outcome), key_runtime_slot_release_trace_flags(&context, phase_contract, resolution),
+                                         key_runtime_slot_release_trace_detail(&context, resolution));
+
+    return resolution;
 }
 
 static void key_runtime_slot_release_apply_tap(key_runtime_slot_result_t *result, active_key_state_t *slot, uint16_t keycode, keypos_t key_pos,

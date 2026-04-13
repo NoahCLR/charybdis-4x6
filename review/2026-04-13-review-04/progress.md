@@ -833,3 +833,76 @@ Next steps:
 - treat Finding 2 as structurally landed and choose between:
   adding decision tracing for key-runtime release branches, or moving on to
   Finding 4 and splitting `compat/` into feature-owned surfaces
+
+### Implementation pass: key-runtime decision traces
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Extended
+  `users/noah/lib/state/runtime/runtime_trace.h`
+  and
+  `users/noah/lib/key/runtime/key_runtime_trace.[ch]`
+  so the shared trace ring buffer now has typed key-runtime decision events
+  for release resolution, hold-policy decisions, and pending multi-tap
+  decisions.
+- Updated
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c`
+  so active release emits one compact release-resolution trace event with the
+  selected slot phase, chosen release outcome, and key release flags.
+- Updated
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_policy.c`
+  so fallback activation, immediate-hold commit, hold-threshold firing, and
+  long-hold promotion emit typed hold-policy decisions instead of relying on
+  downstream effect inference.
+- Updated
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c`,
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c`, and
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_step.c`
+  so the trace surface now records pending multi-tap chain reuse, press-time
+  flush, release-time preserve/delayed/held resolution, explicit flush, and
+  expiry flush decisions.
+- Extended
+  `tests/host/runtime_trace_test.c`
+  to assert the new packed decision events directly, and updated the slot and
+  feedback host runners so modules that now call `key_runtime_trace.*` link
+  that translation unit consistently.
+- Updated
+  `docs/KEY_RUNTIME.md`
+  and the active review so the maintainer-facing/debuggability notes now match
+  the richer trace surface.
+
+Contracts touched in this pass:
+
+- `NOAH_TRACE_KEY_RUNTIME_EVENT_RELEASE_RESOLUTION`
+- `NOAH_TRACE_KEY_RUNTIME_EVENT_HOLD_POLICY_DECISION`
+- `NOAH_TRACE_KEY_RUNTIME_EVENT_MULTI_TAP_DECISION`
+- `key_runtime_trace_release_resolution(...)`
+- `key_runtime_trace_hold_policy_decision(...)`
+- `key_runtime_trace_multi_tap_decision(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- treat Finding 2 as landed enough to leave the release contract alone unless
+  a concrete bug surfaces
+- move on to Finding 4 and split `compat/` into feature-owned surfaces
