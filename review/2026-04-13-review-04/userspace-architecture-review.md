@@ -416,41 +416,54 @@ The important design constraint now is to keep this split honest:
 That is the right shape for future fork auditing without forcing a larger
 runtime rewrite.
 
-### 5. Macro semantics still cross two partially separate execution models
+### 5. Macro semantics now have one canonical repo model, with VIA reduced to a codec boundary
 
-The earlier hardcoded-macro IR work improved the repo materially, but the macro
-system still has two meaningfully different pipelines:
+The macro system now has the cleaner shape this review was asking for:
 
-- hardcoded macros: payload DSL -> repo IR -> repo playback
-- VIA defaults: payload DSL -> QMK/VIA byte encoding
-- live VIA playback: QMK/VIA byte encoding -> forked compatibility playback
+- payload DSL compiles into `macro_payload_ir_t`
+- hardcoded macros cache and play that IR
+- VIA defaults now compile payload DSL into that same IR and then encode the IR
+  into QMK/VIA bytes for seeding
+- live VIA playback now decodes the current dynamic macro buffer back into that
+  same IR before executing it
 
-That is better than before, but the repo still does not have one canonical
-macro command model for both hardcoded and VIA-backed surfaces.
+That means the repo no longer has two separate semantic cores for "what a
+macro means". The canonical model is the repo IR, and VIA bytecode is now an
+encoding/decoding boundary around it.
 
 Why this matters:
 
-- new macro features will need changes in more than one semantic pipeline
-- debugging "why did the hardcoded macro work but the VIA macro not work"
-  remains harder than it should be
-- compatibility with upstream VIA encoding is still partly protected by copied
-  playback logic rather than by a first-class repo-level codec contract
+- new macro features now have one obvious implementation target
+- debugging hardcoded vs VIA macro mismatches is much cheaper because both
+  routes now share the same IR executor
+- the old forked VIA playback copy has been replaced by an explicit codec path
+  instead of remaining an independent semantic pipeline
 
-Recommended direction:
+Implementation update:
 
-- treat the repo's macro command sequence as the canonical model
-- make VIA encoding and decoding a codec around that model
-- keep QMK/VIA byte compatibility as a boundary, not as a second semantic core
+- `macro_payload_validate(...)` and `macro_payload_play(...)` now route through
+  IR compilation instead of relying on separate visitor-only execution paths
+- `macro_payload_encode_write(...)` now compiles payload DSL into IR first, and
+  IR-to-VIA encoding is exposed explicitly as `macro_payload_encode_ir_write(...)`
+- live VIA macro playback now decodes QMK dynamic-macro bytes through
+  `macro_payload_decode_qmk_stream(...)` and then executes the resulting IR
+- the codec now recognizes the down/tap/up pattern emitted for tap chords and
+  reconstructs it back into the canonical tap-list IR form
+- the remaining intentional distinction is transport policy, not macro meaning:
+  VIA playback still keeps delayed plain-text emission so live VIA-edited
+  macros preserve current QMK-compatible pacing while sharing the same IR for
+  delays, holds, taps, and text content
 
-A practical next step would be:
+The current shape is now the right one:
 
-1. define a shared macro command sequence object
-2. compile payload DSL into that object
-3. encode that object into VIA bytes for default seeding
-4. add a decode/probe path in tests so VIA playback compatibility is checked
-   against the same command sequence
+```c
+payload DSL -> macro_payload_ir_t -> repo playback
+payload DSL -> macro_payload_ir_t -> VIA bytes
+VIA bytes -> macro_payload_ir_t -> repo playback
+```
 
-The current `qmk_contract_probe` coverage is the right place to extend this.
+That is enough architectural cleanup here. Future work should add features to
+the IR and codec, not reintroduce separate hardcoded and VIA macro semantics.
 
 ### 6. The host suite is strong, but too much higher-level coverage still depends on storage layout
 
@@ -509,11 +522,9 @@ more about surface choice:
 
 ## Recommended Refactor Order
 
-Findings 1 through 4 are now landed enough that the remaining order is:
+Finding 6 is the main remaining structural follow-up:
 
-1. Move macro semantics toward one canonical command model and treat VIA as a
-   codec boundary.
-2. Keep shifting higher-level tests toward semantic builders and richer traces.
+1. Keep shifting higher-level tests toward semantic builders and richer traces.
 
 ## Bottom Line
 

@@ -90,6 +90,11 @@ void send_char_with_delay(char ascii_code, uint8_t interval) {
     test_log_call(TEST_CALL_SEND_CHAR, (uint8_t)ascii_code, interval);
 }
 
+void send_char(char ascii_code) {
+    (void)ascii_code;
+    CHECK(false);
+}
+
 void wait_ms(uint16_t ms) {
     test_log_call(TEST_CALL_WAIT, ms, 0);
 }

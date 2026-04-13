@@ -10,6 +10,7 @@
 
 typedef enum {
     TEST_OP_SEND_CHAR = 1,
+    TEST_OP_SEND_CHAR_DELAYED,
     TEST_OP_WAIT,
     TEST_OP_REGISTER,
     TEST_OP_UNREGISTER,
@@ -56,6 +57,10 @@ static void test_reset_stubs(void) {
 
 void send_char(char ascii_code) {
     test_log_op(TEST_OP_SEND_CHAR, (uint8_t)ascii_code);
+}
+
+void send_char_with_delay(char ascii_code, uint8_t interval) {
+    test_log_op(TEST_OP_SEND_CHAR_DELAYED, (uint16_t)(((uint16_t)interval << 8) | (uint8_t)ascii_code));
 }
 
 void wait_ms(uint16_t ms) {
@@ -160,6 +165,19 @@ static void test_compile_and_play_ir_runs_without_reparsing_source(void) {
     CHECK(test_ops[11].value == 'Z');
 }
 
+typedef struct {
+    const uint8_t *buffer;
+} test_qmk_reader_t;
+
+static bool test_qmk_reader_read_byte(uint16_t offset, uint8_t *byte, void *context) {
+    test_qmk_reader_t *reader = (test_qmk_reader_t *)context;
+
+    CHECK(byte != NULL);
+    CHECK(reader != NULL);
+    *byte = reader->buffer[offset];
+    return true;
+}
+
 static void test_compile_rejects_invalid_payloads(void) {
     static const char non_ascii_payload[] = {'A', (char)0x80, '\0'};
     macro_payload_ir_t ir                 = {0};
@@ -191,6 +209,40 @@ static void test_encode_fails_when_buffer_is_too_small(void) {
     CHECK(written == 0);
 }
 
+static void test_encode_and_decode_qmk_round_trip_through_ir(void) {
+    macro_payload_ir_t expected   = {0};
+    macro_payload_ir_t decoded    = {0};
+    uint8_t            buffer[64] = {0};
+    uint16_t           written    = 0;
+    test_qmk_reader_t  reader     = {.buffer = buffer};
+
+    CHECK(macro_payload_compile("A{12}{KC_LCTL,KC_C}{-KC_LSFT}", &expected));
+    CHECK(macro_payload_encode_ir(&expected, buffer, sizeof(buffer), &written));
+    CHECK(written > 0);
+
+    buffer[written] = 0;
+    CHECK(macro_payload_decode_qmk_stream(&decoded, (uint16_t)(written + 1u), test_qmk_reader_read_byte, &reader));
+    CHECK(decoded.length == expected.length);
+    CHECK(memcmp(decoded.bytes, expected.bytes, expected.length) == 0);
+}
+
+static void test_play_ir_with_delayed_text_uses_send_char_with_delay(void) {
+    macro_payload_ir_t ir = {0};
+
+    CHECK(macro_payload_compile("Hi", &ir));
+
+    test_reset_stubs();
+
+    CHECK(macro_payload_play_ir_with_text_output(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, TAP_CODE_DELAY));
+    CHECK(test_op_count == 2);
+    CHECK(test_ops[0].kind == TEST_OP_SEND_CHAR_DELAYED);
+    CHECK((uint8_t)(test_ops[0].value & 0xFFu) == 'H');
+    CHECK((uint8_t)(test_ops[0].value >> 8) == TAP_CODE_DELAY);
+    CHECK(test_ops[1].kind == TEST_OP_SEND_CHAR_DELAYED);
+    CHECK((uint8_t)(test_ops[1].value & 0xFFu) == 'i');
+    CHECK((uint8_t)(test_ops[1].value >> 8) == TAP_CODE_DELAY);
+}
+
 int main(void) {
     test_validate_accepts_mixed_payload();
     test_validate_rejects_invalid_payloads();
@@ -199,6 +251,8 @@ int main(void) {
     test_compile_rejects_invalid_payloads();
     test_encode_emits_expected_qmk_sequence();
     test_encode_fails_when_buffer_is_too_small();
+    test_encode_and_decode_qmk_round_trip_through_ir();
+    test_play_ir_with_delayed_text_uses_send_char_with_delay();
 
     puts("macro_payload host tests passed");
     return 0;

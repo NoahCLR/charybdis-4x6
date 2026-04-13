@@ -1044,3 +1044,71 @@ Next steps:
 - treat Finding 4 as landed
 - move on to Finding 5 and unify macro semantics around one canonical repo
   command model with VIA as a codec boundary
+
+### Implementation pass: canonical macro IR plus VIA codec boundary
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Promoted `macro_payload_ir_t` to the actual shared macro model by extending
+  `users/noah/lib/macro/macro_payload.h` with explicit IR playback, IR encode,
+  and QMK/VIA decode surfaces.
+- Updated
+  `users/noah/lib/macro/macro_payload.c`
+  so payload validation and direct payload playback now compile through the IR
+  path instead of using a separate visitor-only execution path.
+- Updated
+  `users/noah/lib/macro/macro_payload_encode.c`
+  so payload-to-VIA encoding now compiles payload DSL into IR first and then
+  encodes the IR, with `macro_payload_encode_ir(...)` and
+  `macro_payload_encode_ir_write(...)` as explicit codec helpers.
+- Updated
+  `users/noah/lib/macro/macro_payload_run.c`
+  so the shared macro executor can play IR with either plain-text or delayed
+  text output policy, and added `macro_payload_decode_qmk_stream(...)` to
+  decode live QMK/VIA macro bytes back into canonical IR.
+- Updated
+  `users/noah/lib/compat/qmk_contract.c`
+  so live VIA macro playback now decodes the current dynamic macro buffer into
+  IR and executes that IR instead of keeping an independent forked playback
+  implementation.
+- Extended
+  `tests/host/macro_payload_test.c`
+  to assert IR <-> VIA byte round-tripping and delayed-text IR playback, and
+  updated the VIA action-lifecycle runner/test harness so it links the shared
+  macro runtime instead of only the old standalone compat playback.
+- Updated the active review so Finding 5 now describes the landed IR/codec
+  structure instead of leaving it as an open recommendation.
+
+Contracts touched in this pass:
+
+- `macro_payload_ir_t`
+- `macro_payload_play_ir_with_text_output(...)`
+- `macro_payload_decode_qmk_stream(...)`
+- `macro_payload_encode_ir(...)`
+- `macro_payload_encode_ir_write(...)`
+- `noah_qmk_contract_try_play_via_macro(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_macro_payload_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_via_macro_defaults_tests.sh`
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `sh tests/host/run_macro_dispatch_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- treat Finding 5 as landed
+- move on to Finding 6 and keep shifting higher-level tests toward semantic
+  builders and `noah_runtime_debug_snapshot(...)`
