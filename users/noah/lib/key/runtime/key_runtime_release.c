@@ -11,11 +11,11 @@
 #include "key_runtime_transition.h"
 #include "../../state/runtime/split_runtime_sync.h"
 
-bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_view_t key) {
+bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution) {
     key_runtime_transition_plan_t plan;
 
     key_runtime_transition_plan_init(&plan);
-    bool handled = key_runtime_transition_handled_key_release(keycode, record, key, &plan);
+    bool handled = key_runtime_transition_handled_key_release(keycode, record, resolution, &plan);
     key_runtime_trace_plan("release", &plan);
     key_runtime_transition_execute_plan(&plan);
     if (handled) {

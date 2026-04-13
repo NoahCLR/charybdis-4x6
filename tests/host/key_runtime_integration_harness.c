@@ -103,24 +103,24 @@ void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_s
     }
 }
 
-handled_key_view_t key_runtime_integration_multi_tap_handled_key(uint16_t keycode, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
-    handled_key_view_t key = handled_key_lookup(keycode);
+handled_key_resolution_t key_runtime_integration_multi_tap_handled_key(uint16_t keycode, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
+    handled_key_resolution_t resolution = handled_key_lookup(keycode);
 
-    key.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
-    key.tap_hold_term    = tap_hold_term;
-    key.longer_hold_term = longer_hold_term;
-    key.multi_tap_term   = multi_tap_term;
-    return key;
+    resolution.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    resolution.tap_hold_term    = tap_hold_term;
+    resolution.longer_hold_term = longer_hold_term;
+    resolution.multi_tap_term   = multi_tap_term;
+    return resolution;
 }
 
-bool key_runtime_integration_process_handled_press(uint16_t keycode, keypos_t key_pos, handled_key_view_t key) {
+bool key_runtime_integration_process_handled_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution) {
     keyrecord_t record = key_runtime_integration_record(key_pos, true);
-    return key_runtime_process_handled_key_press(keycode, &record, key);
+    return key_runtime_process_handled_key_press(keycode, &record, resolution);
 }
 
-bool key_runtime_integration_process_handled_release(uint16_t keycode, keypos_t key_pos, handled_key_view_t key) {
+bool key_runtime_integration_process_handled_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution) {
     keyrecord_t record = key_runtime_integration_record(key_pos, false);
-    return key_runtime_process_handled_key_release(keycode, &record, key);
+    return key_runtime_process_handled_key_release(keycode, &record, resolution);
 }
 
 void key_runtime_integration_debug_snapshot(noah_runtime_debug_snapshot_t *out) {

@@ -158,9 +158,11 @@ Implementation update:
 - `key_runtime_slot_interaction_t` now carries an explicit `.resolution`
   object, but the compatibility typedef and direct-field compatibility are
   still present while callers migrate
-- the remaining gap is that authored/runtime boundaries still expose
-  `handled_key_view_t` in several runtime and test surfaces, so the authored
-  lookup type is not yet the only obvious API
+- runtime/process/host seams now name authored lookup output as
+  `handled_key_resolution_t` directly
+- the remaining gap is that compatibility helpers and several legacy
+  accessor names still use `handled_key_view_t`, so the old name still exists
+  even though it is no longer the primary authored/runtime seam
 
 Example shape:
 

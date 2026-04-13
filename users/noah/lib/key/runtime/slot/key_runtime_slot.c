@@ -97,7 +97,7 @@ key_runtime_slot_interaction_t key_runtime_slot_cached_interaction(const active_
     return slot->interaction.view;
 }
 
-handled_key_view_t key_runtime_slot_interaction(const active_key_state_t *slot) {
+handled_key_resolution_t key_runtime_slot_interaction(const active_key_state_t *slot) {
     return key_runtime_slot_interaction_to_handled_key_view(key_runtime_slot_cached_interaction(slot));
 }
 
@@ -205,9 +205,9 @@ uint16_t key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, ui
         return KC_NO;
     }
 
-    handled_key_view_t key = handled_key_lookup_tap_count(keycode, (uint8_t)(slot->pending_multi_tap.count + 1u));
+    handled_key_resolution_t resolution = handled_key_lookup_tap_count(keycode, (uint8_t)(slot->pending_multi_tap.count + 1u));
 
-    return multi_tap_advance(&slot->pending_multi_tap, key.tap_action, key.tap_repeat_count, key.has_more_taps, key.tap_resolves_on_press, key.hold, key.long_hold);
+    return multi_tap_advance(&slot->pending_multi_tap, resolution.tap_action, resolution.tap_repeat_count, resolution.has_more_taps, resolution.tap_resolves_on_press, resolution.hold, resolution.long_hold);
 }
 
 uint16_t key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slot, uint8_t *repeat_count) {

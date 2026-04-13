@@ -203,11 +203,61 @@ Workspace scope:
 - no sibling workspace folders were edited
 - all changes are confined to `charybdis-4x6/`
 
+### Implementation pass: runtime and host seam migration
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Migrated key-runtime orchestration headers and reducers to use
+  `handled_key_resolution_t` directly for authored lookup surfaces:
+  `key_runtime_process.h`, `key_runtime_transition.h`,
+  `key_runtime_state.h`, `key_runtime_slot_step.h`,
+  `key_runtime_slot_press_reduce.h`, and
+  `key_runtime_slot_release_reduce.h`.
+- Updated the corresponding runtime implementations to pass authored lookup
+  results through process, transition, press, release, preflight, and
+  multi-tap advancement as `handled_key_resolution_t`.
+- Migrated the host integration harness and the remaining key-runtime host
+  suites to use `handled_key_resolution_t` directly instead of relying on the
+  `handled_key_view_t` compatibility typedef.
+
+Contracts touched in this pass:
+
+- `key_runtime_process_handled_key_press(...)`
+- `key_runtime_process_handled_key_release(...)`
+- `key_runtime_transition_handled_key_press(...)`
+- `key_runtime_transition_handled_key_release(...)`
+- `key_runtime_slot_reduce_handled_press(...)`
+- `key_runtime_slot_reduce_handled_release(...)`
+- `key_runtime_slot_interaction(...)`
+- host integration harness handled-key entry points
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
 Next steps:
 
-- continue finding 1 by migrating runtime/process/host surfaces off the
-  `handled_key_view_t` compatibility typedef and onto
-  `handled_key_resolution_t`
+- continue finding 1 by removing the now-narrow compatibility helpers in
+  `key_runtime_interaction.h` and the remaining `handled_key_view_t`-named
+  accessors in `handled_key.h` once the broader codebase no longer depends on
+  them
 - if release-contract work continues, move contract construction earlier so the
   slot interaction can cache release semantics at press/tap-branch resolution
 - after that, make pd-mode exclusivity explicit in the public state model and

@@ -8,7 +8,7 @@
 #include "key_runtime_slot_pending_multi_tap.h"
 #include "key_runtime_slot_result_internal.h"
 
-key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key) {
+key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution) {
     key_runtime_slot_result_t result = {0};
 
     if (slot) {
@@ -24,7 +24,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_sta
     }
 
     result.handled = true;
-    if (handled_key_is_momentary_layer(key)) {
+    if (handled_key_is_momentary_layer(resolution)) {
         key_runtime_slot_result_push_layer_release(&result, key_pos);
     }
     key_runtime_slot_result_push_builder_if_present(&result, key_pos,

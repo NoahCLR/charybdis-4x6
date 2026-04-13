@@ -54,7 +54,7 @@ static active_key_state_t *test_primary_slot(void) {
 #define key_runtime_primary_slot() test_primary_slot()
 
 static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
-    return key_runtime_slot_interaction_from_handled_key((handled_key_view_t){
+    return key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
         .tap_action            = tap_action,
         .tap_repeat_count      = tap_action == KC_NO ? 0 : 1,
         .hold                  = hold,
@@ -74,13 +74,13 @@ static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_actio
 
 #define HOLD_LIT(expr) ((hold_behavior_t)expr)
 
-static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior);
+static handled_key_resolution_t test_resolve_handled_key(key_behavior_view_t behavior);
 
 static bool test_key_behavior_step_present(key_behavior_step_t step) {
     return step.tap.present || step.hold.present || step.long_hold.present;
 }
 
-static key_runtime_slot_result_t test_step_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, bool active_held_action_survives_flush) {
+static key_runtime_slot_result_t test_step_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t key, bool active_held_action_survives_flush) {
     return key_runtime_slot_step(slot, (key_runtime_slot_event_t){
                                            .kind = KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS,
                                            .data.handled_press =
@@ -210,7 +210,7 @@ static bool test_handled_key_uses_buffered_modifier_single_step(key_behavior_vie
     return behavior.has_multi_tap && behavior.keycode < SAFE_RANGE && false;
 }
 
-static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior) {
+static handled_key_resolution_t test_resolve_handled_key(key_behavior_view_t behavior) {
     noah_action_desc_t desc     = noah_action_describe(behavior.keycode);
     pd_mode_mask_t     mode     = pd_mode_for_keycode(behavior.keycode);
     bool               implicit = mode != 0;
@@ -220,7 +220,7 @@ static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior)
         fallback = behavior.single.tap.present || behavior.has_multi_tap;
     }
 
-    return (handled_key_view_t){
+    return (handled_key_resolution_t){
         .tap_action =
             behavior.single.tap.present ? behavior.single.tap.action
                                         : implicit                ? KC_NO
@@ -254,9 +254,9 @@ static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior)
     };
 }
 
-handled_key_view_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
+handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
     key_behavior_view_t behavior = key_behavior_lookup(keycode);
-    handled_key_view_t  key      = test_resolve_handled_key(behavior);
+    handled_key_resolution_t  key      = test_resolve_handled_key(behavior);
 
     if (tap_count <= 1) {
         key.has_more_taps = key_behavior_has_more_taps(keycode, 1);
@@ -285,59 +285,59 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
     return (delayed_action_mods_t){0};
 }
 
-bool handled_key_uses_implicit_hold(handled_key_view_t key) {
+bool handled_key_uses_implicit_hold(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) != 0;
 }
 
-bool handled_key_uses_fallback_hold(handled_key_view_t key) {
+bool handled_key_uses_fallback_hold(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0;
 }
 
-hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
+hold_behavior_t handled_key_single_hold(handled_key_resolution_t key) {
     return key.hold;
 }
 
-hold_behavior_t handled_key_long_hold(handled_key_view_t key) {
+hold_behavior_t handled_key_long_hold(handled_key_resolution_t key) {
     return key.long_hold;
 }
 
-key_runtime_slot_hold_strategy_t handled_key_hold_strategy(handled_key_view_t key) {
+key_runtime_slot_hold_strategy_t handled_key_hold_strategy(handled_key_resolution_t key) {
     return key.hold_strategy;
 }
 
-uint16_t handled_key_tap_action(handled_key_view_t key) {
+uint16_t handled_key_tap_action(handled_key_resolution_t key) {
     return key.tap_action;
 }
 
-uint16_t handled_key_tap_hold_term(handled_key_view_t key) {
+uint16_t handled_key_tap_hold_term(handled_key_resolution_t key) {
     return key.tap_hold_term;
 }
 
-uint16_t handled_key_longer_hold_term(handled_key_view_t key) {
+uint16_t handled_key_longer_hold_term(handled_key_resolution_t key) {
     return key.longer_hold_term;
 }
 
-uint16_t handled_key_multi_tap_term(handled_key_view_t key) {
+uint16_t handled_key_multi_tap_term(handled_key_resolution_t key) {
     return key.multi_tap_term;
 }
 
-uint8_t handled_key_layer(handled_key_view_t key) {
+uint8_t handled_key_layer(handled_key_resolution_t key) {
     return key.layer;
 }
 
-pd_mode_mask_t handled_key_pd_mode(handled_key_view_t key) {
+pd_mode_mask_t handled_key_pd_mode(handled_key_resolution_t key) {
     return key.pd_mode;
 }
 
-bool handled_key_has_multi_tap(handled_key_view_t key) {
+bool handled_key_has_multi_tap(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0;
 }
 
-bool handled_key_is_momentary_layer(handled_key_view_t key) {
+bool handled_key_is_momentary_layer(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
 }
 
-bool handled_key_is_layer_tap(handled_key_view_t key) {
+bool handled_key_is_layer_tap(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_LAYER_TAP) != 0;
 }
 
@@ -446,7 +446,7 @@ static void test_slot_track_preserves_pending_multi_tap(void) {
     CHECK(key_runtime_slot_pending_multi_tap_pending_hold(slot));
 
     key_runtime_slot_track(slot, TEST_MULTI_TAP_KEY, pos,
-                           key_runtime_slot_interaction_from_handled_key((handled_key_view_t){
+                           key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
                                .tap_action       = KC_NO,
                                .tap_repeat_count = 0,
                                .hold             = hold_behavior_none(),
@@ -771,7 +771,7 @@ static void test_take_active_scan_event_returns_fallback_hold_request(void) {
         .lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
         .timer                   = (uint16_t)(fake_time - 120),
         .interaction.valid       = true,
-        .interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_view_t){
+        .interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
             .tap_action       = KC_NO,
             .tap_repeat_count = 0,
             .hold             = hold_behavior_none(),
@@ -1376,7 +1376,7 @@ static void test_take_interrupt_result_maps_slot_effect_request(void) {
         .owner.key_pos           = test_keypos(6, 2),
         .lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
         .interaction.valid       = true,
-        .interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_view_t){
+        .interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
             .tap_action       = KC_NO,
             .tap_repeat_count = 0,
             .hold             = hold_behavior_none(),

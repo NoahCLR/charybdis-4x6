@@ -12,4 +12,4 @@
 #include "key_runtime_slot_result.h"
 #include "../key_runtime_state.h"
 
-key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key);
+key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution);

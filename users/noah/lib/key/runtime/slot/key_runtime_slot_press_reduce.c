@@ -15,26 +15,26 @@ static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavi
     return hold_registers_on_press(hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
 }
 
-static key_runtime_slot_interaction_t key_runtime_slot_press_interaction(handled_key_view_t key, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_hold_strategy_t hold_strategy) {
-    key.tap_action       = tap_action;
-    key.tap_repeat_count = tap_action == KC_NO ? 0 : 1;
-    key.hold             = hold;
-    key.long_hold        = long_hold;
-    key.hold_strategy    = hold_strategy;
-    key.tap_hold_term    = tap_hold_term;
-    key.longer_hold_term = longer_hold_term;
-    key.multi_tap_term   = multi_tap_term;
-    key.flags &= (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD);
+static key_runtime_slot_interaction_t key_runtime_slot_press_interaction(handled_key_resolution_t resolution, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_hold_strategy_t hold_strategy) {
+    resolution.tap_action       = tap_action;
+    resolution.tap_repeat_count = tap_action == KC_NO ? 0 : 1;
+    resolution.hold             = hold;
+    resolution.long_hold        = long_hold;
+    resolution.hold_strategy    = hold_strategy;
+    resolution.tap_hold_term    = tap_hold_term;
+    resolution.longer_hold_term = longer_hold_term;
+    resolution.multi_tap_term   = multi_tap_term;
+    resolution.flags &= (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD);
     if (hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT) {
-        key.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
+        resolution.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
     }
     if (hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK) {
-        key.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+        resolution.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
     }
-    return key_runtime_slot_interaction_from_handled_key(key);
+    return key_runtime_slot_interaction_from_resolution(resolution);
 }
 
-static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
+static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
     key_runtime_effect_builder_t builder = {0};
     key_runtime_slot_interaction_t interaction;
 
@@ -42,7 +42,7 @@ static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_stat
         return builder;
     }
 
-    interaction = key_runtime_slot_press_interaction(key, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, hold_strategy);
+    interaction = key_runtime_slot_press_interaction(resolution, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, hold_strategy);
     key_runtime_slot_track(slot, keycode, key_pos, interaction, phase);
     slot->lifecycle.pd_mode_was_locked_on_press = pd_mode_was_locked_on_press;
 
@@ -65,7 +65,7 @@ typedef struct {
     active_key_state_t              *slot;
     uint16_t                         keycode;
     keypos_t                         key_pos;
-    handled_key_view_t               key;
+    handled_key_resolution_t         resolution;
     uint16_t                         tap_action;
     hold_behavior_t                  hold;
     hold_behavior_t                  long_hold;
@@ -82,24 +82,24 @@ typedef struct {
     bool                             active_held_action_survives_flush;
 } key_runtime_slot_press_context_t;
 
-static key_runtime_slot_press_context_t key_runtime_slot_press_context(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, bool active_held_action_survives_flush) {
+static key_runtime_slot_press_context_t key_runtime_slot_press_context(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush) {
     return (key_runtime_slot_press_context_t){
         .slot                              = slot,
         .keycode                           = keycode,
         .key_pos                           = key_pos,
-        .key                               = key,
-        .tap_action                        = handled_key_tap_action(key),
-        .hold                              = handled_key_single_hold(key),
-        .long_hold                         = handled_key_long_hold(key),
-        .hold_strategy                     = handled_key_hold_strategy(key),
-        .tap_hold_term                     = handled_key_tap_hold_term(key),
-        .longer_hold_term                  = handled_key_longer_hold_term(key),
-        .multi_tap_term                    = handled_key_multi_tap_term(key),
-        .layer                             = handled_key_layer(key),
-        .pd_mode                           = handled_key_pd_mode(key),
-        .matching_pending_multi_tap        = slot && handled_key_has_multi_tap(key) && key_runtime_slot_pending_multi_tap_matches(slot, keycode, key_pos),
+        .resolution                        = resolution,
+        .tap_action                        = handled_key_tap_action(resolution),
+        .hold                              = handled_key_single_hold(resolution),
+        .long_hold                         = handled_key_long_hold(resolution),
+        .hold_strategy                     = handled_key_hold_strategy(resolution),
+        .tap_hold_term                     = handled_key_tap_hold_term(resolution),
+        .longer_hold_term                  = handled_key_longer_hold_term(resolution),
+        .multi_tap_term                    = handled_key_multi_tap_term(resolution),
+        .layer                             = handled_key_layer(resolution),
+        .pd_mode                           = handled_key_pd_mode(resolution),
+        .matching_pending_multi_tap        = slot && handled_key_has_multi_tap(resolution) && key_runtime_slot_pending_multi_tap_matches(slot, keycode, key_pos),
         .flush_pending_multi_tap           = slot && key_runtime_slot_has_pending_multi_tap(slot) && !key_runtime_slot_pending_multi_tap_matches(slot, keycode, key_pos),
-        .needs_layer_press                 = handled_key_is_momentary_layer(key),
+        .needs_layer_press                 = handled_key_is_momentary_layer(resolution),
         .reclaim_active_slot               = slot && key_runtime_slot_active(slot) && !key_runtime_slot_matches(slot, keycode, key_pos),
         .active_held_action_survives_flush = active_held_action_survives_flush,
     };
@@ -132,7 +132,7 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_reuse_pending_mul
     }
 
     if (key_runtime_slot_pending_multi_tap_pending_hold(context->slot) || context->needs_layer_press) {
-        handled_key_view_t current_tap = key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? handled_key_lookup_tap_count(context->keycode, context->slot->pending_multi_tap.count) : context->key;
+        handled_key_resolution_t current_tap = key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? handled_key_lookup_tap_count(context->keycode, context->slot->pending_multi_tap.count) : context->resolution;
         key_runtime_effect_builder_t begin_builder = key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, current_tap, KC_NO, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.hold : hold_behavior_none(), key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.long_hold : hold_behavior_none(), key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.tap_hold_term : context->tap_hold_term, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.longer_hold_term : context->longer_hold_term, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.multi_tap_term : context->multi_tap_term, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE, key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? current_tap.hold_strategy : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT, false);
         key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, begin_builder);
     }
@@ -164,12 +164,12 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_begin_fresh(const
         key_runtime_slot_result_push_builder_if_present(&result, reclaim_key_pos, reclaim_builder);
     }
 
-    key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, context->key, context->tap_action, context->hold, context->long_hold, context->tap_hold_term, context->longer_hold_term, context->multi_tap_term, key_runtime_slot_initial_press_phase(context->hold), context->hold_strategy, context->pd_mode && pd_mode_local_locked(context->pd_mode)));
+    key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, context->resolution, context->tap_action, context->hold, context->long_hold, context->tap_hold_term, context->longer_hold_term, context->multi_tap_term, key_runtime_slot_initial_press_phase(context->hold), context->hold_strategy, context->pd_mode && pd_mode_local_locked(context->pd_mode)));
     return result;
 }
 
-key_runtime_slot_result_t key_runtime_slot_reduce_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, bool active_held_action_survives_flush) {
-    key_runtime_slot_press_context_t context = key_runtime_slot_press_context(slot, keycode, key_pos, key, active_held_action_survives_flush);
+key_runtime_slot_result_t key_runtime_slot_reduce_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush) {
+    key_runtime_slot_press_context_t context = key_runtime_slot_press_context(slot, keycode, key_pos, resolution, active_held_action_survives_flush);
 
     switch (key_runtime_slot_press_outcome_for_context(&context)) {
         case KEY_RUNTIME_SLOT_PRESS_OUTCOME_REUSE_PENDING_MULTI_TAP:

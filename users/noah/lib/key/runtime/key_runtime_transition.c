@@ -114,7 +114,7 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
     }
 }
 
-bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_view_t key, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
+bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
     return key_runtime_transition_apply_slot_step(slot,
                                                   (key_runtime_slot_event_t){
                                                       .kind = KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS,
@@ -122,7 +122,7 @@ bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t
                                                           {
                                                               .keycode                           = keycode,
                                                               .key_pos                           = key_pos,
-                                                              .key                               = key,
+                                                              .key                               = resolution,
                                                               .active_held_action_survives_flush = active_held_action_survives_flush,
                                                           },
                                                   },
@@ -164,10 +164,10 @@ void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_tran
     key_runtime_transition_interrupt_active_keys_on_other_press((keypos_t){0xFF, 0xFF}, plan);
 }
 
-static bool key_runtime_transition_process_active_key_release(uint16_t keycode, keyrecord_t *record, handled_key_view_t key, key_runtime_transition_plan_t *plan) {
-    active_key_state_t *slot            = key_runtime_find_slot_by_position(record->event.key);
-    uint16_t            release_keycode = keycode;
-    handled_key_view_t  release_key     = key;
+static bool key_runtime_transition_process_active_key_release(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+    active_key_state_t      *slot            = key_runtime_find_slot_by_position(record->event.key);
+    uint16_t                 release_keycode = keycode;
+    handled_key_resolution_t release_key     = resolution;
 
     if (key_runtime_slot_active(slot) && slot->owner.keycode != keycode) {
         release_keycode = slot->owner.keycode;
@@ -188,8 +188,8 @@ static bool key_runtime_transition_process_active_key_release(uint16_t keycode, 
     return true;
 }
 
-bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_view_t key, key_runtime_transition_plan_t *plan) {
-    return key_runtime_transition_process_active_key_release(keycode, record, key, plan);
+bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+    return key_runtime_transition_process_active_key_release(keycode, record, resolution, plan);
 }
 
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {

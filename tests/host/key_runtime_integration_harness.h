@@ -58,8 +58,8 @@ void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_s
 void key_runtime_integration_advance(uint16_t *time, uint16_t advance_ms);
 void key_runtime_integration_scan(void);
 bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed);
-handled_key_view_t key_runtime_integration_multi_tap_handled_key(uint16_t keycode, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term);
-bool key_runtime_integration_process_handled_press(uint16_t keycode, keypos_t key_pos, handled_key_view_t key);
-bool key_runtime_integration_process_handled_release(uint16_t keycode, keypos_t key_pos, handled_key_view_t key);
+handled_key_resolution_t key_runtime_integration_multi_tap_handled_key(uint16_t keycode, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term);
+bool key_runtime_integration_process_handled_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution);
+bool key_runtime_integration_process_handled_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution);
 void key_runtime_integration_debug_snapshot(noah_runtime_debug_snapshot_t *out);
 const active_key_state_t *key_runtime_integration_snapshot_slot(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
