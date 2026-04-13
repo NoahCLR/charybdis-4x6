@@ -5,6 +5,7 @@
 #include "key_runtime_slot_pending_multi_tap.h"
 
 #include "key_runtime_slot_policy.h"
+#include "key_runtime_slot_release_resolver.h"
 #include "key_runtime_slot_result_internal.h"
 
 #include "../../../action/action_dispatch.h"
@@ -21,20 +22,6 @@ static void key_runtime_slot_pending_multi_tap_clear_active_state(active_key_sta
     slot->pending_multi_tap       = pending_multi_tap;
 }
 
-static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const active_key_state_t *slot, handled_key_hold_contract_t contract, hold_behavior_t hold, uint16_t action, uint8_t repeat_count, uint16_t elapsed) {
-    key_runtime_slot_interaction_t interaction = key_runtime_slot_cached_interaction(slot);
-
-    if (!slot || !hold.present || repeat_count != 1 || elapsed < interaction.binding.tap_hold_term) {
-        return false;
-    }
-
-    if (hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || action != hold.action) {
-        return false;
-    }
-
-    return contract.release_uses_held_lifecycle;
-}
-
 typedef enum {
     KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_NONE = 0,
     KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
@@ -46,16 +33,12 @@ typedef struct {
     active_key_state_t   *slot;
     uint16_t              keycode;
     uint16_t              elapsed;
-    uint16_t              tap_hold_term;
-    uint16_t              longer_hold_term;
     keypos_t              key_pos;
     bool                  is_momentary_layer;
     delayed_action_mods_t mods;
-    hold_behavior_t       hold;
-    handled_key_interaction_policy_t policy;
-    key_runtime_slot_release_contract_t release_contract;
-    uint16_t              action;
-    uint8_t               repeat_count;
+    key_runtime_slot_interaction_t interaction;
+    uint16_t              tap_action;
+    uint8_t               tap_repeat_count;
     bool                  matched;
 } key_runtime_slot_pending_multi_tap_release_context_t;
 
@@ -66,13 +49,34 @@ typedef struct {
     delayed_action_mods_t                                mods;
 } key_runtime_slot_pending_multi_tap_release_resolution_t;
 
+static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const key_runtime_slot_pending_multi_tap_release_context_t *context, uint16_t action) {
+    handled_key_hold_contract_t contract;
+    hold_behavior_t             hold;
+
+    if (!context) {
+        return false;
+    }
+
+    contract = context->interaction.policy.hold;
+    hold     = context->interaction.binding.hold;
+
+    if (!hold.present || context->tap_repeat_count != 1 || context->elapsed < context->interaction.binding.tap_hold_term) {
+        return false;
+    }
+
+    if (hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || action != hold.action) {
+        return false;
+    }
+
+    return contract.release_uses_held_lifecycle;
+}
+
 static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pending_multi_tap_release_context(active_key_state_t *slot, uint16_t keycode, uint16_t elapsed) {
     key_runtime_slot_pending_multi_tap_release_context_t context = {
         .slot    = slot,
         .keycode = keycode,
         .elapsed = elapsed,
     };
-    key_runtime_slot_interaction_t interaction;
     multi_tap_t *slot_multi_tap;
 
     if (!(slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && key_runtime_slot_pending_multi_tap_matches(slot, keycode, slot->owner.key_pos))) {
@@ -84,62 +88,110 @@ static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pen
         return context;
     }
 
-    interaction = key_runtime_slot_cached_interaction(slot);
-    context.key_pos   = slot->owner.key_pos;
-    context.tap_hold_term = interaction.binding.tap_hold_term;
-    context.longer_hold_term = interaction.binding.longer_hold_term;
-    context.is_momentary_layer = key_runtime_slot_interaction_is_momentary_layer(interaction);
-    context.mods      = delayed_action_mods_from_multi_tap(slot_multi_tap);
-    context.hold      = interaction.binding.hold;
-    context.policy    = interaction.policy;
-    context.release_contract = key_runtime_slot_release_contract(interaction);
-    context.action    = key_runtime_slot_resolve_pending_multi_tap_hold(slot, &context.repeat_count);
-    context.matched   = true;
-
-    if (key_runtime_slot_release_hold_contract_has_any_action(context.release_contract.hold)) {
-        bool release_hold_pending = context.policy.hold.dispatches_on_release ? elapsed >= context.tap_hold_term
-                                                                               : !context.hold.present && context.policy.long_hold.dispatches_on_release &&
-                                                                                     elapsed >= context.longer_hold_term;
-
-        if (release_hold_pending) {
-            context.action = key_runtime_slot_release_hold_contract_select_action(context.release_contract.hold, elapsed, context.longer_hold_term);
-            if (context.action != KC_NO) {
-                context.repeat_count = 1;
-            }
-        }
-    }
+    context.interaction       = key_runtime_slot_cached_interaction(slot);
+    context.key_pos           = slot->owner.key_pos;
+    context.is_momentary_layer = key_runtime_slot_interaction_is_momentary_layer(context.interaction);
+    context.mods              = delayed_action_mods_from_multi_tap(slot_multi_tap);
+    context.tap_action        = key_runtime_slot_resolve_pending_multi_tap_hold(slot, &context.tap_repeat_count);
+    context.matched           = true;
 
     return context;
 }
 
 static bool key_runtime_slot_pending_multi_tap_release_preserves_chain(const key_runtime_slot_pending_multi_tap_release_context_t *context) {
-    return context && context->action == KC_NO && context->repeat_count == 0 && key_runtime_slot_has_pending_multi_tap(context->slot);
+    return context && context->tap_action == KC_NO && context->tap_repeat_count == 0 && key_runtime_slot_has_pending_multi_tap(context->slot);
+}
+
+static key_runtime_slot_release_semantics_t key_runtime_slot_pending_multi_tap_release_semantics(const key_runtime_slot_pending_multi_tap_release_context_t *context) {
+    key_runtime_slot_release_semantics_t semantics = {
+        .quick_tap_dispatches_tap        = true,
+        .nonquick_release_dispatches_tap = true,
+    };
+
+    if (!context) {
+        return semantics;
+    }
+
+    if (context->interaction.policy.hold.dispatches_on_release ? context->elapsed >= context->interaction.binding.tap_hold_term
+                                                               : !context->interaction.binding.hold.present && context->interaction.policy.long_hold.dispatches_on_release &&
+                                                                     context->elapsed >= context->interaction.binding.longer_hold_term) {
+        semantics.hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
+    }
+
+    return semantics;
 }
 
 static key_runtime_slot_pending_multi_tap_release_resolution_t key_runtime_slot_pending_multi_tap_release_resolve(const key_runtime_slot_pending_multi_tap_release_context_t *context) {
+    key_runtime_slot_release_decision_t decision;
+
     if (!(context && context->matched)) {
         return (key_runtime_slot_pending_multi_tap_release_resolution_t){0};
     }
 
-    if (key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(context->slot, context->policy.hold, context->hold, context->action, context->repeat_count, context->elapsed)) {
-        return (key_runtime_slot_pending_multi_tap_release_resolution_t){
-            .outcome = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
-            .action  = context->action,
-        };
-    }
+    decision = key_runtime_slot_release_decide(&(key_runtime_slot_release_query_t){
+        .interaction = context->interaction,
+        .semantics   = key_runtime_slot_pending_multi_tap_release_semantics(context),
+        .elapsed     = context->elapsed,
+    });
 
-    if (key_runtime_slot_pending_multi_tap_release_preserves_chain(context)) {
-        return (key_runtime_slot_pending_multi_tap_release_resolution_t){
-            .outcome = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN,
-        };
-    }
+    switch (decision.outcome) {
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION:
+            if (key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(context, decision.action)) {
+                return (key_runtime_slot_pending_multi_tap_release_resolution_t){
+                    .outcome = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
+                    .action  = decision.action,
+                };
+            }
 
-    return (key_runtime_slot_pending_multi_tap_release_resolution_t){
-        .outcome      = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
-        .action       = context->action,
-        .repeat_count = context->repeat_count,
-        .mods         = context->mods,
-    };
+            return (key_runtime_slot_pending_multi_tap_release_resolution_t){
+                .outcome      = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
+                .action       = decision.action,
+                .repeat_count = decision.action == KC_NO ? 0 : 1,
+                .mods         = context->mods,
+            };
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_TAP:
+            if (key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(context, context->tap_action)) {
+                return (key_runtime_slot_pending_multi_tap_release_resolution_t){
+                    .outcome = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
+                    .action  = context->tap_action,
+                };
+            }
+
+            if (key_runtime_slot_pending_multi_tap_release_preserves_chain(context)) {
+                return (key_runtime_slot_pending_multi_tap_release_resolution_t){
+                    .outcome = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN,
+                };
+            }
+
+            return (key_runtime_slot_pending_multi_tap_release_resolution_t){
+                .outcome      = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
+                .action       = context->tap_action,
+                .repeat_count = context->tap_repeat_count,
+                .mods         = context->mods,
+            };
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE:
+        default:
+            if (key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(context, context->tap_action)) {
+                return (key_runtime_slot_pending_multi_tap_release_resolution_t){
+                    .outcome = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
+                    .action  = context->tap_action,
+                };
+            }
+
+            if (key_runtime_slot_pending_multi_tap_release_preserves_chain(context)) {
+                return (key_runtime_slot_pending_multi_tap_release_resolution_t){
+                    .outcome = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN,
+                };
+            }
+
+            return (key_runtime_slot_pending_multi_tap_release_resolution_t){
+                .outcome      = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
+                .action       = context->tap_action,
+                .repeat_count = context->tap_repeat_count,
+                .mods         = context->mods,
+            };
+    }
 }
 
 key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(active_key_state_t *slot, uint16_t keycode, uint16_t elapsed) {

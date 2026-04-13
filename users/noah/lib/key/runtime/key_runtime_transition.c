@@ -2,6 +2,8 @@
 // Key Runtime Transitions
 // ────────────────────────────────────────────────────────────────────────────
 
+#include QMK_KEYBOARD_H // IWYU pragma: keep
+
 #include "key_runtime_transition.h"
 
 #ifdef CONSOLE_ENABLE
@@ -34,6 +36,15 @@ static void key_runtime_transition_log_plan_overflow(key_runtime_effect_kind_t k
 #endif
 }
 
+static void key_runtime_transition_fail_host_overflow(key_runtime_effect_kind_t kind, uint8_t capacity) {
+#ifdef NOAH_HOST_TEST_ENV
+    noah_host_test_fail_runtime_overflow("key runtime transition plan", (unsigned int)kind, (unsigned int)capacity);
+#else
+    (void)kind;
+    (void)capacity;
+#endif
+}
+
 static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan, key_runtime_effect_t effect) {
     if (plan->count < ARRAY_SIZE(plan->items)) {
         plan->items[plan->count++] = effect;
@@ -43,6 +54,7 @@ static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan
     if (!plan->overflowed) {
         plan->overflowed = true;
         key_runtime_transition_log_plan_overflow(effect.kind, ARRAY_SIZE(plan->items));
+        key_runtime_transition_fail_host_overflow(effect.kind, ARRAY_SIZE(plan->items));
     }
 }
 

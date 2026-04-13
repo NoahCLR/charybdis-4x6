@@ -57,6 +57,12 @@ typedef struct {
 } key_runtime_slot_binding_t;
 
 typedef struct {
+    handled_key_resolution_t         resolution;
+    key_runtime_slot_binding_t       binding;
+    key_runtime_slot_hold_strategy_t hold_strategy;
+} key_runtime_slot_materialize_args_t;
+
+typedef struct {
     key_runtime_slot_selection_t     selection;
     key_runtime_slot_binding_t       binding;
     key_runtime_slot_hold_strategy_t hold_strategy;
@@ -152,26 +158,36 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
     };
 }
 
-static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_resolution(handled_key_resolution_t resolution) {
+static inline key_runtime_slot_interaction_t key_runtime_slot_materialize(key_runtime_slot_materialize_args_t args) {
     key_runtime_slot_interaction_t interaction = {
-        .selection     = key_runtime_slot_selection_from_resolution(resolution),
-        .binding       = key_runtime_slot_binding_from_resolution(resolution),
-        .hold_strategy = handled_key_resolution_hold_strategy(resolution),
-        .layer         = resolution.layer,
-        .pd_mode       = resolution.pd_mode,
-        .flags         = resolution.flags,
+        .selection     = key_runtime_slot_selection_from_resolution(args.resolution),
+        .binding       = args.binding,
+        .hold_strategy = args.hold_strategy,
+        .layer         = args.resolution.layer,
+        .pd_mode       = args.resolution.pd_mode,
+        .flags         = args.resolution.flags,
     };
 
-    if (handled_key_resolution_uses_implicit_hold(resolution)) {
+    interaction.flags &= (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD);
+
+    if (args.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT) {
         interaction.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
     }
-    if (handled_key_resolution_uses_fallback_hold(resolution)) {
+    if (args.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK) {
         interaction.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
     }
 
     interaction.policy  = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
     interaction.release = key_runtime_slot_release_contract_build(interaction);
     return interaction;
+}
+
+static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_resolution(handled_key_resolution_t resolution) {
+    return key_runtime_slot_materialize((key_runtime_slot_materialize_args_t){
+        .resolution     = resolution,
+        .binding        = key_runtime_slot_binding_from_resolution(resolution),
+        .hold_strategy  = handled_key_resolution_hold_strategy(resolution),
+    });
 }
 
 static inline bool key_runtime_slot_interaction_uses_implicit_hold(key_runtime_slot_interaction_t interaction) {

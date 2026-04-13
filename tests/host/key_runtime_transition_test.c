@@ -1554,12 +1554,12 @@ static void test_scan_pending_multi_tap_long_hold_releases_layer_before_lock(voi
     CHECK(multi_tap.count == 0);
 }
 
-static void test_interrupt_plan_overflow_sets_flag_and_logs_once(void) {
+static void test_interrupt_plan_capacity_boundary_does_not_overflow(void) {
     key_runtime_transition_plan_t plan;
 
     test_reset_stubs();
 
-    for (uint8_t index = 0; index < (uint8_t)(KEY_RUNTIME_TRANSITION_PLAN_CAPACITY + 2); index++) {
+    for (uint8_t index = 0; index < (uint8_t)KEY_RUNTIME_TRANSITION_PLAN_CAPACITY; index++) {
         keypos_t            key_pos = test_keypos((uint8_t)(index / MATRIX_COLS), (uint8_t)(index % MATRIX_COLS));
         active_key_state_t *slot    = test_slot_for_position(key_pos);
 
@@ -1589,8 +1589,8 @@ static void test_interrupt_plan_overflow_sets_flag_and_logs_once(void) {
     key_runtime_transition_interrupt_active_keys_on_other_press(test_keypos(7, 7), &plan);
 
     CHECK(plan.count == KEY_RUNTIME_TRANSITION_PLAN_CAPACITY);
-    CHECK(plan.overflowed);
-    CHECK(overflow_log_count == 1);
+    CHECK(!plan.overflowed);
+    CHECK(overflow_log_count == 0);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
     CHECK(plan.items[0].data.held_action.action == TEST_NEW_KEY);
     CHECK(plan.items[KEY_RUNTIME_TRANSITION_PLAN_CAPACITY - 1].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
@@ -1630,7 +1630,7 @@ int main(void) {
     test_scan_promotes_to_long_hold_and_replaces_held_action();
     test_scan_promotes_repeat_hold_to_long_hold();
     test_scan_pending_multi_tap_long_hold_releases_layer_before_lock();
-    test_interrupt_plan_overflow_sets_flag_and_logs_once();
+    test_interrupt_plan_capacity_boundary_does_not_overflow();
 
     puts("key_runtime_transition host tests passed");
     return 0;

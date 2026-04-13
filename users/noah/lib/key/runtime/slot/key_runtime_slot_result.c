@@ -5,6 +5,8 @@
 // Shared slot-result builders used by the slot-step reducer implementation.
 // ────────────────────────────────────────────────────────────────────────────
 
+#include QMK_KEYBOARD_H // IWYU pragma: keep
+
 #include "key_runtime_slot_result_internal.h"
 
 #ifdef CONSOLE_ENABLE
@@ -14,6 +16,15 @@
 static void key_runtime_slot_result_log_overflow(key_runtime_effect_kind_t kind, uint8_t capacity) {
 #ifdef CONSOLE_ENABLE
     uprintf("Key runtime slot result overflow dropping effect kind %u after %u queued effects\n", (unsigned int)kind, (unsigned int)capacity);
+#else
+    (void)kind;
+    (void)capacity;
+#endif
+}
+
+static void key_runtime_slot_result_fail_host_overflow(key_runtime_effect_kind_t kind, uint8_t capacity) {
+#ifdef NOAH_HOST_TEST_ENV
+    noah_host_test_fail_runtime_overflow("key runtime slot result", (unsigned int)kind, (unsigned int)capacity);
 #else
     (void)kind;
     (void)capacity;
@@ -33,6 +44,7 @@ void key_runtime_slot_result_push(key_runtime_slot_result_t *result, key_runtime
     if (!result->overflowed) {
         result->overflowed = true;
         key_runtime_slot_result_log_overflow(effect.kind, ARRAY_SIZE(result->items));
+        key_runtime_slot_result_fail_host_overflow(effect.kind, ARRAY_SIZE(result->items));
     }
 }
 

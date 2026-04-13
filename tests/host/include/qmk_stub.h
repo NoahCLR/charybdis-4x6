@@ -3,9 +3,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "quantum_keycodes.h"
+
+#define NOAH_HOST_TEST_ENV 1
 
 #define PROGMEM
 
@@ -206,6 +210,11 @@ typedef struct {
 typedef struct {
     uint16_t dummy;
 } combo_t;
+
+static inline void noah_host_test_fail_runtime_overflow(const char *surface, unsigned int kind, unsigned int capacity) {
+    fprintf(stderr, "host test failed: %s overflow dropping effect kind %u after %u queued effects\n", surface, kind, capacity);
+    exit(1);
+}
 
 uint16_t         timer_read(void);
 uint16_t         timer_elapsed(uint16_t last);

@@ -54,6 +54,8 @@ static active_key_state_t *test_primary_slot(void) {
 
 #define key_runtime_primary_slot() test_primary_slot()
 
+#define HOLD_LIT(expr) ((hold_behavior_t)expr)
+
 static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
     return key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
         .keycode               = TEST_ACTIVE_KEY,
@@ -88,7 +90,105 @@ static void test_set_cached_interaction_view(active_key_state_t *slot, key_runti
     slot->interaction = test_refresh_cached_interaction(interaction);
 }
 
-#define HOLD_LIT(expr) ((hold_behavior_t)expr)
+static void test_slot_materialize_matches_resolution_defaults(void) {
+    handled_key_resolution_t resolution = {
+        .keycode               = TEST_ACTIVE_KEY,
+        .tap_count             = 2,
+        .step =
+            {
+                .tap       = (tap_behavior_t)TAP_SENDS(TEST_SINGLE_ACTION),
+                .hold      = HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_HOLD_ACTION)),
+                .long_hold = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_LAYER_LOCK)),
+            },
+        .tap_hold_term         = 135,
+        .longer_hold_term      = 275,
+        .multi_tap_term        = 165,
+        .layer                 = 4,
+        .pd_mode               = PD_MODE_VOLUME,
+        .has_more_taps         = true,
+        .flags                 = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP,
+    };
+    key_runtime_slot_interaction_t from_resolution = key_runtime_slot_interaction_from_resolution(resolution);
+    key_runtime_slot_interaction_t materialized    = key_runtime_slot_materialize((key_runtime_slot_materialize_args_t){
+        .resolution    = resolution,
+        .binding       = key_runtime_slot_binding_from_resolution(resolution),
+        .hold_strategy = handled_key_resolution_hold_strategy(resolution),
+    });
+
+    CHECK(materialized.selection.keycode == from_resolution.selection.keycode);
+    CHECK(materialized.selection.tap_count == from_resolution.selection.tap_count);
+    CHECK(materialized.binding.tap_action == from_resolution.binding.tap_action);
+    CHECK(materialized.binding.tap_repeat_count == from_resolution.binding.tap_repeat_count);
+    CHECK(materialized.binding.hold.action == from_resolution.binding.hold.action);
+    CHECK(materialized.binding.long_hold.action == from_resolution.binding.long_hold.action);
+    CHECK(materialized.binding.tap_hold_term == from_resolution.binding.tap_hold_term);
+    CHECK(materialized.binding.longer_hold_term == from_resolution.binding.longer_hold_term);
+    CHECK(materialized.binding.multi_tap_term == from_resolution.binding.multi_tap_term);
+    CHECK(materialized.hold_strategy == from_resolution.hold_strategy);
+    CHECK(materialized.layer == from_resolution.layer);
+    CHECK(materialized.pd_mode == from_resolution.pd_mode);
+    CHECK(materialized.flags == from_resolution.flags);
+    CHECK(materialized.policy.hold.threshold == from_resolution.policy.hold.threshold);
+    CHECK(materialized.policy.long_hold.dispatches_on_release == from_resolution.policy.long_hold.dispatches_on_release);
+    CHECK(materialized.release.tap.outcome == from_resolution.release.tap.outcome);
+    CHECK(materialized.release.tap.action == from_resolution.release.tap.action);
+    CHECK(materialized.release.tap.repeat_count == from_resolution.release.tap.repeat_count);
+    CHECK(materialized.release.hold.primary_action == from_resolution.release.hold.primary_action);
+    CHECK(materialized.release.hold.long_action == from_resolution.release.hold.long_action);
+}
+
+static void test_slot_materialize_applies_binding_and_strategy_overrides(void) {
+    handled_key_resolution_t resolution = {
+        .keycode               = TEST_ACTIVE_KEY,
+        .tap_count             = 1,
+        .step =
+            {
+                .tap       = (tap_behavior_t)TAP_SENDS(TEST_SINGLE_ACTION),
+                .hold      = hold_behavior_none(),
+                .long_hold = hold_behavior_none(),
+            },
+        .tap_hold_term         = 120,
+        .longer_hold_term      = 240,
+        .multi_tap_term        = 160,
+        .layer                 = 3,
+        .pd_mode               = PD_MODE_VOLUME,
+        .has_more_taps         = true,
+        .flags                 = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP,
+    };
+    key_runtime_slot_binding_t binding = key_runtime_slot_binding_from_resolution(resolution);
+    key_runtime_slot_interaction_t interaction;
+
+    binding.tap_action       = TEST_SINGLE_ACTION;
+    binding.tap_repeat_count = 3;
+    binding.hold             = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_HOLD_ACTION));
+    binding.long_hold        = HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK));
+    binding.tap_hold_term    = 145;
+    binding.longer_hold_term = 285;
+    binding.multi_tap_term   = 175;
+
+    interaction = key_runtime_slot_materialize((key_runtime_slot_materialize_args_t){
+        .resolution    = resolution,
+        .binding       = binding,
+        .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
+    });
+
+    CHECK(interaction.binding.tap_action == TEST_SINGLE_ACTION);
+    CHECK(interaction.binding.tap_repeat_count == 3);
+    CHECK(interaction.binding.hold.action == TEST_HOLD_ACTION);
+    CHECK(interaction.binding.long_hold.action == TEST_LAYER_LOCK);
+    CHECK(interaction.binding.tap_hold_term == 145);
+    CHECK(interaction.binding.longer_hold_term == 285);
+    CHECK(interaction.binding.multi_tap_term == 175);
+    CHECK(interaction.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK);
+    CHECK((interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0);
+    CHECK((interaction.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) == 0);
+    CHECK(interaction.policy.hold.dispatches_on_release);
+    CHECK(!interaction.policy.long_hold.dispatches_on_release);
+    CHECK(interaction.release.tap.outcome == KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP);
+    CHECK(interaction.release.tap.repeat_count == 3);
+    CHECK(interaction.release.hold.primary_action == TEST_HOLD_ACTION);
+    CHECK(interaction.release.hold.long_action == KC_NO);
+}
 
 static handled_key_resolution_t test_resolve_handled_key(key_behavior_view_t behavior);
 
@@ -1493,19 +1593,19 @@ static void test_take_interrupt_result_maps_slot_effect_request(void) {
     test_expect_held_register(&result, 0, slot->owner.key_pos, TEST_LAYER_KEY);
 }
 
-static void test_slot_result_overflow_sets_flag_and_logs_once(void) {
+static void test_slot_result_capacity_boundary_does_not_overflow(void) {
     key_runtime_slot_result_t result  = {.handled = true};
     keypos_t                  key_pos = test_keypos(7, 7);
 
     test_reset_state();
 
-    for (uint8_t index = 0; index < (uint8_t)(KEY_RUNTIME_SLOT_RESULT_CAPACITY + 2); index++) {
+    for (uint8_t index = 0; index < (uint8_t)KEY_RUNTIME_SLOT_RESULT_CAPACITY; index++) {
         key_runtime_slot_result_push_dispatch_action(&result, key_pos, (uint16_t)(TEST_SINGLE_ACTION + index));
     }
 
     CHECK(result.count == KEY_RUNTIME_SLOT_RESULT_CAPACITY);
-    CHECK(result.overflowed);
-    CHECK(overflow_log_count == 1);
+    CHECK(!result.overflowed);
+    CHECK(overflow_log_count == 0);
     CHECK(result.items[0].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK(result.items[0].data.action == TEST_SINGLE_ACTION);
     CHECK(result.items[KEY_RUNTIME_SLOT_RESULT_CAPACITY - 1].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
@@ -1513,6 +1613,8 @@ static void test_slot_result_overflow_sets_flag_and_logs_once(void) {
 }
 
 int main(void) {
+    test_slot_materialize_matches_resolution_defaults();
+    test_slot_materialize_applies_binding_and_strategy_overrides();
     test_slot_pending_multi_tap_ownership_marks_slot_non_idle();
     test_slot_pending_multi_tap_lifecycle_helpers();
     test_slot_track_preserves_pending_multi_tap();
@@ -1545,7 +1647,7 @@ int main(void) {
     test_take_active_scan_result_maps_commit_and_long_hold_requests();
     test_take_active_scan_result_starts_repeat_binding();
     test_take_interrupt_result_maps_slot_effect_request();
-    test_slot_result_overflow_sets_flag_and_logs_once();
+    test_slot_result_capacity_boundary_does_not_overflow();
 
     puts("key_runtime_slot host tests passed");
     return 0;
