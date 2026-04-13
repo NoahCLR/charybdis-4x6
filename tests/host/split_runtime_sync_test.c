@@ -4,12 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "host_runtime_fixture.h"
 #include "transactions.h"
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
 
-static uint32_t       fake_time32;
-static bool           fake_is_master;
+static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
+
+#define fake_time32 runtime_fixture.time32
+#define fake_is_master runtime_fixture.is_master
+
 static uint16_t       fake_auto_mouse_elapsed;
 static bool           fake_auto_mouse_active;
 static bool           fake_any_mode_locked;
@@ -44,8 +48,7 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset_stubs(void) {
-    fake_time32                 = 1000u;
-    fake_is_master              = true;
+    host_runtime_fixture_reset(&runtime_fixture);
     fake_auto_mouse_elapsed     = 83u;
     fake_auto_mouse_active      = true;
     fake_any_mode_locked        = false;
@@ -66,17 +69,7 @@ static void test_reset_stubs(void) {
     remote_snapshot_locked      = 0;
 }
 
-uint32_t timer_read32(void) {
-    return fake_time32;
-}
-
-uint32_t timer_elapsed32(uint32_t last) {
-    return fake_time32 - last;
-}
-
-bool is_keyboard_master(void) {
-    return fake_is_master;
-}
+HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(runtime_fixture)
 
 uint16_t auto_mouse_get_time_elapsed(void) {
     return fake_auto_mouse_elapsed;

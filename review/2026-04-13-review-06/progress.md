@@ -205,3 +205,134 @@ Next steps:
 - choose between the remaining review items:
   - pd-mode policy ownership split
   - shared host runtime fixtures for non-key-runtime suites
+
+### Shared host runtime fixture follow-up
+
+Completed in this pass:
+
+- Started with `git status --short` and confirmed the only in-flight delta was
+  a new shared fixture header under `tests/host/include/`.
+- Landed `tests/host/include/host_runtime_fixture.h` as the shared host-test
+  baseline for:
+  - timer/modifier/report stub state
+  - master-half selection
+  - layer-state stubs
+  - pd-mode display/snapshot synthesis
+  - split-runtime remote-packet initialization
+- Migrated `tests/host/pd_mode_handlers_test.c` off its duplicated timer,
+  modifier, and keyboard-report stub implementations onto the shared fixture
+  while keeping its mode-specific logs and expectations local.
+- Migrated `tests/host/split_runtime_sync_test.c` onto the shared fixture for
+  timer/master-role state so the suite now shares the same runtime stub model
+  as other non-key-runtime tests.
+- Migrated `tests/host/rgb_layer_render_test.c` onto the shared fixture for
+  layer/master stubs and pd-mode snapshot/display reconstruction while
+  preserving the existing rendered-scene assertions.
+
+Contracts touched in this pass:
+
+- non-key-runtime host suites now share one baseline QMK/runtime stub model for
+  timer, mod, report, layer, and master-role state
+- pd-mode display/snapshot reconstruction used by RGB tests is now derived from
+  the same helper contract instead of being rebuilt inline in that suite
+- split-runtime packet initialization used by tests is now centralized instead
+  of open-coded per suite
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted pd-mode handlers, RGB layer render, and split-runtime sync suites
+  passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes in this pass touched:
+  - `tests/host/include/host_runtime_fixture.h`
+  - `tests/host/pd_mode_handlers_test.c`
+  - `tests/host/rgb_layer_render_test.c`
+  - `tests/host/split_runtime_sync_test.c`
+  - this review folder
+
+Next steps:
+
+- decide whether to continue expanding the shared host fixture opportunistically
+  into other non-key-runtime suites or move to the remaining architecture item:
+  pd-mode policy ownership separation
+
+### Pd-mode policy centralization follow-up
+
+Completed in this pass:
+
+- Started from the in-flight fixture/review work already present in the
+  worktree and re-read the pd-mode architecture finding before changing code.
+- Added `users/noah/lib/pointing/policy/pd_mode_policy.h` as the shared
+  interpretation seam for:
+  - remote display-mode selection from split-sync flag snapshots
+  - auto-mouse anchoring policy
+  - typing-layer preference
+  - dragscroll-backend DPI ownership
+- Updated `users/noah/lib/pointing/runtime/pd_mode_state.c` to use the shared
+  policy helper for remote display active/locked selection instead of keeping
+  its own local first-match reducer.
+- Updated `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c` to consume the
+  shared policy helper for auto-mouse anchoring, typing-layer preference, and
+  dragscroll DPI ownership.
+- Updated `users/noah/lib/pointing/policy/pointer_layer_policy.c` to consume
+  the same policy helper instead of re-interpreting pd-mode traits inline.
+- Refreshed
+  `review/2026-04-13-review-06/userspace-architecture-review.md` so the active
+  review reflects the current post-follow-up architecture: release/materialize,
+  overflow, and shared-fixture items are marked closed, and the pd-mode item is
+  narrowed to the remaining "not yet mode-owned" gap.
+
+Contracts touched in this pass:
+
+- pd-mode remote display selection now uses the same shared policy helper as
+  other policy consumers
+- pd-mode lifecycle and pointer-layer policy now share one trait/policy
+  interpretation surface
+- pd-mode architecture review state now matches the code that actually shipped
+  from this review cycle
+
+Verification run in this pass:
+
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted pd-mode, pointer-layer policy, RGB layer render, and split-runtime
+  sync suites passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes in this pass touched:
+  - `users/noah/lib/pointing/policy/pd_mode_policy.h`
+  - `users/noah/lib/pointing/runtime/pd_mode_state.c`
+  - `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`
+  - `users/noah/lib/pointing/policy/pointer_layer_policy.c`
+  - this review folder
+
+Next steps:
+
+- decide whether to keep pushing pd-mode toward explicit mode-owned policy
+  objects/callbacks or stop here with the shared policy helper as the current
+  architectural seam

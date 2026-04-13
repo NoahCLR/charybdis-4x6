@@ -2,10 +2,10 @@
 
 Date: 2026-04-13
 
-Status: new architecture review pass after the implementation follow-ups logged in
-[2026-04-13-review-05](../2026-04-13-review-05/userspace-architecture-review.md).
-This pass focuses on long-term software architecture and extensibility for the
-current userspace as it exists today. The hardware is treated as fixed.
+Status: architecture review plus the implementation follow-ups logged in
+[progress.md](./progress.md). This file now reflects the current post-follow-up
+architecture rather than only the review-open state. The hardware is treated
+as fixed.
 
 Scope:
 
@@ -31,18 +31,35 @@ flag composition, macro semantics are centralized around one IR, and the host
 suite is broad enough to make architectural claims defensible.
 
 The remaining risks are mostly not "this is broken today" risks. They are
-"future features will keep paying a coordination tax" risks. The main pattern
-behind them is policy duplication: release semantics are implemented in more
-than one reducer, slot interaction materialization still has override-heavy
-callers, pd-mode definition mixes identity with policy, effect capacities are
-hard-coded and lossy, and only the key runtime currently has a genuinely shared
-high-level host harness.
+"future features will keep paying a coordination tax" risks. Most of the
+review-open duplication has now been removed: release semantics have a shared
+resolver, slot interaction materialization is explicit, effect overflow fails
+host tests, and non-key-runtime suites now share a host runtime fixture. The
+main remaining coordination cost is pd-mode policy ownership: the policy
+interpretation is now centralized, but mode rows still encode dense
+trait/lifecycle combinations instead of supplying a clearer mode-owned policy
+surface.
+
+Implementation status after follow-ups in this review folder:
+
+- closed: shared key-release resolver
+- closed: slot materialization boundary
+- reduced but still open: pd-mode policy is centralized, but not yet
+  mode-owned
+- closed: effect-queue overflow now fails host tests
+- closed first pass: shared host runtime fixture now covers pd-mode handlers,
+  RGB layer render, and split-runtime sync suites
 
 ## Findings
 
 ### High Priority
 
 #### 1. Release semantics still live in two engines
+
+Status:
+
+- Closed in the release/materialization follow-up. Kept here for review
+  history.
 
 References:
 
@@ -107,6 +124,11 @@ typedef struct {
 
 #### 2. `key_runtime_slot_interaction_t` is not yet a stable boundary
 
+Status:
+
+- Closed in the release/materialization follow-up. Kept here for review
+  history.
+
 References:
 
 - `users/noah/lib/key/runtime/key_runtime_interaction.h:59-175`
@@ -158,41 +180,42 @@ key_runtime_slot_interaction_t
 key_runtime_slot_materialize(key_runtime_slot_materialize_args_t args);
 ```
 
-#### 3. Pd-mode extensibility is still distributed policy, not truly mode-owned behavior
+#### 3. Pd-mode policy is now centralized, but not yet truly mode-owned
 
 References:
 
 - `users/noah/lib/pointing/defs/pd_mode_manifest.h:12-74`
-- `users/noah/lib/pointing/runtime/pd_mode_state.c:31-68`
-- `users/noah/lib/pointing/runtime/pd_mode_state.c:207-253`
-- `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c:27-143`
-- `users/noah/lib/pointing/policy/pointer_layer_policy.c:20-102`
+- `users/noah/lib/pointing/policy/pd_mode_policy.h:1-53`
+- `users/noah/lib/pointing/runtime/pd_mode_state.c:86-93`
+- `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c:14-66`
+- `users/noah/lib/pointing/policy/pointer_layer_policy.c:16-68`
 
 Why this matters:
 
 - A simple mode fits the current manifest-driven system well.
-- A non-trivial mode still spreads its meaning across at least four places:
-  manifest row, state transitions, lifecycle side effects, and pointer-layer
-  policy.
-- The manifest row itself already mixes identity, handler selection, reset
+- A non-trivial mode no longer spreads raw trait interpretation across every
+  consumer: remote-display selection, lifecycle auto-mouse/DPI decisions, and
+  pointer-layer policy now route through one shared policy helper surface.
+- But the mode definition row still mixes identity, handler selection, reset
   callback, DPI, traits, and lifecycle hook selection.
 
 Why this is a design bottleneck:
 
 - `PDM(...)` rows are compact, but they are also dense. The DRAGSCROLL and
   PINCH rows encode several cross-cutting behaviors in one macro line.
-- Traits are consumed in different subsystems for different reasons:
-  exclusivity/state in `pd_mode_state.c`, auto-mouse/DPI in
-  `pd_mode_lifecycle.c`, and layer visibility in `pointer_layer_policy.c`.
-- Adding a mode with a new shared behavior usually means editing generic
-  runtime policy, not just adding a mode-owned file.
+- The new shared policy helper is an improvement, but it is still generic
+  runtime policy owned outside the mode definition itself.
+- Adding a mode with a new shared behavior still means editing the shared
+  policy helper or the manifest trait vocabulary, not just adding a mode-owned
+  file/object.
 
 Recommended direction:
 
-- Keep the manifest as the identity registry, but move growing behavior policy
-  out of trait-bit interpretation and into explicit mode policy objects.
-- Let shared defaults remain shared, but let a mode definition supply a
-  narrow policy surface for the places that currently interpret traits.
+- Keep the manifest as the identity registry and keep the new shared policy
+  helper as the current interpretation seam.
+- From there, move dense trait/lifecycle combinations toward explicit mode
+  policy objects or mode-owned callbacks so adding a new policy does not
+  require editing generic helper logic.
 
 Practical target:
 
@@ -207,6 +230,11 @@ threshold handler.
 ### Medium Priority
 
 #### 4. Effect queue caps are a hidden scalability ceiling
+
+Status:
+
+- Closed for host safety in the overflow follow-up. The hard caps still exist,
+  but overflow now fails host tests instead of silently continuing.
 
 References:
 
@@ -241,6 +269,12 @@ Recommended direction:
   incremental execution between reduction passes.
 
 #### 5. Test architecture is strongest where there is a shared harness; other suites still rebuild their own runtime world
+
+Status:
+
+- First shared-fixture pass is complete for pd-mode handlers, RGB layer
+  render, and split-runtime sync. Further adoption is now incremental rather
+  than greenfield.
 
 References:
 
@@ -293,18 +327,17 @@ Recommended direction:
 
 ## Concrete Recommendations
 
-1. Extract a shared key-release resolver and make active release and pending
-   multi-tap release thin adapters around it.
-2. Replace post-construction interaction mutation with one slot-materialization
-   API so `key_runtime_slot_interaction_t` becomes a trustworthy cached
-   contract.
-3. Split pd-mode identity from pd-mode policy. Keep the manifest-generated
-   registry, but move growing behavior out of shared trait interpretation and
-   into mode-owned policy objects or callbacks.
-4. Make effect-queue overflow a host-test failure, not just a console-side
-   warning.
-5. Build a shared host runtime fixture under `tests/host/` and reuse it across
-   pd-mode, RGB, split-sync, and action-lifecycle suites.
+1. Completed: extract a shared key-release resolver and keep active release and
+   pending multi-tap release as thin adapters.
+2. Completed: replace post-construction interaction mutation with one
+   slot-materialization API so `key_runtime_slot_interaction_t` is a
+   trustworthy cached contract.
+3. Next: continue splitting pd-mode identity from pd-mode policy. The shared
+   policy helper is now the right seam, but mode-owned policy objects or
+   callbacks are still the cleaner long-term target.
+4. Completed: effect-queue overflow is a host-test failure.
+5. Completed first pass: shared host runtime fixture now covers pd-mode, RGB,
+   and split-runtime suites; continue expanding it opportunistically.
 
 ## Verification
 

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "host_runtime_fixture.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/pointing/modes/pd_mode_handlers.h"
 #include "users/noah/lib/state/runtime/keyboard_mod_state.h"
@@ -27,12 +28,13 @@ typedef struct {
     uint8_t  oneshot_locked;
 } literal_tap_call_t;
 
-static uint8_t fake_mods;
-static uint8_t fake_weak_mods;
-static uint8_t fake_oneshot_mods;
-static uint8_t fake_oneshot_locked_mods;
+static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
 
-static uint8_t send_keyboard_report_count;
+#define fake_mods runtime_fixture.mods
+#define fake_weak_mods runtime_fixture.weak_mods
+#define fake_oneshot_mods runtime_fixture.oneshot_mods
+#define fake_oneshot_locked_mods runtime_fixture.oneshot_locked_mods
+#define fake_time32 runtime_fixture.time32
 
 static synthetic_tap_call_t synthetic_tap_calls[TEST_MAX_CALLS];
 static uint8_t              synthetic_tap_call_count;
@@ -42,7 +44,6 @@ static uint8_t            literal_tap_call_count;
 
 static uint8_t  fallback_hold_activation_count;
 static bool     fallback_hold_active;
-static uint32_t fake_time32;
 
 static uint8_t  keyboard_mod_register_count;
 static uint8_t  keyboard_mod_unregister_count;
@@ -62,7 +63,7 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_clear_logs(void) {
-    send_keyboard_report_count     = 0;
+    runtime_fixture.send_keyboard_report_count = 0;
     synthetic_tap_call_count       = 0;
     literal_tap_call_count         = 0;
     fallback_hold_activation_count = 0;
@@ -78,92 +79,14 @@ static void test_clear_logs(void) {
 }
 
 static void test_reset_stubs(void) {
-    fake_mods                = 0;
-    fake_weak_mods           = 0;
-    fake_oneshot_mods        = 0;
-    fake_oneshot_locked_mods = 0;
-
+    host_runtime_fixture_reset(&runtime_fixture);
     test_clear_logs();
     reset_dragscroll_mode();
     reset_arrow_mode();
     test_clear_logs();
 }
 
-uint16_t timer_read(void) {
-    return (uint16_t)fake_time32;
-}
-
-uint16_t timer_elapsed(uint16_t last) {
-    return (uint16_t)(timer_read() - last);
-}
-
-uint32_t timer_read32(void) {
-    return fake_time32;
-}
-
-uint32_t timer_elapsed32(uint32_t last) {
-    return fake_time32 - last;
-}
-
-uint8_t get_mods(void) {
-    return fake_mods;
-}
-
-uint8_t get_weak_mods(void) {
-    return fake_weak_mods;
-}
-
-uint8_t get_oneshot_mods(void) {
-    return fake_oneshot_mods;
-}
-
-uint8_t get_oneshot_locked_mods(void) {
-    return fake_oneshot_locked_mods;
-}
-
-void set_mods(uint8_t mods) {
-    fake_mods = mods;
-}
-
-void set_weak_mods(uint8_t mods) {
-    fake_weak_mods = mods;
-}
-
-void set_oneshot_mods(uint8_t mods) {
-    fake_oneshot_mods = mods;
-}
-
-void set_oneshot_locked_mods(uint8_t mods) {
-    fake_oneshot_locked_mods = mods;
-}
-
-void clear_mods(void) {
-    fake_mods = 0;
-}
-
-void clear_weak_mods(void) {
-    fake_weak_mods = 0;
-}
-
-void clear_oneshot_mods(void) {
-    fake_oneshot_mods = 0;
-}
-
-void clear_oneshot_locked_mods(void) {
-    fake_oneshot_locked_mods = 0;
-}
-
-void add_mods(uint8_t mods) {
-    fake_mods |= mods;
-}
-
-void del_mods(uint8_t mods) {
-    fake_mods &= (uint8_t)~mods;
-}
-
-void send_keyboard_report(void) {
-    send_keyboard_report_count++;
-}
+HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(runtime_fixture)
 
 bool key_runtime_activate_pending_fallback_hold(void) {
     fallback_hold_activation_count++;
@@ -584,7 +507,7 @@ static void test_horizontal_arrow_tap_preserves_mod_state(void) {
     CHECK(synthetic_tap_calls[0].oneshot_locked == MOD_BIT(KC_RIGHT_GUI));
     CHECK(synthetic_tap_calls[0].fallback_hold_active);
     CHECK(fallback_hold_activation_count == 1);
-    CHECK(send_keyboard_report_count == 0);
+    CHECK(runtime_fixture.send_keyboard_report_count == 0);
 }
 
 static void test_vertical_arrow_tap_masks_alt_and_restores_mod_state(void) {
@@ -613,7 +536,7 @@ static void test_vertical_arrow_tap_masks_alt_and_restores_mod_state(void) {
     CHECK(fake_oneshot_mods == MOD_BIT(KC_LEFT_ALT));
     CHECK(fake_oneshot_locked_mods == (MOD_BIT(KC_RIGHT_ALT) | MOD_BIT(KC_RIGHT_SHIFT)));
     CHECK(fallback_hold_activation_count == 1);
-    CHECK(send_keyboard_report_count == 3);
+    CHECK(runtime_fixture.send_keyboard_report_count == 3);
 }
 
 static void test_arrow_mode_selection_button_holds_and_releases_shift(void) {
@@ -657,7 +580,7 @@ static void test_arrow_mode_copy_shortcut_suspends_ambient_mods(void) {
     CHECK(fake_oneshot_locked_mods == MOD_BIT(KC_RIGHT_GUI));
     CHECK(fallback_hold_activation_count == 1);
     CHECK(fallback_hold_active);
-    CHECK(send_keyboard_report_count == 2);
+    CHECK(runtime_fixture.send_keyboard_report_count == 2);
 }
 
 int main(void) {

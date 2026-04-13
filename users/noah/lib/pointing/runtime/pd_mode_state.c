@@ -7,22 +7,13 @@
 #include "../../state/runtime/runtime_shared_state.h"
 #include "../../state/runtime/split_runtime_sync.h"
 #include "../../state/runtime/runtime_trace.h"
+#include "../policy/pd_mode_policy.h"
 #include "pd_mode_internal.h"
 
 #define PD_MODE_LOCAL_ACTIVE_MODE (noah_runtime_shared_state.pd.local_active_mode)
 #define PD_MODE_LOCAL_LOCKED_MODE (noah_runtime_shared_state.pd.local_locked_mode)
 #define PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE (noah_runtime_shared_state.pd.remote_display_active_mode)
 #define PD_MODE_REMOTE_DISPLAY_LOCKED_MODE (noah_runtime_shared_state.pd.remote_display_locked_mode)
-
-static pd_mode_mask_t pd_mode_first_snapshot_match(pd_mode_mask_t flags) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if ((flags & pd_modes[i].mode_flag) != 0) {
-            return pd_modes[i].mode_flag;
-        }
-    }
-
-    return 0;
-}
 
 static bool pd_mode_snapshot_view_changed(pd_mode_snapshot_view_t before, pd_mode_snapshot_view_t after) {
     return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode;
@@ -109,8 +100,8 @@ static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_flags, p
     // Do not replay local side effects such as dragscroll or auto-mouse
     // ownership changes from this path. Keep only one effective mode so the
     // mirrored UI matches the local exclusivity invariant.
-    pd_mode_mask_t locked_mode = pd_mode_first_snapshot_match(locked_flags);
-    pd_mode_mask_t active_mode = locked_mode ? locked_mode : pd_mode_first_snapshot_match(active_flags);
+    pd_mode_mask_t locked_mode = pd_mode_policy_remote_display_locked_mode(locked_flags);
+    pd_mode_mask_t active_mode = pd_mode_policy_remote_display_active_mode(active_flags, locked_flags);
     bool           changed     = PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE != active_mode || PD_MODE_REMOTE_DISPLAY_LOCKED_MODE != locked_mode;
 
     PD_MODE_REMOTE_DISPLAY_LOCKED_MODE = locked_mode;

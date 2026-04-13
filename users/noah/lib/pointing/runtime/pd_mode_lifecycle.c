@@ -6,6 +6,7 @@
 
 #include "pd_mode_internal.h"
 #include "pd_mode_registry_internal.h"
+#include "../policy/pd_mode_policy.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../compat/qmk_pointing_contract.h"
 #include "../../state/runtime/runtime_trace.h"
@@ -25,7 +26,7 @@ static void pd_mode_auto_mouse_sync_anchor(bool should_anchor) {
 }
 
 static void pd_mode_auto_mouse_activate(pd_mode_mask_t mode, bool was_any_mode_active) {
-    if (pd_mode_has_trait(mode, PD_MODE_TRAIT_PREFER_TYPING_LAYER)) {
+    if (pd_mode_policy_mode_prefers_typing_layer(mode)) {
         // Arrow mode should fall back to the typing/nav surface immediately
         // instead of waiting for the auto-mouse timeout to drop the pointer
         // layer.
@@ -33,13 +34,13 @@ static void pd_mode_auto_mouse_activate(pd_mode_mask_t mode, bool was_any_mode_a
         return;
     }
 
-    if (!was_any_mode_active && pd_mode_has_trait(mode, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)) {
+    if (!was_any_mode_active && pd_mode_policy_mode_keeps_auto_mouse_anchored(mode)) {
         pd_mode_auto_mouse_sync_anchor(true);
     }
 }
 
 static void pd_mode_auto_mouse_deactivate(pd_mode_mask_t mode, bool was_any_mode_active) {
-    if (!pd_mode_has_trait(mode, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)) {
+    if (!pd_mode_policy_mode_keeps_auto_mouse_anchored(mode)) {
         return;
     }
 
@@ -50,10 +51,10 @@ static void pd_mode_auto_mouse_deactivate(pd_mode_mask_t mode, bool was_any_mode
 #endif
 
 void pd_mode_apply_active_dpi(void) {
-    pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+    pd_mode_snapshot_t   snapshot    = pd_mode_snapshot();
     const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
 
-    if ((snapshot.local.active_traits & PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND) != 0) {
+    if (pd_mode_policy_mode_uses_dragscroll_backend(snapshot.local.active_mode)) {
         pointing_device_set_cpi(noah_qmk_contract_pointer_dragscroll_dpi());
         return;
     }

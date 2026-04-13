@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "host_runtime_fixture.h"
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/rgb/automouse/rgb_automouse.h"
@@ -30,7 +31,7 @@ enum test_layers {
 
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max);
 
-layer_state_t layer_state;
+HOST_RUNTIME_FIXTURE_DEFINE_LAYER_STUBS()
 
 static uint16_t       test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static rgb_t          led_output[RGB_MATRIX_LED_COUNT];
@@ -38,7 +39,8 @@ static uint8_t        fake_preview_layer      = UINT8_MAX;
 static uint8_t        fake_auto_mouse_layer   = LAYER_POINTER;
 static uint16_t       fake_auto_mouse_elapsed = 0;
 static bool           fake_auto_mouse_active  = true;
-static bool           fake_is_master          = true;
+static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
+#define fake_is_master runtime_fixture.is_master
 static uint8_t        fake_feedback_flags     = 0;
 static pd_mode_mask_t fake_pd_active_mode     = 0;
 static pd_mode_mask_t fake_pd_locked_mode     = 0;
@@ -137,31 +139,12 @@ static rgb_t rgb_blend(rgb_t start, rgb_t end, uint8_t amount) {
     };
 }
 
-static pd_mode_mask_t test_snapshot_mode(pd_mode_mask_t flags) {
-    if (flags == 0) {
-        return 0;
-    }
-
-    for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
-        if ((flags & pd_modes[index].mode_flag) != 0) {
-            return pd_modes[index].mode_flag;
-        }
-    }
-
-    return 0;
-}
-
 static pd_mode_mask_t test_display_locked_mode(void) {
-    return fake_is_master ? fake_pd_locked_mode : test_snapshot_mode(split_runtime_sync_remote.pd_mode_locked_flags);
+    return host_runtime_fixture_display_locked_mode(pd_modes, PD_MODE_COUNT, fake_is_master, fake_pd_locked_mode, split_runtime_sync_remote);
 }
 
 static pd_mode_mask_t test_display_active_mode(void) {
-    if (fake_is_master) {
-        return fake_pd_active_mode;
-    }
-
-    pd_mode_mask_t locked_mode = test_display_locked_mode();
-    return locked_mode ? locked_mode : test_snapshot_mode(split_runtime_sync_remote.pd_mode_flags);
+    return host_runtime_fixture_display_active_mode(pd_modes, PD_MODE_COUNT, fake_is_master, fake_pd_active_mode, fake_pd_locked_mode, split_runtime_sync_remote);
 }
 
 static uint8_t automouse_blend_amount_from_elapsed(uint16_t elapsed) {
@@ -177,6 +160,7 @@ static uint8_t automouse_blend_amount_from_elapsed(uint16_t elapsed) {
 }
 
 static void test_reset(void) {
+    host_runtime_fixture_reset(&runtime_fixture);
     memset(test_keymap, 0, sizeof(test_keymap));
     memset(led_output, 0, sizeof(led_output));
     memset(ws2812_leds, 0, sizeof(ws2812_leds));
@@ -185,13 +169,10 @@ static void test_reset(void) {
     fake_auto_mouse_layer     = LAYER_POINTER;
     fake_auto_mouse_elapsed   = 0;
     fake_auto_mouse_active    = true;
-    fake_is_master            = true;
     fake_feedback_flags       = 0;
     fake_pd_active_mode       = 0;
     fake_pd_locked_mode       = 0;
-    split_runtime_sync_remote = (split_runtime_sync_packet_t){
-        .key_preview_layer = UINT8_MAX,
-    };
+    split_runtime_sync_remote = host_runtime_fixture_split_remote_init();
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
@@ -214,43 +195,10 @@ static void test_reset(void) {
     noah_rgb_runtime_post_init();
 }
 
-bool is_keyboard_master(void) {
-    return fake_is_master;
-}
+HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(runtime_fixture)
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {
-    pd_mode_snapshot_t snapshot = {
-        .local.active_mode    = fake_pd_active_mode,
-        .local.locked_mode    = fake_pd_locked_mode,
-        .local.active_index   = PD_MODE_COUNT,
-        .local.locked_index   = PD_MODE_COUNT,
-        .display.active_mode  = test_display_active_mode(),
-        .display.locked_mode  = test_display_locked_mode(),
-        .display.active_index = PD_MODE_COUNT,
-        .display.locked_index = PD_MODE_COUNT,
-    };
-
-    for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
-        pd_mode_mask_t mode = pd_modes[index].mode_flag;
-
-        if (fake_pd_active_mode == mode) {
-            snapshot.local.active_index = index;
-        }
-
-        if (fake_pd_locked_mode == mode) {
-            snapshot.local.locked_index = index;
-        }
-
-        if (test_display_active_mode() == mode) {
-            snapshot.display.active_index = index;
-        }
-
-        if (test_display_locked_mode() == mode) {
-            snapshot.display.locked_index = index;
-        }
-    }
-
-    return snapshot;
+    return host_runtime_fixture_pd_mode_snapshot(pd_modes, PD_MODE_COUNT, fake_is_master, fake_pd_active_mode, fake_pd_locked_mode, split_runtime_sync_remote);
 }
 
 int rgb_matrix_led_index(int index) {
@@ -259,10 +207,6 @@ int rgb_matrix_led_index(int index) {
     }
 
     return index;
-}
-
-bool layer_state_cmp(layer_state_t state, uint8_t layer) {
-    return (state & ((layer_state_t)1u << layer)) != 0;
 }
 
 rgb_t hsv_to_rgb(hsv_t hsv) {

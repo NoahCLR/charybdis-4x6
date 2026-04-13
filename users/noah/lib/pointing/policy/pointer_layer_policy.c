@@ -4,6 +4,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "pd_mode_policy.h"
 #include "../defs/pd_modes.h"
 #include "pointer_layer_policy.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
@@ -17,27 +18,18 @@ static inline bool pointer_layer_policy_is_mouse_button_action(uint16_t action) 
     return IS_MOUSEKEY_BUTTON(action);
 }
 
-static inline bool pointer_layer_policy_active_mode_prefers_typing_layer(pd_mode_snapshot_t snapshot) {
-    return (snapshot.local.active_traits & PD_MODE_TRAIT_PREFER_TYPING_LAYER) != 0;
-}
-
-static inline bool pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored(pd_mode_snapshot_t snapshot) {
-    return snapshot.local.active_mode != 0 && (snapshot.local.active_traits & PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED) != 0;
-}
-
 static bool pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(uint16_t keycode) {
-    pd_mode_mask_t mode = pd_mode_for_keycode(keycode);
-    return pd_mode_has_trait(mode, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED);
+    return pd_mode_policy_key_keeps_auto_mouse_anchored(keycode);
 }
 
 static inline bool pointer_layer_policy_auto_mouse_anchored(pd_mode_snapshot_t snapshot) {
-    return noah_qmk_contract_auto_mouse_toggle_enabled() || noah_qmk_contract_auto_mouse_key_tracker() != 0 || pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored(snapshot);
+    return noah_qmk_contract_auto_mouse_toggle_enabled() || noah_qmk_contract_auto_mouse_key_tracker() != 0 || pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot);
 }
 
 bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
     pd_mode_snapshot_t snapshot = pd_mode_snapshot();
 
-    if (pointer_layer_policy_pd_mode_keeps_auto_mouse_anchored(snapshot) && pointer_layer_policy_is_layer_hold_key(keycode)) {
+    if (pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot) && pointer_layer_policy_is_layer_hold_key(keycode)) {
         return true;
     }
 
@@ -70,7 +62,7 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     pd_mode_snapshot_t snapshot             = pd_mode_snapshot();
-    bool               prefers_typing_layer = pointer_layer_policy_active_mode_prefers_typing_layer(snapshot);
+    bool               prefers_typing_layer = pd_mode_policy_snapshot_prefers_typing_layer(snapshot);
     bool               auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored(snapshot);
     uint8_t       auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
     layer_state_t auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
