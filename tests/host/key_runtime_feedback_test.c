@@ -7,6 +7,7 @@
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_step.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 enum {
     TEST_MULTI_TAP_KEY      = SAFE_RANGE + 0x20,
@@ -38,8 +39,8 @@ static active_key_state_t *test_other_slot(void) {
 #define active_key (*test_default_slot())
 
 static void test_reset_state(void) {
-    noah_runtime_shared_state = (runtime_shared_state_t){0};
-    fake_time                 = 0;
+    runtime_shared_state_reset(&noah_runtime_shared_state);
+    fake_time = 0;
 }
 
 static handled_key_view_t test_resolve_handled_key(key_behavior_view_t behavior);

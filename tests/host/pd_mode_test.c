@@ -60,7 +60,7 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset_runtime(void) {
-    noah_runtime_shared_state = (runtime_shared_state_t){0};
+    runtime_shared_state_reset(&noah_runtime_shared_state);
 }
 
 static void test_reset_stubs(void) {

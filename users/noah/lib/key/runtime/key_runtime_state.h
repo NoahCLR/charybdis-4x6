@@ -4,14 +4,15 @@
 //
 // Shared per-slot handled-key state for the split key runtime modules.
 // Each slot owns both the currently pressed key state and any deferred
-// multi-tap chain that still belongs to that physical key. The helper surface
-// keeps higher-level code off the raw storage layout so the runtime can keep
-// evolving toward clearer per-key FSMs without another global-state sweep.
+// multi-tap chain that still belongs to that physical key. This header stays
+// key-runtime-local: callers that need the aggregate userspace runtime state
+// should include state/runtime/runtime_shared_state.h explicitly instead of
+// reaching it through the key engine.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "../../state/runtime/runtime_shared_state.h"
 #include "delayed_action.h"
+#include "key_runtime_shared_state.h"
 #include "../interaction/handled_key.h"
 #include "../interaction/key_behavior_lookup.h"
 

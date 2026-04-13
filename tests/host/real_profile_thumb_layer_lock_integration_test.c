@@ -11,6 +11,7 @@
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
+#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
 
@@ -131,7 +132,7 @@ static void test_run_double_tap_hold_cycle_with_intermediate_scan(keypos_t key_p
 static void test_reset_state(void) {
     fake_time                 = 1000;
     layer_state               = test_layer_mask(LAYER_BASE);
-    noah_runtime_shared_state = (runtime_shared_state_t){0};
+    runtime_shared_state_reset(&noah_runtime_shared_state);
     layer_ownership_reset_for_test();
 }
 

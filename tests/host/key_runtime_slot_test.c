@@ -11,6 +11,7 @@
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_result.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_step.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x40,
@@ -127,7 +128,7 @@ static void test_reset_state(void) {
     test_pd_mode              = 0;
     test_pd_locked_modes      = 0;
     overflow_log_count        = 0;
-    noah_runtime_shared_state = (runtime_shared_state_t){0};
+    runtime_shared_state_reset(&noah_runtime_shared_state);
 }
 
 int uprintf(const char *fmt, ...) {

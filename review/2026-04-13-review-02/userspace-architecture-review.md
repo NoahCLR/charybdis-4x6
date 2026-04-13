@@ -661,6 +661,27 @@ Expected payoff:
 - clearer module ownership
 - fewer include dependencies that cross layers awkwardly
 
+Current status:
+
+- landed `key_runtime_shared_state.h` under `users/noah/lib/key/runtime/`
+  as the owner of slot lifecycle/storage types and key-runtime feedback state
+- `state/runtime/runtime_shared_state.h` now only defines the aggregate
+  `runtime_shared_state_t` wrapper plus pd-mode runtime state
+- aggregate reset now delegates key-slot initialization back to the
+  key-runtime-owned reset helper instead of hardcoding slot initialization in
+  `state/runtime/runtime_shared_state.c`
+- this removes the most obvious domain leak where the aggregate runtime layer
+  defined key-runtime slot internals directly
+- `key_runtime_state.h` no longer re-exports
+  `state/runtime/runtime_shared_state.h`, so key-runtime modules no longer
+  pull the aggregate state contract in transitively
+- the remaining key-runtime readers that need storage access now go through a
+  small `key_runtime_shared_state()` seam instead of reaching through
+  `noah_runtime_shared_state.key`
+- host tests that need the aggregate runtime singleton now include
+  `runtime_shared_state.h` explicitly and reset through
+  `runtime_shared_state_reset(...)` instead of raw aggregate zeroing
+
 ### Recommendation 4: build a pd-mode controller snapshot
 
 Do before adding materially richer pd-mode policy.

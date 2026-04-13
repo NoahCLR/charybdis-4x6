@@ -53,7 +53,7 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 }
 
 static void test_reset_state(void) {
-    noah_runtime_shared_state                         = (runtime_shared_state_t){0};
+    runtime_shared_state_reset(&noah_runtime_shared_state);
     *key_runtime_slot_for_position(test_keypos(1, 2)) = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
 
     fake_time          = 1000;

@@ -7,7 +7,7 @@
 #include "../../action/action_dispatch.h"
 #include "../../pointing/defs/pd_modes.h"
 
-#define key_feedback_pulse (noah_runtime_shared_state.key.feedback)
+#define key_feedback_pulse (key_runtime_shared_state()->feedback)
 
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
 #    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS

@@ -29,7 +29,7 @@ active_key_state_t *key_runtime_slot_for_position(keypos_t key_pos) {
         return NULL;
     }
 
-    return &noah_runtime_shared_state.key.slots_by_position[key_runtime_slot_table_index(key_pos)];
+    return &key_runtime_shared_state()->slots_by_position[key_runtime_slot_table_index(key_pos)];
 }
 
 active_key_state_t *key_runtime_slot_at(uint8_t index) {
@@ -37,7 +37,7 @@ active_key_state_t *key_runtime_slot_at(uint8_t index) {
         return NULL;
     }
 
-    return &noah_runtime_shared_state.key.slots_by_position[index];
+    return &key_runtime_shared_state()->slots_by_position[index];
 }
 
 bool key_runtime_slot_idle(const active_key_state_t *slot) {
@@ -160,11 +160,15 @@ multi_tap_t *key_runtime_multi_tap_for_slot(const active_key_state_t *slot) {
 }
 
 active_key_state_t *key_runtime_slot_for_multi_tap(const multi_tap_t *mt) {
+    const key_runtime_shared_state_t *state;
+
     if (!mt) {
         return NULL;
     }
 
-    const active_key_state_t *base = &noah_runtime_shared_state.key.slots_by_position[0];
+    state = key_runtime_shared_state();
+
+    const active_key_state_t *base = &state->slots_by_position[0];
     const multi_tap_t        *min  = &base[0].pending_multi_tap;
     const multi_tap_t        *max  = &base[KEY_RUNTIME_SLOT_TABLE_CAPACITY - 1].pending_multi_tap;
 

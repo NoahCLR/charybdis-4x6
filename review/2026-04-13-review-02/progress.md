@@ -516,3 +516,106 @@ Next steps:
 
 - start recommendation 3 without carrying the removed compatibility action
   contracts into the runtime-storage refactor
+
+## 2026-04-13: Recommendation 3 landed
+
+Completed in this pass:
+
+- Moved the key-runtime-owned storage layout out of
+  `state/runtime/runtime_shared_state.h` into new
+  `key/runtime/key_runtime_shared_state.h`.
+- That new key-runtime header now owns:
+  `key_runtime_slot_phase_t`, slot owner/lifecycle/interaction storage types,
+  `active_key_state_t`, `key_runtime_feedback_state_t`,
+  `key_runtime_shared_state_t`, `ACTIVE_KEY_STATE_INIT`, and the slot-table
+  capacity constant.
+- Slimmed `state/runtime/runtime_shared_state.h` down to the aggregate wrapper
+  only: it now composes `key_runtime_shared_state_t` with
+  `pd_mode_runtime_shared_state_t` instead of defining key-runtime internals
+  itself.
+- Reworked `runtime_shared_state_reset()` so the aggregate layer delegates
+  key-state initialization back to `key_runtime_shared_state_reset(...)`
+  instead of directly knowing how slots are initialized.
+
+Contracts touched:
+
+- `users/noah/lib/key/runtime/key_runtime_shared_state.h`
+- `users/noah/lib/state/runtime/runtime_shared_state.h`
+- `users/noah/lib/state/runtime/runtime_shared_state.c`
+
+Verification run in this pass:
+
+- `git diff --check`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- move on to recommendation 4
+
+## 2026-04-13: Recommendation 3 include cleanup landed
+
+Completed in this pass:
+
+- Narrowed the include direction around the runtime aggregate:
+  `key_runtime_state.h` no longer re-exports
+  `state/runtime/runtime_shared_state.h`.
+- Added a minimal `key_runtime_shared_state()` seam so key-runtime modules can
+  reach the `key` slice of userspace state without importing the aggregate
+  `runtime_shared_state_t` contract.
+- Updated the remaining key-runtime implementation files that were still
+  piercing the aggregate directly:
+  `key_runtime_feedback.c` and `slot/key_runtime_slot.c`.
+- Updated host tests that actually need the aggregate singleton to include
+  `runtime_shared_state.h` explicitly instead of getting it transitively
+  through `key_runtime_state.h`.
+- Replaced raw aggregate zeroing in those host tests with
+  `runtime_shared_state_reset(&noah_runtime_shared_state)` so test resets now
+  follow the same initialization contract as production code.
+
+Contracts touched:
+
+- `users/noah/lib/key/runtime/key_runtime_shared_state.h`
+- `users/noah/lib/key/runtime/key_runtime_state.h`
+- `users/noah/lib/key/runtime/key_runtime.c`
+- `users/noah/lib/key/runtime/key_runtime_feedback.c`
+- `users/noah/lib/key/runtime/slot/key_runtime_slot.c`
+- `users/noah/lib/state/runtime/runtime_shared_state.c`
+- `tests/host/key_runtime_admission_test.c`
+- `tests/host/key_runtime_feedback_test.c`
+- `tests/host/key_runtime_layer_lock_integration_test.c`
+- `tests/host/key_runtime_modifier_hold_integration_test.c`
+- `tests/host/key_runtime_preflight_test.c`
+- `tests/host/key_runtime_slot_test.c`
+- `tests/host/key_runtime_transition_test.c`
+- `tests/host/pd_mode_key_runtime_integration_test.c`
+- `tests/host/pd_mode_test.c`
+- `tests/host/real_profile_thumb_layer_lock_integration_test.c`
+
+Verification run in this pass:
+
+- `git diff --check`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Next steps:
+
+- move on to recommendation 4
