@@ -28,19 +28,19 @@ typedef struct {
 } key_runtime_slot_release_hold_contract_t;
 
 typedef struct {
-    key_runtime_slot_release_tap_contract_t tap;
+    key_runtime_slot_release_tap_contract_t  tap;
     key_runtime_slot_release_hold_contract_t hold;
-    pd_mode_mask_t                          quick_tap_pd_mode_lock;
-    bool                                    suppress_tap_on_layer_interrupt;
-    bool                                    buffered_base_tap_dispatches_tap;
-    bool                                    quick_release_of_immediate_hold_dispatches_tap;
-    bool                                    fallback_hold_suppresses_nonquick_release;
-    bool                                    nonquick_release_dispatches_tap;
+    pd_mode_mask_t                           quick_tap_pd_mode_lock;
+    bool                                     suppress_tap_on_layer_interrupt;
+    bool                                     buffered_base_tap_dispatches_tap;
+    bool                                     quick_release_of_immediate_hold_dispatches_tap;
+    bool                                     fallback_hold_suppresses_nonquick_release;
+    bool                                     nonquick_release_dispatches_tap;
 } key_runtime_slot_release_contract_t;
 
 typedef struct {
-    uint16_t        keycode;
-    uint8_t         tap_count;
+    uint16_t            keycode;
+    uint8_t             tap_count;
     key_behavior_step_t step;
 } key_runtime_slot_selection_t;
 
@@ -63,13 +63,13 @@ typedef struct {
 } key_runtime_slot_materialize_args_t;
 
 typedef struct {
-    key_runtime_slot_selection_t     selection;
-    key_runtime_slot_binding_t       binding;
-    key_runtime_slot_hold_strategy_t hold_strategy;
-    uint8_t                          layer;
-    pd_mode_mask_t                   pd_mode;
-    uint16_t                         flags;
-    handled_key_interaction_policy_t policy;
+    key_runtime_slot_selection_t        selection;
+    key_runtime_slot_binding_t          binding;
+    key_runtime_slot_hold_strategy_t    hold_strategy;
+    uint8_t                             layer;
+    pd_mode_mask_t                      pd_mode;
+    uint16_t                            flags;
+    handled_key_interaction_policy_t    policy;
     key_runtime_slot_release_contract_t release;
 } key_runtime_slot_interaction_t;
 
@@ -124,14 +124,14 @@ static inline key_runtime_slot_release_hold_contract_t key_runtime_slot_release_
 
 static inline key_runtime_slot_release_contract_t key_runtime_slot_release_contract_build(key_runtime_slot_interaction_t interaction) {
     return (key_runtime_slot_release_contract_t){
-        .tap                                          = key_runtime_slot_release_tap_contract_build(interaction),
-        .hold                                         = key_runtime_slot_release_hold_contract_build(interaction),
-        .quick_tap_pd_mode_lock                       = interaction.pd_mode,
-        .suppress_tap_on_layer_interrupt              = (interaction.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0,
-        .buffered_base_tap_dispatches_tap             = (interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0 && interaction.binding.tap_action == KC_NO,
+        .tap                                            = key_runtime_slot_release_tap_contract_build(interaction),
+        .hold                                           = key_runtime_slot_release_hold_contract_build(interaction),
+        .quick_tap_pd_mode_lock                         = interaction.pd_mode,
+        .suppress_tap_on_layer_interrupt                = (interaction.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0,
+        .buffered_base_tap_dispatches_tap               = (interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0 && interaction.binding.tap_action == KC_NO,
         .quick_release_of_immediate_hold_dispatches_tap = hold_registers_on_press(interaction.binding.hold),
-        .fallback_hold_suppresses_nonquick_release    = (interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0,
-        .nonquick_release_dispatches_tap              = (interaction.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) == 0 && interaction.binding.tap_action != KC_NO,
+        .fallback_hold_suppresses_nonquick_release      = (interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0,
+        .nonquick_release_dispatches_tap                = (interaction.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) == 0 && interaction.binding.tap_action != KC_NO,
     };
 }
 
@@ -143,7 +143,7 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
                 .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
                 .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
             },
-        .layer  = UINT8_MAX,
+        .layer = UINT8_MAX,
         .policy =
             {
                 .hold =
@@ -184,9 +184,9 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_materialize(key_ru
 
 static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_resolution(handled_key_resolution_t resolution) {
     return key_runtime_slot_materialize((key_runtime_slot_materialize_args_t){
-        .resolution     = resolution,
-        .binding        = key_runtime_slot_binding_from_resolution(resolution),
-        .hold_strategy  = handled_key_resolution_hold_strategy(resolution),
+        .resolution    = resolution,
+        .binding       = key_runtime_slot_binding_from_resolution(resolution),
+        .hold_strategy = handled_key_resolution_hold_strategy(resolution),
     });
 }
 

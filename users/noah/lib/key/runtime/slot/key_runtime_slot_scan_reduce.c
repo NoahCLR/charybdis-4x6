@@ -65,9 +65,9 @@ static key_runtime_slot_result_t key_runtime_slot_step_active_scan_tap_window(ac
 }
 
 static key_runtime_slot_result_t key_runtime_slot_step_active_scan_press_held_window(active_key_state_t *slot, uint16_t elapsed) {
-    key_runtime_effect_builder_t immediate_hold_builder = {0};
-    key_runtime_effect_builder_t effect_builder         = {0};
-    key_runtime_slot_interaction_t   interaction;
+    key_runtime_effect_builder_t   immediate_hold_builder = {0};
+    key_runtime_effect_builder_t   effect_builder         = {0};
+    key_runtime_slot_interaction_t interaction;
 
     if (!slot) {
         return (key_runtime_slot_result_t){0};

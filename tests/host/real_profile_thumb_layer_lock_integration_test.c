@@ -86,13 +86,13 @@ static uint16_t test_resolve_keycode(keypos_t key_pos) {
 }
 
 static void test_press_resolved(keypos_t key_pos) {
-    uint16_t    keycode = test_resolve_keycode(key_pos);
+    uint16_t keycode = test_resolve_keycode(key_pos);
 
     CHECK(!key_runtime_integration_process_record(keycode, key_pos, true));
 }
 
 static void test_release_resolved(keypos_t key_pos) {
-    uint16_t    keycode = test_resolve_keycode(key_pos);
+    uint16_t keycode = test_resolve_keycode(key_pos);
 
     CHECK(!key_runtime_integration_process_record(keycode, key_pos, false));
 }
@@ -127,8 +127,8 @@ static void test_run_double_tap_hold_cycle_with_intermediate_scan(keypos_t key_p
 }
 
 static void test_reset_state(void) {
-    fake_time                 = 1000;
-    layer_state               = test_layer_mask(LAYER_BASE);
+    fake_time   = 1000;
+    layer_state = test_layer_mask(LAYER_BASE);
     runtime_shared_state_reset(&noah_runtime_shared_state);
     layer_ownership_reset_for_test();
 }
@@ -514,9 +514,9 @@ uint8_t key_feedback_preview_layer(void) {
 void split_runtime_sync(void) {}
 
 static void test_left_thumb_double_tap_hold_toggles_num_layer(void) {
-    keypos_t key_pos      = test_left_thumb_pos();
-    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keypos_t                      key_pos      = test_left_thumb_pos();
+    uint16_t                      base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+    noah_runtime_debug_snapshot_t snapshot     = {0};
 
     test_reset_state();
 
@@ -535,9 +535,9 @@ static void test_left_thumb_double_tap_hold_toggles_num_layer(void) {
 }
 
 static void test_right_thumb_double_tap_hold_toggles_num_layer(void) {
-    keypos_t key_pos      = test_right_thumb_pos();
-    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keypos_t                      key_pos      = test_right_thumb_pos();
+    uint16_t                      base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+    noah_runtime_debug_snapshot_t snapshot     = {0};
 
     test_reset_state();
 
@@ -556,7 +556,7 @@ static void test_right_thumb_double_tap_hold_toggles_num_layer(void) {
 }
 
 static void test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle(void) {
-    keypos_t key_pos = test_right_thumb_pos();
+    keypos_t                      key_pos  = test_right_thumb_pos();
     noah_runtime_debug_snapshot_t snapshot = {0};
 
     test_reset_state();

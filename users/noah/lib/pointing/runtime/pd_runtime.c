@@ -23,7 +23,7 @@ static inline bool pd_runtime_report_has_motion(report_mouse_t report) {
 }
 
 static inline uint16_t pd_runtime_report_abs_total(report_mouse_t report) {
-    uint16_t total = 0;
+    uint16_t total    = 0;
     int16_t  deltas[] = {report.x, report.y, report.h, report.v};
 
     for (uint8_t i = 0; i < ARRAY_SIZE(deltas); ++i) {
@@ -59,13 +59,11 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
     pd_mode_snapshot_t   snapshot    = pd_mode_snapshot();
     const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
 
-#if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
-    if (snapshot.local.active_mode == 0 && mouse_report.buttons == 0 && pd_runtime_report_has_motion(mouse_report) &&
-        last_input_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS &&
-        pd_runtime_report_abs_total(mouse_report) <= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
+#    if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
+    if (snapshot.local.active_mode == 0 && mouse_report.buttons == 0 && pd_runtime_report_has_motion(mouse_report) && last_input_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS && pd_runtime_report_abs_total(mouse_report) <= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
         return (report_mouse_t){0};
     }
-#endif
+#    endif
 
     if (active_mode && active_mode->handler) {
         return active_mode->handler(mouse_report);

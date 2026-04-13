@@ -69,13 +69,11 @@ static inline pd_mode_mask_t host_runtime_fixture_first_mode(const pd_mode_def_t
     return 0;
 }
 
-static inline pd_mode_mask_t host_runtime_fixture_display_locked_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_locked,
-                                                                      split_runtime_sync_packet_t remote) {
+static inline pd_mode_mask_t host_runtime_fixture_display_locked_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_locked, split_runtime_sync_packet_t remote) {
     return is_master ? local_locked : host_runtime_fixture_first_mode(defs, count, remote.pd_mode_locked_flags);
 }
 
-static inline pd_mode_mask_t host_runtime_fixture_display_active_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active,
-                                                                      pd_mode_mask_t local_locked, split_runtime_sync_packet_t remote) {
+static inline pd_mode_mask_t host_runtime_fixture_display_active_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active, pd_mode_mask_t local_locked, split_runtime_sync_packet_t remote) {
     if (is_master) {
         return local_active;
     }
@@ -99,8 +97,7 @@ static inline pd_mode_snapshot_view_t host_runtime_fixture_pd_mode_view(const pd
     return view;
 }
 
-static inline pd_mode_snapshot_t host_runtime_fixture_pd_mode_snapshot(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active,
-                                                                       pd_mode_mask_t local_locked, split_runtime_sync_packet_t remote) {
+static inline pd_mode_snapshot_t host_runtime_fixture_pd_mode_snapshot(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active, pd_mode_mask_t local_locked, split_runtime_sync_packet_t remote) {
     pd_mode_mask_t display_locked = host_runtime_fixture_display_locked_mode(defs, count, is_master, local_locked, remote);
     pd_mode_mask_t display_active = host_runtime_fixture_display_active_mode(defs, count, is_master, local_active, local_locked, remote);
 
@@ -110,76 +107,76 @@ static inline pd_mode_snapshot_t host_runtime_fixture_pd_mode_snapshot(const pd_
     };
 }
 
-#define HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(fixture_expr)                                     \
-    uint16_t timer_read(void) {                                                                       \
-        return (uint16_t)((fixture_expr).time32);                                                     \
-    }                                                                                                 \
-    uint16_t timer_elapsed(uint16_t last) {                                                           \
-        return (uint16_t)(timer_read() - last);                                                       \
-    }                                                                                                 \
-    uint32_t timer_read32(void) {                                                                     \
-        return (fixture_expr).time32;                                                                 \
-    }                                                                                                 \
-    uint32_t timer_elapsed32(uint32_t last) {                                                         \
-        return (fixture_expr).time32 - last;                                                          \
-    }                                                                                                 \
-    uint8_t get_mods(void) {                                                                          \
-        return (fixture_expr).mods;                                                                   \
-    }                                                                                                 \
-    uint8_t get_weak_mods(void) {                                                                     \
-        return (fixture_expr).weak_mods;                                                              \
-    }                                                                                                 \
-    uint8_t get_oneshot_mods(void) {                                                                  \
-        return (fixture_expr).oneshot_mods;                                                           \
-    }                                                                                                 \
-    uint8_t get_oneshot_locked_mods(void) {                                                           \
-        return (fixture_expr).oneshot_locked_mods;                                                    \
-    }                                                                                                 \
-    void set_mods(uint8_t mods) {                                                                     \
-        (fixture_expr).mods = mods;                                                                   \
-    }                                                                                                 \
-    void set_weak_mods(uint8_t mods) {                                                                \
-        (fixture_expr).weak_mods = mods;                                                              \
-    }                                                                                                 \
-    void set_oneshot_mods(uint8_t mods) {                                                             \
-        (fixture_expr).oneshot_mods = mods;                                                           \
-    }                                                                                                 \
-    void set_oneshot_locked_mods(uint8_t mods) {                                                      \
-        (fixture_expr).oneshot_locked_mods = mods;                                                    \
-    }                                                                                                 \
-    void clear_mods(void) {                                                                           \
-        (fixture_expr).mods = 0;                                                                      \
-    }                                                                                                 \
-    void clear_weak_mods(void) {                                                                      \
-        (fixture_expr).weak_mods = 0;                                                                 \
-    }                                                                                                 \
-    void clear_oneshot_mods(void) {                                                                   \
-        (fixture_expr).oneshot_mods = 0;                                                              \
-    }                                                                                                 \
-    void clear_oneshot_locked_mods(void) {                                                            \
-        (fixture_expr).oneshot_locked_mods = 0;                                                       \
-    }                                                                                                 \
-    void add_mods(uint8_t mods) {                                                                     \
-        (fixture_expr).mods |= mods;                                                                  \
-    }                                                                                                 \
-    void del_mods(uint8_t mods) {                                                                     \
-        (fixture_expr).mods &= (uint8_t)~mods;                                                        \
-    }                                                                                                 \
-    void send_keyboard_report(void) {                                                                 \
-        (fixture_expr).send_keyboard_report_count++;                                                  \
-    }                                                                                                 \
-    bool is_keyboard_master(void) {                                                                   \
-        return (fixture_expr).is_master;                                                              \
+#define HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(fixture_expr) \
+    uint16_t timer_read(void) {                                   \
+        return (uint16_t)((fixture_expr).time32);                 \
+    }                                                             \
+    uint16_t timer_elapsed(uint16_t last) {                       \
+        return (uint16_t)(timer_read() - last);                   \
+    }                                                             \
+    uint32_t timer_read32(void) {                                 \
+        return (fixture_expr).time32;                             \
+    }                                                             \
+    uint32_t timer_elapsed32(uint32_t last) {                     \
+        return (fixture_expr).time32 - last;                      \
+    }                                                             \
+    uint8_t get_mods(void) {                                      \
+        return (fixture_expr).mods;                               \
+    }                                                             \
+    uint8_t get_weak_mods(void) {                                 \
+        return (fixture_expr).weak_mods;                          \
+    }                                                             \
+    uint8_t get_oneshot_mods(void) {                              \
+        return (fixture_expr).oneshot_mods;                       \
+    }                                                             \
+    uint8_t get_oneshot_locked_mods(void) {                       \
+        return (fixture_expr).oneshot_locked_mods;                \
+    }                                                             \
+    void set_mods(uint8_t mods) {                                 \
+        (fixture_expr).mods = mods;                               \
+    }                                                             \
+    void set_weak_mods(uint8_t mods) {                            \
+        (fixture_expr).weak_mods = mods;                          \
+    }                                                             \
+    void set_oneshot_mods(uint8_t mods) {                         \
+        (fixture_expr).oneshot_mods = mods;                       \
+    }                                                             \
+    void set_oneshot_locked_mods(uint8_t mods) {                  \
+        (fixture_expr).oneshot_locked_mods = mods;                \
+    }                                                             \
+    void clear_mods(void) {                                       \
+        (fixture_expr).mods = 0;                                  \
+    }                                                             \
+    void clear_weak_mods(void) {                                  \
+        (fixture_expr).weak_mods = 0;                             \
+    }                                                             \
+    void clear_oneshot_mods(void) {                               \
+        (fixture_expr).oneshot_mods = 0;                          \
+    }                                                             \
+    void clear_oneshot_locked_mods(void) {                        \
+        (fixture_expr).oneshot_locked_mods = 0;                   \
+    }                                                             \
+    void add_mods(uint8_t mods) {                                 \
+        (fixture_expr).mods |= mods;                              \
+    }                                                             \
+    void del_mods(uint8_t mods) {                                 \
+        (fixture_expr).mods &= (uint8_t)~mods;                    \
+    }                                                             \
+    void send_keyboard_report(void) {                             \
+        (fixture_expr).send_keyboard_report_count++;              \
+    }                                                             \
+    bool is_keyboard_master(void) {                               \
+        return (fixture_expr).is_master;                          \
     }
 
-#define HOST_RUNTIME_FIXTURE_DEFINE_LAYER_STUBS()                                                     \
-    layer_state_t layer_state;                                                                        \
-    bool layer_state_cmp(layer_state_t state, uint8_t layer) {                                        \
-        return (state & ((layer_state_t)1u << layer)) != 0;                                           \
-    }                                                                                                 \
-    void layer_on(uint8_t layer) {                                                                    \
-        layer_state |= ((layer_state_t)1u << layer);                                                  \
-    }                                                                                                 \
-    void layer_off(uint8_t layer) {                                                                   \
-        layer_state &= (layer_state_t)~((layer_state_t)1u << layer);                                  \
+#define HOST_RUNTIME_FIXTURE_DEFINE_LAYER_STUBS()                       \
+    layer_state_t layer_state;                                          \
+    bool          layer_state_cmp(layer_state_t state, uint8_t layer) { \
+        return (state & ((layer_state_t)1u << layer)) != 0;             \
+    }                                                                   \
+    void layer_on(uint8_t layer) {                                      \
+        layer_state |= ((layer_state_t)1u << layer);                    \
+    }                                                                   \
+    void layer_off(uint8_t layer) {                                     \
+        layer_state &= (layer_state_t) ~((layer_state_t)1u << layer);   \
     }

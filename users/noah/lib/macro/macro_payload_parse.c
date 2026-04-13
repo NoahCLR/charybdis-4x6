@@ -42,9 +42,7 @@ static bool macro_payload_ir_write_text(macro_payload_ir_t *ir, const char *text
 static bool macro_payload_ir_write_command(macro_payload_ir_t *ir, const macro_payload_command_t *command) {
     switch (command->kind) {
         case MACRO_PAYLOAD_COMMAND_DELAY:
-            return macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_DELAY) &&
-                   macro_payload_ir_write_byte(ir, (uint8_t)(command->delay_ms & 0xFFu)) &&
-                   macro_payload_ir_write_byte(ir, (uint8_t)(command->delay_ms >> 8));
+            return macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_DELAY) && macro_payload_ir_write_byte(ir, (uint8_t)(command->delay_ms & 0xFFu)) && macro_payload_ir_write_byte(ir, (uint8_t)(command->delay_ms >> 8));
         case MACRO_PAYLOAD_COMMAND_KEY_DOWN:
             return macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_KEY_DOWN) && macro_payload_ir_write_byte(ir, command->keycode);
         case MACRO_PAYLOAD_COMMAND_KEY_UP:

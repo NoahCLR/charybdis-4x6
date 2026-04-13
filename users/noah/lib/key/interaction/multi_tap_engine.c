@@ -84,7 +84,7 @@ void multi_tap_flush(multi_tap_t *mt, void (*dispatch)(uint16_t, const multi_tap
 
 uint16_t multi_tap_advance(multi_tap_t *mt, uint16_t tap_action, uint8_t tap_repeat_count, bool has_more_taps, bool tap_resolves_on_press, hold_behavior_t hold, hold_behavior_t long_hold) {
     mt->count++;
-    mt->timer = timer_read();
+    mt->timer            = timer_read();
     mt->tap_action       = tap_action;
     mt->tap_repeat_count = tap_repeat_count;
     mt->has_more_taps    = has_more_taps;
@@ -135,7 +135,7 @@ uint16_t multi_tap_resolve_hold(multi_tap_t *mt, uint8_t *repeat_count) {
     }
 
     uint16_t action = cached_tap_repeats > 0 ? cached_tap : mt->single_action;
-    *repeat_count = cached_tap_repeats > 0 ? cached_tap_repeats : mt->count;
+    *repeat_count   = cached_tap_repeats > 0 ? cached_tap_repeats : mt->count;
     multi_tap_reset(mt);
     return action;
 }

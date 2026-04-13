@@ -71,9 +71,7 @@ static bool macro_payload_ir_write_byte(macro_payload_ir_t *ir, uint8_t byte) {
 }
 
 static bool macro_payload_ir_write_delay(macro_payload_ir_t *ir, uint16_t delay_ms) {
-    return macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_DELAY) &&
-           macro_payload_ir_write_byte(ir, (uint8_t)(delay_ms & 0xFFu)) &&
-           macro_payload_ir_write_byte(ir, (uint8_t)(delay_ms >> 8));
+    return macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_DELAY) && macro_payload_ir_write_byte(ir, (uint8_t)(delay_ms & 0xFFu)) && macro_payload_ir_write_byte(ir, (uint8_t)(delay_ms >> 8));
 }
 
 static bool macro_payload_ir_write_key_action(macro_payload_ir_t *ir, macro_payload_ir_opcode_t opcode, uint8_t keycode) {
@@ -182,13 +180,13 @@ bool macro_payload_run(const char *payload) {
 }
 
 bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, macro_payload_read_byte_fn read_byte, void *context) {
-    macro_payload_text_chunk_t text_chunk = {0};
-    uint32_t                  delay_ms   = 0;
-    uint8_t                   pending_downs[MACRO_PAYLOAD_MAX_TAP_KEYS] = {0};
-    uint8_t                   pending_down_count                        = 0;
-    bool                      pending_tap                               = false;
-    uint8_t                   pending_tap_key                           = 0;
-    uint8_t                   matched_up_count                          = 0;
+    macro_payload_text_chunk_t text_chunk                                = {0};
+    uint32_t                   delay_ms                                  = 0;
+    uint8_t                    pending_downs[MACRO_PAYLOAD_MAX_TAP_KEYS] = {0};
+    uint8_t                    pending_down_count                        = 0;
+    bool                       pending_tap                               = false;
+    uint8_t                    pending_tap_key                           = 0;
+    uint8_t                    matched_up_count                          = 0;
 
     if (!ir || !read_byte) {
         return false;
@@ -298,8 +296,7 @@ bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, ma
                     return false;
                 }
 
-                if (pending_tap && matched_up_count < pending_down_count &&
-                    keycode == pending_downs[pending_down_count - 1u - matched_up_count]) {
+                if (pending_tap && matched_up_count < pending_down_count && keycode == pending_downs[pending_down_count - 1u - matched_up_count]) {
                     matched_up_count++;
                     if (matched_up_count == pending_down_count) {
                         uint8_t tap_list[MACRO_PAYLOAD_MAX_TAP_KEYS + 1] = {0};
@@ -322,8 +319,7 @@ bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, ma
                     break;
                 }
 
-                if (!macro_payload_flush_pending_qmk_sequence(ir, pending_downs, pending_down_count, pending_tap, pending_tap_key, matched_up_count) ||
-                    !macro_payload_ir_write_key_action(ir, MACRO_PAYLOAD_IR_OP_KEY_UP, keycode)) {
+                if (!macro_payload_flush_pending_qmk_sequence(ir, pending_downs, pending_down_count, pending_tap, pending_tap_key, matched_up_count) || !macro_payload_ir_write_key_action(ir, MACRO_PAYLOAD_IR_OP_KEY_UP, keycode)) {
                     ir->length = 0;
                     return false;
                 }
@@ -343,7 +339,7 @@ bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, ma
                 pending_tap        = false;
                 pending_tap_key    = 0;
                 matched_up_count   = 0;
-                delay_ms = 0;
+                delay_ms           = 0;
                 {
                     bool terminated = false;
 

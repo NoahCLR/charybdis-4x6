@@ -33,17 +33,17 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max);
 
 HOST_RUNTIME_FIXTURE_DEFINE_LAYER_STUBS()
 
-static uint16_t       test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
-static rgb_t          led_output[RGB_MATRIX_LED_COUNT];
-static uint8_t        fake_preview_layer      = UINT8_MAX;
-static uint8_t        fake_auto_mouse_layer   = LAYER_POINTER;
-static uint16_t       fake_auto_mouse_elapsed = 0;
-static bool           fake_auto_mouse_active  = true;
-static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
+static uint16_t               test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
+static rgb_t                  led_output[RGB_MATRIX_LED_COUNT];
+static uint8_t                fake_preview_layer      = UINT8_MAX;
+static uint8_t                fake_auto_mouse_layer   = LAYER_POINTER;
+static uint16_t               fake_auto_mouse_elapsed = 0;
+static bool                   fake_auto_mouse_active  = true;
+static host_runtime_fixture_t runtime_fixture         = HOST_RUNTIME_FIXTURE_INIT;
 #define fake_is_master runtime_fixture.is_master
-static uint8_t        fake_feedback_flags     = 0;
-static pd_mode_mask_t fake_pd_active_mode     = 0;
-static pd_mode_mask_t fake_pd_locked_mode     = 0;
+static uint8_t        fake_feedback_flags = 0;
+static pd_mode_mask_t fake_pd_active_mode = 0;
+static pd_mode_mask_t fake_pd_locked_mode = 0;
 
 ws2812_led_t                ws2812_leds[WS2812_LED_COUNT];
 split_runtime_sync_packet_t split_runtime_sync_remote = {
@@ -528,7 +528,7 @@ static void test_hold_pending_feedback_overrides_preview_and_pd_mode(void) {
 static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
     test_reset();
 
-    layer_state          = (layer_state_t)1u << LAYER_SYM;
+    layer_state         = (layer_state_t)1u << LAYER_SYM;
     fake_pd_active_mode = PD_MODE_VOLUME;
 
     CHECK(render_output());

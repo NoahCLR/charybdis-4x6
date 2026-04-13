@@ -74,7 +74,7 @@ typedef struct {
 extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];
 
 pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command);
-void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags);
+void                   pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags);
 
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode);
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action);

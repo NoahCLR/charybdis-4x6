@@ -16,8 +16,7 @@ static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavi
     return hold_registers_on_press(hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
 }
 
-static key_runtime_slot_binding_t key_runtime_slot_press_binding(handled_key_resolution_t resolution, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term,
-                                                                 uint16_t longer_hold_term, uint16_t multi_tap_term) {
+static key_runtime_slot_binding_t key_runtime_slot_press_binding(handled_key_resolution_t resolution, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
     key_runtime_slot_binding_t binding = key_runtime_slot_binding_from_resolution(resolution);
 
     binding.tap_action       = tap_action;
@@ -31,7 +30,7 @@ static key_runtime_slot_binding_t key_runtime_slot_press_binding(handled_key_res
 }
 
 static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
-    key_runtime_effect_builder_t builder = {0};
+    key_runtime_effect_builder_t   builder = {0};
     key_runtime_slot_interaction_t interaction;
 
     if (!slot) {
@@ -39,9 +38,9 @@ static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_stat
     }
 
     interaction = key_runtime_slot_materialize((key_runtime_slot_materialize_args_t){
-        .resolution     = resolution,
-        .binding        = key_runtime_slot_press_binding(resolution, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term),
-        .hold_strategy  = hold_strategy,
+        .resolution    = resolution,
+        .binding       = key_runtime_slot_press_binding(resolution, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term),
+        .hold_strategy = hold_strategy,
     });
     key_runtime_slot_track(slot, keycode, key_pos, interaction, phase);
     slot->lifecycle.pd_mode_was_locked_on_press = pd_mode_was_locked_on_press;
@@ -126,7 +125,7 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_reuse_pending_mul
     }
 
     result.handled = true;
-    action = key_runtime_slot_advance_pending_multi_tap(context->slot, context->keycode);
+    action         = key_runtime_slot_advance_pending_multi_tap(context->slot, context->keycode);
     key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_PRESS_REUSE_CHAIN, context->slot->pending_multi_tap.count, action);
     key_runtime_slot_result_push_dispatch_action(&result, context->key_pos, action);
 
@@ -135,21 +134,9 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_reuse_pending_mul
     }
 
     if (key_runtime_slot_pending_multi_tap_pending_hold(context->slot) || context->needs_layer_press) {
-        handled_key_resolution_t current_tap = key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? handled_key_lookup_tap_count(context->keycode, context->slot->pending_multi_tap.count) : context->resolution;
-        bool                     pending_hold = key_runtime_slot_pending_multi_tap_pending_hold(context->slot);
-        key_runtime_effect_builder_t begin_builder = key_runtime_slot_begin_press(context->slot,
-                                                                                 context->keycode,
-                                                                                 context->key_pos,
-                                                                                 current_tap,
-                                                                                 KC_NO,
-                                                                                 pending_hold ? handled_key_resolution_hold(current_tap) : hold_behavior_none(),
-                                                                                 pending_hold ? handled_key_resolution_long_hold(current_tap) : hold_behavior_none(),
-                                                                                 pending_hold ? current_tap.tap_hold_term : context->tap_hold_term,
-                                                                                 pending_hold ? current_tap.longer_hold_term : context->longer_hold_term,
-                                                                                 pending_hold ? current_tap.multi_tap_term : context->multi_tap_term,
-                                                                                 pending_hold ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-                                                                                 pending_hold ? handled_key_resolution_hold_strategy(current_tap) : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT,
-                                                                                 false);
+        handled_key_resolution_t     current_tap   = key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? handled_key_lookup_tap_count(context->keycode, context->slot->pending_multi_tap.count) : context->resolution;
+        bool                         pending_hold  = key_runtime_slot_pending_multi_tap_pending_hold(context->slot);
+        key_runtime_effect_builder_t begin_builder = key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, current_tap, KC_NO, pending_hold ? handled_key_resolution_hold(current_tap) : hold_behavior_none(), pending_hold ? handled_key_resolution_long_hold(current_tap) : hold_behavior_none(), pending_hold ? current_tap.tap_hold_term : context->tap_hold_term, pending_hold ? current_tap.longer_hold_term : context->longer_hold_term, pending_hold ? current_tap.multi_tap_term : context->multi_tap_term, pending_hold ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE, pending_hold ? handled_key_resolution_hold_strategy(current_tap) : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT, false);
         key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, begin_builder);
     }
 

@@ -56,13 +56,13 @@ typedef struct {
     bool     long_hold_level;
 } key_runtime_feedback_state_t;
 
-#define ACTIVE_KEY_STATE_INIT                                         \
-    {                                                                 \
-        .owner.keycode                 = KC_NO,                       \
-        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_IDLE, \
-        .lifecycle.held_action_keycode = KC_NO,                       \
-        .interaction                    = key_runtime_slot_interaction_default(), \
-        .pending_multi_tap             = {0},                         \
+#define ACTIVE_KEY_STATE_INIT                                                    \
+    {                                                                            \
+        .owner.keycode                 = KC_NO,                                  \
+        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_IDLE,            \
+        .lifecycle.held_action_keycode = KC_NO,                                  \
+        .interaction                   = key_runtime_slot_interaction_default(), \
+        .pending_multi_tap             = {0},                                    \
     }
 
 typedef struct {

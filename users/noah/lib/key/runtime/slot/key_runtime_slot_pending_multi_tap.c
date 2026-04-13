@@ -30,16 +30,16 @@ typedef enum {
 } key_runtime_slot_pending_multi_tap_release_outcome_t;
 
 typedef struct {
-    active_key_state_t   *slot;
-    uint16_t              keycode;
-    uint16_t              elapsed;
-    keypos_t              key_pos;
-    bool                  is_momentary_layer;
-    delayed_action_mods_t mods;
+    active_key_state_t            *slot;
+    uint16_t                       keycode;
+    uint16_t                       elapsed;
+    keypos_t                       key_pos;
+    bool                           is_momentary_layer;
+    delayed_action_mods_t          mods;
     key_runtime_slot_interaction_t interaction;
-    uint16_t              tap_action;
-    uint8_t               tap_repeat_count;
-    bool                  matched;
+    uint16_t                       tap_action;
+    uint8_t                        tap_repeat_count;
+    bool                           matched;
 } key_runtime_slot_pending_multi_tap_release_context_t;
 
 typedef struct {
@@ -88,12 +88,12 @@ static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pen
         return context;
     }
 
-    context.interaction       = key_runtime_slot_cached_interaction(slot);
-    context.key_pos           = slot->owner.key_pos;
+    context.interaction        = key_runtime_slot_cached_interaction(slot);
+    context.key_pos            = slot->owner.key_pos;
     context.is_momentary_layer = key_runtime_slot_interaction_is_momentary_layer(context.interaction);
-    context.mods              = delayed_action_mods_from_multi_tap(slot_multi_tap);
-    context.tap_action        = key_runtime_slot_resolve_pending_multi_tap_hold(slot, &context.tap_repeat_count);
-    context.matched           = true;
+    context.mods               = delayed_action_mods_from_multi_tap(slot_multi_tap);
+    context.tap_action         = key_runtime_slot_resolve_pending_multi_tap_hold(slot, &context.tap_repeat_count);
+    context.matched            = true;
 
     return context;
 }
@@ -112,9 +112,7 @@ static key_runtime_slot_release_semantics_t key_runtime_slot_pending_multi_tap_r
         return semantics;
     }
 
-    if (context->interaction.policy.hold.dispatches_on_release ? context->elapsed >= context->interaction.binding.tap_hold_term
-                                                               : !context->interaction.binding.hold.present && context->interaction.policy.long_hold.dispatches_on_release &&
-                                                                     context->elapsed >= context->interaction.binding.longer_hold_term) {
+    if (context->interaction.policy.hold.dispatches_on_release ? context->elapsed >= context->interaction.binding.tap_hold_term : !context->interaction.binding.hold.present && context->interaction.policy.long_hold.dispatches_on_release && context->elapsed >= context->interaction.binding.longer_hold_term) {
         semantics.hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
     }
 
@@ -279,7 +277,7 @@ typedef struct {
 
 static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pending_multi_tap_scan_resolve(active_key_state_t *slot, uint16_t elapsed) {
     key_runtime_slot_pending_multi_tap_scan_resolution_t resolution = {0};
-    key_runtime_slot_interaction_t interaction;
+    key_runtime_slot_interaction_t                       interaction;
 
     if (!slot) {
         return resolution;

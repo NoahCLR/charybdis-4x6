@@ -215,16 +215,18 @@ static uint8_t test_pd_mode_index(pd_mode_mask_t mode) {
 }
 
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
-    [PD_MODE_INDEX_VOLUME] = {
-        .mode_flag    = PD_MODE_VOLUME,
-        .keycode      = VOLUME_MODE,
-        .lock_action  = VOLUME_MODE_LOCK,
-    },
-    [PD_MODE_INDEX_ARROW] = {
-        .mode_flag    = PD_MODE_ARROW,
-        .keycode      = ARROW_MODE,
-        .lock_action  = ARROW_MODE_LOCK,
-    },
+    [PD_MODE_INDEX_VOLUME] =
+        {
+            .mode_flag   = PD_MODE_VOLUME,
+            .keycode     = VOLUME_MODE,
+            .lock_action = VOLUME_MODE_LOCK,
+        },
+    [PD_MODE_INDEX_ARROW] =
+        {
+            .mode_flag   = PD_MODE_ARROW,
+            .keycode     = ARROW_MODE,
+            .lock_action = ARROW_MODE_LOCK,
+        },
 };
 
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode) {
@@ -320,11 +322,7 @@ static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
     CHECK(key_pos.col == 0);
     slot = key_runtime_slot_at(0);
     CHECK(slot != NULL);
-    key_runtime_slot_track(slot,
-                           keycode,
-                           key_pos,
-                           key_runtime_slot_interaction_from_resolution(test_handled_key_resolution(keycode, 1)),
-                           KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_track(slot, keycode, key_pos, key_runtime_slot_interaction_from_resolution(test_handled_key_resolution(keycode, 1)), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 }
 
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {

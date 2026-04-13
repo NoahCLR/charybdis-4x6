@@ -269,7 +269,7 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
 }
 
 static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifier, uint8_t expected_mask) {
-    handled_key_resolution_t key  = key_runtime_integration_multi_tap_handled_key(TEST_MULTI_TAP_KEY, 120, 240, 150);
+    handled_key_resolution_t      key        = key_runtime_integration_multi_tap_handled_key(TEST_MULTI_TAP_KEY, 120, 240, 150);
     keypos_t                      source_pos = test_keypos(1, 1);
     noah_runtime_debug_snapshot_t snapshot   = {0};
 

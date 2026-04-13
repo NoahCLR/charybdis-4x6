@@ -92,10 +92,10 @@ bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {
     pd_mode_snapshot_t snapshot = {
-        .local.active_mode   = fake_active_modes,
-        .local.active_index  = PD_MODE_COUNT,
-        .local.locked_index  = PD_MODE_COUNT,
-        .display.active_mode = fake_active_modes,
+        .local.active_mode    = fake_active_modes,
+        .local.active_index   = PD_MODE_COUNT,
+        .local.locked_index   = PD_MODE_COUNT,
+        .display.active_mode  = fake_active_modes,
         .display.active_index = PD_MODE_COUNT,
         .display.locked_index = PD_MODE_COUNT,
     };

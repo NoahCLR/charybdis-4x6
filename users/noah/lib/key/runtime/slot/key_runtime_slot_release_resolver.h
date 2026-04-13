@@ -35,20 +35,20 @@ typedef struct {
 } key_runtime_slot_release_semantics_t;
 
 typedef struct {
-    key_runtime_slot_interaction_t      interaction;
+    key_runtime_slot_interaction_t       interaction;
     key_runtime_slot_release_semantics_t semantics;
-    uint16_t                            elapsed;
-    bool                                held_action_active;
-    bool                                repeat_active;
-    bool                                layer_interrupted;
-    bool                                pd_mode_was_locked_on_press;
+    uint16_t                             elapsed;
+    bool                                 held_action_active;
+    bool                                 repeat_active;
+    bool                                 layer_interrupted;
+    bool                                 pd_mode_was_locked_on_press;
 } key_runtime_slot_release_query_t;
 
 typedef struct {
-    bool                                       release_owned_state;
+    bool                                        release_owned_state;
     key_runtime_slot_release_decision_outcome_t outcome;
-    uint16_t                                   action;
-    pd_mode_mask_t                             pd_mode_lock_tap;
+    uint16_t                                    action;
+    pd_mode_mask_t                              pd_mode_lock_tap;
 } key_runtime_slot_release_decision_t;
 
 static inline bool key_runtime_slot_release_query_interrupted_layer_tap(const key_runtime_slot_release_query_t *query) {

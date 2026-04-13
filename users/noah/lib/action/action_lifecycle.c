@@ -153,56 +153,66 @@ static void noah_action_release_qmk_behavior(noah_action_desc_t desc, keypos_t k
 }
 
 static const noah_action_ops_t noah_action_ops_by_kind[NOAH_ACTION_KIND_COUNT] = {
-    [NOAH_ACTION_KIND_LITERAL] = {
-        .tap     = noah_action_tap_literal,
-        .press   = noah_action_press_literal,
-        .release = noah_action_release_literal,
-    },
-    [NOAH_ACTION_KIND_LAYER_LOCK] = {
-        .tap     = noah_action_tap_noop,
-        .press   = noah_action_press_noop,
-        .release = noah_action_release_noop,
-    },
-    [NOAH_ACTION_KIND_LAYER_HOLD] = {
-        .tap     = noah_action_tap_unsupported_layer,
-        .press   = noah_action_press_owned_momentary_layer,
-        .release = noah_action_release_owned_momentary_layer,
-    },
-    [NOAH_ACTION_KIND_LAYER_TAP] = {
-        .tap     = noah_action_tap_unsupported_layer,
-        .press   = noah_action_press_unsupported_layer,
-        .release = noah_action_release_unsupported_layer,
-    },
-    [NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION] = {
-        .tap     = noah_action_tap_unsupported_layer,
-        .press   = noah_action_press_unsupported_layer,
-        .release = noah_action_release_unsupported_layer,
-    },
-    [NOAH_ACTION_KIND_MACRO] = {
-        .tap     = noah_action_tap_noop,
-        .press   = noah_action_press_noop,
-        .release = noah_action_release_noop,
-    },
-    [NOAH_ACTION_KIND_QMK_BEHAVIOR] = {
-        .tap     = noah_action_tap_qmk_behavior,
-        .press   = noah_action_press_qmk_behavior,
-        .release = noah_action_release_qmk_behavior,
-    },
-    [NOAH_ACTION_KIND_KEYMAP_CUSTOM] = {
-        .tap     = noah_action_tap_keymap_custom,
-        .press   = noah_action_press_keymap_custom,
-        .release = noah_action_release_keymap_custom,
-    },
-    [NOAH_ACTION_KIND_PD_MODE_HOLD] = {
-        .tap     = noah_action_tap_literal,
-        .press   = noah_action_press_literal,
-        .release = noah_action_release_literal,
-    },
-    [NOAH_ACTION_KIND_PD_MODE_LOCK] = {
-        .tap     = noah_action_tap_noop,
-        .press   = noah_action_press_noop,
-        .release = noah_action_release_noop,
-    },
+    [NOAH_ACTION_KIND_LITERAL] =
+        {
+            .tap     = noah_action_tap_literal,
+            .press   = noah_action_press_literal,
+            .release = noah_action_release_literal,
+        },
+    [NOAH_ACTION_KIND_LAYER_LOCK] =
+        {
+            .tap     = noah_action_tap_noop,
+            .press   = noah_action_press_noop,
+            .release = noah_action_release_noop,
+        },
+    [NOAH_ACTION_KIND_LAYER_HOLD] =
+        {
+            .tap     = noah_action_tap_unsupported_layer,
+            .press   = noah_action_press_owned_momentary_layer,
+            .release = noah_action_release_owned_momentary_layer,
+        },
+    [NOAH_ACTION_KIND_LAYER_TAP] =
+        {
+            .tap     = noah_action_tap_unsupported_layer,
+            .press   = noah_action_press_unsupported_layer,
+            .release = noah_action_release_unsupported_layer,
+        },
+    [NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION] =
+        {
+            .tap     = noah_action_tap_unsupported_layer,
+            .press   = noah_action_press_unsupported_layer,
+            .release = noah_action_release_unsupported_layer,
+        },
+    [NOAH_ACTION_KIND_MACRO] =
+        {
+            .tap     = noah_action_tap_noop,
+            .press   = noah_action_press_noop,
+            .release = noah_action_release_noop,
+        },
+    [NOAH_ACTION_KIND_QMK_BEHAVIOR] =
+        {
+            .tap     = noah_action_tap_qmk_behavior,
+            .press   = noah_action_press_qmk_behavior,
+            .release = noah_action_release_qmk_behavior,
+        },
+    [NOAH_ACTION_KIND_KEYMAP_CUSTOM] =
+        {
+            .tap     = noah_action_tap_keymap_custom,
+            .press   = noah_action_press_keymap_custom,
+            .release = noah_action_release_keymap_custom,
+        },
+    [NOAH_ACTION_KIND_PD_MODE_HOLD] =
+        {
+            .tap     = noah_action_tap_literal,
+            .press   = noah_action_press_literal,
+            .release = noah_action_release_literal,
+        },
+    [NOAH_ACTION_KIND_PD_MODE_LOCK] =
+        {
+            .tap     = noah_action_tap_noop,
+            .press   = noah_action_press_noop,
+            .release = noah_action_release_noop,
+        },
 };
 
 static const noah_action_ops_t *noah_action_ops(noah_action_desc_t desc) {
@@ -214,7 +224,7 @@ static const noah_action_ops_t *noah_action_ops(noah_action_desc_t desc) {
 }
 
 void noah_action_tap(uint16_t action) {
-    noah_action_desc_t        desc = noah_action_describe(action);
+    noah_action_desc_t       desc = noah_action_describe(action);
     const noah_action_ops_t *ops  = noah_action_ops(desc);
 
     if (noah_action_handle_one_shot_press(desc)) {
@@ -225,7 +235,7 @@ void noah_action_tap(uint16_t action) {
 }
 
 void noah_action_press(keypos_t key_pos, uint16_t action) {
-    noah_action_desc_t        desc = noah_action_describe(action);
+    noah_action_desc_t       desc = noah_action_describe(action);
     const noah_action_ops_t *ops  = noah_action_ops(desc);
 
     if (noah_action_handle_one_shot_press(desc)) {
@@ -240,7 +250,7 @@ void noah_action_press(keypos_t key_pos, uint16_t action) {
 }
 
 void noah_action_release(keypos_t key_pos, uint16_t action) {
-    noah_action_desc_t        desc = noah_action_describe(action);
+    noah_action_desc_t       desc = noah_action_describe(action);
     const noah_action_ops_t *ops  = noah_action_ops(desc);
 
     if (pd_mode_handle_keycode_release(action)) {

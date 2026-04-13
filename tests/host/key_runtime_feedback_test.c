@@ -249,8 +249,8 @@ static void test_fallback_hold_has_no_hold_feedback(void) {
         .owner.keycode                 = KC_RIGHT_ALT,
         .lifecycle.held_action_keycode = KC_RIGHT_ALT,
         .interaction                   = test_cached_interaction((handled_key_resolution_t){
-            .keycode       = KC_RIGHT_ALT,
-            .tap_count     = 1,
+            .keycode   = KC_RIGHT_ALT,
+            .tap_count = 1,
             .step =
                 {
                     .tap = TAP_SENDS(KC_NO),
@@ -270,17 +270,18 @@ static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) 
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .owner.keycode           = KC_RIGHT_ALT,
-        .interaction             = test_cached_interaction((handled_key_resolution_t){
-            .keycode       = KC_RIGHT_ALT,
-            .tap_count     = 1,
+        .owner.keycode = KC_RIGHT_ALT,
+        .interaction   = test_cached_interaction((handled_key_resolution_t){
+            .keycode   = KC_RIGHT_ALT,
+            .tap_count = 1,
             .step =
                 {
-                    .hold = {
-                        .present = true,
-                        .action  = MO(3),
-                        .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
-                    },
+                    .hold =
+                        {
+                            .present = true,
+                            .action  = MO(3),
+                            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+                        },
                 },
             .tap_hold_term = 120,
             .layer         = UINT8_MAX,
@@ -297,17 +298,18 @@ static void test_cached_preview_layer_metadata_is_used_when_present(void) {
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .owner.keycode           = KC_RIGHT_ALT,
-        .interaction             = test_cached_interaction((handled_key_resolution_t){
-            .keycode       = KC_RIGHT_ALT,
-            .tap_count     = 1,
+        .owner.keycode = KC_RIGHT_ALT,
+        .interaction   = test_cached_interaction((handled_key_resolution_t){
+            .keycode   = KC_RIGHT_ALT,
+            .tap_count = 1,
             .step =
                 {
-                    .hold = {
-                        .present = true,
-                        .action  = MO(4),
-                        .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
-                    },
+                    .hold =
+                        {
+                            .present = true,
+                            .action  = MO(4),
+                            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+                        },
                 },
             .tap_hold_term = 120,
             .layer         = UINT8_MAX,
@@ -325,17 +327,18 @@ static void test_momentary_hold_preview_layer_stays_quiet_after_threshold_until_
     fake_time = 150;
 
     active_key = (active_key_state_t){
-        .owner.keycode           = KC_RIGHT_ALT,
-        .interaction             = test_cached_interaction((handled_key_resolution_t){
-            .keycode       = KC_RIGHT_ALT,
-            .tap_count     = 1,
+        .owner.keycode = KC_RIGHT_ALT,
+        .interaction   = test_cached_interaction((handled_key_resolution_t){
+            .keycode   = KC_RIGHT_ALT,
+            .tap_count = 1,
             .step =
                 {
-                    .hold = {
-                        .present = true,
-                        .action  = MO(4),
-                        .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
-                    },
+                    .hold =
+                        {
+                            .present = true,
+                            .action  = MO(4),
+                            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+                        },
                 },
             .tap_hold_term = 120,
             .layer         = UINT8_MAX,
@@ -406,11 +409,11 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
     test_reset_state();
 
     active_key = (active_key_state_t){
-        .owner.keycode      = TEST_MULTI_TAP_KEY,
-        .owner.key_pos      = pos,
-        .interaction        = test_cached_interaction((handled_key_resolution_t){
-            .keycode          = TEST_MULTI_TAP_KEY,
-            .tap_count        = 1,
+        .owner.keycode = TEST_MULTI_TAP_KEY,
+        .owner.key_pos = pos,
+        .interaction   = test_cached_interaction((handled_key_resolution_t){
+            .keycode   = TEST_MULTI_TAP_KEY,
+            .tap_count = 1,
             .step =
                 {
                     .tap = TAP_SENDS(TEST_PENDING_TAP_ACTION),
@@ -418,7 +421,7 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
             .tap_hold_term    = 120,
             .longer_hold_term = 240,
             .has_more_taps    = false,
-            .flags         = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP,
+            .flags            = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP,
         }),
         .pending_multi_tap =
             {
@@ -453,11 +456,11 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
     };
 
     *test_other_slot() = (active_key_state_t){
-        .timer                 = (uint16_t)(fake_time - 150),
-        .owner.keycode         = KC_LEFT,
-        .interaction           = test_cached_interaction((handled_key_resolution_t){
-            .keycode          = KC_LEFT,
-            .tap_count        = 1,
+        .timer         = (uint16_t)(fake_time - 150),
+        .owner.keycode = KC_LEFT,
+        .interaction   = test_cached_interaction((handled_key_resolution_t){
+            .keycode   = KC_LEFT,
+            .tap_count = 1,
             .step =
                 {
                     .hold      = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
@@ -466,7 +469,7 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
             .tap_hold_term    = 100,
             .longer_hold_term = 300,
             .has_more_taps    = false,
-            .flags         = HANDLED_KEY_FLAG_HANDLED,
+            .flags            = HANDLED_KEY_FLAG_HANDLED,
         }),
     };
 

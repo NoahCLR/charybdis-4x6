@@ -58,21 +58,15 @@ static bool test_snapshot_layer_locked(const noah_runtime_debug_snapshot_t *snap
 }
 
 static void test_reset_state(void) {
-    fake_time                 = 1000;
-    layer_state               = 0;
+    fake_time   = 1000;
+    layer_state = 0;
     runtime_shared_state_reset(&noah_runtime_shared_state);
     layer_ownership_reset_for_test();
 }
 
 static void test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(keypos_t key_pos, uint16_t release_keycode) {
     const key_runtime_integration_step_t steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col),
-        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(40),
-        KEY_RUNTIME_INTEGRATION_PRESS(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(360),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
-        KEY_RUNTIME_INTEGRATION_RELEASE(release_keycode, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col), KEY_RUNTIME_INTEGRATION_RELEASE(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col), KEY_RUNTIME_INTEGRATION_ADVANCE(40), KEY_RUNTIME_INTEGRATION_PRESS(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col), KEY_RUNTIME_INTEGRATION_ADVANCE(360), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_RELEASE(release_keycode, key_pos.row, key_pos.col),
     };
 
     key_runtime_integration_run(&fake_time, steps, ARRAY_SIZE(steps));
@@ -80,15 +74,7 @@ static void test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(keypo
 
 static void test_run_thumb_like_double_tap_hold_cycle_with_intermediate_scan(keypos_t key_pos, uint16_t release_keycode, uint16_t pre_threshold_scan_ms, uint16_t hold_ms) {
     const key_runtime_integration_step_t steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col),
-        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(40),
-        KEY_RUNTIME_INTEGRATION_PRESS(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(pre_threshold_scan_ms),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(hold_ms),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
-        KEY_RUNTIME_INTEGRATION_RELEASE(release_keycode, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col), KEY_RUNTIME_INTEGRATION_RELEASE(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col), KEY_RUNTIME_INTEGRATION_ADVANCE(40), KEY_RUNTIME_INTEGRATION_PRESS(TEST_MULTI_TAP_KEY, key_pos.row, key_pos.col), KEY_RUNTIME_INTEGRATION_ADVANCE(pre_threshold_scan_ms), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_ADVANCE(hold_ms), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_RELEASE(release_keycode, key_pos.row, key_pos.col),
     };
 
     key_runtime_integration_run(&fake_time, steps, ARRAY_SIZE(steps));
@@ -381,7 +367,7 @@ void key_feedback_pulse_arm(bool long_hold_level) {
 }
 
 static void test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle(void) {
-    keypos_t key_pos = test_keypos(4, 2);
+    keypos_t                      key_pos  = test_keypos(4, 2);
     noah_runtime_debug_snapshot_t snapshot = {0};
 
     test_reset_state();
@@ -423,7 +409,7 @@ static void test_thumb_cycle_release_still_clears_slot_when_layer_change_resolve
 }
 
 static void test_double_tap_hold_with_prethreshold_scan_toggles_num_layer_only_once(void) {
-    keypos_t key_pos = test_keypos(4, 2);
+    keypos_t                      key_pos  = test_keypos(4, 2);
     noah_runtime_debug_snapshot_t snapshot = {0};
 
     test_reset_state();

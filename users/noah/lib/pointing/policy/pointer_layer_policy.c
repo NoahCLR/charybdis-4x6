@@ -64,9 +64,9 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     pd_mode_snapshot_t snapshot             = pd_mode_snapshot();
     bool               prefers_typing_layer = pd_mode_policy_snapshot_prefers_typing_layer(snapshot);
     bool               auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored(snapshot);
-    uint8_t       auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
-    layer_state_t auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
-    bool          sniping_layer_active = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
+    uint8_t            auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
+    layer_state_t      auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
+    bool               sniping_layer_active = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
 
     // Arrow mode consumes trackball motion as arrows, so keep the keyboard on
     // the current typing/nav surface instead of forcing the pointer layer back

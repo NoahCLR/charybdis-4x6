@@ -36,9 +36,9 @@ static bool qmk_contract_via_macro_reader(uint16_t offset, uint8_t *byte, void *
 }
 
 static bool qmk_contract_play_via_macro(uint8_t id) {
-    uint16_t size   = dynamic_keymap_macro_get_buffer_size();
-    uint16_t offset = 0;
-    macro_payload_ir_t ir = {0};
+    uint16_t                        size   = dynamic_keymap_macro_get_buffer_size();
+    uint16_t                        offset = 0;
+    macro_payload_ir_t              ir     = {0};
     qmk_contract_via_macro_reader_t reader = {0};
 
     if (id >= dynamic_keymap_macro_get_count() || size == 0) {

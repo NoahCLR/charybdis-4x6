@@ -17,10 +17,10 @@
 #include "../../state/ownership/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
-    active_key_state_t *slot              = key_runtime_find_slot_by_position(record->event.key);
-    handled_key_resolution_t handled_key  = handled_key_lookup(keycode);
-    bool                other_slot_active = false;
-    bool                flush_multi_taps  = false;
+    active_key_state_t      *slot              = key_runtime_find_slot_by_position(record->event.key);
+    handled_key_resolution_t handled_key       = handled_key_lookup(keycode);
+    bool                     other_slot_active = false;
+    bool                     flush_multi_taps  = false;
 
     keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {

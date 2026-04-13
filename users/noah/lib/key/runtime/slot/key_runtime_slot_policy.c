@@ -137,7 +137,7 @@ key_runtime_effect_builder_t key_runtime_slot_policy_commit_immediate_hold(activ
 }
 
 key_runtime_effect_builder_t key_runtime_slot_policy_take_flush(active_key_state_t *slot, bool active_held_action_survives_flush) {
-    key_runtime_effect_builder_t builder = {0};
+    key_runtime_effect_builder_t   builder = {0};
     key_runtime_slot_interaction_t interaction;
 
     if (!key_runtime_slot_active(slot)) {

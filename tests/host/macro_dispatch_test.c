@@ -15,13 +15,7 @@ static bool    fail_compile_for_slot_1;
 static bool    fail_playback;
 
 const char *const hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT] = {
-    [0] = "A{KC_C}",
-    [1] = "{KC_NOT_A_KEY}",
-    [2] = "",
-    [3] = "Z",
-    [4] = "B",
-    [5] = "{KC_BAD}",
-    [6] = "C",
+    [0] = "A{KC_C}", [1] = "{KC_NOT_A_KEY}", [2] = "", [3] = "Z", [4] = "B", [5] = "{KC_BAD}", [6] = "C",
 };
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -38,10 +32,10 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 static void test_reset_state(void) {
     memset(compile_call_count, 0, sizeof(compile_call_count));
-    play_call_count       = 0;
-    last_play_program_id  = 0;
+    play_call_count         = 0;
+    last_play_program_id    = 0;
     fail_compile_for_slot_1 = true;
-    fail_playback         = false;
+    fail_playback           = false;
 }
 
 static int test_payload_slot(const char *payload) {

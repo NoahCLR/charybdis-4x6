@@ -47,13 +47,13 @@
 #include "key_behavior.h"
 
 typedef struct {
-    uint16_t        keycode;        // the key being tracked (KC_NO = idle)
-    keypos_t        key_pos;        // physical key that owns the current tap sequence
-    uint16_t        timer;          // when the current pending window started
-    uint8_t         count;          // taps counted so far (0 = idle)
-    uint16_t        single_action;  // resolved tap action for the first tap count
-    bool            pending_hold;   // true = waiting to see if final tap is held
-    uint16_t        tap_action;     // resolved tap action for the current tap count
+    uint16_t        keycode;       // the key being tracked (KC_NO = idle)
+    keypos_t        key_pos;       // physical key that owns the current tap sequence
+    uint16_t        timer;         // when the current pending window started
+    uint8_t         count;         // taps counted so far (0 = idle)
+    uint16_t        single_action; // resolved tap action for the first tap count
+    bool            pending_hold;  // true = waiting to see if final tap is held
+    uint16_t        tap_action;    // resolved tap action for the current tap count
     uint8_t         tap_repeat_count;
     bool            has_more_taps;
     uint16_t        tap_hold_term;  // resolved tap-vs-hold threshold for this key

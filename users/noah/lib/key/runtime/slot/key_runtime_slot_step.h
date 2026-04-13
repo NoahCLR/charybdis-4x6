@@ -26,14 +26,14 @@ typedef struct {
     key_runtime_slot_event_kind_t kind;
     union {
         struct {
-            uint16_t                keycode;
-            keypos_t                key_pos;
+            uint16_t                 keycode;
+            keypos_t                 key_pos;
             handled_key_resolution_t key;
-            bool                    active_held_action_survives_flush;
+            bool                     active_held_action_survives_flush;
         } handled_press;
         struct {
-            uint16_t                keycode;
-            keypos_t                key_pos;
+            uint16_t                 keycode;
+            keypos_t                 key_pos;
             handled_key_resolution_t key;
         } handled_release;
         struct {

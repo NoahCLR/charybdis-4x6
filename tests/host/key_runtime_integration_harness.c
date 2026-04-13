@@ -46,7 +46,7 @@ __attribute__((weak)) void noah_runtime_debug_snapshot(noah_runtime_debug_snapsh
         return;
     }
 
-    *out = (noah_runtime_debug_snapshot_t){0};
+    *out      = (noah_runtime_debug_snapshot_t){0};
     out->core = noah_runtime_shared_state;
 
     layer_ownership_debug_snapshot(&out->layer_ownership);

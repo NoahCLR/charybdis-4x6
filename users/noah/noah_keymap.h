@@ -9,9 +9,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "noah_keymap_ids.h"            // IWYU pragma: export
-#include "lib/key/interaction/key_behavior.h"       // IWYU pragma: export
-#include "keymap_materialize.h"         // IWYU pragma: export
-#include "lib/pointing/defs/pd_mode_flags.h" // IWYU pragma: export
-#include "lib/rgb/core/rgb_config_helpers.h" // IWYU pragma: export
-#include "lib/rgb/core/rgb_helpers.h"        // IWYU pragma: export
+#include "noah_keymap_ids.h"                  // IWYU pragma: export
+#include "lib/key/interaction/key_behavior.h" // IWYU pragma: export
+#include "keymap_materialize.h"               // IWYU pragma: export
+#include "lib/pointing/defs/pd_mode_flags.h"  // IWYU pragma: export
+#include "lib/rgb/core/rgb_config_helpers.h"  // IWYU pragma: export
+#include "lib/rgb/core/rgb_helpers.h"         // IWYU pragma: export

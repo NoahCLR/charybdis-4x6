@@ -85,14 +85,14 @@ uint8_t key_feedback_preview_layer(void) {
 }
 
 static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
-    uint8_t flags = 0;
-    key_runtime_slot_interaction_t   interaction;
+    uint8_t                        flags = 0;
+    key_runtime_slot_interaction_t interaction;
 
     if (!key_runtime_slot_active(slot)) {
         return flags;
     }
 
-    interaction = key_runtime_slot_cached_interaction(slot);
+    interaction                = key_runtime_slot_cached_interaction(slot);
     uint16_t elapsed           = timer_elapsed(slot->timer);
     bool     long_hold_reached = interaction.binding.long_hold.present && elapsed >= interaction.binding.longer_hold_term;
 
@@ -159,8 +159,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     // not keep a hold color latched after the threshold. Only an authored
     // normal hold tier keeps the pending hold color before it resolves;
     // long-hold-only surfaces stay quiet until the long-hold tier commits.
-    if (!key_feedback_hold_contract_uses_preview_layer(interaction.policy.hold) && key_runtime_slot_allows_tap_release(slot) && elapsed >= interaction.binding.tap_hold_term &&
-        (handled_key_hold_contract_fires_at_threshold(interaction.policy.hold) || interaction.policy.hold.keeps_pending_feedback)) {
+    if (!key_feedback_hold_contract_uses_preview_layer(interaction.policy.hold) && key_runtime_slot_allows_tap_release(slot) && elapsed >= interaction.binding.tap_hold_term && (handled_key_hold_contract_fires_at_threshold(interaction.policy.hold) || interaction.policy.hold.keeps_pending_feedback)) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
     }
 

@@ -21,18 +21,18 @@ enum {
 
 const key_behavior_t key_behaviors[] = {
     {
-        .keycode         = TEST_PD_HOLD_KEY,
-        .tap_hold_term   = TEST_PD_TAP_HOLD_TERM,
-        .multi_tap_term  = TEST_PD_MULTI_TAP_TERM,
+        .keycode        = TEST_PD_HOLD_KEY,
+        .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
+        .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[0] =
             {
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(VOLUME_MODE),
             },
     },
     {
-        .keycode         = VOLUME_MODE,
-        .tap_hold_term   = TEST_PD_TAP_HOLD_TERM,
-        .multi_tap_term  = TEST_PD_MULTI_TAP_TERM,
+        .keycode        = VOLUME_MODE,
+        .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
+        .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[1] =
             {
                 .tap  = TAP_SENDS(LOCK_PD_MODE(VOLUME_MODE)),
@@ -170,7 +170,7 @@ void wait_ms(uint16_t ms) {
 
 void action_dispatch(uint16_t action) {
     const pd_mode_def_t *lock_mode = pd_mode_lock_action_lookup(action);
-    pd_mode_mask_t        mode      = pd_mode_for_keycode(action);
+    pd_mode_mask_t       mode      = pd_mode_for_keycode(action);
 
     if (lock_mode) {
         pd_mode_toggle_lock_state(lock_mode->mode_flag);
@@ -364,8 +364,8 @@ void reset_zoom_mode(void) {}
 void reset_arrow_mode(void) {}
 
 static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
-    keypos_t                      key_pos  = test_keypos(1, 2);
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keypos_t                             key_pos       = test_keypos(1, 2);
+    noah_runtime_debug_snapshot_t        snapshot      = {0};
     const key_runtime_integration_step_t press_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
     };
@@ -401,8 +401,8 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
 }
 
 static void test_authored_hold_action_activates_pd_mode_while_held(void) {
-    keypos_t                      key_pos  = test_keypos(1, 3);
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keypos_t                             key_pos    = test_keypos(1, 3);
+    noah_runtime_debug_snapshot_t        snapshot   = {0};
     const key_runtime_integration_step_t scenario[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(TEST_PD_HOLD_KEY, 1, 3),
         KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
@@ -434,13 +434,9 @@ static void test_authored_hold_action_activates_pd_mode_while_held(void) {
 }
 
 static void test_authored_double_tap_lock_locks_pd_mode(void) {
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    noah_runtime_debug_snapshot_t        snapshot   = {0};
     const key_runtime_integration_step_t scenario[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(20),
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
     };
 
     test_reset_state();
@@ -456,16 +452,10 @@ static void test_authored_double_tap_lock_locks_pd_mode(void) {
 }
 
 static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
-    keypos_t                      key_pos  = test_keypos(1, 2);
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keypos_t                             key_pos    = test_keypos(1, 2);
+    noah_runtime_debug_snapshot_t        snapshot   = {0};
     const key_runtime_integration_step_t scenario[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(20),
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
     };
 
     test_reset_state();

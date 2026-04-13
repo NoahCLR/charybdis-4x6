@@ -121,10 +121,10 @@ static void pd_mode_apply_result_finish(pd_mode_apply_result_t *result, bool spl
         return;
     }
 
-    result->after = pd_mode_snapshot();
-    result->local_state_changed = pd_mode_snapshot_view_changed(result->before.local, result->after.local);
+    result->after                 = pd_mode_snapshot();
+    result->local_state_changed   = pd_mode_snapshot_view_changed(result->before.local, result->after.local);
     result->display_state_changed = pd_mode_snapshot_view_changed(result->before.display, result->after.display);
-    result->split_sync_required = split_sync_required && result->local_state_changed;
+    result->split_sync_required   = split_sync_required && result->local_state_changed;
 }
 
 void pd_mode_set(pd_mode_mask_t mode) {
@@ -198,7 +198,7 @@ bool pd_any_display_mode_locked(void) {
 pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
     pd_mode_apply_result_t result              = pd_mode_apply_result_begin();
     bool                   split_sync_required = false;
-    pd_mode_mask_t         mode               = command.mode;
+    pd_mode_mask_t         mode                = command.mode;
 
     switch (command.kind) {
         case PD_MODE_COMMAND_ACTIVATE:

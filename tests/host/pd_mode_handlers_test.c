@@ -42,8 +42,8 @@ static uint8_t              synthetic_tap_call_count;
 static literal_tap_call_t literal_tap_calls[TEST_MAX_CALLS];
 static uint8_t            literal_tap_call_count;
 
-static uint8_t  fallback_hold_activation_count;
-static bool     fallback_hold_active;
+static uint8_t fallback_hold_activation_count;
+static bool    fallback_hold_active;
 
 static uint8_t  keyboard_mod_register_count;
 static uint8_t  keyboard_mod_unregister_count;
@@ -64,15 +64,15 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 static void test_clear_logs(void) {
     runtime_fixture.send_keyboard_report_count = 0;
-    synthetic_tap_call_count       = 0;
-    literal_tap_call_count         = 0;
-    fallback_hold_activation_count = 0;
-    fallback_hold_active           = false;
-    fake_time32                    = 1000u;
-    keyboard_mod_register_count    = 0;
-    keyboard_mod_unregister_count  = 0;
-    last_registered_keycode        = KC_NO;
-    last_unregistered_keycode      = KC_NO;
+    synthetic_tap_call_count                   = 0;
+    literal_tap_call_count                     = 0;
+    fallback_hold_activation_count             = 0;
+    fallback_hold_active                       = false;
+    fake_time32                                = 1000u;
+    keyboard_mod_register_count                = 0;
+    keyboard_mod_unregister_count              = 0;
+    last_registered_keycode                    = KC_NO;
+    last_unregistered_keycode                  = KC_NO;
 
     memset(synthetic_tap_calls, 0, sizeof(synthetic_tap_calls));
     memset(literal_tap_calls, 0, sizeof(literal_tap_calls));

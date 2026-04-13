@@ -7,18 +7,18 @@
 #include "users/noah/noah_keymap_ids.h"
 
 enum {
-    TEST_ACTIVE_KEY           = SAFE_RANGE + 0x90,
-    TEST_MULTI_TAP_KEY        = SAFE_RANGE + 0x91,
-    TEST_RELEASE_PRIMARY      = SAFE_RANGE + 0x92,
-    TEST_RELEASE_LONG         = SAFE_RANGE + 0x93,
-    TEST_HELD_ACTION          = SAFE_RANGE + 0x94,
-    TEST_THRESHOLD_ACTION     = SAFE_RANGE + 0x95,
-    TEST_SECOND_TAP_ACTION    = SAFE_RANGE + 0x96,
-    TEST_CHAIN_CONTINUE_TAP   = SAFE_RANGE + 0x97,
-    TEST_TAP_HOLD_TERM_MS     = 120,
-    TEST_LONGER_HOLD_TERM_MS  = 240,
-    TEST_MULTI_TAP_TERM_MS    = 150,
-    TEST_TAP_SETUP_ELAPSED_MS = TEST_TAP_HOLD_TERM_MS + 1,
+    TEST_ACTIVE_KEY            = SAFE_RANGE + 0x90,
+    TEST_MULTI_TAP_KEY         = SAFE_RANGE + 0x91,
+    TEST_RELEASE_PRIMARY       = SAFE_RANGE + 0x92,
+    TEST_RELEASE_LONG          = SAFE_RANGE + 0x93,
+    TEST_HELD_ACTION           = SAFE_RANGE + 0x94,
+    TEST_THRESHOLD_ACTION      = SAFE_RANGE + 0x95,
+    TEST_SECOND_TAP_ACTION     = SAFE_RANGE + 0x96,
+    TEST_CHAIN_CONTINUE_TAP    = SAFE_RANGE + 0x97,
+    TEST_TAP_HOLD_TERM_MS      = 120,
+    TEST_LONGER_HOLD_TERM_MS   = 240,
+    TEST_MULTI_TAP_TERM_MS     = 150,
+    TEST_TAP_SETUP_ELAPSED_MS  = TEST_TAP_HOLD_TERM_MS + 1,
     TEST_LONG_SETUP_ELAPSED_MS = TEST_LONGER_HOLD_TERM_MS + 1,
 };
 
@@ -48,23 +48,23 @@ typedef enum {
 } test_pending_setup_t;
 
 typedef struct {
-    const char           *name;
-    hold_behavior_t       hold;
-    hold_behavior_t       long_hold;
-    test_active_setup_t   active_setup;
-    test_pending_setup_t  pending_setup;
-    uint16_t              release_elapsed;
+    const char            *name;
+    hold_behavior_t        hold;
+    hold_behavior_t        long_hold;
+    test_active_setup_t    active_setup;
+    test_pending_setup_t   pending_setup;
+    uint16_t               release_elapsed;
     test_release_summary_t expected;
 } test_release_equivalence_case_t;
 
 typedef struct {
-    const char           *name;
-    uint16_t              second_tap_action;
-    hold_behavior_t       hold;
-    hold_behavior_t       long_hold;
-    bool                  has_more_taps;
-    test_pending_setup_t  pending_setup;
-    uint16_t              release_elapsed;
+    const char            *name;
+    uint16_t               second_tap_action;
+    hold_behavior_t        hold;
+    hold_behavior_t        long_hold;
+    bool                   has_more_taps;
+    test_pending_setup_t   pending_setup;
+    uint16_t               release_elapsed;
     test_release_summary_t expected;
 } test_pending_release_case_t;
 
@@ -73,39 +73,34 @@ static void test_case_fail(const char *case_name, const char *expr, const char *
     exit(1);
 }
 
-#define CHECK_CASE(case_name, expr)                         \
-    do {                                                    \
-        if (!(expr)) {                                      \
+#define CHECK_CASE(case_name, expr)                                 \
+    do {                                                            \
+        if (!(expr)) {                                              \
             test_case_fail((case_name), #expr, __FILE__, __LINE__); \
-        }                                                   \
+        }                                                           \
     } while (0)
 
 #define HOLD_LIT(expr) ((hold_behavior_t)expr)
 #define HOLD_NONE_LIT ((hold_behavior_t){0})
 
-#define TEST_EXPECT_NONE()            \
-    (test_release_summary_t) {        \
+#define TEST_EXPECT_NONE()                 \
+    (test_release_summary_t) {             \
         .kind = TEST_RELEASE_SUMMARY_NONE, \
     }
 
-#define TEST_EXPECT_ACTION(action_, release_owned_) \
-    (test_release_summary_t) {                      \
-        .kind                = TEST_RELEASE_SUMMARY_ACTION, \
-        .action              = (action_),           \
-        .release_owned_state = (release_owned_),    \
+#define TEST_EXPECT_ACTION(action_, release_owned_)                                                        \
+    (test_release_summary_t) {                                                                             \
+        .kind = TEST_RELEASE_SUMMARY_ACTION, .action = (action_), .release_owned_state = (release_owned_), \
     }
 
-#define TEST_EXPECT_HELD(action_, release_owned_) \
-    (test_release_summary_t) {                    \
-        .kind                = TEST_RELEASE_SUMMARY_HELD_LIFECYCLE, \
-        .action              = (action_),         \
-        .release_owned_state = (release_owned_),  \
+#define TEST_EXPECT_HELD(action_, release_owned_)                                                                  \
+    (test_release_summary_t) {                                                                                     \
+        .kind = TEST_RELEASE_SUMMARY_HELD_LIFECYCLE, .action = (action_), .release_owned_state = (release_owned_), \
     }
 
-#define TEST_EXPECT_PRESERVE_CHAIN() \
-    (test_release_summary_t) {       \
-        .kind          = TEST_RELEASE_SUMMARY_PRESERVE_CHAIN, \
-        .pending_chain = true,       \
+#define TEST_EXPECT_PRESERVE_CHAIN()                                        \
+    (test_release_summary_t) {                                              \
+        .kind = TEST_RELEASE_SUMMARY_PRESERVE_CHAIN, .pending_chain = true, \
     }
 
 static keypos_t test_keypos(uint8_t row, uint8_t col) {
@@ -177,7 +172,7 @@ static test_release_summary_t test_release_summary_from_effects(const char *case
     test_release_summary_t summary = {
         .pending_chain = key_runtime_scenario_slot_has_pending_multi_tap(key_pos),
     };
-    uint16_t register_action = KC_NO;
+    uint16_t register_action   = KC_NO;
     uint16_t unregister_action = KC_NO;
 
     for (uint8_t index = 0; index < key_runtime_scenario_effect_count(); index++) {
@@ -371,81 +366,81 @@ static test_release_summary_t test_run_pending_release_case(const char *case_nam
 static void test_active_and_pending_release_semantics_stay_equivalent(void) {
     static const test_release_equivalence_case_t cases[] = {
         {
-            .name           = "release primary dispatches after tap",
-            .hold           = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold      = HOLD_NONE_LIT,
-            .active_setup   = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
-            .pending_setup  = TEST_PENDING_SETUP_NONE,
+            .name            = "release primary dispatches after tap",
+            .hold            = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold       = HOLD_NONE_LIT,
+            .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
+            .pending_setup   = TEST_PENDING_SETUP_NONE,
             .release_elapsed = TEST_TAP_SETUP_ELAPSED_MS,
-            .expected       = TEST_EXPECT_ACTION(TEST_RELEASE_PRIMARY, false),
+            .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_PRIMARY, false),
         },
         {
-            .name           = "release long dispatches without primary hold",
-            .hold           = HOLD_NONE_LIT,
-            .long_hold      = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
-            .active_setup   = TEST_ACTIVE_SETUP_SCAN_AT_LONG,
-            .pending_setup  = TEST_PENDING_SETUP_NONE,
+            .name            = "release long dispatches without primary hold",
+            .hold            = HOLD_NONE_LIT,
+            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_LONG,
+            .pending_setup   = TEST_PENDING_SETUP_NONE,
             .release_elapsed = TEST_LONG_SETUP_ELAPSED_MS,
-            .expected       = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
+            .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
         },
         {
-            .name           = "release long wins over primary after longer term",
-            .hold           = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold      = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
-            .active_setup   = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
-            .pending_setup  = TEST_PENDING_SETUP_NONE,
+            .name            = "release long wins over primary after longer term",
+            .hold            = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
+            .pending_setup   = TEST_PENDING_SETUP_NONE,
             .release_elapsed = TEST_LONG_SETUP_ELAPSED_MS,
-            .expected       = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
+            .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
         },
         {
-            .name           = "release primary still wins before longer term",
-            .hold           = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold      = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
-            .active_setup   = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
-            .pending_setup  = TEST_PENDING_SETUP_NONE,
+            .name            = "release primary still wins before longer term",
+            .hold            = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
+            .pending_setup   = TEST_PENDING_SETUP_NONE,
             .release_elapsed = TEST_TAP_SETUP_ELAPSED_MS,
-            .expected       = TEST_EXPECT_ACTION(TEST_RELEASE_PRIMARY, false),
+            .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_PRIMARY, false),
         },
         {
-            .name           = "threshold hold does not redispatch on release before long",
-            .hold           = HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
-            .long_hold      = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
-            .active_setup   = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
-            .pending_setup  = TEST_PENDING_SETUP_SCAN_AT_TAP,
+            .name            = "threshold hold does not redispatch on release before long",
+            .hold            = HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
+            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
+            .pending_setup   = TEST_PENDING_SETUP_SCAN_AT_TAP,
             .release_elapsed = TEST_TAP_SETUP_ELAPSED_MS,
-            .expected       = TEST_EXPECT_NONE(),
+            .expected        = TEST_EXPECT_NONE(),
         },
         {
-            .name           = "threshold hold releases long action after longer term",
-            .hold           = HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
-            .long_hold      = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
-            .active_setup   = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
-            .pending_setup  = TEST_PENDING_SETUP_SCAN_AT_TAP,
+            .name            = "threshold hold releases long action after longer term",
+            .hold            = HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
+            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
+            .pending_setup   = TEST_PENDING_SETUP_SCAN_AT_TAP,
             .release_elapsed = TEST_LONG_SETUP_ELAPSED_MS,
-            .expected       = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
+            .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
         },
         {
-            .name           = "held lifecycle survives release before long",
-            .hold           = HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
-            .long_hold      = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
-            .active_setup   = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
-            .pending_setup  = TEST_PENDING_SETUP_SCAN_AT_TAP,
+            .name            = "held lifecycle survives release before long",
+            .hold            = HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
+            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
+            .pending_setup   = TEST_PENDING_SETUP_SCAN_AT_TAP,
             .release_elapsed = TEST_TAP_SETUP_ELAPSED_MS,
-            .expected       = TEST_EXPECT_HELD(TEST_HELD_ACTION, true),
+            .expected        = TEST_EXPECT_HELD(TEST_HELD_ACTION, true),
         },
         {
-            .name           = "held lifecycle releases owned state and long action after longer term",
-            .hold           = HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
-            .long_hold      = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
-            .active_setup   = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
-            .pending_setup  = TEST_PENDING_SETUP_SCAN_AT_TAP,
+            .name            = "held lifecycle releases owned state and long action after longer term",
+            .hold            = HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
+            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
+            .pending_setup   = TEST_PENDING_SETUP_SCAN_AT_TAP,
             .release_elapsed = TEST_LONG_SETUP_ELAPSED_MS,
-            .expected       = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, true),
+            .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, true),
         },
     };
 
     for (uint8_t index = 0; index < ARRAY_SIZE(cases); index++) {
-        test_release_summary_t active_summary = test_run_active_release_case(cases[index].name, cases[index].hold, cases[index].long_hold, cases[index].active_setup, cases[index].release_elapsed);
+        test_release_summary_t active_summary  = test_run_active_release_case(cases[index].name, cases[index].hold, cases[index].long_hold, cases[index].active_setup, cases[index].release_elapsed);
         test_release_summary_t pending_summary = test_run_pending_release_case(cases[index].name, KC_NO, cases[index].hold, cases[index].long_hold, false, cases[index].pending_setup, cases[index].release_elapsed);
 
         test_expect_summary(cases[index].name, active_summary, cases[index].expected);
@@ -456,34 +451,34 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
 static void test_pending_release_edge_cases(void) {
     static const test_pending_release_case_t cases[] = {
         {
-            .name           = "quick release preserves pending chain when more taps remain",
+            .name              = "quick release preserves pending chain when more taps remain",
             .second_tap_action = KC_NO,
-            .hold           = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold      = HOLD_NONE_LIT,
-            .has_more_taps  = true,
-            .pending_setup  = TEST_PENDING_SETUP_NONE,
-            .release_elapsed = 60,
-            .expected       = TEST_EXPECT_PRESERVE_CHAIN(),
+            .hold              = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold         = HOLD_NONE_LIT,
+            .has_more_taps     = true,
+            .pending_setup     = TEST_PENDING_SETUP_NONE,
+            .release_elapsed   = 60,
+            .expected          = TEST_EXPECT_PRESERVE_CHAIN(),
         },
         {
-            .name           = "quick release falls back to second tap action when chain ends",
+            .name              = "quick release falls back to second tap action when chain ends",
             .second_tap_action = TEST_SECOND_TAP_ACTION,
-            .hold           = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold      = HOLD_NONE_LIT,
-            .has_more_taps  = false,
-            .pending_setup  = TEST_PENDING_SETUP_NONE,
-            .release_elapsed = 60,
-            .expected       = TEST_EXPECT_ACTION(TEST_SECOND_TAP_ACTION, false),
+            .hold              = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold         = HOLD_NONE_LIT,
+            .has_more_taps     = false,
+            .pending_setup     = TEST_PENDING_SETUP_NONE,
+            .release_elapsed   = 60,
+            .expected          = TEST_EXPECT_ACTION(TEST_SECOND_TAP_ACTION, false),
         },
         {
-            .name           = "pending release synthesizes held lifecycle without scan",
+            .name              = "pending release synthesizes held lifecycle without scan",
             .second_tap_action = KC_NO,
-            .hold           = HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
-            .long_hold      = HOLD_NONE_LIT,
-            .has_more_taps  = false,
-            .pending_setup  = TEST_PENDING_SETUP_NONE,
-            .release_elapsed = TEST_TAP_SETUP_ELAPSED_MS,
-            .expected       = TEST_EXPECT_HELD(TEST_HELD_ACTION, false),
+            .hold              = HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
+            .long_hold         = HOLD_NONE_LIT,
+            .has_more_taps     = false,
+            .pending_setup     = TEST_PENDING_SETUP_NONE,
+            .release_elapsed   = TEST_TAP_SETUP_ELAPSED_MS,
+            .expected          = TEST_EXPECT_HELD(TEST_HELD_ACTION, false),
         },
     };
 

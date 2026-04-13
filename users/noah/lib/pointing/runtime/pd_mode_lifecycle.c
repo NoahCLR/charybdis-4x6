@@ -145,8 +145,8 @@ void pd_mode_transition_unlock(pd_mode_mask_t mode) {
 }
 
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    pd_mode_snapshot_t snapshot = pd_mode_snapshot();
-    const pd_mode_def_t *def    = pd_mode_lookup(snapshot.local.active_mode);
+    pd_mode_snapshot_t   snapshot = pd_mode_snapshot();
+    const pd_mode_def_t *def      = pd_mode_lookup(snapshot.local.active_mode);
 
     if (def && def->key_handler && def->key_handler(keycode, record)) {
         return true;

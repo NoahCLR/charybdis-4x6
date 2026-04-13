@@ -48,7 +48,7 @@ static bool key_behavior_keycode_supported(uint16_t keycode) {
 }
 
 static bool key_behavior_action_supported(uint16_t action, hold_behavior_mode_t hold_mode) {
-    noah_action_desc_t           desc = noah_action_describe(action);
+    noah_action_desc_t         desc         = noah_action_describe(action);
     noah_action_authored_use_t authored_use = NOAH_ACTION_AUTHORED_USE_TAP;
 
     if (hold_mode != HOLD_BEHAVIOR_NONE) {

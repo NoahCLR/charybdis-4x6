@@ -13,16 +13,16 @@
 #include "key_behavior.h"
 
 typedef struct {
-    uint16_t                         keycode;
-    uint8_t                          tap_count;
-    key_behavior_step_t              step;
-    uint16_t                         tap_hold_term;
-    uint16_t                         longer_hold_term;
-    uint16_t                         multi_tap_term;
-    uint8_t                          layer;
-    pd_mode_mask_t                   pd_mode;
-    bool                             has_more_taps;
-    uint16_t                         flags;
+    uint16_t            keycode;
+    uint8_t             tap_count;
+    key_behavior_step_t step;
+    uint16_t            tap_hold_term;
+    uint16_t            longer_hold_term;
+    uint16_t            multi_tap_term;
+    uint8_t             layer;
+    pd_mode_mask_t      pd_mode;
+    bool                has_more_taps;
+    uint16_t            flags;
 } handled_key_resolution_t;
 
 typedef enum {
@@ -115,7 +115,7 @@ static inline handled_key_hold_contract_t handled_key_hold_contract_for_behavior
             contract.keeps_registered_feedback = true;
             return contract;
         case HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD:
-            contract.dispatches_on_release = true;
+            contract.dispatches_on_release  = true;
             contract.keeps_pending_feedback = true;
             return contract;
         case HOLD_BEHAVIOR_NONE:

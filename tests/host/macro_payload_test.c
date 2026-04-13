@@ -179,8 +179,8 @@ static bool test_qmk_reader_read_byte(uint16_t offset, uint8_t *byte, void *cont
 }
 
 static void test_compile_rejects_invalid_payloads(void) {
-    static const char non_ascii_payload[] = {'A', (char)0x80, '\0'};
-    macro_payload_ir_t ir                 = {0};
+    static const char  non_ascii_payload[] = {'A', (char)0x80, '\0'};
+    macro_payload_ir_t ir                  = {0};
 
     CHECK(!macro_payload_compile("{KC_A", &ir));
     CHECK(ir.length == 0);
