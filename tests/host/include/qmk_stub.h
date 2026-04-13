@@ -72,10 +72,26 @@
 
 #define QK_MODS 0x0100u
 #define QK_MODS_MAX 0x1FFFu
+#define QK_TO 0x5000u
+#define QK_TO_MAX 0x501Fu
+#define QK_DEF_LAYER 0x5020u
+#define QK_DEF_LAYER_MAX 0x503Fu
+#define QK_TOGGLE_LAYER 0x5040u
+#define QK_TOGGLE_LAYER_MAX 0x505Fu
+#define QK_ONE_SHOT_LAYER 0x5060u
+#define QK_ONE_SHOT_LAYER_MAX 0x507Fu
+#define QK_LAYER_TAP_TOGGLE 0x5080u
+#define QK_LAYER_TAP_TOGGLE_MAX 0x509Fu
+#define QK_LAYER_MOD 0x50A0u
+#define QK_LAYER_MOD_MAX 0x51FFu
 #define QK_LAYER_TAP 0x4000u
 #define QK_LAYER_TAP_MAX 0x4FFFu
 #define QK_MOMENTARY 0x5220u
 #define QK_MOMENTARY_MAX 0x523Fu
+#define QK_ONE_SHOT_MOD 0x5240u
+#define QK_ONE_SHOT_MOD_MAX 0x525Fu
+#define QK_MOD_TAP 0x6000u
+#define QK_MOD_TAP_MAX 0x6FFFu
 #define QK_MOUSE_BUTTON_1 0x00D1u
 #define QK_MOUSE_BUTTON_8 0x00D8u
 #define QK_LCTL 0x0100u
@@ -83,34 +99,56 @@
 #define QK_LALT 0x0400u
 #define QK_LGUI 0x0800u
 #define QK_RMODS_MIN 0x1000u
+#define MOD_LCTL 0x01u
+#define MOD_LSFT 0x02u
+#define MOD_LALT 0x04u
+#define MOD_LGUI 0x08u
 
 #define G(keycode_) ((uint16_t)(QK_LGUI | ((keycode_) & 0x00FFu)))
 
+#define TO(layer_) ((uint16_t)(QK_TO | ((layer_) & 0x001Fu)))
+#define DF(layer_) ((uint16_t)(QK_DEF_LAYER | ((layer_) & 0x001Fu)))
+#define TG(layer_) ((uint16_t)(QK_TOGGLE_LAYER | ((layer_) & 0x001Fu)))
+#define OSL(layer_) ((uint16_t)(QK_ONE_SHOT_LAYER | ((layer_) & 0x001Fu)))
+#define TT(layer_) ((uint16_t)(QK_LAYER_TAP_TOGGLE | ((layer_) & 0x001Fu)))
+#define LM(layer_, mod_) ((uint16_t)(QK_LAYER_MOD | ((((layer_) & 0x000Fu) << 5) | ((mod_) & 0x001Fu))))
 #define MS_BTN1 ((uint16_t)(QK_MOUSE_BUTTON_1 + 0))
 #define MS_BTN2 ((uint16_t)(QK_MOUSE_BUTTON_1 + 1))
 #define MS_BTN3 ((uint16_t)(QK_MOUSE_BUTTON_1 + 2))
 
 #define MO(layer_) ((uint16_t)(QK_MOMENTARY | ((layer_) & 0x001Fu)))
 #define LT(layer_, keycode_) ((uint16_t)(QK_LAYER_TAP | (((layer_) & 0x000Fu) << 8) | ((keycode_) & 0x00FFu)))
+#define OSM(mods_) ((uint16_t)(QK_ONE_SHOT_MOD | ((mods_) & 0x001Fu)))
+#define MT(mods_, keycode_) ((uint16_t)(QK_MOD_TAP | ((((mods_) & 0x001Fu) << 8) | ((keycode_) & 0x00FFu))))
 
 #define IS_QK_MOMENTARY(keycode_) ((keycode_) >= QK_MOMENTARY && (keycode_) <= QK_MOMENTARY_MAX)
 #define IS_QK_LAYER_TAP(keycode_) ((keycode_) >= QK_LAYER_TAP && (keycode_) <= QK_LAYER_TAP_MAX)
 #define IS_QK_MODS(keycode_) ((keycode_) >= QK_MODS && (keycode_) <= QK_MODS_MAX)
 #define IS_QK_MACRO(keycode_) ((keycode_) >= QK_MACRO_0 && (keycode_) < (QK_MACRO_0 + DYNAMIC_KEYMAP_MACRO_COUNT))
-#define IS_QK_TO(keycode_) (false)
-#define IS_QK_DEF_LAYER(keycode_) (false)
-#define IS_QK_TOGGLE_LAYER(keycode_) (false)
-#define IS_QK_ONE_SHOT_LAYER(keycode_) (false)
-#define IS_QK_LAYER_TAP_TOGGLE(keycode_) (false)
-#define IS_QK_LAYER_MOD(keycode_) (false)
-#define IS_QK_ONE_SHOT_MOD(keycode_) (false)
-#define IS_QK_MOD_TAP(keycode_) (false)
+#define IS_QK_TO(keycode_) ((keycode_) >= QK_TO && (keycode_) <= QK_TO_MAX)
+#define IS_QK_DEF_LAYER(keycode_) ((keycode_) >= QK_DEF_LAYER && (keycode_) <= QK_DEF_LAYER_MAX)
+#define IS_QK_TOGGLE_LAYER(keycode_) ((keycode_) >= QK_TOGGLE_LAYER && (keycode_) <= QK_TOGGLE_LAYER_MAX)
+#define IS_QK_ONE_SHOT_LAYER(keycode_) ((keycode_) >= QK_ONE_SHOT_LAYER && (keycode_) <= QK_ONE_SHOT_LAYER_MAX)
+#define IS_QK_LAYER_TAP_TOGGLE(keycode_) ((keycode_) >= QK_LAYER_TAP_TOGGLE && (keycode_) <= QK_LAYER_TAP_TOGGLE_MAX)
+#define IS_QK_LAYER_MOD(keycode_) ((keycode_) >= QK_LAYER_MOD && (keycode_) <= QK_LAYER_MOD_MAX)
+#define IS_QK_ONE_SHOT_MOD(keycode_) ((keycode_) >= QK_ONE_SHOT_MOD && (keycode_) <= QK_ONE_SHOT_MOD_MAX)
+#define IS_QK_MOD_TAP(keycode_) ((keycode_) >= QK_MOD_TAP && (keycode_) <= QK_MOD_TAP_MAX)
 #define IS_MOUSEKEY_BUTTON(keycode_) ((keycode_) >= QK_MOUSE_BUTTON_1 && (keycode_) <= QK_MOUSE_BUTTON_8)
 #define IS_MODIFIER_KEYCODE(keycode_) (((keycode_) & 0xFFF8u) == KC_LEFT_CTRL)
 #define QK_MODS_GET_BASIC_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
+#define QK_TO_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x001Fu))
+#define QK_DEF_LAYER_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x001Fu))
+#define QK_TOGGLE_LAYER_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x001Fu))
+#define QK_ONE_SHOT_LAYER_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x001Fu))
+#define QK_LAYER_TAP_TOGGLE_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x001Fu))
+#define QK_LAYER_MOD_GET_LAYER(keycode_) ((uint8_t)(((keycode_) >> 5) & 0x000Fu))
+#define QK_LAYER_MOD_GET_MODS(keycode_) ((uint8_t)((keycode_) & 0x001Fu))
 #define QK_MOMENTARY_GET_LAYER(keycode_) ((uint8_t)((keycode_) & 0x001Fu))
 #define QK_LAYER_TAP_GET_LAYER(keycode_) ((uint8_t)(((keycode_) >> 8) & 0x000Fu))
 #define QK_LAYER_TAP_GET_TAP_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
+#define QK_ONE_SHOT_MOD_GET_MODS(keycode_) ((uint8_t)((keycode_) & 0x001Fu))
+#define QK_MOD_TAP_GET_MODS(keycode_) ((uint8_t)(((keycode_) >> 8) & 0x001Fu))
+#define QK_MOD_TAP_GET_TAP_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
 
 #define COMBO_END 0
 #define COMBO(keys_, result_) {0}

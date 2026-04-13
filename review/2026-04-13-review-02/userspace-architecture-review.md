@@ -627,25 +627,26 @@ Expected payoff:
 
 Current status:
 
-- landed an initial `noah_action_desc_t` descriptor on the existing
-  action-dispatch surface
-- moved action lifecycle and direct-action preflight routing onto that
-  descriptor instead of repeating raw-keycode classification at each branch
-- moved key-runtime slot policy, feedback, and pending multi-tap action-policy
-  checks onto the descriptor surface too
-- moved held-action ownership dispatch decisions onto descriptor helpers too,
-  so ownership no longer needs to ask lifecycle for hold-kind classification
-- kept the older boolean helper predicates as compatibility wrappers so the
-  rest of the repo can migrate incrementally
-- intentionally left qmk-behavior classification behind the existing helper
-  seam for now because several host harnesses stub that classification directly
-- also kept `layer lock`, `raw layer action`, and `macro` classification
-  available through the existing helper seams because several lightweight host
-  harnesses still stub those names directly
-- remaining migration work is now mostly about deciding which of those legacy
-  helper seams plus `noah_action_hold_kind()` should stay public compatibility
-  wrappers and which should be folded completely into the descriptor internals
-  later
+- `noah_action_desc_t` is now the canonical production action-classification
+  contract
+- `noah_action_describe()` computes descriptor semantics directly for
+  layer-lock, raw layer-action, layer-tap, owned momentary-layer, macro,
+  qmk-behavior, pd-mode, and pd-lock classification
+- action lifecycle, direct-action preflight, key-runtime slot policy,
+  key-runtime feedback, pending multi-tap policy, handled-key fallback-hold
+  classification, key-behavior validation, keymap validation, and held-action
+  ownership dispatch all consume descriptor semantics instead of rediscovering
+  action meaning from raw keycodes
+- the older exported `action_dispatch_is_*()` helpers and
+  `noah_action_hold_kind()` remain only as compatibility projections over the
+  descriptor, not as an independent second system
+- the host harness now has real encodable test surfaces for unsupported raw
+  layer actions and supported qmk-behavior actions, so the canonical
+  descriptor is validated against actual action families rather than
+  stub-private fake keycodes
+- the real-profile host runners now honor the authored keymap's real
+  `LAYER_COUNT`, which closes a latent out-of-bounds validation blind spot that
+  previously hid behind the older classifier seams
 
 ### Recommendation 3: move key-runtime storage types under key/runtime
 

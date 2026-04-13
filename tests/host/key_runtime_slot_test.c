@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/noah_keymap_ids.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_effect.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_result_internal.h"
@@ -16,8 +17,8 @@ enum {
     TEST_SINGLE_ACTION = SAFE_RANGE + 0x42,
     TEST_HOLD_ACTION   = SAFE_RANGE + 0x43,
     TEST_PD_MODE_KEY   = SAFE_RANGE + 0x44,
-    TEST_LAYER_KEY     = SAFE_RANGE + 0x45,
-    TEST_LAYER_LOCK    = SAFE_RANGE + 0x46,
+    TEST_LAYER_KEY     = MO(3),
+    TEST_LAYER_LOCK    = LOCK_LAYER(3),
 };
 
 static uint16_t       fake_time;
@@ -187,11 +188,11 @@ bool pd_mode_local_locked(pd_mode_mask_t mode) {
 }
 
 bool action_dispatch_is_layer_lock(uint16_t action) {
-    return action == TEST_LAYER_LOCK;
+    return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
 }
 
 bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return action == TEST_LAYER_KEY;
+    return IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
 }
 
 bool action_dispatch_is_macro(uint16_t action) {
@@ -210,12 +211,11 @@ bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
 }
 
 bool is_layer_key(uint16_t keycode) {
-    return keycode == TEST_LAYER_KEY;
+    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
 uint8_t behavior_get_layer(uint16_t keycode) {
-    (void)keycode;
-    return 3;
+    return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
 }
 
 static bool test_handled_key_uses_buffered_modifier_single_step(key_behavior_view_t behavior) {
@@ -1051,7 +1051,7 @@ static void test_prepare_handled_press_matching_pending_multi_tap_reuses_slot(vo
     test_reset_state();
 
     slot->pending_multi_tap = (multi_tap_t){
-        .keycode        = TEST_MULTI_TAP_KEY,
+        .keycode        = TEST_LAYER_KEY,
         .key_pos        = pos,
         .count          = 1,
         .single_action  = TEST_SINGLE_ACTION,
@@ -1059,9 +1059,9 @@ static void test_prepare_handled_press_matching_pending_multi_tap_reuses_slot(vo
         .multi_tap_term = 150,
     };
 
-    plan = test_step_handled_press(slot, TEST_MULTI_TAP_KEY, pos,
+    plan = test_step_handled_press(slot, TEST_LAYER_KEY, pos,
                                    test_resolve_handled_key((key_behavior_view_t){
-                                       .keycode            = TEST_MULTI_TAP_KEY,
+                                       .keycode            = TEST_LAYER_KEY,
                                        .handled            = true,
                                        .has_multi_tap      = true,
                                        .is_momentary_layer = true,
@@ -1078,7 +1078,7 @@ static void test_prepare_handled_press_matching_pending_multi_tap_reuses_slot(vo
     CHECK(plan.handled);
     CHECK(plan.count == 1);
     test_expect_layer_press(&plan, 0, pos, 3);
-    CHECK(slot->owner.keycode == TEST_MULTI_TAP_KEY);
+    CHECK(slot->owner.keycode == TEST_LAYER_KEY);
     CHECK(slot->owner.key_pos.row == pos.row);
     CHECK(slot->owner.key_pos.col == pos.col);
     CHECK(key_runtime_slot_interaction(slot).tap_action == KC_NO);

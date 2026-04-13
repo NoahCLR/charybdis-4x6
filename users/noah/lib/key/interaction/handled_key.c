@@ -53,6 +53,8 @@ static bool handled_key_uses_implicit_hold_behavior(key_behavior_view_t behavior
 }
 
 static bool handled_key_uses_fallback_hold_behavior(key_behavior_view_t behavior, uint8_t tap_count) {
+    noah_action_desc_t desc;
+
     if (tap_count != 1) {
         return false;
     }
@@ -61,7 +63,8 @@ static bool handled_key_uses_fallback_hold_behavior(key_behavior_view_t behavior
         return false;
     }
 
-    if (action_dispatch_is_qmk_behavior_keycode(behavior.keycode)) {
+    desc = noah_action_describe(behavior.keycode);
+    if (desc.is_qmk_behavior_keycode) {
         return false;
     }
 

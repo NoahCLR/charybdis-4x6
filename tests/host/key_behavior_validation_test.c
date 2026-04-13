@@ -49,6 +49,11 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     return 0;
 }
 
+bool is_pd_mode_lock_action(uint16_t action) {
+    (void)action;
+    return false;
+}
+
 int main(void) {
     key_behavior_validate_all();
 

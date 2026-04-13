@@ -22,7 +22,7 @@ enum {
     TEST_THRESHOLD_HOLD      = SAFE_RANGE + 0x17,
     TEST_MULTI_TAP_HOLD      = SAFE_RANGE + 0x18,
     TEST_FALLBACK_TAP_ACTION = SAFE_RANGE + 0x19,
-    TEST_LAYER_LOCK_ACTION   = SAFE_RANGE + 0x1A,
+    TEST_LAYER_LOCK_ACTION   = LOCK_LAYER(2),
 };
 
 typedef enum {
@@ -403,7 +403,7 @@ bool is_pd_mode_lock_action(uint16_t action) {
 }
 
 bool action_dispatch_is_layer_lock(uint16_t action) {
-    return action == TEST_LAYER_LOCK_ACTION;
+    return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
 }
 
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {

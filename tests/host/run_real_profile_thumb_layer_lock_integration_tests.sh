@@ -24,6 +24,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DDPI_RMOD=0x5202u \
     -DS_D_MOD=0x5203u \
     -DS_D_RMOD=0x5204u \
+    -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

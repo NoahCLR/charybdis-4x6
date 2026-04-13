@@ -46,6 +46,11 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     return keycode == TEST_PD_MODE_KEY ? 1u : 0u;
 }
 
+bool is_pd_mode_lock_action(uint16_t action) {
+    (void)action;
+    return false;
+}
+
 static void test_bare_lt_falls_back_to_qmk(void) {
     key_behavior_view_t behavior = key_behavior_lookup(TEST_BARE_LAYER_TAP);
 

@@ -8,7 +8,7 @@
 #include "users/noah/noah_keymap_ids.h"
 
 enum {
-    TEST_QMK_BEHAVIOR_ACTION = 0x2A01u,
+    TEST_QMK_BEHAVIOR_ACTION = OSM(MOD_LSFT),
     TEST_CUSTOM_ACTION       = NOAH_KEYMAP_SAFE_RANGE + 1,
     TEST_RAW_LAYER_ACTION    = LT(2, KC_C),
 };
@@ -101,22 +101,6 @@ static void test_reset_stubs(void) {
     pd_release_result         = false;
     owned_register_result     = false;
     owned_unregister_result   = false;
-}
-
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
-}
-
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return action == TEST_RAW_LAYER_ACTION;
-}
-
-bool action_dispatch_is_macro(uint16_t action) {
-    return action == MACRO_0;
-}
-
-bool action_dispatch_is_qmk_behavior_keycode(uint16_t action) {
-    return action == TEST_QMK_BEHAVIOR_ACTION;
 }
 
 bool macro_dispatch(uint16_t action) {

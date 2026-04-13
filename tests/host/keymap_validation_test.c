@@ -13,10 +13,10 @@
 static char log_buffer[4096];
 
 enum {
-    TEST_PRESENT_KEY = NOAH_KEYMAP_SAFE_RANGE,
+    TEST_PRESENT_KEY      = NOAH_KEYMAP_SAFE_RANGE,
     TEST_COMBO_KEY,
     TEST_DEAD_KEY,
-    TEST_RAW_LAYER_ACTION = 0x6F00u,
+    TEST_RAW_LAYER_ACTION = TO(LAYER_NUM),
 };
 
 static const uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS] = {
@@ -64,13 +64,14 @@ int uprintf(const char *fmt, ...) {
     return written;
 }
 
-bool action_dispatch_is_raw_qmk_layer_action(uint16_t action) {
-    return action == TEST_RAW_LAYER_ACTION || IS_QK_MOMENTARY(action) || IS_QK_LAYER_TAP(action);
-}
-
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
+}
+
+bool is_pd_mode_lock_action(uint16_t action) {
+    (void)action;
+    return false;
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {

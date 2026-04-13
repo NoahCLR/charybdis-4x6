@@ -14,11 +14,13 @@
 #include "keymap_validation.h"
 
 static bool keymap_layer_action_supported(uint16_t keycode) {
-    if (!action_dispatch_is_raw_qmk_layer_action(keycode)) {
+    noah_action_desc_t desc = noah_action_describe(keycode);
+
+    if (!desc.is_raw_qmk_layer_action) {
         return true;
     }
 
-    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
+    return desc.is_owned_momentary_layer || desc.is_layer_tap;
 }
 
 static void log_invalid_keymap_layer_action(uint8_t layer, uint8_t row, uint8_t col, uint16_t keycode) {
@@ -92,7 +94,7 @@ static void validate_combo_outputs(void) {
     for (uint8_t combo_index = 0; combo_index < noah_combo_output_count; combo_index++) {
         uint16_t keycode = noah_combo_output_keycodes[combo_index];
 
-        if (action_dispatch_is_raw_qmk_layer_action(keycode)) {
+        if (noah_action_describe(keycode).is_raw_qmk_layer_action) {
             log_invalid_combo_output(combo_index, keycode);
         }
     }

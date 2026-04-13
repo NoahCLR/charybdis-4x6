@@ -68,6 +68,11 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     }
 }
 
+bool is_pd_mode_lock_action(uint16_t action) {
+    (void)action;
+    return false;
+}
+
 bool pd_mode_local_active(pd_mode_mask_t mode) {
     return (fake_active_modes & mode) != 0;
 }

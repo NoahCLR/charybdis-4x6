@@ -376,3 +376,78 @@ Next steps:
 - continue recommendation 2 by removing any remaining production callers that
   still need lifecycle-owned action classification instead of descriptor-owned
   action classification
+
+## 2026-04-13: Recommendation 2 completed
+
+Completed in this pass:
+
+- Made `noah_action_desc_t` the canonical action-classification contract.
+  `noah_action_describe()` now computes layer-lock, raw layer-action, macro,
+  qmk-behavior, layer-tap, owned-momentary-layer, pd-mode, and pd-lock
+  semantics directly instead of delegating that work to older boolean helper
+  seams.
+- Rebased the older exported action predicate helpers on the canonical
+  classifier so they now act as compatibility projections rather than as a
+  second independently-maintained classification system.
+- Migrated the remaining production call sites that still inferred action
+  meaning directly from helper predicates:
+  `handled_key.c`, `key_behavior_lookup.c`, and `keymap_validation.c` now read
+  descriptor semantics instead.
+- Extended the host QMK stub surface with real encodable `TO(...)`, `OSM(...)`,
+  `MT(...)`, and related layer/mod ranges so action tests no longer rely on
+  fake “pretend qmk behavior” keycodes.
+- Reworked the affected host fixtures to use real encodable action families
+  where recommendation 2 had previously been masked by stub-only
+  classification, including action lifecycle, keymap validation, slot/transition
+  runtime tests, and real-profile host runners.
+- Fixed the real-profile host validation/integration runners to honor the
+  authored keymap's real `LAYER_COUNT` via `QMK_STUB_SUPPRESS_LAYER_COUNT`
+  instead of silently iterating beyond the authored layer array.
+
+Contracts touched:
+
+- `users/noah/lib/action/action_dispatch.[ch]`
+- `users/noah/lib/key/interaction/handled_key.c`
+- `users/noah/lib/key/interaction/key_behavior_lookup.c`
+- `users/noah/lib/key/interaction/keymap_validation.c`
+- `tests/host/include/qmk_stub.h`
+- `tests/host/action_dispatch_test.c`
+- `tests/host/action_lifecycle_test.c`
+- `tests/host/key_behavior_lookup_test.c`
+- `tests/host/key_behavior_validation_test.c`
+- `tests/host/keymap_validation_test.c`
+- `tests/host/key_runtime_slot_test.c`
+- `tests/host/key_runtime_transition_test.c`
+- `tests/host/pd_mode_key_runtime_integration_test.c`
+- `tests/host/pointer_layer_policy_test.c`
+- `tests/host/real_profile_validation_test.c`
+- `tests/host/run_real_profile_validation_tests.sh`
+- `tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+
+Verification run in this pass:
+
+- `git diff --check`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_keymap_validation_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+- treat `action_dispatch_is_*()` and `noah_action_hold_kind()` as compatibility
+  projections only and avoid introducing any new production callers
+- move on to recommendation 3, since recommendation 2 is now structurally
+  complete and production action classification is descriptor-owned

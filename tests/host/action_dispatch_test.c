@@ -164,6 +164,9 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
 static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t layer_lock   = noah_action_describe(LOCK_LAYER(2));
     noah_action_desc_t momentary    = noah_action_describe(MO(3));
+    noah_action_desc_t layer_tap    = noah_action_describe(LT(4, KC_V));
+    noah_action_desc_t layer_jump   = noah_action_describe(TO(5));
+    noah_action_desc_t qmk_behavior = noah_action_describe(OSM(MOD_LSFT));
     noah_action_desc_t pd_key       = noah_action_describe(ARROW_MODE);
     noah_action_desc_t pd_lock      = noah_action_describe(ARROW_MODE_LOCK);
     noah_action_desc_t macro_action = noah_action_describe(MACRO_0);
@@ -179,6 +182,18 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(momentary.is_raw_qmk_layer_action);
     CHECK(momentary.layer == 3);
     CHECK(noah_action_desc_requires_per_key_hold(momentary));
+
+    CHECK(layer_tap.is_layer_tap);
+    CHECK(layer_tap.is_raw_qmk_layer_action);
+    CHECK(layer_tap.layer == 4);
+    CHECK(!layer_tap.is_owned_momentary_layer);
+
+    CHECK(layer_jump.is_raw_qmk_layer_action);
+    CHECK(!layer_jump.is_owned_momentary_layer);
+    CHECK(!layer_jump.is_layer_tap);
+
+    CHECK(qmk_behavior.is_qmk_behavior_keycode);
+    CHECK(!qmk_behavior.is_raw_qmk_layer_action);
 
     CHECK(pd_key.pd_mode == PD_MODE_ARROW);
     CHECK(noah_action_desc_is_pd_mode_action(pd_key));
