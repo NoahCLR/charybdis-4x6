@@ -1112,3 +1112,56 @@ Next steps:
 - treat Finding 5 as landed
 - move on to Finding 6 and keep shifting higher-level tests toward semantic
   builders and `noah_runtime_debug_snapshot(...)`
+
+### Implementation pass: scenario-harness boundary cleanup
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Narrowed
+  `tests/host/key_runtime_scenario_harness.h`
+  and
+  `tests/host/key_runtime_scenario_harness.c`
+  so the scenario harness no longer exports
+  `runtime_shared_state_t *` as a public test seam.
+- Added semantic scenario-slot helpers for owner keycode, held-action keycode,
+  pending multi-tap state, and hold completion, with each helper sourcing its
+  answer from `noah_runtime_debug_snapshot(...)` instead of live slot storage.
+- Updated
+  `tests/host/key_runtime_scenario_test.c`
+  so its higher-level assertions now use those semantic helpers instead of
+  raw `key_runtime_slot_for_position(...)` reads or direct lifecycle-field
+  inspection through snapshot slot structs.
+- Updated the active review so Finding 6 now reflects that the scenario
+  harness leak is closed, while the broader higher-level test surface still
+  has remaining raw-storage coupling in other fixtures.
+
+Contracts touched in this pass:
+
+- removal of `key_runtime_scenario_state(...)`
+- `key_runtime_scenario_slot_owner_keycode(...)`
+- `key_runtime_scenario_slot_held_action_keycode(...)`
+- `key_runtime_scenario_slot_has_pending_multi_tap(...)`
+- `key_runtime_scenario_slot_hold_is_complete(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- continue Finding 6 by moving more integration/debug fixtures off direct
+  `noah_runtime_shared_state` and `key_runtime_slot_for_position(...)` access
+- likely next targets are `runtime_debug_test.c` and the remaining
+  key-runtime integration fixtures that still reset or mutate storage
+  directly

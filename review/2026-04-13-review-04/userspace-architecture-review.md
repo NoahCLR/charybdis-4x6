@@ -474,7 +474,8 @@ on internal layout and raw mutable globals":
 - direct writes into `noah_runtime_shared_state`
 - direct slot access through `key_runtime_slot_for_position(...)`
 - direct construction of `handled_key_resolution_t`
-- scenario harness exposure of `runtime_shared_state_t`
+- some higher-level assertions still reach through raw slot/lifecycle fields
+  instead of semantic helpers or debug snapshots
 
 Some of that is absolutely appropriate for low-level storage or reducer tests.
 The problem is where those patterns bleed upward into broader behavior tests.
@@ -493,6 +494,17 @@ Recommended direction:
   `noah_runtime_debug_snapshot(...)`
 - avoid exposing whole shared-state pointers from scenario helpers unless the
   test is explicitly about storage
+
+Implementation update:
+
+- the key-runtime scenario harness no longer exposes
+  `runtime_shared_state_t *` as a public test seam
+- scenario-level slot assertions now have semantic helpers for owner keycode,
+  held-action keycode, pending multi-tap state, and hold completion instead of
+  reaching through live slot storage directly
+- the remaining work here is broader than the scenario harness: several
+  integration and debug fixtures still write raw shared state or access slots
+  directly when they could move to builders plus debug snapshots
 
 ## Testing And Debuggability
 

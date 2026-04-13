@@ -8,7 +8,6 @@
 #include "users/noah/lib/key/runtime/effects/key_runtime_effect.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
-#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 typedef key_runtime_effect_t key_runtime_scenario_effect_t;
 
@@ -80,9 +79,11 @@ void key_runtime_scenario_set_hold_survives_flush(bool survives_flush);
 void key_runtime_scenario_run(const key_runtime_scenario_step_t *steps, uint8_t step_count);
 bool key_runtime_scenario_layer_locked(uint8_t layer);
 void key_runtime_scenario_debug_snapshot(noah_runtime_debug_snapshot_t *out);
-const active_key_state_t *key_runtime_scenario_snapshot_slot(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
+uint16_t key_runtime_scenario_slot_owner_keycode(keypos_t key_pos);
+uint16_t key_runtime_scenario_slot_held_action_keycode(keypos_t key_pos);
+bool     key_runtime_scenario_slot_has_pending_multi_tap(keypos_t key_pos);
+bool     key_runtime_scenario_slot_hold_is_complete(keypos_t key_pos);
 
 uint8_t                              key_runtime_scenario_effect_count(void);
 const key_runtime_scenario_effect_t *key_runtime_scenario_effect_at(uint8_t index);
-const runtime_shared_state_t        *key_runtime_scenario_state(void);
 uint16_t                             key_runtime_scenario_now(void);

@@ -225,12 +225,56 @@ void key_runtime_scenario_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
     noah_runtime_debug_snapshot(out);
 }
 
-const active_key_state_t *key_runtime_scenario_snapshot_slot(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
-    if (!snapshot || !key_runtime_scenario_slot_position_is_valid(key_pos)) {
-        return NULL;
+static bool key_runtime_scenario_snapshot_slot_copy(keypos_t key_pos, active_key_state_t *out) {
+    noah_runtime_debug_snapshot_t snapshot;
+
+    if (!out || !key_runtime_scenario_slot_position_is_valid(key_pos)) {
+        return false;
     }
 
-    return &snapshot->core.key.slots_by_position[key_runtime_scenario_slot_table_index(key_pos)];
+    noah_runtime_debug_snapshot(&snapshot);
+    *out = snapshot.core.key.slots_by_position[key_runtime_scenario_slot_table_index(key_pos)];
+    return true;
+}
+
+uint16_t key_runtime_scenario_slot_owner_keycode(keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+
+    if (!key_runtime_scenario_snapshot_slot_copy(key_pos, &slot)) {
+        return KC_NO;
+    }
+
+    return slot.owner.keycode;
+}
+
+uint16_t key_runtime_scenario_slot_held_action_keycode(keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+
+    if (!key_runtime_scenario_snapshot_slot_copy(key_pos, &slot)) {
+        return KC_NO;
+    }
+
+    return slot.lifecycle.held_action_keycode;
+}
+
+bool key_runtime_scenario_slot_has_pending_multi_tap(keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+
+    if (!key_runtime_scenario_snapshot_slot_copy(key_pos, &slot)) {
+        return false;
+    }
+
+    return key_runtime_slot_has_pending_multi_tap(&slot);
+}
+
+bool key_runtime_scenario_slot_hold_is_complete(keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+
+    if (!key_runtime_scenario_snapshot_slot_copy(key_pos, &slot)) {
+        return false;
+    }
+
+    return key_runtime_slot_hold_is_complete(&slot);
 }
 
 uint8_t key_runtime_scenario_effect_count(void) {
@@ -243,10 +287,6 @@ const key_runtime_scenario_effect_t *key_runtime_scenario_effect_at(uint8_t inde
     }
 
     return &key_runtime_scenario_effects[index];
-}
-
-const runtime_shared_state_t *key_runtime_scenario_state(void) {
-    return &noah_runtime_shared_state;
 }
 
 uint16_t key_runtime_scenario_now(void) {
