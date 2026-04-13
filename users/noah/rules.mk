@@ -9,9 +9,6 @@ include $(USER_PATH)/source_manifest.mk
 # VIA support: enables runtime key remapping via the VIA desktop app.
 VIA_ENABLE = yes
 
-# Console stays enabled for the temporary pointing-motion diagnostic trace.
-CONSOLE_ENABLE = yes
-
 # Key combos: press multiple keys simultaneously to trigger an action.
 COMBO_ENABLE = yes
 

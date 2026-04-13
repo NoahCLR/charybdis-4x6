@@ -1,9 +1,7 @@
 #include <stdbool.h>
-#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
@@ -44,8 +42,6 @@ static uint8_t  keyboard_mod_register_count;
 static uint8_t  keyboard_mod_unregister_count;
 static uint16_t last_registered_keycode;
 static uint16_t last_unregistered_keycode;
-static char     console_log[4096];
-static size_t   console_log_len;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -65,23 +61,6 @@ static bool report_mouse_equal(report_mouse_t lhs, report_mouse_t rhs) {
 
 static void test_reset_runtime(void) {
     runtime_shared_state_reset(&noah_runtime_shared_state);
-}
-
-static void test_reset_console_log(void) {
-    console_log[0] = '\0';
-    console_log_len = 0;
-}
-
-static size_t test_console_line_count(void) {
-    size_t count = 0;
-
-    for (size_t i = 0; i < console_log_len; ++i) {
-        if (console_log[i] == '\n') {
-            count++;
-        }
-    }
-
-    return count;
 }
 
 static void test_reset_stubs(void) {
@@ -117,7 +96,6 @@ static void test_reset_stubs(void) {
     keyboard_mod_unregister_count = 0;
     last_registered_keycode       = KC_NO;
     last_unregistered_keycode     = KC_NO;
-    test_reset_console_log();
 }
 
 uint16_t timer_read(void) {
@@ -138,32 +116,6 @@ uint32_t timer_elapsed32(uint32_t last) {
 
 uint32_t last_input_activity_elapsed(void) {
     return fake_last_input_idle_ms;
-}
-
-int uprintf(const char *fmt, ...) {
-    va_list args;
-    int     written;
-    size_t  remaining = sizeof(console_log) - console_log_len;
-
-    if (remaining == 0) {
-        return 0;
-    }
-
-    va_start(args, fmt);
-    written = vsnprintf(console_log + console_log_len, remaining, fmt, args);
-    va_end(args);
-
-    if (written < 0) {
-        return written;
-    }
-
-    if ((size_t)written >= remaining) {
-        console_log_len = sizeof(console_log) - 1u;
-    } else {
-        console_log_len += (size_t)written;
-    }
-
-    return written;
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
@@ -402,14 +354,10 @@ static void test_pointing_device_task_dispatches_active_local_mode_and_tracks_la
 static void test_pointing_device_task_suppresses_idle_noise_after_quiet_window(void) {
     test_reset_stubs();
     fake_last_input_idle_ms = 1000u;
-    fake_timer_ms           = 1000u;
 
     report_mouse_t input = {.x = -1, .y = 1, .h = 0, .v = 0, .buttons = 0};
 
     CHECK(report_mouse_equal(noah_pointing_device_task_user(input), (report_mouse_t){0}));
-    CHECK(strstr(console_log, "raw=(-1,1,0,0 btn=0x00 abs=2)") != NULL);
-    CHECK(strstr(console_log, "out=(0,0,0,0 btn=0x00 abs=0)") != NULL);
-    CHECK(strstr(console_log, "caught=1") != NULL);
 }
 
 static void test_pointing_device_task_keeps_small_motion_while_recently_active(void) {
@@ -430,6 +378,15 @@ static void test_pointing_device_task_keeps_small_motion_with_buttons_after_quie
     CHECK(report_mouse_equal(noah_pointing_device_task_user(input), input));
 }
 
+static void test_pointing_device_task_keeps_larger_motion_after_quiet_window(void) {
+    test_reset_stubs();
+    fake_last_input_idle_ms = 5000u;
+
+    report_mouse_t input = {.x = 2, .y = 1, .h = 0, .v = 0, .buttons = 0};
+
+    CHECK(report_mouse_equal(noah_pointing_device_task_user(input), input));
+}
+
 static void test_pointing_device_task_keeps_small_motion_in_active_local_mode(void) {
     test_reset_stubs();
     fake_last_input_idle_ms = 5000u;
@@ -439,66 +396,6 @@ static void test_pointing_device_task_keeps_small_motion_in_active_local_mode(vo
 
     CHECK(report_mouse_equal(noah_pointing_device_task_user(input), (report_mouse_t){.x = 4, .y = 0, .h = 0, .v = 0, .buttons = 1}));
     CHECK(volume_handler_calls == 1);
-}
-
-static void test_pointing_motion_trace_stays_silent_for_zero_reports(void) {
-    test_reset_stubs();
-    fake_last_input_idle_ms = 4321u;
-    fake_timer_ms           = 1000u;
-
-    CHECK(report_mouse_equal(noah_pointing_device_task_user((report_mouse_t){0}), (report_mouse_t){0}));
-    CHECK(console_log_len == 0u);
-}
-
-static void test_pointing_motion_trace_logs_motion_and_rate_limits_bursts(void) {
-    test_reset_stubs();
-    fake_last_input_idle_ms = 4321u;
-    fake_timer_ms           = 1000u;
-
-    report_mouse_t input = {.x = 1, .y = -2, .h = 3, .v = -4, .buttons = 5};
-
-    CHECK(report_mouse_equal(noah_pointing_device_task_user(input), input));
-    CHECK(strstr(console_log, "Pointing motion trace idle=4321") != NULL);
-    CHECK(strstr(console_log, "burst=0 reports=1") != NULL);
-    CHECK(strstr(console_log, "raw=(1,-2,3,-4 btn=0x05 abs=10)") != NULL);
-    CHECK(strstr(console_log, "raw_sum=10 raw_peak=10 raw_axes=(1,2,3,4)") != NULL);
-    CHECK(strstr(console_log, "out=(1,-2,3,-4 btn=0x05 abs=10)") != NULL);
-    CHECK(strstr(console_log, "caught=0") != NULL);
-    CHECK(strstr(console_log, "mode=0x0000") != NULL);
-    CHECK(test_console_line_count() == 1u);
-
-    fake_last_input_idle_ms = 12u;
-    fake_timer_ms           = 1100u;
-    (void)noah_pointing_device_task_user(input);
-    CHECK(test_console_line_count() == 1u);
-
-    fake_last_input_idle_ms = 34u;
-    fake_timer_ms           = 1300u;
-    (void)noah_pointing_device_task_user(input);
-    CHECK(test_console_line_count() == 2u);
-    CHECK(strstr(console_log, "burst=300 reports=3") != NULL);
-    CHECK(strstr(console_log, "raw_sum=30 raw_peak=10 raw_axes=(1,2,3,4)") != NULL);
-}
-
-static void test_pointing_motion_trace_logs_active_mode_transform(void) {
-    char expected_mode[32];
-
-    test_reset_stubs();
-    fake_last_input_idle_ms = 60000u;
-    fake_timer_ms           = 2000u;
-    CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
-
-    report_mouse_t input = {.x = 10, .y = 20, .h = 30, .v = 40, .buttons = 0};
-    report_mouse_t output = noah_pointing_device_task_user(input);
-
-    CHECK(report_mouse_equal(output, (report_mouse_t){.x = 13, .y = 20, .h = 30, .v = 40, .buttons = 1}));
-    CHECK(strstr(console_log, "burst=0 reports=1") != NULL);
-    CHECK(strstr(console_log, "raw=(10,20,30,40 btn=0x00 abs=100)") != NULL);
-    CHECK(strstr(console_log, "raw_sum=100 raw_peak=100 raw_axes=(10,20,30,40)") != NULL);
-    CHECK(strstr(console_log, "out=(13,20,30,40 btn=0x01 abs=103)") != NULL);
-    CHECK(strstr(console_log, "caught=0") != NULL);
-    snprintf(expected_mode, sizeof(expected_mode), "mode=0x%04X", (unsigned int)PD_MODE_VOLUME);
-    CHECK(strstr(console_log, expected_mode) != NULL);
 }
 
 static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_after_sniping_drops(void) {
@@ -571,10 +468,8 @@ int main(void) {
     test_pointing_device_task_suppresses_idle_noise_after_quiet_window();
     test_pointing_device_task_keeps_small_motion_while_recently_active();
     test_pointing_device_task_keeps_small_motion_with_buttons_after_quiet_window();
+    test_pointing_device_task_keeps_larger_motion_after_quiet_window();
     test_pointing_device_task_keeps_small_motion_in_active_local_mode();
-    test_pointing_motion_trace_stays_silent_for_zero_reports();
-    test_pointing_motion_trace_logs_motion_and_rate_limits_bursts();
-    test_pointing_motion_trace_logs_active_mode_transform();
     test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_after_sniping_drops();
     test_layer_state_set_strips_pointer_layer_for_arrow_mode();
     test_layer_state_set_enables_sniping_and_blocks_dpi_restore_while_sniping_layer_active();

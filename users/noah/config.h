@@ -85,6 +85,14 @@
 #    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
 
+// Shared idle-noise filter for tiny trackball motion seen while the board is
+// otherwise untouched. Comment out the enable define to compile this path out
+// entirely; when enabled, matching reports are zeroed before they can refresh
+// RGB activity or drift into auto-mouse activation.
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS 1000
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX 2
+
 // Local drag-scroll tuning (DPI for the scroll speed lives in the keymap config).
 // The repo-owned NOAH_DRAGSCROLL_* surface controls gesture feel; the older
 // CHARYBDIS_* scroll defines remain as compatibility fallbacks only.
