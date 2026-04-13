@@ -117,11 +117,51 @@ Workspace scope:
 - no sibling workspace folders were edited
 - all changes are confined to `charybdis-4x6/`
 
+### Implementation pass: active-release contract extraction
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Added `key_runtime_slot_release_contract_t` plus release-contract helpers in
+  `users/noah/lib/key/runtime/key_runtime_interaction.h` so authored
+  release-time semantics are represented as an explicit typed contract instead
+  of being reinterpreted inline inside the reducer.
+- Updated
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c`
+  to build and execute that contract for quick taps, immediate-hold quick
+  release, fallback suppression, release-hold selection, pd-mode quick lock,
+  and multi-tap buffering.
+- Narrowed the active-release reducer surface by removing the now-unused raw
+  handled-key parameter from `key_runtime_slot_reduce_active_release(...)`.
+
+Contracts touched in this pass:
+
+- `key_runtime_slot_release_contract_t`
+- `key_runtime_slot_release_contract(...)`
+- `key_runtime_slot_release_contract_select_hold_action(...)`
+- `key_runtime_slot_reduce_active_release(...)`
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
 Next steps:
 
 - continue finding 1 by splitting authored handled-key resolution from the
   remaining fields still mirrored into `key_runtime_slot_interaction_t`
-- next, extract a typed release contract so new hold/release behaviors stop
-  inflating `key_runtime_slot_release_active.c`
+- if release-contract work continues, move contract construction earlier so the
+  slot interaction can cache release semantics at press/tap-branch resolution
 - after that, make pd-mode exclusivity explicit in the public state model and
   split the remaining compatibility seams by owning subsystem

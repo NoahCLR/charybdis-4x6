@@ -8,10 +8,13 @@ This pass reviews the current live userspace after the earlier contract cleanup
 work. Hardware is treated as fixed; this review is only about software
 architecture, structure, and long-term extensibility.
 
-Implementation update later the same day: the first slice of Finding 1 has
-landed. Active slot storage now uses `key_runtime_slot_interaction_t` as the
-slot-owned cached interaction contract, with a compatibility wrapper still
-exposing `handled_key_view_t` where older call sites need it.
+Implementation update later the same day: the first slice of Finding 1 and the
+first slice of Finding 2 have landed. Active slot storage now uses
+`key_runtime_slot_interaction_t` as the slot-owned cached interaction contract,
+with a compatibility wrapper still exposing `handled_key_view_t` where older
+call sites need it. The active-release reducer now also executes a typed
+release contract derived from that interaction instead of reconstructing all
+release semantics directly from raw hold flags.
 
 This review is intentionally not a repeat of the earlier action-family,
 pd-mode write-controller, macro IR, and test-harness recommendations. Those
@@ -243,6 +246,18 @@ typedef struct {
 
 Then the release reducer becomes "pick branch from elapsed time and execute",
 not "reconstruct policy from many local booleans".
+
+Implementation update:
+
+- the active-release reducer now executes a typed
+  `key_runtime_slot_release_contract_t`
+- quick tap, immediate-hold quick release, fallback suppression, pd-mode quick
+  lock, release-hold selection, and multi-tap buffering are now expressed
+  through that contract instead of each branch reinterpreting raw interaction
+  fields independently
+- the remaining gap is timing: the contract is still derived on demand from the
+  cached slot interaction at release time rather than being cached when the
+  press or tap-count branch resolves
 
 ### 3. PD-mode state still advertises composition while the runtime enforces exclusivity
 

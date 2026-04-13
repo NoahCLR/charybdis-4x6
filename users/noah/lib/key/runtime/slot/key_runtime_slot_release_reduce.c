@@ -20,7 +20,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_sta
     }
 
     if (key_runtime_slot_matches(slot, keycode, key_pos)) {
-        return key_runtime_slot_reduce_active_release(slot, keycode, key);
+        return key_runtime_slot_reduce_active_release(slot, keycode);
     }
 
     result.handled = true;
