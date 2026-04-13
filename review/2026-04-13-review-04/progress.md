@@ -252,12 +252,57 @@ Workspace scope:
 - no sibling workspace folders were edited
 - all changes are confined to `charybdis-4x6/`
 
+### Implementation pass: handled-key compatibility cleanup
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Removed the last public `handled_key_view_t` compatibility layer from
+  `users/noah/lib/key/interaction/handled_key.h` and
+  `users/noah/lib/key/interaction/handled_key.c`.
+- Renamed the handled-key authored-resolution accessors to the explicit
+  `handled_key_resolution_*` surface so call sites no longer depend on
+  view-era naming for authored lookup results.
+- Removed the last slot interaction compatibility wrappers in
+  `users/noah/lib/key/runtime/key_runtime_interaction.h`, leaving
+  `key_runtime_slot_interaction_from_resolution(...)` and
+  `key_runtime_slot_interaction_to_resolution(...)` as the explicit
+  conversion seam between authored lookup output and slot-owned runtime state.
+- Updated the remaining key-runtime reducers and host suites to use the new
+  authored-resolution accessor names directly.
+
+Contracts touched in this pass:
+
+- `handled_key_resolution_*` accessor family
+- `key_runtime_slot_interaction_from_resolution(...)`
+- `key_runtime_slot_interaction_to_resolution(...)`
+- the remaining key-runtime and host-test authored-resolution call sites
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
 Next steps:
 
-- continue finding 1 by removing the now-narrow compatibility helpers in
-  `key_runtime_interaction.h` and the remaining `handled_key_view_t`-named
-  accessors in `handled_key.h` once the broader codebase no longer depends on
-  them
+- continue finding 1 by deciding whether the direct-field compatibility in
+  `key_runtime_slot_interaction_t` should remain for pragmatism or be narrowed
+  further behind policy/resolution accessors
 - if release-contract work continues, move contract construction earlier so the
   slot interaction can cache release semantics at press/tap-branch resolution
 - after that, make pd-mode exclusivity explicit in the public state model and

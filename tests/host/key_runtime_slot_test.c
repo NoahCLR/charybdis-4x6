@@ -54,7 +54,7 @@ static active_key_state_t *test_primary_slot(void) {
 #define key_runtime_primary_slot() test_primary_slot()
 
 static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
-    return key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
+    return key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
         .tap_action            = tap_action,
         .tap_repeat_count      = tap_action == KC_NO ? 0 : 1,
         .hold                  = hold,
@@ -285,59 +285,59 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
     return (delayed_action_mods_t){0};
 }
 
-bool handled_key_uses_implicit_hold(handled_key_resolution_t key) {
+bool handled_key_resolution_uses_implicit_hold(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) != 0;
 }
 
-bool handled_key_uses_fallback_hold(handled_key_resolution_t key) {
+bool handled_key_resolution_uses_fallback_hold(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0;
 }
 
-hold_behavior_t handled_key_single_hold(handled_key_resolution_t key) {
+hold_behavior_t handled_key_resolution_hold(handled_key_resolution_t key) {
     return key.hold;
 }
 
-hold_behavior_t handled_key_long_hold(handled_key_resolution_t key) {
+hold_behavior_t handled_key_resolution_long_hold(handled_key_resolution_t key) {
     return key.long_hold;
 }
 
-key_runtime_slot_hold_strategy_t handled_key_hold_strategy(handled_key_resolution_t key) {
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t key) {
     return key.hold_strategy;
 }
 
-uint16_t handled_key_tap_action(handled_key_resolution_t key) {
+uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
     return key.tap_action;
 }
 
-uint16_t handled_key_tap_hold_term(handled_key_resolution_t key) {
+uint16_t handled_key_resolution_tap_hold_term(handled_key_resolution_t key) {
     return key.tap_hold_term;
 }
 
-uint16_t handled_key_longer_hold_term(handled_key_resolution_t key) {
+uint16_t handled_key_resolution_longer_hold_term(handled_key_resolution_t key) {
     return key.longer_hold_term;
 }
 
-uint16_t handled_key_multi_tap_term(handled_key_resolution_t key) {
+uint16_t handled_key_resolution_multi_tap_term(handled_key_resolution_t key) {
     return key.multi_tap_term;
 }
 
-uint8_t handled_key_layer(handled_key_resolution_t key) {
+uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
     return key.layer;
 }
 
-pd_mode_mask_t handled_key_pd_mode(handled_key_resolution_t key) {
+pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
     return key.pd_mode;
 }
 
-bool handled_key_has_multi_tap(handled_key_resolution_t key) {
+bool handled_key_resolution_has_multi_tap(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0;
 }
 
-bool handled_key_is_momentary_layer(handled_key_resolution_t key) {
+bool handled_key_resolution_is_momentary_layer(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
 }
 
-bool handled_key_is_layer_tap(handled_key_resolution_t key) {
+bool handled_key_resolution_is_layer_tap(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_LAYER_TAP) != 0;
 }
 
@@ -446,7 +446,7 @@ static void test_slot_track_preserves_pending_multi_tap(void) {
     CHECK(key_runtime_slot_pending_multi_tap_pending_hold(slot));
 
     key_runtime_slot_track(slot, TEST_MULTI_TAP_KEY, pos,
-                           key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
+                           key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
                                .tap_action       = KC_NO,
                                .tap_repeat_count = 0,
                                .hold             = hold_behavior_none(),
@@ -771,7 +771,7 @@ static void test_take_active_scan_event_returns_fallback_hold_request(void) {
         .lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
         .timer                   = (uint16_t)(fake_time - 120),
         .interaction.valid       = true,
-        .interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
+        .interaction.view        = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
             .tap_action       = KC_NO,
             .tap_repeat_count = 0,
             .hold             = hold_behavior_none(),
@@ -1063,8 +1063,8 @@ static void test_prepare_handled_press_matching_pending_multi_tap_reuses_slot(vo
     CHECK(slot->owner.key_pos.col == pos.col);
     CHECK(key_runtime_slot_interaction(slot).tap_action == KC_NO);
     CHECK(key_runtime_slot_interaction(slot).flags & HANDLED_KEY_FLAG_MULTI_TAP);
-    CHECK(handled_key_is_momentary_layer(key_runtime_slot_interaction(slot)));
-    CHECK(handled_key_layer(key_runtime_slot_interaction(slot)) == 3);
+    CHECK(handled_key_resolution_is_momentary_layer(key_runtime_slot_interaction(slot)));
+    CHECK(handled_key_resolution_layer(key_runtime_slot_interaction(slot)) == 3);
     CHECK(key_runtime_slot_hold_is_complete(slot));
     CHECK(slot->pending_multi_tap.count == 2);
     CHECK(!slot->pending_multi_tap.pending_hold);
@@ -1376,7 +1376,7 @@ static void test_take_interrupt_result_maps_slot_effect_request(void) {
         .owner.key_pos           = test_keypos(6, 2),
         .lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
         .interaction.valid       = true,
-        .interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
+        .interaction.view        = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
             .tap_action       = KC_NO,
             .tap_repeat_count = 0,
             .hold             = hold_behavior_none(),

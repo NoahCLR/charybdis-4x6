@@ -9,13 +9,15 @@ work. Hardware is treated as fixed; this review is only about software
 architecture, structure, and long-term extensibility.
 
 Implementation update later the same day: the first slice of Finding 1 and the
-first slice of Finding 2 have landed. Active slot storage now uses
+first slice of Finding 2 have landed, followed by the authored/runtime seam
+migration and the removal of the last public handled-key compatibility alias.
+Active slot storage now uses
 `key_runtime_slot_interaction_t` as the slot-owned cached interaction contract,
-and authored lookup now has an explicit `handled_key_resolution_t` name with
-`handled_key_view_t` kept only as a compatibility typedef while older call
-sites migrate. The active-release reducer now also executes a typed release
-contract derived from that interaction instead of reconstructing all release
-semantics directly from raw hold flags.
+and authored lookup now has an explicit `handled_key_resolution_t` surface with
+`handled_key_resolution_*` accessors and explicit slot conversion helpers. The
+active-release reducer now also executes a typed release contract derived from
+that interaction instead of reconstructing all release semantics directly from
+raw hold flags.
 
 This review is intentionally not a repeat of the earlier action-family,
 pd-mode write-controller, macro IR, and test-harness recommendations. Those
@@ -51,8 +53,8 @@ architectural properties that many firmware repos never reach:
 The next scaling risks are no longer "everything is tangled together". They are
 "one contract is carrying too many meanings" risks:
 
-- `handled_key_view_t` now acts as authored lookup result, slot-cached runtime
-  interaction, and feedback-policy input at the same time
+- the handled-key resolution/interaction boundary only recently split, and one
+  slot contract still carries more than one concern
 - release behavior is still resolved by a large feature matrix inside one
   reducer instead of by a narrower release contract
 - pd modes are represented as composable bitmasks even though the runtime
@@ -108,15 +110,15 @@ refactors realistic instead of aspirational.
 
 ## Findings
 
-### 1. `handled_key_view_t` still conflates three different concepts
+### 1. The handled-key resolution/interaction seam still carries too many meanings
 
-The handled-key contract is more normalized than it used to be, but one type is
+The handled-key contract is more normalized than it used to be, but one seam is
 still doing too much:
 
-- `handled_key_lookup_tap_count(...)` builds `handled_key_view_t` from authored
-  config in `handled_key.c`
-- `handled_key_view_t` also carries runtime policy flags and derived hold
-  semantics in `handled_key.h`
+- `handled_key_lookup_tap_count(...)` builds `handled_key_resolution_t` from
+  authored config in `handled_key.c`
+- `handled_key_resolution_t` still carries runtime-facing policy flags and
+  derived hold semantics in `handled_key.h`
 - `key_runtime_slot_press_interaction(...)` mutates that same type before
   storing it into slot state in `key_runtime_slot_press_reduce.c`
 - feedback and scan reducers later consume the stored value as if it were the
@@ -135,7 +137,8 @@ scan, release, feedback, and tests how to interpret it.
 Why this matters:
 
 - it raises the cost of adding new key behavior families
-- it makes the meaning of a `handled_key_view_t` value context-dependent
+- it still makes the meaning of a handled-key resolution/context value partly
+  phase-dependent
 - it encourages feature policy to spread through flags instead of through
   narrower contracts
 
@@ -156,13 +159,12 @@ Implementation update:
 - cached hold policy now lives with the slot interaction contract instead of
   being recomputed at every feedback/scan consumer
 - `key_runtime_slot_interaction_t` now carries an explicit `.resolution`
-  object, but the compatibility typedef and direct-field compatibility are
-  still present while callers migrate
+  object, and the public `handled_key_view_t` alias has now been removed
 - runtime/process/host seams now name authored lookup output as
   `handled_key_resolution_t` directly
-- the remaining gap is that compatibility helpers and several legacy
-  accessor names still use `handled_key_view_t`, so the old name still exists
-  even though it is no longer the primary authored/runtime seam
+- the remaining gap is that `key_runtime_slot_interaction_t` still exposes
+  mirrored direct fields beside `.resolution`, so the slot-owned contract is
+  clearer than before but not yet as narrow as it could be
 
 Example shape:
 

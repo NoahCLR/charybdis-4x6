@@ -29,8 +29,6 @@ typedef struct {
     uint16_t                         flags;
 } handled_key_resolution_t;
 
-typedef handled_key_resolution_t handled_key_view_t;
-
 typedef enum {
     HANDLED_KEY_FLAG_HANDLED         = (1u << 0),
     HANDLED_KEY_FLAG_MULTI_TAP       = (1u << 1),
@@ -139,19 +137,19 @@ static inline handled_key_interaction_policy_t handled_key_resolve_policy(handle
 
 handled_key_resolution_t         handled_key_lookup(uint16_t keycode);
 handled_key_resolution_t         handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count);
-bool                             handled_key_is_handled(handled_key_view_t key);
-bool                             handled_key_uses_implicit_hold(handled_key_view_t key);
-bool                             handled_key_uses_fallback_hold(handled_key_view_t key);
-bool                             handled_key_has_multi_tap(handled_key_view_t key);
-bool                             handled_key_is_momentary_layer(handled_key_view_t key);
-bool                             handled_key_is_layer_tap(handled_key_view_t key);
-hold_behavior_t                  handled_key_single_hold(handled_key_view_t key);
-hold_behavior_t                  handled_key_long_hold(handled_key_view_t key);
-key_runtime_slot_hold_strategy_t handled_key_hold_strategy(handled_key_view_t key);
-uint16_t                         handled_key_tap_action(handled_key_view_t key);
-uint8_t                          handled_key_tap_repeat_count(handled_key_view_t key);
-uint16_t                         handled_key_tap_hold_term(handled_key_view_t key);
-uint16_t                         handled_key_longer_hold_term(handled_key_view_t key);
-uint16_t                         handled_key_multi_tap_term(handled_key_view_t key);
-uint8_t                          handled_key_layer(handled_key_view_t key);
-pd_mode_mask_t                   handled_key_pd_mode(handled_key_view_t key);
+bool                             handled_key_resolution_is_handled(handled_key_resolution_t resolution);
+bool                             handled_key_resolution_uses_implicit_hold(handled_key_resolution_t resolution);
+bool                             handled_key_resolution_uses_fallback_hold(handled_key_resolution_t resolution);
+bool                             handled_key_resolution_has_multi_tap(handled_key_resolution_t resolution);
+bool                             handled_key_resolution_is_momentary_layer(handled_key_resolution_t resolution);
+bool                             handled_key_resolution_is_layer_tap(handled_key_resolution_t resolution);
+hold_behavior_t                  handled_key_resolution_hold(handled_key_resolution_t resolution);
+hold_behavior_t                  handled_key_resolution_long_hold(handled_key_resolution_t resolution);
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t resolution);
+uint16_t                         handled_key_resolution_tap_action(handled_key_resolution_t resolution);
+uint8_t                          handled_key_resolution_tap_repeat_count(handled_key_resolution_t resolution);
+uint16_t                         handled_key_resolution_tap_hold_term(handled_key_resolution_t resolution);
+uint16_t                         handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution);
+uint16_t                         handled_key_resolution_multi_tap_term(handled_key_resolution_t resolution);
+uint8_t                          handled_key_resolution_layer(handled_key_resolution_t resolution);
+pd_mode_mask_t                   handled_key_resolution_pd_mode(handled_key_resolution_t resolution);

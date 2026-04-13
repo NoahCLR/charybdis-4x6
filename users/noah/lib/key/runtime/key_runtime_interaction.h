@@ -76,11 +76,7 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_r
     };
 }
 
-static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_handled_key(handled_key_view_t key) {
-    return key_runtime_slot_interaction_from_resolution(key);
-}
-
-static inline handled_key_view_t key_runtime_slot_interaction_to_handled_key_view(key_runtime_slot_interaction_t interaction) {
+static inline handled_key_resolution_t key_runtime_slot_interaction_to_resolution(key_runtime_slot_interaction_t interaction) {
     return interaction.resolution;
 }
 

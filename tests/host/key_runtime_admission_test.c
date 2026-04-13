@@ -82,27 +82,27 @@ handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t 
     return (handled_key_resolution_t){0};
 }
 
-bool handled_key_has_multi_tap(handled_key_resolution_t key) {
+bool handled_key_resolution_has_multi_tap(handled_key_resolution_t key) {
     (void)key;
     return false;
 }
 
-bool handled_key_is_momentary_layer(handled_key_resolution_t key) {
+bool handled_key_resolution_is_momentary_layer(handled_key_resolution_t key) {
     (void)key;
     return false;
 }
 
-bool handled_key_is_layer_tap(handled_key_resolution_t key) {
+bool handled_key_resolution_is_layer_tap(handled_key_resolution_t key) {
     (void)key;
     return false;
 }
 
-uint8_t handled_key_layer(handled_key_resolution_t key) {
+uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
     (void)key;
     return UINT8_MAX;
 }
 
-pd_mode_mask_t handled_key_pd_mode(handled_key_resolution_t key) {
+pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
     (void)key;
     return 0;
 }

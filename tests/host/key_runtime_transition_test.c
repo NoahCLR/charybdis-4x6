@@ -110,7 +110,7 @@ static void test_set_default_slot_key_pos(keypos_t key_pos) {
 }
 
 static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
-    return key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
+    return key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
         .tap_action            = tap_action,
         .tap_repeat_count      = tap_action == KC_NO ? 0 : 1,
         .hold                  = hold,
@@ -152,7 +152,7 @@ static void active_key_reset(void) {
 }
 
 static void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
-    key_runtime_slot_interaction_t interaction = key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
+    key_runtime_slot_interaction_t interaction = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
         .tap_action       = tap_action,
         .tap_repeat_count = tap_action == KC_NO ? 0 : 1,
         .hold             = hold,
@@ -1545,7 +1545,7 @@ static void test_interrupt_plan_overflow_sets_flag_and_logs_once(void) {
             .owner.key_pos           = key_pos,
             .lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
             .interaction.valid       = true,
-            .interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
+            .interaction.view        = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
                 .tap_action    = KC_NO,
                 .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
                 .layer         = UINT8_MAX,

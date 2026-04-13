@@ -98,7 +98,7 @@ key_runtime_slot_interaction_t key_runtime_slot_cached_interaction(const active_
 }
 
 handled_key_resolution_t key_runtime_slot_interaction(const active_key_state_t *slot) {
-    return key_runtime_slot_interaction_to_handled_key_view(key_runtime_slot_cached_interaction(slot));
+    return key_runtime_slot_interaction_to_resolution(key_runtime_slot_cached_interaction(slot));
 }
 
 uint8_t key_runtime_slot_preview_layer_hint(const active_key_state_t *slot) {

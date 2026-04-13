@@ -24,7 +24,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_sta
     }
 
     result.handled = true;
-    if (handled_key_is_momentary_layer(resolution)) {
+    if (handled_key_resolution_is_momentary_layer(resolution)) {
         key_runtime_slot_result_push_layer_release(&result, key_pos);
     }
     key_runtime_slot_result_push_builder_if_present(&result, key_pos,

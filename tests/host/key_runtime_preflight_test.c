@@ -227,31 +227,31 @@ handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t 
     return handled_key_lookup(keycode);
 }
 
-bool handled_key_is_handled(handled_key_resolution_t key) {
+bool handled_key_resolution_is_handled(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_HANDLED) != 0;
 }
 
-bool handled_key_has_multi_tap(handled_key_resolution_t key) {
+bool handled_key_resolution_has_multi_tap(handled_key_resolution_t key) {
     (void)key;
     return false;
 }
 
-bool handled_key_is_momentary_layer(handled_key_resolution_t key) {
+bool handled_key_resolution_is_momentary_layer(handled_key_resolution_t key) {
     (void)key;
     return false;
 }
 
-bool handled_key_is_layer_tap(handled_key_resolution_t key) {
+bool handled_key_resolution_is_layer_tap(handled_key_resolution_t key) {
     (void)key;
     return false;
 }
 
-uint8_t handled_key_layer(handled_key_resolution_t key) {
+uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
     (void)key;
     return UINT8_MAX;
 }
 
-pd_mode_mask_t handled_key_pd_mode(handled_key_resolution_t key) {
+pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
     (void)key;
     return 0;
 }
@@ -318,7 +318,7 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
     active_key.owner.key_pos           = stored;
     active_key.lifecycle.phase         = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
     active_key.interaction.valid       = true;
-    active_key.interaction.view        = key_runtime_slot_interaction_from_handled_key((handled_key_resolution_t){
+    active_key.interaction.view        = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
         .tap_action    = KC_NO,
         .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
         .layer         = UINT8_MAX,

@@ -213,66 +213,66 @@ handled_key_resolution_t handled_key_lookup(uint16_t keycode) {
     return handled_key_lookup_tap_count(keycode, 1);
 }
 
-bool handled_key_is_handled(handled_key_view_t key) {
-    return (key.flags & HANDLED_KEY_FLAG_HANDLED) != 0;
+bool handled_key_resolution_is_handled(handled_key_resolution_t resolution) {
+    return (resolution.flags & HANDLED_KEY_FLAG_HANDLED) != 0;
 }
 
-bool handled_key_uses_implicit_hold(handled_key_view_t key) {
-    return (key.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) != 0;
+bool handled_key_resolution_uses_implicit_hold(handled_key_resolution_t resolution) {
+    return (resolution.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) != 0;
 }
 
-bool handled_key_uses_fallback_hold(handled_key_view_t key) {
-    return (key.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0;
+bool handled_key_resolution_uses_fallback_hold(handled_key_resolution_t resolution) {
+    return (resolution.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0;
 }
 
-bool handled_key_has_multi_tap(handled_key_view_t key) {
-    return (key.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0;
+bool handled_key_resolution_has_multi_tap(handled_key_resolution_t resolution) {
+    return (resolution.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0;
 }
 
-bool handled_key_is_momentary_layer(handled_key_view_t key) {
-    return (key.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
+bool handled_key_resolution_is_momentary_layer(handled_key_resolution_t resolution) {
+    return (resolution.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
 }
 
-bool handled_key_is_layer_tap(handled_key_view_t key) {
-    return (key.flags & HANDLED_KEY_FLAG_LAYER_TAP) != 0;
+bool handled_key_resolution_is_layer_tap(handled_key_resolution_t resolution) {
+    return (resolution.flags & HANDLED_KEY_FLAG_LAYER_TAP) != 0;
 }
 
-hold_behavior_t handled_key_single_hold(handled_key_view_t key) {
-    return key.hold;
+hold_behavior_t handled_key_resolution_hold(handled_key_resolution_t resolution) {
+    return resolution.hold;
 }
 
-hold_behavior_t handled_key_long_hold(handled_key_view_t key) {
-    return key.long_hold;
+hold_behavior_t handled_key_resolution_long_hold(handled_key_resolution_t resolution) {
+    return resolution.long_hold;
 }
 
-key_runtime_slot_hold_strategy_t handled_key_hold_strategy(handled_key_view_t key) {
-    return key.hold_strategy;
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t resolution) {
+    return resolution.hold_strategy;
 }
 
-uint16_t handled_key_tap_action(handled_key_view_t key) {
-    return key.tap_action;
+uint16_t handled_key_resolution_tap_action(handled_key_resolution_t resolution) {
+    return resolution.tap_action;
 }
 
-uint8_t handled_key_tap_repeat_count(handled_key_view_t key) {
-    return key.tap_repeat_count;
+uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t resolution) {
+    return resolution.tap_repeat_count;
 }
 
-uint16_t handled_key_tap_hold_term(handled_key_view_t key) {
-    return key.tap_hold_term;
+uint16_t handled_key_resolution_tap_hold_term(handled_key_resolution_t resolution) {
+    return resolution.tap_hold_term;
 }
 
-uint16_t handled_key_longer_hold_term(handled_key_view_t key) {
-    return key.longer_hold_term;
+uint16_t handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution) {
+    return resolution.longer_hold_term;
 }
 
-uint16_t handled_key_multi_tap_term(handled_key_view_t key) {
-    return key.multi_tap_term;
+uint16_t handled_key_resolution_multi_tap_term(handled_key_resolution_t resolution) {
+    return resolution.multi_tap_term;
 }
 
-uint8_t handled_key_layer(handled_key_view_t key) {
-    return key.layer;
+uint8_t handled_key_resolution_layer(handled_key_resolution_t resolution) {
+    return resolution.layer;
 }
 
-pd_mode_mask_t handled_key_pd_mode(handled_key_view_t key) {
-    return key.pd_mode;
+pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t resolution) {
+    return resolution.pd_mode;
 }

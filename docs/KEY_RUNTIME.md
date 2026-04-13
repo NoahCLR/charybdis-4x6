@@ -39,7 +39,7 @@ These files are the core map of the runtime:
 
 | File | Responsibility |
 | --- | --- |
-| [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h) and [`handled_key.c`](../users/noah/lib/key/interaction/handled_key.c) | Resolve a keycode into a fully interpreted `handled_key_view_t` with tap, hold, long-hold, timing, layer, pd-mode, and flags |
+| [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h) and [`handled_key.c`](../users/noah/lib/key/interaction/handled_key.c) | Resolve a keycode into a fully interpreted `handled_key_resolution_t` with tap, hold, long-hold, timing, layer, pd-mode, and flags |
 | [`runtime_shared_state.h`](../users/noah/lib/state/runtime/runtime_shared_state.h) | Own the central slot storage and pd-mode runtime flags |
 | [`key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c) | `process_record_user` entry flow and top-level branching |
 | [`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c) | Physical-event preflight, modifier suppression, active-slot interrupts, and pending-multi-tap flushing |
@@ -235,9 +235,10 @@ These are the easiest runtime rules to break by accident:
 
 - Release is routed by physical key position, not by the current layer's live
   keycode mapping.
-- `handled_key_view_t` is the resolved handled-key contract. If downstream code
-  needs extra semantics later, add them there first instead of re-deriving
-  policy from raw authored data.
+- `handled_key_resolution_t` is the authored handled-key resolution contract,
+  while `key_runtime_slot_interaction_t` is the slot-owned cached interaction
+  contract. Keep that boundary explicit instead of re-deriving policy from raw
+  authored data or from mutable slot state.
 - Feedback and debug readers should prefer cached slot semantic metadata over
   re-running handled-key resolution against mutable slot state.
 - New emitters should prefer the explicit helpers in
