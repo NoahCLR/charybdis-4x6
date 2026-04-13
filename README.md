@@ -378,8 +378,8 @@ independently toggled in the keymap
 - **Key-behavior feedback** (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`): the
   key-behavior engine projects its state into the RGB overlay on both halves:
   multi-tap pending, pending momentary-layer previews, hold pending, trigger
-  pulses, and active held non-layer actions. Held layer-switch actions pulse
-  once when they activate, then let the layer color take over
+  pulses, and active held non-layer actions. Momentary layer holds use preview
+  and active layer color instead of a trigger pulse or persistent hold overlay
 
 Both overlays are purely additive. With both disabled, `rgb_config.c` still
 provides full layer and pointer-mode color feedback. With both enabled, the

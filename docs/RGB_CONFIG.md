@@ -237,9 +237,9 @@ The helper decides the RGB behavior shape:
   that tier remains active
 
 Held layer-switch actions are intentionally a special case: they get the short
-trigger pulse when the threshold is crossed, but they do not keep a persistent
-hold overlay after that. Once the layer is on, the layer color itself is the
-main feedback.
+preview color before activation and the real layer color after activation, but
+they do not use the feedback overlay colors or trigger pulse. Once the layer
+is on, the layer color itself is the main feedback.
 
 The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h). Its flash cadence is controlled by

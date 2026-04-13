@@ -50,6 +50,10 @@ Implementation status after follow-ups in this review folder:
   direct press-consumption queries, and `action_lifecycle.c` now routes
   tap/press/release through a kind-owned ops table instead of one large branch
   tree
+- clarified: owned momentary-layer RGB feedback now treats
+  `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))` as layer-owned visual state rather
+  than generic hold feedback, so the contract is preview layer color before
+  activation and real layer color after activation with no trigger pulse
 - still open: handled-key fallback and implicit-hold policy still inspect
   action kinds directly instead of consuming narrower action-owned policy
   helpers

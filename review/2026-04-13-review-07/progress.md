@@ -218,5 +218,75 @@ Next steps:
 
 - decide whether handled-key fallback and implicit-hold logic should consume
   narrower action-owned policy helpers instead of direct kind checks
+
+## 2026-04-14
+
+### Momentary-layer RGB feedback contract pass
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the clean worktree.
+- Narrowed the remaining RGB feedback inconsistency for owned momentary-layer
+  actions:
+  - the normal hold threshold-window overlay bug had already been removed in
+    the previous pass
+  - pending multi-tap hold and long-hold promotion still opted momentary-layer
+    actions into trigger pulses
+- Updated
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c` so
+  pending multi-tap hold and long-hold promotion no longer request a feedback
+  pulse for `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))`.
+- Expanded `tests/host/key_runtime_transition_test.c` with explicit transition
+  coverage for:
+  - pending multi-tap hold -> momentary-layer activation without feedback pulse
+  - pending multi-tap long-hold -> momentary-layer activation without feedback
+    pulse
+- Updated the main docs contract in:
+  - `README.md`
+  - `docs/RGB_CONFIG.md`
+  - `docs/INTERACTION_MODEL.md`
+
+Contracts touched in this pass:
+
+- owned momentary-layer actions now use only preview-layer color before
+  activation and real layer color after activation
+- the no-pulse rule now applies consistently across:
+  - ordinary hold activation
+  - pending multi-tap hold activation
+  - pending multi-tap long-hold promotion
+- non-layer hold and long-hold actions keep the existing pulse / active-overlay
+  semantics
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted transition, feedback, and RGB render suites passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes in this pass touched:
+  - `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c`
+  - `tests/host/key_runtime_transition_test.c`
+  - `README.md`
+  - `docs/RGB_CONFIG.md`
+  - `docs/INTERACTION_MODEL.md`
+  - this review folder
+
+Next steps:
+
+- if desired, make the preview-layer helper surface more explicit so RGB does
+  not need to infer momentary-layer special cases from hold contracts
+- otherwise return to the higher-priority pd-mode contract work
 - if that coupling stays acceptable, move on to the next architecture item:
   pd-mode explicit identity / precedence in the sync and policy contract

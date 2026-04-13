@@ -211,8 +211,8 @@ Shared semantics:
 - threshold-fired hold or longer-hold actions can pulse once when they fire
 - held non-layer `PRESS_AND_HOLD_UNTIL_RELEASE(...)` actions can stay visibly
   active while the action remains registered
-- held layer-switch actions pulse when they activate, then hand off to the
-  layer color itself
+- held layer-switch actions use preview and active layer color instead of a
+  pulse or hold overlay
 
 For the full RGB authoring model, render order, and configuration surface, see
 [RGB_CONFIG.md](./RGB_CONFIG.md).

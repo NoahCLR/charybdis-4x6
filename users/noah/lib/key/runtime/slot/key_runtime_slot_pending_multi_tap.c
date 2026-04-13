@@ -290,7 +290,9 @@ static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pen
     if (handled_key_hold_contract_fires_at_threshold(interaction.policy.long_hold) && elapsed >= interaction.binding.longer_hold_term) {
         resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD;
         resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, interaction.binding.long_hold.action);
-        resolution.effect_builder              = key_runtime_slot_policy_promote_to_long_hold(slot, interaction.binding.long_hold, interaction.policy.long_hold, true);
+        // Momentary-layer actions use preview/real layer color as feedback, so
+        // pending multi-tap promotion should not opt them into a pulse here.
+        resolution.effect_builder = key_runtime_slot_policy_promote_to_long_hold(slot, interaction.binding.long_hold, interaction.policy.long_hold, false);
         return resolution;
     }
 
@@ -300,7 +302,7 @@ static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pen
 
     resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD;
     resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, interaction.binding.hold.action);
-    resolution.effect_builder              = key_runtime_slot_policy_fire_hold_at_threshold(slot, interaction.binding.hold, interaction.policy.hold, !interaction.binding.long_hold.present, true);
+    resolution.effect_builder              = key_runtime_slot_policy_fire_hold_at_threshold(slot, interaction.binding.hold, interaction.policy.hold, !interaction.binding.long_hold.present, false);
     return resolution;
 }
 
