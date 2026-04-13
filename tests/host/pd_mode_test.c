@@ -379,6 +379,73 @@ static void test_activate_switches_to_single_unlocked_mode(void) {
     CHECK(reset_arrow_count == 1);
 }
 
+static void test_apply_command_reports_before_after_and_sync_intent_for_key_press(void) {
+    pd_mode_apply_result_t result;
+
+    test_reset_stubs();
+
+    pd_mode_lock(PD_MODE_ARROW);
+    reset_arrow_count = 0;
+    split_sync_count  = 0;
+
+    result = pd_mode_apply_command((pd_mode_command_t){
+        .kind    = PD_MODE_COMMAND_KEY_PRESS,
+        .keycode = BRIGHTNESS_MODE,
+    });
+
+    CHECK(result.handled);
+    CHECK(result.local_state_changed);
+    CHECK(result.display_state_changed);
+    CHECK(result.split_sync_required);
+    CHECK(result.before.local.active_flags == PD_MODE_ARROW);
+    CHECK(result.before.local.locked_flags == PD_MODE_ARROW);
+    CHECK(result.after.local.active_flags == PD_MODE_BRIGHTNESS);
+    CHECK(result.after.local.locked_flags == 0);
+    CHECK(split_sync_count == 0);
+    CHECK(reset_arrow_count == 1);
+}
+
+static void test_apply_command_reports_display_only_remote_snapshot_change(void) {
+    pd_mode_apply_result_t result;
+
+    test_reset_stubs();
+    fake_is_master = false;
+
+    result = pd_mode_apply_command((pd_mode_command_t){
+        .kind         = PD_MODE_COMMAND_REMOTE_SNAPSHOT,
+        .active_flags = PD_MODE_VOLUME,
+        .locked_flags = PD_MODE_ARROW,
+    });
+
+    CHECK(result.handled);
+    CHECK(!result.local_state_changed);
+    CHECK(result.display_state_changed);
+    CHECK(!result.split_sync_required);
+    CHECK(result.before.local.active_flags == 0);
+    CHECK(result.after.local.active_flags == 0);
+    CHECK(result.after.display.active_flags == PD_MODE_ARROW);
+    CHECK(result.after.display.locked_flags == PD_MODE_ARROW);
+}
+
+static void test_apply_command_release_reports_handled_without_sync_when_locked(void) {
+    pd_mode_apply_result_t result;
+
+    test_reset_stubs();
+
+    pd_mode_lock(PD_MODE_VOLUME);
+
+    result = pd_mode_apply_command((pd_mode_command_t){
+        .kind    = PD_MODE_COMMAND_KEY_RELEASE,
+        .keycode = VOLUME_MODE,
+    });
+
+    CHECK(result.handled);
+    CHECK(!result.local_state_changed);
+    CHECK(!result.split_sync_required);
+    CHECK(result.after.local.active_flags == PD_MODE_VOLUME);
+    CHECK(result.after.local.locked_flags == PD_MODE_VOLUME);
+}
+
 static void test_handle_keycode_press_and_release_updates_state_and_syncs(void) {
     test_reset_stubs();
 
@@ -507,6 +574,9 @@ int main(void) {
     test_apply_remote_snapshot_keeps_only_one_effective_mode();
     test_set_lock_state_switches_to_single_locked_mode();
     test_activate_switches_to_single_unlocked_mode();
+    test_apply_command_reports_before_after_and_sync_intent_for_key_press();
+    test_apply_command_reports_display_only_remote_snapshot_change();
+    test_apply_command_release_reports_handled_without_sync_when_locked();
     test_handle_keycode_press_and_release_updates_state_and_syncs();
     test_locked_mode_release_keeps_mode_active();
     test_apply_active_dpi_respects_pointer_state();

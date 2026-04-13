@@ -24,6 +24,124 @@ static pd_mode_mask_t pd_mode_first_snapshot_match(pd_mode_mask_t flags) {
     return 0;
 }
 
+static bool pd_mode_snapshot_view_changed(pd_mode_snapshot_view_t before, pd_mode_snapshot_view_t after) {
+    return before.active_flags != after.active_flags || before.locked_flags != after.locked_flags;
+}
+
+static bool pd_mode_apply_unlock_other_locks(pd_mode_mask_t keep_mode) {
+    bool changed = false;
+
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        pd_mode_mask_t mode = pd_modes[i].mode_flag;
+        if (mode != keep_mode && pd_mode_local_locked(mode)) {
+            pd_mode_transition_unlock(mode);
+            changed = true;
+        }
+    }
+
+    return changed;
+}
+
+static bool pd_mode_apply_deactivate_other_unlocked(pd_mode_mask_t keep_mode) {
+    bool changed = false;
+
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        pd_mode_mask_t mode = pd_modes[i].mode_flag;
+        if (mode != keep_mode && pd_mode_local_active(mode) && !pd_mode_local_locked(mode)) {
+            pd_mode_transition_deactivate(mode);
+            changed = true;
+        }
+    }
+
+    return changed;
+}
+
+static bool pd_mode_apply_activate_mode(pd_mode_mask_t mode) {
+    bool changed = false;
+
+    if (!mode) {
+        return false;
+    }
+
+    changed |= pd_mode_apply_unlock_other_locks(mode);
+    changed |= pd_mode_apply_deactivate_other_unlocked(mode);
+
+    if (!pd_mode_local_active(mode)) {
+        pd_mode_transition_activate(mode);
+        changed = true;
+    }
+
+    return changed;
+}
+
+static bool pd_mode_apply_deactivate_mode(pd_mode_mask_t mode) {
+    if (!mode || !pd_mode_local_active(mode)) {
+        return false;
+    }
+
+    pd_mode_transition_deactivate(mode);
+    return true;
+}
+
+static bool pd_mode_apply_lock_mode(pd_mode_mask_t mode) {
+    bool changed = false;
+
+    if (!mode) {
+        return false;
+    }
+
+    changed |= pd_mode_apply_unlock_other_locks(mode);
+    changed |= pd_mode_apply_deactivate_other_unlocked(mode);
+
+    if (!pd_mode_local_locked(mode) || !pd_mode_local_active(mode)) {
+        pd_mode_transition_lock(mode);
+        changed = true;
+    }
+
+    return changed;
+}
+
+static bool pd_mode_apply_unlock_mode(pd_mode_mask_t mode) {
+    if (!mode || !pd_mode_local_locked(mode)) {
+        return false;
+    }
+
+    pd_mode_transition_unlock(mode);
+    return true;
+}
+
+static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
+    // Remote sync only mirrors mode state for the non-master half's policy/UI.
+    // Do not replay local side effects such as dragscroll or auto-mouse
+    // ownership changes from this path. Keep only one effective mode so the
+    // mirrored UI matches the local exclusivity invariant.
+    pd_mode_mask_t locked_mode = pd_mode_first_snapshot_match(locked_flags);
+    pd_mode_mask_t active_mode = locked_mode ? locked_mode : pd_mode_first_snapshot_match(active_flags);
+    bool           changed     = PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS != active_mode || PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS != locked_mode;
+
+    PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS = locked_mode;
+    PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS = active_mode;
+    noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT, active_mode, locked_mode);
+    return changed;
+}
+
+static pd_mode_apply_result_t pd_mode_apply_result_begin(void) {
+    return (pd_mode_apply_result_t){
+        .before = pd_mode_snapshot(),
+    };
+}
+
+static void pd_mode_apply_result_finish(pd_mode_apply_result_t *result, bool split_sync_required) {
+    if (!result) {
+        return;
+    }
+
+    result->after = pd_mode_snapshot();
+    result->local_state_changed = pd_mode_snapshot_view_changed(result->before.local, result->after.local);
+    result->display_state_changed = pd_mode_snapshot_view_changed(result->before.display, result->after.display);
+    result->split_sync_required = split_sync_required && result->local_state_changed;
+}
+
 void pd_mode_set(pd_mode_mask_t mode) {
     PD_MODE_LOCAL_ACTIVE_FLAGS |= mode;
 }
@@ -88,122 +206,132 @@ bool pd_any_display_mode_locked(void) {
     return pd_mode_snapshot().display.locked_flags != 0;
 }
 
-void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
-    // Remote sync only mirrors mode state for the non-master half's policy/UI.
-    // Do not replay local side effects such as dragscroll or auto-mouse
-    // ownership changes from this path. Keep only one effective mode so the
-    // mirrored UI matches the local exclusivity invariant.
-    pd_mode_mask_t locked_mode = pd_mode_first_snapshot_match(locked_flags);
-    pd_mode_mask_t active_mode = locked_mode ? locked_mode : pd_mode_first_snapshot_match(active_flags);
+pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
+    pd_mode_apply_result_t result              = pd_mode_apply_result_begin();
+    bool                   split_sync_required = false;
+    pd_mode_mask_t         mode               = command.mode;
 
-    PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS = locked_mode;
-    PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS = active_mode;
-    noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT, active_mode, locked_mode);
+    switch (command.kind) {
+        case PD_MODE_COMMAND_ACTIVATE:
+            result.handled      = mode != 0;
+            split_sync_required = pd_mode_apply_activate_mode(mode);
+            break;
+        case PD_MODE_COMMAND_DEACTIVATE:
+            result.handled      = mode != 0;
+            split_sync_required = pd_mode_apply_deactivate_mode(mode);
+            break;
+        case PD_MODE_COMMAND_LOCK:
+            result.handled      = mode != 0;
+            split_sync_required = pd_mode_apply_lock_mode(mode);
+            break;
+        case PD_MODE_COMMAND_UNLOCK:
+            result.handled      = mode != 0;
+            split_sync_required = pd_mode_apply_unlock_mode(mode);
+            break;
+        case PD_MODE_COMMAND_KEY_PRESS:
+            mode           = pd_mode_for_keycode(command.keycode);
+            result.handled = mode != 0;
+            if (mode != 0) {
+                split_sync_required = pd_mode_apply_activate_mode(mode);
+            }
+            break;
+        case PD_MODE_COMMAND_KEY_RELEASE:
+            mode           = pd_mode_for_keycode(command.keycode);
+            result.handled = mode != 0;
+            if (mode != 0 && pd_mode_local_active(mode) && !pd_mode_local_locked(mode)) {
+                split_sync_required = pd_mode_apply_deactivate_mode(mode);
+            }
+            break;
+        case PD_MODE_COMMAND_REMOTE_SNAPSHOT:
+            result.handled = true;
+            (void)pd_mode_apply_remote_display_snapshot(command.active_flags, command.locked_flags);
+            break;
+        case PD_MODE_COMMAND_NONE:
+        default:
+            break;
+    }
+
+    pd_mode_apply_result_finish(&result, split_sync_required);
+    return result;
+}
+
+void pd_mode_activate(pd_mode_mask_t mode) {
+    (void)pd_mode_apply_command((pd_mode_command_t){
+        .kind = PD_MODE_COMMAND_ACTIVATE,
+        .mode = mode,
+    });
+}
+
+void pd_mode_deactivate(pd_mode_mask_t mode) {
+    (void)pd_mode_apply_command((pd_mode_command_t){
+        .kind = PD_MODE_COMMAND_DEACTIVATE,
+        .mode = mode,
+    });
+}
+
+void pd_mode_lock(pd_mode_mask_t mode) {
+    (void)pd_mode_apply_command((pd_mode_command_t){
+        .kind = PD_MODE_COMMAND_LOCK,
+        .mode = mode,
+    });
+}
+
+void pd_mode_unlock(pd_mode_mask_t mode) {
+    (void)pd_mode_apply_command((pd_mode_command_t){
+        .kind = PD_MODE_COMMAND_UNLOCK,
+        .mode = mode,
+    });
+}
+
+void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
+    (void)pd_mode_apply_command((pd_mode_command_t){
+        .kind         = PD_MODE_COMMAND_REMOTE_SNAPSHOT,
+        .active_flags = active_flags,
+        .locked_flags = locked_flags,
+    });
 }
 
 bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
-    if (locked) {
-        bool changed = false;
+    pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
+        .kind = locked ? PD_MODE_COMMAND_LOCK : PD_MODE_COMMAND_UNLOCK,
+        .mode = mode,
+    });
 
-        for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-            pd_mode_mask_t other_mode = pd_modes[i].mode_flag;
-            if (other_mode != mode && pd_mode_local_locked(other_mode)) {
-                pd_mode_unlock(other_mode);
-                changed = true;
-            }
-        }
-
-        changed |= pd_mode_deactivate_other_unlocked(mode);
-
-        if (!pd_mode_local_locked(mode) || !pd_mode_local_active(mode)) {
-            pd_mode_lock(mode);
-            changed = true;
-        }
-
-        return changed;
+    if (result.split_sync_required) {
+        split_runtime_sync();
     }
 
-    if (!pd_mode_local_locked(mode)) return false;
-
-    pd_mode_unlock(mode);
-
-    return true;
+    return result.local_state_changed;
 }
 
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     return pd_mode_set_lock_state(mode, !pd_mode_local_locked(mode));
 }
 
-bool pd_mode_unlock_other_locks(pd_mode_mask_t keep_mode) {
-    bool changed = false;
-
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        pd_mode_mask_t mode = pd_modes[i].mode_flag;
-        if (mode != keep_mode) {
-            changed |= pd_mode_set_lock_state(mode, false);
-        }
-    }
-
-    return changed;
-}
-
-bool pd_mode_deactivate_other_unlocked(pd_mode_mask_t keep_mode) {
-    bool changed = false;
-
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        pd_mode_mask_t mode = pd_modes[i].mode_flag;
-        if (mode != keep_mode && pd_mode_local_active(mode) && !pd_mode_local_locked(mode)) {
-            pd_mode_deactivate(mode);
-            changed = true;
-        }
-    }
-
-    return changed;
-}
-
-void pd_mode_update(pd_mode_mask_t mode, bool active) {
-    if (active) {
-        pd_mode_activate(mode);
-    } else if (!pd_mode_local_locked(mode)) {
-        pd_mode_deactivate(mode);
-    }
-}
-
 bool pd_mode_handle_keycode_press(uint16_t keycode) {
-    pd_mode_mask_t mode = pd_mode_for_keycode(keycode);
-    if (!mode) {
-        return false;
-    }
+    pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
+        .kind    = PD_MODE_COMMAND_KEY_PRESS,
+        .keycode = keycode,
+    });
 
-    bool state_changed = false;
-
-    state_changed |= pd_mode_unlock_other_locks(mode);
-    state_changed |= pd_mode_deactivate_other_unlocked(mode);
-
-    if (!pd_mode_local_active(mode)) {
-        pd_mode_activate(mode);
-        state_changed = true;
-    }
-
-    if (state_changed) {
+    if (result.split_sync_required) {
         split_runtime_sync();
     }
 
-    return true;
+    return result.handled;
 }
 
 bool pd_mode_handle_keycode_release(uint16_t keycode) {
-    pd_mode_mask_t mode = pd_mode_for_keycode(keycode);
-    if (!mode) {
-        return false;
-    }
+    pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
+        .kind    = PD_MODE_COMMAND_KEY_RELEASE,
+        .keycode = keycode,
+    });
 
-    if (pd_mode_local_active(mode) && !pd_mode_local_locked(mode)) {
-        pd_mode_deactivate(mode);
+    if (result.split_sync_required) {
         split_runtime_sync();
     }
 
-    return true;
+    return result.handled;
 }
 
 #undef PD_MODE_LOCAL_ACTIVE_FLAGS

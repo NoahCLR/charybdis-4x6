@@ -18,7 +18,6 @@
 #include "../pointing/defs/pd_modes.h"
 #include "../pointing/policy/pointer_layer_policy.h"
 #include "../state/ownership/layer_ownership.h"
-#include "../state/runtime/split_runtime_sync.h"
 
 static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
 #ifdef CONSOLE_ENABLE
@@ -36,8 +35,8 @@ static bool noah_action_handle_one_shot_press(noah_action_desc_t desc) {
 
     if (noah_action_desc_is_pd_mode_lock(desc)) {
         const pd_mode_def_t *def = pd_mode_lock_action_lookup(desc.action);
-        if (def && pd_mode_toggle_lock_state(def->mode_flag)) {
-            split_runtime_sync();
+        if (def) {
+            pd_mode_toggle_lock_state(def->mode_flag);
         }
         return true;
     }

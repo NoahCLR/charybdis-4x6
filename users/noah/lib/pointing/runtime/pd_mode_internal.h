@@ -15,11 +15,16 @@ void pd_mode_clear(pd_mode_mask_t mode);
 void pd_mode_set_locked(pd_mode_mask_t mode);
 void pd_mode_clear_locked(pd_mode_mask_t mode);
 
+// Leaf local transitions: mutate one mode and run its lifecycle side effects
+// without performing any cross-mode orchestration or split-runtime sync.
+void pd_mode_transition_activate(pd_mode_mask_t mode);
+void pd_mode_transition_deactivate(pd_mode_mask_t mode);
+void pd_mode_transition_lock(pd_mode_mask_t mode);
+void pd_mode_transition_unlock(pd_mode_mask_t mode);
+
+// Internal convenience entrypoints that route through the typed pd-mode write
+// controller. These preserve the historical internal API used by host tests.
 void pd_mode_activate(pd_mode_mask_t mode);
 void pd_mode_deactivate(pd_mode_mask_t mode);
 void pd_mode_lock(pd_mode_mask_t mode);
 void pd_mode_unlock(pd_mode_mask_t mode);
-
-bool pd_mode_unlock_other_locks(pd_mode_mask_t keep_mode);
-bool pd_mode_deactivate_other_unlocked(pd_mode_mask_t keep_mode);
-void pd_mode_update(pd_mode_mask_t mode, bool active);

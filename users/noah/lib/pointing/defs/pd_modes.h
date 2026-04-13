@@ -43,8 +43,37 @@ typedef struct {
 
 _Static_assert(PD_MODE_KEYCODE_COUNT == PD_MODE_COUNT, "pd-mode keycode count in custom_keycodes enum doesn't match PD_MODE_COUNT — keep the pd-mode keycode block dense and update both together");
 
+typedef enum {
+    PD_MODE_COMMAND_NONE = 0,
+    PD_MODE_COMMAND_ACTIVATE,
+    PD_MODE_COMMAND_DEACTIVATE,
+    PD_MODE_COMMAND_LOCK,
+    PD_MODE_COMMAND_UNLOCK,
+    PD_MODE_COMMAND_KEY_PRESS,
+    PD_MODE_COMMAND_KEY_RELEASE,
+    PD_MODE_COMMAND_REMOTE_SNAPSHOT,
+} pd_mode_command_kind_t;
+
+typedef struct {
+    pd_mode_command_kind_t kind;
+    uint16_t               keycode;
+    pd_mode_mask_t         mode;
+    pd_mode_mask_t         active_flags;
+    pd_mode_mask_t         locked_flags;
+} pd_mode_command_t;
+
+typedef struct {
+    pd_mode_snapshot_t before;
+    pd_mode_snapshot_t after;
+    bool               handled;
+    bool               local_state_changed;
+    bool               display_state_changed;
+    bool               split_sync_required;
+} pd_mode_apply_result_t;
+
 extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];
 
+pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command);
 void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags);
 
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode);

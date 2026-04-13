@@ -56,6 +56,8 @@ static const pd_mode_def_t test_pd_mode_def = {
     .lock_action = ARROW_MODE_LOCK,
 };
 
+void split_runtime_sync(void);
+
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
     exit(1);
@@ -124,6 +126,9 @@ const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     CHECK(mode == PD_MODE_ARROW);
     pd_toggle_calls++;
+    if (pd_toggle_result) {
+        split_runtime_sync();
+    }
     return pd_toggle_result;
 }
 

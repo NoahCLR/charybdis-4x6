@@ -8,6 +8,19 @@ This pass reviews the current live userspace after the earlier contract
 cleanup work. Hardware is treated as fixed; this review is only about software
 architecture, structure, and long-term extensibility.
 
+Implementation status update:
+
+- Recommendation 1 has landed: action dispatch now uses a tagged action-family
+  contract instead of the earlier boolean-heavy descriptor.
+- Recommendation 2 has landed: pd-mode writes now route through
+  `pd_mode_apply_command(...)`, which owns mutation, lifecycle coordination,
+  and split-sync intent.
+- Recommendation 3 has its first implementation slice: slot / feedback /
+  pending-multi-tap hold policy now consumes a shared resolved interaction
+  contract.
+- The remaining open recommendation areas are macro IR and shifting more host
+  integration coverage onto semantic builders.
+
 Scope:
 
 - `users/noah/` runtime architecture and module boundaries
