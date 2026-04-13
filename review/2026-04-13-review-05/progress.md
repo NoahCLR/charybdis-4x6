@@ -282,3 +282,79 @@ Next steps:
   rendered frame
 - consider a small pd-runtime task-user suite so active-mode pointer dispatch
   is asserted at the same behavioral level as the raw handler tests
+
+### Implementation pass: remote RGB scene and pd-runtime hook coverage
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-05/` implementation log.
+- Extended
+  `tests/host/rgb_layer_render_test.c`
+  with full-scene slave-side assertions that now combine:
+  - remote preview-layer sync
+  - remote locked/displayed pd-mode state
+  - remote key-feedback state
+- Added one slave scene where flash-gated hold feedback is present but hidden,
+  proving the rendered frame still matches the human-visible expectation:
+  preview on the keyboard half, locked pd-mode color on the pointing half, and
+  pd-mode LED-group overrides where they overlap.
+- Added one slave scene where remote `MULTI_TAP_PENDING` feedback repaints both
+  halves after preview and pd-mode overlays, so the documented last-stage
+  override is covered on the mirrored split path as well.
+- Added a dedicated
+  `tests/host/pd_runtime_test.c`
+  suite for the top-level pointing hooks in
+  `users/noah/lib/pointing/runtime/pd_runtime.c`.
+- Covered the hook-level contracts for:
+  - `noah_pointing_device_init_user()` enabling auto-mouse and restoring the
+    configured default layer
+  - `noah_pointing_device_task_user()` returning untouched reports when no
+    local mode is active
+  - `noah_pointing_device_task_user()` ignoring slave-side mirrored display
+    state and dispatching only the current local active mode
+  - `noah_layer_state_set_user()` restoring active-mode DPI after sniping
+    drops, stripping the pointer layer for arrow mode, and respecting the
+    sniping-layer short-circuit
+  - `noah_is_mouse_record_user()` delegating the pointer-layer policy contract
+- Wired the new runtime suite into
+  `tests/host/run_pd_runtime_tests.sh`
+  and the default full host runner.
+
+Contracts touched in this pass:
+
+- slave-side RGB stage order across remote preview, remote pd-mode display
+  state, pd-mode LED groups, and remote key-feedback overlays
+- `noah_pointing_device_init_user()`
+- `noah_pointing_device_task_user()`
+- `noah_layer_state_set_user()`
+- `noah_is_mouse_record_user()`
+- full-suite host runner coverage for top-level pd-runtime behavior
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted RGB and pd-runtime suites passed
+- neighboring pd-mode and pointer-policy suites passed
+- full host suite passed with the new runtime runner wired in
+- firmware build passed
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- no additional must-have behavioral gaps remain from this README-alignment
+  pass; add new full-scene tests only when docs introduce another cross-stage
+  interaction that is not already pinned semantically
