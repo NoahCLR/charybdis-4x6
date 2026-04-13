@@ -323,3 +323,64 @@ Next steps:
   builders so storage layout stops acting like a public test API.
 - If hardcoded macros grow substantially, consider whether the fixed-capacity
   IR cache should stay runtime-allocated or move toward build-time generation.
+
+### Implementation Pass: Semantic Scenario Builders
+
+Completed in this pass:
+
+- Landed the first implementation slice of Recommendation 5 by extending
+  `tests/host/key_runtime_scenario_harness.*` with higher-level semantic test
+  helpers:
+  - `key_runtime_scenario_pressable_handled_key(...)`
+  - `key_runtime_scenario_add_pending_multi_tap_behavior(...)`
+  - `key_runtime_scenario_add_pending_multi_tap_chain(...)`
+  - `key_runtime_scenario_define_pd_mode_key(...)`
+  - `key_runtime_scenario_debug_snapshot(...)`
+  - `key_runtime_scenario_snapshot_slot(...)`
+- Kept the builders intentionally test-side and semantic:
+  - handled-key setup now starts from one “pressable handled key” builder
+    instead of repeatedly reconstructing full behavior views
+  - pending multi-tap setup can now be authored as a chain of tap-count steps
+  - pd-mode scenario setup can now declare mode + lock state together
+  - read-side scenario assertions can use the runtime-debug snapshot seam
+    instead of reaching directly into live slot storage for every state check
+- Migrated `tests/host/key_runtime_scenario_test.c` onto those builders:
+  - repeated handled-key and multi-tap boilerplate moved into the harness
+  - pd-mode scenario setup now uses the semantic pd-mode helper
+  - slot ownership / lifecycle assertions now read from debug snapshots where
+    that is the more stable seam, while keeping direct slot helpers for
+    truly slot-specific derived predicates such as pending multi-tap and
+    hold-complete checks
+- Deliberately left low-level storage-owning tests such as
+  `key_runtime_slot_test.c` and `key_runtime_transition_test.c` white-box for
+  now, which matches the review guidance to reduce storage coupling in
+  integration tests without flattening the lower-level ownership tests.
+
+Contracts touched in this pass:
+
+- scenario-level semantic fixture helpers:
+  `tests/host/key_runtime_scenario_harness.h`,
+  `tests/host/key_runtime_scenario_harness.c`
+- scenario-level key-runtime integration coverage:
+  `tests/host/key_runtime_scenario_test.c`
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes stayed inside `charybdis-4x6/tests/host/` and the active review
+  folder
+
+Next steps:
+
+- Continue Recommendation 5 by moving additional integration fixtures onto
+  semantic builders, especially the tests that still hand-assemble runtime
+  state outside the scenario harness.
+- Keep `key_runtime_slot_test.c` and `key_runtime_transition_test.c` white-box
+  where they are exercising true slot/transition storage ownership, and focus
+  the next migration work on higher-level integration seams.

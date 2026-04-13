@@ -68,6 +68,14 @@ static keyrecord_t key_runtime_scenario_record(keypos_t key_pos, bool pressed) {
     };
 }
 
+static bool key_runtime_scenario_slot_position_is_valid(keypos_t key_pos) {
+    return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
+}
+
+static uint16_t key_runtime_scenario_slot_table_index(keypos_t key_pos) {
+    return (uint16_t)((uint16_t)key_pos.row * (uint16_t)MATRIX_COLS + (uint16_t)key_pos.col);
+}
+
 static key_behavior_view_t key_runtime_scenario_default_behavior(uint16_t keycode) {
     return (key_behavior_view_t){
         .keycode            = keycode,
@@ -79,6 +87,13 @@ static key_behavior_view_t key_runtime_scenario_default_behavior(uint16_t keycod
         .longer_hold_term   = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term     = CUSTOM_MULTI_TAP_TERM,
     };
+}
+
+key_behavior_view_t key_runtime_scenario_pressable_handled_key(uint16_t keycode) {
+    key_behavior_view_t behavior = key_runtime_scenario_default_behavior(keycode);
+
+    behavior.handled = true;
+    return behavior;
 }
 
 void key_runtime_scenario_reset(void) {
@@ -137,6 +152,22 @@ void key_runtime_scenario_add_behavior_step(uint16_t keycode, uint8_t tap_count,
     };
 }
 
+void key_runtime_scenario_add_pending_multi_tap_behavior(key_behavior_view_t behavior, const key_runtime_scenario_multi_tap_entry_t *entries, uint8_t entry_count) {
+    key_runtime_scenario_add_behavior_view(behavior);
+
+    for (uint8_t index = 0; index < entry_count; index++) {
+        key_runtime_scenario_add_behavior_step(behavior.keycode, entries[index].tap_count, entries[index].step);
+    }
+}
+
+void key_runtime_scenario_add_pending_multi_tap_chain(uint16_t keycode, key_behavior_step_t single, const key_runtime_scenario_multi_tap_entry_t *entries, uint8_t entry_count) {
+    key_behavior_view_t behavior = key_runtime_scenario_pressable_handled_key(keycode);
+
+    behavior.has_multi_tap = true;
+    behavior.single        = single;
+    key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, entry_count);
+}
+
 void key_runtime_scenario_add_pd_mode(uint16_t keycode, pd_mode_mask_t mode) {
     if (key_runtime_scenario_pd_mode_count >= ARRAY_SIZE(key_runtime_scenario_pd_modes)) {
         return;
@@ -146,6 +177,13 @@ void key_runtime_scenario_add_pd_mode(uint16_t keycode, pd_mode_mask_t mode) {
         .keycode = keycode,
         .mode    = mode,
     };
+}
+
+void key_runtime_scenario_define_pd_mode_key(uint16_t keycode, pd_mode_mask_t mode, bool locked) {
+    key_runtime_scenario_add_pd_mode(keycode, mode);
+    if (locked) {
+        key_runtime_scenario_pd_locked_modes |= mode;
+    }
 }
 
 void key_runtime_scenario_set_pd_locked_modes(pd_mode_mask_t modes) {
@@ -181,6 +219,18 @@ void key_runtime_scenario_run(const key_runtime_scenario_step_t *steps, uint8_t 
 
 bool key_runtime_scenario_layer_locked(uint8_t layer) {
     return layer < LAYER_COUNT && (key_runtime_scenario_locked_layers & ((layer_state_t)1u << layer)) != 0;
+}
+
+void key_runtime_scenario_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
+    noah_runtime_debug_snapshot(out);
+}
+
+const active_key_state_t *key_runtime_scenario_snapshot_slot(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    if (!snapshot || !key_runtime_scenario_slot_position_is_valid(key_pos)) {
+        return NULL;
+    }
+
+    return &snapshot->core.key.slots_by_position[key_runtime_scenario_slot_table_index(key_pos)];
 }
 
 uint8_t key_runtime_scenario_effect_count(void) {

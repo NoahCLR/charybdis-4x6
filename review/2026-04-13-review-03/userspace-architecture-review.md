@@ -21,8 +21,12 @@ Implementation status update:
 - Recommendation 4 has landed: hardcoded authored macros now compile into a
   cached execution IR, while VIA default seeding stays on the encoded-string
   path.
-- The remaining open recommendation area is shifting more host integration
-  coverage onto semantic builders.
+- Recommendation 5 has its first implementation slice: the key-runtime
+  scenario harness now exposes semantic builders for handled-key and pd-mode
+  setup plus a runtime-debug snapshot helper, and scenario tests have started
+  moving onto that seam.
+- The remaining open recommendation area is pushing more integration coverage
+  onto those semantic builders beyond the current scenario-level slice.
 
 Scope:
 
