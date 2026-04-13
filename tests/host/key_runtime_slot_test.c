@@ -72,6 +72,15 @@ static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_actio
     });
 }
 
+static void test_set_cached_interaction(active_key_state_t *slot, handled_key_resolution_t resolution) {
+    if (!slot) {
+        return;
+    }
+
+    slot->interaction.valid = true;
+    slot->interaction.view  = key_runtime_slot_interaction_from_resolution(resolution);
+}
+
 #define HOLD_LIT(expr) ((hold_behavior_t)expr)
 
 static handled_key_resolution_t test_resolve_handled_key(key_behavior_view_t behavior);
@@ -500,8 +509,10 @@ static void test_take_active_release_starts_pending_multi_tap_chain(void) {
         .interaction.valid     = true,
         .interaction.view      = test_cached_interaction(TEST_SINGLE_ACTION, hold_behavior_none(), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, 150),
     };
-    slot->interaction.view.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
-    slot->interaction.view.has_more_taps = true;
+    handled_key_resolution_t pending_multi_tap_resolution = key_runtime_slot_interaction_to_resolution(slot->interaction.view);
+    pending_multi_tap_resolution.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    pending_multi_tap_resolution.has_more_taps = true;
+    test_set_cached_interaction(slot, pending_multi_tap_resolution);
 
     result = test_step_handled_release(slot, TEST_MULTI_TAP_KEY, pos,
                                        (key_behavior_view_t){
@@ -573,7 +584,9 @@ static void test_take_active_release_maps_locked_pd_mode_tap(void) {
         .interaction.valid                     = true,
         .interaction.view                      = test_cached_interaction(TEST_SINGLE_ACTION, hold_behavior_none(), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     };
-    slot->interaction.view.pd_mode = PD_MODE_VOLUME;
+    handled_key_resolution_t pd_mode_resolution = key_runtime_slot_interaction_to_resolution(slot->interaction.view);
+    pd_mode_resolution.pd_mode                  = PD_MODE_VOLUME;
+    test_set_cached_interaction(slot, pd_mode_resolution);
 
     result = test_step_handled_release(slot, TEST_PD_MODE_KEY, pos,
                                        (key_behavior_view_t){

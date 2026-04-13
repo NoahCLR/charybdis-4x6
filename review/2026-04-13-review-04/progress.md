@@ -298,11 +298,57 @@ Workspace scope:
 - no sibling workspace folders were edited
 - all changes are confined to `charybdis-4x6/`
 
+### Implementation pass: explicit slot interaction resolution nesting
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the active
+  `review/2026-04-13-review-04/` architecture review.
+- Removed the anonymous direct-field mirror from
+  `users/noah/lib/key/runtime/key_runtime_interaction.h` so
+  `key_runtime_slot_interaction_t` now exposes only explicit
+  `.resolution` plus cached `.policy`.
+- Updated the release, feedback, scan, pending-multi-tap, and slot-policy
+  reducers to read authored semantics through `interaction.resolution` instead
+  of treating cached slot interaction as a flat handled-key struct.
+- Updated the host transition, slot, and runtime-debug suites so tests that
+  need tweaked cached interaction state rebuild from a modified
+  `handled_key_resolution_t` instead of mutating mirrored cached fields in
+  place.
+- Updated the maintainer runtime doc to describe the real slot storage shape:
+  owner/lifecycle/timer/pending-multi-tap plus cached interaction
+  `resolution` and `policy`.
+
+Contracts touched in this pass:
+
+- `key_runtime_slot_interaction_t`
+- `key_runtime_slot_release_contract(...)`
+- runtime consumers of `key_runtime_slot_cached_interaction(...)`
+- host cached-interaction setup helpers in the key-runtime suites
+
+Verification run in this pass:
+
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all changes are confined to `charybdis-4x6/`
+
 Next steps:
 
-- continue finding 1 by deciding whether the direct-field compatibility in
-  `key_runtime_slot_interaction_t` should remain for pragmatism or be narrowed
-  further behind policy/resolution accessors
+- continue finding 1 by deciding whether `handled_key_resolution_t` itself
+  should stay as the cached per-press authored branch contract or be narrowed
+  further into a smaller slot-owned branch record
 - if release-contract work continues, move contract construction earlier so the
   slot interaction can cache release semantics at press/tap-branch resolution
 - after that, make pd-mode exclusivity explicit in the public state model and

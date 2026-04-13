@@ -157,14 +157,14 @@ multi-tap chain that still belongs to that position.
 
 The main fields are:
 
+- `timer`: press timestamp used for threshold and release-time evaluation
 - `owner`: original keycode and physical key position
 - `lifecycle`: slot phase, current held-action ownership, repeat ownership,
   hold strategy, pd-mode lock state on press, and whether a layer hold was
   interrupted by another key
-- `binding`: resolved tap, hold, and long-hold actions for the active press
-- `timing`: tap-hold, longer-hold, and multi-tap terms
-- `semantic`: cached metadata for feedback and debugging such as layer,
-  preview-layer hint, pd-mode, and multi-tap capability
+- `interaction`: cached `key_runtime_slot_interaction_t`, which owns the
+  active press's `handled_key_resolution_t` branch plus cached hold/release
+  policy used by feedback, scan, and release reducers
 - `pending_multi_tap`: deferred tap-chain state that remains after release
 
 The phase enum is small but important:

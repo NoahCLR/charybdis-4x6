@@ -206,7 +206,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(snapshot.core.pd.remote_display_active_flags == PD_MODE_ARROW);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_C);
     CHECK(snapshot.core.key.slots_by_position[0].interaction.valid);
-    CHECK(snapshot.core.key.slots_by_position[0].interaction.view.tap_action == KC_C);
+    CHECK(snapshot.core.key.slots_by_position[0].interaction.view.resolution.tap_action == KC_C);
 
     CHECK(snapshot.layer_ownership.applied_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
     CHECK(snapshot.layer_ownership.locked_mask == ((layer_state_t)1u << 3));

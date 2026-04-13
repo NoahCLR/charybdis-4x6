@@ -10,14 +10,16 @@ architecture, structure, and long-term extensibility.
 
 Implementation update later the same day: the first slice of Finding 1 and the
 first slice of Finding 2 have landed, followed by the authored/runtime seam
-migration and the removal of the last public handled-key compatibility alias.
-Active slot storage now uses
+migration, the removal of the last public handled-key compatibility alias, and
+the removal of the slot interaction's anonymous direct-field mirror. Active
+slot storage now uses
 `key_runtime_slot_interaction_t` as the slot-owned cached interaction contract,
 and authored lookup now has an explicit `handled_key_resolution_t` surface with
 `handled_key_resolution_*` accessors and explicit slot conversion helpers. The
 active-release reducer now also executes a typed release contract derived from
 that interaction instead of reconstructing all release semantics directly from
-raw hold flags.
+raw hold flags, and runtime consumers now read cached authored semantics
+through `interaction.resolution` instead of through a flat mirrored struct.
 
 This review is intentionally not a repeat of the earlier action-family,
 pd-mode write-controller, macro IR, and test-harness recommendations. Those
@@ -131,7 +133,7 @@ This means one struct currently represents:
 - feedback/release-policy metadata
 
 That is a leaky abstraction. A future behavior family will tend to add another
-field or another flag to `handled_key_view_t`, then teach lookup, slot press,
+field or another flag to `handled_key_resolution_t`, then teach lookup, slot press,
 scan, release, feedback, and tests how to interpret it.
 
 Why this matters:
@@ -162,9 +164,10 @@ Implementation update:
   object, and the public `handled_key_view_t` alias has now been removed
 - runtime/process/host seams now name authored lookup output as
   `handled_key_resolution_t` directly
-- the remaining gap is that `key_runtime_slot_interaction_t` still exposes
-  mirrored direct fields beside `.resolution`, so the slot-owned contract is
-  clearer than before but not yet as narrow as it could be
+- the remaining gap is that `handled_key_resolution_t` still carries a large
+  amount of derived runtime-facing semantics, so the slot-owned contract is
+  clearer than before but the authored branch record is still doing multiple
+  jobs
 
 Example shape:
 
@@ -192,7 +195,7 @@ typedef struct {
 ```
 
 That would make the slot model clearer and keep feedback/release code from
-depending on "whatever `handled_key_view_t` happens to mean at this phase".
+depending on "whatever the cached handled-key resolution happens to mean at this phase".
 
 ### 2. Release behavior is still a monolithic feature matrix
 
@@ -405,7 +408,7 @@ on internal layout and raw mutable globals":
 
 - direct writes into `noah_runtime_shared_state`
 - direct slot access through `key_runtime_slot_for_position(...)`
-- direct construction of `handled_key_view_t`
+- direct construction of `handled_key_resolution_t`
 - scenario harness exposure of `runtime_shared_state_t`
 
 Some of that is absolutely appropriate for low-level storage or reducer tests.

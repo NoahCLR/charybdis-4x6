@@ -24,25 +24,7 @@ typedef struct {
 } key_runtime_slot_release_contract_t;
 
 typedef struct {
-    union {
-        handled_key_resolution_t resolution;
-        struct {
-            uint16_t                         tap_action;
-            uint8_t                          tap_repeat_count;
-            hold_behavior_t                  hold;
-            hold_behavior_t                  long_hold;
-            key_runtime_slot_hold_strategy_t hold_strategy;
-            uint16_t                         tap_hold_term;
-            uint16_t                         longer_hold_term;
-            uint16_t                         multi_tap_term;
-            uint8_t                          layer;
-            pd_mode_mask_t                   pd_mode;
-            bool                             step_present;
-            bool                             has_more_taps;
-            bool                             tap_resolves_on_press;
-            uint16_t                         flags;
-        };
-    };
+    handled_key_resolution_t         resolution;
     handled_key_interaction_policy_t policy;
 } key_runtime_slot_interaction_t;
 
@@ -81,29 +63,29 @@ static inline handled_key_resolution_t key_runtime_slot_interaction_to_resolutio
 }
 
 static inline bool key_runtime_slot_interaction_uses_implicit_hold(key_runtime_slot_interaction_t interaction) {
-    return (interaction.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) != 0;
+    return (interaction.resolution.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) != 0;
 }
 
 static inline bool key_runtime_slot_interaction_uses_fallback_hold(key_runtime_slot_interaction_t interaction) {
-    return (interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0;
+    return (interaction.resolution.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0;
 }
 
 static inline bool key_runtime_slot_interaction_is_momentary_layer(key_runtime_slot_interaction_t interaction) {
-    return (interaction.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
+    return (interaction.resolution.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
 }
 
 static inline key_runtime_slot_release_contract_t key_runtime_slot_release_contract(key_runtime_slot_interaction_t interaction) {
     return (key_runtime_slot_release_contract_t){
-        .tap_action                                   = interaction.tap_action,
-        .release_hold_action                          = interaction.policy.hold.dispatches_on_release ? interaction.hold.action : KC_NO,
-        .release_long_hold_action                     = interaction.policy.long_hold.dispatches_on_release ? interaction.long_hold.action : KC_NO,
-        .quick_tap_pd_mode_lock                       = interaction.pd_mode,
+        .tap_action                                   = interaction.resolution.tap_action,
+        .release_hold_action                          = interaction.policy.hold.dispatches_on_release ? interaction.resolution.hold.action : KC_NO,
+        .release_long_hold_action                     = interaction.policy.long_hold.dispatches_on_release ? interaction.resolution.long_hold.action : KC_NO,
+        .quick_tap_pd_mode_lock                       = interaction.resolution.pd_mode,
         .suppress_tap_on_layer_interrupt              = key_runtime_slot_interaction_is_momentary_layer(interaction),
-        .buffered_base_tap_dispatches_tap             = key_runtime_slot_interaction_uses_fallback_hold(interaction) && interaction.tap_action == KC_NO,
-        .quick_release_of_immediate_hold_dispatches_tap = hold_registers_on_press(interaction.hold),
+        .buffered_base_tap_dispatches_tap             = key_runtime_slot_interaction_uses_fallback_hold(interaction) && interaction.resolution.tap_action == KC_NO,
+        .quick_release_of_immediate_hold_dispatches_tap = hold_registers_on_press(interaction.resolution.hold),
         .fallback_hold_suppresses_nonquick_release    = key_runtime_slot_interaction_uses_fallback_hold(interaction),
-        .nonquick_release_dispatches_tap              = !key_runtime_slot_interaction_is_momentary_layer(interaction) && interaction.tap_action != KC_NO,
-        .buffers_multi_tap                            = (interaction.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0,
+        .nonquick_release_dispatches_tap              = !key_runtime_slot_interaction_is_momentary_layer(interaction) && interaction.resolution.tap_action != KC_NO,
+        .buffers_multi_tap                            = (interaction.resolution.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0,
     };
 }
 
