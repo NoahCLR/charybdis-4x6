@@ -320,6 +320,35 @@ static void test_cached_preview_layer_metadata_is_used_when_present(void) {
     CHECK(key_feedback_preview_layer() == 4);
 }
 
+static void test_momentary_hold_preview_layer_stays_quiet_after_threshold_until_activation(void) {
+    test_reset_state();
+    fake_time = 150;
+
+    active_key = (active_key_state_t){
+        .owner.keycode           = KC_RIGHT_ALT,
+        .interaction             = test_cached_interaction((handled_key_resolution_t){
+            .keycode       = KC_RIGHT_ALT,
+            .tap_count     = 1,
+            .step =
+                {
+                    .hold = {
+                        .present = true,
+                        .action  = MO(4),
+                        .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+                    },
+                },
+            .tap_hold_term = 120,
+            .layer         = UINT8_MAX,
+            .pd_mode       = 0,
+            .has_more_taps = false,
+            .flags         = HANDLED_KEY_FLAG_HANDLED,
+        }),
+    };
+
+    CHECK(key_feedback_preview_layer() == 4);
+    CHECK(key_feedback_pack() == 0);
+}
+
 static void test_momentary_hold_preview_layer_clears_once_layer_is_active(void) {
     test_reset_state();
 
@@ -453,6 +482,7 @@ int main(void) {
     test_fallback_hold_has_no_hold_feedback();
     test_momentary_hold_preview_layer_is_exposed_before_threshold();
     test_cached_preview_layer_metadata_is_used_when_present();
+    test_momentary_hold_preview_layer_stays_quiet_after_threshold_until_activation();
     test_momentary_hold_preview_layer_clears_once_layer_is_active();
     test_non_layer_held_action_has_no_preview_layer();
     test_feedback_falls_back_to_secondary_active_slot();
