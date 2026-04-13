@@ -44,6 +44,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/key/runtime/key_runtime_release.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_transition.c" \
     "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \

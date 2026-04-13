@@ -696,6 +696,21 @@ Expected payoff:
 - easier display/policy consistency
 - less procedural loop duplication
 
+Current status:
+
+- landed `pd_mode_snapshot_t` as the central read-only pd-mode controller
+  contract
+- local/display flags, first-active-mode selection, first-locked-mode
+  selection, and aggregated active traits are now computed in one runtime
+  implementation instead of being rediscovered across state/registry/policy
+  files
+- `pd_mode_state.c` display projections, `pd_mode_registry.c` trait/index
+  queries, `pd_mode_apply_active_dpi()`, `pd_mode_handle_key_event()`, and
+  `pointer_layer_policy.c` now consume that snapshot contract
+- split-sync storage still transports raw active/locked flags, but display and
+  policy consumers now read those through the same snapshot-backed projection
+  as local state
+
 ### Recommendation 5: split the macro DSL implementation
 
 Do opportunistically; it is valuable but less urgent than the contract work.

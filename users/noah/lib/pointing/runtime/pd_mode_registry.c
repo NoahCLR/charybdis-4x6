@@ -129,13 +129,15 @@ bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
 }
 
 bool pd_any_active_mode_has_trait(pd_mode_traits_t trait) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_local_active(pd_modes[i].mode_flag) && (pd_modes[i].traits & trait) == trait) {
-            return true;
-        }
-    }
+    return (pd_mode_snapshot().local.active_traits & trait) == trait;
+}
 
-    return false;
+uint8_t pd_mode_first_local_active_index(void) {
+    return pd_mode_snapshot().local.first_active_index;
+}
+
+uint8_t pd_mode_first_display_active_index(void) {
+    return pd_mode_snapshot().display.first_active_index;
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
@@ -143,20 +145,4 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
         if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode) return pd_modes[i].mode_flag;
     }
     return 0;
-}
-
-static uint8_t pd_mode_first_snapshot_index(pd_mode_mask_t active_flags) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if ((active_flags & pd_modes[i].mode_flag) != 0) return i;
-    }
-
-    return PD_MODE_COUNT;
-}
-
-uint8_t pd_mode_first_local_active_index(void) {
-    return pd_mode_first_snapshot_index(pd_mode_local_active_snapshot());
-}
-
-uint8_t pd_mode_first_display_active_index(void) {
-    return pd_mode_first_snapshot_index(pd_mode_display_active_snapshot());
 }

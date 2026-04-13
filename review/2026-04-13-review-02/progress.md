@@ -561,6 +561,60 @@ Next steps:
 
 - move on to recommendation 4
 
+## 2026-04-13: Recommendation 4 landed
+
+Completed in this pass:
+
+- Added a central `pd_mode_snapshot_t` read-only contract in
+  `pointing/defs/pd_mode_flags.h`, backed by new
+  `pointing/runtime/pd_mode_snapshot.c`.
+- The snapshot now computes one place for:
+  local active/locked flags, display active/locked flags, first active/locked
+  mode selection, and aggregated active-mode traits.
+- Routed the main read-only pd-mode helpers through that snapshot instead of
+  recomputing local/display state and first-active-mode selection in multiple
+  runtime modules.
+- Migrated the higher-value policy consumers onto the snapshot:
+  `pd_mode_apply_active_dpi()`, `pd_mode_handle_key_event()`, and
+  `pointer_layer_policy.c`.
+- Updated the pd-mode and pointer-layer host coverage so the new snapshot
+  contract is asserted directly rather than only through older helper
+  projections.
+- Wired the new source into the userspace source manifest and the host runners
+  that compile the pd-mode runtime.
+
+Contracts touched:
+
+- `users/noah/lib/pointing/defs/pd_mode_flags.h`
+- `users/noah/lib/pointing/runtime/pd_mode_snapshot.c`
+- `users/noah/lib/pointing/runtime/pd_mode_state.c`
+- `users/noah/lib/pointing/runtime/pd_mode_registry.c`
+- `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`
+- `users/noah/lib/pointing/policy/pointer_layer_policy.c`
+- `users/noah/source_manifest.mk`
+- `tests/host/pd_mode_test.c`
+- `tests/host/pointer_layer_policy_test.c`
+- `tests/host/run_pd_mode_tests.sh`
+- `tests/host/run_runtime_trace_tests.sh`
+- `tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+
+Verification run in this pass:
+
+- `git diff --check`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Next steps:
+
+- move on to recommendation 5 unless you want to migrate the remaining
+  read-only pd-mode consumers (`pd_runtime.c`, `rgb_pd_mode_stage.c`) from the
+  delegating helpers to the snapshot directly
+
 ## 2026-04-13: Recommendation 3 include cleanup landed
 
 Completed in this pass:

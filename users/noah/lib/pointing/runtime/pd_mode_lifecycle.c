@@ -54,7 +54,9 @@ static void pd_mode_enforce_exclusive_active_mode(pd_mode_mask_t keep_mode) {
 }
 
 void pd_mode_apply_active_dpi(void) {
-    if (pd_any_active_mode_has_trait(PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND)) {
+    pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+
+    if ((snapshot.local.active_traits & PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND) != 0) {
         pointing_device_set_cpi(noah_qmk_contract_pointer_dragscroll_dpi());
         return;
     }
@@ -64,11 +66,9 @@ void pd_mode_apply_active_dpi(void) {
         return;
     }
 
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_local_active(pd_modes[i].mode_flag) && pd_modes[i].dpi != 0) {
-            pointing_device_set_cpi(pd_modes[i].dpi);
-            return;
-        }
+    if (snapshot.local.first_active_index < PD_MODE_COUNT && pd_modes[snapshot.local.first_active_index].dpi != 0) {
+        pointing_device_set_cpi(pd_modes[snapshot.local.first_active_index].dpi);
+        return;
     }
 
     // No active mode with a custom DPI — restore Charybdis's configured default.
@@ -150,10 +150,15 @@ void pd_mode_unlock(pd_mode_mask_t mode) {
 }
 
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_mode_local_active(pd_modes[i].mode_flag) && pd_modes[i].key_handler && pd_modes[i].key_handler(keycode, record)) {
+    pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+
+    if (snapshot.local.first_active_index < PD_MODE_COUNT) {
+        const pd_mode_def_t *def = &pd_modes[snapshot.local.first_active_index];
+
+        if (def->key_handler && def->key_handler(keycode, record)) {
             return true;
         }
     }
+
     return false;
 }

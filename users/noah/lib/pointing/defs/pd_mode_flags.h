@@ -41,6 +41,23 @@ _Static_assert(PD_MODE_COUNT <= (sizeof(pd_mode_mask_t) * 8u), "PD_MODE_COUNT ex
 // Display queries report what UI consumers should render: local state on the
 // master half, mirrored split-sync state on the slave half.
 
+typedef struct {
+    pd_mode_mask_t   active_flags;
+    pd_mode_mask_t   locked_flags;
+    pd_mode_mask_t   first_active_mode;
+    pd_mode_mask_t   first_locked_mode;
+    pd_mode_traits_t active_traits;
+    uint8_t          first_active_index;
+    uint8_t          first_locked_index;
+} pd_mode_snapshot_view_t;
+
+typedef struct {
+    pd_mode_snapshot_view_t local;
+    pd_mode_snapshot_view_t display;
+} pd_mode_snapshot_t;
+
+pd_mode_snapshot_t pd_mode_snapshot(void);
+
 pd_mode_mask_t pd_mode_local_active_snapshot(void);
 pd_mode_mask_t pd_mode_local_locked_snapshot(void);
 pd_mode_mask_t pd_mode_display_active_snapshot(void);

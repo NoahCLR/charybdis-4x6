@@ -40,10 +40,6 @@ void pd_mode_clear_locked(pd_mode_mask_t mode) {
     PD_MODE_LOCAL_LOCKED_FLAGS &= (pd_mode_mask_t)~mode;
 }
 
-static inline bool pd_mode_display_uses_local_state(void) {
-    return is_keyboard_master();
-}
-
 pd_mode_mask_t pd_mode_local_active_snapshot(void) {
     return PD_MODE_LOCAL_ACTIVE_FLAGS;
 }
@@ -53,11 +49,11 @@ pd_mode_mask_t pd_mode_local_locked_snapshot(void) {
 }
 
 pd_mode_mask_t pd_mode_display_active_snapshot(void) {
-    return pd_mode_display_uses_local_state() ? PD_MODE_LOCAL_ACTIVE_FLAGS : PD_MODE_REMOTE_DISPLAY_ACTIVE_FLAGS;
+    return pd_mode_snapshot().display.active_flags;
 }
 
 pd_mode_mask_t pd_mode_display_locked_snapshot(void) {
-    return pd_mode_display_uses_local_state() ? PD_MODE_LOCAL_LOCKED_FLAGS : PD_MODE_REMOTE_DISPLAY_LOCKED_FLAGS;
+    return pd_mode_snapshot().display.locked_flags;
 }
 
 bool pd_mode_local_active(pd_mode_mask_t mode) {
@@ -69,11 +65,11 @@ bool pd_mode_local_locked(pd_mode_mask_t mode) {
 }
 
 bool pd_mode_display_active(pd_mode_mask_t mode) {
-    return (pd_mode_display_active_snapshot() & mode) != 0;
+    return (pd_mode_snapshot().display.active_flags & mode) != 0;
 }
 
 bool pd_mode_display_locked(pd_mode_mask_t mode) {
-    return (pd_mode_display_locked_snapshot() & mode) != 0;
+    return (pd_mode_snapshot().display.locked_flags & mode) != 0;
 }
 
 bool pd_any_local_mode_active(void) {
@@ -85,11 +81,11 @@ bool pd_any_local_mode_locked(void) {
 }
 
 bool pd_any_display_mode_active(void) {
-    return pd_mode_display_active_snapshot() != 0;
+    return pd_mode_snapshot().display.active_flags != 0;
 }
 
 bool pd_any_display_mode_locked(void) {
-    return pd_mode_display_locked_snapshot() != 0;
+    return pd_mode_snapshot().display.locked_flags != 0;
 }
 
 void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
