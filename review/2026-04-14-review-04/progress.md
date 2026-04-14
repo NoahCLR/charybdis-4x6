@@ -158,4 +158,8 @@ Next steps:
 
 - if another action-kind expansion is needed later, consider moving lifecycle
   ops into the shared action-kind definition as a separate cleanup
-- otherwise no immediate follow-up is required from this review pass
+- review-05 immediately followed this pass and closed three remaining seams:
+  the duplicated handled-key contract path, the registry test bypasses, and
+  the partial action-kind lifecycle consolidation
+- treat this pass as a major architecture improvement, but not the final
+  cleanup point for those remaining review-05 follow-ups

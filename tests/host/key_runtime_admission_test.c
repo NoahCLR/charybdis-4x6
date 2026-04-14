@@ -39,10 +39,8 @@ static active_key_state_t *test_slot(uint8_t row, uint8_t col) {
     return key_runtime_slot_for_position(test_keypos(row, col));
 }
 
-static void test_sync_index(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        key_runtime_index_sync_slot(key_runtime_slot_at(index));
-    }
+static void test_track_slot(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos) {
+    key_runtime_slot_track(slot, keycode, key_pos, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 }
 
 static void test_reset_state(void) {
@@ -193,9 +191,7 @@ static void test_find_slot_by_position_returns_matching_active_slot(void) {
     keypos_t            pos  = test_keypos(4, 5);
 
     test_reset_state();
-    slot->owner.keycode = TEST_ACTIVE_KEY;
-    slot->owner.key_pos = pos;
-    test_sync_index();
+    test_track_slot(slot, TEST_ACTIVE_KEY, pos);
 
     CHECK(key_runtime_find_slot_by_position(pos) == slot);
     CHECK(key_runtime_first_active_slot() == slot);
@@ -207,12 +203,7 @@ static void test_find_slot_with_pending_multi_tap_returns_position_owner(void) {
     keypos_t            pos  = test_keypos(5, 2);
 
     test_reset_state();
-    slot->pending_multi_tap = (multi_tap_t){
-        .keycode = TEST_MULTI_TAP_KEY,
-        .key_pos = pos,
-        .count   = 1,
-    };
-    test_sync_index();
+    key_runtime_slot_begin_pending_multi_tap(slot, TEST_MULTI_TAP_KEY, pos, KC_NO, 0, CUSTOM_TAP_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
 
     CHECK(key_runtime_find_slot_with_pending_multi_tap(pos) == slot);
 }
@@ -231,12 +222,7 @@ static void test_select_slot_for_press_reuses_position_with_pending_multi_tap(vo
     active_key_state_t *slot   = test_slot(6, 2);
 
     test_reset_state();
-    slot->pending_multi_tap = (multi_tap_t){
-        .keycode = TEST_MULTI_TAP_KEY,
-        .key_pos = target,
-        .count   = 1,
-    };
-    test_sync_index();
+    key_runtime_slot_begin_pending_multi_tap(slot, TEST_MULTI_TAP_KEY, target, KC_NO, 0, CUSTOM_TAP_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
 
     CHECK(key_runtime_select_slot_for_press(target) == slot);
 }
@@ -247,11 +233,8 @@ static void test_select_slot_for_press_keeps_distinct_active_positions_independe
     active_key_state_t *slot_c = test_slot(0, 2);
 
     test_reset_state();
-    slot_a->owner.keycode = TEST_ACTIVE_KEY;
-    slot_a->owner.key_pos = test_keypos(0, 0);
-    slot_b->owner.keycode = TEST_ACTIVE_KEY;
-    slot_b->owner.key_pos = test_keypos(0, 1);
-    test_sync_index();
+    test_track_slot(slot_a, TEST_ACTIVE_KEY, test_keypos(0, 0));
+    test_track_slot(slot_b, TEST_ACTIVE_KEY, test_keypos(0, 1));
 
     CHECK(key_runtime_select_slot_for_press(test_keypos(0, 2)) == slot_c);
     CHECK(slot_a->owner.keycode == TEST_ACTIVE_KEY);

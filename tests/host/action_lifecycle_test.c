@@ -229,6 +229,7 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     test_reset_stubs();
 
     noah_action_tap(LOCK_LAYER(4));
+    CHECK(macro_dispatch_calls == 0);
     CHECK(layer_toggle_call.layer == 4);
     CHECK(split_sync_calls == 0);
     CHECK(tap_code16_call.keycode == KC_NO);
@@ -237,6 +238,7 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     pd_toggle_result = true;
 
     noah_action_tap(ARROW_MODE_LOCK);
+    CHECK(macro_dispatch_calls == 0);
     CHECK(pd_toggle_calls == 1);
     CHECK(split_sync_calls == 1);
     CHECK(tap_code16_call.keycode == KC_NO);
@@ -245,6 +247,7 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     pd_toggle_result = false;
 
     noah_action_tap(ARROW_MODE_LOCK);
+    CHECK(macro_dispatch_calls == 0);
     CHECK(pd_toggle_calls == 1);
     CHECK(split_sync_calls == 0);
 }
@@ -306,6 +309,7 @@ static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
     pd_press_result = true;
 
     noah_action_press(key_pos, ARROW_MODE);
+    CHECK(macro_dispatch_calls == 1);
     CHECK(pd_press_calls == 1);
     CHECK(layer_press_call.layer == 0);
     CHECK(register_code16_call.keycode == KC_NO);
@@ -313,6 +317,8 @@ static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
     test_reset_stubs();
 
     noah_action_press(key_pos, MO(5));
+    CHECK(macro_dispatch_calls == 1);
+    CHECK(pd_press_calls == 0);
     CHECK(layer_press_call.layer == 5);
     CHECK(layer_press_call.key_pos.row == key_pos.row);
     CHECK(layer_press_call.key_pos.col == key_pos.col);
@@ -359,6 +365,7 @@ static void test_press_ignores_raw_layer_actions_and_one_shot_actions(void) {
     test_reset_stubs();
 
     noah_action_press(key_pos, LOCK_LAYER(1));
+    CHECK(macro_dispatch_calls == 0);
     CHECK(layer_toggle_call.layer == 1);
     CHECK(pd_press_calls == 0);
     CHECK(register_code16_call.keycode == KC_NO);
@@ -385,6 +392,7 @@ static void test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plai
     test_reset_stubs();
 
     noah_action_release(key_pos, MO(6));
+    CHECK(pd_release_calls == 0);
     CHECK(layer_release_call.key_pos.row == key_pos.row);
     CHECK(layer_release_call.key_pos.col == key_pos.col);
     CHECK(unregister_code16_call.keycode == KC_NO);

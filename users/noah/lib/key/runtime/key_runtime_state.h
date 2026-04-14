@@ -59,6 +59,8 @@ uint16_t                                   key_runtime_slot_advance_pending_mult
 uint16_t                                   key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slot, uint8_t *repeat_count);
 key_runtime_slot_pending_multi_tap_flush_t key_runtime_slot_take_pending_multi_tap_flush(active_key_state_t *slot);
 void                                       key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot);
+void                                       key_runtime_slot_set_held_action_keycode(active_key_state_t *slot, uint16_t held_action_keycode);
+void                                       key_runtime_slot_set_repeat_binding_active(active_key_state_t *slot, bool active);
 bool                                       key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot);
 bool                                       key_runtime_activate_pending_fallback_hold(void);
 void                                       key_runtime_slot_set_release_hold_pending(active_key_state_t *slot);

@@ -9,7 +9,6 @@
 #pragma once
 
 #include "../interaction/handled_key.h"
-#include "../interaction/handled_key_policy.h"
 
 typedef enum {
     KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE = 0,
@@ -56,15 +55,6 @@ typedef struct {
     bool            has_more_taps;
     bool            tap_resolves_on_press;
 } key_runtime_slot_binding_t;
-
-typedef struct {
-    handled_key_resolution_t         resolution;
-    key_runtime_slot_binding_t       binding;
-    key_runtime_slot_hold_strategy_t hold_strategy;
-    uint8_t                          layer;
-    pd_mode_mask_t                   pd_mode;
-    uint16_t                         flags;
-} key_runtime_slot_materialize_args_t;
 
 typedef struct {
     key_runtime_slot_selection_t        selection;
@@ -162,39 +152,19 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
     };
 }
 
-static inline key_runtime_slot_interaction_t key_runtime_slot_materialize(key_runtime_slot_materialize_args_t args) {
-    key_runtime_slot_interaction_t interaction = {
-        .selection     = key_runtime_slot_selection_from_resolution(args.resolution),
-        .binding       = args.binding,
-        .hold_strategy = args.hold_strategy,
-        .layer         = args.layer,
-        .pd_mode       = args.pd_mode,
-        .flags         = args.flags,
-    };
-
-    interaction.flags &= (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD);
-
-    if (args.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT) {
-        interaction.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
-    }
-    if (args.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK) {
-        interaction.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
-    }
-
-    interaction.contract = handled_key_behavior_contract(interaction.hold_strategy, interaction.flags, interaction.binding.tap_action, interaction.pd_mode, interaction.binding.hold, interaction.binding.long_hold);
-    interaction.release = key_runtime_slot_release_contract_build(interaction);
-    return interaction;
-}
-
 static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_materialized(handled_key_materialized_t materialized) {
-    return key_runtime_slot_materialize((key_runtime_slot_materialize_args_t){
-        .resolution    = materialized.authored,
+    key_runtime_slot_interaction_t interaction = {
+        .selection     = key_runtime_slot_selection_from_resolution(materialized.authored),
         .binding       = key_runtime_slot_binding_from_materialized(materialized),
         .hold_strategy = materialized.hold_strategy,
         .layer         = materialized.layer,
         .pd_mode       = materialized.pd_mode,
         .flags         = materialized.flags,
-    });
+        .contract      = materialized.contract,
+    };
+
+    interaction.release = key_runtime_slot_release_contract_build(interaction);
+    return interaction;
 }
 
 static inline bool key_runtime_slot_interaction_uses_implicit_hold(key_runtime_slot_interaction_t interaction) {

@@ -74,14 +74,12 @@ static void test_reset_state(void) {
     executed_transition_plan_count = 0;
 }
 
-static void test_sync_index(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        key_runtime_index_sync_slot(key_runtime_slot_at(index));
-    }
+static void test_track_active_slot(uint16_t keycode, keypos_t key_pos, key_runtime_slot_interaction_t interaction, key_runtime_slot_phase_t phase) {
+    test_set_active_slot_key_pos(key_pos);
+    key_runtime_slot_track(test_active_slot(), keycode, key_pos, interaction, phase);
 }
 
 static bool test_preflight_record(uint16_t keycode, keyrecord_t *record) {
-    test_sync_index();
     return key_runtime_preflight_record(keycode, record);
 }
 
@@ -330,9 +328,7 @@ static void test_active_handled_release_bypasses_modifier_suppression(void) {
 
     test_reset_state();
     suppress_default = true;
-    test_set_active_slot_key_pos(record.event.key);
-    active_key.owner.keycode = KC_RIGHT_ALT;
-    active_key.owner.key_pos = record.event.key;
+    test_track_active_slot(KC_RIGHT_ALT, record.event.key, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
@@ -344,9 +340,7 @@ static void test_unrelated_release_stays_suppressed(void) {
 
     test_reset_state();
     suppress_default = true;
-    test_set_active_slot_key_pos(stored);
-    active_key.owner.keycode = KC_RIGHT_ALT;
-    active_key.owner.key_pos = stored;
+    test_track_active_slot(KC_RIGHT_ALT, stored, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(!test_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
@@ -359,9 +353,7 @@ static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
     test_reset_state();
     suppress_default            = true;
     handled_key_stub_is_handled = true;
-    test_set_active_slot_key_pos(stored);
-    active_key.owner.keycode = KC_LEFT_CTRL;
-    active_key.owner.key_pos = stored;
+    test_track_active_slot(KC_LEFT_CTRL, stored, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
@@ -372,26 +364,24 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
     keypos_t    stored = test_keypos(2, 3);
 
     test_reset_state();
-    test_set_active_slot_key_pos(stored);
-    active_key.owner.keycode   = KC_RIGHT_ALT;
-    active_key.owner.key_pos   = stored;
-    active_key.lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
-    active_key.interaction     = host_key_runtime_slot_interaction_from_authored_resolution((handled_key_resolution_t){
-                                           .keycode   = KC_RIGHT_ALT,
-                                           .tap_count = 1,
-                                           .step =
-                                               {
-                                                   .tap = TAP_SENDS(KC_NO),
-                                               },
-                                           .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-                                           .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-                                           .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-                                           .layer            = UINT8_MAX,
-                                           .pd_mode          = 0,
-                                           .has_more_taps    = false,
-                                           .flags            = HANDLED_KEY_FLAG_HANDLED,
-                                       },
-                                       handled_key_resolution_ctx_make(stored, (layer_state_t)1u << 0));
+    test_track_active_slot(KC_RIGHT_ALT, stored,
+                           host_key_runtime_slot_interaction_from_authored_resolution((handled_key_resolution_t){
+                                                                                           .keycode   = KC_RIGHT_ALT,
+                                                                                           .tap_count = 1,
+                                                                                           .step =
+                                                                                               {
+                                                                                                   .tap = TAP_SENDS(KC_NO),
+                                                                                               },
+                                                                                           .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+                                                                                           .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+                                                                                           .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+                                                                                           .layer            = UINT8_MAX,
+                                                                                           .pd_mode          = 0,
+                                                                                           .has_more_taps    = false,
+                                                                                           .flags            = HANDLED_KEY_FLAG_HANDLED,
+                                                                                       },
+                                                                                       handled_key_resolution_ctx_make(stored, (layer_state_t)1u << 0)),
+                           KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(tracked_physical_event);
@@ -404,11 +394,7 @@ static void test_handled_press_keeps_foreign_multi_tap_pending(void) {
 
     test_reset_state();
     handled_key_stub_is_handled                                         = true;
-    key_runtime_slot_for_position(test_keypos(3, 3))->pending_multi_tap = (multi_tap_t){
-        .keycode = KC_RIGHT_ALT,
-        .key_pos = test_keypos(3, 3),
-        .count   = 1,
-    };
+    key_runtime_slot_begin_pending_multi_tap(key_runtime_slot_for_position(test_keypos(3, 3)), KC_RIGHT_ALT, test_keypos(3, 3), KC_NO, 0, CUSTOM_TAP_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
 
     CHECK(test_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(!flushed_multi_tap);
@@ -419,11 +405,7 @@ static void test_non_handled_press_flushes_foreign_multi_tap(void) {
     keyrecord_t record = test_record(test_keypos(3, 4), true);
 
     test_reset_state();
-    key_runtime_slot_for_position(test_keypos(3, 3))->pending_multi_tap = (multi_tap_t){
-        .keycode = KC_RIGHT_ALT,
-        .key_pos = test_keypos(3, 3),
-        .count   = 1,
-    };
+    key_runtime_slot_begin_pending_multi_tap(key_runtime_slot_for_position(test_keypos(3, 3)), KC_RIGHT_ALT, test_keypos(3, 3), KC_NO, 0, CUSTOM_TAP_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
 
     CHECK(test_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(flushed_multi_tap);

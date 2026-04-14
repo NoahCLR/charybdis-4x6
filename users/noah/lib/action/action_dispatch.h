@@ -91,14 +91,11 @@ typedef enum {
 typedef struct {
     noah_action_kind_t kind;
     uint16_t           action;
-    uint16_t           caps;
     uint8_t            layer;
     pd_mode_mask_t     pd_mode;
 } noah_action_desc_t;
 
-static inline bool noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability) {
-    return (desc.caps & (uint16_t)capability) != 0;
-}
+bool noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability);
 
 static inline bool noah_action_desc_is_layer_lock(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_LAYER_LOCK;

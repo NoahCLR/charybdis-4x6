@@ -9,25 +9,25 @@
 #include "key_runtime_slot_policy.h"
 #include "key_runtime_slot_result_internal.h"
 
-#include "../key_runtime_index.h"
+#include "../key_runtime_index_internal.h"
 #include "../key_runtime_trace.h"
+#include "../../interaction/handled_key_internal.h"
 #include "../../../pointing/defs/pd_modes.h"
 
 static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavior_t hold) {
     return hold_registers_on_press(hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
 }
 
-static key_runtime_slot_binding_t key_runtime_slot_press_binding(handled_key_materialized_t materialized, uint16_t tap_action, uint8_t tap_repeat_count, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
-    key_runtime_slot_binding_t binding = key_runtime_slot_binding_from_materialized(materialized);
-
-    binding.tap_action       = tap_action;
-    binding.tap_repeat_count = tap_repeat_count;
-    binding.hold             = hold;
-    binding.long_hold        = long_hold;
-    binding.tap_hold_term    = tap_hold_term;
-    binding.longer_hold_term = longer_hold_term;
-    binding.multi_tap_term   = multi_tap_term;
-    return binding;
+static handled_key_materialized_t key_runtime_slot_press_materialized(handled_key_materialized_t materialized, uint16_t tap_action, uint8_t tap_repeat_count, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_hold_strategy_t hold_strategy) {
+    materialized.tap_action              = tap_action;
+    materialized.tap_repeat_count        = tap_repeat_count;
+    materialized.hold                    = hold;
+    materialized.long_hold               = long_hold;
+    materialized.authored.tap_hold_term  = tap_hold_term;
+    materialized.authored.longer_hold_term = longer_hold_term;
+    materialized.authored.multi_tap_term = multi_tap_term;
+    materialized.hold_strategy           = hold_strategy;
+    return handled_key_materialized_refresh_contract(materialized);
 }
 
 static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_materialized_t materialized, uint16_t tap_action, uint8_t tap_repeat_count, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy, bool pd_mode_was_locked_on_press) {
@@ -38,14 +38,7 @@ static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_stat
         return builder;
     }
 
-    interaction = key_runtime_slot_materialize((key_runtime_slot_materialize_args_t){
-        .resolution    = materialized.authored,
-        .binding       = key_runtime_slot_press_binding(materialized, tap_action, tap_repeat_count, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term),
-        .hold_strategy = hold_strategy,
-        .layer         = materialized.layer,
-        .pd_mode       = materialized.pd_mode,
-        .flags         = materialized.flags,
-    });
+    interaction = key_runtime_slot_interaction_from_materialized(key_runtime_slot_press_materialized(materialized, tap_action, tap_repeat_count, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, hold_strategy));
     key_runtime_slot_track(slot, keycode, key_pos, interaction, phase);
     slot->lifecycle.pd_mode_was_locked_on_press = pd_mode_was_locked_on_press;
 

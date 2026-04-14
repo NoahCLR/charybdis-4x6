@@ -46,19 +46,15 @@ static void test_reset_state(void) {
     fake_time = 0;
 }
 
-static void test_sync_index(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        key_runtime_index_sync_slot(key_runtime_slot_at(index));
-    }
+static void test_track_slot(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, key_runtime_slot_interaction_t interaction, key_runtime_slot_phase_t phase) {
+    key_runtime_slot_track(slot, keycode, key_pos, interaction, phase);
 }
 
 static uint8_t test_feedback_pack(void) {
-    test_sync_index();
     return key_feedback_pack();
 }
 
 static uint8_t test_feedback_preview_layer(void) {
-    test_sync_index();
     return key_feedback_preview_layer();
 }
 
@@ -242,12 +238,11 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 }
 
 static void test_non_passthrough_held_action_flashes(void) {
-    test_reset_state();
+    keypos_t pos = {.row = 0, .col = 0};
 
-    active_key = (active_key_state_t){
-        .owner.keycode                 = KC_RIGHT_ALT,
-        .lifecycle.held_action_keycode = SAFE_RANGE + 1,
-    };
+    test_reset_state();
+    test_track_slot(test_default_slot(), KC_RIGHT_ALT, pos, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_set_held_action_keycode(test_default_slot(), SAFE_RANGE + 1);
 
     uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_hold_active(flags));
@@ -255,12 +250,11 @@ static void test_non_passthrough_held_action_flashes(void) {
 }
 
 static void test_repeat_hold_flashes_while_active(void) {
-    test_reset_state();
+    keypos_t pos = {.row = 0, .col = 0};
 
-    active_key = (active_key_state_t){
-        .owner.keycode                   = KC_RIGHT_ALT,
-        .lifecycle.repeat_binding_active = true,
-    };
+    test_reset_state();
+    test_track_slot(test_default_slot(), KC_RIGHT_ALT, pos, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_set_repeat_binding_active(test_default_slot(), true);
 
     uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_hold_active(flags));
@@ -268,146 +262,143 @@ static void test_repeat_hold_flashes_while_active(void) {
 }
 
 static void test_fallback_hold_has_no_hold_feedback(void) {
-    test_reset_state();
+    keypos_t pos = {.row = 0, .col = 0};
 
-    active_key = (active_key_state_t){
-        .owner.keycode                 = KC_RIGHT_ALT,
-        .lifecycle.held_action_keycode = KC_RIGHT_ALT,
-        .interaction                   = test_cached_interaction((handled_key_resolution_t){
-            .keycode   = KC_RIGHT_ALT,
-            .tap_count = 1,
-            .step =
-                {
-                    .tap = TAP_SENDS(KC_NO),
-                },
-            .layer         = UINT8_MAX,
-            .pd_mode       = 0,
-            .has_more_taps = false,
-            .flags         = HANDLED_KEY_FLAG_HANDLED,
-        }),
-    };
+    test_reset_state();
+    test_track_slot(test_default_slot(), KC_RIGHT_ALT, pos,
+                    test_cached_interaction((handled_key_resolution_t){
+                        .keycode   = KC_RIGHT_ALT,
+                        .tap_count = 1,
+                        .step =
+                            {
+                                .tap = TAP_SENDS(KC_NO),
+                            },
+                        .layer         = UINT8_MAX,
+                        .pd_mode       = 0,
+                        .has_more_taps = false,
+                        .flags         = HANDLED_KEY_FLAG_HANDLED,
+                    }),
+                    KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_set_held_action_keycode(test_default_slot(), KC_RIGHT_ALT);
 
     uint8_t flags = test_feedback_pack();
     CHECK(flags == 0);
 }
 
 static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) {
-    test_reset_state();
+    keypos_t pos = {.row = 0, .col = 0};
 
-    active_key = (active_key_state_t){
-        .owner.keycode = KC_RIGHT_ALT,
-        .interaction   = test_cached_interaction((handled_key_resolution_t){
-            .keycode   = KC_RIGHT_ALT,
-            .tap_count = 1,
-            .step =
-                {
-                    .hold =
-                        {
-                            .present = true,
-                            .action  = MO(3),
-                            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
-                        },
-                },
-            .tap_hold_term = 120,
-            .layer         = UINT8_MAX,
-            .pd_mode       = 0,
-            .has_more_taps = false,
-            .flags         = HANDLED_KEY_FLAG_HANDLED,
-        }),
-    };
+    test_reset_state();
+    test_track_slot(test_default_slot(), KC_RIGHT_ALT, pos,
+                    test_cached_interaction((handled_key_resolution_t){
+                        .keycode   = KC_RIGHT_ALT,
+                        .tap_count = 1,
+                        .step =
+                            {
+                                .hold =
+                                    {
+                                        .present = true,
+                                        .action  = MO(3),
+                                        .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+                                    },
+                            },
+                        .tap_hold_term = 120,
+                        .layer         = UINT8_MAX,
+                        .pd_mode       = 0,
+                        .has_more_taps = false,
+                        .flags         = HANDLED_KEY_FLAG_HANDLED,
+                    }),
+                    KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_feedback_preview_layer() == 3);
 }
 
 static void test_cached_preview_layer_metadata_is_used_when_present(void) {
-    test_reset_state();
+    keypos_t pos = {.row = 0, .col = 0};
 
-    active_key = (active_key_state_t){
-        .owner.keycode = KC_RIGHT_ALT,
-        .interaction   = test_cached_interaction((handled_key_resolution_t){
-            .keycode   = KC_RIGHT_ALT,
-            .tap_count = 1,
-            .step =
-                {
-                    .hold =
-                        {
-                            .present = true,
-                            .action  = MO(4),
-                            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
-                        },
-                },
-            .tap_hold_term = 120,
-            .layer         = UINT8_MAX,
-            .pd_mode       = 0,
-            .has_more_taps = false,
-            .flags         = HANDLED_KEY_FLAG_HANDLED,
-        }),
-    };
+    test_reset_state();
+    test_track_slot(test_default_slot(), KC_RIGHT_ALT, pos,
+                    test_cached_interaction((handled_key_resolution_t){
+                        .keycode   = KC_RIGHT_ALT,
+                        .tap_count = 1,
+                        .step =
+                            {
+                                .hold =
+                                    {
+                                        .present = true,
+                                        .action  = MO(4),
+                                        .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+                                    },
+                            },
+                        .tap_hold_term = 120,
+                        .layer         = UINT8_MAX,
+                        .pd_mode       = 0,
+                        .has_more_taps = false,
+                        .flags         = HANDLED_KEY_FLAG_HANDLED,
+                    }),
+                    KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_feedback_preview_layer() == 4);
 }
 
 static void test_momentary_hold_preview_layer_stays_quiet_after_threshold_until_activation(void) {
+    keypos_t pos = {.row = 0, .col = 0};
+
     test_reset_state();
     fake_time = 150;
-
-    active_key = (active_key_state_t){
-        .owner.keycode = KC_RIGHT_ALT,
-        .interaction   = test_cached_interaction((handled_key_resolution_t){
-            .keycode   = KC_RIGHT_ALT,
-            .tap_count = 1,
-            .step =
-                {
-                    .hold =
-                        {
-                            .present = true,
-                            .action  = MO(4),
-                            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
-                        },
-                },
-            .tap_hold_term = 120,
-            .layer         = UINT8_MAX,
-            .pd_mode       = 0,
-            .has_more_taps = false,
-            .flags         = HANDLED_KEY_FLAG_HANDLED,
-        }),
-    };
+    test_track_slot(test_default_slot(), KC_RIGHT_ALT, pos,
+                    test_cached_interaction((handled_key_resolution_t){
+                        .keycode   = KC_RIGHT_ALT,
+                        .tap_count = 1,
+                        .step =
+                            {
+                                .hold =
+                                    {
+                                        .present = true,
+                                        .action  = MO(4),
+                                        .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+                                    },
+                            },
+                        .tap_hold_term = 120,
+                        .layer         = UINT8_MAX,
+                        .pd_mode       = 0,
+                        .has_more_taps = false,
+                        .flags         = HANDLED_KEY_FLAG_HANDLED,
+                    }),
+                    KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_feedback_preview_layer() == 4);
     CHECK(test_feedback_pack() == 0);
 }
 
 static void test_momentary_hold_preview_layer_clears_once_layer_is_active(void) {
-    test_reset_state();
+    keypos_t pos = {.row = 0, .col = 0};
 
-    active_key = (active_key_state_t){
-        .owner.keycode                 = KC_RIGHT_ALT,
-        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-        .lifecycle.held_action_keycode = MO(4),
-    };
+    test_reset_state();
+    test_track_slot(test_default_slot(), KC_RIGHT_ALT, pos, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_set_held_action_keycode(test_default_slot(), MO(4));
+    key_runtime_slot_commit_hold_phase(test_default_slot(), true);
 
     CHECK(test_feedback_preview_layer() == UINT8_MAX);
 }
 
 static void test_non_layer_held_action_has_no_preview_layer(void) {
-    test_reset_state();
+    keypos_t pos = {.row = 0, .col = 0};
 
-    active_key = (active_key_state_t){
-        .owner.keycode                 = KC_RIGHT_ALT,
-        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-        .lifecycle.held_action_keycode = SAFE_RANGE + 1,
-    };
+    test_reset_state();
+    test_track_slot(test_default_slot(), KC_RIGHT_ALT, pos, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_set_held_action_keycode(test_default_slot(), SAFE_RANGE + 1);
+    key_runtime_slot_commit_hold_phase(test_default_slot(), true);
 
     CHECK(test_feedback_preview_layer() == UINT8_MAX);
 }
 
 static void test_feedback_falls_back_to_secondary_active_slot(void) {
-    test_reset_state();
+    keypos_t other_pos = {.row = 0, .col = 1};
 
-    *test_other_slot() = (active_key_state_t){
-        .owner.keycode                 = KC_RIGHT_ALT,
-        .lifecycle.held_action_keycode = SAFE_RANGE + 1,
-    };
+    test_reset_state();
+    test_track_slot(test_other_slot(), KC_RIGHT_ALT, other_pos, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_set_held_action_keycode(test_other_slot(), SAFE_RANGE + 1);
 
     uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_hold_active(flags));
@@ -415,13 +406,10 @@ static void test_feedback_falls_back_to_secondary_active_slot(void) {
 }
 
 static void test_multi_tap_pending_flag_uses_secondary_slot(void) {
-    test_reset_state();
+    keypos_t pos = {.row = 4, .col = 2};
 
-    test_other_slot()->pending_multi_tap = (multi_tap_t){
-        .keycode = KC_RIGHT_ALT,
-        .key_pos = (keypos_t){.row = 4, .col = 2},
-        .count   = 1,
-    };
+    test_reset_state();
+    key_runtime_slot_begin_pending_multi_tap(test_other_slot(), KC_RIGHT_ALT, pos, KC_NO, 0, 120, 180, false);
 
     uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_multi_tap_pending(flags));
@@ -433,34 +421,24 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
 
     test_reset_state();
 
-    active_key = (active_key_state_t){
-        .owner.keycode = TEST_MULTI_TAP_KEY,
-        .owner.key_pos = pos,
-        .interaction   = test_cached_interaction((handled_key_resolution_t){
-            .keycode   = TEST_MULTI_TAP_KEY,
-            .tap_count = 1,
-            .step =
-                {
-                    .tap = TAP_SENDS(TEST_PENDING_TAP_ACTION),
-                },
-            .tap_hold_term    = 120,
-            .longer_hold_term = 240,
-            .has_more_taps    = false,
-            .flags            = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP,
-        }),
-        .pending_multi_tap =
-            {
-                .keycode          = TEST_MULTI_TAP_KEY,
-                .key_pos          = pos,
-                .timer            = (uint16_t)(fake_time - 50),
-                .count            = 2,
-                .pending_hold     = true,
-                .tap_action       = TEST_PENDING_TAP_ACTION,
-                .tap_repeat_count = 1,
-                .has_more_taps    = true,
-                .tap_hold_term    = 120,
-            },
-    };
+    test_track_slot(test_default_slot(), TEST_MULTI_TAP_KEY, pos,
+                    test_cached_interaction((handled_key_resolution_t){
+                        .keycode   = TEST_MULTI_TAP_KEY,
+                        .tap_count = 1,
+                        .step =
+                            {
+                                .tap = TAP_SENDS(TEST_PENDING_TAP_ACTION),
+                            },
+                        .tap_hold_term    = 120,
+                        .longer_hold_term = 240,
+                        .has_more_taps    = false,
+                        .flags            = HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP,
+                    }),
+                    KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_begin_pending_multi_tap(test_default_slot(), TEST_MULTI_TAP_KEY, pos, TEST_PENDING_TAP_ACTION, 1, 120, 180, true);
+    test_default_slot()->pending_multi_tap.timer        = (uint16_t)(fake_time - 50);
+    test_default_slot()->pending_multi_tap.count        = 2;
+    test_default_slot()->pending_multi_tap.pending_hold = true;
 
     release = test_step_handled_release(test_default_slot(), TEST_MULTI_TAP_KEY, pos, (key_behavior_view_t){.keycode = TEST_MULTI_TAP_KEY});
 
@@ -472,31 +450,30 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
 }
 
 static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
+    keypos_t primary_pos = {.row = 0, .col = 0};
+    keypos_t other_pos   = {.row = 0, .col = 1};
+
     test_reset_state();
+    test_track_slot(test_default_slot(), MO(2), primary_pos, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_set_held_action_keycode(test_default_slot(), MO(2));
+    key_runtime_slot_commit_hold_phase(test_default_slot(), true);
 
-    active_key = (active_key_state_t){
-        .owner.keycode                 = MO(2),
-        .lifecycle.held_action_keycode = MO(2),
-        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-    };
-
-    *test_other_slot() = (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 150),
-        .owner.keycode = KC_LEFT,
-        .interaction   = test_cached_interaction((handled_key_resolution_t){
-            .keycode   = KC_LEFT,
-            .tap_count = 1,
-            .step =
-                {
-                    .hold      = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
-                    .long_hold = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
-                },
-            .tap_hold_term    = 100,
-            .longer_hold_term = 300,
-            .has_more_taps    = false,
-            .flags            = HANDLED_KEY_FLAG_HANDLED,
-        }),
-    };
+    test_track_slot(test_other_slot(), KC_LEFT, other_pos,
+                    test_cached_interaction((handled_key_resolution_t){
+                        .keycode   = KC_LEFT,
+                        .tap_count = 1,
+                        .step =
+                            {
+                                .hold      = TAP_ON_RELEASE_AFTER_HOLD(TEST_PENDING_TAP_ACTION),
+                                .long_hold = TAP_AT_HOLD_THRESHOLD(TEST_MULTI_TAP_KEY),
+                            },
+                        .tap_hold_term    = 100,
+                        .longer_hold_term = 300,
+                        .has_more_taps    = false,
+                        .flags            = HANDLED_KEY_FLAG_HANDLED,
+                    }),
+                    KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    test_other_slot()->timer = (uint16_t)(fake_time - 150);
 
     uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_hold_pending(flags));

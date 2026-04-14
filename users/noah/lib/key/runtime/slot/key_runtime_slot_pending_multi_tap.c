@@ -10,7 +10,7 @@
 
 #include "../../../action/action_dispatch.h"
 #include "../../../action/action_lifecycle.h"
-#include "../key_runtime_index.h"
+#include "../key_runtime_index_internal.h"
 #include "../key_runtime_trace.h"
 
 static void key_runtime_slot_pending_multi_tap_clear_active_state(active_key_state_t *slot) {

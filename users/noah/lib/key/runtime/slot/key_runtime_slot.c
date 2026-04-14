@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "../key_runtime_state.h"
-#include "../key_runtime_index.h"
+#include "../key_runtime_index_internal.h"
 #include "../../interaction/key_behavior_lookup.h"
 
 #include <stddef.h>
@@ -255,6 +255,24 @@ void key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot) {
     }
 
     multi_tap_reset(&slot->pending_multi_tap);
+    key_runtime_index_sync_slot(slot);
+}
+
+void key_runtime_slot_set_held_action_keycode(active_key_state_t *slot, uint16_t held_action_keycode) {
+    if (!slot) {
+        return;
+    }
+
+    slot->lifecycle.held_action_keycode = held_action_keycode;
+    key_runtime_index_sync_slot(slot);
+}
+
+void key_runtime_slot_set_repeat_binding_active(active_key_state_t *slot, bool active) {
+    if (!slot) {
+        return;
+    }
+
+    slot->lifecycle.repeat_binding_active = active;
     key_runtime_index_sync_slot(slot);
 }
 

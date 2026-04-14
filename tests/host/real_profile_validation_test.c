@@ -58,6 +58,77 @@ bool is_pd_mode_lock_action(uint16_t action) {
     return false;
 }
 
+bool layer_ownership_toggle_lock_state(uint8_t layer) {
+    (void)layer;
+    return true;
+}
+
+void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
+    (void)key_pos;
+    (void)layer;
+}
+
+bool layer_ownership_momentary_release(keypos_t key_pos) {
+    (void)key_pos;
+    return true;
+}
+
+const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+    (void)action;
+    return NULL;
+}
+
+bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+    (void)mode;
+    return false;
+}
+
+void noah_dispatch_synthetic_tap(uint16_t keycode) {
+    (void)keycode;
+}
+
+void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
+    (void)keycode;
+}
+
+void noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
+    (void)keycode;
+    (void)pressed;
+}
+
+void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t tap_count) {
+    (void)keycode;
+    (void)pressed;
+    (void)tap_count;
+}
+
+bool owned_keycode_register(uint16_t keycode) {
+    (void)keycode;
+    return false;
+}
+
+bool owned_keycode_unregister(uint16_t keycode) {
+    (void)keycode;
+    return false;
+}
+
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    (void)action;
+    (void)pressed;
+}
+
+void register_code16(uint16_t keycode) {
+    (void)keycode;
+}
+
+void tap_code16(uint16_t keycode) {
+    (void)keycode;
+}
+
+void unregister_code16(uint16_t keycode) {
+    (void)keycode;
+}
+
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
     return keymaps[layer_num][row][column];
 }

@@ -20,6 +20,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/key_runtime_layer_lock_integration_test.c" \
+    "$ROOT/tests/host/action_kind_host_stubs.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
