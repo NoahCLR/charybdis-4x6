@@ -83,6 +83,7 @@ static uint8_t overflow_log_count;
 
 static test_call_t test_calls[TEST_MAX_CALLS];
 static uint8_t     test_call_count;
+layer_state_t      layer_state;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -101,6 +102,17 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
         .row = row,
         .col = col,
     };
+}
+
+bool layer_state_cmp(layer_state_t state, uint8_t layer) {
+    return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
+}
+
+uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+    (void)layer_num;
+    (void)row;
+    (void)column;
+    return KC_TRNS;
 }
 
 static keypos_t test_default_slot_key_pos;

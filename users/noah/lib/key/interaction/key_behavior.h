@@ -59,6 +59,8 @@ typedef struct {
 //
 // present = true:
 //   Send action instead.
+//   TAP_SENDS(KC_TRNS) is a special tap-tier fallback: it resolves the next
+//   lower active layer's tap action at the same physical position.
 
 typedef struct {
     bool     present;

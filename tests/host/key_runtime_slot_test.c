@@ -453,6 +453,11 @@ uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
     return key.keycode;
 }
 
+uint16_t handled_key_resolution_tap_action_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_tap_action(key);
+}
+
 uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t key) {
     uint16_t action = handled_key_resolution_tap_action(key);
 
@@ -465,6 +470,11 @@ uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t key) {
     }
 
     return key.tap_count;
+}
+
+uint8_t handled_key_resolution_tap_repeat_count_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_tap_repeat_count(key);
 }
 
 bool handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t key) {

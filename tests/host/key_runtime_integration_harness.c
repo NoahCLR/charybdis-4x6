@@ -3,6 +3,19 @@
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/noah_runtime.h"
 
+__attribute__((weak)) layer_state_t layer_state;
+
+__attribute__((weak)) bool layer_state_cmp(layer_state_t state, uint8_t layer) {
+    return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
+}
+
+__attribute__((weak)) uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+    (void)layer_num;
+    (void)row;
+    (void)column;
+    return KC_TRNS;
+}
+
 __attribute__((weak)) bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

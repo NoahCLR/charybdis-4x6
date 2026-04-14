@@ -144,6 +144,8 @@ hold_behavior_t                  handled_key_resolution_long_hold(handled_key_re
 key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t resolution);
 uint16_t                         handled_key_resolution_tap_action(handled_key_resolution_t resolution);
 uint8_t                          handled_key_resolution_tap_repeat_count(handled_key_resolution_t resolution);
+uint16_t                         handled_key_resolution_tap_action_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
+uint8_t                          handled_key_resolution_tap_repeat_count_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 bool                             handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t resolution);
 uint16_t                         handled_key_resolution_tap_hold_term(handled_key_resolution_t resolution);
 uint16_t                         handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution);

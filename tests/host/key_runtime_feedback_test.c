@@ -151,6 +151,11 @@ uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
     return key.step.tap.present ? key.step.tap.action : KC_NO;
 }
 
+uint16_t handled_key_resolution_tap_action_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_tap_action(key);
+}
+
 bool handled_key_resolution_uses_fallback_hold(handled_key_resolution_t key) {
     return key.tap_count == 1 && key.keycode < SAFE_RANGE && !handled_key_resolution_is_momentary_layer(key) && key.step.tap.present && !key.step.hold.present && !key.step.long_hold.present;
 }
@@ -166,6 +171,11 @@ key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_ke
 
 uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t key) {
     return handled_key_resolution_tap_action(key) == KC_NO ? 0 : 1;
+}
+
+uint8_t handled_key_resolution_tap_repeat_count_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_tap_repeat_count(key);
 }
 
 bool handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t key) {

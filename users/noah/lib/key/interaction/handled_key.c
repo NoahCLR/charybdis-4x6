@@ -11,6 +11,7 @@
 #include "../../action/action_dispatch.h"
 #include "../../pointing/defs/pd_modes.h"
 #include "key_behavior_lookup.h"
+#include "keymap_introspection.h" // QMK
 
 uint8_t behavior_get_layer(uint16_t keycode) {
     return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
@@ -101,6 +102,96 @@ static uint16_t handled_key_single_tap_action(handled_key_resolution_t resolutio
     }
 
     return handled_key_default_tap_action(resolution);
+}
+
+static uint16_t handled_key_tap_action_behavior(handled_key_resolution_t resolution);
+
+static bool handled_key_keypos_in_bounds(keypos_t key_pos) {
+    return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
+}
+
+static layer_state_t handled_key_transparent_tap_layer_state(void) {
+    return layer_state | ((layer_state_t)1u << 0);
+}
+
+static uint16_t handled_key_unhandled_candidate_tap_action(uint16_t keycode) {
+    noah_action_desc_t desc = noah_action_describe(keycode);
+
+    if (keycode == KC_TRNS) {
+        return KC_TRNS;
+    }
+
+    if (noah_action_desc_is_owned_momentary_layer(desc)) {
+        return KC_NO;
+    }
+
+    if (noah_action_desc_is_layer_tap(desc)) {
+        return QK_LAYER_TAP_GET_TAP_KEYCODE(keycode);
+    }
+
+    return keycode;
+}
+
+static uint16_t handled_key_candidate_tap_action(uint16_t keycode, uint8_t tap_count) {
+    handled_key_resolution_t resolution = handled_key_lookup_tap_count(keycode, tap_count);
+
+    if (handled_key_resolution_is_handled(resolution)) {
+        return handled_key_tap_action_behavior(resolution);
+    }
+
+    return handled_key_unhandled_candidate_tap_action(keycode);
+}
+
+static int8_t handled_key_transparent_tap_origin_layer(handled_key_resolution_t resolution, keypos_t key_pos) {
+    layer_state_t active_layers = handled_key_transparent_tap_layer_state();
+
+    if (!handled_key_keypos_in_bounds(key_pos)) {
+        return -1;
+    }
+
+    for (int8_t layer = (int8_t)(LAYER_COUNT - 1); layer >= 0; layer--) {
+        if (!layer_state_cmp(active_layers, (uint8_t)layer)) {
+            continue;
+        }
+
+        if (keycode_at_keymap_location((uint8_t)layer, key_pos.row, key_pos.col) == resolution.keycode) {
+            return layer;
+        }
+    }
+
+    return -1;
+}
+
+static uint16_t handled_key_transparent_tap_action_below_origin(handled_key_resolution_t resolution, keypos_t key_pos) {
+    layer_state_t active_layers = handled_key_transparent_tap_layer_state();
+    int8_t        origin_layer  = handled_key_transparent_tap_origin_layer(resolution, key_pos);
+
+    if (origin_layer <= 0) {
+        return KC_NO;
+    }
+
+    for (int8_t layer = (int8_t)(origin_layer - 1); layer >= 0; layer--) {
+        uint16_t keycode;
+        uint16_t tap_action;
+
+        if (!layer_state_cmp(active_layers, (uint8_t)layer)) {
+            continue;
+        }
+
+        keycode = keycode_at_keymap_location((uint8_t)layer, key_pos.row, key_pos.col);
+        if (keycode == KC_TRNS) {
+            continue;
+        }
+
+        tap_action = handled_key_candidate_tap_action(keycode, resolution.tap_count);
+        if (tap_action == KC_TRNS) {
+            continue;
+        }
+
+        return tap_action;
+    }
+
+    return KC_NO;
 }
 
 static hold_behavior_t handled_key_hold_behavior(handled_key_resolution_t resolution) {
@@ -243,6 +334,20 @@ uint16_t handled_key_resolution_tap_action(handled_key_resolution_t resolution) 
 
 uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t resolution) {
     return handled_key_tap_repeat_count_behavior(resolution, handled_key_resolution_tap_action(resolution));
+}
+
+uint16_t handled_key_resolution_tap_action_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
+    uint16_t tap_action = handled_key_tap_action_behavior(resolution);
+
+    if (tap_action != KC_TRNS) {
+        return tap_action;
+    }
+
+    return handled_key_transparent_tap_action_below_origin(resolution, key_pos);
+}
+
+uint8_t handled_key_resolution_tap_repeat_count_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
+    return handled_key_tap_repeat_count_behavior(resolution, handled_key_resolution_tap_action_at_position(resolution, key_pos));
 }
 
 bool handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t resolution) {

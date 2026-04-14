@@ -50,6 +50,17 @@ static uint8_t                               key_runtime_scenario_effect_count_v
 
 layer_state_t layer_state;
 
+bool layer_state_cmp(layer_state_t state, uint8_t layer) {
+    return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
+}
+
+uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+    (void)layer_num;
+    (void)row;
+    (void)column;
+    return KC_TRNS;
+}
+
 static void key_runtime_scenario_log_effect(key_runtime_scenario_effect_t effect) {
     if (key_runtime_scenario_effect_count_value >= ARRAY_SIZE(key_runtime_scenario_effects)) {
         return;

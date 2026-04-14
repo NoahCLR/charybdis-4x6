@@ -87,7 +87,7 @@ static key_runtime_slot_press_context_t key_runtime_slot_press_context(active_ke
         .keycode                           = keycode,
         .key_pos                           = key_pos,
         .resolution                        = resolution,
-        .tap_action                        = handled_key_resolution_tap_action(resolution),
+        .tap_action                        = handled_key_resolution_tap_action_at_position(resolution, key_pos),
         .hold                              = handled_key_resolution_hold(resolution),
         .long_hold                         = handled_key_resolution_long_hold(resolution),
         .hold_strategy                     = handled_key_resolution_hold_strategy(resolution),

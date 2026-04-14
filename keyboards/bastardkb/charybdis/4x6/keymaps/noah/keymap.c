@@ -228,6 +228,9 @@ enum keymap_custom_keycodes {
 //     send action on a quick release instead of the key's normal tap
 //     use this for alternate tap output, media keys, macros, layer locks,
 //     and pointer-mode locks
+//   TAP_SENDS(KC_TRNS)
+//     keep the lower active layer's tap output at this physical key while the
+//     authored row still owns this tap count's timing and hold behavior
 //
 // hold-tier and long-hold-tier actions accept the same three helpers:
 //   PRESS_AND_HOLD_UNTIL_RELEASE(action)

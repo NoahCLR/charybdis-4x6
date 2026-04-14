@@ -201,13 +201,17 @@ void key_runtime_slot_begin_pending_multi_tap(active_key_state_t *slot, uint16_t
 }
 
 uint16_t key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, uint16_t keycode) {
+    keypos_t key_pos;
+
     if (!slot) {
         return KC_NO;
     }
 
+    key_pos = slot->pending_multi_tap.key_pos;
+
     handled_key_resolution_t resolution = handled_key_lookup_tap_count(keycode, (uint8_t)(slot->pending_multi_tap.count + 1u));
 
-    return multi_tap_advance(&slot->pending_multi_tap, handled_key_resolution_tap_action(resolution), handled_key_resolution_tap_repeat_count(resolution), resolution.has_more_taps, handled_key_resolution_tap_resolves_on_press(resolution), handled_key_resolution_hold(resolution), handled_key_resolution_long_hold(resolution));
+    return multi_tap_advance(&slot->pending_multi_tap, handled_key_resolution_tap_action_at_position(resolution, key_pos), handled_key_resolution_tap_repeat_count_at_position(resolution, key_pos), resolution.has_more_taps, handled_key_resolution_tap_resolves_on_press(resolution), handled_key_resolution_hold(resolution), handled_key_resolution_long_hold(resolution));
 }
 
 uint16_t key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slot, uint8_t *repeat_count) {
