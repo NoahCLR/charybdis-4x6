@@ -6,7 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_admission.h"
-#include "key_runtime_index.h"
+#include "key_runtime_index_internal.h"
 
 active_key_state_t *key_runtime_first_active_slot(void) {
     return key_runtime_active_slot_by_order(0);

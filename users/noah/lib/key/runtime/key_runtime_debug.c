@@ -4,7 +4,7 @@
 
 #include "../../state/runtime/runtime_debug.h"
 
-#include "key_runtime_index.h"
+#include "key_runtime_index_internal.h"
 #include "key_runtime_internal.h"
 
 static bool noah_runtime_debug_key_pos_valid(keypos_t key_pos) {

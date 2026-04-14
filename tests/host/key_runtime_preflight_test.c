@@ -5,7 +5,7 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
-#include "users/noah/lib/key/runtime/key_runtime_index.h"
+#include "users/noah/lib/key/runtime/key_runtime_index_internal.h"
 #include "users/noah/lib/key/runtime/key_runtime_process_internal.h"
 #include "users/noah/lib/key/runtime/key_runtime_internal.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"

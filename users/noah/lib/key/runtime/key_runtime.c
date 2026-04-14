@@ -7,7 +7,7 @@
 
 #include "../interaction/handled_key.h"
 #include "key_runtime_api.h"
-#include "key_runtime_index.h"
+#include "key_runtime_index_internal.h"
 #include "key_runtime_internal.h"
 #include "../ownership/held_action.h"
 

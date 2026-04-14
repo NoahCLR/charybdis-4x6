@@ -2,7 +2,6 @@
 // Key Runtime Index
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_index.h"
 #include "key_runtime_index_internal.h"
 
 #include <stddef.h>

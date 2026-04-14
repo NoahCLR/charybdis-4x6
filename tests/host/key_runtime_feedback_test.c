@@ -5,7 +5,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
-#include "users/noah/lib/key/runtime/key_runtime_index.h"
+#include "users/noah/lib/key/runtime/key_runtime_index_internal.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_step.h"
 #include "users/noah/lib/key/runtime/key_runtime_internal.h"
 #include "host_handled_key_fixture.h"

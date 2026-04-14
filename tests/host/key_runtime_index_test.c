@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "users/noah/lib/key/runtime/key_runtime_index.h"
+#include "users/noah/lib/key/runtime/key_runtime_index_internal.h"
 #include "users/noah/lib/key/runtime/key_runtime_internal.h"
 #include "host_runtime_reset_fixture.h"
 
