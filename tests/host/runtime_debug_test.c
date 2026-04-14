@@ -397,11 +397,11 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
 
     noah_runtime_debug_snapshot(&snapshot);
 
-    CHECK(snapshot.core.key.feedback.active);
-    CHECK(snapshot.core.pd.local_active_mode == PD_MODE_VOLUME);
-    CHECK(snapshot.core.pd.remote_display_active_mode == PD_MODE_ARROW);
+    CHECK(snapshot.key.feedback_active);
+    CHECK(snapshot.pd.local_active_mode == PD_MODE_VOLUME);
+    CHECK(snapshot.pd.remote_display_active_mode == PD_MODE_ARROW);
     CHECK(noah_runtime_debug_slot_owner_keycode(&snapshot, active_key) == KC_C);
-    CHECK(snapshot.core.key.slots_by_position[0].interaction.binding.tap_action == KC_C);
+    CHECK(noah_runtime_debug_slot_tap_action(&snapshot, active_key) == KC_C);
     CHECK(noah_runtime_debug_active_slot_count(&snapshot) == 1);
     CHECK(noah_runtime_debug_active_slot_key_pos(&snapshot, 0, &key_pos));
     CHECK(test_keypos_equal(key_pos, active_key));
@@ -471,13 +471,13 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     noah_runtime_reset_for_test();
     noah_runtime_debug_snapshot(&snapshot);
 
-    CHECK(!snapshot.core.key.feedback.active);
-    CHECK(snapshot.core.pd.local_active_mode == 0);
-    CHECK(snapshot.core.pd.local_locked_mode == 0);
-    CHECK(snapshot.core.pd.remote_display_active_mode == 0);
-    CHECK(snapshot.core.pd.remote_display_locked_mode == 0);
+    CHECK(!snapshot.key.feedback_active);
+    CHECK(snapshot.pd.local_active_mode == 0);
+    CHECK(snapshot.pd.local_locked_mode == 0);
+    CHECK(snapshot.pd.remote_display_active_mode == 0);
+    CHECK(snapshot.pd.remote_display_locked_mode == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(&snapshot, active_key) == KC_NO);
-    CHECK(snapshot.core.key.slots_by_position[0].interaction.binding.tap_action == KC_NO);
+    CHECK(noah_runtime_debug_slot_tap_action(&snapshot, active_key) == KC_NO);
     CHECK(noah_runtime_debug_active_slot_count(&snapshot) == 0);
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count(&snapshot) == 0);
     CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&snapshot, &active_key));
