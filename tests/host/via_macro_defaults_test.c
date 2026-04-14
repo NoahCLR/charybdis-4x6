@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/macro/macro_slot_provider.h"
 #include "users/noah/lib/macro/macro_payload.h"
 #include "users/noah/lib/macro/via_macro_defaults.h"
 #include "users/noah/noah_keymap_ids.h"
@@ -20,6 +21,7 @@ static uint8_t macro_buffer[TEST_MACRO_BUFFER_CAPACITY];
 static bool    fake_via_eeprom_valid;
 static uint8_t rgb_invalidate_count;
 static uint8_t dynamic_keymap_set_buffer_calls;
+static uint8_t macro_payload_encode_write_calls;
 
 const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT] = {
     [0] = "AB",
@@ -43,6 +45,7 @@ static void test_reset_state(void) {
     fake_via_eeprom_valid           = true;
     rgb_invalidate_count            = 0;
     dynamic_keymap_set_buffer_calls = 0;
+    macro_payload_encode_write_calls = 0;
 }
 
 uint16_t dynamic_keymap_macro_get_buffer_size(void) {
@@ -86,6 +89,8 @@ bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_
 bool macro_payload_encode_write(const char *payload, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {
     uint16_t count = 0;
 
+    macro_payload_encode_write_calls++;
+
     if (written) {
         *written = 0;
     }
@@ -105,6 +110,46 @@ bool macro_payload_encode_write(const char *payload, macro_payload_write_byte_fn
         *written = count;
     }
 
+    return true;
+}
+
+typedef struct {
+    uint16_t offset;
+    uint8_t  bytes[TEST_MACRO_BUFFER_CAPACITY];
+} test_provider_sink_t;
+
+static uint8_t test_provider_load_ir_calls;
+static uint8_t test_provider_lookup_calls;
+
+static bool test_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir, void *context) {
+    (void)context;
+
+    test_provider_load_ir_calls++;
+    if (!ir || slot != 0) {
+        return false;
+    }
+
+    ir->length = 0;
+    return true;
+}
+
+static bool test_provider_lookup_payload(uint8_t slot, const char **payload, void *context) {
+    (void)context;
+
+    test_provider_lookup_calls++;
+    if (!payload || slot != 0) {
+        return false;
+    }
+
+    *payload = "AB";
+    return true;
+}
+
+static bool test_provider_sink_write_byte(uint8_t byte, void *context) {
+    test_provider_sink_t *sink = (test_provider_sink_t *)context;
+
+    CHECK(sink && sink->offset < sizeof(sink->bytes));
+    sink->bytes[sink->offset++] = byte;
     return true;
 }
 
@@ -177,12 +222,42 @@ static void test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan(void) {
     CHECK(dynamic_keymap_set_buffer_calls > 0);
 }
 
+static void test_provider_encode_write_uses_cached_load_state(void) {
+    macro_slot_cache_t           cache[1]  = {0};
+    macro_slot_provider_t        provider  = {
+        .slot_count     = 1,
+        .load_ir        = test_provider_load_ir,
+        .lookup_payload = test_provider_lookup_payload,
+    };
+    test_provider_sink_t         sink      = {0};
+    uint16_t                     written   = 0;
+
+    test_provider_load_ir_calls = 0;
+    test_provider_lookup_calls  = 0;
+    macro_payload_encode_write_calls = 0;
+
+    CHECK(macro_slot_provider_encode_write(&provider, cache, 0, test_provider_sink_write_byte, &sink, &written));
+    CHECK(test_provider_load_ir_calls == 1);
+    CHECK(test_provider_lookup_calls == 1);
+    CHECK(macro_payload_encode_write_calls == 1);
+    CHECK(written == 2);
+    CHECK(sink.offset == 2);
+    CHECK(sink.bytes[0] == 'A');
+    CHECK(sink.bytes[1] == 'B');
+
+    CHECK(macro_slot_provider_encode_write(&provider, cache, 0, test_provider_sink_write_byte, &sink, NULL));
+    CHECK(test_provider_load_ir_calls == 1);
+    CHECK(test_provider_lookup_calls == 2);
+    CHECK(macro_payload_encode_write_calls == 2);
+}
+
 int main(void) {
     test_post_init_seeds_defaults_when_via_eeprom_is_invalid();
     test_eeprom_init_seeds_defaults_immediately();
     test_macro_reset_command_defers_reseed_to_matrix_scan();
     test_keymap_reset_commands_invalidate_rgb();
     test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan();
+    test_provider_encode_write_uses_cached_load_state();
 
     puts("via_macro_defaults host tests passed");
     return 0;

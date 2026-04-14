@@ -22,6 +22,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_transparency.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_materialize.c" \
+    "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \
     -o "$BIN"
 
 "$BIN"

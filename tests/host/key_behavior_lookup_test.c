@@ -5,29 +5,32 @@
 
 #include "users/noah/lib/key/interaction/handled_key.h"
 #include "users/noah/lib/key/interaction/key_behavior_lookup.h"
+#include "users/noah/lib/key/interaction/multi_tap_engine.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 
 enum {
-    TEST_LAYER_TAP_KEY      = 0x04,
-    TEST_AUTHORED_LAYER_TAP = LT(2, TEST_LAYER_TAP_KEY),
-    TEST_BARE_LAYER_TAP     = LT(3, TEST_LAYER_TAP_KEY),
-    TEST_PD_MODE_KEY        = SAFE_RANGE + 0x0Fu,
-    TEST_TAP_ACTION         = SAFE_RANGE + 0x10u,
-    TEST_PD_MODE_LOCK_KEY   = SAFE_RANGE + 0x11u,
-    TEST_TRANSPARENT_PD_KEY = SAFE_RANGE + 0x12u,
-    TEST_TRANSPARENT_KEY    = SAFE_RANGE + 0x13u,
-    TEST_MULTI_TAP_KEY      = SAFE_RANGE + 0x14u,
-    TEST_TRANSPARENT_HOLD_KEY = SAFE_RANGE + 0x15u,
-    TEST_TRANSPARENT_HOLD_OTHER_KEY = SAFE_RANGE + 0x16u,
-    TEST_TRANSPARENT_LONG_HOLD_KEY = SAFE_RANGE + 0x17u,
-    TEST_HOLD_ACTION = SAFE_RANGE + 0x18u,
-    TEST_LONG_HOLD_ACTION = SAFE_RANGE + 0x19u,
-    TEST_HOLD_BEHAVIOR_KEY = SAFE_RANGE + 0x1Au,
-    TEST_LONG_HOLD_BEHAVIOR_KEY = SAFE_RANGE + 0x1Bu,
+    TEST_LAYER_TAP_KEY                = 0x04,
+    TEST_AUTHORED_LAYER_TAP           = LT(2, TEST_LAYER_TAP_KEY),
+    TEST_BARE_LAYER_TAP               = LT(3, TEST_LAYER_TAP_KEY),
+    TEST_PD_MODE_KEY                  = SAFE_RANGE + 0x0Fu,
+    TEST_TAP_ACTION                   = SAFE_RANGE + 0x10u,
+    TEST_PD_MODE_LOCK_KEY             = SAFE_RANGE + 0x11u,
+    TEST_TRANSPARENT_PD_KEY           = SAFE_RANGE + 0x12u,
+    TEST_TRANSPARENT_KEY              = SAFE_RANGE + 0x13u,
+    TEST_MULTI_TAP_KEY                = SAFE_RANGE + 0x14u,
+    TEST_TRANSPARENT_HOLD_KEY         = SAFE_RANGE + 0x15u,
+    TEST_TRANSPARENT_HOLD_OTHER_KEY   = SAFE_RANGE + 0x16u,
+    TEST_TRANSPARENT_LONG_HOLD_KEY    = SAFE_RANGE + 0x17u,
+    TEST_HOLD_ACTION                  = SAFE_RANGE + 0x18u,
+    TEST_LONG_HOLD_ACTION             = SAFE_RANGE + 0x19u,
+    TEST_HOLD_BEHAVIOR_KEY            = SAFE_RANGE + 0x1Au,
+    TEST_LONG_HOLD_BEHAVIOR_KEY       = SAFE_RANGE + 0x1Bu,
+    TEST_CHAIN_MULTI_TAP_KEY          = SAFE_RANGE + 0x1Cu,
 };
 
 layer_state_t   layer_state;
 static uint16_t test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
+static uint16_t fake_time;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -58,10 +61,15 @@ static void test_reset_keymap(void) {
     }
 
     layer_state = 0;
+    fake_time   = 1000u;
 }
 
 static void test_set_keymap_key(uint8_t layer, keypos_t key_pos, uint16_t keycode) {
     test_keymap[layer][key_pos.row][key_pos.col] = keycode;
+}
+
+static handled_key_materialized_t test_materialize(handled_key_resolution_t resolution, keypos_t key_pos) {
+    return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
 }
 
 const key_behavior_t key_behaviors[] = {
@@ -93,6 +101,15 @@ const key_behavior_t key_behaviors[] = {
             {
                 [0] = {.tap = TAP_SENDS(KC_C)},
                 [1] = {.tap = TAP_SENDS(TEST_TAP_ACTION)},
+            },
+    },
+    {
+        .keycode = TEST_CHAIN_MULTI_TAP_KEY,
+        .tap_counts =
+            {
+                [0] = {.tap = TAP_SENDS(KC_V)},
+                [1] = {.tap = TAP_SENDS(TEST_TAP_ACTION)},
+                [2] = {.tap = TAP_SENDS(TEST_HOLD_ACTION)},
             },
     },
     {
@@ -152,6 +169,30 @@ uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t colu
     return test_keymap[layer_num][row][column];
 }
 
+uint16_t timer_read(void) {
+    return fake_time;
+}
+
+uint16_t timer_elapsed(uint16_t last) {
+    return (uint16_t)(fake_time - last);
+}
+
+uint8_t get_mods(void) {
+    return 0;
+}
+
+uint8_t get_weak_mods(void) {
+    return 0;
+}
+
+uint8_t get_oneshot_mods(void) {
+    return 0;
+}
+
+uint8_t get_oneshot_locked_mods(void) {
+    return 0;
+}
+
 static void test_bare_lt_falls_back_to_qmk(void) {
     key_behavior_view_t behavior = key_behavior_lookup(TEST_BARE_LAYER_TAP);
 
@@ -208,62 +249,62 @@ static void test_repeat_rate_validation_helper_enforces_supported_range(void) {
 }
 
 static void test_transparent_tap_uses_lower_active_layer_tap_action(void) {
-    keypos_t                 key_pos     = test_keypos(0, 0);
-    handled_key_resolution_t resolution;
+    keypos_t                   key_pos     = test_keypos(0, 0);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, KC_V);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_PD_KEY);
-    CHECK(handled_key_resolution_tap_action_at_position(resolution, key_pos) == KC_V);
-    CHECK(handled_key_resolution_tap_repeat_count_at_position(resolution, key_pos) == 1);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_PD_KEY), key_pos);
+    CHECK(materialized.tap_action == KC_V);
+    CHECK(materialized.tap_repeat_count == 1);
 }
 
 static void test_transparent_tap_falls_back_to_base_layer_tap_action(void) {
-    keypos_t                 key_pos     = test_keypos(0, 1);
-    handled_key_resolution_t resolution;
+    keypos_t                   key_pos     = test_keypos(0, 1);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(0, key_pos, KC_C);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
     layer_state = (layer_state_t)1u << 2;
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_PD_KEY);
-    CHECK(handled_key_resolution_tap_action_at_position(resolution, key_pos) == KC_C);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_PD_KEY), key_pos);
+    CHECK(materialized.tap_action == KC_C);
 }
 
 static void test_transparent_tap_resolves_bare_lt_to_its_tap_keycode(void) {
-    keypos_t                 key_pos     = test_keypos(0, 2);
-    handled_key_resolution_t resolution;
+    keypos_t                   key_pos     = test_keypos(0, 2);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_BARE_LAYER_TAP);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_PD_KEY);
-    CHECK(handled_key_resolution_tap_action_at_position(resolution, key_pos) == TEST_LAYER_TAP_KEY);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_PD_KEY), key_pos);
+    CHECK(materialized.tap_action == TEST_LAYER_TAP_KEY);
 }
 
 static void test_transparent_tap_stops_at_plain_pd_mode_key_without_tap_output(void) {
-    keypos_t                 key_pos     = test_keypos(0, 3);
-    handled_key_resolution_t resolution;
+    keypos_t                   key_pos     = test_keypos(0, 3);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_PD_MODE_KEY);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_PD_KEY);
-    CHECK(handled_key_resolution_tap_action_at_position(resolution, key_pos) == KC_NO);
-    CHECK(handled_key_resolution_tap_repeat_count_at_position(resolution, key_pos) == 0);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_PD_KEY), key_pos);
+    CHECK(materialized.tap_action == KC_NO);
+    CHECK(materialized.tap_repeat_count == 0);
 }
 
 static void test_transparent_tap_chains_through_lower_authored_transparency(void) {
-    keypos_t                 key_pos     = test_keypos(0, 4);
-    handled_key_resolution_t resolution;
+    keypos_t                   key_pos     = test_keypos(0, 4);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(0, key_pos, KC_V);
@@ -271,92 +312,137 @@ static void test_transparent_tap_chains_through_lower_authored_transparency(void
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_PD_KEY);
-    CHECK(handled_key_resolution_tap_action_at_position(resolution, key_pos) == KC_V);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_PD_KEY), key_pos);
+    CHECK(materialized.tap_action == KC_V);
 }
 
 static void test_transparent_tap_uses_current_tap_count_for_lower_handled_key(void) {
-    keypos_t                 key_pos     = test_keypos(0, 5);
-    handled_key_resolution_t resolution;
+    keypos_t                   key_pos     = test_keypos(0, 5);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_MULTI_TAP_KEY);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup_tap_count(TEST_TRANSPARENT_PD_KEY, 2);
-    CHECK(handled_key_resolution_tap_action_at_position(resolution, key_pos) == TEST_TAP_ACTION);
-    CHECK(handled_key_resolution_tap_repeat_count_at_position(resolution, key_pos) == 1);
+    materialized = test_materialize(handled_key_lookup_tap_count(TEST_TRANSPARENT_PD_KEY, 2), key_pos);
+    CHECK(materialized.tap_action == TEST_TAP_ACTION);
+    CHECK(materialized.tap_repeat_count == 1);
+}
+
+static void test_transparent_tap_inherits_lower_press_resolve_contract(void) {
+    keypos_t                   key_pos     = test_keypos(0, 6);
+    handled_key_materialized_t first_tap;
+    handled_key_materialized_t second_tap;
+    multi_tap_t                chain = {0};
+
+    test_reset_keymap();
+    test_set_keymap_key(1, key_pos, TEST_MULTI_TAP_KEY);
+    test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
+    layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
+
+    first_tap  = test_materialize(handled_key_lookup(TEST_TRANSPARENT_PD_KEY), key_pos);
+    second_tap = test_materialize(handled_key_lookup_tap_count(TEST_TRANSPARENT_PD_KEY, 2), key_pos);
+
+    CHECK(!second_tap.tap_has_more_taps);
+    CHECK(second_tap.tap_resolves_on_press);
+
+    multi_tap_begin(&chain, TEST_TRANSPARENT_PD_KEY, key_pos, first_tap.tap_action, first_tap.tap_repeat_count, first_tap.authored.tap_hold_term, first_tap.authored.multi_tap_term, first_tap.tap_has_more_taps);
+    CHECK(multi_tap_advance(&chain, second_tap.tap_action, second_tap.tap_repeat_count, second_tap.tap_has_more_taps, second_tap.tap_resolves_on_press, second_tap.hold, second_tap.long_hold) == TEST_TAP_ACTION);
+    CHECK(!multi_tap_active(&chain));
+}
+
+static void test_transparent_tap_inherits_lower_release_resolve_contract(void) {
+    keypos_t                   key_pos     = test_keypos(0, 7);
+    handled_key_materialized_t first_tap;
+    handled_key_materialized_t second_tap;
+    multi_tap_t                chain = {0};
+
+    test_reset_keymap();
+    test_set_keymap_key(1, key_pos, TEST_CHAIN_MULTI_TAP_KEY);
+    test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
+    layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
+
+    first_tap  = test_materialize(handled_key_lookup(TEST_TRANSPARENT_PD_KEY), key_pos);
+    second_tap = test_materialize(handled_key_lookup_tap_count(TEST_TRANSPARENT_PD_KEY, 2), key_pos);
+
+    CHECK(second_tap.tap_action == TEST_TAP_ACTION);
+    CHECK(second_tap.tap_repeat_count == 1);
+    CHECK(second_tap.tap_has_more_taps);
+    CHECK(!second_tap.tap_resolves_on_press);
+
+    multi_tap_begin(&chain, TEST_TRANSPARENT_PD_KEY, key_pos, first_tap.tap_action, first_tap.tap_repeat_count, first_tap.authored.tap_hold_term, first_tap.authored.multi_tap_term, first_tap.tap_has_more_taps);
+    CHECK(multi_tap_advance(&chain, second_tap.tap_action, second_tap.tap_repeat_count, second_tap.tap_has_more_taps, second_tap.tap_resolves_on_press, second_tap.hold, second_tap.long_hold) == KC_NO);
+    CHECK(multi_tap_active(&chain));
+    CHECK(chain.count == 2);
+    CHECK(chain.has_more_taps);
 }
 
 static void test_transparent_hold_uses_lower_plain_key_normal_hold_behavior(void) {
-    keypos_t                 key_pos     = test_keypos(0, 6);
-    handled_key_resolution_t resolution;
+    keypos_t                   key_pos     = test_keypos(1, 0);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, KC_V);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
-    CHECK(!handled_key_resolution_hold_at_position(resolution, key_pos).present);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
+    CHECK(!materialized.hold.present);
 }
 
 static void test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata(void) {
-    keypos_t                 key_pos     = test_keypos(0, 7);
-    handled_key_resolution_t resolution;
-    hold_behavior_t          hold;
+    keypos_t                   key_pos     = test_keypos(1, 1);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_PD_MODE_KEY);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
-    hold       = handled_key_resolution_hold_at_position(resolution, key_pos);
-    CHECK(hold.present);
-    CHECK(hold.action == TEST_PD_MODE_KEY);
-    CHECK(hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
-    CHECK(handled_key_resolution_hold_strategy_at_position(resolution, key_pos) == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT);
-    CHECK(handled_key_resolution_pd_mode_at_position(resolution, key_pos) == 1u);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
+    CHECK(materialized.hold.present);
+    CHECK(materialized.hold.action == TEST_PD_MODE_KEY);
+    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
+    CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT);
+    CHECK(materialized.pd_mode == 1u);
 }
 
 static void test_transparent_hold_uses_lower_layer_tap_metadata(void) {
-    keypos_t                 key_pos     = test_keypos(1, 0);
-    handled_key_resolution_t resolution;
+    keypos_t                   key_pos     = test_keypos(1, 2);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_BARE_LAYER_TAP);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
-    CHECK(!handled_key_resolution_hold_at_position(resolution, key_pos).present);
-    CHECK(handled_key_resolution_hold_strategy_at_position(resolution, key_pos) == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
-    CHECK(handled_key_resolution_layer_at_position(resolution, key_pos) == 3);
-    CHECK((handled_key_resolution_flags_at_position(resolution, key_pos) & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0);
-    CHECK((handled_key_resolution_flags_at_position(resolution, key_pos) & HANDLED_KEY_FLAG_LAYER_TAP) != 0);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
+    CHECK(!materialized.hold.present);
+    CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
+    CHECK(materialized.layer == 3);
+    CHECK((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0);
+    CHECK((materialized.flags & HANDLED_KEY_FLAG_LAYER_TAP) != 0);
 }
 
 static void test_transparent_hold_other_uses_lower_layer_tap_metadata(void) {
-    keypos_t                 key_pos     = test_keypos(1, 1);
-    handled_key_resolution_t resolution;
+    keypos_t                   key_pos     = test_keypos(1, 3);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_BARE_LAYER_TAP);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_OTHER_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_OTHER_KEY);
-    CHECK(!handled_key_resolution_hold_at_position(resolution, key_pos).present);
-    CHECK(handled_key_resolution_layer_at_position(resolution, key_pos) == 3);
-    CHECK((handled_key_resolution_flags_at_position(resolution, key_pos) & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_OTHER_KEY), key_pos);
+    CHECK(!materialized.hold.present);
+    CHECK(materialized.layer == 3);
+    CHECK((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0);
 }
 
 static void test_transparent_hold_chains_through_lower_authored_transparency(void) {
-    keypos_t                 key_pos     = test_keypos(1, 2);
-    handled_key_resolution_t resolution;
-    hold_behavior_t          hold;
+    keypos_t                   key_pos     = test_keypos(1, 4);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(0, key_pos, TEST_HOLD_BEHAVIOR_KEY);
@@ -364,45 +450,40 @@ static void test_transparent_hold_chains_through_lower_authored_transparency(voi
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
-    hold       = handled_key_resolution_hold_at_position(resolution, key_pos);
-    CHECK(hold.present);
-    CHECK(hold.action == TEST_HOLD_ACTION);
-    CHECK(hold.mode == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
+    CHECK(materialized.hold.present);
+    CHECK(materialized.hold.action == TEST_HOLD_ACTION);
+    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
 }
 
 static void test_transparent_hold_uses_current_tap_count_for_lower_handled_key(void) {
-    keypos_t                 key_pos     = test_keypos(1, 3);
-    handled_key_resolution_t resolution;
-    hold_behavior_t          hold;
+    keypos_t                   key_pos     = test_keypos(1, 5);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_HOLD_BEHAVIOR_KEY);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup_tap_count(TEST_TRANSPARENT_HOLD_KEY, 2);
-    hold       = handled_key_resolution_hold_at_position(resolution, key_pos);
-    CHECK(hold.present);
-    CHECK(hold.action == TEST_TAP_ACTION);
-    CHECK(hold.mode == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
+    materialized = test_materialize(handled_key_lookup_tap_count(TEST_TRANSPARENT_HOLD_KEY, 2), key_pos);
+    CHECK(materialized.hold.present);
+    CHECK(materialized.hold.action == TEST_TAP_ACTION);
+    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
 }
 
 static void test_transparent_long_hold_uses_lower_explicit_long_hold_action(void) {
-    keypos_t                 key_pos     = test_keypos(1, 4);
-    handled_key_resolution_t resolution;
-    hold_behavior_t          long_hold;
+    keypos_t                   key_pos     = test_keypos(1, 6);
+    handled_key_materialized_t materialized;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_LONG_HOLD_BEHAVIOR_KEY);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_LONG_HOLD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    resolution = handled_key_lookup(TEST_TRANSPARENT_LONG_HOLD_KEY);
-    long_hold  = handled_key_resolution_long_hold_at_position(resolution, key_pos);
-    CHECK(long_hold.present);
-    CHECK(long_hold.action == TEST_LONG_HOLD_ACTION);
-    CHECK(long_hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_LONG_HOLD_KEY), key_pos);
+    CHECK(materialized.long_hold.present);
+    CHECK(materialized.long_hold.action == TEST_LONG_HOLD_ACTION);
+    CHECK(materialized.long_hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD);
 }
 
 int main(void) {
@@ -418,6 +499,8 @@ int main(void) {
     test_transparent_tap_stops_at_plain_pd_mode_key_without_tap_output();
     test_transparent_tap_chains_through_lower_authored_transparency();
     test_transparent_tap_uses_current_tap_count_for_lower_handled_key();
+    test_transparent_tap_inherits_lower_press_resolve_contract();
+    test_transparent_tap_inherits_lower_release_resolve_contract();
     test_transparent_hold_uses_lower_plain_key_normal_hold_behavior();
     test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata();
     test_transparent_hold_uses_lower_layer_tap_metadata();

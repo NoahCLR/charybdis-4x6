@@ -59,11 +59,6 @@ typedef handled_key_hold_semantics_t handled_key_hold_contract_t;
 typedef struct {
     handled_key_hold_semantics_t hold;
     handled_key_hold_semantics_t long_hold;
-} handled_key_interaction_policy_t;
-
-typedef struct {
-    handled_key_hold_semantics_t hold;
-    handled_key_hold_semantics_t long_hold;
     pd_mode_mask_t               quick_tap_pd_mode_lock;
     bool                         suppress_tap_on_layer_interrupt;
     bool                         buffered_base_tap_dispatches_tap;
@@ -82,6 +77,7 @@ typedef struct {
     handled_key_resolution_t      authored;
     uint16_t                      tap_action;
     uint8_t                       tap_repeat_count;
+    bool                          tap_has_more_taps;
     hold_behavior_t               hold;
     hold_behavior_t               long_hold;
     key_runtime_slot_hold_strategy_t hold_strategy;
@@ -197,13 +193,6 @@ static inline handled_key_hold_contract_t handled_key_hold_contract_for_behavior
     return handled_key_hold_semantics_for_behavior(hold_strategy, flags, hold);
 }
 
-static inline handled_key_interaction_policy_t handled_key_interaction_policy(key_runtime_slot_hold_strategy_t hold_strategy, uint16_t flags, hold_behavior_t hold, hold_behavior_t long_hold) {
-    return (handled_key_interaction_policy_t){
-        .hold      = handled_key_hold_semantics_for_behavior(hold_strategy, flags, hold),
-        .long_hold = handled_key_hold_semantics_for_behavior(hold_strategy, flags, long_hold),
-    };
-}
-
 static inline handled_key_behavior_contract_t handled_key_behavior_contract(key_runtime_slot_hold_strategy_t hold_strategy, uint16_t flags, uint16_t tap_action, pd_mode_mask_t pd_mode, hold_behavior_t hold, hold_behavior_t long_hold) {
     return (handled_key_behavior_contract_t){
         .hold                                      = handled_key_hold_semantics_for_behavior(hold_strategy, flags, hold),
@@ -229,20 +218,12 @@ bool                             handled_key_resolution_is_momentary_layer(handl
 bool                             handled_key_resolution_is_layer_tap(handled_key_resolution_t resolution);
 hold_behavior_t                  handled_key_resolution_hold(handled_key_resolution_t resolution);
 hold_behavior_t                  handled_key_resolution_long_hold(handled_key_resolution_t resolution);
-hold_behavior_t                  handled_key_resolution_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
-hold_behavior_t                  handled_key_resolution_long_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t resolution);
-key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 uint16_t                         handled_key_resolution_tap_action(handled_key_resolution_t resolution);
 uint8_t                          handled_key_resolution_tap_repeat_count(handled_key_resolution_t resolution);
-uint16_t                         handled_key_resolution_tap_action_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
-uint8_t                          handled_key_resolution_tap_repeat_count_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 bool                             handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t resolution);
 uint16_t                         handled_key_resolution_tap_hold_term(handled_key_resolution_t resolution);
 uint16_t                         handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution);
 uint16_t                         handled_key_resolution_multi_tap_term(handled_key_resolution_t resolution);
 uint8_t                          handled_key_resolution_layer(handled_key_resolution_t resolution);
-uint8_t                          handled_key_resolution_layer_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 pd_mode_mask_t                   handled_key_resolution_pd_mode(handled_key_resolution_t resolution);
-pd_mode_mask_t                   handled_key_resolution_pd_mode_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
-uint16_t                         handled_key_resolution_flags_at_position(handled_key_resolution_t resolution, keypos_t key_pos);

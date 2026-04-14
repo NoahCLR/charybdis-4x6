@@ -23,6 +23,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/macro/macro_payload.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_decode_qmk.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_run.c" \

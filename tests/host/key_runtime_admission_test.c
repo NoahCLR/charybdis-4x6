@@ -6,6 +6,7 @@
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/key_runtime_admission.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
+#include "host_handled_key_fixture.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x60,
@@ -105,42 +106,17 @@ hold_behavior_t handled_key_resolution_long_hold(handled_key_resolution_t key) {
     return key.step.long_hold;
 }
 
-hold_behavior_t handled_key_resolution_hold_at_position(handled_key_resolution_t key, keypos_t key_pos) {
-    (void)key_pos;
-    return handled_key_resolution_hold(key);
-}
-
-hold_behavior_t handled_key_resolution_long_hold_at_position(handled_key_resolution_t key, keypos_t key_pos) {
-    (void)key_pos;
-    return handled_key_resolution_long_hold(key);
-}
-
 key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t key) {
     (void)key;
     return KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
-}
-
-key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy_at_position(handled_key_resolution_t key, keypos_t key_pos) {
-    (void)key_pos;
-    return handled_key_resolution_hold_strategy(key);
 }
 
 uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
     return key.step.tap.present ? key.step.tap.action : KC_NO;
 }
 
-uint16_t handled_key_resolution_tap_action_at_position(handled_key_resolution_t key, keypos_t key_pos) {
-    (void)key_pos;
-    return handled_key_resolution_tap_action(key);
-}
-
 uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t key) {
     return handled_key_resolution_tap_action(key) == KC_NO ? 0 : 1;
-}
-
-uint8_t handled_key_resolution_tap_repeat_count_at_position(handled_key_resolution_t key, keypos_t key_pos) {
-    (void)key_pos;
-    return handled_key_resolution_tap_repeat_count(key);
 }
 
 bool handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t key) {
@@ -163,24 +139,9 @@ uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
     return UINT8_MAX;
 }
 
-uint8_t handled_key_resolution_layer_at_position(handled_key_resolution_t key, keypos_t key_pos) {
-    (void)key_pos;
-    return handled_key_resolution_layer(key);
-}
-
 pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
     (void)key;
     return 0;
-}
-
-pd_mode_mask_t handled_key_resolution_pd_mode_at_position(handled_key_resolution_t key, keypos_t key_pos) {
-    (void)key_pos;
-    return handled_key_resolution_pd_mode(key);
-}
-
-uint16_t handled_key_resolution_flags_at_position(handled_key_resolution_t key, keypos_t key_pos) {
-    (void)key_pos;
-    return key.flags;
 }
 
 handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
@@ -188,20 +149,7 @@ handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
 }
 
 handled_key_materialized_t handled_key_materialize(handled_key_resolution_t key, handled_key_resolution_ctx_t ctx) {
-    handled_key_materialized_t materialized = handled_key_materialized_default(key);
-
-    materialized.tap_action            = handled_key_resolution_tap_action_at_position(key, ctx.key_pos);
-    materialized.tap_repeat_count      = handled_key_resolution_tap_repeat_count_at_position(key, ctx.key_pos);
-    materialized.hold                  = handled_key_resolution_hold_at_position(key, ctx.key_pos);
-    materialized.long_hold             = handled_key_resolution_long_hold_at_position(key, ctx.key_pos);
-    materialized.hold_strategy         = handled_key_resolution_hold_strategy_at_position(key, ctx.key_pos);
-    materialized.tap_resolves_on_press = handled_key_resolution_tap_resolves_on_press(key);
-    materialized.layer                 = handled_key_resolution_layer_at_position(key, ctx.key_pos);
-    materialized.pd_mode               = handled_key_resolution_pd_mode_at_position(key, ctx.key_pos);
-    materialized.flags                 = handled_key_resolution_flags_at_position(key, ctx.key_pos);
-    materialized.contract              = handled_key_behavior_contract(materialized.hold_strategy, materialized.flags, materialized.tap_action, materialized.pd_mode, materialized.hold, materialized.long_hold);
-
-    return materialized;
+    return host_handled_key_materialize_from_authored_resolution(key, ctx);
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {

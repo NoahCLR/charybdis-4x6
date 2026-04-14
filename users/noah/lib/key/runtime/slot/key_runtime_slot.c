@@ -214,7 +214,7 @@ uint16_t key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, ui
     handled_key_resolution_t   resolution    = handled_key_lookup_tap_count(keycode, (uint8_t)(slot->pending_multi_tap.count + 1u));
     handled_key_materialized_t materialized  = handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
 
-    uint16_t action = multi_tap_advance(&slot->pending_multi_tap, materialized.tap_action, materialized.tap_repeat_count, resolution.has_more_taps, materialized.tap_resolves_on_press, materialized.hold, materialized.long_hold);
+    uint16_t action = multi_tap_advance(&slot->pending_multi_tap, materialized.tap_action, materialized.tap_repeat_count, materialized.tap_has_more_taps, materialized.tap_resolves_on_press, materialized.hold, materialized.long_hold);
     key_runtime_index_rebuild();
     return action;
 }

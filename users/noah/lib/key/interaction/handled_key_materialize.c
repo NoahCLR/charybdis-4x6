@@ -40,12 +40,13 @@ handled_key_materialized_t handled_key_materialize(handled_key_resolution_t reso
     if (tap_source.found) {
         materialized.tap_action       = handled_key_tap_action_behavior(tap_source.resolution);
         materialized.tap_repeat_count = handled_key_tap_repeat_count_behavior(tap_source.resolution, materialized.tap_action);
+        materialized.tap_has_more_taps = tap_source.resolution.has_more_taps;
+        materialized.tap_resolves_on_press = handled_key_tap_resolves_on_press_behavior(tap_source.resolution);
     }
 
     materialized.hold                  = hold_source.found ? handled_key_hold_behavior(hold_source.resolution) : hold_behavior_none();
     materialized.long_hold             = long_hold_source.found ? long_hold_source.resolution.step.long_hold : hold_behavior_none();
     materialized.hold_strategy         = hold_source.found ? handled_key_hold_strategy_behavior(hold_source.resolution) : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
-    materialized.tap_resolves_on_press = handled_key_tap_resolves_on_press_behavior(resolution);
     materialized.layer                 = hold_source.found ? handled_key_resolution_source_layer(hold_source.resolution) : UINT8_MAX;
     materialized.pd_mode               = hold_source.found ? hold_source.resolution.pd_mode : 0;
     materialized.flags                 = resolution.flags & (uint16_t)~(HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
@@ -59,36 +60,4 @@ handled_key_materialized_t handled_key_materialize(handled_key_resolution_t reso
 
     materialized.contract = handled_key_behavior_contract(materialized.hold_strategy, materialized.flags, materialized.tap_action, materialized.pd_mode, materialized.hold, materialized.long_hold);
     return materialized;
-}
-
-uint16_t handled_key_resolution_tap_action_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos)).tap_action;
-}
-
-uint8_t handled_key_resolution_tap_repeat_count_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos)).tap_repeat_count;
-}
-
-hold_behavior_t handled_key_resolution_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos)).hold;
-}
-
-hold_behavior_t handled_key_resolution_long_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos)).long_hold;
-}
-
-key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos)).hold_strategy;
-}
-
-uint8_t handled_key_resolution_layer_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos)).layer;
-}
-
-pd_mode_mask_t handled_key_resolution_pd_mode_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos)).pd_mode;
-}
-
-uint16_t handled_key_resolution_flags_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos)).flags;
 }

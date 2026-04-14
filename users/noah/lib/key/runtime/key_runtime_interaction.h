@@ -70,7 +70,6 @@ typedef struct {
     pd_mode_mask_t                      pd_mode;
     uint16_t                            flags;
     handled_key_behavior_contract_t     contract;
-    handled_key_interaction_policy_t    policy;
     key_runtime_slot_release_contract_t release;
 } key_runtime_slot_interaction_t;
 
@@ -105,7 +104,7 @@ static inline key_runtime_slot_binding_t key_runtime_slot_binding_from_materiali
         .tap_hold_term         = materialized.authored.tap_hold_term,
         .longer_hold_term      = materialized.authored.longer_hold_term,
         .multi_tap_term        = materialized.authored.multi_tap_term,
-        .has_more_taps         = materialized.authored.has_more_taps,
+        .has_more_taps         = materialized.tap_has_more_taps,
         .tap_resolves_on_press = materialized.tap_resolves_on_press,
     };
 }
@@ -159,7 +158,7 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
                 .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
             },
         .layer = UINT8_MAX,
-        .policy =
+        .contract =
             {
                 .hold =
                     {
@@ -193,10 +192,6 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_materialize(key_ru
     }
 
     interaction.contract = handled_key_behavior_contract(interaction.hold_strategy, interaction.flags, interaction.binding.tap_action, interaction.pd_mode, interaction.binding.hold, interaction.binding.long_hold);
-    interaction.policy   = (handled_key_interaction_policy_t){
-        .hold      = interaction.contract.hold,
-        .long_hold = interaction.contract.long_hold,
-    };
     interaction.release = key_runtime_slot_release_contract_build(interaction);
     return interaction;
 }

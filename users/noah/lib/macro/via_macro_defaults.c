@@ -137,15 +137,12 @@ static bool seed_via_default_macros(uint16_t capacity, uint16_t *written) {
     };
 
     for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
-        const char *payload = via_macro_payloads[slot];
+        if (!via_macro_payload_slot_is_valid(slot)) {
+            goto terminate_slot;
+        }
 
-        if (payload && *payload) {
-            if (!via_macro_payload_slot_is_valid(slot)) {
-                goto terminate_slot;
-            }
-            if (!macro_payload_encode_write(payload, via_macro_seed_writer_write_byte, &writer, NULL)) {
-                return false;
-            }
+        if (!macro_slot_provider_encode_write(&via_macro_defaults_provider, via_macro_slots, slot, via_macro_seed_writer_write_byte, &writer, NULL)) {
+            return false;
         }
 
     terminate_slot:
