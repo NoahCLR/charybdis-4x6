@@ -302,27 +302,39 @@ Completed in this pass:
   - tap fields still resolve the lower active layer's tap action at the same
     physical position
   - hold and long-hold fields now resolve the lower active layer's same-tier
-    action target at the same physical position
-  - explicit lower `KC_TRNS` fields keep chaining downward until a real action
-    or `KC_NO` boundary is found
-- Kept helper ownership explicit:
-  - transparent tap keeps the current tap branch timing and repeat behavior
-  - transparent hold and long-hold keep the current helper mode
-    (`PRESS_AND_HOLD_UNTIL_RELEASE`, `REPEAT_WHILE_HELD`, and so on) while only
-    the action target falls through
+    behavior at the same physical position
+  - explicit lower `KC_TRNS` fields keep chaining downward until a real lower
+    field behavior or `KC_NO` boundary is found
+- Tightened the hold-surface contract so transparent hold and long-hold now
+  inherit the lower key's actual same-tier behavior instead of only swapping
+  the lower action target:
+  - lower authored helper mode now comes through for transparent hold/long-hold
+  - lower pd-mode ownership now comes through for transparent hold surfaces
+  - lower momentary-layer ownership now comes through for transparent hold
+    surfaces, including raw lower `LT()` keys
+- Kept row ownership explicit where it still belongs:
+  - transparent tap keeps the current tap branch timing and multi-tap branching
+  - transparent hold metadata now comes from the lower hold surface, but the
+    current row still owns this branch's authored timing values
 - Updated the runtime materialization sites in
-  `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c` and
-  `users/noah/lib/key/runtime/slot/key_runtime_slot.c` so cached slot bindings
-  and pending multi-tap resolution both consume the new position-aware
-  transparent hold/long-hold helpers.
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c` so cached
+  slot bindings are now materialized from the effective position-aware hold
+  surface, including lower layer / pd-mode metadata and lower hold strategy
+  where transparency falls through.
+- Carried the same effective hold-surface materialization through pending
+  multi-tap reuse so follow-up presses do not fall back to stale upper-key
+  metadata.
 - Expanded `tests/host/key_behavior_lookup_test.c` so the handled-key contract
   is asserted directly for:
-  - lower plain-key tap and hold fallthrough
-  - bare `LT()` tap and press-and-hold fallthrough
-  - unsupported hold-other fallthrough over lower `LT()` hold targets
+  - lower plain-key tap fallthrough and lower plain-key no-hold fallthrough
+  - lower pd-mode hold behavior plus lower pd-mode metadata
+  - lower raw `LT()` hold-surface metadata
+  - helper-agnostic lower layer-tap metadata fallthrough
   - lower authored transparent chaining
   - lower multi-tap branch selection by current tap count
   - lower explicit long-hold fallthrough
+- Updated the slot/reducer host stubs to cover the new position-aware
+  hold-surface metadata helpers and preserved full-suite compile coverage.
 - Updated the maintainer-facing authoring docs and comments in:
   - `users/noah/lib/key/interaction/key_behavior.h`
   - `docs/INTERACTION_MODEL.md`
@@ -333,10 +345,15 @@ Contracts touched in this pass:
 - `KC_TRNS` is now a native field-level fallback across authored tap, hold, and
   long-hold actions
 - tap fallthrough still resolves lower tap behavior
-- hold and long-hold fallthrough now resolve lower same-tier action targets
-  without changing the current helper mode
-- pending multi-tap reuse now consumes the same transparent action resolution
-  rules as the initial handled press
+- hold and long-hold fallthrough now resolve lower same-tier behavior rather
+  than only lower action targets
+- lower hold-surface ownership now comes through transparently for pd-mode and
+  momentary-layer behavior, including lower raw `LT()` keys
+- cached slot interactions and pending multi-tap reuse now consume the same
+  effective transparent hold-surface metadata as the initial handled press
+- transparent tap keeps current-row branching and timing; transparent hold and
+  long-hold no longer keep the upper helper mode when the lower key owns a real
+  same-tier behavior
 
 Verification run in this pass:
 
@@ -367,7 +384,6 @@ Workspace scope:
   - `users/noah/lib/key/interaction/handled_key.c`
   - `users/noah/lib/key/interaction/handled_key.h`
   - `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c`
-  - `users/noah/lib/key/runtime/slot/key_runtime_slot.c`
   - `tests/host/key_behavior_lookup_test.c`
   - `tests/host/key_runtime_slot_test.c`
   - `tests/host/key_runtime_preflight_test.c`
@@ -381,9 +397,9 @@ Workspace scope:
 
 Next steps:
 
-- decide whether transparent authored actions should eventually inherit lower
-  helper mode as well as lower action target, or whether the current
-  helper-mode-preserving contract is the intended long-term surface
-- if helper-mode preservation stays correct, consider moving the new
-  transparent-action resolution behind a narrower handled-key materialization
-  helper so slot callers stop assembling position-aware binding pieces by hand
+- decide whether transparent tap should ever inherit lower-key multi-tap
+  branching as well as lower tap output, or whether current-row branching is
+  the intended long-term surface
+- if this contract stays correct, consider moving the new transparent
+  hold-surface materialization behind a narrower handled-key helper so slot
+  callers stop assembling position-aware metadata pieces by hand

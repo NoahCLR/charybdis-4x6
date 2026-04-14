@@ -268,6 +268,11 @@ key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_ke
     return key.tap_count == 1 && key.keycode < SAFE_RANGE && key.step.tap.present && !key.step.hold.present && !key.step.long_hold.present ? KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
 }
 
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_hold_strategy(key);
+}
+
 uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
     return key.step.tap.present ? key.step.tap.action : KC_NO;
 }
@@ -305,9 +310,24 @@ uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
     return UINT8_MAX;
 }
 
+uint8_t handled_key_resolution_layer_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_layer(key);
+}
+
 pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
     (void)key;
     return 0;
+}
+
+pd_mode_mask_t handled_key_resolution_pd_mode_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_pd_mode(key);
+}
+
+uint16_t handled_key_resolution_flags_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return key.flags;
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {

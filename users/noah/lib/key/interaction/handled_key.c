@@ -77,11 +77,13 @@ static bool handled_key_resolution_uses_fallback_hold_behavior(handled_key_resol
 }
 
 static uint16_t handled_key_default_tap_action(handled_key_resolution_t resolution) {
+    noah_action_desc_t desc = noah_action_describe(resolution.keycode);
+
     if (resolution.pd_mode != 0) {
         return KC_NO;
     }
 
-    if (handled_key_resolution_is_layer_tap(resolution)) {
+    if (noah_action_desc_is_layer_tap(desc)) {
         return QK_LAYER_TAP_GET_TAP_KEYCODE(resolution.keycode);
     }
 
@@ -112,6 +114,11 @@ typedef enum {
     HANDLED_KEY_TRANSPARENT_FIELD_LONG_HOLD,
 } handled_key_transparent_field_t;
 
+typedef struct {
+    handled_key_resolution_t resolution;
+    bool                     found;
+} handled_key_transparent_source_t;
+
 static bool handled_key_keypos_in_bounds(keypos_t key_pos) {
     return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
 }
@@ -120,87 +127,52 @@ static layer_state_t handled_key_transparent_tap_layer_state(void) {
     return layer_state | ((layer_state_t)1u << 0);
 }
 
-static bool handled_key_hold_mode_uses_press_and_hold_authored_surface(hold_behavior_mode_t mode) {
-    return mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE || mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE;
+static handled_key_transparent_source_t handled_key_transparent_source_none(void) {
+    return (handled_key_transparent_source_t){0};
 }
 
-static noah_action_authored_use_t handled_key_authored_use_for_hold_mode(hold_behavior_mode_t mode) {
-    return handled_key_hold_mode_uses_press_and_hold_authored_surface(mode) ? NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD : NOAH_ACTION_AUTHORED_USE_HOLD_OTHER;
+static handled_key_transparent_source_t handled_key_transparent_source_current(handled_key_resolution_t resolution) {
+    return (handled_key_transparent_source_t){
+        .resolution = resolution,
+        .found      = true,
+    };
 }
 
-static bool handled_key_action_supported_for_hold_mode(uint16_t action, hold_behavior_mode_t mode) {
-    if (action == KC_TRNS) {
-        return true;
-    }
-
-    return noah_action_desc_supported_as_authored_action(noah_action_describe(action), handled_key_authored_use_for_hold_mode(mode));
-}
-
-static uint16_t handled_key_candidate_default_tap_action(handled_key_resolution_t resolution) {
-    noah_action_desc_t desc = noah_action_describe(resolution.keycode);
-
-    if (resolution.pd_mode != 0) {
-        return KC_NO;
-    }
-
-    if (noah_action_desc_is_layer_tap(desc)) {
-        return QK_LAYER_TAP_GET_TAP_KEYCODE(resolution.keycode);
-    }
-
-    if (noah_action_desc_is_owned_momentary_layer(desc) || resolution.keycode >= SAFE_RANGE) {
-        return KC_NO;
-    }
-
-    return resolution.keycode;
-}
-
-static uint16_t handled_key_candidate_default_hold_action(handled_key_resolution_t resolution, hold_behavior_mode_t mode) {
-    noah_action_desc_t desc = noah_action_describe(resolution.keycode);
-
-    if (resolution.pd_mode != 0) {
-        return resolution.keycode;
-    }
-
-    if (noah_action_desc_is_layer_tap(desc)) {
-        return handled_key_hold_mode_uses_press_and_hold_authored_surface(mode) ? MO(QK_LAYER_TAP_GET_LAYER(resolution.keycode)) : KC_NO;
-    }
-
-    if (noah_action_desc_is_owned_momentary_layer(desc)) {
-        return handled_key_hold_mode_uses_press_and_hold_authored_surface(mode) ? resolution.keycode : KC_NO;
-    }
-
-    if (resolution.keycode >= SAFE_RANGE || noah_action_desc_is_qmk_behavior_keycode(desc)) {
-        return KC_NO;
-    }
-
-    return resolution.keycode;
-}
-
-static uint16_t handled_key_candidate_action_for_field(handled_key_resolution_t resolution, handled_key_transparent_field_t field, hold_behavior_mode_t hold_mode) {
+static bool handled_key_resolution_uses_transparent_source(handled_key_resolution_t resolution, handled_key_transparent_field_t field) {
     switch (field) {
         case HANDLED_KEY_TRANSPARENT_FIELD_TAP:
-            if (resolution.step.tap.present) {
-                return resolution.step.tap.action;
-            }
-            return handled_key_candidate_default_tap_action(resolution);
+            return handled_key_tap_action_behavior(resolution) == KC_TRNS;
         case HANDLED_KEY_TRANSPARENT_FIELD_HOLD:
-            if (resolution.step.hold.present) {
-                return handled_key_action_supported_for_hold_mode(resolution.step.hold.action, hold_mode) ? resolution.step.hold.action : KC_NO;
-            }
-            return handled_key_candidate_default_hold_action(resolution, hold_mode);
+            return resolution.step.hold.present && resolution.step.hold.action == KC_TRNS;
         case HANDLED_KEY_TRANSPARENT_FIELD_LONG_HOLD:
-            if (resolution.step.long_hold.present) {
-                return handled_key_action_supported_for_hold_mode(resolution.step.long_hold.action, hold_mode) ? resolution.step.long_hold.action : KC_NO;
-            }
-            return KC_NO;
+            return resolution.step.long_hold.present && resolution.step.long_hold.action == KC_TRNS;
         default:
-            return KC_NO;
+            return false;
     }
 }
 
-static uint16_t handled_key_candidate_action(uint16_t keycode, uint8_t tap_count, handled_key_transparent_field_t field, hold_behavior_mode_t hold_mode) {
-    handled_key_resolution_t resolution = handled_key_lookup_tap_count(keycode, tap_count);
-    return handled_key_candidate_action_for_field(resolution, field, hold_mode);
+static noah_action_desc_t handled_key_resolution_action_desc(handled_key_resolution_t resolution) {
+    return noah_action_describe(resolution.keycode);
+}
+
+static bool handled_key_resolution_source_is_layer_tap(handled_key_resolution_t resolution) {
+    return noah_action_desc_is_layer_tap(handled_key_resolution_action_desc(resolution));
+}
+
+static bool handled_key_resolution_source_is_momentary_layer(handled_key_resolution_t resolution) {
+    return handled_key_resolution_is_momentary_layer(resolution) || handled_key_resolution_source_is_layer_tap(resolution);
+}
+
+static uint8_t handled_key_resolution_source_layer(handled_key_resolution_t resolution) {
+    if (handled_key_resolution_is_momentary_layer(resolution)) {
+        return resolution.layer;
+    }
+
+    if (handled_key_resolution_source_is_layer_tap(resolution)) {
+        return QK_LAYER_TAP_GET_LAYER(resolution.keycode);
+    }
+
+    return UINT8_MAX;
 }
 
 static int8_t handled_key_transparent_origin_layer(handled_key_resolution_t resolution, keypos_t key_pos) {
@@ -223,17 +195,17 @@ static int8_t handled_key_transparent_origin_layer(handled_key_resolution_t reso
     return -1;
 }
 
-static uint16_t handled_key_transparent_action_below_origin(handled_key_resolution_t resolution, keypos_t key_pos, handled_key_transparent_field_t field, hold_behavior_mode_t hold_mode) {
+static handled_key_transparent_source_t handled_key_transparent_source_below_origin(handled_key_resolution_t resolution, keypos_t key_pos, handled_key_transparent_field_t field) {
     layer_state_t active_layers = handled_key_transparent_tap_layer_state();
     int8_t        origin_layer  = handled_key_transparent_origin_layer(resolution, key_pos);
 
     if (origin_layer <= 0) {
-        return KC_NO;
+        return handled_key_transparent_source_none();
     }
 
     for (int8_t layer = (int8_t)(origin_layer - 1); layer >= 0; layer--) {
-        uint16_t keycode;
-        uint16_t action;
+        uint16_t                 keycode;
+        handled_key_resolution_t candidate;
 
         if (!layer_state_cmp(active_layers, (uint8_t)layer)) {
             continue;
@@ -244,15 +216,23 @@ static uint16_t handled_key_transparent_action_below_origin(handled_key_resoluti
             continue;
         }
 
-        action = handled_key_candidate_action(keycode, resolution.tap_count, field, hold_mode);
-        if (action == KC_TRNS) {
+        candidate = handled_key_lookup_tap_count(keycode, resolution.tap_count);
+        if (handled_key_resolution_uses_transparent_source(candidate, field)) {
             continue;
         }
 
-        return action;
+        return handled_key_transparent_source_current(candidate);
     }
 
-    return KC_NO;
+    return handled_key_transparent_source_none();
+}
+
+static handled_key_transparent_source_t handled_key_transparent_source_at_position(handled_key_resolution_t resolution, keypos_t key_pos, handled_key_transparent_field_t field) {
+    if (!handled_key_resolution_uses_transparent_source(resolution, field)) {
+        return handled_key_transparent_source_current(resolution);
+    }
+
+    return handled_key_transparent_source_below_origin(resolution, key_pos, field);
 }
 
 static hold_behavior_t handled_key_hold_behavior(handled_key_resolution_t resolution) {
@@ -398,39 +378,53 @@ uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t resolut
 }
 
 uint16_t handled_key_resolution_tap_action_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    uint16_t tap_action = handled_key_tap_action_behavior(resolution);
+    handled_key_transparent_source_t source = handled_key_transparent_source_at_position(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_TAP);
 
-    if (tap_action != KC_TRNS) {
-        return tap_action;
+    if (!source.found) {
+        return KC_NO;
     }
 
-    return handled_key_transparent_action_below_origin(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_TAP, HOLD_BEHAVIOR_NONE);
+    return handled_key_tap_action_behavior(source.resolution);
 }
 
 uint8_t handled_key_resolution_tap_repeat_count_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    return handled_key_tap_repeat_count_behavior(resolution, handled_key_resolution_tap_action_at_position(resolution, key_pos));
+    handled_key_transparent_source_t source = handled_key_transparent_source_at_position(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_TAP);
+
+    if (!source.found) {
+        return 0;
+    }
+
+    return handled_key_tap_repeat_count_behavior(source.resolution, handled_key_tap_action_behavior(source.resolution));
 }
 
 hold_behavior_t handled_key_resolution_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    hold_behavior_t hold = handled_key_hold_behavior(resolution);
+    handled_key_transparent_source_t source = handled_key_transparent_source_at_position(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_HOLD);
 
-    if (!hold.present || hold.action != KC_TRNS) {
-        return hold;
+    if (!source.found) {
+        return hold_behavior_none();
     }
 
-    hold.action = handled_key_transparent_action_below_origin(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_HOLD, hold.mode);
-    return hold.action == KC_NO ? hold_behavior_none() : hold;
+    return handled_key_hold_behavior(source.resolution);
 }
 
 hold_behavior_t handled_key_resolution_long_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
-    hold_behavior_t long_hold = resolution.step.long_hold;
+    handled_key_transparent_source_t source = handled_key_transparent_source_at_position(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_LONG_HOLD);
 
-    if (!long_hold.present || long_hold.action != KC_TRNS) {
-        return long_hold;
+    if (!source.found) {
+        return hold_behavior_none();
     }
 
-    long_hold.action = handled_key_transparent_action_below_origin(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_LONG_HOLD, long_hold.mode);
-    return long_hold.action == KC_NO ? hold_behavior_none() : long_hold;
+    return source.resolution.step.long_hold;
+}
+
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
+    handled_key_transparent_source_t source = handled_key_transparent_source_at_position(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_HOLD);
+
+    if (!source.found) {
+        return KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
+    }
+
+    return handled_key_hold_strategy_behavior(source.resolution);
 }
 
 bool handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t resolution) {
@@ -453,6 +447,44 @@ uint8_t handled_key_resolution_layer(handled_key_resolution_t resolution) {
     return resolution.layer;
 }
 
+uint8_t handled_key_resolution_layer_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
+    handled_key_transparent_source_t source = handled_key_transparent_source_at_position(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_HOLD);
+
+    if (!source.found) {
+        return UINT8_MAX;
+    }
+
+    return handled_key_resolution_source_layer(source.resolution);
+}
+
 pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t resolution) {
     return resolution.pd_mode;
+}
+
+pd_mode_mask_t handled_key_resolution_pd_mode_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
+    handled_key_transparent_source_t source = handled_key_transparent_source_at_position(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_HOLD);
+
+    if (!source.found) {
+        return 0;
+    }
+
+    return source.resolution.pd_mode;
+}
+
+uint16_t handled_key_resolution_flags_at_position(handled_key_resolution_t resolution, keypos_t key_pos) {
+    handled_key_transparent_source_t source = handled_key_transparent_source_at_position(resolution, key_pos, HANDLED_KEY_TRANSPARENT_FIELD_HOLD);
+    uint16_t                         flags  = resolution.flags & (uint16_t)~(HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
+
+    if (!source.found) {
+        return flags;
+    }
+
+    if (handled_key_resolution_source_is_momentary_layer(source.resolution)) {
+        flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER;
+    }
+    if (handled_key_resolution_source_is_layer_tap(source.resolution) || handled_key_resolution_is_layer_tap(source.resolution)) {
+        flags |= HANDLED_KEY_FLAG_LAYER_TAP;
+    }
+
+    return flags;
 }

@@ -289,10 +289,9 @@ static void test_transparent_tap_uses_current_tap_count_for_lower_handled_key(vo
     CHECK(handled_key_resolution_tap_repeat_count_at_position(resolution, key_pos) == 1);
 }
 
-static void test_transparent_hold_uses_lower_active_layer_hold_action(void) {
+static void test_transparent_hold_uses_lower_plain_key_normal_hold_behavior(void) {
     keypos_t                 key_pos     = test_keypos(0, 6);
     handled_key_resolution_t resolution;
-    hold_behavior_t          hold;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, KC_V);
@@ -300,16 +299,31 @@ static void test_transparent_hold_uses_lower_active_layer_hold_action(void) {
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
     resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
-    hold       = handled_key_resolution_hold_at_position(resolution, key_pos);
-    CHECK(hold.present);
-    CHECK(hold.action == KC_V);
-    CHECK(hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+    CHECK(!handled_key_resolution_hold_at_position(resolution, key_pos).present);
 }
 
-static void test_transparent_hold_resolves_bare_lt_to_owned_momentary_layer_action(void) {
+static void test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata(void) {
     keypos_t                 key_pos     = test_keypos(0, 7);
     handled_key_resolution_t resolution;
     hold_behavior_t          hold;
+
+    test_reset_keymap();
+    test_set_keymap_key(1, key_pos, TEST_PD_MODE_KEY);
+    test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_KEY);
+    layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
+
+    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
+    hold       = handled_key_resolution_hold_at_position(resolution, key_pos);
+    CHECK(hold.present);
+    CHECK(hold.action == TEST_PD_MODE_KEY);
+    CHECK(hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
+    CHECK(handled_key_resolution_hold_strategy_at_position(resolution, key_pos) == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT);
+    CHECK(handled_key_resolution_pd_mode_at_position(resolution, key_pos) == 1u);
+}
+
+static void test_transparent_hold_uses_lower_layer_tap_metadata(void) {
+    keypos_t                 key_pos     = test_keypos(1, 0);
+    handled_key_resolution_t resolution;
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_BARE_LAYER_TAP);
@@ -317,14 +331,15 @@ static void test_transparent_hold_resolves_bare_lt_to_owned_momentary_layer_acti
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
     resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
-    hold       = handled_key_resolution_hold_at_position(resolution, key_pos);
-    CHECK(hold.present);
-    CHECK(hold.action == MO(3));
-    CHECK(hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+    CHECK(!handled_key_resolution_hold_at_position(resolution, key_pos).present);
+    CHECK(handled_key_resolution_hold_strategy_at_position(resolution, key_pos) == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
+    CHECK(handled_key_resolution_layer_at_position(resolution, key_pos) == 3);
+    CHECK((handled_key_resolution_flags_at_position(resolution, key_pos) & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0);
+    CHECK((handled_key_resolution_flags_at_position(resolution, key_pos) & HANDLED_KEY_FLAG_LAYER_TAP) != 0);
 }
 
-static void test_transparent_hold_other_stops_when_lower_hold_action_is_not_supported(void) {
-    keypos_t                 key_pos     = test_keypos(1, 0);
+static void test_transparent_hold_other_uses_lower_layer_tap_metadata(void) {
+    keypos_t                 key_pos     = test_keypos(1, 1);
     handled_key_resolution_t resolution;
 
     test_reset_keymap();
@@ -334,10 +349,12 @@ static void test_transparent_hold_other_stops_when_lower_hold_action_is_not_supp
 
     resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_OTHER_KEY);
     CHECK(!handled_key_resolution_hold_at_position(resolution, key_pos).present);
+    CHECK(handled_key_resolution_layer_at_position(resolution, key_pos) == 3);
+    CHECK((handled_key_resolution_flags_at_position(resolution, key_pos) & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0);
 }
 
 static void test_transparent_hold_chains_through_lower_authored_transparency(void) {
-    keypos_t                 key_pos     = test_keypos(1, 1);
+    keypos_t                 key_pos     = test_keypos(1, 2);
     handled_key_resolution_t resolution;
     hold_behavior_t          hold;
 
@@ -351,11 +368,11 @@ static void test_transparent_hold_chains_through_lower_authored_transparency(voi
     hold       = handled_key_resolution_hold_at_position(resolution, key_pos);
     CHECK(hold.present);
     CHECK(hold.action == TEST_HOLD_ACTION);
-    CHECK(hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+    CHECK(hold.mode == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
 }
 
 static void test_transparent_hold_uses_current_tap_count_for_lower_handled_key(void) {
-    keypos_t                 key_pos     = test_keypos(1, 2);
+    keypos_t                 key_pos     = test_keypos(1, 3);
     handled_key_resolution_t resolution;
     hold_behavior_t          hold;
 
@@ -368,11 +385,11 @@ static void test_transparent_hold_uses_current_tap_count_for_lower_handled_key(v
     hold       = handled_key_resolution_hold_at_position(resolution, key_pos);
     CHECK(hold.present);
     CHECK(hold.action == TEST_TAP_ACTION);
-    CHECK(hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+    CHECK(hold.mode == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
 }
 
 static void test_transparent_long_hold_uses_lower_explicit_long_hold_action(void) {
-    keypos_t                 key_pos     = test_keypos(1, 3);
+    keypos_t                 key_pos     = test_keypos(1, 4);
     handled_key_resolution_t resolution;
     hold_behavior_t          long_hold;
 
@@ -401,9 +418,10 @@ int main(void) {
     test_transparent_tap_stops_at_plain_pd_mode_key_without_tap_output();
     test_transparent_tap_chains_through_lower_authored_transparency();
     test_transparent_tap_uses_current_tap_count_for_lower_handled_key();
-    test_transparent_hold_uses_lower_active_layer_hold_action();
-    test_transparent_hold_resolves_bare_lt_to_owned_momentary_layer_action();
-    test_transparent_hold_other_stops_when_lower_hold_action_is_not_supported();
+    test_transparent_hold_uses_lower_plain_key_normal_hold_behavior();
+    test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata();
+    test_transparent_hold_uses_lower_layer_tap_metadata();
+    test_transparent_hold_other_uses_lower_layer_tap_metadata();
     test_transparent_hold_chains_through_lower_authored_transparency();
     test_transparent_hold_uses_current_tap_count_for_lower_handled_key();
     test_transparent_long_hold_uses_lower_explicit_long_hold_action();

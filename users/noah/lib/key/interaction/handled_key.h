@@ -144,6 +144,7 @@ hold_behavior_t                  handled_key_resolution_long_hold(handled_key_re
 hold_behavior_t                  handled_key_resolution_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 hold_behavior_t                  handled_key_resolution_long_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t resolution);
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 uint16_t                         handled_key_resolution_tap_action(handled_key_resolution_t resolution);
 uint8_t                          handled_key_resolution_tap_repeat_count(handled_key_resolution_t resolution);
 uint16_t                         handled_key_resolution_tap_action_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
@@ -153,4 +154,7 @@ uint16_t                         handled_key_resolution_tap_hold_term(handled_ke
 uint16_t                         handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution);
 uint16_t                         handled_key_resolution_multi_tap_term(handled_key_resolution_t resolution);
 uint8_t                          handled_key_resolution_layer(handled_key_resolution_t resolution);
+uint8_t                          handled_key_resolution_layer_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 pd_mode_mask_t                   handled_key_resolution_pd_mode(handled_key_resolution_t resolution);
+pd_mode_mask_t                   handled_key_resolution_pd_mode_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
+uint16_t                         handled_key_resolution_flags_at_position(handled_key_resolution_t resolution, keypos_t key_pos);

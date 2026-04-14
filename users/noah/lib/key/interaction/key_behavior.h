@@ -60,9 +60,9 @@ typedef struct {
 // present = true:
 //   Send action instead.
 //   KC_TRNS is a special field-level fallback in any authored action helper:
-//   tap fields resolve the lower active layer's tap action at the same
+//   tap fields resolve the lower active layer's tap behavior at the same
 //   physical position, while hold and long-hold fields resolve the lower
-//   active layer's same-tier action target and keep the current helper mode.
+//   active layer's same-tier behavior and mode-owned metadata.
 
 typedef struct {
     bool     present;

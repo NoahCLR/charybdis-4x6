@@ -430,6 +430,11 @@ key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_ke
     return KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
 }
 
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_hold_strategy(key);
+}
+
 uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
     if (key.tap_count > 1 && key.step.tap.present) {
         return key.step.tap.action;
@@ -503,12 +508,27 @@ uint16_t handled_key_resolution_multi_tap_term(handled_key_resolution_t key) {
     return key.multi_tap_term;
 }
 
+uint8_t handled_key_resolution_layer_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return key.layer;
+}
+
 uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
     return key.layer;
 }
 
+pd_mode_mask_t handled_key_resolution_pd_mode_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return key.pd_mode;
+}
+
 pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
     return key.pd_mode;
+}
+
+uint16_t handled_key_resolution_flags_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return key.flags;
 }
 
 bool handled_key_resolution_has_multi_tap(handled_key_resolution_t key) {

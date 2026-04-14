@@ -81,7 +81,8 @@ An authored row does not automatically replace everything about a key.
   normal tap behavior
 - `KC_TRNS` inside any authored action helper is transparent for that field:
   tap fields use the lower active layer's tap output, while hold and long-hold
-  fields use the lower active layer's same-tier action target
+  fields use the lower active layer's same-tier behavior and mode-owned
+  metadata
 - if `.tap` is present but `.hold` and `.long_hold` are both omitted, keys
   that already have a default held path keep using it for that branch
 - once `.hold` or `.long_hold` is authored for that branch, the normal held
@@ -91,9 +92,10 @@ In practice, the common families look like this:
 
 - ordinary keys such as `KC_A` can keep their normal held-key behavior when
   only the tap is overridden
-- `KC_TRNS` keeps the lower key's action target for that field while the
-  current authored row still owns timing, helper mode, and multi-tap branching
-  for that press
+- `KC_TRNS` keeps the current row's timing and multi-tap branching, but the
+  lower key still owns the actual transparent field behavior; for hold and
+  long-hold fields that includes helper mode and mode-owned metadata such as
+  lower momentary-layer or pd-mode ownership
 - `LT()` rows keep their normal momentary layer hold when only the tap is
   overridden
 - plain pd-mode keycodes keep their default momentary mode hold when only the

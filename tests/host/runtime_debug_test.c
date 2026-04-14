@@ -169,6 +169,11 @@ key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_ke
     return KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
 }
 
+key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_hold_strategy(key);
+}
+
 uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
     return key.step.tap.present ? key.step.tap.action : KC_NO;
 }
@@ -200,6 +205,29 @@ bool handled_key_resolution_uses_fallback_hold(handled_key_resolution_t key) {
 bool handled_key_resolution_uses_implicit_hold(handled_key_resolution_t key) {
     (void)key;
     return false;
+}
+
+uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
+    return key.layer;
+}
+
+uint8_t handled_key_resolution_layer_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_layer(key);
+}
+
+pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
+    return key.pd_mode;
+}
+
+pd_mode_mask_t handled_key_resolution_pd_mode_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_pd_mode(key);
+}
+
+uint16_t handled_key_resolution_flags_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return key.flags;
 }
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {

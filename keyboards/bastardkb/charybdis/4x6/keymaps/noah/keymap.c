@@ -230,7 +230,7 @@ enum keymap_custom_keycodes {
 //     and pointer-mode locks
 //   TAP_SENDS(KC_TRNS)
 //     keep the lower active layer's tap output at this physical key while the
-//     authored row still owns this tap count's timing and hold behavior
+//     authored row still owns this tap count's timing and branching
 //
 // hold-tier and long-hold-tier actions accept the same three helpers:
 //   PRESS_AND_HOLD_UNTIL_RELEASE(action)
@@ -242,8 +242,9 @@ enum keymap_custom_keycodes {
 //       release the key -> do nothing
 //     use this for modifiers or keys you want to stay down while held;
 //     macros use the same helper for a held-triggered one-shot
-//     PRESS_AND_HOLD_UNTIL_RELEASE(KC_TRNS) keeps this helper mode but resolves
-//     the lower active layer's hold-tier action target at the same key
+//     PRESS_AND_HOLD_UNTIL_RELEASE(KC_TRNS) uses the lower active layer's
+//     actual hold-tier behavior at the same key; if that lower key is a
+//     momentary layer or pd mode, its normal hold ownership comes through
 //
 //   REPEAT_WHILE_HELD(action, hz)
 //     cross .tap_hold_term -> send action once immediately
@@ -252,15 +253,15 @@ enum keymap_custom_keycodes {
 //     supported authored range: 1..100 Hz
 //     use this for click spam, repeated navigation, or other rapid tap
 //     actions that should stay declarative inside key_behaviors[]
-//     REPEAT_WHILE_HELD(KC_TRNS, hz) repeats the lower active layer's same-tier
-//     action target with this helper's repeat policy
+//     REPEAT_WHILE_HELD(KC_TRNS, hz) uses the lower active layer's same-tier
+//     behavior; lower mode-owned hold surfaces still behave like themselves
 //
 //   TAP_AT_HOLD_THRESHOLD(action)
 //     cross .tap_hold_term -> send action once immediately
 //     use this for one-shot actions such as layer lock, pointer lock,
 //     media controls, or macros
-//     TAP_AT_HOLD_THRESHOLD(KC_TRNS) taps the lower active layer's same-tier
-//     action target when this threshold fires
+//     TAP_AT_HOLD_THRESHOLD(KC_TRNS) uses the lower active layer's same-tier
+//     behavior when this threshold fires
 //
 //   TAP_ON_RELEASE_AFTER_HOLD(action)
 //     cross .tap_hold_term -> qualify the hold, but do nothing yet
@@ -268,7 +269,7 @@ enum keymap_custom_keycodes {
 //     use this when the key should stay quiet while held, or when a longer
 //     hold should still be able to replace the shorter hold action
 //     TAP_ON_RELEASE_AFTER_HOLD(KC_TRNS) releases into the lower active
-//     layer's same-tier action target at this physical key
+//     layer's same-tier behavior at this physical key
 //     with .long_hold configured, this creates a clean middle tier:
 //       release after .tap_hold_term but before .longer_hold_term = .hold action
 //       keep holding past .longer_hold_term = .long_hold action instead
