@@ -31,105 +31,112 @@ noah_source_manifest_raw_paths() {
     noah_source_manifest_value "$root" "$variable_name" "$keymap_path"
 }
 
-noah_source_manifest_absolute_userspace_paths_excluding() {
+noah_source_manifest_absolute_userspace_paths_selected() {
     root="$1"
     variable_name="$2"
-    excluded_paths="${3:-}"
+    selected_paths="${3:-}"
     keymap_path="${4:-keyboards/bastardkb/charybdis/4x6/keymaps/noah}"
-    value="$(noah_source_manifest_userspace_paths "$root" "$variable_name" "$keymap_path")"
-    filtered_paths=""
+    manifest_paths="$(noah_source_manifest_raw_paths "$root" "$variable_name" "$keymap_path")"
+    absolute_paths=""
 
-    for src in $value; do
-        rel_path="${src#users/noah/}"
-        include_src=true
+    for src in $selected_paths; do
+        found_in_manifest=false
 
-        for excluded in $excluded_paths; do
-            if [ "$rel_path" = "$excluded" ]; then
-                include_src=false
+        for manifest_src in $manifest_paths; do
+            if [ "$src" = "$manifest_src" ]; then
+                found_in_manifest=true
                 break
             fi
         done
 
-        if [ "$include_src" = true ]; then
-            filtered_paths="$filtered_paths $root/$src"
+        if [ "$found_in_manifest" = false ]; then
+            printf 'source not present in %s: %s\n' "$variable_name" "$src" >&2
+            return 1
         fi
+
+        absolute_paths="$absolute_paths $root/users/noah/$src"
     done
 
-    printf '%s\n' "${filtered_paths# }"
+    printf '%s\n' "${absolute_paths# }"
 }
 
-noah_host_public_key_runtime_base_exclusions() {
+noah_host_public_key_runtime_base_sources() {
     cat <<'EOF'
-runtime_init.c
-hooks.c
-lib/compat/qmk_contract.c
-lib/compat/qmk_mod_contract.c
-lib/compat/qmk_via_contract.c
-lib/compat/split_role.c
-lib/action/action_dispatch.c
-lib/action/action_kind_dispatch.c
-lib/action/action_lifecycle.c
-lib/action/synthetic_record.c
-lib/key/interaction/key_behavior_lookup.c
-lib/key/interaction/keymap_validation.c
-lib/key/runtime/delayed_action.c
-lib/macro/macro_dispatch.c
-lib/macro/macro_slot_provider.c
-lib/macro/macro_payload.c
-lib/macro/macro_payload_decode_qmk.c
-lib/macro/macro_payload_keycodes.c
-lib/macro/macro_payload_parse.c
-lib/macro/macro_payload_run.c
-lib/macro/macro_payload_encode.c
-lib/macro/via_macro_provider.c
-lib/macro/via_macro_defaults.c
-lib/state/runtime/keyboard_mod_state.c
-lib/state/runtime/split_runtime_sync.c
-lib/rgb/core/rgb_runtime.c
-lib/rgb/stages/rgb_key_feedback_stage.c
-lib/rgb/stages/rgb_layer_stage.c
-lib/rgb/automouse/rgb_automouse_stage.c
-lib/rgb/stages/rgb_pd_mode_stage.c
-lib/rgb/stages/rgb_preview_stage.c
-lib/rgb/core/rgb_config_defaults.c
-lib/rgb/core/rgb_validation.c
+lib/action/action_kind.c
+lib/key/interaction/handled_key_defaults.c
+lib/key/interaction/handled_key_materialize.c
+lib/key/interaction/handled_key_resolution_accessors.c
+lib/key/interaction/handled_key_transparency.c
+lib/key/interaction/multi_tap_engine.c
+lib/key/runtime/key_runtime_admission.c
+lib/key/runtime/key_runtime_debug.c
+lib/key/runtime/key_runtime_index.c
+lib/key/runtime/key_runtime_preflight.c
+lib/key/runtime/key_runtime_press.c
+lib/key/runtime/key_runtime_process.c
+lib/key/runtime/key_runtime_release.c
+lib/key/runtime/key_runtime_trace.c
+lib/key/runtime/key_runtime_transition.c
+lib/key/runtime/slot/key_runtime_slot.c
+lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c
+lib/key/runtime/slot/key_runtime_slot_policy.c
+lib/key/runtime/slot/key_runtime_slot_press_reduce.c
+lib/key/runtime/slot/key_runtime_slot_release_active.c
+lib/key/runtime/slot/key_runtime_slot_release_reduce.c
+lib/key/runtime/slot/key_runtime_slot_result.c
+lib/key/runtime/slot/key_runtime_slot_scan_reduce.c
+lib/key/runtime/slot/key_runtime_slot_step.c
+lib/state/runtime/runtime_shared_state.c
 EOF
 }
 
 noah_host_runtime_debug_support_paths() {
     root="$1"
-    exclusions="$(noah_host_public_key_runtime_base_exclusions)
-lib/action/owned_keycode.c
-lib/key/interaction/handled_key_lookup.c
-lib/key/runtime/key_runtime.c
-lib/key/runtime/key_runtime_scan.c"
-    common_paths="$(noah_source_manifest_absolute_userspace_paths_excluding "$root" NOAH_COMMON_SOURCES "$exclusions")"
-
-    printf '%s %s %s\n' \
-        "$common_paths" \
-        "$root/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
-        "$root/users/noah/lib/pointing/runtime/pd_mode_state.c"
-}
-
-noah_host_key_runtime_modifier_hold_support_paths() {
-    root="$1"
-    exclusions="$(noah_host_public_key_runtime_base_exclusions)
-lib/key/runtime/key_runtime_feedback.c
-lib/state/ownership/layer_ownership.c
-lib/state/runtime/runtime_trace.c"
-
-    noah_source_manifest_absolute_userspace_paths_excluding "$root" NOAH_COMMON_SOURCES "$exclusions"
-}
-
-noah_host_key_runtime_scenario_support_paths() {
-    root="$1"
-    exclusions="$(noah_host_public_key_runtime_base_exclusions)
-lib/action/owned_keycode.c
+    base_sources="$(noah_host_public_key_runtime_base_sources)"
+    common_additions='
 lib/key/ownership/held_action.c
 lib/key/ownership/held_repeat.c
 lib/key/runtime/key_runtime_feedback.c
 lib/state/ownership/keyboard_mod_ownership.c
-lib/state/ownership/layer_ownership.c"
+lib/state/ownership/layer_ownership.c
+lib/state/runtime/runtime_trace.c'
+    pointing_additions='
+lib/pointing/runtime/pd_mode_snapshot.c
+lib/pointing/runtime/pd_mode_state.c'
+    base_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$base_sources")"
+    common_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$common_additions")"
+    pointing_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_POINTING_SOURCES "$pointing_additions")"
 
-    noah_source_manifest_absolute_userspace_paths_excluding "$root" NOAH_COMMON_SOURCES "$exclusions"
+    printf '%s %s %s\n' "$base_paths" "$common_paths" "$pointing_paths"
+}
+
+noah_host_key_runtime_modifier_hold_support_paths() {
+    root="$1"
+    base_sources="$(noah_host_public_key_runtime_base_sources)"
+    common_additions='
+lib/action/owned_keycode.c
+lib/key/interaction/handled_key_lookup.c
+lib/key/ownership/held_action.c
+lib/key/ownership/held_repeat.c
+lib/key/runtime/key_runtime.c
+lib/key/runtime/key_runtime_scan.c
+lib/state/ownership/keyboard_mod_ownership.c'
+    base_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$base_sources")"
+    common_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$common_additions")"
+
+    printf '%s %s\n' "$base_paths" "$common_paths"
+}
+
+noah_host_key_runtime_scenario_support_paths() {
+    root="$1"
+    base_sources="$(noah_host_public_key_runtime_base_sources)"
+    common_additions='
+lib/key/interaction/handled_key_lookup.c
+lib/key/runtime/key_runtime.c
+lib/key/runtime/key_runtime_scan.c
+lib/state/runtime/runtime_trace.c'
+    base_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$base_sources")"
+    common_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$common_additions")"
+
+    printf '%s %s\n' "$base_paths" "$common_paths"
 }

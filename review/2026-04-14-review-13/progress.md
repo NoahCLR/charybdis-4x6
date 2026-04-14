@@ -111,3 +111,19 @@ Next steps:
 - update `tests/host/runtime_init_order_test.c` and
   `tests/host/rgb_layer_render_test.c` in the same pass as any intentional
   stage-order changes
+
+### Review-history reconciliation
+
+Completed in this pass:
+
+- annotated `review/2026-04-14-review-13/userspace-architecture-review.md` so
+  the landed structure summary and the audit-time findings are no longer framed
+  as simultaneous claims about the same tree
+- clarified that the findings section is the pre-remediation audit snapshot and
+  that the later landed state is recorded by the structure update and the
+  follow-up reviews
+
+Result:
+
+- `review-13` now reads as a historical checkpoint plus later landed update,
+  instead of an internally contradictory source-of-truth document

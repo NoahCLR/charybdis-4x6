@@ -35,7 +35,20 @@ seams:
   through explicit local stage tables, with host tests pinning runtime-init
   order and RGB render precedence.
 
-## Findings
+## Reconciliation Note
+
+This folder now serves two purposes:
+
+- the `Landed Structure Update` above records the later code that landed after
+  the original audit
+- the audit findings below are preserved as the review-13 snapshot before that
+  remediation landed
+
+Read the findings below as audit-time issues that were later resolved in
+`review/2026-04-14-review-14/`, `review/2026-04-14-review-15/`, and
+`review/2026-04-14-review-16/`, not as claims about the current tree.
+
+## Audit Snapshot Before Follow-Up Remediation
 
 ### No must-fix correctness regressions found in the current tree
 
@@ -43,7 +56,7 @@ The current tree passed the full host suite and firmware compile, and I did not
 find a concrete behavior regression in the reviewed runtime, pd, debug, or RGB
 surfaces.
 
-### Should-fix: key-runtime sealing is still incomplete because `key_runtime_internal.h` remains the de facto cross-module API
+### Audit-time should-fix: key-runtime sealing was still incomplete because `key_runtime_internal.h` remained the de facto cross-module API
 
 References:
 
@@ -75,7 +88,7 @@ Why this matters:
   higher-level harnesses
 - boundary drift is not mechanically prevented today
 
-### Should-fix: the refactor did not converge orchestration; it left three different order-sensitive stage dialects
+### Audit-time should-fix: the refactor had not yet converged orchestration; it left three different order-sensitive stage dialects
 
 References:
 
@@ -101,7 +114,7 @@ Why this matters:
 - changing order or adding a stage still requires bespoke control-flow edits
 - there is no single seam that mechanically protects these ordering contracts
 
-### Should-fix: higher-level host harnesses still depend on private key-runtime headers instead of the narrowed semantic seams
+### Audit-time should-fix: higher-level host harnesses still depended on private key-runtime headers instead of the narrowed semantic seams
 
 References:
 
@@ -174,7 +187,7 @@ Commands run in this audit pass:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
-Current conclusion:
+Audit-time conclusion before the later remediation:
 
 - no must-fix correctness regressions found in the reviewed refactor
 - the strongest remaining debt is not aggregate runtime sealing anymore; it is
