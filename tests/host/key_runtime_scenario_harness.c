@@ -10,6 +10,7 @@
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
+#include "users/noah/lib/state/runtime/runtime_reset.h"
 #include "users/noah/noah_runtime.h"
 
 enum {

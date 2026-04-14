@@ -57,6 +57,12 @@ void layer_off(uint8_t layer) {
     layer_off_calls[layer]++;
 }
 
+void clear_mods(void) {}
+void clear_weak_mods(void) {}
+void clear_oneshot_mods(void) {}
+void clear_oneshot_locked_mods(void) {}
+void send_keyboard_report(void) {}
+
 static void test_single_momentary_press_and_release_toggles_layer(void) {
     keypos_t key_pos = test_keypos(1, 2);
 

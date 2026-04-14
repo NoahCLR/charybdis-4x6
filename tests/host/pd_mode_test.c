@@ -8,6 +8,9 @@
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
 #include "host_runtime_fixture.h"
 
+static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
+HOST_RUNTIME_FIXTURE_DEFINE_RESET_QMK_STUBS(runtime_fixture)
+
 #ifndef CHARYBDIS_DRAGSCROLL_DPI
 #    define CHARYBDIS_DRAGSCROLL_DPI 100
 #endif
@@ -64,6 +67,7 @@ static void test_reset_runtime(void) {
 }
 
 static void test_reset_stubs(void) {
+    host_runtime_fixture_reset(&runtime_fixture);
     test_reset_runtime();
 
     current_cpi                   = 0;

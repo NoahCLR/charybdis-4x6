@@ -44,6 +44,7 @@ static uint16_t              mod_unregister_calls[16];
 static uint8_t               mod_register_count;
 static uint8_t               mod_unregister_count;
 static uint16_t              fake_time;
+layer_state_t                layer_state;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -107,6 +108,12 @@ uint16_t timer_read(void) {
 uint16_t timer_elapsed(uint16_t last) {
     return (uint16_t)(fake_time - last);
 }
+
+void clear_mods(void) {}
+void clear_weak_mods(void) {}
+void clear_oneshot_mods(void) {}
+void clear_oneshot_locked_mods(void) {}
+void send_keyboard_report(void) {}
 
 void action_dispatch(uint16_t action) {
     CHECK(tap_call_count < ARRAY_SIZE(tap_calls));

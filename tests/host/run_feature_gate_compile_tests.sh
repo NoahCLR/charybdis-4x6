@@ -28,26 +28,50 @@ check_header_boundaries() {
 }
 
 check_runtime_sealing_boundaries() {
-    if rg -n '#include "((users/noah/lib/state/runtime/)?runtime_(context|shared_state)\.h)"' "$ROOT/users/noah" "$ROOT/tests/host" >/dev/null; then
+    if rg -n '#include "((users/noah/lib/state/runtime/)?(.*/)?runtime_(context|shared_state)\.h)"' "$ROOT/users/noah" "$ROOT/tests/host" >/dev/null; then
         echo "repo-owned code must not include removed public runtime aggregate/context headers" >&2
-        rg -n '#include "((users/noah/lib/state/runtime/)?runtime_(context|shared_state)\.h)"' "$ROOT/users/noah" "$ROOT/tests/host" >&2
+        rg -n '#include "((users/noah/lib/state/runtime/)?(.*/)?runtime_(context|shared_state)\.h)"' "$ROOT/users/noah" "$ROOT/tests/host" >&2
         exit 1
     fi
 
-    if rg -n '#include ".*runtime_(context|shared_state)_internal\.h"' "$ROOT/tests/host" >/dev/null; then
+    if rg -n '#include "(.*/)?runtime_(context|shared_state)_internal\.h"' "$ROOT/tests/host" >/dev/null; then
         echo "host tests must not include internal runtime storage headers" >&2
-        rg -n '#include ".*runtime_(context|shared_state)_internal\.h"' "$ROOT/tests/host" >&2
+        rg -n '#include "(.*/)?runtime_(context|shared_state)_internal\.h"' "$ROOT/tests/host" >&2
         exit 1
     fi
 
     if (
         cd "$ROOT/users/noah"
-        rg -n '#include ".*runtime_(context|shared_state)_internal\.h"' . --glob '!lib/state/runtime/**' --glob '!lib/state/ownership/**' --glob '!lib/key/ownership/**'
+        rg -n '#include "(.*/)?runtime_(context|shared_state)_internal\.h"' . --glob '!lib/state/runtime/**' --glob '!lib/state/ownership/**' --glob '!lib/key/ownership/**'
     ) >/dev/null; then
         echo "only runtime owner modules may include internal runtime storage headers" >&2
         (
             cd "$ROOT/users/noah"
-            rg -n '#include ".*runtime_(context|shared_state)_internal\.h"' . --glob '!lib/state/runtime/**' --glob '!lib/state/ownership/**' --glob '!lib/key/ownership/**'
+            rg -n '#include "(.*/)?runtime_(context|shared_state)_internal\.h"' . --glob '!lib/state/runtime/**' --glob '!lib/state/ownership/**' --glob '!lib/key/ownership/**'
+        ) >&2
+        exit 1
+    fi
+
+    if rg -n '#include ".*pd_mode_runtime_shared_state\.h"' "$ROOT/users/noah" "$ROOT/tests/host" >/dev/null; then
+        echo "repo-owned code must not include removed public pd runtime shared-state header" >&2
+        rg -n '#include ".*pd_mode_runtime_shared_state\.h"' "$ROOT/users/noah" "$ROOT/tests/host" >&2
+        exit 1
+    fi
+
+    if rg -n '#include ".*pd_mode_runtime_shared_state_internal\.h"' "$ROOT/tests/host" >/dev/null; then
+        echo "host tests must not include internal pd runtime storage headers" >&2
+        rg -n '#include ".*pd_mode_runtime_shared_state_internal\.h"' "$ROOT/tests/host" >&2
+        exit 1
+    fi
+
+    if (
+        cd "$ROOT/users/noah"
+        rg -n '#include ".*pd_mode_runtime_shared_state_internal\.h"' . --glob '!lib/state/runtime/**' --glob '!lib/pointing/runtime/**'
+    ) >/dev/null; then
+        echo "only runtime owner and pd runtime modules may include internal pd runtime storage headers" >&2
+        (
+            cd "$ROOT/users/noah"
+            rg -n '#include ".*pd_mode_runtime_shared_state_internal\.h"' . --glob '!lib/state/runtime/**' --glob '!lib/pointing/runtime/**'
         ) >&2
         exit 1
     fi

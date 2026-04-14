@@ -10,7 +10,9 @@
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/key_runtime_process.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
+#include "users/noah/lib/state/runtime/runtime_reset.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,
@@ -59,10 +61,10 @@ static void test_snapshot_capture(noah_runtime_debug_snapshot_t *snapshot) {
 }
 
 static uint8_t test_snapshot_real_mods(void) {
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keyboard_mod_ownership_debug_snapshot_t snapshot = {0};
 
-    key_runtime_integration_debug_snapshot(&snapshot);
-    return snapshot.keyboard_mod_ownership.live_state.real;
+    keyboard_mod_ownership_debug_snapshot(&snapshot);
+    return snapshot.live_state.real;
 }
 
 static void test_reset_state(void) {

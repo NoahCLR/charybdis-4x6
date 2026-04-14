@@ -32,16 +32,6 @@ static void runtime_shared_state_reset(runtime_shared_state_t *state) {
     key_runtime_shared_state_reset(&state->key);
 }
 
-// Minimal host runners may not provide the full QMK layer/mod/report surface.
-// Keep the public runtime reset callable there by supplying weak no-op fallbacks
-// that production/QMK builds override with their real implementations.
-__attribute__((weak)) layer_state_t layer_state;
-__attribute__((weak)) void          clear_mods(void) {}
-__attribute__((weak)) void          clear_weak_mods(void) {}
-__attribute__((weak)) void          clear_oneshot_mods(void) {}
-__attribute__((weak)) void          clear_oneshot_locked_mods(void) {}
-__attribute__((weak)) void          send_keyboard_report(void) {}
-
 void noah_runtime_context_reset_for_test(noah_runtime_context_t *ctx) {
     if (!ctx) {
         return;

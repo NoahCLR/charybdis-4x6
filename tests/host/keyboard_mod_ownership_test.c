@@ -9,6 +9,7 @@ static uint8_t fake_mods;
 static uint8_t fake_weak_mods;
 static uint8_t fake_oneshot_mods;
 static uint8_t fake_oneshot_locked_mods;
+layer_state_t  layer_state;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);

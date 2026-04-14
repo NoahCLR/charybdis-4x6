@@ -415,6 +415,24 @@ uint8_t get_oneshot_locked_mods(void) {
     return fake_oneshot_locked_mods;
 }
 
+void clear_mods(void) {
+    fake_mods = 0;
+}
+
+void clear_weak_mods(void) {
+    fake_weak_mods = 0;
+}
+
+void clear_oneshot_mods(void) {
+    fake_oneshot_mods = 0;
+}
+
+void clear_oneshot_locked_mods(void) {
+    fake_oneshot_locked_mods = 0;
+}
+
+void send_keyboard_report(void) {}
+
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .keycode          = keycode,

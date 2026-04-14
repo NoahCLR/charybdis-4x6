@@ -1,18 +1,10 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Runtime Shared State Internals
+// Runtime Reset
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Aggregate runtime-owned storage shared across the split key engine and
-// pd-mode modules. This layout is internal to the runtime owner layer.
+// Public hard-reset seam for the userspace-owned runtime state. Higher-level
+// host tests should use this instead of rebuilding partial reset logic.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // IWYU pragma: keep
-
-#include "../../key/runtime/key_runtime_shared_state.h"
-#include "../../pointing/runtime/pd_mode_runtime_shared_state_internal.h"
-
-typedef struct {
-    key_runtime_shared_state_t     key;
-    pd_mode_runtime_shared_state_t pd;
-} runtime_shared_state_t;
+void noah_runtime_reset_for_test(void);

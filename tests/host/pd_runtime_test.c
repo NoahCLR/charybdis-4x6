@@ -8,6 +8,9 @@
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "host_runtime_fixture.h"
 
+static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
+HOST_RUNTIME_FIXTURE_DEFINE_RESET_QMK_STUBS(runtime_fixture)
+
 static uint16_t current_cpi;
 static uint16_t cpi_set_count;
 static uint16_t default_dpi;
@@ -65,6 +68,7 @@ static void test_reset_runtime(void) {
 }
 
 static void test_reset_stubs(void) {
+    host_runtime_fixture_reset(&runtime_fixture);
     test_reset_runtime();
 
     current_cpi                   = 0;
@@ -122,10 +126,6 @@ uint32_t last_input_activity_elapsed(void) {
 
 uint32_t last_matrix_activity_elapsed(void) {
     return fake_last_matrix_idle_ms;
-}
-
-bool layer_state_cmp(layer_state_t state, uint8_t layer) {
-    return (state & ((layer_state_t)1u << layer)) != 0;
 }
 
 bool is_keyboard_master(void) {

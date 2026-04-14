@@ -99,6 +99,12 @@ bool charybdis_get_pointer_sniping_enabled(void) {
     return fake_sniping_enabled;
 }
 
+void clear_mods(void) {}
+void clear_weak_mods(void) {}
+void clear_oneshot_mods(void) {}
+void clear_oneshot_locked_mods(void) {}
+void send_keyboard_report(void) {}
+
 uint16_t charybdis_get_pointer_default_dpi(void) {
     return fake_default_dpi;
 }

@@ -4,7 +4,7 @@
 //
 // Slot-owned interaction contract cached by the key runtime after a handled
 // key press resolves. This is distinct from handled_key_resolution_t, which
-// remains the authored lookup result from interaction/handled_key.c.
+// remains the authored lookup result from the handled-key interaction seam.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

@@ -2,22 +2,14 @@
 // Runtime Debug Snapshot
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Aggregate read-only snapshot and hard reset helpers for the userspace-owned
-// runtime state. Higher-level host tests can use this surface instead of
-// rebuilding partial reset logic across key runtime, pd modes, layer
-// ownership, held-action ownership, held-repeat scheduling, and modifier
-// ownership modules.
+// Public key-runtime observation surface for the userspace-owned runtime state.
+// Higher-level host tests can use this to inspect slot ownership, feedback,
+// and pending multi-tap state without reaching into the runtime-owned storage
+// layout directly.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
-
-#include "../../key/ownership/held_action.h"
-#include "../../key/ownership/held_repeat.h"
-#include "../../pointing/defs/pd_mode_flags.h"
-#include "../ownership/keyboard_mod_ownership.h"
-#include "../ownership/layer_ownership.h"
-#include "runtime_trace.h"
 
 #define NOAH_RUNTIME_DEBUG_SLOT_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 
@@ -42,27 +34,10 @@ typedef struct {
     bool                               preview_owner_slot_present;
     keypos_t                           pending_fallback_slot;
     bool                               pending_fallback_slot_present;
-} noah_runtime_debug_key_snapshot_t;
-
-typedef struct {
-    pd_mode_mask_t local_active_mode;
-    pd_mode_mask_t local_locked_mode;
-    pd_mode_mask_t remote_display_active_mode;
-    pd_mode_mask_t remote_display_locked_mode;
-} noah_runtime_debug_pd_snapshot_t;
-
-typedef struct {
-    noah_runtime_debug_key_snapshot_t       key;
-    noah_runtime_debug_pd_snapshot_t        pd;
-    layer_ownership_debug_snapshot_t        layer_ownership;
-    held_action_debug_snapshot_t            held_actions;
-    held_repeat_debug_snapshot_t            held_repeats;
-    keyboard_mod_ownership_debug_snapshot_t keyboard_mod_ownership;
-    noah_runtime_trace_snapshot_t           trace;
 } noah_runtime_debug_snapshot_t;
 
 void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out);
-void noah_runtime_reset_for_test(void);
+bool noah_runtime_debug_feedback_active(const noah_runtime_debug_snapshot_t *snapshot);
 uint16_t noah_runtime_debug_slot_owner_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
 uint16_t noah_runtime_debug_slot_tap_action(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
 uint16_t noah_runtime_debug_slot_held_action_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);

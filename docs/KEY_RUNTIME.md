@@ -39,9 +39,9 @@ These files are the core map of the runtime:
 
 | File | Responsibility |
 | --- | --- |
-| [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h) and [`handled_key.c`](../users/noah/lib/key/interaction/handled_key.c) | Resolve a keycode into an authored `handled_key_resolution_t` branch record: keycode, selected tap-count step, timing, layer/pd metadata, and structural flags |
+| [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h), [`handled_key_lookup.c`](../users/noah/lib/key/interaction/handled_key_lookup.c), [`handled_key_materialize.c`](../users/noah/lib/key/interaction/handled_key_materialize.c), [`handled_key_defaults.c`](../users/noah/lib/key/interaction/handled_key_defaults.c), and [`handled_key_resolution_accessors.c`](../users/noah/lib/key/interaction/handled_key_resolution_accessors.c) | Resolve authored behavior into a `handled_key_resolution_t`, then materialize it into slot-owned interaction metadata, transparency defaults, and release-policy helpers |
 | [`key_runtime_interaction.h`](../users/noah/lib/key/runtime/key_runtime_interaction.h) | Materialize authored handled-key resolution into the slot-owned `key_runtime_slot_interaction_t` contract: cached binding, hold strategy, release semantics, and preview/feedback policy |
-| [`runtime_shared_state.h`](../users/noah/lib/state/runtime/runtime_shared_state.h) | Own the central slot storage and explicit pd-mode runtime selection state |
+| [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h), [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), [`key_runtime_shared_state.h`](../users/noah/lib/key/runtime/key_runtime_shared_state.h), and the pd-mode read APIs in [`pd_mode_flags.h`](../users/noah/lib/pointing/defs/pd_mode_flags.h) / [`pd_modes.h`](../users/noah/lib/pointing/defs/pd_modes.h) | Public runtime reset seam, key-runtime observation helpers, slot-state implementation detail, and semantic pd-mode read state |
 | [`key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c) | `process_record_user` entry flow and top-level branching |
 | [`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c) | Physical-event preflight, modifier suppression, active-slot interrupts, and pending-multi-tap flushing |
 | [`key_runtime_press.c`](../users/noah/lib/key/runtime/key_runtime_press.c), [`key_runtime_release.c`](../users/noah/lib/key/runtime/key_runtime_release.c), and [`key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c) | Outer orchestration for press, release, and scan passes |
@@ -52,7 +52,7 @@ These files are the core map of the runtime:
 | [`key_runtime_effect.h`](../users/noah/lib/key/runtime/effects/key_runtime_effect.h), [`key_runtime_effect_queue.h`](../users/noah/lib/key/runtime/effects/key_runtime_effect_queue.h), [`key_runtime_slot_result.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_result.c), and [`key_runtime_transition.c`](../users/noah/lib/key/runtime/key_runtime_transition.c) | Shared runtime effect vocabulary, shared queue field layout, request expansion, plan batching, and effect execution |
 | [`action_dispatch.h`](../users/noah/lib/action/action_dispatch.h), [`action_dispatch.c`](../users/noah/lib/action/action_dispatch.c), [`action_lifecycle.c`](../users/noah/lib/action/action_lifecycle.c), [`owned_keycode.c`](../users/noah/lib/action/owned_keycode.c), and [`keyboard_mod_state.c`](../users/noah/lib/state/runtime/keyboard_mod_state.c) | Action classification, lifecycle dispatch, overlap-safe literal key ownership, and explicit output-intent helpers for authored taps, synthetic QMK taps, and temporary modifier suspension |
 | [`held_action.c`](../users/noah/lib/key/ownership/held_action.c), [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c), [`layer_ownership.c`](../users/noah/lib/state/ownership/layer_ownership.c), and [`keyboard_mod_ownership.c`](../users/noah/lib/state/ownership/keyboard_mod_ownership.c) | Long-lived ownership registries touched by runtime effects |
-| [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), [`runtime_debug.c`](../users/noah/lib/state/runtime/runtime_debug.c), [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h), and [`runtime_trace.c`](../users/noah/lib/state/runtime/runtime_trace.c) | Aggregate runtime snapshot and test reset surface, plus the optional shared trace ring buffer used for cross-subsystem debugging |
+| [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h), [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h), and [`runtime_trace.c`](../users/noah/lib/state/runtime/runtime_trace.c) | Public key-runtime observation surface, public runtime reset seam, and the optional shared trace ring buffer used for cross-subsystem debugging |
 
 ## End-To-End Flow
 
@@ -155,11 +155,12 @@ advances time-based repeat bindings and dispatches any repeat taps that are due.
 
 ## Slot Model
 
-The central runtime storage is
-[`active_key_state_t`](../users/noah/lib/state/runtime/runtime_shared_state.h) inside
-[`runtime_shared_state.h`](../users/noah/lib/state/runtime/runtime_shared_state.h).
-Each slot owns one physical position's active press state plus any deferred
-multi-tap chain that still belongs to that position.
+The central slot storage lives in
+[`key_runtime_shared_state.h`](../users/noah/lib/key/runtime/key_runtime_shared_state.h)
+and is composed into the internal runtime owner layer from
+`runtime_context_internal.h`. Each slot owns one physical position's active
+press state plus any deferred multi-tap chain that still belongs to that
+position.
 
 The main fields are:
 
@@ -266,8 +267,9 @@ These are the easiest runtime rules to break by accident:
 - `action_dispatch()` now exists as the compatibility wrapper for the
   runtime-default authored tap path. New code should not treat it as the only
   output seam.
-- Slot reset should flow through `key_runtime_slot_reset()` or
-  `runtime_shared_state_reset()` so default timing and semantic sentinels stay
+- Slot reset should flow through `key_runtime_slot_reset()` for individual slots
+  or [`noah_runtime_reset_for_test()`](../users/noah/lib/state/runtime/runtime_reset.h)
+  for whole-runtime host resets so default timing and semantic sentinels stay
   valid.
 - Authored momentary layers are owned through `layer_ownership.c`, not raw
   `layer_on()` and `layer_off()` calls in the key runtime.
@@ -280,8 +282,11 @@ These are the easiest runtime rules to break by accident:
 If you are changing one of these categories, start here:
 
 - resolved handled-key semantics:
-  [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h) and
-  [`handled_key.c`](../users/noah/lib/key/interaction/handled_key.c)
+  [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h),
+  [`handled_key_lookup.c`](../users/noah/lib/key/interaction/handled_key_lookup.c),
+  [`handled_key_materialize.c`](../users/noah/lib/key/interaction/handled_key_materialize.c),
+  [`handled_key_defaults.c`](../users/noah/lib/key/interaction/handled_key_defaults.c),
+  and [`handled_key_resolution_accessors.c`](../users/noah/lib/key/interaction/handled_key_resolution_accessors.c)
 - slot interaction materialization and cached release semantics:
   [`key_runtime_interaction.h`](../users/noah/lib/key/runtime/key_runtime_interaction.h)
 - outer event orchestration:
@@ -313,9 +318,11 @@ If you are changing one of these categories, start here:
   [`owned_keycode.c`](../users/noah/lib/action/owned_keycode.c), and
   [`keyboard_mod_state.c`](../users/noah/lib/state/runtime/keyboard_mod_state.c)
 - new hidden runtime state:
-  either [`runtime_shared_state.h`](../users/noah/lib/state/runtime/runtime_shared_state.h)
-  or one explicit ownership module plus
-  [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h)
+  one explicit ownership module plus the public observation/reset seams in
+  [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h) and
+  [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h).
+  Internal aggregate composition lives in `runtime_context_internal.h` and the
+  pd-mode storage slice in `pd_mode_runtime_shared_state_internal.h`.
 - new runtime translation units or build wiring:
   [`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk) plus
   `sh tests/host/run_feature_gate_compile_tests.sh`
@@ -330,14 +337,17 @@ deserve updates to this doc and to the active review log in `review/`.
 ## Debugging And Tests
 
 For higher-level debugging, use
-[`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h) instead of
-rebuilding partial resets inside individual tests.
+[`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h) for
+key-runtime state inspection and
+[`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h) for
+whole-runtime test resets instead of rebuilding partial reset logic inside
+individual tests.
 
 If you need to chase ordering across the key runtime, pd modes, layer
 ownership, and split sync, enable `NOAH_RUNTIME_TRACE_ENABLE`. The shared
 trace ring buffer in
 [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h) is included in
-the aggregate debug snapshot and reset with the rest of the runtime.
+its own trace snapshot API and reset with the rest of the runtime.
 That buffer now records not only transition plans and executed effects, but
 also typed key-runtime decision events for release resolution, hold-policy
 selection, and pending multi-tap reuse/flush decisions.
@@ -353,7 +363,7 @@ and
 [`tests/host/key_runtime_scenario_harness.c`](../tests/host/key_runtime_scenario_harness.c)
 now records the shared [`key_runtime_effect_t`](../users/noah/lib/key/runtime/effects/key_runtime_effect.h)
 payloads directly and resets runtime state through
-[`noah_runtime_reset_for_test()`](../users/noah/lib/state/runtime/runtime_debug.h).
+[`noah_runtime_reset_for_test()`](../users/noah/lib/state/runtime/runtime_reset.h).
 Keep new scripted scenarios on that shared surface instead of adding a
 test-only effect or reset dialect.
 

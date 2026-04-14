@@ -8,6 +8,7 @@
 #include "host_runtime_fixture.h"
 
 static uint16_t fake_time;
+layer_state_t   layer_state;
 
 enum {
     TEST_KEY_A = SAFE_RANGE + 0x01,
@@ -208,6 +209,12 @@ uint8_t get_oneshot_mods(void) {
 uint8_t get_oneshot_locked_mods(void) {
     return 0;
 }
+
+void clear_mods(void) {}
+void clear_weak_mods(void) {}
+void clear_oneshot_mods(void) {}
+void clear_oneshot_locked_mods(void) {}
+void send_keyboard_report(void) {}
 
 handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
     return (handled_key_resolution_t){

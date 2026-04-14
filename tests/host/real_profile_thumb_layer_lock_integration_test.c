@@ -14,6 +14,7 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
+#include "users/noah/lib/state/runtime/runtime_reset.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
 
@@ -52,11 +53,13 @@ static uint16_t test_layer_mask(uint8_t layer) {
 }
 
 static bool test_snapshot_layer_active(const noah_runtime_debug_snapshot_t *snapshot, uint8_t layer) {
-    return snapshot != NULL && layer < LAYER_COUNT && (snapshot->layer_ownership.applied_layer_state & ((layer_state_t)1u << layer)) != 0;
+    (void)snapshot;
+    return layer < LAYER_COUNT && (layer_state & ((layer_state_t)1u << layer)) != 0;
 }
 
 static bool test_snapshot_layer_locked(const noah_runtime_debug_snapshot_t *snapshot, uint8_t layer) {
-    return snapshot != NULL && layer < LAYER_COUNT && (snapshot->layer_ownership.locked_mask & ((layer_state_t)1u << layer)) != 0;
+    (void)snapshot;
+    return layer < LAYER_COUNT && layer_ownership_is_locked(layer);
 }
 
 static uint8_t test_highest_active_layer(void) {

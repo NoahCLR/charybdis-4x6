@@ -111,6 +111,12 @@ uint8_t get_oneshot_locked_mods(void) {
     return 0;
 }
 
+void clear_mods(void) {}
+void clear_weak_mods(void) {}
+void clear_oneshot_mods(void) {}
+void clear_oneshot_locked_mods(void) {}
+void send_keyboard_report(void) {}
+
 key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
     (void)keycode;
     (void)tap_count;

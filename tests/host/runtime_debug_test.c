@@ -11,7 +11,11 @@
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
+#include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
+#include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
+#include "users/noah/lib/state/runtime/runtime_reset.h"
+#include "users/noah/lib/state/runtime/runtime_trace.h"
 #include "host_handled_key_fixture.h"
 
 enum {
@@ -48,6 +52,51 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
         .row = row,
         .col = col,
     };
+}
+
+static const layer_ownership_binding_snapshot_t *test_find_layer_binding(const layer_ownership_debug_snapshot_t *snapshot, keypos_t key_pos, uint8_t layer) {
+    if (!snapshot) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < LAYER_OWNERSHIP_BINDING_CAPACITY; index++) {
+        const layer_ownership_binding_snapshot_t *binding = &snapshot->bindings[index];
+        if (binding->active && binding->layer == layer && test_keypos_equal(binding->key_pos, key_pos)) {
+            return binding;
+        }
+    }
+
+    return NULL;
+}
+
+static const held_action_binding_snapshot_t *test_find_held_action_binding(const held_action_debug_snapshot_t *snapshot, keypos_t key_pos, uint16_t action) {
+    if (!snapshot) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < HELD_ACTION_BINDING_CAPACITY; index++) {
+        const held_action_binding_snapshot_t *binding = &snapshot->actions[index];
+        if (binding->active && binding->action == action && test_keypos_equal(binding->key_pos, key_pos)) {
+            return binding;
+        }
+    }
+
+    return NULL;
+}
+
+static const held_repeat_binding_snapshot_t *test_find_held_repeat_binding(const held_repeat_debug_snapshot_t *snapshot, keypos_t key_pos, uint16_t action) {
+    if (!snapshot) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < HELD_REPEAT_BINDING_CAPACITY; index++) {
+        const held_repeat_binding_snapshot_t *binding = &snapshot->bindings[index];
+        if (binding->active && binding->action == action && test_keypos_equal(binding->key_pos, key_pos)) {
+            return binding;
+        }
+    }
+
+    return NULL;
 }
 
 static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, uint8_t tap_count) {
@@ -362,13 +411,22 @@ static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
 }
 
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
-    noah_runtime_debug_snapshot_t snapshot;
-    keypos_t                      key_pos;
-    keypos_t                      active_key = test_keypos(0, 0);
-    keypos_t                      pending_key = test_keypos(0, 1);
-    keypos_t                      layer_key  = test_keypos(1, 2);
-    keypos_t                      action_key = test_keypos(3, 4);
-    keypos_t                      repeat_key = test_keypos(5, 6);
+    noah_runtime_debug_snapshot_t             snapshot;
+    pd_mode_snapshot_t                        pd_snapshot;
+    layer_ownership_debug_snapshot_t          layer_snapshot;
+    held_action_debug_snapshot_t              held_action_snapshot;
+    held_repeat_debug_snapshot_t              held_repeat_snapshot;
+    keyboard_mod_ownership_debug_snapshot_t   keyboard_mod_snapshot;
+    noah_runtime_trace_snapshot_t             trace_snapshot;
+    const layer_ownership_binding_snapshot_t *layer_binding;
+    const held_action_binding_snapshot_t     *held_action_binding;
+    const held_repeat_binding_snapshot_t     *held_repeat_binding;
+    keypos_t                                  key_pos;
+    keypos_t                                  active_key  = test_keypos(0, 0);
+    keypos_t                                  pending_key = test_keypos(0, 1);
+    keypos_t                                  layer_key   = test_keypos(1, 2);
+    keypos_t                                  action_key  = test_keypos(3, 4);
+    keypos_t                                  repeat_key  = test_keypos(5, 6);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -396,10 +454,20 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     fake_oneshot_locked_mods = MOD_BIT(KC_RIGHT_GUI);
 
     noah_runtime_debug_snapshot(&snapshot);
+    pd_snapshot = pd_mode_snapshot();
+    layer_ownership_debug_snapshot(&layer_snapshot);
+    held_action_debug_snapshot(&held_action_snapshot);
+    held_repeat_debug_snapshot(&held_repeat_snapshot);
+    keyboard_mod_ownership_debug_snapshot(&keyboard_mod_snapshot);
+    noah_runtime_trace_snapshot(&trace_snapshot);
+    layer_binding       = test_find_layer_binding(&layer_snapshot, layer_key, 2);
+    held_action_binding = test_find_held_action_binding(&held_action_snapshot, action_key, TEST_ACTION);
+    held_repeat_binding = test_find_held_repeat_binding(&held_repeat_snapshot, repeat_key, TEST_ACTION);
 
-    CHECK(snapshot.key.feedback_active);
-    CHECK(snapshot.pd.local_active_mode == PD_MODE_VOLUME);
-    CHECK(snapshot.pd.remote_display_active_mode == PD_MODE_ARROW);
+    CHECK(noah_runtime_debug_feedback_active(&snapshot));
+    CHECK(pd_snapshot.local.active_mode == PD_MODE_VOLUME);
+    CHECK(pd_snapshot.local.locked_mode == 0);
+    CHECK(pd_snapshot.display.active_mode == PD_MODE_VOLUME);
     CHECK(noah_runtime_debug_slot_owner_keycode(&snapshot, active_key) == KC_C);
     CHECK(noah_runtime_debug_slot_tap_action(&snapshot, active_key) == KC_C);
     CHECK(noah_runtime_debug_active_slot_count(&snapshot) == 1);
@@ -411,44 +479,42 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&snapshot, &key_pos));
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&snapshot, &key_pos));
 
-    CHECK(snapshot.layer_ownership.applied_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
-    CHECK(snapshot.layer_ownership.locked_mask == ((layer_state_t)1u << 3));
-    CHECK(snapshot.layer_ownership.momentary_refcounts[2] == 1);
-    CHECK(snapshot.layer_ownership.bindings[0].active);
-    CHECK(snapshot.layer_ownership.bindings[0].key_pos.row == layer_key.row);
-    CHECK(snapshot.layer_ownership.bindings[0].key_pos.col == layer_key.col);
+    CHECK(layer_snapshot.applied_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
+    CHECK(layer_snapshot.locked_mask == ((layer_state_t)1u << 3));
+    CHECK(layer_snapshot.momentary_refcounts[2] == 1);
+    CHECK(layer_binding != NULL);
 
-    CHECK(snapshot.held_actions.actions[0].active);
-    CHECK(snapshot.held_actions.actions[0].key_pos.row == action_key.row);
-    CHECK(snapshot.held_actions.actions[0].key_pos.col == action_key.col);
-    CHECK(snapshot.held_actions.actions[0].action == TEST_ACTION);
-    CHECK(snapshot.held_repeats.bindings[0].active);
-    CHECK(snapshot.held_repeats.bindings[0].key_pos.row == repeat_key.row);
-    CHECK(snapshot.held_repeats.bindings[0].key_pos.col == repeat_key.col);
-    CHECK(snapshot.held_repeats.bindings[0].action == TEST_ACTION);
-    CHECK(snapshot.held_repeats.bindings[0].interval_ms == 40);
+    CHECK(held_action_binding != NULL);
+    CHECK(held_repeat_binding != NULL);
+    CHECK(held_repeat_binding->interval_ms == 40);
 
-    CHECK(snapshot.keyboard_mod_ownership.live_state.real == MOD_BIT(KC_LEFT_SHIFT));
-    CHECK(snapshot.keyboard_mod_ownership.live_state.weak == MOD_BIT(KC_RIGHT_ALT));
-    CHECK(snapshot.keyboard_mod_ownership.live_state.oneshot == MOD_BIT(KC_LEFT_GUI));
-    CHECK(snapshot.keyboard_mod_ownership.live_state.oneshot_locked == MOD_BIT(KC_RIGHT_GUI));
-    CHECK(snapshot.keyboard_mod_ownership.managed_refcounts[1] == 1);
+    CHECK(keyboard_mod_snapshot.live_state.real == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(keyboard_mod_snapshot.live_state.weak == MOD_BIT(KC_RIGHT_ALT));
+    CHECK(keyboard_mod_snapshot.live_state.oneshot == MOD_BIT(KC_LEFT_GUI));
+    CHECK(keyboard_mod_snapshot.live_state.oneshot_locked == MOD_BIT(KC_RIGHT_GUI));
+    CHECK(keyboard_mod_snapshot.managed_refcounts[1] == 1);
 
-    CHECK(snapshot.trace.count == 3u);
-    CHECK(!snapshot.trace.overflowed);
-    CHECK(snapshot.trace.entries[0].kind == NOAH_TRACE_LAYER_OWNERSHIP);
-    CHECK(snapshot.trace.entries[0].event == NOAH_TRACE_LAYER_OWNERSHIP_EVENT_LOCK);
-    CHECK(snapshot.trace.entries[1].kind == NOAH_TRACE_LAYER_OWNERSHIP);
-    CHECK(snapshot.trace.entries[1].event == NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_PRESS);
-    CHECK(snapshot.trace.entries[2].kind == NOAH_TRACE_SPLIT_SYNC);
-    CHECK(snapshot.trace.entries[2].event == NOAH_TRACE_SPLIT_SYNC_EVENT_SEND);
-    CHECK(snapshot.trace.entries[2].a == PD_MODE_VOLUME);
-    CHECK(snapshot.trace.entries[2].b == PD_MODE_ARROW);
+    CHECK(trace_snapshot.count == 3u);
+    CHECK(!trace_snapshot.overflowed);
+    CHECK(trace_snapshot.entries[0].kind == NOAH_TRACE_LAYER_OWNERSHIP);
+    CHECK(trace_snapshot.entries[0].event == NOAH_TRACE_LAYER_OWNERSHIP_EVENT_LOCK);
+    CHECK(trace_snapshot.entries[1].kind == NOAH_TRACE_LAYER_OWNERSHIP);
+    CHECK(trace_snapshot.entries[1].event == NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_PRESS);
+    CHECK(trace_snapshot.entries[2].kind == NOAH_TRACE_SPLIT_SYNC);
+    CHECK(trace_snapshot.entries[2].event == NOAH_TRACE_SPLIT_SYNC_EVENT_SEND);
+    CHECK(trace_snapshot.entries[2].a == PD_MODE_VOLUME);
+    CHECK(trace_snapshot.entries[2].b == PD_MODE_ARROW);
 }
 
 static void test_reset_clears_all_runtime_surfaces(void) {
-    noah_runtime_debug_snapshot_t snapshot;
-    keypos_t                      active_key = test_keypos(0, 0);
+    noah_runtime_debug_snapshot_t           snapshot;
+    pd_mode_snapshot_t                      pd_snapshot;
+    layer_ownership_debug_snapshot_t        layer_snapshot;
+    held_action_debug_snapshot_t            held_action_snapshot;
+    held_repeat_debug_snapshot_t            held_repeat_snapshot;
+    keyboard_mod_ownership_debug_snapshot_t keyboard_mod_snapshot;
+    noah_runtime_trace_snapshot_t           trace_snapshot;
+    keypos_t                                active_key = test_keypos(0, 0);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -470,12 +536,18 @@ static void test_reset_clears_all_runtime_surfaces(void) {
 
     noah_runtime_reset_for_test();
     noah_runtime_debug_snapshot(&snapshot);
+    pd_snapshot = pd_mode_snapshot();
+    layer_ownership_debug_snapshot(&layer_snapshot);
+    held_action_debug_snapshot(&held_action_snapshot);
+    held_repeat_debug_snapshot(&held_repeat_snapshot);
+    keyboard_mod_ownership_debug_snapshot(&keyboard_mod_snapshot);
+    noah_runtime_trace_snapshot(&trace_snapshot);
 
-    CHECK(!snapshot.key.feedback_active);
-    CHECK(snapshot.pd.local_active_mode == 0);
-    CHECK(snapshot.pd.local_locked_mode == 0);
-    CHECK(snapshot.pd.remote_display_active_mode == 0);
-    CHECK(snapshot.pd.remote_display_locked_mode == 0);
+    CHECK(!noah_runtime_debug_feedback_active(&snapshot));
+    CHECK(pd_snapshot.local.active_mode == 0);
+    CHECK(pd_snapshot.local.locked_mode == 0);
+    CHECK(pd_snapshot.display.active_mode == 0);
+    CHECK(pd_snapshot.display.locked_mode == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(&snapshot, active_key) == KC_NO);
     CHECK(noah_runtime_debug_slot_tap_action(&snapshot, active_key) == KC_NO);
     CHECK(noah_runtime_debug_active_slot_count(&snapshot) == 0);
@@ -483,22 +555,22 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&snapshot, &active_key));
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&snapshot, &active_key));
 
-    CHECK(snapshot.layer_ownership.applied_layer_state == 0);
-    CHECK(snapshot.layer_ownership.locked_mask == 0);
-    CHECK(snapshot.layer_ownership.momentary_refcounts[1] == 0);
-    CHECK(!snapshot.layer_ownership.bindings[0].active);
+    CHECK(layer_snapshot.applied_layer_state == 0);
+    CHECK(layer_snapshot.locked_mask == 0);
+    CHECK(layer_snapshot.momentary_refcounts[1] == 0);
+    CHECK(!layer_snapshot.bindings[0].active);
 
-    CHECK(!snapshot.held_actions.actions[0].active);
-    CHECK(!snapshot.held_repeats.bindings[0].active);
-    CHECK(snapshot.held_actions.modifier_refcounts[2] == 0);
+    CHECK(!held_action_snapshot.actions[0].active);
+    CHECK(!held_repeat_snapshot.bindings[0].active);
+    CHECK(held_action_snapshot.modifier_refcounts[2] == 0);
 
-    CHECK(snapshot.keyboard_mod_ownership.live_state.real == 0);
-    CHECK(snapshot.keyboard_mod_ownership.live_state.weak == 0);
-    CHECK(snapshot.keyboard_mod_ownership.live_state.oneshot == 0);
-    CHECK(snapshot.keyboard_mod_ownership.live_state.oneshot_locked == 0);
-    CHECK(snapshot.keyboard_mod_ownership.managed_refcounts[2] == 0);
-    CHECK(snapshot.trace.count == 0u);
-    CHECK(!snapshot.trace.overflowed);
+    CHECK(keyboard_mod_snapshot.live_state.real == 0);
+    CHECK(keyboard_mod_snapshot.live_state.weak == 0);
+    CHECK(keyboard_mod_snapshot.live_state.oneshot == 0);
+    CHECK(keyboard_mod_snapshot.live_state.oneshot_locked == 0);
+    CHECK(keyboard_mod_snapshot.managed_refcounts[2] == 0);
+    CHECK(trace_snapshot.count == 0u);
+    CHECK(!trace_snapshot.overflowed);
     CHECK(send_keyboard_report_count >= 2);
 }
 

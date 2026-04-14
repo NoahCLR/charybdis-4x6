@@ -1,10 +1,9 @@
 // ────────────────────────────────────────────────────────────────────────────
-// PD Mode Runtime Shared State
+// PD Mode Runtime Shared State Internals
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Narrow pd-mode runtime slice owned by the userspace runtime context.
-// Pd runtime modules should use this surface instead of depending on the
-// aggregate runtime storage layout.
+// Concrete pd-mode runtime storage owned by the userspace runtime context.
+// This layout is internal to the pd/runtime owner layer.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
