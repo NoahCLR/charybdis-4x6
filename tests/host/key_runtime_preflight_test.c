@@ -254,6 +254,16 @@ hold_behavior_t handled_key_resolution_long_hold(handled_key_resolution_t key) {
     return key.step.long_hold;
 }
 
+hold_behavior_t handled_key_resolution_hold_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_hold(key);
+}
+
+hold_behavior_t handled_key_resolution_long_hold_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_long_hold(key);
+}
+
 key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t key) {
     return key.tap_count == 1 && key.keycode < SAFE_RANGE && key.step.tap.present && !key.step.hold.present && !key.step.long_hold.present ? KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
 }

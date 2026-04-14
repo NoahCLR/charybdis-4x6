@@ -147,6 +147,16 @@ hold_behavior_t handled_key_resolution_long_hold(handled_key_resolution_t key) {
     return key.step.long_hold;
 }
 
+hold_behavior_t handled_key_resolution_hold_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_hold(key);
+}
+
+hold_behavior_t handled_key_resolution_long_hold_at_position(handled_key_resolution_t key, keypos_t key_pos) {
+    (void)key_pos;
+    return handled_key_resolution_long_hold(key);
+}
+
 uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
     return key.step.tap.present ? key.step.tap.action : KC_NO;
 }

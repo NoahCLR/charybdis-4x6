@@ -290,3 +290,100 @@ Next steps:
 - otherwise return to the higher-priority pd-mode contract work
 - if that coupling stays acceptable, move on to the next architecture item:
   pd-mode explicit identity / precedence in the sync and policy contract
+
+### Transparent authored-action support pass
+
+Completed in this pass:
+
+- Started with `git status --short` and continued from the in-flight handled-key
+  transparency work already in the tree.
+- Extended `users/noah/lib/key/interaction/handled_key.c` so `KC_TRNS` is now
+  resolved natively for all authored action fields at the handled-key layer:
+  - tap fields still resolve the lower active layer's tap action at the same
+    physical position
+  - hold and long-hold fields now resolve the lower active layer's same-tier
+    action target at the same physical position
+  - explicit lower `KC_TRNS` fields keep chaining downward until a real action
+    or `KC_NO` boundary is found
+- Kept helper ownership explicit:
+  - transparent tap keeps the current tap branch timing and repeat behavior
+  - transparent hold and long-hold keep the current helper mode
+    (`PRESS_AND_HOLD_UNTIL_RELEASE`, `REPEAT_WHILE_HELD`, and so on) while only
+    the action target falls through
+- Updated the runtime materialization sites in
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c` and
+  `users/noah/lib/key/runtime/slot/key_runtime_slot.c` so cached slot bindings
+  and pending multi-tap resolution both consume the new position-aware
+  transparent hold/long-hold helpers.
+- Expanded `tests/host/key_behavior_lookup_test.c` so the handled-key contract
+  is asserted directly for:
+  - lower plain-key tap and hold fallthrough
+  - bare `LT()` tap and press-and-hold fallthrough
+  - unsupported hold-other fallthrough over lower `LT()` hold targets
+  - lower authored transparent chaining
+  - lower multi-tap branch selection by current tap count
+  - lower explicit long-hold fallthrough
+- Updated the maintainer-facing authoring docs and comments in:
+  - `users/noah/lib/key/interaction/key_behavior.h`
+  - `docs/INTERACTION_MODEL.md`
+  - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
+
+Contracts touched in this pass:
+
+- `KC_TRNS` is now a native field-level fallback across authored tap, hold, and
+  long-hold actions
+- tap fallthrough still resolves lower tap behavior
+- hold and long-hold fallthrough now resolve lower same-tier action targets
+  without changing the current helper mode
+- pending multi-tap reuse now consumes the same transparent action resolution
+  rules as the initial handled press
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted handled-key, slot, transition, scenario, release-matrix, and
+  integration suites passed
+- full host suite passed
+- firmware build passed
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- changes in this pass touched:
+  - `users/noah/lib/key/interaction/handled_key.c`
+  - `users/noah/lib/key/interaction/handled_key.h`
+  - `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c`
+  - `users/noah/lib/key/runtime/slot/key_runtime_slot.c`
+  - `tests/host/key_behavior_lookup_test.c`
+  - `tests/host/key_runtime_slot_test.c`
+  - `tests/host/key_runtime_preflight_test.c`
+  - `tests/host/key_runtime_feedback_test.c`
+  - `tests/host/key_runtime_admission_test.c`
+  - `tests/host/runtime_debug_test.c`
+  - `users/noah/lib/key/interaction/key_behavior.h`
+  - `docs/INTERACTION_MODEL.md`
+  - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
+  - this review folder
+
+Next steps:
+
+- decide whether transparent authored actions should eventually inherit lower
+  helper mode as well as lower action target, or whether the current
+  helper-mode-preserving contract is the intended long-term surface
+- if helper-mode preservation stays correct, consider moving the new
+  transparent-action resolution behind a narrower handled-key materialization
+  helper so slot callers stop assembling position-aware binding pieces by hand

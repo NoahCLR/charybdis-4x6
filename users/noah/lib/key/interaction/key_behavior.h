@@ -59,8 +59,10 @@ typedef struct {
 //
 // present = true:
 //   Send action instead.
-//   TAP_SENDS(KC_TRNS) is a special tap-tier fallback: it resolves the next
-//   lower active layer's tap action at the same physical position.
+//   KC_TRNS is a special field-level fallback in any authored action helper:
+//   tap fields resolve the lower active layer's tap action at the same
+//   physical position, while hold and long-hold fields resolve the lower
+//   active layer's same-tier action target and keep the current helper mode.
 
 typedef struct {
     bool     present;

@@ -141,6 +141,8 @@ bool                             handled_key_resolution_is_momentary_layer(handl
 bool                             handled_key_resolution_is_layer_tap(handled_key_resolution_t resolution);
 hold_behavior_t                  handled_key_resolution_hold(handled_key_resolution_t resolution);
 hold_behavior_t                  handled_key_resolution_long_hold(handled_key_resolution_t resolution);
+hold_behavior_t                  handled_key_resolution_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
+hold_behavior_t                  handled_key_resolution_long_hold_at_position(handled_key_resolution_t resolution, keypos_t key_pos);
 key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t resolution);
 uint16_t                         handled_key_resolution_tap_action(handled_key_resolution_t resolution);
 uint8_t                          handled_key_resolution_tap_repeat_count(handled_key_resolution_t resolution);
