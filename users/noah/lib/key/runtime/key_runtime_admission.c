@@ -9,7 +9,6 @@
 #include "key_runtime_index.h"
 
 active_key_state_t *key_runtime_first_active_slot(void) {
-    key_runtime_index_rebuild();
     return key_runtime_active_slot_by_order(0);
 }
 

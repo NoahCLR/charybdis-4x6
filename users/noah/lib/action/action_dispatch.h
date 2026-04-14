@@ -96,61 +96,6 @@ typedef struct {
     pd_mode_mask_t     pd_mode;
 } noah_action_desc_t;
 
-static inline noah_action_desc_t noah_action_describe(uint16_t action) {
-    bool               is_layer_lock            = noah_action_keycode_is_layer_lock(action);
-    bool               is_owned_momentary_layer = noah_action_keycode_is_owned_momentary_layer(action);
-    bool               is_layer_tap             = noah_action_keycode_is_layer_tap(action);
-    bool               is_macro                 = noah_action_keycode_is_macro(action);
-    bool               is_qmk_behavior          = noah_action_keycode_is_qmk_behavior(action);
-    bool               is_keymap_custom         = action >= NOAH_KEYMAP_SAFE_RANGE;
-    bool               is_pd_mode_lock          = is_pd_mode_lock_action(action);
-    pd_mode_mask_t     pd_mode                  = pd_mode_for_keycode(action);
-    noah_action_kind_t kind                     = NOAH_ACTION_KIND_LITERAL;
-    uint16_t           caps                     = NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED | NOAH_ACTION_CAP_AUTHORED_TAP_SUPPORTED | NOAH_ACTION_CAP_AUTHORED_HOLD_PRESS_AND_HOLD_SUPPORTED | NOAH_ACTION_CAP_AUTHORED_HOLD_OTHER_SUPPORTED;
-    uint8_t            layer                    = UINT8_MAX;
-
-    if (is_layer_lock) {
-        kind = NOAH_ACTION_KIND_LAYER_LOCK;
-        caps |= NOAH_ACTION_CAP_PRESS_ONLY | NOAH_ACTION_CAP_LAYER_AFFECTING | NOAH_ACTION_CAP_CONSUMES_DIRECT_PRESS;
-        layer = (uint8_t)(action - LAYER_LOCK_BASE);
-    } else if (is_owned_momentary_layer) {
-        kind = NOAH_ACTION_KIND_LAYER_HOLD;
-        caps |= NOAH_ACTION_CAP_REQUIRES_KEY_OWNER | NOAH_ACTION_CAP_LAYER_AFFECTING;
-        caps &= (uint16_t)~(NOAH_ACTION_CAP_AUTHORED_TAP_SUPPORTED | NOAH_ACTION_CAP_AUTHORED_HOLD_OTHER_SUPPORTED);
-        layer = QK_MOMENTARY_GET_LAYER(action);
-    } else if (is_layer_tap) {
-        kind = NOAH_ACTION_KIND_LAYER_TAP;
-        caps |= NOAH_ACTION_CAP_LAYER_AFFECTING;
-        caps &= (uint16_t)~(NOAH_ACTION_CAP_AUTHORED_TAP_SUPPORTED | NOAH_ACTION_CAP_AUTHORED_HOLD_PRESS_AND_HOLD_SUPPORTED | NOAH_ACTION_CAP_AUTHORED_HOLD_OTHER_SUPPORTED);
-        layer = QK_LAYER_TAP_GET_LAYER(action);
-    } else if (noah_action_keycode_is_raw_qmk_layer_action(action)) {
-        kind = NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION;
-        caps |= NOAH_ACTION_CAP_LAYER_AFFECTING;
-        caps &= (uint16_t)~(NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED | NOAH_ACTION_CAP_AUTHORED_TAP_SUPPORTED | NOAH_ACTION_CAP_AUTHORED_HOLD_PRESS_AND_HOLD_SUPPORTED | NOAH_ACTION_CAP_AUTHORED_HOLD_OTHER_SUPPORTED);
-    } else if (is_pd_mode_lock) {
-        kind = NOAH_ACTION_KIND_PD_MODE_LOCK;
-        caps |= NOAH_ACTION_CAP_PRESS_ONLY | NOAH_ACTION_CAP_PD_MODE_AFFECTING | NOAH_ACTION_CAP_CONSUMES_DIRECT_PRESS;
-    } else if (pd_mode != 0) {
-        kind = NOAH_ACTION_KIND_PD_MODE_HOLD;
-        caps |= NOAH_ACTION_CAP_PD_MODE_AFFECTING;
-    } else if (is_macro) {
-        kind = NOAH_ACTION_KIND_MACRO;
-        caps |= NOAH_ACTION_CAP_PRESS_ONLY;
-    } else if (is_qmk_behavior) {
-        kind = NOAH_ACTION_KIND_QMK_BEHAVIOR;
-    } else if (is_keymap_custom) {
-        kind = NOAH_ACTION_KIND_KEYMAP_CUSTOM;
-    }
-
-    return (noah_action_desc_t){
-        .kind    = kind,
-        .action  = action,
-        .caps    = caps,
-        .layer   = layer,
-        .pd_mode = pd_mode,
-    };
-}
-
 static inline bool noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability) {
     return (desc.caps & (uint16_t)capability) != 0;
 }
@@ -232,6 +177,7 @@ static inline bool noah_action_desc_consumes_direct_press(noah_action_desc_t des
     return noah_action_desc_has_capability(desc, NOAH_ACTION_CAP_CONSUMES_DIRECT_PRESS);
 }
 
+noah_action_desc_t noah_action_describe(uint16_t action);
 bool action_dispatch_layer_is_locked(uint8_t layer);
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy);
 void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy);

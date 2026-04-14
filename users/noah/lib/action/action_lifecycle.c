@@ -37,27 +37,6 @@ static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
 #endif
 }
 
-static bool noah_action_handle_one_shot_press(noah_action_desc_t desc) {
-    if (noah_action_desc_is_layer_lock(desc)) {
-        layer_ownership_toggle_lock_state(desc.layer);
-        return true;
-    }
-
-    if (noah_action_desc_is_pd_mode_lock(desc)) {
-        const pd_mode_def_t *def = pd_mode_lock_action_lookup(desc.action);
-        if (def) {
-            pd_mode_toggle_lock_state(def->mode_flag);
-        }
-        return true;
-    }
-
-    if (noah_qmk_contract_try_play_via_macro(desc.action)) {
-        return true;
-    }
-
-    return macro_dispatch(desc.action);
-}
-
 static void noah_action_tap_noop(noah_action_desc_t desc) {
     (void)desc;
 }
@@ -115,6 +94,43 @@ static void noah_action_release_unsupported_layer(noah_action_desc_t desc, keypo
     noah_action_log_unsupported_layer_action(desc);
 }
 
+static void noah_action_toggle_layer_lock(noah_action_desc_t desc) {
+    layer_ownership_toggle_lock_state(desc.layer);
+}
+
+static void noah_action_toggle_pd_mode_lock(noah_action_desc_t desc) {
+    const pd_mode_def_t *def = pd_mode_lock_action_lookup(desc.action);
+    if (def) {
+        pd_mode_toggle_lock_state(def->mode_flag);
+    }
+}
+
+static bool noah_action_handle_macro_preflight(noah_action_desc_t desc) {
+    if (noah_qmk_contract_try_play_via_macro(desc.action)) {
+        return true;
+    }
+
+    return macro_dispatch(desc.action);
+}
+
+static void noah_action_tap_layer_lock(noah_action_desc_t desc) {
+    noah_action_toggle_layer_lock(desc);
+}
+
+static void noah_action_press_layer_lock(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
+    noah_action_toggle_layer_lock(desc);
+}
+
+static void noah_action_tap_pd_mode_lock(noah_action_desc_t desc) {
+    noah_action_toggle_pd_mode_lock(desc);
+}
+
+static void noah_action_press_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
+    noah_action_toggle_pd_mode_lock(desc);
+}
+
 static void noah_action_press_owned_momentary_layer(noah_action_desc_t desc, keypos_t key_pos) {
     layer_ownership_momentary_press(key_pos, desc.layer);
 }
@@ -161,8 +177,8 @@ static const noah_action_ops_t noah_action_ops_by_kind[NOAH_ACTION_KIND_COUNT] =
         },
     [NOAH_ACTION_KIND_LAYER_LOCK] =
         {
-            .tap     = noah_action_tap_noop,
-            .press   = noah_action_press_noop,
+            .tap     = noah_action_tap_layer_lock,
+            .press   = noah_action_press_layer_lock,
             .release = noah_action_release_noop,
         },
     [NOAH_ACTION_KIND_LAYER_HOLD] =
@@ -209,8 +225,8 @@ static const noah_action_ops_t noah_action_ops_by_kind[NOAH_ACTION_KIND_COUNT] =
         },
     [NOAH_ACTION_KIND_PD_MODE_LOCK] =
         {
-            .tap     = noah_action_tap_noop,
-            .press   = noah_action_press_noop,
+            .tap     = noah_action_tap_pd_mode_lock,
+            .press   = noah_action_press_pd_mode_lock,
             .release = noah_action_release_noop,
         },
 };
@@ -227,7 +243,12 @@ void noah_action_tap(uint16_t action) {
     noah_action_desc_t       desc = noah_action_describe(action);
     const noah_action_ops_t *ops  = noah_action_ops(desc);
 
-    if (noah_action_handle_one_shot_press(desc)) {
+    if (noah_action_desc_is_layer_lock(desc) || noah_action_desc_is_pd_mode_lock(desc)) {
+        ops->tap(desc);
+        return;
+    }
+
+    if (noah_action_handle_macro_preflight(desc)) {
         return;
     }
 
@@ -238,7 +259,12 @@ void noah_action_press(keypos_t key_pos, uint16_t action) {
     noah_action_desc_t       desc = noah_action_describe(action);
     const noah_action_ops_t *ops  = noah_action_ops(desc);
 
-    if (noah_action_handle_one_shot_press(desc)) {
+    if (noah_action_desc_is_layer_lock(desc) || noah_action_desc_is_pd_mode_lock(desc)) {
+        ops->press(desc, key_pos);
+        return;
+    }
+
+    if (noah_action_handle_macro_preflight(desc)) {
         return;
     }
 

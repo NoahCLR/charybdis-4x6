@@ -29,6 +29,7 @@ static uint16_t       fake_time;
 static pd_mode_mask_t test_pd_mode;
 static pd_mode_mask_t test_pd_locked_modes;
 static uint8_t        overflow_log_count;
+layer_state_t         layer_state;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -171,6 +172,9 @@ static void test_slot_materialize_applies_binding_and_strategy_overrides(void) {
         .resolution    = resolution,
         .binding       = binding,
         .hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK,
+        .layer         = authored.layer,
+        .pd_mode       = authored.pd_mode,
+        .flags         = authored.flags,
     });
 
     CHECK(interaction.binding.tap_action == TEST_SINGLE_ACTION);
@@ -262,6 +266,17 @@ uint16_t timer_elapsed(uint16_t last) {
     return (uint16_t)(fake_time - last);
 }
 
+bool layer_state_cmp(layer_state_t state, uint8_t layer) {
+    return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
+}
+
+uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+    (void)layer_num;
+    (void)row;
+    (void)column;
+    return KC_TRNS;
+}
+
 uint8_t get_mods(void) {
     return 0;
 }
@@ -309,14 +324,6 @@ bool pd_mode_local_locked(pd_mode_mask_t mode) {
 bool is_pd_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
-}
-
-bool is_layer_key(uint16_t keycode) {
-    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
-}
-
-uint8_t behavior_get_layer(uint16_t keycode) {
-    return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
 }
 
 static bool test_handled_key_uses_buffered_modifier_single_step(key_behavior_view_t behavior) {
@@ -494,10 +501,6 @@ pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
 
 handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
     return handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0);
-}
-
-handled_key_materialized_t handled_key_materialize(handled_key_resolution_t key, handled_key_resolution_ctx_t ctx) {
-    return host_handled_key_materialize_from_authored_resolution(key, ctx);
 }
 
 bool handled_key_resolution_has_multi_tap(handled_key_resolution_t key) {

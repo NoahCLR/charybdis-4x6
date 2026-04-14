@@ -20,9 +20,12 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/key_runtime_layer_lock_integration_test.c" \
+    "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_resolution_accessors.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_lookup.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_transparency.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_materialize.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_trace.c" \
@@ -37,6 +40,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot_result.c" \
     "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot_scan_reduce.c" \
     "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot_step.c" \
+    "$ROOT/users/noah/lib/key/runtime/key_runtime_index.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_preflight.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_press.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_release.c" \

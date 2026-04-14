@@ -199,7 +199,7 @@ void key_runtime_slot_begin_pending_multi_tap(active_key_state_t *slot, uint16_t
     }
 
     multi_tap_begin(&slot->pending_multi_tap, keycode, key_pos, tap_action, tap_repeat_count, tap_hold_term, multi_tap_term, has_more_taps);
-    key_runtime_index_rebuild();
+    key_runtime_index_sync_slot(slot);
 }
 
 uint16_t key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, uint16_t keycode) {
@@ -215,7 +215,7 @@ uint16_t key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, ui
     handled_key_materialized_t materialized  = handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
 
     uint16_t action = multi_tap_advance(&slot->pending_multi_tap, materialized.tap_action, materialized.tap_repeat_count, materialized.tap_has_more_taps, materialized.tap_resolves_on_press, materialized.hold, materialized.long_hold);
-    key_runtime_index_rebuild();
+    key_runtime_index_sync_slot(slot);
     return action;
 }
 
@@ -227,7 +227,9 @@ uint16_t key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slo
         return KC_NO;
     }
 
-    return multi_tap_resolve_hold(&slot->pending_multi_tap, repeat_count);
+    uint16_t action = multi_tap_resolve_hold(&slot->pending_multi_tap, repeat_count);
+    key_runtime_index_sync_slot(slot);
+    return action;
 }
 
 key_runtime_slot_pending_multi_tap_flush_t key_runtime_slot_take_pending_multi_tap_flush(active_key_state_t *slot) {
@@ -253,7 +255,7 @@ void key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot) {
     }
 
     multi_tap_reset(&slot->pending_multi_tap);
-    key_runtime_index_rebuild();
+    key_runtime_index_sync_slot(slot);
 }
 
 void key_runtime_slot_reset(active_key_state_t *slot) {
@@ -262,7 +264,7 @@ void key_runtime_slot_reset(active_key_state_t *slot) {
     }
 
     *slot = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
-    key_runtime_index_rebuild();
+    key_runtime_index_sync_slot(slot);
 }
 
 void key_runtime_slot_set_release_hold_pending(active_key_state_t *slot) {
@@ -271,7 +273,7 @@ void key_runtime_slot_set_release_hold_pending(active_key_state_t *slot) {
     }
 
     slot->lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
-    key_runtime_index_rebuild();
+    key_runtime_index_sync_slot(slot);
 }
 
 void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes_hold) {
@@ -280,7 +282,7 @@ void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes
     }
 
     slot->lifecycle.phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
-    key_runtime_index_rebuild();
+    key_runtime_index_sync_slot(slot);
 }
 
 static void key_runtime_slot_set_interaction(active_key_state_t *slot, key_runtime_slot_interaction_t key) {
@@ -311,5 +313,5 @@ void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t
     };
 
     key_runtime_slot_set_interaction(slot, interaction);
-    key_runtime_index_rebuild();
+    key_runtime_index_sync_slot(slot);
 }

@@ -19,9 +19,14 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/runtime_debug_test.c" \
+    "$ROOT/users/noah/lib/action/action_kind.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_transparency.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_materialize.c" \
     "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \
     "$ROOT/users/noah/lib/key/ownership/held_action.c" \
     "$ROOT/users/noah/lib/key/ownership/held_repeat.c" \
+    "$ROOT/users/noah/lib/key/runtime/key_runtime_index.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_feedback.c" \
     "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \

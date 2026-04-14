@@ -83,6 +83,13 @@ bool layer_state_cmp(layer_state_t state, uint8_t layer) {
     return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
 }
 
+uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+    (void)layer_num;
+    (void)row;
+    (void)column;
+    return KC_TRNS;
+}
+
 void layer_on(uint8_t layer) {
     layer_state |= (layer_state_t)1u << layer;
 }
@@ -183,6 +190,18 @@ bool handled_key_resolution_uses_implicit_hold(handled_key_resolution_t key) {
     return false;
 }
 
+bool handled_key_resolution_has_multi_tap(handled_key_resolution_t key) {
+    return (key.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0;
+}
+
+bool handled_key_resolution_is_momentary_layer(handled_key_resolution_t key) {
+    return (key.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
+}
+
+bool handled_key_resolution_is_layer_tap(handled_key_resolution_t key) {
+    return (key.flags & HANDLED_KEY_FLAG_LAYER_TAP) != 0;
+}
+
 uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
     return key.layer;
 }
@@ -193,10 +212,6 @@ pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
 
 handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
     return handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0);
-}
-
-handled_key_materialized_t handled_key_materialize(handled_key_resolution_t key, handled_key_resolution_ctx_t ctx) {
-    return host_handled_key_materialize_from_authored_resolution(key, ctx);
 }
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {

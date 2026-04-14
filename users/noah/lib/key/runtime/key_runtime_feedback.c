@@ -5,7 +5,7 @@
 #include "key_runtime_state.h"
 #include "key_runtime_feedback.h"
 #include "key_runtime_index.h"
-#include "../../action/action_dispatch.h"
+#include "../interaction/handled_key_policy.h"
 #include "../../pointing/defs/pd_modes.h"
 
 #define key_feedback_pulse (key_runtime_shared_state()->feedback)
@@ -75,7 +75,6 @@ static bool key_feedback_hold_contract_uses_preview_layer(handled_key_hold_seman
 }
 
 uint8_t key_feedback_preview_layer(void) {
-    key_runtime_index_rebuild();
     return key_feedback_preview_layer_for_slot(key_runtime_preview_owner_slot());
 }
 
@@ -163,8 +162,6 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
 
 uint8_t key_feedback_pack(void) {
     uint8_t flags = 0;
-
-    key_runtime_index_rebuild();
 
     if (key_feedback_pulse_active()) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;

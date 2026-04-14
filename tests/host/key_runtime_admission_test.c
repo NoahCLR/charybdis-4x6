@@ -5,6 +5,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/key_runtime_admission.h"
+#include "users/noah/lib/key/runtime/key_runtime_index.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "host_handled_key_fixture.h"
 
@@ -12,6 +13,8 @@ enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x60,
     TEST_ACTIVE_KEY    = SAFE_RANGE + 0x61,
 };
+
+layer_state_t layer_state;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -36,6 +39,12 @@ static active_key_state_t *test_slot(uint8_t row, uint8_t col) {
     return key_runtime_slot_for_position(test_keypos(row, col));
 }
 
+static void test_sync_index(void) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
+        key_runtime_index_sync_slot(key_runtime_slot_at(index));
+    }
+}
+
 static void test_reset_state(void) {
     runtime_shared_state_reset(&noah_runtime_shared_state);
 }
@@ -47,6 +56,17 @@ uint16_t timer_read(void) {
 uint16_t timer_elapsed(uint16_t last) {
     (void)last;
     return 0;
+}
+
+bool layer_state_cmp(layer_state_t state, uint8_t layer) {
+    return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
+}
+
+uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+    (void)layer_num;
+    (void)row;
+    (void)column;
+    return KC_TRNS;
 }
 
 uint8_t get_mods(void) {
@@ -148,10 +168,6 @@ handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
     return handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0);
 }
 
-handled_key_materialized_t handled_key_materialize(handled_key_resolution_t key, handled_key_resolution_ctx_t ctx) {
-    return host_handled_key_materialize_from_authored_resolution(key, ctx);
-}
-
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
@@ -167,11 +183,6 @@ bool pd_mode_local_locked(pd_mode_mask_t mode) {
     return false;
 }
 
-bool is_layer_key(uint16_t keycode) {
-    (void)keycode;
-    return false;
-}
-
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
     (void)mt;
     return (delayed_action_mods_t){0};
@@ -184,6 +195,7 @@ static void test_find_slot_by_position_returns_matching_active_slot(void) {
     test_reset_state();
     slot->owner.keycode = TEST_ACTIVE_KEY;
     slot->owner.key_pos = pos;
+    test_sync_index();
 
     CHECK(key_runtime_find_slot_by_position(pos) == slot);
     CHECK(key_runtime_first_active_slot() == slot);
@@ -200,6 +212,7 @@ static void test_find_slot_with_pending_multi_tap_returns_position_owner(void) {
         .key_pos = pos,
         .count   = 1,
     };
+    test_sync_index();
 
     CHECK(key_runtime_find_slot_with_pending_multi_tap(pos) == slot);
 }
@@ -223,6 +236,7 @@ static void test_select_slot_for_press_reuses_position_with_pending_multi_tap(vo
         .key_pos = target,
         .count   = 1,
     };
+    test_sync_index();
 
     CHECK(key_runtime_select_slot_for_press(target) == slot);
 }
@@ -237,6 +251,7 @@ static void test_select_slot_for_press_keeps_distinct_active_positions_independe
     slot_a->owner.key_pos = test_keypos(0, 0);
     slot_b->owner.keycode = TEST_ACTIVE_KEY;
     slot_b->owner.key_pos = test_keypos(0, 1);
+    test_sync_index();
 
     CHECK(key_runtime_select_slot_for_press(test_keypos(0, 2)) == slot_c);
     CHECK(slot_a->owner.keycode == TEST_ACTIVE_KEY);

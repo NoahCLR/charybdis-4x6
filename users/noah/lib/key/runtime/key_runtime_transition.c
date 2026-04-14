@@ -143,7 +143,6 @@ bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t
 }
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {
-    key_runtime_index_rebuild();
     const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
     uint8_t                          slot_indices[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
     uint8_t                          pending_count = index_state->pending_multi_tap_count;
@@ -156,7 +155,6 @@ void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan)
 }
 
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
-    key_runtime_index_rebuild();
     const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
     uint8_t                          slot_indices[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
     uint8_t                          active_count = index_state->active_slot_count;
@@ -209,7 +207,6 @@ bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *r
 }
 
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
-    key_runtime_index_rebuild();
     const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
     uint8_t                          active_indices[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
     uint8_t                          pending_indices[KEY_RUNTIME_SLOT_TABLE_CAPACITY];

@@ -21,7 +21,7 @@ static void key_runtime_slot_pending_multi_tap_clear_active_state(active_key_sta
     multi_tap_t pending_multi_tap = slot->pending_multi_tap;
     *slot                         = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
     slot->pending_multi_tap       = pending_multi_tap;
-    key_runtime_index_rebuild();
+    key_runtime_index_sync_slot(slot);
 }
 
 typedef enum {

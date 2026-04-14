@@ -7,6 +7,7 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/key_runtime_admission.h"
+#include "users/noah/lib/key/runtime/key_runtime_index.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
@@ -121,6 +122,49 @@ static keypos_t test_default_slot_key_pos;
 static void test_set_default_slot_key_pos(keypos_t key_pos) {
     test_default_slot_key_pos = key_pos;
 }
+
+static void test_sync_index(void) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
+        key_runtime_index_sync_slot(key_runtime_slot_at(index));
+    }
+}
+
+static void test_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {
+    test_sync_index();
+    key_runtime_transition_flush_multi_tap(plan);
+}
+
+static void test_transition_scan(key_runtime_transition_plan_t *plan) {
+    test_sync_index();
+    key_runtime_transition_scan(plan);
+}
+
+static void test_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
+    test_sync_index();
+    key_runtime_transition_interrupt_active_keys_on_other_press(key_pos, plan);
+}
+
+static void test_transition_interrupt_active_key_on_other_press(key_runtime_transition_plan_t *plan) {
+    test_sync_index();
+    key_runtime_transition_interrupt_active_key_on_other_press(plan);
+}
+
+static bool test_transition_handled_key_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
+    test_sync_index();
+    return key_runtime_transition_handled_key_press(slot, keycode, key_pos, resolution, active_held_action_survives_flush, plan);
+}
+
+static bool test_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+    test_sync_index();
+    return key_runtime_transition_handled_key_release(keycode, record, resolution, plan);
+}
+
+#define key_runtime_transition_flush_multi_tap test_transition_flush_multi_tap
+#define key_runtime_transition_scan test_transition_scan
+#define key_runtime_transition_interrupt_active_keys_on_other_press test_transition_interrupt_active_keys_on_other_press
+#define key_runtime_transition_interrupt_active_key_on_other_press test_transition_interrupt_active_key_on_other_press
+#define key_runtime_transition_handled_key_press test_transition_handled_key_press
+#define key_runtime_transition_handled_key_release test_transition_handled_key_release
 
 static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
     return host_key_runtime_slot_interaction_from_authored_resolution((handled_key_resolution_t){

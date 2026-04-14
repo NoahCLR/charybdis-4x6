@@ -18,8 +18,11 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_behavior_lookup_test.c" \
+    "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/key/interaction/key_behavior_lookup.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_resolution_accessors.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_lookup.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_transparency.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_materialize.c" \
     "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \

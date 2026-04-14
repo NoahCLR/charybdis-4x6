@@ -23,8 +23,6 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     bool                     other_slot_active = false;
     bool                     flush_multi_taps  = false;
 
-    key_runtime_index_rebuild();
-
     keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
         // Managed modifier releases normally suppress the raw QMK path, but a

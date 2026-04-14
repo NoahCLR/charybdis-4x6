@@ -9,6 +9,7 @@
 #pragma once
 
 #include "../interaction/handled_key.h"
+#include "../interaction/handled_key_policy.h"
 
 typedef enum {
     KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE = 0,
@@ -60,6 +61,9 @@ typedef struct {
     handled_key_resolution_t         resolution;
     key_runtime_slot_binding_t       binding;
     key_runtime_slot_hold_strategy_t hold_strategy;
+    uint8_t                          layer;
+    pd_mode_mask_t                   pd_mode;
+    uint16_t                         flags;
 } key_runtime_slot_materialize_args_t;
 
 typedef struct {
@@ -163,9 +167,9 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_materialize(key_ru
         .selection     = key_runtime_slot_selection_from_resolution(args.resolution),
         .binding       = args.binding,
         .hold_strategy = args.hold_strategy,
-        .layer         = args.resolution.layer,
-        .pd_mode       = args.resolution.pd_mode,
-        .flags         = args.resolution.flags,
+        .layer         = args.layer,
+        .pd_mode       = args.pd_mode,
+        .flags         = args.flags,
     };
 
     interaction.flags &= (uint16_t)~(HANDLED_KEY_FLAG_IMPLICIT_HOLD | HANDLED_KEY_FLAG_FALLBACK_HOLD);
@@ -187,6 +191,9 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_m
         .resolution    = materialized.authored,
         .binding       = key_runtime_slot_binding_from_materialized(materialized),
         .hold_strategy = materialized.hold_strategy,
+        .layer         = materialized.layer,
+        .pd_mode       = materialized.pd_mode,
+        .flags         = materialized.flags,
     });
 }
 

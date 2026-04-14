@@ -9,16 +9,20 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_contract.c \
     lib/compat/qmk_mod_contract.c \
     lib/compat/qmk_via_contract.c \
+    lib/action/action_kind.c \
     lib/action/action_lifecycle.c \
     lib/action/synthetic_record.c \
     lib/compat/split_role.c \
     lib/key/interaction/handled_key_defaults.c \
+    lib/key/interaction/handled_key_resolution_accessors.c \
+    lib/key/interaction/handled_key_lookup.c \
     lib/key/interaction/handled_key_transparency.c \
     lib/key/interaction/handled_key_materialize.c \
     lib/key/interaction/key_behavior_lookup.c \
     lib/key/interaction/keymap_validation.c \
     lib/key/runtime/key_runtime.c \
     lib/key/runtime/key_runtime_admission.c \
+    lib/key/runtime/key_runtime_index.c \
     lib/key/runtime/slot/key_runtime_slot_policy.c \
     lib/key/runtime/slot/key_runtime_slot_press_reduce.c \
     lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c \

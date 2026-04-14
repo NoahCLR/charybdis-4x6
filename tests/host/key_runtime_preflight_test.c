@@ -5,6 +5,7 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/key/runtime/key_runtime_index.h"
 #include "users/noah/lib/key/runtime/key_runtime_process.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"
@@ -17,6 +18,7 @@ static bool    handled_key_stub_is_handled;
 static bool    interrupted_active_key;
 static bool    flushed_multi_tap;
 static uint8_t executed_transition_plan_count;
+layer_state_t  layer_state;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -72,6 +74,17 @@ static void test_reset_state(void) {
     executed_transition_plan_count = 0;
 }
 
+static void test_sync_index(void) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
+        key_runtime_index_sync_slot(key_runtime_slot_at(index));
+    }
+}
+
+static bool test_preflight_record(uint16_t keycode, keyrecord_t *record) {
+    test_sync_index();
+    return key_runtime_preflight_record(keycode, record);
+}
+
 uint16_t timer_read(void) {
     return 0;
 }
@@ -79,6 +92,17 @@ uint16_t timer_read(void) {
 uint16_t timer_elapsed(uint16_t last) {
     (void)last;
     return 0;
+}
+
+bool layer_state_cmp(layer_state_t state, uint8_t layer) {
+    return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
+}
+
+uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+    (void)layer_num;
+    (void)row;
+    (void)column;
+    return KC_TRNS;
 }
 
 uint8_t get_mods(void) {
@@ -145,10 +169,6 @@ void charybdis_set_pointer_dragscroll_enabled(bool enabled) {
 
 void pointing_device_set_cpi(uint16_t cpi) {
     (void)cpi;
-}
-
-bool is_layer_key(uint16_t keycode) {
-    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
@@ -295,10 +315,6 @@ handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
     return handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0);
 }
 
-handled_key_materialized_t handled_key_materialize(handled_key_resolution_t key, handled_key_resolution_ctx_t ctx) {
-    return host_handled_key_materialize_from_authored_resolution(key, ctx);
-}
-
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
@@ -318,7 +334,7 @@ static void test_active_handled_release_bypasses_modifier_suppression(void) {
     active_key.owner.keycode = KC_RIGHT_ALT;
     active_key.owner.key_pos = record.event.key;
 
-    CHECK(key_runtime_preflight_record(KC_RIGHT_ALT, &record));
+    CHECK(test_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
 }
 
@@ -332,7 +348,7 @@ static void test_unrelated_release_stays_suppressed(void) {
     active_key.owner.keycode = KC_RIGHT_ALT;
     active_key.owner.key_pos = stored;
 
-    CHECK(!key_runtime_preflight_record(KC_RIGHT_ALT, &record));
+    CHECK(!test_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
 }
 
@@ -347,7 +363,7 @@ static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
     active_key.owner.keycode = KC_LEFT_CTRL;
     active_key.owner.key_pos = stored;
 
-    CHECK(key_runtime_preflight_record(KC_RIGHT_ALT, &record));
+    CHECK(test_preflight_record(KC_RIGHT_ALT, &record));
     CHECK(tracked_physical_event);
 }
 
@@ -377,7 +393,7 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
                                        },
                                        handled_key_resolution_ctx_make(stored, (layer_state_t)1u << 0));
 
-    CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
+    CHECK(test_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(tracked_physical_event);
     CHECK(interrupted_active_key);
     CHECK(executed_transition_plan_count == 1);
@@ -394,7 +410,7 @@ static void test_handled_press_keeps_foreign_multi_tap_pending(void) {
         .count   = 1,
     };
 
-    CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
+    CHECK(test_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(!flushed_multi_tap);
     CHECK(executed_transition_plan_count == 0);
 }
@@ -409,7 +425,7 @@ static void test_non_handled_press_flushes_foreign_multi_tap(void) {
         .count   = 1,
     };
 
-    CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
+    CHECK(test_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(flushed_multi_tap);
     CHECK(executed_transition_plan_count == 1);
 }

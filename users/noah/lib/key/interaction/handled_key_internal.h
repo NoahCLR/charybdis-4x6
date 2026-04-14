@@ -7,7 +7,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include "../../action/action_dispatch.h"
 #include "handled_key.h"
+#include "handled_key_policy.h"
 #include "key_behavior_lookup.h"
 
 typedef enum {

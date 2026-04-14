@@ -42,6 +42,9 @@ static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_stat
         .resolution    = materialized.authored,
         .binding       = key_runtime_slot_press_binding(materialized, tap_action, tap_repeat_count, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term),
         .hold_strategy = hold_strategy,
+        .layer         = materialized.layer,
+        .pd_mode       = materialized.pd_mode,
+        .flags         = materialized.flags,
     });
     key_runtime_slot_track(slot, keycode, key_pos, interaction, phase);
     slot->lifecycle.pd_mode_was_locked_on_press = pd_mode_was_locked_on_press;
@@ -50,7 +53,7 @@ static key_runtime_effect_builder_t key_runtime_slot_begin_press(active_key_stat
         slot->lifecycle.held_action_keycode = hold.action;
         builder.kind                        = KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER;
         builder.action                      = hold.action;
-        key_runtime_index_rebuild();
+        key_runtime_index_sync_slot(slot);
     }
 
     return builder;

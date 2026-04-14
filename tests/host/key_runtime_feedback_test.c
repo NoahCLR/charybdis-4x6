@@ -5,6 +5,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
+#include "users/noah/lib/key/runtime/key_runtime_index.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_step.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
@@ -16,6 +17,7 @@ enum {
 };
 
 static uint16_t fake_time;
+layer_state_t    layer_state;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -44,6 +46,22 @@ static void test_reset_state(void) {
     fake_time = 0;
 }
 
+static void test_sync_index(void) {
+    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
+        key_runtime_index_sync_slot(key_runtime_slot_at(index));
+    }
+}
+
+static uint8_t test_feedback_pack(void) {
+    test_sync_index();
+    return key_feedback_pack();
+}
+
+static uint8_t test_feedback_preview_layer(void) {
+    test_sync_index();
+    return key_feedback_preview_layer();
+}
+
 static key_runtime_slot_interaction_t test_cached_interaction(handled_key_resolution_t key) {
     return host_key_runtime_slot_interaction_from_authored_resolution(key, handled_key_resolution_ctx_make((keypos_t){0}, (layer_state_t)1u << 0));
 }
@@ -68,6 +86,17 @@ uint16_t timer_read(void) {
 
 uint16_t timer_elapsed(uint16_t last) {
     return (uint16_t)(fake_time - last);
+}
+
+bool layer_state_cmp(layer_state_t state, uint8_t layer) {
+    return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
+}
+
+uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+    (void)layer_num;
+    (void)row;
+    (void)column;
+    return KC_TRNS;
 }
 
 uint8_t get_mods(void) {
@@ -102,15 +131,6 @@ bool is_pd_mode_lock_action(uint16_t action) {
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    (void)keycode;
-    return 0;
-}
-
-bool is_layer_key(uint16_t keycode) {
-    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
-}
-
-uint8_t behavior_get_layer(uint16_t keycode) {
     (void)keycode;
     return 0;
 }
@@ -199,10 +219,6 @@ handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
     return handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0);
 }
 
-handled_key_materialized_t handled_key_materialize(handled_key_resolution_t key, handled_key_resolution_ctx_t ctx) {
-    return host_handled_key_materialize_from_authored_resolution(key, ctx);
-}
-
 bool handled_key_resolution_has_multi_tap(handled_key_resolution_t key) {
     return (key.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0;
 }
@@ -233,7 +249,7 @@ static void test_non_passthrough_held_action_flashes(void) {
         .lifecycle.held_action_keycode = SAFE_RANGE + 1,
     };
 
-    uint8_t flags = key_feedback_pack();
+    uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_hold_active(flags));
     CHECK(key_feedback_flags_level_flash(flags));
 }
@@ -246,7 +262,7 @@ static void test_repeat_hold_flashes_while_active(void) {
         .lifecycle.repeat_binding_active = true,
     };
 
-    uint8_t flags = key_feedback_pack();
+    uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_hold_active(flags));
     CHECK(key_feedback_flags_level_flash(flags));
 }
@@ -271,7 +287,7 @@ static void test_fallback_hold_has_no_hold_feedback(void) {
         }),
     };
 
-    uint8_t flags = key_feedback_pack();
+    uint8_t flags = test_feedback_pack();
     CHECK(flags == 0);
 }
 
@@ -300,7 +316,7 @@ static void test_momentary_hold_preview_layer_is_exposed_before_threshold(void) 
         }),
     };
 
-    CHECK(key_feedback_preview_layer() == 3);
+    CHECK(test_feedback_preview_layer() == 3);
 }
 
 static void test_cached_preview_layer_metadata_is_used_when_present(void) {
@@ -328,7 +344,7 @@ static void test_cached_preview_layer_metadata_is_used_when_present(void) {
         }),
     };
 
-    CHECK(key_feedback_preview_layer() == 4);
+    CHECK(test_feedback_preview_layer() == 4);
 }
 
 static void test_momentary_hold_preview_layer_stays_quiet_after_threshold_until_activation(void) {
@@ -357,8 +373,8 @@ static void test_momentary_hold_preview_layer_stays_quiet_after_threshold_until_
         }),
     };
 
-    CHECK(key_feedback_preview_layer() == 4);
-    CHECK(key_feedback_pack() == 0);
+    CHECK(test_feedback_preview_layer() == 4);
+    CHECK(test_feedback_pack() == 0);
 }
 
 static void test_momentary_hold_preview_layer_clears_once_layer_is_active(void) {
@@ -370,7 +386,7 @@ static void test_momentary_hold_preview_layer_clears_once_layer_is_active(void) 
         .lifecycle.held_action_keycode = MO(4),
     };
 
-    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+    CHECK(test_feedback_preview_layer() == UINT8_MAX);
 }
 
 static void test_non_layer_held_action_has_no_preview_layer(void) {
@@ -382,7 +398,7 @@ static void test_non_layer_held_action_has_no_preview_layer(void) {
         .lifecycle.held_action_keycode = SAFE_RANGE + 1,
     };
 
-    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+    CHECK(test_feedback_preview_layer() == UINT8_MAX);
 }
 
 static void test_feedback_falls_back_to_secondary_active_slot(void) {
@@ -393,7 +409,7 @@ static void test_feedback_falls_back_to_secondary_active_slot(void) {
         .lifecycle.held_action_keycode = SAFE_RANGE + 1,
     };
 
-    uint8_t flags = key_feedback_pack();
+    uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_hold_active(flags));
     CHECK(key_feedback_flags_level_flash(flags));
 }
@@ -407,7 +423,7 @@ static void test_multi_tap_pending_flag_uses_secondary_slot(void) {
         .count   = 1,
     };
 
-    uint8_t flags = key_feedback_pack();
+    uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_multi_tap_pending(flags));
 }
 
@@ -451,7 +467,7 @@ static void test_multi_tap_pending_flag_survives_quick_release_for_higher_taps(v
     CHECK(release.handled);
     CHECK(release.count == 0);
 
-    uint8_t flags = key_feedback_pack();
+    uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_multi_tap_pending(flags));
 }
 
@@ -482,7 +498,7 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
         }),
     };
 
-    uint8_t flags = key_feedback_pack();
+    uint8_t flags = test_feedback_pack();
     CHECK(key_feedback_flags_hold_pending(flags));
     CHECK(!key_feedback_flags_hold_active(flags));
     CHECK(!key_feedback_flags_long_hold_active(flags));
