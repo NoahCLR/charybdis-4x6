@@ -10,7 +10,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "../defs/pd_modes.h"
-#include "../../state/runtime/runtime_shared_state.h"
+#include "pd_mode_runtime_shared_state.h"
 
 static uint8_t pd_mode_snapshot_mode_index(pd_mode_mask_t mode) {
     if (mode == 0) {

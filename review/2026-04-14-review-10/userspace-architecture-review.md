@@ -31,22 +31,75 @@ The strongest parts of the design are:
 - the pd-mode manifest and command/snapshot split
 - the unusually strong host-test and compile-gate coverage
 
+The refactor work from this review cycle landed materially, not cosmetically:
+
+- runtime state now has a real canonical owner
+- action-family semantics are now mostly descriptor-backed instead of
+  hand-synchronized across parallel files
+- the remaining handled-key transparency code is local traversal logic, not a
+  disguised second action-policy system
+
 The main long-term risks are not correctness bugs in the current tree. They are
 architecture scaling risks:
 
-1. runtime state ownership now has a canonical singleton context, but
-   `runtime_shared_state.h` still exists as a compatibility shim and should not
-   regain status as a primary runtime surface
-2. action-kind identity, classification, metadata, dispatch, and most handled-
-   key runtime policy are now registry-backed; the remaining transparency code
-   is mostly resolution-local traversal and authored-resolution override logic
-   rather than hidden action-family policy
-3. hook-level orchestration is centralized and order-sensitive, so adding new
+1. hook-level orchestration is still centralized and order-sensitive, so adding
    subsystems still means editing core pipelines instead of registering
    capabilities
-4. the authored keymap surface is intentionally data-only, but too much of that
+2. the authored keymap surface is intentionally data-only, but too much of that
    data still lives in one large `keymap.c`, which will get harder to review
    and evolve as behavior count grows
+3. the action-kind registry is now in a good place, but that also changes the
+   risk profile: continuing to widen it without new feature pressure would add
+   abstraction weight faster than it adds leverage
+
+## Landing Assessment
+
+### What Actually Improved
+
+- The runtime-context refactor succeeded. State ownership is now explicit
+  enough that reset/debug/query work has one real home instead of being spread
+  across private statics.
+- The runtime interface sealing pass also succeeded. The concrete runtime
+  context and aggregate shared-state layout are now internal-only, pd-mode uses
+  its own narrow shared-state slice, and host tests reset through the same
+  public runtime seam instead of privileged storage access.
+- The action refactor also succeeded. Classification, metadata, dispatch, and
+  the meaningful action-family policy decisions now live together closely
+  enough that new action kinds no longer imply editing several disconnected
+  core files.
+- The handled-key layer is cleaner after the action pass. The residual code in
+  `handled_key_transparency.c` is mostly about walking lower active layers and
+  respecting authored `KC_TRNS` behavior, which is the right kind of local
+  complexity for that module.
+
+### What Did Not Improve
+
+- Top-level orchestration is still owned by a few privileged files:
+  `key_runtime_process.c`, `runtime_init.c`, and `rgb_runtime.c`.
+- `noah_process_record_user()` is somewhat more structured than a raw branch
+  chain because it uses a local stage table, but it is still not an additive
+  registration surface. The owner function still decides the whole pipeline.
+- The authored keymap surface is still dense. A `500` line `keymap.c` is not a
+  disaster, but it is still the wrong long-term place to accumulate unrelated
+  authored domains.
+
+### What To Stop Touching
+
+- Stop widening the action registry unless a new feature proves a remaining
+  action-family semantic is still leaking into handled-key local code.
+- Stop chasing `handled_key_transparency.c` just because it is still
+  non-trivial. Most of what remains there is traversal and authored-resolution
+  logic, not unfinished action architecture.
+
+### Next Refactor Target
+
+- The next highest-value refactor target is declarative hook/stage
+  registration.
+- Runtime sealing should stop being treated as an active debt item. Preserve
+  the public reset/debug and slice seams, but do not spend more time there
+  unless a new feature forces a new public leak.
+- Keymap file decomposition is still worth doing, but it is lower risk and can
+  wait until hook orchestration is less privileged.
 
 ## What Is Already Working Well
 
@@ -94,17 +147,24 @@ enough that architecture work can be done safely if the seams stay coherent.
 
 ### Runtime state now has a canonical owner
 
-Milestone 1 of the runtime-state refactor is now landed:
+The runtime-state refactor is now both landed and sealed:
 
-- `users/noah/lib/state/runtime/runtime_context.h:1-57`
-- `users/noah/lib/state/runtime/runtime_shared_state.h:16-32`
-- `users/noah/lib/state/runtime/runtime_shared_state.c:7-38`
-- `users/noah/lib/state/runtime/runtime_debug.c:118-226`
+- `users/noah/lib/state/runtime/runtime_context_internal.h:1-59`
+- `users/noah/lib/state/runtime/runtime_shared_state_internal.h:1-18`
+- `users/noah/lib/state/runtime/runtime_shared_state.c:7-53`
+- `users/noah/lib/state/runtime/runtime_debug.h:1-67`
+- `users/noah/lib/pointing/runtime/pd_mode_runtime_shared_state.h:1-22`
 
 The runtime singleton now owns the shared key/pd aggregate, layer ownership,
 held-action ownership, held-repeat ownership, keyboard modifier ownership, and
-the runtime trace ring. The old public module APIs still exist, but they now
-forward into that one owner instead of maintaining separate mutable statics.
+the runtime trace ring. That concrete storage is no longer publicly visible.
+The supported external seam is now:
+
+- public reset/debug helpers in `runtime_debug.h`
+- the existing key-runtime slice in `key_runtime_shared_state.h`
+- the new pd-mode slice in `pd_mode_runtime_shared_state.h`
+
+That is a much sounder stopping point than the earlier compatibility phase.
 
 ### Action kinds now have a single source of truth
 
@@ -123,49 +183,54 @@ surface in the tree.
 
 ## Findings
 
-### 1. Milestone 1 is landed and the first Milestone 2 boundary cleanup is done, but the compatibility shim still needs to stay narrow
+### 1. Runtime sealing is now complete enough to stop treating it as an active debt item
 
-Severity: should-fix
+Severity: resolved enough to preserve, not continue expanding
 
 References:
 
-- `users/noah/lib/state/runtime/runtime_context.h:1-57`
-- `users/noah/lib/state/runtime/runtime_shared_state.h:16-30`
-- `users/noah/lib/state/runtime/runtime_shared_state.c:7-42`
-- `users/noah/lib/state/runtime/runtime_debug.c:118-226`
+- `users/noah/lib/state/runtime/runtime_context_internal.h:1-59`
+- `users/noah/lib/state/runtime/runtime_shared_state_internal.h:1-18`
+- `users/noah/lib/state/runtime/runtime_shared_state.c:7-53`
+- `users/noah/lib/state/runtime/runtime_debug.h:1-67`
+- `users/noah/lib/pointing/runtime/pd_mode_runtime_shared_state.h:1-22`
 - `users/noah/lib/pointing/runtime/pd_mode_state.c:13-20`
 - `users/noah/lib/pointing/runtime/pd_mode_snapshot.c:45-53`
+- `tests/host/include/host_runtime_fixture.h:1-52`
+- `tests/host/run_feature_gate_compile_tests.sh:12-78`
 
 What I observed:
 
 - runtime-owned mutable state now lives under one
   `noah_runtime_context_t` singleton
-- the old `noah_runtime_shared_state` name is now a compatibility alias into
-  that context rather than an independent owner
-- `noah_runtime_debug_snapshot()` and
-  `noah_runtime_context_reset_for_test()` now work over the context directly
-  instead of assembling or resetting state by calling each subsystem manually
-- repo-owned pd-mode runtime code no longer reads the compatibility alias
-  directly; it now goes through `pd_mode_runtime_shared_state()`
-- the remaining concern is policy, not mechanism: keep new code on the slice
-  accessors and avoid letting the compatibility shim expand again
+- the concrete context layout and aggregate shared-state layout are now
+  internal-only headers
+- the public runtime seam is back to the right shape: `noah_runtime_reset_for_test()`,
+  `noah_runtime_debug_snapshot(...)`, and narrow state slices where a module
+  truly needs one
+- repo-owned pd-mode runtime code reads runtime state only through
+  `pd_mode_runtime_shared_state()`
+- host tests no longer include runtime aggregate/context headers; they reset
+  the userspace runtime through `host_runtime_fixture_reset_userspace_runtime()`
+- the feature gate now fails if removed public runtime headers or new internal
+  runtime headers leak into normal userspace modules or host tests
 
 Why this matters:
 
-- Milestone 1 removed the biggest scaling tax: new runtime-owned subsystems no
-  longer need their own private static store plus bespoke debug/reset wiring.
-- The remaining cost is boundary drift risk. If new runtime code keeps using
-  the compatibility alias instead of slice accessors, the old ownership model
-  will quietly grow back around the new context.
-- That matters because Milestone 1 only pays off long term if the compatibility
-  layer stays visibly secondary to the runtime context and its slice helpers.
+- This is the point where the runtime refactor becomes architecturally real
+  rather than behaviorally real. The boundary is now enforced by header shape,
+  test seams, and compile gates instead of convention alone.
+- That removes the last strong reason to keep spending time on runtime storage
+  cleanup. The remaining major debt is no longer state ownership; it is
+  userspace composition and hook orchestration.
 
 Recommended direction:
 
-- `runtime_shared_state.h` should become an explicitly temporary compatibility
-  shim, not a surface that new code treats as a primary owner.
-- New runtime code should reach shared key/pd state through the context-backed
-  helpers and let only the compatibility layer expose the legacy alias.
+- Preserve the seal. New runtime-owned subsystems should either stay fully
+  internal to the runtime owner layer or expose a narrow slice helper when a
+  cross-module contract is genuinely needed.
+- Do not reopen the aggregate/context headers just to make a test or helper
+  convenient. Add a fixture helper or a slice surface instead.
 
 ### 2. The action-kind core now owns handled-key action-family policy; the remaining transparency logic is local by design
 
@@ -430,9 +495,8 @@ Leaky abstractions:
 - the compatibility `runtime_shared_state` surface is still visible enough that
   new code could regress toward aggregate access if the boundary is not kept
   narrow
-- action-kind abstractions are much healthier now, and the remaining
-  transparency helpers sit outside the registry mostly because they are local
-  resolution logic rather than missing action-family descriptors
+- process and init orchestration still expose a central owner with too much
+  privilege over subsystem ordering
 
 ### 4. Code Organization & Structure
 
@@ -460,9 +524,8 @@ Risky:
 - the runtime context solved the old “private mutable statics everywhere”
   problem, but the compatibility alias still needs to remain secondary or that
   ownership model will drift back
-- action lifecycle policy is now effectively registry-backed; the remaining
-  downstream handled-key code is primarily transparency traversal and explicit
-  authored-resolution override logic
+- top-level subsystem flow is still encoded as privileged ordered pipelines
+  rather than registered participation
 
 ### 6. Scalability of the Design
 
@@ -496,9 +559,8 @@ Specific improvement area:
 
 If I were sequencing architecture work here, I would do it in this order:
 
-1. Keep the runtime context as the only primary state owner and continue
-   narrowing the compatibility shim so new code cannot drift back onto legacy
-   aggregate access.
+1. Keep the runtime context as the only primary state owner and preserve the
+   sealed public surface: reset/debug helpers plus narrow slices only.
 2. Replace top-level imperative hook ordering with small declarative stage
    tables for process-record, scan, post-init, and RGB render.
 3. Split the authored keymap data into smaller data-only files without moving

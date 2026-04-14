@@ -10,10 +10,9 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/runtime/keyboard_mod_state.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
-#include "users/noah/lib/state/runtime/runtime_context.h"
-#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "users/noah/lib/state/runtime/runtime_trace.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
+#include "host_runtime_fixture.h"
 
 static uint32_t fake_time32;
 static bool     fake_is_master;
@@ -65,7 +64,7 @@ static void test_reset_stubs(void) {
     rpc_last_packet         = (split_runtime_sync_packet_t){0};
     layer_state             = 0;
 
-    noah_runtime_context_reset_for_test(noah_runtime_context());
+    host_runtime_fixture_reset_userspace_runtime();
 }
 
 uint32_t timer_read32(void) {

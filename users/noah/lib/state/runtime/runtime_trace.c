@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "runtime_trace.h"
-#include "runtime_context.h"
+#include "runtime_context_internal.h"
 
 #if defined(NOAH_RUNTIME_TRACE_ENABLE)
 

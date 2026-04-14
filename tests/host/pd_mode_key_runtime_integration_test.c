@@ -13,7 +13,6 @@
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
-#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 enum {
     TEST_PD_HOLD_KEY       = NOAH_KEYMAP_SAFE_RANGE + 0x10,

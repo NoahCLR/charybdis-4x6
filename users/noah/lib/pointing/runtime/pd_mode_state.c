@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../../state/runtime/runtime_shared_state.h"
+#include "pd_mode_runtime_shared_state.h"
 #include "../../state/runtime/split_runtime_sync.h"
 #include "../../state/runtime/runtime_trace.h"
 #include "../policy/pd_mode_policy.h"

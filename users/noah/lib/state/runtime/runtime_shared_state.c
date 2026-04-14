@@ -4,8 +4,7 @@
 
 #include <string.h>
 
-#include "runtime_context.h"
-#include "runtime_shared_state.h"
+#include "runtime_context_internal.h"
 
 static noah_runtime_context_t noah_runtime_singleton = {
     .shared.key.index.preview_owner_slot    = UINT8_MAX,
@@ -16,10 +15,6 @@ noah_runtime_context_t *noah_runtime_context(void) {
     return &noah_runtime_singleton;
 }
 
-runtime_shared_state_t *noah_runtime_shared_state_ptr(void) {
-    return &noah_runtime_context()->shared;
-}
-
 pd_mode_runtime_shared_state_t *pd_mode_runtime_shared_state(void) {
     return &noah_runtime_context()->shared.pd;
 }
@@ -28,7 +23,7 @@ key_runtime_shared_state_t *key_runtime_shared_state(void) {
     return &noah_runtime_context()->shared.key;
 }
 
-void runtime_shared_state_reset(runtime_shared_state_t *state) {
+static void runtime_shared_state_reset(runtime_shared_state_t *state) {
     if (!state) {
         return;
     }
@@ -36,6 +31,16 @@ void runtime_shared_state_reset(runtime_shared_state_t *state) {
     *state = (runtime_shared_state_t){0};
     key_runtime_shared_state_reset(&state->key);
 }
+
+// Minimal host runners may not provide the full QMK layer/mod/report surface.
+// Keep the public runtime reset callable there by supplying weak no-op fallbacks
+// that production/QMK builds override with their real implementations.
+__attribute__((weak)) layer_state_t layer_state;
+__attribute__((weak)) void          clear_mods(void) {}
+__attribute__((weak)) void          clear_weak_mods(void) {}
+__attribute__((weak)) void          clear_oneshot_mods(void) {}
+__attribute__((weak)) void          clear_oneshot_locked_mods(void) {}
+__attribute__((weak)) void          send_keyboard_report(void) {}
 
 void noah_runtime_context_reset_for_test(noah_runtime_context_t *ctx) {
     if (!ctx) {
@@ -48,4 +53,15 @@ void noah_runtime_context_reset_for_test(noah_runtime_context_t *ctx) {
     memset(&ctx->held_repeats, 0, sizeof(ctx->held_repeats));
     memset(&ctx->keyboard_mod_ownership, 0, sizeof(ctx->keyboard_mod_ownership));
     memset(&ctx->trace, 0, sizeof(ctx->trace));
+}
+
+void noah_runtime_reset_for_test(void) {
+    noah_runtime_context_reset_for_test(noah_runtime_context());
+
+    layer_state = 0;
+    clear_mods();
+    clear_weak_mods();
+    clear_oneshot_mods();
+    clear_oneshot_locked_mods();
+    send_keyboard_report();
 }

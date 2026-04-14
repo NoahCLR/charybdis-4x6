@@ -17,7 +17,6 @@
 #include "../../pointing/defs/pd_mode_flags.h"
 #include "../ownership/keyboard_mod_ownership.h"
 #include "../ownership/layer_ownership.h"
-#include "runtime_context.h"
 #include "runtime_trace.h"
 
 #define NOAH_RUNTIME_DEBUG_SLOT_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
@@ -62,7 +61,6 @@ typedef struct {
     noah_runtime_trace_snapshot_t           trace;
 } noah_runtime_debug_snapshot_t;
 
-void noah_runtime_context_debug_snapshot(const noah_runtime_context_t *ctx, noah_runtime_debug_snapshot_t *out);
 void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out);
 void noah_runtime_reset_for_test(void);
 uint16_t noah_runtime_debug_slot_owner_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);

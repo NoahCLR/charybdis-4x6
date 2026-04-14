@@ -548,3 +548,137 @@ Next steps:
 - treat the remaining transparency traversal helpers as local unless a future
   feature proves they still encode action-family policy
 - move the next architecture pass to declarative hook registration
+
+### Post-refactor landing review
+
+Completed in this pass:
+
+- re-read the landed runtime-context, action-kind, handled-key transparency,
+  hook-entry, init, and RGB orchestration seams after the refactor work
+- re-ranked the remaining architecture debts based on the code as it actually
+  stands now instead of the earlier in-flight state
+- updated `userspace-architecture-review.md` to record:
+  - what materially improved
+  - what did not materially improve
+  - what the team should stop touching for now
+  - what the next highest-value refactor target should be
+
+Landing assessment recorded in the review:
+
+- the runtime-context refactor landed successfully enough to treat split state
+  ownership as solved at the storage level
+- the action-policy refactor landed successfully enough to stop treating the
+  action registry as an active debt item
+- the next architecture target is now clearly hook/stage registration rather
+  than more action-registry expansion
+- the authored keymap monolith is still a real but lower-priority cleanup
+
+Verification run in this pass:
+
+- `git status --short`
+- `wc -l keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
+
+Checks intentionally skipped in this pass:
+
+- no host tests or firmware build rerun
+- this was a review-only documentation pass over an already clean worktree
+  with no source changes outside the active review folder
+
+Workspace scope for this pass:
+
+- no sibling workspace folders were edited
+- changes are confined to `review/2026-04-14-review-10/`
+
+Next steps:
+
+- if work continues, start the next implementation pass on declarative
+  hook/stage registration
+- keep `runtime_shared_state.h` narrow as compatibility-only while doing that
+- defer more action-registry work unless a new feature exposes a real missing
+  action-family seam
+
+### Strict runtime interface sealing
+
+Completed in this pass:
+
+- split the concrete runtime storage surface into internal-only headers:
+  - `users/noah/lib/state/runtime/runtime_context_internal.h`
+  - `users/noah/lib/state/runtime/runtime_shared_state_internal.h`
+- removed the old public aggregate/context headers:
+  - `users/noah/lib/state/runtime/runtime_context.h`
+  - `users/noah/lib/state/runtime/runtime_shared_state.h`
+- added the narrow pd-mode slice surface:
+  - `users/noah/lib/pointing/runtime/pd_mode_runtime_shared_state.h`
+- kept the public runtime seam on:
+  - `noah_runtime_reset_for_test()`
+  - `noah_runtime_debug_snapshot(...)`
+  - existing narrow shared-state slice accessors
+- moved pd-mode runtime modules onto the pd-mode slice header instead of any
+  aggregate runtime include
+- migrated host tests off direct runtime aggregate/context headers and onto
+  `host_runtime_fixture_reset_userspace_runtime()` or existing debug helpers
+- added shared host fixture helpers for public runtime reset and optional
+  snapshot capture in `tests/host/include/host_runtime_fixture.h`
+- tightened `tests/host/run_feature_gate_compile_tests.sh` so it now fails on:
+  - removed public runtime aggregate/context includes
+  - internal runtime storage includes from host tests
+  - internal runtime storage includes from non-owner userspace modules
+- moved the public `noah_runtime_reset_for_test()` implementation into the
+  runtime owner layer and added weak QMK hook fallbacks there so minimal host
+  runners can still use the public reset seam
+
+Architecture result after this pass:
+
+- runtime ownership is now sealed at the interface level, not just unified at
+  the storage level
+- the runtime aggregate/context layout is no longer a repo-wide surface
+- pd-mode now has a real narrow slice contract parallel to the existing key
+  runtime slice
+- host tests and compile gates now reinforce the sealed boundary instead of
+  relying on convention
+- the main remaining architecture debt is now hook/stage orchestration, not
+  runtime state exposure
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_key_runtime_index_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- all targeted runtime-boundary, key-runtime, pd-mode, integration, and
+  compile-gate runners passed
+- full host suite passed
+- firmware build passed and produced
+  `.build/bastardkb_charybdis_4x6_noah.uf2`
+
+Workspace scope for this pass:
+
+- no sibling workspace folders were edited
+- changes are confined to `charybdis-4x6/`
+- runtime internals, pd-mode runtime slices, host tests, compile gates, and
+  the active review folder were updated together
+
+Next steps:
+
+- keep the sealed runtime surface stable: new cross-module runtime contracts
+  should be slice helpers, not reopened aggregate headers
+- move the next architecture pass to declarative hook/stage registration
+- defer more action-registry work unless a future feature proves a new
+  action-family seam is still missing

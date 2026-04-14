@@ -5,8 +5,7 @@
 
 #include "users/noah/lib/key/runtime/key_runtime_index.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
-#include "users/noah/lib/state/runtime/runtime_context.h"
-#include "users/noah/lib/state/runtime/runtime_shared_state.h"
+#include "host_runtime_fixture.h"
 
 static uint16_t fake_time;
 
@@ -58,7 +57,7 @@ static key_runtime_slot_interaction_t test_interaction(uint8_t preview_layer, ui
 
 static void test_reset_state(void) {
     fake_time = 1000;
-    noah_runtime_context_reset_for_test(noah_runtime_context());
+    host_runtime_fixture_reset_userspace_runtime();
 }
 
 static void test_expect_active_order(const keypos_t *positions, uint8_t count) {

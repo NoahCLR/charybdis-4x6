@@ -6,8 +6,7 @@
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
-#include "users/noah/lib/state/runtime/runtime_context.h"
-#include "users/noah/lib/state/runtime/runtime_shared_state.h"
+#include "host_runtime_fixture.h"
 
 static uint16_t current_cpi;
 static uint16_t cpi_set_count;
@@ -62,7 +61,7 @@ static bool report_mouse_equal(report_mouse_t lhs, report_mouse_t rhs) {
 }
 
 static void test_reset_runtime(void) {
-    noah_runtime_context_reset_for_test(noah_runtime_context());
+    host_runtime_fixture_reset_userspace_runtime();
 }
 
 static void test_reset_stubs(void) {

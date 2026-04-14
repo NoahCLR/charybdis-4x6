@@ -7,6 +7,7 @@
 #include "runtime_debug.h"
 
 #include "../../key/runtime/key_runtime_state.h"
+#include "runtime_context_internal.h"
 
 static keypos_t noah_runtime_debug_slot_index_key_pos(uint8_t slot_index) {
     return (keypos_t){
@@ -118,7 +119,7 @@ static void noah_runtime_debug_snapshot_trace(const noah_runtime_context_t *ctx,
     }
 }
 
-void noah_runtime_context_debug_snapshot(const noah_runtime_context_t *ctx, noah_runtime_debug_snapshot_t *out) {
+static void noah_runtime_context_debug_snapshot(const noah_runtime_context_t *ctx, noah_runtime_debug_snapshot_t *out) {
     const runtime_shared_state_t *state = ctx ? &ctx->shared : NULL;
 
     if (!out) {
@@ -249,15 +250,4 @@ bool noah_runtime_debug_pending_fallback_slot_key_pos(const noah_runtime_debug_s
 
     *out = snapshot->key.pending_fallback_slot;
     return true;
-}
-
-void noah_runtime_reset_for_test(void) {
-    noah_runtime_context_reset_for_test(noah_runtime_context());
-
-    layer_state = 0;
-    clear_mods();
-    clear_weak_mods();
-    clear_oneshot_mods();
-    clear_oneshot_locked_mods();
-    send_keyboard_report();
 }

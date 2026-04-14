@@ -1,10 +1,10 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Runtime Context
+// Runtime Context Internals
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Canonical userspace-owned runtime storage. This composes the split key/pd
-// aggregate with the state slices that were previously held in private module
-// statics so reset/debug helpers can operate over one owner.
+// Canonical userspace-owned runtime storage. The concrete layout is internal
+// to the runtime owner layer so callers cannot reach aggregate state through a
+// public context type.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -14,7 +14,7 @@
 #include "../../key/ownership/held_repeat.h"
 #include "../ownership/keyboard_mod_ownership.h"
 #include "../ownership/layer_ownership.h"
-#include "runtime_shared_state.h"
+#include "runtime_shared_state_internal.h"
 #include "runtime_trace.h"
 
 typedef struct {
@@ -46,13 +46,13 @@ typedef struct {
     bool                       overflowed;
 } noah_runtime_trace_state_t;
 
-typedef struct {
-    runtime_shared_state_t             shared;
-    noah_layer_ownership_state_t       layer_ownership;
-    noah_held_action_state_t           held_actions;
-    noah_held_repeat_state_t           held_repeats;
+typedef struct noah_runtime_context_t {
+    runtime_shared_state_t              shared;
+    noah_layer_ownership_state_t        layer_ownership;
+    noah_held_action_state_t            held_actions;
+    noah_held_repeat_state_t            held_repeats;
     noah_keyboard_mod_ownership_state_t keyboard_mod_ownership;
-    noah_runtime_trace_state_t         trace;
+    noah_runtime_trace_state_t          trace;
 } noah_runtime_context_t;
 
 noah_runtime_context_t *noah_runtime_context(void);

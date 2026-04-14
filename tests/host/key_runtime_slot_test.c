@@ -12,9 +12,8 @@
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_result.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_step.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
-#include "users/noah/lib/state/runtime/runtime_context.h"
-#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "host_handled_key_fixture.h"
+#include "host_runtime_fixture.h"
 
 enum {
     TEST_PLAIN_KEY     = 0x0004,
@@ -246,7 +245,7 @@ static void test_reset_state(void) {
     test_pd_mode         = 0;
     test_pd_locked_modes = 0;
     overflow_log_count   = 0;
-    noah_runtime_context_reset_for_test(noah_runtime_context());
+    host_runtime_fixture_reset_userspace_runtime();
 }
 
 int uprintf(const char *fmt, ...) {

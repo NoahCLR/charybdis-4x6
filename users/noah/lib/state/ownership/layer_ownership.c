@@ -9,7 +9,7 @@
 #include "layer_ownership.h"
 
 #include "noah_keymap_ids.h"
-#include "../runtime/runtime_context.h"
+#include "../runtime/runtime_context_internal.h"
 #include "../runtime/runtime_trace.h"
 
 static inline layer_state_t layer_ownership_mask_for_layer(uint8_t layer) {

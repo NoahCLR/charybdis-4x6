@@ -11,7 +11,6 @@
 #include "users/noah/lib/key/runtime/key_runtime_process.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
-#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,

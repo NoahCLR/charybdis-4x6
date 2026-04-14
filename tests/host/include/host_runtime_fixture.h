@@ -9,6 +9,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
 
 typedef struct {
@@ -33,6 +34,18 @@ static inline void host_runtime_fixture_reset(host_runtime_fixture_t *fixture) {
     }
 
     *fixture = (host_runtime_fixture_t)HOST_RUNTIME_FIXTURE_INIT;
+}
+
+static inline void host_runtime_fixture_reset_userspace_runtime(void) {
+    noah_runtime_reset_for_test();
+}
+
+static inline void host_runtime_fixture_capture_runtime_snapshot(noah_runtime_debug_snapshot_t *snapshot) {
+    if (!snapshot) {
+        return;
+    }
+
+    noah_runtime_debug_snapshot(snapshot);
 }
 
 static inline split_runtime_sync_packet_t host_runtime_fixture_split_remote_init(void) {

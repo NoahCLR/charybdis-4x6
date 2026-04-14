@@ -5,9 +5,8 @@
 #include <string.h>
 
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
-#include "users/noah/lib/state/runtime/runtime_context.h"
-#include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
+#include "host_runtime_fixture.h"
 
 #ifndef CHARYBDIS_DRAGSCROLL_DPI
 #    define CHARYBDIS_DRAGSCROLL_DPI 100
@@ -61,7 +60,7 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset_runtime(void) {
-    noah_runtime_context_reset_for_test(noah_runtime_context());
+    host_runtime_fixture_reset_userspace_runtime();
 }
 
 static void test_reset_stubs(void) {

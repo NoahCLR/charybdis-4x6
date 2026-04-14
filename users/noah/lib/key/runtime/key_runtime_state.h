@@ -5,9 +5,10 @@
 // Shared per-slot handled-key state for the split key runtime modules.
 // Each slot owns both the currently pressed key state and any deferred
 // multi-tap chain that still belongs to that physical key. This header stays
-// key-runtime-local: callers that need the aggregate userspace runtime state
-// should include state/runtime/runtime_shared_state.h explicitly instead of
-// reaching it through the key engine.
+// key-runtime-local: callers that need higher-level runtime inspection should
+// use state/runtime/runtime_debug.h or the narrow module-local slice headers
+// they actually need instead of reaching aggregate userspace state through the
+// key engine.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

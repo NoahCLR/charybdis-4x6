@@ -7,8 +7,7 @@
 #include "users/noah/lib/key/interaction/handled_key.h"
 #include "users/noah/lib/key/runtime/key_runtime_admission.h"
 #include "users/noah/lib/key/runtime/key_runtime_index.h"
-#include "users/noah/lib/state/runtime/runtime_context.h"
-#include "users/noah/lib/state/runtime/runtime_shared_state.h"
+#include "host_runtime_fixture.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x60,
@@ -45,7 +44,7 @@ static void test_track_slot(active_key_state_t *slot, uint16_t keycode, keypos_t
 }
 
 static void test_reset_state(void) {
-    noah_runtime_context_reset_for_test(noah_runtime_context());
+    host_runtime_fixture_reset_userspace_runtime();
 }
 
 uint16_t timer_read(void) {
