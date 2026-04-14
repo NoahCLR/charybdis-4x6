@@ -185,6 +185,7 @@ This pattern applies to:
 If you change hook wiring or override behavior, run:
 
 - `sh tests/host/run_hook_chaining_tests.sh`
+- `sh tests/host/run_runtime_init_order_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`

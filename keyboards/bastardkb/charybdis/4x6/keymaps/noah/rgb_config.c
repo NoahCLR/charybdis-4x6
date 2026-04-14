@@ -7,11 +7,11 @@
 //
 // Want to change layer, mode, LED-group, automouse, or key-behavior feedback
 // colors?  Edit this file.
-// Want to change the rendering logic?  Edit users/noah/lib/rgb/rgb_runtime.c
+// Want to change the rendering logic?  Edit users/noah/lib/rgb/core/rgb_runtime.c
 // and the stage modules under users/noah/lib/rgb/.
 // For shared RGB config types and the HSV helper, see
-// users/noah/lib/rgb/rgb_config_helpers.h.
-// For split-safe LED helper functions, see users/noah/lib/rgb/rgb_helpers.h.
+// users/noah/lib/rgb/core/rgb_config_helpers.h.
+// For split-safe LED helper functions, see users/noah/lib/rgb/core/rgb_helpers.h.
 //
 // ────────────────────────────────────────────────────────────────────────────
 

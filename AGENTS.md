@@ -46,12 +46,13 @@ Required verification workflow:
 1. Treat tests and compile checks as required checkpoints throughout the work, not a one-time end-of-task ceremony.
 2. Run targeted host tests repeatedly while working on a subsystem. Prefer the concrete runners in `tests/host/` over guessing from `run_<area>_tests.sh`.
 3. Use the subsystem runners that match the files and behavior you touched:
-   - key runtime: `sh tests/host/run_key_runtime_slot_tests.sh`, `sh tests/host/run_key_runtime_preflight_tests.sh`, `sh tests/host/run_key_runtime_transition_tests.sh`, `sh tests/host/run_key_runtime_feedback_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
-   - pointing / pd mode: `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_pointer_layer_policy_tests.sh`, `sh tests/host/run_split_runtime_sync_tests.sh`
+   - key runtime: `sh tests/host/run_key_runtime_admission_tests.sh`, `sh tests/host/run_key_runtime_index_tests.sh`, `sh tests/host/run_key_runtime_slot_tests.sh`, `sh tests/host/run_key_runtime_release_matrix_tests.sh`, `sh tests/host/run_key_runtime_preflight_tests.sh`, `sh tests/host/run_key_runtime_transition_tests.sh`, `sh tests/host/run_key_runtime_feedback_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`
+   - pointing / pd mode: `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_pointer_layer_policy_tests.sh`, `sh tests/host/run_split_runtime_sync_tests.sh`
    - authored profile validation: `sh tests/host/run_key_behavior_lookup_tests.sh`, `sh tests/host/run_key_behavior_validation_tests.sh`, `sh tests/host/run_keymap_validation_tests.sh`, `sh tests/host/run_real_profile_validation_tests.sh`
    - RGB: `sh tests/host/run_rgb_validation_tests.sh`, `sh tests/host/run_rgb_layer_render_tests.sh`
    - hooks / ownership: `sh tests/host/run_hook_chaining_tests.sh`, `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_owned_keycode_tests.sh`, `sh tests/host/run_held_action_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`
-   - macro / VIA / QMK-contract work: `sh tests/host/run_qmk_contract_checks.sh`, `sh tests/host/run_action_lifecycle_tests.sh`, `sh tests/host/run_macro_payload_tests.sh`, `sh tests/host/run_via_macro_defaults_tests.sh`, `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+   - macro / VIA / QMK-contract work: `sh tests/host/run_qmk_contract_checks.sh`, `sh tests/host/run_action_lifecycle_tests.sh`, `sh tests/host/run_macro_dispatch_tests.sh`, `sh tests/host/run_macro_payload_tests.sh`, `sh tests/host/run_via_macro_defaults_tests.sh`, `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+   - shared runtime / tracing: `sh tests/host/run_runtime_init_order_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`
 4. If authored keymap, combo, macro, or RGB data changed, also run:
    `sh tests/host/run_real_profile_validation_tests.sh`
 5. If runtime wiring, source lists, compat surfaces, or header boundaries changed, also run:
@@ -77,7 +78,7 @@ Required reporting:
 
 Repo-specific guardrails:
 
-- When adding a new firmware source file that should participate in the userspace build, wire it into `users/noah/rules.mk` in the same pass. If host compile gates or test runners mirror that build surface, update them too.
+- When adding a new firmware source file that should participate in the userspace build, wire it into `users/noah/source_manifest.mk` in the same pass. If host compile gates or test runners mirror that build surface, update them too.
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update `README.md` and the relevant files under `docs/` in the same pass.
 - If architectural work lands, update the active review folder's `progress.md` in the same pass.

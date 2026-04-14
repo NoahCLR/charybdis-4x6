@@ -93,12 +93,12 @@ For the full round-trip workflow, see
 
 Practical usage:
 
-- `python 'via layouts/via_to_qmk_layout.py' --print` previews rewritten
+- `python3 'via layouts/via_to_qmk_layout.py' --print` previews rewritten
   `VIA_MACROS(MACRO)` and `keymaps[][]`
-- `python 'via layouts/via_to_qmk_layout.py' --write` rewrites those VIA-owned
+- `python3 'via layouts/via_to_qmk_layout.py' --write` rewrites those VIA-owned
   sections in
   [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
-- `python 'via layouts/via_to_qmk_layout.py' --via-json path/to/export.json`
+- `python3 'via layouts/via_to_qmk_layout.py' --via-json path/to/export.json`
   uses a specific VIA export instead of choosing one from `via layouts/`
 
 ## Where To Change Things

@@ -3,15 +3,15 @@
 # keep the authored keymap.c tables in sync.
 #
 # Usage:
-#   python via_to_qmk_layout.py                    Choose a JSON export from this
+#   python3 via_to_qmk_layout.py                   Choose a JSON export from this
 #                                                  directory and use default MODE
-#   python via_to_qmk_layout.py --write            Update keymap.c in-place:
+#   python3 via_to_qmk_layout.py --write           Update keymap.c in-place:
 #                                                  rewrite keymaps[][] and make
 #                                                  VIA_MACROS(MACRO) match the
 #                                                  selected VIA export
-#   python via_to_qmk_layout.py --print            Print VIA_MACROS(MACRO) and
+#   python3 via_to_qmk_layout.py --print           Print VIA_MACROS(MACRO) and
 #                                                  keymaps[][] previews to stdout
-#   python via_to_qmk_layout.py --via-json path/to/export.json
+#   python3 via_to_qmk_layout.py --via-json path/to/export.json
 #                                                  Override the default VIA export input
 #
 # Reads the active VIA export from this directory and rewrites only the
@@ -26,7 +26,7 @@ from typing import NoReturn
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 KEYMAP_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "keymap.c"
-PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "pd_mode_manifest.h"
+PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "defs" / "pd_mode_manifest.h"
 
 # Default mode: "write" makes the selected VIA export authoritative for
 # keymaps[][] and VIA_MACROS(MACRO). If you do not run this script,

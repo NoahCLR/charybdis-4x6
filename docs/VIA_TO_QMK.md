@@ -42,36 +42,36 @@ Recommended path:
 
 ## Commands
 
-Run from the repo root.
+Run from the repo root with Python 3.
 
 Preview generated output:
 
 ```sh
-python 'via layouts/via_to_qmk_layout.py' --print
+python3 'via layouts/via_to_qmk_layout.py' --print
 ```
 
 Preview a specific export:
 
 ```sh
-python 'via layouts/via_to_qmk_layout.py' --print --via-json /path/to/export.json
+python3 'via layouts/via_to_qmk_layout.py' --print --via-json /path/to/export.json
 ```
 
 Run the default interactive write flow:
 
 ```sh
-python 'via layouts/via_to_qmk_layout.py'
+python3 'via layouts/via_to_qmk_layout.py'
 ```
 
 Write back into `keymap.c`:
 
 ```sh
-python 'via layouts/via_to_qmk_layout.py' --write
+python3 'via layouts/via_to_qmk_layout.py' --write
 ```
 
 Write from a specific export:
 
 ```sh
-python 'via layouts/via_to_qmk_layout.py' --write --via-json /path/to/export.json
+python3 'via layouts/via_to_qmk_layout.py' --write --via-json /path/to/export.json
 ```
 
 When you use `--write`, the script asks two separate questions:

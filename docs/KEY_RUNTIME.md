@@ -379,6 +379,7 @@ test-only effect or reset dialect.
 The most relevant host checks for the runtime are:
 
 - `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_index_tests.sh`
 - `sh tests/host/run_key_runtime_slot_tests.sh`
 - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
 - `sh tests/host/run_key_runtime_transition_tests.sh`
