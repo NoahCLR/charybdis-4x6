@@ -52,8 +52,8 @@ static void test_reset_stubs(void) {
     fake_auto_mouse_elapsed     = 83u;
     fake_auto_mouse_active      = true;
     fake_any_mode_locked        = false;
-    fake_pd_active_flags        = PD_MODE_VOLUME | PD_MODE_ZOOM;
-    fake_pd_locked_flags        = PD_MODE_VOLUME;
+    fake_pd_active_flags        = PD_MODE_ZOOM;
+    fake_pd_locked_flags        = 0;
     fake_key_feedback_flags     = KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
     fake_key_preview_layer      = 3u;
     rpc_register_count          = 0;
@@ -99,10 +99,10 @@ uint8_t key_feedback_preview_layer(void) {
     return fake_key_preview_layer;
 }
 
-void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
+void pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id) {
     remote_snapshot_apply_count++;
-    remote_snapshot_active = active_flags;
-    remote_snapshot_locked = locked_flags;
+    remote_snapshot_active = pd_mode_mask_from_id(active_mode_id);
+    remote_snapshot_locked = pd_mode_mask_from_id(locked_mode_id);
 }
 
 void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) {
@@ -130,8 +130,8 @@ static void test_init_registers_rpc_and_sends_initial_packet_on_master(void) {
     CHECK(rpc_registered_callback != NULL);
     CHECK(rpc_send_count == 1);
     CHECK(rpc_last_packet.automouse_progress == 60u);
-    CHECK(rpc_last_packet.pd_mode_flags == fake_pd_active_flags);
-    CHECK(rpc_last_packet.pd_mode_locked_flags == fake_pd_locked_flags);
+    CHECK(rpc_last_packet.active_mode_id == pd_mode_id_from_mask(fake_pd_active_flags));
+    CHECK(rpc_last_packet.locked_mode_id == pd_mode_id_from_mask(fake_pd_locked_flags));
     CHECK(rpc_last_packet.key_feedback_flags == fake_key_feedback_flags);
     CHECK(rpc_last_packet.key_preview_layer == fake_key_preview_layer);
     CHECK(split_runtime_sync_remote.key_preview_layer == UINT8_MAX);
@@ -254,8 +254,8 @@ static void test_automouse_progress_quantizes_concrete_boundaries(void) {
 static void test_slave_rpc_applies_exact_packet_and_snapshot(void) {
     split_runtime_sync_packet_t packet = {
         .automouse_progress   = 42u,
-        .pd_mode_flags        = PD_MODE_ARROW,
-        .pd_mode_locked_flags = PD_MODE_VOLUME,
+        .active_mode_id       = pd_mode_id_from_mask(PD_MODE_ARROW),
+        .locked_mode_id       = pd_mode_id_from_mask(PD_MODE_VOLUME),
         .key_feedback_flags   = KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE,
         .key_preview_layer    = 6u,
     };
@@ -269,19 +269,19 @@ static void test_slave_rpc_applies_exact_packet_and_snapshot(void) {
     rpc_registered_callback(sizeof(packet), &packet, 0, NULL);
 
     CHECK(split_runtime_sync_remote.automouse_progress == packet.automouse_progress);
-    CHECK(split_runtime_sync_remote.pd_mode_flags == packet.pd_mode_flags);
-    CHECK(split_runtime_sync_remote.pd_mode_locked_flags == packet.pd_mode_locked_flags);
+    CHECK(split_runtime_sync_remote.active_mode_id == packet.active_mode_id);
+    CHECK(split_runtime_sync_remote.locked_mode_id == packet.locked_mode_id);
     CHECK(split_runtime_sync_remote.key_feedback_flags == packet.key_feedback_flags);
     CHECK(split_runtime_sync_remote.key_preview_layer == packet.key_preview_layer);
     CHECK(remote_snapshot_apply_count == 1);
-    CHECK(remote_snapshot_active == packet.pd_mode_flags);
-    CHECK(remote_snapshot_locked == packet.pd_mode_locked_flags);
+    CHECK(remote_snapshot_active == pd_mode_mask_from_id(packet.active_mode_id));
+    CHECK(remote_snapshot_locked == pd_mode_mask_from_id(packet.locked_mode_id));
 }
 
 static void test_slave_rpc_ignores_short_packets(void) {
     split_runtime_sync_packet_t packet = {
         .automouse_progress = 12u,
-        .pd_mode_flags      = PD_MODE_ZOOM,
+        .active_mode_id     = pd_mode_id_from_mask(PD_MODE_ZOOM),
         .key_preview_layer  = 5u,
     };
 

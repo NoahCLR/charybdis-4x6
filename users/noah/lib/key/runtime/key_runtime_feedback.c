@@ -4,6 +4,7 @@
 
 #include "key_runtime_state.h"
 #include "key_runtime_feedback.h"
+#include "key_runtime_index.h"
 #include "../../action/action_dispatch.h"
 #include "../../pointing/defs/pd_modes.h"
 
@@ -55,33 +56,27 @@ static uint8_t key_feedback_preview_layer_for_slot(const active_key_state_t *slo
     return key_runtime_slot_preview_layer_hint(slot);
 }
 
-static handled_key_hold_contract_t key_feedback_registered_hold_contract(key_runtime_slot_interaction_t interaction, uint16_t held_action, bool long_hold_reached) {
-    if (long_hold_reached && interaction.binding.long_hold.present && held_action == interaction.binding.long_hold.action) {
-        return interaction.policy.long_hold;
+static handled_key_hold_semantics_t key_feedback_registered_hold_contract(key_runtime_slot_interaction_t interaction, uint16_t held_action, bool long_hold_reached) {
+    if (long_hold_reached && interaction.contract.long_hold.threshold_action == held_action) {
+        return interaction.contract.long_hold;
     }
 
-    if (interaction.binding.hold.present && held_action == interaction.binding.hold.action) {
-        return interaction.policy.hold;
+    if (interaction.contract.hold.threshold_action == held_action) {
+        return interaction.contract.hold;
     }
 
-    return (handled_key_hold_contract_t){
+    return (handled_key_hold_semantics_t){
         .keeps_registered_feedback = handled_key_hold_action_keeps_registered_feedback(noah_action_describe(held_action)),
     };
 }
 
-static bool key_feedback_hold_contract_uses_preview_layer(handled_key_hold_contract_t contract) {
-    return contract.preview_layer != UINT8_MAX;
+static bool key_feedback_hold_contract_uses_preview_layer(handled_key_hold_semantics_t semantics) {
+    return semantics.preview_layer != UINT8_MAX;
 }
 
 uint8_t key_feedback_preview_layer(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        uint8_t layer = key_feedback_preview_layer_for_slot(key_runtime_slot_at(index));
-        if (layer != UINT8_MAX) {
-            return layer;
-        }
-    }
-
-    return UINT8_MAX;
+    key_runtime_index_rebuild();
+    return key_feedback_preview_layer_for_slot(key_runtime_preview_owner_slot());
 }
 
 static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
@@ -107,7 +102,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     }
 
     if (slot->lifecycle.held_action_keycode != KC_NO) {
-        handled_key_hold_contract_t active_contract = key_feedback_registered_hold_contract(interaction, slot->lifecycle.held_action_keycode, long_hold_reached);
+        handled_key_hold_semantics_t active_contract = key_feedback_registered_hold_contract(interaction, slot->lifecycle.held_action_keycode, long_hold_reached);
 
         // Held layer and pd-mode actions do not keep a hold overlay once they
         // are active; the layer or pd-mode color itself is the feedback.
@@ -142,7 +137,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
         return flags;
     }
 
-    if (long_hold_reached && interaction.policy.long_hold.keeps_pending_feedback) {
+    if (long_hold_reached && interaction.contract.long_hold.keeps_pending_feedback) {
         // TAP_ON_RELEASE_AFTER_HOLD keeps feedback visible because the action
         // is still pending until release.
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
@@ -150,7 +145,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
         return flags;
     }
 
-    if (!long_hold_reached && key_runtime_slot_has_pending_release_hold(slot) && !key_feedback_hold_contract_uses_preview_layer(interaction.policy.hold)) {
+    if (!long_hold_reached && key_runtime_slot_has_pending_release_hold(slot) && !key_feedback_hold_contract_uses_preview_layer(interaction.contract.hold)) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
         return flags;
     }
@@ -159,7 +154,7 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     // not keep a hold color latched after the threshold. Only an authored
     // normal hold tier keeps the pending hold color before it resolves;
     // long-hold-only surfaces stay quiet until the long-hold tier commits.
-    if (!key_feedback_hold_contract_uses_preview_layer(interaction.policy.hold) && key_runtime_slot_allows_tap_release(slot) && elapsed >= interaction.binding.tap_hold_term && (handled_key_hold_contract_fires_at_threshold(interaction.policy.hold) || interaction.policy.hold.keeps_pending_feedback)) {
+    if (!key_feedback_hold_contract_uses_preview_layer(interaction.contract.hold) && key_runtime_slot_allows_tap_release(slot) && elapsed >= interaction.binding.tap_hold_term && (handled_key_hold_contract_fires_at_threshold(interaction.contract.hold) || interaction.contract.hold.keeps_pending_feedback)) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
     }
 
@@ -168,6 +163,8 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
 
 uint8_t key_feedback_pack(void) {
     uint8_t flags = 0;
+
+    key_runtime_index_rebuild();
 
     if (key_feedback_pulse_active()) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
@@ -179,17 +176,18 @@ uint8_t key_feedback_pack(void) {
 
     // Multi-tap pending: at least one slot still has an open tap window that
     // has not crossed into a pending hold.
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
+    const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
 
+    for (uint8_t index = 0; index < index_state->pending_multi_tap_count; index++) {
+        active_key_state_t *slot = key_runtime_pending_multi_tap_slot_by_order(index);
         if (key_runtime_slot_has_pending_multi_tap(slot) && !key_runtime_slot_pending_multi_tap_pending_hold(slot)) {
             flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
             break;
         }
     }
 
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        uint8_t slot_flags = key_feedback_pack_for_slot(key_runtime_slot_at(index));
+    for (uint8_t index = 0; index < index_state->active_slot_count; index++) {
+        uint8_t slot_flags = key_feedback_pack_for_slot(key_runtime_active_slot_by_order(index));
         if (slot_flags != 0) {
             return flags | slot_flags;
         }

@@ -6,17 +6,11 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_admission.h"
+#include "key_runtime_index.h"
 
 active_key_state_t *key_runtime_first_active_slot(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
-
-        if (key_runtime_slot_active(slot)) {
-            return slot;
-        }
-    }
-
-    return NULL;
+    key_runtime_index_rebuild();
+    return key_runtime_active_slot_by_order(0);
 }
 
 active_key_state_t *key_runtime_find_slot_by_position(keypos_t key_pos) {

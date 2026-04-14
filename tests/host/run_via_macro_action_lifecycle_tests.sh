@@ -19,11 +19,14 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/via_macro_action_lifecycle_test.c" \
+    "$ROOT/users/noah/lib/macro/macro_slot_provider.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/macro/macro_payload.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_decode_qmk.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+    "$ROOT/users/noah/lib/macro/via_macro_provider.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
     -o "$BIN"
 

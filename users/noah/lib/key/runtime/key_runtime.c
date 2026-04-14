@@ -6,6 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "../interaction/handled_key.h"
+#include "key_runtime_index.h"
 #include "key_runtime_state.h"
 #include "../ownership/held_action.h"
 
@@ -21,11 +22,5 @@ bool key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot) {
 }
 
 bool key_runtime_activate_pending_fallback_hold(void) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        if (key_runtime_slot_activate_pending_fallback_hold(key_runtime_slot_at(index))) {
-            return true;
-        }
-    }
-
-    return false;
+    return key_runtime_slot_activate_pending_fallback_hold(key_runtime_pending_fallback_slot());
 }

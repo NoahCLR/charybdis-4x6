@@ -51,6 +51,15 @@ typedef struct {
 typedef active_key_state_t key_runtime_slot_state_t;
 
 typedef struct {
+    uint8_t active_slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t active_slot_count;
+    uint8_t pending_multi_tap_slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t pending_multi_tap_count;
+    uint8_t preview_owner_slot;
+    uint8_t pending_fallback_slot;
+} key_runtime_index_state_t;
+
+typedef struct {
     uint16_t timer;
     bool     active;
     bool     long_hold_level;
@@ -67,6 +76,7 @@ typedef struct {
 
 typedef struct {
     key_runtime_slot_state_t     slots_by_position[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    key_runtime_index_state_t    index;
     key_runtime_feedback_state_t feedback;
 } key_runtime_shared_state_t;
 
@@ -78,6 +88,8 @@ static inline void key_runtime_shared_state_reset(key_runtime_shared_state_t *st
     }
 
     *state = (key_runtime_shared_state_t){0};
+    state->index.preview_owner_slot   = UINT8_MAX;
+    state->index.pending_fallback_slot = UINT8_MAX;
 
     for (uint16_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
         state->slots_by_position[index] = (active_key_state_t)ACTIVE_KEY_STATE_INIT;

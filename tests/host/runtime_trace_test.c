@@ -236,9 +236,9 @@ static void test_key_runtime_and_layer_ownership_share_one_trace_buffer(void) {
 static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     noah_runtime_trace_snapshot_t snapshot;
     split_runtime_sync_packet_t   packet = {
-        .pd_mode_flags        = PD_MODE_ZOOM,
-        .pd_mode_locked_flags = PD_MODE_ZOOM,
-        .key_preview_layer    = UINT8_MAX,
+        .active_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),
+        .locked_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),
+        .key_preview_layer = UINT8_MAX,
     };
 
     test_reset_stubs();
@@ -252,8 +252,8 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     CHECK(rpc_registered_id == PUT_SPLIT_RUNTIME_SYNC);
     CHECK(rpc_registered_callback != NULL);
     CHECK(rpc_send_count == 1u);
-    CHECK(rpc_last_packet.pd_mode_flags == 0u);
-    CHECK(rpc_last_packet.pd_mode_locked_flags == 0u);
+    CHECK(rpc_last_packet.active_mode_id == PD_MODE_ID_NONE);
+    CHECK(rpc_last_packet.locked_mode_id == PD_MODE_ID_NONE);
 
     rpc_registered_callback(sizeof(packet), &packet, 0u, NULL);
 

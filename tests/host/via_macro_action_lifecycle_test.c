@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/macro/via_macro_provider.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "send_string.h"
 
@@ -57,6 +58,7 @@ static void test_reset_state(void) {
     memset(test_calls, 0, sizeof(test_calls));
     fake_macro_buffer_size = sizeof(macro_buffer);
     test_call_count        = 0;
+    via_macro_provider_invalidate_all();
 }
 
 uint8_t dynamic_keymap_macro_get_count(void) {

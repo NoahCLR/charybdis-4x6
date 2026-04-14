@@ -49,6 +49,19 @@ uint16_t dynamic_keymap_macro_get_buffer_size(void) {
     return TEST_MACRO_BUFFER_CAPACITY;
 }
 
+uint8_t noah_qmk_via_macro_count(void) {
+    return 0;
+}
+
+uint16_t noah_qmk_via_macro_buffer_size(void) {
+    return 0;
+}
+
+void noah_qmk_via_macro_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    (void)offset;
+    memset(data, 0, size);
+}
+
 void dynamic_keymap_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
     CHECK((uint32_t)offset + (uint32_t)size <= sizeof(macro_buffer));
     memcpy(&macro_buffer[offset], data, size);
@@ -61,6 +74,13 @@ bool via_eeprom_is_valid(void) {
 
 bool macro_payload_validate(const char *payload) {
     return payload != NULL;
+}
+
+bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval) {
+    (void)ir;
+    (void)text_output;
+    (void)interval;
+    return true;
 }
 
 bool macro_payload_encode_write(const char *payload, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {

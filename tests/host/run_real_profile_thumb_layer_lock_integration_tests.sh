@@ -35,7 +35,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
-    "$ROOT/users/noah/lib/key/interaction/handled_key.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_transparency.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_materialize.c" \
     "$ROOT/users/noah/lib/key/interaction/key_behavior_lookup.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_trace.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime.c" \

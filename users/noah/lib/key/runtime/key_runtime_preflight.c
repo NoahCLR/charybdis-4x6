@@ -9,6 +9,7 @@
 #include "key_runtime_process.h"
 #include "../interaction/handled_key.h"
 #include "key_runtime_admission.h"
+#include "key_runtime_index.h"
 #include "key_runtime_state.h"
 #include "key_runtime_trace.h"
 #include "key_runtime_transition.h"
@@ -21,6 +22,8 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     handled_key_resolution_t handled_key       = handled_key_lookup(keycode);
     bool                     other_slot_active = false;
     bool                     flush_multi_taps  = false;
+
+    key_runtime_index_rebuild();
 
     keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
@@ -38,10 +41,12 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.pressed) {
-        for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-            active_key_state_t *candidate = key_runtime_slot_at(index);
+        const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
 
-            if (!key_runtime_slot_active(candidate) || key_runtime_keypos_equal(candidate->owner.key_pos, record->event.key)) {
+        for (uint8_t index = 0; index < index_state->active_slot_count; index++) {
+            active_key_state_t *candidate = key_runtime_active_slot_by_order(index);
+
+            if (!candidate || key_runtime_keypos_equal(candidate->owner.key_pos, record->event.key)) {
                 continue;
             }
 
@@ -59,10 +64,12 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.pressed && !handled_key_resolution_is_handled(handled_key)) {
-        for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-            active_key_state_t *candidate = key_runtime_slot_at(index);
+        const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
 
-            if (key_runtime_slot_has_pending_multi_tap(candidate) && !key_runtime_slot_pending_multi_tap_matches(candidate, keycode, record->event.key)) {
+        for (uint8_t index = 0; index < index_state->pending_multi_tap_count; index++) {
+            active_key_state_t *candidate = key_runtime_pending_multi_tap_slot_by_order(index);
+
+            if (candidate && !key_runtime_slot_pending_multi_tap_matches(candidate, keycode, record->event.key)) {
                 flush_multi_taps = true;
                 break;
             }

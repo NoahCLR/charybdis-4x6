@@ -45,7 +45,7 @@ static uint8_t reset_brightness_count;
 static uint8_t reset_zoom_count;
 static uint8_t reset_arrow_count;
 
-split_runtime_sync_packet_t split_runtime_sync_remote = {0};
+split_runtime_sync_packet_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -89,7 +89,7 @@ static void test_reset_stubs(void) {
     reset_brightness_count        = 0;
     reset_zoom_count              = 0;
     reset_arrow_count             = 0;
-    split_runtime_sync_remote     = (split_runtime_sync_packet_t){0};
+    split_runtime_sync_remote     = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
 }
 
 void split_runtime_sync_init(void) {}
@@ -407,9 +407,9 @@ static void test_apply_command_reports_display_only_remote_snapshot_change(void)
     fake_is_master = false;
 
     result = pd_mode_apply_command((pd_mode_command_t){
-        .kind         = PD_MODE_COMMAND_REMOTE_SNAPSHOT,
-        .active_flags = PD_MODE_VOLUME,
-        .locked_flags = PD_MODE_ARROW,
+        .kind           = PD_MODE_COMMAND_REMOTE_SNAPSHOT,
+        .active_mode_id = pd_mode_id_from_mask(PD_MODE_ARROW),
+        .locked_mode_id = pd_mode_id_from_mask(PD_MODE_ARROW),
     });
 
     CHECK(result.handled);

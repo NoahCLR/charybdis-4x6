@@ -10,6 +10,7 @@
 
 key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution) {
     key_runtime_slot_result_t result = {0};
+    handled_key_materialized_t materialized = handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
 
     if (slot) {
         uint16_t elapsed = timer_elapsed(slot->timer);
@@ -24,7 +25,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_sta
     }
 
     result.handled = true;
-    if (handled_key_resolution_is_momentary_layer(resolution)) {
+    if ((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0) {
         key_runtime_slot_result_push_layer_release(&result, key_pos);
     }
     key_runtime_slot_result_push_builder_if_present(&result, key_pos,

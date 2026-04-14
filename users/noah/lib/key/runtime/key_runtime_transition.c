@@ -12,6 +12,7 @@
 
 #include "key_runtime_feedback.h"
 #include "key_runtime_admission.h"
+#include "key_runtime_index.h"
 #include "slot/key_runtime_slot_step.h"
 #include "key_runtime_state.h"
 #include "key_runtime_trace.h"
@@ -142,25 +143,28 @@ bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t
 }
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
+    key_runtime_index_rebuild();
+    const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
+    uint8_t                          slot_indices[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t                          pending_count = index_state->pending_multi_tap_count;
 
-        if (!key_runtime_slot_has_pending_multi_tap(slot)) {
-            continue;
-        }
+    memcpy(slot_indices, index_state->pending_multi_tap_slots, pending_count);
 
-        key_runtime_transition_apply_slot_step(slot, (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH}, plan);
+    for (uint8_t index = 0; index < pending_count; index++) {
+        key_runtime_transition_apply_slot_step(key_runtime_slot_at(slot_indices[index]), (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH}, plan);
     }
 }
 
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        active_key_state_t *slot = key_runtime_slot_at(index);
-        if (!slot) {
-            continue;
-        }
+    key_runtime_index_rebuild();
+    const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
+    uint8_t                          slot_indices[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t                          active_count = index_state->active_slot_count;
 
-        key_runtime_transition_apply_slot_step(slot,
+    memcpy(slot_indices, index_state->active_slots, active_count);
+
+    for (uint8_t index = 0; index < active_count; index++) {
+        key_runtime_transition_apply_slot_step(key_runtime_slot_at(slot_indices[index]),
                                                (key_runtime_slot_event_t){
                                                    .kind = KEY_RUNTIME_SLOT_EVENT_INTERRUPT,
                                                    .data.interrupt =
@@ -205,11 +209,21 @@ bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *r
 }
 
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        key_runtime_transition_apply_slot_step(key_runtime_slot_at(index), (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN}, plan);
+    key_runtime_index_rebuild();
+    const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
+    uint8_t                          active_indices[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t                          pending_indices[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t                          active_count  = index_state->active_slot_count;
+    uint8_t                          pending_count = index_state->pending_multi_tap_count;
+
+    memcpy(active_indices, index_state->active_slots, active_count);
+    memcpy(pending_indices, index_state->pending_multi_tap_slots, pending_count);
+
+    for (uint8_t index = 0; index < active_count; index++) {
+        key_runtime_transition_apply_slot_step(key_runtime_slot_at(active_indices[index]), (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN}, plan);
     }
 
-    for (uint8_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {
-        key_runtime_transition_apply_slot_step(key_runtime_slot_at(index), (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN}, plan);
+    for (uint8_t index = 0; index < pending_count; index++) {
+        key_runtime_transition_apply_slot_step(key_runtime_slot_at(pending_indices[index]), (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN}, plan);
     }
 }

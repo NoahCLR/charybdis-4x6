@@ -46,9 +46,7 @@ static pd_mode_mask_t fake_pd_active_mode = 0;
 static pd_mode_mask_t fake_pd_locked_mode = 0;
 
 ws2812_led_t                ws2812_leds[WS2812_LED_COUNT];
-split_runtime_sync_packet_t split_runtime_sync_remote = {
-    .key_preview_layer = UINT8_MAX,
-};
+split_runtime_sync_packet_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
 
 led_config_t g_led_config = {0};
 
@@ -434,7 +432,7 @@ static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_wh
     test_keymap[LAYER_NUM][1][0]                   = 0x0022u;
     layer_state                                    = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_preview_layer    = LAYER_NUM;
-    split_runtime_sync_remote.pd_mode_locked_flags = PD_MODE_VOLUME;
+    split_runtime_sync_remote.locked_mode_id       = pd_mode_id_from_mask(PD_MODE_VOLUME);
     split_runtime_sync_remote.key_feedback_flags   = KEY_FEEDBACK_FLAG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LEVEL_FLASH;
 
     CHECK(render_output());
@@ -456,7 +454,7 @@ static void test_slave_full_scene_feedback_overrides_remote_preview_and_locked_p
     test_keymap[LAYER_NUM][1][0]                   = 0x0022u;
     layer_state                                    = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_preview_layer    = LAYER_NUM;
-    split_runtime_sync_remote.pd_mode_locked_flags = PD_MODE_VOLUME;
+    split_runtime_sync_remote.locked_mode_id       = pd_mode_id_from_mask(PD_MODE_VOLUME);
     split_runtime_sync_remote.key_feedback_flags   = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
 
     CHECK(render_output());
@@ -548,7 +546,7 @@ static void test_slave_pointer_mode_overlay_uses_remote_display_state(void) {
 
     fake_is_master                          = false;
     layer_state                             = (layer_state_t)1u << LAYER_SYM;
-    split_runtime_sync_remote.pd_mode_flags = PD_MODE_VOLUME;
+    split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_VOLUME);
 
     CHECK(render_output());
 
@@ -714,7 +712,7 @@ static void test_slave_locked_pd_mode_clamps_remote_automouse_progress(void) {
     test_keymap[LAYER_POINTER][0][1]               = 0x0041u;
     layer_state                                    = (layer_state_t)1u << LAYER_POINTER;
     split_runtime_sync_remote.automouse_progress   = AUTOMOUSE_RGB_ACTIVE_SPAN / 2u;
-    split_runtime_sync_remote.pd_mode_locked_flags = PD_MODE_VOLUME;
+    split_runtime_sync_remote.locked_mode_id       = pd_mode_id_from_mask(PD_MODE_VOLUME);
 
     CHECK(render_output());
 

@@ -6,6 +6,7 @@
 
 #include "../../../action/action_dispatch.h"
 #include "../../../action/action_lifecycle.h"
+#include "../key_runtime_index.h"
 #include "../key_runtime_trace.h"
 
 typedef enum {
@@ -52,6 +53,7 @@ static void key_runtime_slot_policy_clear_owned_hold(active_key_state_t *slot, k
         builder->release_owned_state          = true;
         slot->lifecycle.held_action_keycode   = KC_NO;
         slot->lifecycle.repeat_binding_active = false;
+        key_runtime_index_rebuild();
     }
 }
 

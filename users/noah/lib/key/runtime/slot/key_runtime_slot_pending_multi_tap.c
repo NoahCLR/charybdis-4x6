@@ -10,6 +10,7 @@
 
 #include "../../../action/action_dispatch.h"
 #include "../../../action/action_lifecycle.h"
+#include "../key_runtime_index.h"
 #include "../key_runtime_trace.h"
 
 static void key_runtime_slot_pending_multi_tap_clear_active_state(active_key_state_t *slot) {
@@ -20,6 +21,7 @@ static void key_runtime_slot_pending_multi_tap_clear_active_state(active_key_sta
     multi_tap_t pending_multi_tap = slot->pending_multi_tap;
     *slot                         = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
     slot->pending_multi_tap       = pending_multi_tap;
+    key_runtime_index_rebuild();
 }
 
 typedef enum {
@@ -50,25 +52,23 @@ typedef struct {
 } key_runtime_slot_pending_multi_tap_release_resolution_t;
 
 static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const key_runtime_slot_pending_multi_tap_release_context_t *context, uint16_t action) {
-    handled_key_hold_contract_t contract;
-    hold_behavior_t             hold;
+    handled_key_hold_semantics_t semantics;
 
     if (!context) {
         return false;
     }
 
-    contract = context->interaction.policy.hold;
-    hold     = context->interaction.binding.hold;
+    semantics = context->interaction.contract.hold;
 
-    if (!hold.present || context->tap_repeat_count != 1 || context->elapsed < context->interaction.binding.tap_hold_term) {
+    if (semantics.threshold_action == KC_NO || context->tap_repeat_count != 1 || context->elapsed < context->interaction.binding.tap_hold_term) {
         return false;
     }
 
-    if (hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || action != hold.action) {
+    if (semantics.threshold != HANDLED_KEY_HOLD_THRESHOLD_REGISTER_HELD || action != semantics.threshold_action) {
         return false;
     }
 
-    return contract.release_uses_held_lifecycle;
+    return semantics.uses_held_lifecycle;
 }
 
 static key_runtime_slot_pending_multi_tap_release_context_t key_runtime_slot_pending_multi_tap_release_context(active_key_state_t *slot, uint16_t keycode, uint16_t elapsed) {
@@ -112,7 +112,7 @@ static key_runtime_slot_release_semantics_t key_runtime_slot_pending_multi_tap_r
         return semantics;
     }
 
-    if (context->interaction.policy.hold.dispatches_on_release ? context->elapsed >= context->interaction.binding.tap_hold_term : !context->interaction.binding.hold.present && context->interaction.policy.long_hold.dispatches_on_release && context->elapsed >= context->interaction.binding.longer_hold_term) {
+    if (context->interaction.contract.hold.release_action != KC_NO ? context->elapsed >= context->interaction.binding.tap_hold_term : !context->interaction.binding.hold.present && context->interaction.contract.long_hold.release_action != KC_NO && context->elapsed >= context->interaction.binding.longer_hold_term) {
         semantics.hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
     }
 
@@ -256,7 +256,7 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(acti
 static bool key_runtime_slot_pending_multi_tap_hold_elapsed(const active_key_state_t *slot, uint16_t elapsed) {
     key_runtime_slot_interaction_t interaction = key_runtime_slot_cached_interaction(slot);
 
-    return slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && handled_key_hold_contract_fires_at_threshold(interaction.policy.hold) && elapsed >= interaction.binding.tap_hold_term;
+    return slot && key_runtime_slot_pending_multi_tap_pending_hold(slot) && handled_key_hold_contract_fires_at_threshold(interaction.contract.hold) && elapsed >= interaction.binding.tap_hold_term;
 }
 
 static bool key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(const active_key_state_t *slot, uint16_t action) {
@@ -285,12 +285,12 @@ static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pen
 
     interaction = key_runtime_slot_cached_interaction(slot);
 
-    if (handled_key_hold_contract_fires_at_threshold(interaction.policy.long_hold) && elapsed >= interaction.binding.longer_hold_term) {
+    if (handled_key_hold_contract_fires_at_threshold(interaction.contract.long_hold) && elapsed >= interaction.binding.longer_hold_term) {
         resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD;
         resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, interaction.binding.long_hold.action);
         // Momentary-layer actions use preview/real layer color as feedback, so
         // pending multi-tap promotion should not opt them into a pulse here.
-        resolution.effect_builder = key_runtime_slot_policy_promote_to_long_hold(slot, interaction.binding.long_hold, interaction.policy.long_hold, false);
+        resolution.effect_builder = key_runtime_slot_policy_promote_to_long_hold(slot, interaction.binding.long_hold, interaction.contract.long_hold, false);
         return resolution;
     }
 
@@ -300,7 +300,7 @@ static key_runtime_slot_pending_multi_tap_scan_resolution_t key_runtime_slot_pen
 
     resolution.outcome                     = KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD;
     resolution.release_layer_before_action = key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(slot, interaction.binding.hold.action);
-    resolution.effect_builder              = key_runtime_slot_policy_fire_hold_at_threshold(slot, interaction.binding.hold, interaction.policy.hold, !interaction.binding.long_hold.present, false);
+    resolution.effect_builder              = key_runtime_slot_policy_fire_hold_at_threshold(slot, interaction.binding.hold, interaction.contract.hold, !interaction.binding.long_hold.present, false);
     return resolution;
 }
 

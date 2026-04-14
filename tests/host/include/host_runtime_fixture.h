@@ -36,9 +36,7 @@ static inline void host_runtime_fixture_reset(host_runtime_fixture_t *fixture) {
 }
 
 static inline split_runtime_sync_packet_t host_runtime_fixture_split_remote_init(void) {
-    return (split_runtime_sync_packet_t){
-        .key_preview_layer = UINT8_MAX,
-    };
+    return (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
 }
 
 static inline uint8_t host_runtime_fixture_pd_mode_index(const pd_mode_def_t *defs, uint8_t count, pd_mode_mask_t mode) {
@@ -70,16 +68,21 @@ static inline pd_mode_mask_t host_runtime_fixture_first_mode(const pd_mode_def_t
 }
 
 static inline pd_mode_mask_t host_runtime_fixture_display_locked_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_locked, split_runtime_sync_packet_t remote) {
-    return is_master ? local_locked : host_runtime_fixture_first_mode(defs, count, remote.pd_mode_locked_flags);
+    (void)defs;
+    (void)count;
+    return is_master ? local_locked : pd_mode_mask_from_id(remote.locked_mode_id);
 }
 
 static inline pd_mode_mask_t host_runtime_fixture_display_active_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active, pd_mode_mask_t local_locked, split_runtime_sync_packet_t remote) {
+    (void)defs;
+    (void)count;
+
     if (is_master) {
         return local_active;
     }
 
     pd_mode_mask_t locked_mode = host_runtime_fixture_display_locked_mode(defs, count, false, local_locked, remote);
-    return locked_mode ? locked_mode : host_runtime_fixture_first_mode(defs, count, remote.pd_mode_flags);
+    return locked_mode ? locked_mode : pd_mode_mask_from_id(remote.active_mode_id);
 }
 
 static inline pd_mode_snapshot_view_t host_runtime_fixture_pd_mode_view(const pd_mode_def_t *defs, uint8_t count, pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode) {

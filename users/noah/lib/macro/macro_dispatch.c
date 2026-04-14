@@ -5,21 +5,44 @@
 #endif
 
 #include "macro_dispatch.h"
+#include "macro_slot_provider.h"
 #include "noah_keymap_ids.h"
-#include "../macro/macro_payload.h"
 
-typedef enum {
-    MACRO_DISPATCH_SLOT_UNCHECKED = 0,
-    MACRO_DISPATCH_SLOT_VALID,
-    MACRO_DISPATCH_SLOT_INVALID,
-} macro_dispatch_slot_state_t;
+static macro_slot_cache_t hardcoded_macro_slots[HARDCODED_MACRO_SLOT_COUNT];
 
-typedef struct {
-    macro_dispatch_slot_state_t state;
-    macro_payload_ir_t          ir;
-} macro_dispatch_slot_t;
+static bool macro_dispatch_lookup_payload(uint8_t slot, const char **payload, void *context) {
+    (void)context;
 
-static macro_dispatch_slot_t hardcoded_macro_slots[HARDCODED_MACRO_SLOT_COUNT];
+    if (!payload || slot >= HARDCODED_MACRO_SLOT_COUNT) {
+        return false;
+    }
+
+    *payload = hardcoded_macro_payloads[slot];
+    return true;
+}
+
+static bool macro_dispatch_load_ir(uint8_t slot, macro_payload_ir_t *ir, void *context) {
+    const char *payload = NULL;
+
+    (void)context;
+
+    if (!ir || !macro_dispatch_lookup_payload(slot, &payload, NULL)) {
+        return false;
+    }
+
+    if (!payload || !*payload) {
+        ir->length = 0;
+        return true;
+    }
+
+    return macro_payload_compile(payload, ir);
+}
+
+static const macro_slot_provider_t macro_dispatch_provider = {
+    .slot_count     = HARDCODED_MACRO_SLOT_COUNT,
+    .load_ir        = macro_dispatch_load_ir,
+    .lookup_payload = macro_dispatch_lookup_payload,
+};
 
 static void macro_dispatch_log_invalid_payload(uint8_t slot, const char *payload) {
 #ifdef CONSOLE_ENABLE
@@ -30,37 +53,30 @@ static void macro_dispatch_log_invalid_payload(uint8_t slot, const char *payload
 #endif
 }
 
-static bool macro_dispatch_slot_is_valid(uint8_t slot) {
-    const char            *payload    = hardcoded_macro_payloads[slot];
-    macro_dispatch_slot_t *slot_state = &hardcoded_macro_slots[slot];
+static bool macro_dispatch_validate_slot(uint8_t slot) {
+    const char                *payload = hardcoded_macro_payloads[slot];
+    macro_slot_cache_state_t before  = hardcoded_macro_slots[slot].state;
 
-    if (slot_state->state == MACRO_DISPATCH_SLOT_VALID) {
-        return true;
-    }
-    if (slot_state->state == MACRO_DISPATCH_SLOT_INVALID) {
-        return false;
-    }
-
-    if (!payload || !*payload) {
-        slot_state->state     = MACRO_DISPATCH_SLOT_VALID;
-        slot_state->ir.length = 0;
+    if (macro_slot_provider_load(&macro_dispatch_provider, hardcoded_macro_slots, slot)) {
         return true;
     }
 
-    if (macro_payload_compile(payload, &slot_state->ir)) {
-        slot_state->state = MACRO_DISPATCH_SLOT_VALID;
-        return true;
+    if (before != MACRO_SLOT_CACHE_INVALID) {
+        macro_dispatch_log_invalid_payload(slot, payload);
     }
 
-    slot_state->state     = MACRO_DISPATCH_SLOT_INVALID;
-    slot_state->ir.length = 0;
-    macro_dispatch_log_invalid_payload(slot, payload);
     return false;
+}
+
+static void macro_dispatch_log_playback_failure(uint8_t slot) {
+    const char *payload = hardcoded_macro_payloads[slot];
+
+    macro_dispatch_log_invalid_payload(slot, payload);
 }
 
 void macro_dispatch_validate_all(void) {
     for (uint8_t slot = 0; slot < HARDCODED_MACRO_SLOT_COUNT; slot++) {
-        (void)macro_dispatch_slot_is_valid(slot);
+        (void)macro_dispatch_validate_slot(slot);
     }
 }
 
@@ -72,11 +88,12 @@ bool macro_dispatch(uint16_t keycode) {
 
     slot = (uint8_t)(keycode - MACRO_0);
 
-    const char *payload = hardcoded_macro_payloads[slot];
-    if (payload && *payload && macro_dispatch_slot_is_valid(slot) && !macro_payload_play_ir(&hardcoded_macro_slots[slot].ir)) {
-        hardcoded_macro_slots[slot].state     = MACRO_DISPATCH_SLOT_INVALID;
-        hardcoded_macro_slots[slot].ir.length = 0;
-        macro_dispatch_log_invalid_payload(slot, payload);
+    if (!macro_dispatch_validate_slot(slot)) {
+        return true;
+    }
+
+    if (!macro_slot_provider_play(&macro_dispatch_provider, hardcoded_macro_slots, slot, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0)) {
+        macro_dispatch_log_playback_failure(slot);
     }
 
     return true;

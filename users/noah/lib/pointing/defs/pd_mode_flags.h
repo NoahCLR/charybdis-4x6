@@ -19,6 +19,9 @@
 // ─── Mode flag bit constants ────────────────────────────────────────────────
 
 typedef uint16_t pd_mode_mask_t;
+typedef uint8_t  pd_mode_id_t;
+
+#define PD_MODE_ID_NONE UINT8_MAX
 
 enum {
 #define NOAH_PD_MODE_INDEX(name, keycode, handler, key_handler, reset, dpi, traits, lifecycle) PD_MODE_INDEX_##name,
@@ -34,6 +37,28 @@ enum {
 };
 
 _Static_assert(PD_MODE_COUNT <= (sizeof(pd_mode_mask_t) * 8u), "PD_MODE_COUNT exceeds pd_mode_mask_t storage; widen the flag type and the split runtime sync packet before adding more modes");
+
+static inline pd_mode_id_t pd_mode_id_from_mask(pd_mode_mask_t mode) {
+    if (mode == 0) {
+        return PD_MODE_ID_NONE;
+    }
+
+    for (pd_mode_id_t index = 0; index < PD_MODE_COUNT; index++) {
+        if (mode == ((pd_mode_mask_t)1u << index)) {
+            return index;
+        }
+    }
+
+    return PD_MODE_ID_NONE;
+}
+
+static inline pd_mode_mask_t pd_mode_mask_from_id(pd_mode_id_t id) {
+    if (id >= PD_MODE_COUNT) {
+        return 0;
+    }
+
+    return (pd_mode_mask_t)1u << id;
+}
 
 // ─── Read-only state queries ────────────────────────────────────────────────
 //

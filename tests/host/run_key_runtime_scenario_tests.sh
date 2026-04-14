@@ -20,7 +20,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_scenario_harness.c" \
     "$ROOT/tests/host/key_runtime_scenario_test.c" \
-    "$ROOT/users/noah/lib/key/interaction/handled_key.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_transparency.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_materialize.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_trace.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_process.c" \

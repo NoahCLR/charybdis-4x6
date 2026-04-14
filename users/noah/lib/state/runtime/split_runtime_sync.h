@@ -15,11 +15,20 @@
 
 typedef struct __attribute__((packed)) {
     uint16_t       automouse_progress;
-    pd_mode_mask_t pd_mode_flags;
-    pd_mode_mask_t pd_mode_locked_flags;
+    pd_mode_id_t   active_mode_id;
+    pd_mode_id_t   locked_mode_id;
     uint8_t        key_feedback_flags;
     uint8_t        key_preview_layer;
 } split_runtime_sync_packet_t;
+
+#define SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT \
+    {                                        \
+        .automouse_progress = 0,             \
+        .active_mode_id     = PD_MODE_ID_NONE, \
+        .locked_mode_id     = PD_MODE_ID_NONE, \
+        .key_feedback_flags = 0,             \
+        .key_preview_layer  = UINT8_MAX,     \
+    }
 
 _Static_assert(sizeof(split_runtime_sync_packet_t) <= UINT8_MAX, "split_runtime_sync_packet_t must fit in the QMK RPC length field");
 
@@ -34,9 +43,7 @@ void split_runtime_sync(void);
 
 #else
 
-static const split_runtime_sync_packet_t split_runtime_sync_remote = {
-    .key_preview_layer = UINT8_MAX,
-};
+static const split_runtime_sync_packet_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
 
 static inline void split_runtime_sync_init(void) {}
 static inline void split_runtime_sync_tick(void) {}

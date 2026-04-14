@@ -95,14 +95,12 @@ static bool pd_mode_apply_unlock_mode(pd_mode_mask_t mode) {
     return true;
 }
 
-static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
+static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode) {
     // Remote sync only mirrors mode state for the non-master half's policy/UI.
     // Do not replay local side effects such as dragscroll or auto-mouse
     // ownership changes from this path. Keep only one effective mode so the
     // mirrored UI matches the local exclusivity invariant.
-    pd_mode_mask_t locked_mode = pd_mode_policy_remote_display_locked_mode(locked_flags);
-    pd_mode_mask_t active_mode = pd_mode_policy_remote_display_active_mode(active_flags, locked_flags);
-    bool           changed     = PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE != active_mode || PD_MODE_REMOTE_DISPLAY_LOCKED_MODE != locked_mode;
+    bool changed = PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE != active_mode || PD_MODE_REMOTE_DISPLAY_LOCKED_MODE != locked_mode;
 
     PD_MODE_REMOTE_DISPLAY_LOCKED_MODE = locked_mode;
     PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE = active_mode;
@@ -233,7 +231,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             break;
         case PD_MODE_COMMAND_REMOTE_SNAPSHOT:
             result.handled = true;
-            (void)pd_mode_apply_remote_display_snapshot(command.active_flags, command.locked_flags);
+            (void)pd_mode_apply_remote_display_snapshot(pd_mode_mask_from_id(command.active_mode_id), pd_mode_mask_from_id(command.locked_mode_id));
             break;
         case PD_MODE_COMMAND_NONE:
         default:
@@ -272,12 +270,19 @@ void pd_mode_unlock(pd_mode_mask_t mode) {
     });
 }
 
-void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
+void pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id) {
     (void)pd_mode_apply_command((pd_mode_command_t){
-        .kind         = PD_MODE_COMMAND_REMOTE_SNAPSHOT,
-        .active_flags = active_flags,
-        .locked_flags = locked_flags,
+        .kind           = PD_MODE_COMMAND_REMOTE_SNAPSHOT,
+        .active_mode_id = active_mode_id,
+        .locked_mode_id = locked_mode_id,
     });
+}
+
+void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
+    pd_mode_mask_t locked_mode = locked_flags != 0 ? locked_flags : 0;
+    pd_mode_mask_t active_mode = locked_mode != 0 ? locked_mode : active_flags;
+
+    pd_mode_apply_remote_mode_ids(pd_mode_id_from_mask(active_mode), pd_mode_id_from_mask(locked_mode));
 }
 
 bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {

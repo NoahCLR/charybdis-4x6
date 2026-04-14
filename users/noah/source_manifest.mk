@@ -12,7 +12,9 @@ NOAH_COMMON_SOURCES := \
     lib/action/action_lifecycle.c \
     lib/action/synthetic_record.c \
     lib/compat/split_role.c \
-    lib/key/interaction/handled_key.c \
+    lib/key/interaction/handled_key_defaults.c \
+    lib/key/interaction/handled_key_transparency.c \
+    lib/key/interaction/handled_key_materialize.c \
     lib/key/interaction/key_behavior_lookup.c \
     lib/key/interaction/keymap_validation.c \
     lib/key/runtime/key_runtime.c \
@@ -39,11 +41,14 @@ NOAH_COMMON_SOURCES := \
     lib/action/action_dispatch.c \
     lib/action/owned_keycode.c \
     lib/macro/macro_dispatch.c \
+    lib/macro/macro_slot_provider.c \
     lib/macro/macro_payload.c \
+    lib/macro/macro_payload_decode_qmk.c \
     lib/macro/macro_payload_keycodes.c \
     lib/macro/macro_payload_parse.c \
     lib/macro/macro_payload_run.c \
     lib/macro/macro_payload_encode.c \
+    lib/macro/via_macro_provider.c \
     lib/macro/via_macro_defaults.c \
     lib/key/interaction/multi_tap_engine.c \
     lib/key/runtime/key_runtime_feedback.c \

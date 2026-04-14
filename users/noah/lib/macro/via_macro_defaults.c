@@ -7,19 +7,15 @@
 #ifdef VIA_ENABLE
 
 #    include "noah_keymap_ids.h"
+#    include "macro_slot_provider.h"
 #    include "macro_payload.h"
+#    include "via_macro_provider.h"
 #    include "../compat/qmk_via_storage_contract.h"
 #    include "../rgb/core/rgb_runtime.h"
 
 #    ifdef CONSOLE_ENABLE
 #        include "print.h"
 #    endif
-
-typedef enum {
-    VIA_MACRO_SLOT_UNCHECKED = 0,
-    VIA_MACRO_SLOT_VALID,
-    VIA_MACRO_SLOT_INVALID,
-} via_macro_slot_state_t;
 
 #    ifndef VIA_MACRO_SEED_CHUNK_SIZE
 #        define VIA_MACRO_SEED_CHUNK_SIZE 64u
@@ -34,7 +30,46 @@ typedef struct {
 
 static bool    via_macro_seed_post_init_pending = false;
 static bool    via_macro_seed_scan_pending      = false;
-static uint8_t via_macro_slot_state[VIA_MACRO_SLOT_COUNT];
+static macro_slot_cache_t via_macro_slots[VIA_MACRO_SLOT_COUNT];
+
+static bool via_macro_defaults_lookup_payload(uint8_t slot, const char **payload, void *context) {
+    (void)context;
+
+    if (!payload || slot >= VIA_MACRO_SLOT_COUNT) {
+        return false;
+    }
+
+    *payload = via_macro_payloads[slot];
+    return true;
+}
+
+static bool via_macro_defaults_load_ir(uint8_t slot, macro_payload_ir_t *ir, void *context) {
+    const char *payload = NULL;
+
+    (void)context;
+
+    if (!ir || !via_macro_defaults_lookup_payload(slot, &payload, NULL)) {
+        return false;
+    }
+
+    if (!payload || !*payload) {
+        ir->length = 0;
+        return true;
+    }
+
+    if (!macro_payload_validate(payload)) {
+        return false;
+    }
+
+    ir->length = 0;
+    return true;
+}
+
+static const macro_slot_provider_t via_macro_defaults_provider = {
+    .slot_count     = VIA_MACRO_SLOT_COUNT,
+    .load_ir        = via_macro_defaults_load_ir,
+    .lookup_payload = via_macro_defaults_lookup_payload,
+};
 
 static void log_invalid_via_macro_payload(uint8_t slot, const char *payload) {
 #    ifdef CONSOLE_ENABLE
@@ -46,22 +81,17 @@ static void log_invalid_via_macro_payload(uint8_t slot, const char *payload) {
 }
 
 static bool via_macro_payload_slot_is_valid(uint8_t slot) {
-    const char *payload = via_macro_payloads[slot];
+    const char                *payload = via_macro_payloads[slot];
+    macro_slot_cache_state_t before  = via_macro_slots[slot].state;
 
-    if (via_macro_slot_state[slot] == VIA_MACRO_SLOT_VALID) {
-        return true;
-    }
-    if (via_macro_slot_state[slot] == VIA_MACRO_SLOT_INVALID) {
-        return false;
-    }
-
-    if (!payload || !*payload || macro_payload_validate(payload)) {
-        via_macro_slot_state[slot] = VIA_MACRO_SLOT_VALID;
+    if (macro_slot_provider_load(&via_macro_defaults_provider, via_macro_slots, slot)) {
         return true;
     }
 
-    via_macro_slot_state[slot] = VIA_MACRO_SLOT_INVALID;
-    log_invalid_via_macro_payload(slot, payload);
+    if (before != MACRO_SLOT_CACHE_INVALID) {
+        log_invalid_via_macro_payload(slot, payload);
+    }
+
     return false;
 }
 
@@ -176,6 +206,7 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
 
     (void)length;
 
+    via_macro_provider_invalidate_all();
     effects = noah_qmk_via_command_effects(data[0]);
     if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS) {
         via_macro_seed_scan_pending = true;

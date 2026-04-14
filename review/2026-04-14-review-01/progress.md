@@ -91,3 +91,102 @@ Next steps:
   reconstructing display state from flag masks and registry order
 - add a shared macro source/provider abstraction over hardcoded, VIA-default,
   and live VIA-backed macro slots
+
+### Implementation passes 1-5
+
+Completed in this pass:
+
+- Landed phase 1 by adding `handled_key_hold_semantics_t` and
+  `handled_key_behavior_contract_t`, then moved key-runtime interaction,
+  feedback, and pending-multi-tap release/scan logic onto the cached handled
+  key contract instead of re-deriving hold semantics at each call site.
+- Landed phase 2 by adding `handled_key_resolution_ctx_t`,
+  `handled_key_materialized_t`, and `handled_key_materialize(...)`, then moved
+  layer-stack transparency and same-position fallback resolution into the
+  materializer and split the old handled-key implementation into
+  `handled_key_defaults.c`, `handled_key_transparency.c`, and
+  `handled_key_materialize.c`.
+- Landed phase 3 by adding `key_runtime_index_state_t` plus registry rebuild
+  helpers for active slots, pending multi-tap slots, preview ownership, and
+  pending fallback ownership, then moved preflight, transition, feedback, and
+  fallback activation off whole-table sweeps and onto the registry state.
+- Landed phase 4 by introducing `pd_mode_id_t`, moving split runtime sync from
+  flag masks to `active_mode_id` and `locked_mode_id`, removing registry-order
+  remote display selection, and making the remote-apply path consume explicit
+  pd-mode identity.
+- Landed phase 5 by introducing `macro_slot_provider_t` and shared slot-cache
+  helpers, moving hardcoded macro dispatch, VIA default validation/seeding, and
+  live VIA playback onto provider-backed loaders, and splitting
+  `macro_payload_decode_qmk_stream(...)` out of `macro_payload_run.c` into
+  `macro_payload_decode_qmk.c`.
+- Updated `users/noah/source_manifest.mk` and the affected host runners in the
+  same passes so the build, compile gates, and focused suites all consumed the
+  same refactored source surface.
+
+Contracts and boundaries touched:
+
+- handled-key contract/materialization:
+  `handled_key_hold_semantics_t`, `handled_key_behavior_contract_t`,
+  `handled_key_resolution_ctx_t`, `handled_key_materialized_t`,
+  `handled_key_materialize(...)`
+- key-runtime registry surface:
+  `key_runtime_index_state_t`
+- split runtime sync packet:
+  `split_runtime_sync_packet_t.active_mode_id`,
+  `split_runtime_sync_packet_t.locked_mode_id`
+- macro provider/cache surface:
+  `macro_slot_provider_t`, shared provider cache/load/invalidate helpers,
+  `via_macro_provider_*`
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_layer_ownership_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_macro_dispatch_tests.sh`
+- `sh tests/host/run_macro_payload_tests.sh`
+- `sh tests/host/run_via_macro_defaults_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- all phase-targeted host suites passed
+- feature-gate compile checks passed after the new handled-key and macro source
+  splits
+- the full host suite passed
+- the firmware build passed and produced
+  `bastardkb_charybdis_4x6_noah.uf2`
+
+Checks intentionally skipped in this pass:
+
+- none
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- all implementation changes are confined to `charybdis-4x6/`
+
+Next steps:
+
+- no open implementation work remains for this review roadmap
+- future follow-up, if needed, should add narrower provider-level tests around
+  explicit cache invalidation for direct storage mutation paths

@@ -77,7 +77,8 @@ static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_actio
 }
 
 static key_runtime_slot_interaction_t test_refresh_cached_interaction(key_runtime_slot_interaction_t interaction) {
-    interaction.policy  = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
+    interaction.contract = handled_key_behavior_contract(interaction.hold_strategy, interaction.flags, interaction.binding.tap_action, interaction.pd_mode, interaction.binding.hold, interaction.binding.long_hold);
+    interaction.policy   = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
     interaction.release = key_runtime_slot_release_contract_build(interaction);
     return interaction;
 }
@@ -128,8 +129,10 @@ static void test_slot_materialize_matches_resolution_defaults(void) {
     CHECK(materialized.layer == from_resolution.layer);
     CHECK(materialized.pd_mode == from_resolution.pd_mode);
     CHECK(materialized.flags == from_resolution.flags);
+    CHECK(materialized.contract.hold.threshold == from_resolution.contract.hold.threshold);
+    CHECK(materialized.contract.long_hold.release_action == from_resolution.contract.long_hold.release_action);
     CHECK(materialized.policy.hold.threshold == from_resolution.policy.hold.threshold);
-    CHECK(materialized.policy.long_hold.dispatches_on_release == from_resolution.policy.long_hold.dispatches_on_release);
+    CHECK(materialized.policy.long_hold.release_action == from_resolution.policy.long_hold.release_action);
     CHECK(materialized.release.tap.outcome == from_resolution.release.tap.outcome);
     CHECK(materialized.release.tap.action == from_resolution.release.tap.action);
     CHECK(materialized.release.tap.repeat_count == from_resolution.release.tap.repeat_count);
@@ -182,8 +185,8 @@ static void test_slot_materialize_applies_binding_and_strategy_overrides(void) {
     CHECK(interaction.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK);
     CHECK((interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0);
     CHECK((interaction.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) == 0);
-    CHECK(interaction.policy.hold.dispatches_on_release);
-    CHECK(!interaction.policy.long_hold.dispatches_on_release);
+    CHECK(interaction.contract.hold.release_action == TEST_HOLD_ACTION);
+    CHECK(interaction.contract.long_hold.release_action == KC_NO);
     CHECK(interaction.release.tap.outcome == KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP);
     CHECK(interaction.release.tap.repeat_count == 3);
     CHECK(interaction.release.hold.primary_action == TEST_HOLD_ACTION);
@@ -529,6 +532,27 @@ pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
 uint16_t handled_key_resolution_flags_at_position(handled_key_resolution_t key, keypos_t key_pos) {
     (void)key_pos;
     return key.flags;
+}
+
+handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
+    return handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0);
+}
+
+handled_key_materialized_t handled_key_materialize(handled_key_resolution_t key, handled_key_resolution_ctx_t ctx) {
+    handled_key_materialized_t materialized = handled_key_materialized_default(key);
+
+    materialized.tap_action            = handled_key_resolution_tap_action_at_position(key, ctx.key_pos);
+    materialized.tap_repeat_count      = handled_key_resolution_tap_repeat_count_at_position(key, ctx.key_pos);
+    materialized.hold                  = handled_key_resolution_hold_at_position(key, ctx.key_pos);
+    materialized.long_hold             = handled_key_resolution_long_hold_at_position(key, ctx.key_pos);
+    materialized.hold_strategy         = handled_key_resolution_hold_strategy_at_position(key, ctx.key_pos);
+    materialized.tap_resolves_on_press = handled_key_resolution_tap_resolves_on_press(key);
+    materialized.layer                 = handled_key_resolution_layer_at_position(key, ctx.key_pos);
+    materialized.pd_mode               = handled_key_resolution_pd_mode_at_position(key, ctx.key_pos);
+    materialized.flags                 = handled_key_resolution_flags_at_position(key, ctx.key_pos);
+    materialized.contract              = handled_key_behavior_contract(materialized.hold_strategy, materialized.flags, materialized.tap_action, materialized.pd_mode, materialized.hold, materialized.long_hold);
+
+    return materialized;
 }
 
 bool handled_key_resolution_has_multi_tap(handled_key_resolution_t key) {

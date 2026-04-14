@@ -8,6 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "../key_runtime_state.h"
+#include "../key_runtime_index.h"
 #include "../../interaction/key_behavior_lookup.h"
 
 #include <stddef.h>
@@ -109,7 +110,7 @@ uint8_t key_runtime_slot_preview_layer_hint(const active_key_state_t *slot) {
     }
 
     interaction = key_runtime_slot_cached_interaction(slot);
-    return interaction.policy.hold.preview_layer;
+    return interaction.contract.hold.preview_layer;
 }
 
 bool key_runtime_slot_has_pending_multi_tap(const active_key_state_t *slot) {
@@ -198,6 +199,7 @@ void key_runtime_slot_begin_pending_multi_tap(active_key_state_t *slot, uint16_t
     }
 
     multi_tap_begin(&slot->pending_multi_tap, keycode, key_pos, tap_action, tap_repeat_count, tap_hold_term, multi_tap_term, has_more_taps);
+    key_runtime_index_rebuild();
 }
 
 uint16_t key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, uint16_t keycode) {
@@ -209,9 +211,12 @@ uint16_t key_runtime_slot_advance_pending_multi_tap(active_key_state_t *slot, ui
 
     key_pos = slot->pending_multi_tap.key_pos;
 
-    handled_key_resolution_t resolution = handled_key_lookup_tap_count(keycode, (uint8_t)(slot->pending_multi_tap.count + 1u));
+    handled_key_resolution_t   resolution    = handled_key_lookup_tap_count(keycode, (uint8_t)(slot->pending_multi_tap.count + 1u));
+    handled_key_materialized_t materialized  = handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
 
-    return multi_tap_advance(&slot->pending_multi_tap, handled_key_resolution_tap_action_at_position(resolution, key_pos), handled_key_resolution_tap_repeat_count_at_position(resolution, key_pos), resolution.has_more_taps, handled_key_resolution_tap_resolves_on_press(resolution), handled_key_resolution_hold_at_position(resolution, key_pos), handled_key_resolution_long_hold_at_position(resolution, key_pos));
+    uint16_t action = multi_tap_advance(&slot->pending_multi_tap, materialized.tap_action, materialized.tap_repeat_count, resolution.has_more_taps, materialized.tap_resolves_on_press, materialized.hold, materialized.long_hold);
+    key_runtime_index_rebuild();
+    return action;
 }
 
 uint16_t key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slot, uint8_t *repeat_count) {
@@ -248,6 +253,7 @@ void key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot) {
     }
 
     multi_tap_reset(&slot->pending_multi_tap);
+    key_runtime_index_rebuild();
 }
 
 void key_runtime_slot_reset(active_key_state_t *slot) {
@@ -256,6 +262,7 @@ void key_runtime_slot_reset(active_key_state_t *slot) {
     }
 
     *slot = (active_key_state_t)ACTIVE_KEY_STATE_INIT;
+    key_runtime_index_rebuild();
 }
 
 void key_runtime_slot_set_release_hold_pending(active_key_state_t *slot) {
@@ -264,6 +271,7 @@ void key_runtime_slot_set_release_hold_pending(active_key_state_t *slot) {
     }
 
     slot->lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
+    key_runtime_index_rebuild();
 }
 
 void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes_hold) {
@@ -272,6 +280,7 @@ void key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes
     }
 
     slot->lifecycle.phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
+    key_runtime_index_rebuild();
 }
 
 static void key_runtime_slot_set_interaction(active_key_state_t *slot, key_runtime_slot_interaction_t key) {
@@ -302,4 +311,5 @@ void key_runtime_slot_track(active_key_state_t *slot, uint16_t keycode, keypos_t
     };
 
     key_runtime_slot_set_interaction(slot, interaction);
+    key_runtime_index_rebuild();
 }

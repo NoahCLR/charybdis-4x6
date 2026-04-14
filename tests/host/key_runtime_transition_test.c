@@ -142,7 +142,8 @@ static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_actio
 }
 
 static key_runtime_slot_interaction_t test_refresh_cached_interaction(key_runtime_slot_interaction_t interaction) {
-    interaction.policy  = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
+    interaction.contract = handled_key_behavior_contract(interaction.hold_strategy, interaction.flags, interaction.binding.tap_action, interaction.pd_mode, interaction.binding.hold, interaction.binding.long_hold);
+    interaction.policy   = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
     interaction.release = key_runtime_slot_release_contract_build(interaction);
     return interaction;
 }
@@ -203,6 +204,7 @@ static void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_ac
         interaction.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
     }
     interaction.hold_strategy = hold_strategy;
+    interaction.contract      = handled_key_behavior_contract(interaction.hold_strategy, interaction.flags, interaction.binding.tap_action, interaction.pd_mode, interaction.binding.hold, interaction.binding.long_hold);
     interaction.policy        = handled_key_interaction_policy(interaction.hold_strategy, interaction.flags, interaction.binding.hold, interaction.binding.long_hold);
     interaction.release       = key_runtime_slot_release_contract_build(interaction);
 

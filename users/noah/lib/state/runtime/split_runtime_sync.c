@@ -23,8 +23,8 @@
 #    include "split_runtime_sync.h"
 #    include "transactions.h" // QMK
 
-split_runtime_sync_packet_t        split_runtime_sync_remote      = {0};
-static split_runtime_sync_packet_t split_runtime_sync_last_sent   = {0};
+split_runtime_sync_packet_t        split_runtime_sync_remote      = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
+static split_runtime_sync_packet_t split_runtime_sync_last_sent   = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
 static bool                        split_runtime_sync_sent_once   = false;
 static bool                        split_runtime_sync_initialized = false;
 static uint32_t                    split_runtime_sync_last_send   = 0;
@@ -49,11 +49,11 @@ static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_
         .automouse_progress = 0,
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
-        .pd_mode_flags        = pd_mode_local_active_snapshot(),
-        .pd_mode_locked_flags = pd_mode_local_locked_snapshot(),
+        .active_mode_id   = pd_mode_id_from_mask(pd_mode_local_active_snapshot()),
+        .locked_mode_id   = pd_mode_id_from_mask(pd_mode_local_locked_snapshot()),
 #    else
-        .pd_mode_flags        = 0,
-        .pd_mode_locked_flags = 0,
+        .active_mode_id   = PD_MODE_ID_NONE,
+        .locked_mode_id   = PD_MODE_ID_NONE,
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
         .key_feedback_flags = key_feedback_pack(),
@@ -80,7 +80,7 @@ static void split_runtime_sync_broadcast(const split_runtime_sync_packet_t *pkt,
         split_runtime_sync_last_sent = *pkt;
         split_runtime_sync_sent_once = true;
         split_runtime_sync_last_send = timer_read32();
-        noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, pkt->pd_mode_flags, pkt->pd_mode_locked_flags);
+        noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, pd_mode_mask_from_id(pkt->active_mode_id), pd_mode_mask_from_id(pkt->locked_mode_id));
     }
 }
 
@@ -98,16 +98,16 @@ static void split_runtime_sync_slave_rpc(uint8_t initiator2target_buffer_size, c
     }
 
     memcpy(&split_runtime_sync_remote, initiator2target_buffer, sizeof(split_runtime_sync_packet_t));
-    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, split_runtime_sync_remote.pd_mode_flags, split_runtime_sync_remote.pd_mode_locked_flags);
+    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pd_mode_mask_from_id(split_runtime_sync_remote.active_mode_id), pd_mode_mask_from_id(split_runtime_sync_remote.locked_mode_id));
 #    ifdef POINTING_DEVICE_ENABLE
-    pd_mode_apply_remote_snapshot(split_runtime_sync_remote.pd_mode_flags, split_runtime_sync_remote.pd_mode_locked_flags);
+    pd_mode_apply_remote_mode_ids(split_runtime_sync_remote.active_mode_id, split_runtime_sync_remote.locked_mode_id);
 #    endif
 }
 
 void split_runtime_sync_init(void) {
     transaction_register_rpc(PUT_SPLIT_RUNTIME_SYNC, split_runtime_sync_slave_rpc);
-    split_runtime_sync_remote      = (split_runtime_sync_packet_t){.key_preview_layer = UINT8_MAX};
-    split_runtime_sync_last_sent   = (split_runtime_sync_packet_t){.key_preview_layer = UINT8_MAX};
+    split_runtime_sync_remote      = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
+    split_runtime_sync_last_sent   = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
     split_runtime_sync_sent_once   = false;
     split_runtime_sync_initialized = true;
     split_runtime_sync_last_send   = timer_read32();

@@ -73,6 +73,12 @@ bool macro_payload_play_ir(const macro_payload_ir_t *ir) {
     return !fail_playback;
 }
 
+bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval) {
+    CHECK(text_output == MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN);
+    CHECK(interval == 0);
+    return macro_payload_play_ir(ir);
+}
+
 static void test_dispatch_compiles_valid_slot_once_and_reuses_ir(void) {
     test_reset_state();
 

@@ -23,7 +23,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/tests/host/pd_mode_key_runtime_integration_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
-    "$ROOT/users/noah/lib/key/interaction/handled_key.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_transparency.c" \
+    "$ROOT/users/noah/lib/key/interaction/handled_key_materialize.c" \
     "$ROOT/users/noah/lib/key/ownership/held_action.c" \
     "$ROOT/users/noah/lib/key/ownership/held_repeat.c" \
     "$ROOT/users/noah/lib/key/interaction/key_behavior_lookup.c" \

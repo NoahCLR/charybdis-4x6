@@ -230,6 +230,27 @@ uint16_t handled_key_resolution_flags_at_position(handled_key_resolution_t key, 
     return key.flags;
 }
 
+handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
+    return handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0);
+}
+
+handled_key_materialized_t handled_key_materialize(handled_key_resolution_t key, handled_key_resolution_ctx_t ctx) {
+    handled_key_materialized_t materialized = handled_key_materialized_default(key);
+
+    materialized.tap_action            = handled_key_resolution_tap_action_at_position(key, ctx.key_pos);
+    materialized.tap_repeat_count      = handled_key_resolution_tap_repeat_count_at_position(key, ctx.key_pos);
+    materialized.hold                  = handled_key_resolution_hold_at_position(key, ctx.key_pos);
+    materialized.long_hold             = handled_key_resolution_long_hold_at_position(key, ctx.key_pos);
+    materialized.hold_strategy         = handled_key_resolution_hold_strategy_at_position(key, ctx.key_pos);
+    materialized.tap_resolves_on_press = handled_key_resolution_tap_resolves_on_press(key);
+    materialized.layer                 = handled_key_resolution_layer_at_position(key, ctx.key_pos);
+    materialized.pd_mode               = handled_key_resolution_pd_mode_at_position(key, ctx.key_pos);
+    materialized.flags                 = handled_key_resolution_flags_at_position(key, ctx.key_pos);
+    materialized.contract              = handled_key_behavior_contract(materialized.hold_strategy, materialized.flags, materialized.tap_action, materialized.pd_mode, materialized.hold, materialized.long_hold);
+
+    return materialized;
+}
+
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
     return (delayed_action_mods_t){
         .real           = mt->saved_mods,
@@ -376,6 +397,7 @@ static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_debug_snapshot_t snapshot;
     keypos_t                      active_key = test_keypos(0, 0);
+    keypos_t                      pending_key = test_keypos(0, 1);
     keypos_t                      layer_key  = test_keypos(1, 2);
     keypos_t                      action_key = test_keypos(3, 4);
     keypos_t                      repeat_key = test_keypos(5, 6);
@@ -390,6 +412,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     });
     pd_mode_apply_remote_snapshot(PD_MODE_ARROW, 0);
     test_stage_active_slot(KC_C, active_key);
+    key_runtime_slot_begin_pending_multi_tap(key_runtime_slot_at(1), TEST_ACTION, pending_key, TEST_ACTION, 1, 120, 180, false);
     noah_runtime_trace_reset();
 
     layer_ownership_set_lock_state(3, true);
@@ -411,6 +434,12 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(snapshot.core.pd.remote_display_active_mode == PD_MODE_ARROW);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_C);
     CHECK(snapshot.core.key.slots_by_position[0].interaction.binding.tap_action == KC_C);
+    CHECK(snapshot.core.key.index.active_slot_count == 1);
+    CHECK(snapshot.core.key.index.active_slots[0] == 0);
+    CHECK(snapshot.core.key.index.pending_multi_tap_count == 1);
+    CHECK(snapshot.core.key.index.pending_multi_tap_slots[0] == 1);
+    CHECK(snapshot.core.key.index.preview_owner_slot == UINT8_MAX);
+    CHECK(snapshot.core.key.index.pending_fallback_slot == UINT8_MAX);
 
     CHECK(snapshot.layer_ownership.applied_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
     CHECK(snapshot.layer_ownership.locked_mask == ((layer_state_t)1u << 3));
@@ -479,6 +508,10 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(snapshot.core.pd.remote_display_locked_mode == 0);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_NO);
     CHECK(snapshot.core.key.slots_by_position[0].interaction.binding.tap_action == KC_NO);
+    CHECK(snapshot.core.key.index.active_slot_count == 0);
+    CHECK(snapshot.core.key.index.pending_multi_tap_count == 0);
+    CHECK(snapshot.core.key.index.preview_owner_slot == UINT8_MAX);
+    CHECK(snapshot.core.key.index.pending_fallback_slot == UINT8_MAX);
 
     CHECK(snapshot.layer_ownership.applied_layer_state == 0);
     CHECK(snapshot.layer_ownership.locked_mask == 0);

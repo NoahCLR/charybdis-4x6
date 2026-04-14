@@ -18,6 +18,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/macro_dispatch_test.c" \
+    "$ROOT/users/noah/lib/macro/macro_slot_provider.c" \
     "$ROOT/users/noah/lib/macro/macro_dispatch.c" \
     -o "$BIN"
 
