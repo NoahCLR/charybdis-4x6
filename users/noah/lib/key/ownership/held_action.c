@@ -11,32 +11,16 @@
 #include "../../action/action_dispatch.h"
 #include "../../action/action_lifecycle.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
+#include "../../state/runtime/runtime_context.h"
 #include "held_action.h"
 #include "held_repeat.h"
 
-// A held pure modifier is owned by the physical switch that started it, not by
-// whichever custom key the tap/hold FSM is currently resolving.
-typedef struct {
-    bool     active;
-    keypos_t key_pos;
-    uint16_t action;
-} held_modifier_binding_t;
-
-typedef struct {
-    bool     active;
-    keypos_t key_pos;
-    uint16_t action;
-} held_action_binding_t;
-
-// Board-sized ownership tables keep per-key refcount behavior intact even on
-// unusually large chords. A free-slot miss now indicates state corruption or a
-// broken matrix definition rather than a routine rollover limit.
-static held_modifier_binding_t held_modifiers[HELD_ACTION_BINDING_CAPACITY] = {0};
-static uint8_t                 held_modifier_refcounts[8]                   = {0};
-static held_action_binding_t   held_actions[HELD_ACTION_BINDING_CAPACITY]   = {0};
-
 static inline bool keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
+}
+
+static noah_held_action_state_t *held_action_state(void) {
+    return &noah_runtime_context()->held_actions;
 }
 
 static bool held_action_is_pure_modifier(uint16_t action) {
@@ -93,42 +77,51 @@ static int8_t held_modifier_index_for_action(uint16_t action) {
 }
 
 static int16_t held_modifier_find_slot_for_key(keypos_t key_pos) {
-    for (uint16_t i = 0; i < ARRAY_SIZE(held_modifiers); i++) {
-        if (held_modifiers[i].active && keypos_equal(held_modifiers[i].key_pos, key_pos)) return (int16_t)i;
+    noah_held_action_state_t *state = held_action_state();
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->modifiers); i++) {
+        if (state->modifiers[i].active && keypos_equal(state->modifiers[i].key_pos, key_pos)) return (int16_t)i;
     }
 
     return -1;
 }
 
 static int16_t held_modifier_find_free_slot(void) {
-    for (uint16_t i = 0; i < ARRAY_SIZE(held_modifiers); i++) {
-        if (!held_modifiers[i].active) return (int16_t)i;
+    noah_held_action_state_t *state = held_action_state();
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->modifiers); i++) {
+        if (!state->modifiers[i].active) return (int16_t)i;
     }
 
     return -1;
 }
 
 static int16_t held_action_find_slot_for_key(keypos_t key_pos) {
-    for (uint16_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
-        if (held_actions[i].active && keypos_equal(held_actions[i].key_pos, key_pos)) return (int16_t)i;
+    noah_held_action_state_t *state = held_action_state();
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->actions); i++) {
+        if (state->actions[i].active && keypos_equal(state->actions[i].key_pos, key_pos)) return (int16_t)i;
     }
 
     return -1;
 }
 
 static int16_t held_action_find_free_slot(void) {
-    for (uint16_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
-        if (!held_actions[i].active) return (int16_t)i;
+    noah_held_action_state_t *state = held_action_state();
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->actions); i++) {
+        if (!state->actions[i].active) return (int16_t)i;
     }
 
     return -1;
 }
 
 static uint16_t held_action_refcount(uint16_t action) {
+    noah_held_action_state_t *state = held_action_state();
     uint16_t count = 0;
 
-    for (uint16_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
-        if (held_actions[i].active && held_actions[i].action == action) {
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->actions); i++) {
+        if (state->actions[i].active && state->actions[i].action == action) {
             count++;
         }
     }
@@ -137,23 +130,25 @@ static uint16_t held_action_refcount(uint16_t action) {
 }
 
 static void held_modifier_remove_slot(uint16_t slot) {
-    uint16_t action = held_modifiers[slot].action;
-    int8_t   index  = held_modifier_index_for_action(action);
+    noah_held_action_state_t *state  = held_action_state();
+    uint16_t                 action = state->modifiers[slot].action;
+    int8_t                   index  = held_modifier_index_for_action(action);
 
-    held_modifiers[slot].active = false;
-    held_modifiers[slot].action = KC_NO;
+    state->modifiers[slot].active = false;
+    state->modifiers[slot].action = KC_NO;
 
-    if (index < 0 || held_modifier_refcounts[index] == 0) {
+    if (index < 0 || state->modifier_refcounts[index] == 0) {
         return;
     }
 
-    held_modifier_refcounts[index]--;
-    if (held_modifier_refcounts[index] == 0) {
+    state->modifier_refcounts[index]--;
+    if (state->modifier_refcounts[index] == 0) {
         keyboard_mod_ownership_unregister(action);
     }
 }
 
 static void held_modifier_register(keypos_t key_pos, uint16_t action) {
+    noah_held_action_state_t *state = held_action_state();
     int16_t slot  = held_modifier_find_slot_for_key(key_pos);
     int8_t  index = held_modifier_index_for_action(action);
 
@@ -162,7 +157,7 @@ static void held_modifier_register(keypos_t key_pos, uint16_t action) {
     }
 
     if (slot >= 0) {
-        if (held_modifiers[slot].action == action) {
+        if (state->modifiers[slot].action == action) {
             return;
         }
         held_modifier_remove_slot((uint16_t)slot);
@@ -174,28 +169,29 @@ static void held_modifier_register(keypos_t key_pos, uint16_t action) {
         }
     }
 
-    held_modifiers[slot] = (held_modifier_binding_t){
+    state->modifiers[slot] = (held_action_binding_snapshot_t){
         .active  = true,
         .key_pos = key_pos,
         .action  = action,
     };
 
-    if (held_modifier_refcounts[index]++ == 0) {
+    if (state->modifier_refcounts[index]++ == 0) {
         keyboard_mod_ownership_register(action);
     }
 }
 
 static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
+    noah_held_action_state_t *state = held_action_state();
     int16_t slot = held_action_find_slot_for_key(key_pos);
 
     if (slot >= 0) {
-        if (held_actions[slot].action == action) {
+        if (state->actions[slot].action == action) {
             return true;
         }
 
-        uint16_t old_action       = held_actions[slot].action;
-        held_actions[slot].active = false;
-        held_actions[slot].action = KC_NO;
+        uint16_t old_action        = state->actions[slot].action;
+        state->actions[slot].active = false;
+        state->actions[slot].action = KC_NO;
         if (held_action_refcount(old_action) == 0 || held_action_requires_per_key_dispatch(old_action)) {
             noah_action_release(key_pos, old_action);
         }
@@ -208,7 +204,7 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
     }
 
     bool first_binding = held_action_refcount(action) == 0;
-    held_actions[slot] = (held_action_binding_t){
+    state->actions[slot] = (held_action_binding_snapshot_t){
         .active  = true,
         .key_pos = key_pos,
         .action  = action,
@@ -233,12 +229,13 @@ bool held_modifier_release_owned_by_key(keypos_t key_pos) {
 }
 
 static bool held_action_or_modifier_release_owned_by_key(keypos_t key_pos) {
+    noah_held_action_state_t *state = held_action_state();
     int16_t slot = held_action_find_slot_for_key(key_pos);
 
     if (slot >= 0) {
-        uint16_t action           = held_actions[slot].action;
-        held_actions[slot].active = false;
-        held_actions[slot].action = KC_NO;
+        uint16_t action            = state->actions[slot].action;
+        state->actions[slot].active = false;
+        state->actions[slot].action = KC_NO;
 
         if (held_action_refcount(action) == 0 || held_action_requires_per_key_dispatch(action)) {
             noah_action_release(key_pos, action);
@@ -286,41 +283,43 @@ void held_action_unregister(keypos_t key_pos, uint16_t action) {
 }
 
 bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
+    noah_held_action_state_t *state = held_action_state();
+
     if (held_action_is_pure_modifier(action)) {
         return true;
     }
 
     int16_t slot = held_action_find_slot_for_key(key_pos);
-    return slot >= 0 && held_actions[slot].action == action;
+    return slot >= 0 && state->actions[slot].action == action;
 }
 
 void held_action_debug_snapshot(held_action_debug_snapshot_t *out) {
+    noah_held_action_state_t *state = held_action_state();
+
     if (!out) {
         return;
     }
 
     *out = (held_action_debug_snapshot_t){0};
-    memcpy(out->modifier_refcounts, held_modifier_refcounts, sizeof(held_modifier_refcounts));
+    memcpy(out->modifier_refcounts, state->modifier_refcounts, sizeof(state->modifier_refcounts));
 
-    for (uint16_t i = 0; i < ARRAY_SIZE(held_modifiers); i++) {
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->modifiers); i++) {
         out->modifiers[i] = (held_action_binding_snapshot_t){
-            .active  = held_modifiers[i].active,
-            .key_pos = held_modifiers[i].key_pos,
-            .action  = held_modifiers[i].action,
+            .active  = state->modifiers[i].active,
+            .key_pos = state->modifiers[i].key_pos,
+            .action  = state->modifiers[i].action,
         };
     }
 
-    for (uint16_t i = 0; i < ARRAY_SIZE(held_actions); i++) {
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->actions); i++) {
         out->actions[i] = (held_action_binding_snapshot_t){
-            .active  = held_actions[i].active,
-            .key_pos = held_actions[i].key_pos,
-            .action  = held_actions[i].action,
+            .active  = state->actions[i].active,
+            .key_pos = state->actions[i].key_pos,
+            .action  = state->actions[i].action,
         };
     }
 }
 
 void held_action_reset_for_test(void) {
-    memset(held_modifiers, 0, sizeof(held_modifiers));
-    memset(held_modifier_refcounts, 0, sizeof(held_modifier_refcounts));
-    memset(held_actions, 0, sizeof(held_actions));
+    memset(held_action_state(), 0, sizeof(*held_action_state()));
 }

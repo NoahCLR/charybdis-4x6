@@ -13,6 +13,7 @@
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
+#include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
@@ -128,10 +129,9 @@ static void test_run_double_tap_hold_cycle_with_intermediate_scan(keypos_t key_p
 }
 
 static void test_reset_state(void) {
-    fake_time   = 1000;
+    fake_time = 1000;
+    noah_runtime_reset_for_test();
     layer_state = test_layer_mask(LAYER_BASE);
-    runtime_shared_state_reset(&noah_runtime_shared_state);
-    layer_ownership_reset_for_test();
 }
 
 int uprintf(const char *fmt, ...) {
@@ -472,16 +472,6 @@ void held_action_register(keypos_t key_pos, uint16_t action) {
     (void)action;
 }
 
-void held_action_debug_snapshot(held_action_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (held_action_debug_snapshot_t){0};
-}
-
-void held_action_reset_for_test(void) {}
-
 void held_action_unregister(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;
@@ -503,16 +493,6 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     (void)repeat_hz;
 }
 
-void held_repeat_debug_snapshot(held_repeat_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (held_repeat_debug_snapshot_t){0};
-}
-
-void held_repeat_reset_for_test(void) {}
-
 void held_repeat_tick(void) {}
 
 bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
@@ -532,16 +512,6 @@ uint8_t key_feedback_pack(void) {
 uint8_t key_feedback_preview_layer(void) {
     return UINT8_MAX;
 }
-
-void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (keyboard_mod_ownership_debug_snapshot_t){0};
-}
-
-void keyboard_mod_ownership_reset_for_test(void) {}
 
 void split_runtime_sync(void) {}
 

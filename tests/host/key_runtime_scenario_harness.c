@@ -328,48 +328,6 @@ void del_mods(uint8_t mods) {
 }
 void send_keyboard_report(void) {}
 
-void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (layer_ownership_debug_snapshot_t){0};
-}
-
-void layer_ownership_reset_for_test(void) {
-    key_runtime_scenario_locked_layers = 0;
-}
-
-void held_action_debug_snapshot(held_action_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (held_action_debug_snapshot_t){0};
-}
-
-void held_action_reset_for_test(void) {}
-
-void held_repeat_debug_snapshot(held_repeat_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (held_repeat_debug_snapshot_t){0};
-}
-
-void held_repeat_reset_for_test(void) {}
-
-void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (keyboard_mod_ownership_debug_snapshot_t){0};
-}
-
-void keyboard_mod_ownership_reset_for_test(void) {}
-
 bool noah_synthetic_record_active(void) {
     return false;
 }

@@ -2,10 +2,11 @@
 // Runtime Debug Snapshot
 // ────────────────────────────────────────────────────────────────────────────
 
+#include <string.h>
+
 #include "runtime_debug.h"
 
 #include "../../key/runtime/key_runtime_state.h"
-#include "runtime_shared_state.h"
 
 static keypos_t noah_runtime_debug_slot_index_key_pos(uint8_t slot_index) {
     return (keypos_t){
@@ -46,17 +47,93 @@ static noah_runtime_debug_slot_snapshot_t noah_runtime_debug_slot_snapshot_from_
     };
 }
 
-void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
-    runtime_shared_state_t *state = &noah_runtime_shared_state;
+static void noah_runtime_debug_snapshot_layer_ownership(const noah_runtime_context_t *ctx, layer_ownership_debug_snapshot_t *out) {
+    if (!(ctx && out)) {
+        return;
+    }
+
+    *out = (layer_ownership_debug_snapshot_t){
+        .applied_layer_state = layer_state,
+        .locked_mask         = ctx->layer_ownership.locked_mask,
+    };
+
+    memcpy(out->momentary_refcounts, ctx->layer_ownership.momentary_refcounts, sizeof(ctx->layer_ownership.momentary_refcounts));
+    memcpy(out->bindings, ctx->layer_ownership.bindings, sizeof(ctx->layer_ownership.bindings));
+}
+
+static void noah_runtime_debug_snapshot_held_actions(const noah_runtime_context_t *ctx, held_action_debug_snapshot_t *out) {
+    if (!(ctx && out)) {
+        return;
+    }
+
+    memcpy(out->modifiers, ctx->held_actions.modifiers, sizeof(ctx->held_actions.modifiers));
+    memcpy(out->modifier_refcounts, ctx->held_actions.modifier_refcounts, sizeof(ctx->held_actions.modifier_refcounts));
+    memcpy(out->actions, ctx->held_actions.actions, sizeof(ctx->held_actions.actions));
+}
+
+static void noah_runtime_debug_snapshot_held_repeats(const noah_runtime_context_t *ctx, held_repeat_debug_snapshot_t *out) {
+    if (!(ctx && out)) {
+        return;
+    }
+
+    memcpy(out->bindings, ctx->held_repeats.bindings, sizeof(ctx->held_repeats.bindings));
+}
+
+static void noah_runtime_debug_snapshot_keyboard_mod_ownership(const noah_runtime_context_t *ctx, keyboard_mod_ownership_debug_snapshot_t *out) {
+    if (!(ctx && out)) {
+        return;
+    }
+
+    *out = (keyboard_mod_ownership_debug_snapshot_t){
+        .live_state =
+            {
+                .real           = get_mods(),
+                .weak           = get_weak_mods(),
+                .oneshot        = get_oneshot_mods(),
+                .oneshot_locked = get_oneshot_locked_mods(),
+            },
+    };
+
+    memcpy(out->physical_refcounts, ctx->keyboard_mod_ownership.physical_refcounts, sizeof(ctx->keyboard_mod_ownership.physical_refcounts));
+    memcpy(out->managed_refcounts, ctx->keyboard_mod_ownership.managed_refcounts, sizeof(ctx->keyboard_mod_ownership.managed_refcounts));
+}
+
+static void noah_runtime_debug_snapshot_trace(const noah_runtime_context_t *ctx, noah_runtime_trace_snapshot_t *out) {
+    const noah_runtime_trace_state_t *state;
+
+    if (!(ctx && out)) {
+        return;
+    }
+
+    state = &ctx->trace;
+    *out  = (noah_runtime_trace_snapshot_t){
+        .count      = state->count,
+        .overflowed = state->overflowed,
+    };
+
+    uint8_t start = (uint8_t)((state->next_index + NOAH_RUNTIME_TRACE_CAPACITY - state->count) % NOAH_RUNTIME_TRACE_CAPACITY);
+
+    for (uint8_t index = 0; index < state->count; index++) {
+        out->entries[index] = state->entries[(uint8_t)((start + index) % NOAH_RUNTIME_TRACE_CAPACITY)];
+    }
+}
+
+void noah_runtime_context_debug_snapshot(const noah_runtime_context_t *ctx, noah_runtime_debug_snapshot_t *out) {
+    const runtime_shared_state_t *state = ctx ? &ctx->shared : NULL;
 
     if (!out) {
         return;
     }
 
-    *out                              = (noah_runtime_debug_snapshot_t){0};
-    out->key.feedback_active          = state->key.feedback.active;
-    out->pd.local_active_mode         = state->pd.local_active_mode;
-    out->pd.local_locked_mode         = state->pd.local_locked_mode;
+    *out = (noah_runtime_debug_snapshot_t){0};
+
+    if (!state) {
+        return;
+    }
+
+    out->key.feedback_active           = state->key.feedback.active;
+    out->pd.local_active_mode          = state->pd.local_active_mode;
+    out->pd.local_locked_mode          = state->pd.local_locked_mode;
     out->pd.remote_display_active_mode = state->pd.remote_display_active_mode;
     out->pd.remote_display_locked_mode = state->pd.remote_display_locked_mode;
 
@@ -84,11 +161,15 @@ void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
         out->key.pending_fallback_slot         = noah_runtime_debug_slot_index_key_pos(state->key.index.pending_fallback_slot);
     }
 
-    layer_ownership_debug_snapshot(&out->layer_ownership);
-    held_action_debug_snapshot(&out->held_actions);
-    held_repeat_debug_snapshot(&out->held_repeats);
-    keyboard_mod_ownership_debug_snapshot(&out->keyboard_mod_ownership);
-    noah_runtime_trace_snapshot(&out->trace);
+    noah_runtime_debug_snapshot_layer_ownership(ctx, &out->layer_ownership);
+    noah_runtime_debug_snapshot_held_actions(ctx, &out->held_actions);
+    noah_runtime_debug_snapshot_held_repeats(ctx, &out->held_repeats);
+    noah_runtime_debug_snapshot_keyboard_mod_ownership(ctx, &out->keyboard_mod_ownership);
+    noah_runtime_debug_snapshot_trace(ctx, &out->trace);
+}
+
+void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
+    noah_runtime_context_debug_snapshot(noah_runtime_context(), out);
 }
 
 uint16_t noah_runtime_debug_slot_owner_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
@@ -171,12 +252,7 @@ bool noah_runtime_debug_pending_fallback_slot_key_pos(const noah_runtime_debug_s
 }
 
 void noah_runtime_reset_for_test(void) {
-    runtime_shared_state_reset(&noah_runtime_shared_state);
-    layer_ownership_reset_for_test();
-    held_action_reset_for_test();
-    held_repeat_reset_for_test();
-    keyboard_mod_ownership_reset_for_test();
-    noah_runtime_trace_reset();
+    noah_runtime_context_reset_for_test(noah_runtime_context());
 
     layer_state = 0;
     clear_mods();

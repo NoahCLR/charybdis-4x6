@@ -7,6 +7,7 @@
 #endif
 
 #include "keyboard_mod_ownership.h"
+#include "../runtime/runtime_context.h"
 
 static const uint8_t keyboard_mod_ownership_mod_masks[8] = {
     MOD_BIT(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_SHIFT), MOD_BIT(KC_LEFT_ALT), MOD_BIT(KC_LEFT_GUI), MOD_BIT(KC_RIGHT_CTRL), MOD_BIT(KC_RIGHT_SHIFT), MOD_BIT(KC_RIGHT_ALT), MOD_BIT(KC_RIGHT_GUI),
@@ -35,16 +36,17 @@ static int8_t keyboard_mod_ownership_index_for_keycode(uint16_t keycode) {
     }
 }
 
-static uint8_t keyboard_mod_ownership_physical_refcounts[8] = {0};
-static uint8_t keyboard_mod_ownership_managed_refcounts[8]  = {0};
-
 #ifndef KEYBOARD_MOD_OWNERSHIP_MANAGED_DRIFT_WARN_THRESHOLD
 #    define KEYBOARD_MOD_OWNERSHIP_MANAGED_DRIFT_WARN_THRESHOLD 8u
 #endif
 
+static noah_keyboard_mod_ownership_state_t *keyboard_mod_ownership_state(void) {
+    return &noah_runtime_context()->keyboard_mod_ownership;
+}
+
 static void keyboard_mod_ownership_validate_state(const char *context) {
 #ifdef CONSOLE_ENABLE
-    static uint8_t keyboard_mod_ownership_warned_state[8] = {0};
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
 
     enum {
         KEYBOARD_MOD_OWNERSHIP_WARNING_NONE      = 0,
@@ -57,24 +59,24 @@ static void keyboard_mod_ownership_validate_state(const char *context) {
     for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
         uint8_t warnings = KEYBOARD_MOD_OWNERSHIP_WARNING_NONE;
 
-        if (keyboard_mod_ownership_managed_refcounts[i] > keyboard_mod_ownership_physical_refcounts[i] + KEYBOARD_MOD_OWNERSHIP_MANAGED_DRIFT_WARN_THRESHOLD) {
+        if (state->managed_refcounts[i] > state->physical_refcounts[i] + KEYBOARD_MOD_OWNERSHIP_MANAGED_DRIFT_WARN_THRESHOLD) {
             warnings |= KEYBOARD_MOD_OWNERSHIP_WARNING_DRIFT;
         }
 
-        if (keyboard_mod_ownership_managed_refcounts[i] == 0 && keyboard_mod_ownership_physical_refcounts[i] == 0 && (report_mods & keyboard_mod_ownership_mod_masks[i]) != 0) {
+        if (state->managed_refcounts[i] == 0 && state->physical_refcounts[i] == 0 && (report_mods & keyboard_mod_ownership_mod_masks[i]) != 0) {
             warnings |= KEYBOARD_MOD_OWNERSHIP_WARNING_STUCK_BIT;
         }
 
-        if (warnings == keyboard_mod_ownership_warned_state[i]) {
+        if (warnings == state->warned_state[i]) {
             continue;
         }
 
-        keyboard_mod_ownership_warned_state[i] = warnings;
+        state->warned_state[i] = warnings;
         if (warnings == KEYBOARD_MOD_OWNERSHIP_WARNING_NONE) {
             continue;
         }
 
-        uprintf("Keyboard mod ownership warning after %s: index=%u mask=0x%02X physical=%u managed=%u report=0x%02X flags=0x%02X\n", context, (unsigned int)i, (unsigned int)keyboard_mod_ownership_mod_masks[i], (unsigned int)keyboard_mod_ownership_physical_refcounts[i], (unsigned int)keyboard_mod_ownership_managed_refcounts[i], (unsigned int)report_mods, (unsigned int)warnings);
+        uprintf("Keyboard mod ownership warning after %s: index=%u mask=0x%02X physical=%u managed=%u report=0x%02X flags=0x%02X\n", context, (unsigned int)i, (unsigned int)keyboard_mod_ownership_mod_masks[i], (unsigned int)state->physical_refcounts[i], (unsigned int)state->managed_refcounts[i], (unsigned int)report_mods, (unsigned int)warnings);
     }
 #else
     (void)context;
@@ -82,6 +84,7 @@ static void keyboard_mod_ownership_validate_state(const char *context) {
 }
 
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
     int8_t index = keyboard_mod_ownership_index_for_keycode(keycode);
 
     if (index < 0 || !record || IS_NOEVENT(record->event)) {
@@ -89,17 +92,18 @@ void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyre
     }
 
     if (record->event.pressed) {
-        if (keyboard_mod_ownership_physical_refcounts[index] < UINT8_MAX) {
-            keyboard_mod_ownership_physical_refcounts[index]++;
+        if (state->physical_refcounts[index] < UINT8_MAX) {
+            state->physical_refcounts[index]++;
         }
-    } else if (keyboard_mod_ownership_physical_refcounts[index] > 0) {
-        keyboard_mod_ownership_physical_refcounts[index]--;
+    } else if (state->physical_refcounts[index] > 0) {
+        state->physical_refcounts[index]--;
     }
 
     keyboard_mod_ownership_validate_state("track_physical_keycode_event");
 }
 
 bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
     int8_t index = keyboard_mod_ownership_index_for_keycode(keycode);
 
     if (index < 0 || !record || record->event.pressed) {
@@ -107,10 +111,11 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
     }
 
     keyboard_mod_ownership_validate_state("should_suppress_default");
-    return keyboard_mod_ownership_managed_refcounts[index] > 0;
+    return state->managed_refcounts[index] > 0;
 }
 
 void keyboard_mod_ownership_register_mods(uint8_t mods) {
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
     bool report_needed = false;
 
     if (mods == 0) {
@@ -122,15 +127,15 @@ void keyboard_mod_ownership_register_mods(uint8_t mods) {
             continue;
         }
 
-        if (keyboard_mod_ownership_managed_refcounts[i] < UINT8_MAX) {
-            keyboard_mod_ownership_managed_refcounts[i]++;
+        if (state->managed_refcounts[i] < UINT8_MAX) {
+            state->managed_refcounts[i]++;
         }
 
         // keyboard_mod_state_suspend() intentionally clears the live report
         // bits without touching ownership refcounts. If a nested action
         // registers the same managed modifier while suspended, re-assert the
         // real mod bit so the nested action still sees the modifier.
-        if ((get_mods() & keyboard_mod_ownership_mod_masks[i]) == 0 && (keyboard_mod_ownership_managed_refcounts[i] > 0 || keyboard_mod_ownership_physical_refcounts[i] > 0)) {
+        if ((get_mods() & keyboard_mod_ownership_mod_masks[i]) == 0 && (state->managed_refcounts[i] > 0 || state->physical_refcounts[i] > 0)) {
             add_mods(keyboard_mod_ownership_mod_masks[i]);
             report_needed = true;
         }
@@ -144,6 +149,7 @@ void keyboard_mod_ownership_register_mods(uint8_t mods) {
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
     bool report_needed = false;
 
     if (mods == 0) {
@@ -151,12 +157,12 @@ void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
     }
 
     for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
-        if (!(mods & keyboard_mod_ownership_mod_masks[i]) || keyboard_mod_ownership_managed_refcounts[i] == 0) {
+        if (!(mods & keyboard_mod_ownership_mod_masks[i]) || state->managed_refcounts[i] == 0) {
             continue;
         }
 
-        keyboard_mod_ownership_managed_refcounts[i]--;
-        if (keyboard_mod_ownership_managed_refcounts[i] == 0 && keyboard_mod_ownership_physical_refcounts[i] == 0) {
+        state->managed_refcounts[i]--;
+        if (state->managed_refcounts[i] == 0 && state->physical_refcounts[i] == 0) {
             del_mods(keyboard_mod_ownership_mod_masks[i]);
             report_needed = true;
         }
@@ -190,6 +196,8 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
 }
 
 void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
+
     if (!out) {
         return;
     }
@@ -204,11 +212,10 @@ void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot
             },
     };
 
-    memcpy(out->physical_refcounts, keyboard_mod_ownership_physical_refcounts, sizeof(keyboard_mod_ownership_physical_refcounts));
-    memcpy(out->managed_refcounts, keyboard_mod_ownership_managed_refcounts, sizeof(keyboard_mod_ownership_managed_refcounts));
+    memcpy(out->physical_refcounts, state->physical_refcounts, sizeof(state->physical_refcounts));
+    memcpy(out->managed_refcounts, state->managed_refcounts, sizeof(state->managed_refcounts));
 }
 
 void keyboard_mod_ownership_reset_for_test(void) {
-    memset(keyboard_mod_ownership_physical_refcounts, 0, sizeof(keyboard_mod_ownership_physical_refcounts));
-    memset(keyboard_mod_ownership_managed_refcounts, 0, sizeof(keyboard_mod_ownership_managed_refcounts));
+    memset(keyboard_mod_ownership_state(), 0, sizeof(*keyboard_mod_ownership_state()));
 }

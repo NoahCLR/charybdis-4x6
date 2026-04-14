@@ -7,6 +7,7 @@
 #include "users/noah/lib/key/interaction/handled_key.h"
 #include "users/noah/lib/key/runtime/key_runtime_admission.h"
 #include "users/noah/lib/key/runtime/key_runtime_index.h"
+#include "users/noah/lib/state/runtime/runtime_context.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 enum {
@@ -44,7 +45,7 @@ static void test_track_slot(active_key_state_t *slot, uint16_t keycode, keypos_t
 }
 
 static void test_reset_state(void) {
-    runtime_shared_state_reset(&noah_runtime_shared_state);
+    noah_runtime_context_reset_for_test(noah_runtime_context());
 }
 
 uint16_t timer_read(void) {

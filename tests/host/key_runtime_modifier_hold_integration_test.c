@@ -10,6 +10,7 @@
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/key_runtime_process.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 enum {
@@ -78,7 +79,8 @@ static void test_reset_state(void) {
     last_registered_mods       = 0;
     last_unregistered_keycode  = KC_NO;
     last_unregistered_mods     = 0;
-    runtime_shared_state_reset(&noah_runtime_shared_state);
+    noah_runtime_reset_for_test();
+    send_keyboard_report_count = 0;
 }
 
 uint16_t timer_read(void) {
@@ -252,16 +254,6 @@ void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     (void)key_pos;
     (void)layer;
 }
-
-void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (layer_ownership_debug_snapshot_t){0};
-}
-
-void layer_ownership_reset_for_test(void) {}
 
 bool layer_ownership_momentary_release(keypos_t key_pos) {
     (void)key_pos;

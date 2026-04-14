@@ -10,6 +10,7 @@
 #include "users/noah/lib/key/runtime/key_runtime_index.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"
+#include "users/noah/lib/state/runtime/runtime_context.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "host_handled_key_fixture.h"
 
@@ -362,7 +363,7 @@ static void test_add_pd_mode_mapping(uint16_t keycode, pd_mode_mask_t mode) {
 }
 
 static void test_reset_runtime(void) {
-    runtime_shared_state_reset(&noah_runtime_shared_state);
+    noah_runtime_context_reset_for_test(noah_runtime_context());
     test_set_default_slot_key_pos(test_keypos(0, 0));
     active_key_reset();
     multi_tap_reset(&multi_tap);

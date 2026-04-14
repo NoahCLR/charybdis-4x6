@@ -12,6 +12,7 @@
 #include "users/noah/lib/key/runtime/key_runtime_process.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 enum {
@@ -69,7 +70,7 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 }
 
 static void test_reset_state(void) {
-    runtime_shared_state_reset(&noah_runtime_shared_state);
+    noah_runtime_reset_for_test();
 
     fake_time          = 1000;
     current_cpi        = 0;
@@ -260,30 +261,10 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
     (void)keycode;
 }
 
-void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (keyboard_mod_ownership_debug_snapshot_t){0};
-}
-
-void keyboard_mod_ownership_reset_for_test(void) {}
-
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     (void)key_pos;
     (void)layer;
 }
-
-void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (layer_ownership_debug_snapshot_t){0};
-}
-
-void layer_ownership_reset_for_test(void) {}
 
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
     (void)layer;

@@ -8,6 +8,7 @@
 #include "users/noah/lib/key/runtime/key_runtime_index.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_step.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/state/runtime/runtime_context.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "host_handled_key_fixture.h"
 
@@ -42,7 +43,7 @@ static active_key_state_t *test_other_slot(void) {
 #define active_key (*test_default_slot())
 
 static void test_reset_state(void) {
-    runtime_shared_state_reset(&noah_runtime_shared_state);
+    noah_runtime_context_reset_for_test(noah_runtime_context());
     fake_time = 0;
 }
 

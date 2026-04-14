@@ -9,6 +9,7 @@
 #include "users/noah/lib/key/runtime/key_runtime_process.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"
+#include "users/noah/lib/state/runtime/runtime_context.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "host_handled_key_fixture.h"
 
@@ -64,7 +65,7 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
 }
 
 static void test_reset_state(void) {
-    runtime_shared_state_reset(&noah_runtime_shared_state);
+    noah_runtime_context_reset_for_test(noah_runtime_context());
     test_set_active_slot_key_pos(test_keypos(0, 0));
     suppress_default               = false;
     tracked_physical_event         = false;

@@ -9,20 +9,15 @@
 #include "layer_ownership.h"
 
 #include "noah_keymap_ids.h"
+#include "../runtime/runtime_context.h"
 #include "../runtime/runtime_trace.h"
-
-typedef struct {
-    bool     active;
-    keypos_t key_pos;
-    uint8_t  layer;
-} layer_momentary_binding_t;
-
-static layer_momentary_binding_t layer_momentary_bindings[LAYER_OWNERSHIP_BINDING_CAPACITY] = {0};
-static uint8_t                   layer_momentary_refcounts[LAYER_COUNT]                     = {0};
-static layer_state_t             layer_locked_mask                                          = 0;
 
 static inline layer_state_t layer_ownership_mask_for_layer(uint8_t layer) {
     return (layer_state_t)1u << layer;
+}
+
+static noah_layer_ownership_state_t *layer_ownership_state(void) {
+    return &noah_runtime_context()->layer_ownership;
 }
 
 static inline bool layer_ownership_keypos_equal(keypos_t lhs, keypos_t rhs) {
@@ -44,8 +39,10 @@ static void layer_ownership_log_binding_overflow(keypos_t key_pos, uint8_t layer
 }
 
 static int16_t layer_ownership_find_slot_for_key(keypos_t key_pos) {
-    for (uint16_t i = 0; i < ARRAY_SIZE(layer_momentary_bindings); i++) {
-        if (layer_momentary_bindings[i].active && layer_ownership_keypos_equal(layer_momentary_bindings[i].key_pos, key_pos)) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->bindings); i++) {
+        if (state->bindings[i].active && layer_ownership_keypos_equal(state->bindings[i].key_pos, key_pos)) {
             return (int16_t)i;
         }
     }
@@ -54,8 +51,10 @@ static int16_t layer_ownership_find_slot_for_key(keypos_t key_pos) {
 }
 
 static int16_t layer_ownership_find_free_slot(void) {
-    for (uint16_t i = 0; i < ARRAY_SIZE(layer_momentary_bindings); i++) {
-        if (!layer_momentary_bindings[i].active) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->bindings); i++) {
+        if (!state->bindings[i].active) {
             return (int16_t)i;
         }
     }
@@ -64,7 +63,8 @@ static int16_t layer_ownership_find_free_slot(void) {
 }
 
 static bool layer_ownership_should_be_active(uint8_t layer) {
-    return layer < LAYER_COUNT && (layer_momentary_refcounts[layer] > 0 || (layer_locked_mask & layer_ownership_mask_for_layer(layer)) != 0);
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+    return layer < LAYER_COUNT && (state->momentary_refcounts[layer] > 0 || (state->locked_mask & layer_ownership_mask_for_layer(layer)) != 0);
 }
 
 static bool layer_ownership_apply_layer(uint8_t layer) {
@@ -89,42 +89,47 @@ static bool layer_ownership_apply_layer(uint8_t layer) {
 }
 
 static bool layer_ownership_remove_slot(uint16_t slot) {
-    if (slot >= ARRAY_SIZE(layer_momentary_bindings) || !layer_momentary_bindings[slot].active) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
+    if (slot >= ARRAY_SIZE(state->bindings) || !state->bindings[slot].active) {
         return false;
     }
 
-    uint8_t layer                         = layer_momentary_bindings[slot].layer;
-    layer_momentary_bindings[slot].active = false;
-    layer_momentary_bindings[slot].layer  = 0;
+    uint8_t layer              = state->bindings[slot].layer;
+    state->bindings[slot].active = false;
+    state->bindings[slot].layer  = 0;
 
-    if (layer >= LAYER_COUNT || layer_momentary_refcounts[layer] == 0) {
+    if (layer >= LAYER_COUNT || state->momentary_refcounts[layer] == 0) {
         return false;
     }
 
-    layer_momentary_refcounts[layer]--;
+    state->momentary_refcounts[layer]--;
     return layer_ownership_apply_layer(layer);
 }
 
 bool layer_ownership_is_locked(uint8_t layer) {
-    return layer < LAYER_COUNT && (layer_locked_mask & layer_ownership_mask_for_layer(layer)) != 0;
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+    return layer < LAYER_COUNT && (state->locked_mask & layer_ownership_mask_for_layer(layer)) != 0;
 }
 
 bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
     if (layer >= LAYER_COUNT) {
         return false;
     }
 
     layer_state_t layer_mask = layer_ownership_mask_for_layer(layer);
-    bool          is_locked  = (layer_locked_mask & layer_mask) != 0;
+    bool          is_locked  = (state->locked_mask & layer_mask) != 0;
 
     if (locked == is_locked) {
         return false;
     }
 
     if (locked) {
-        layer_locked_mask |= layer_mask;
+        state->locked_mask |= layer_mask;
     } else {
-        layer_locked_mask &= ~layer_mask;
+        state->locked_mask &= ~layer_mask;
     }
 
     noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_LOCK, layer, locked ? 1u : 0u);
@@ -139,13 +144,15 @@ bool layer_ownership_toggle_lock_state(uint8_t layer) {
 }
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
     if (layer >= LAYER_COUNT) {
         return;
     }
 
     int16_t slot = layer_ownership_find_slot_for_key(key_pos);
     if (slot >= 0) {
-        if (layer_momentary_bindings[slot].layer == layer) {
+        if (state->bindings[slot].layer == layer) {
             layer_ownership_apply_layer(layer);
             return;
         }
@@ -159,7 +166,7 @@ void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
         }
     }
 
-    layer_momentary_bindings[slot] = (layer_momentary_binding_t){
+    state->bindings[slot] = (layer_ownership_binding_snapshot_t){
         .active  = true,
         .key_pos = key_pos,
         .layer   = layer,
@@ -167,46 +174,47 @@ void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
 
     noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_PRESS, layer, layer_ownership_trace_pack_keypos(key_pos));
 
-    if (layer_momentary_refcounts[layer]++ == 0) {
+    if (state->momentary_refcounts[layer]++ == 0) {
         layer_ownership_apply_layer(layer);
     }
 }
 
 bool layer_ownership_momentary_release(keypos_t key_pos) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
     int16_t slot = layer_ownership_find_slot_for_key(key_pos);
 
     if (slot < 0) {
         return false;
     }
 
-    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_RELEASE, layer_momentary_bindings[slot].layer, layer_ownership_trace_pack_keypos(key_pos));
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_RELEASE, state->bindings[slot].layer, layer_ownership_trace_pack_keypos(key_pos));
 
     return layer_ownership_remove_slot((uint16_t)slot);
 }
 
 void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
     if (!out) {
         return;
     }
 
     *out = (layer_ownership_debug_snapshot_t){
         .applied_layer_state = layer_state,
-        .locked_mask         = layer_locked_mask,
+        .locked_mask         = state->locked_mask,
     };
 
-    memcpy(out->momentary_refcounts, layer_momentary_refcounts, sizeof(layer_momentary_refcounts));
+    memcpy(out->momentary_refcounts, state->momentary_refcounts, sizeof(state->momentary_refcounts));
 
-    for (uint16_t i = 0; i < ARRAY_SIZE(layer_momentary_bindings); i++) {
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->bindings); i++) {
         out->bindings[i] = (layer_ownership_binding_snapshot_t){
-            .active  = layer_momentary_bindings[i].active,
-            .key_pos = layer_momentary_bindings[i].key_pos,
-            .layer   = layer_momentary_bindings[i].layer,
+            .active  = state->bindings[i].active,
+            .key_pos = state->bindings[i].key_pos,
+            .layer   = state->bindings[i].layer,
         };
     }
 }
 
 void layer_ownership_reset_for_test(void) {
-    memset(layer_momentary_bindings, 0, sizeof(layer_momentary_bindings));
-    memset(layer_momentary_refcounts, 0, sizeof(layer_momentary_refcounts));
-    layer_locked_mask = 0;
+    memset(layer_ownership_state(), 0, sizeof(*layer_ownership_state()));
 }

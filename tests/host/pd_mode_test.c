@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
+#include "users/noah/lib/state/runtime/runtime_context.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
 
@@ -60,7 +61,7 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset_runtime(void) {
-    runtime_shared_state_reset(&noah_runtime_shared_state);
+    noah_runtime_context_reset_for_test(noah_runtime_context());
 }
 
 static void test_reset_stubs(void) {

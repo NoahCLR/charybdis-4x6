@@ -6,6 +6,7 @@
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
+#include "users/noah/lib/state/runtime/runtime_context.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 
 static uint16_t current_cpi;
@@ -61,7 +62,7 @@ static bool report_mouse_equal(report_mouse_t lhs, report_mouse_t rhs) {
 }
 
 static void test_reset_runtime(void) {
-    runtime_shared_state_reset(&noah_runtime_shared_state);
+    noah_runtime_context_reset_for_test(noah_runtime_context());
 }
 
 static void test_reset_stubs(void) {
@@ -227,16 +228,6 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
     keyboard_mod_unregister_count++;
     last_unregistered_keycode = keycode;
 }
-
-void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (keyboard_mod_ownership_debug_snapshot_t){0};
-}
-
-void keyboard_mod_ownership_reset_for_test(void) {}
 
 report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     volume_handler_calls++;

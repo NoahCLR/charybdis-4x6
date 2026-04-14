@@ -10,6 +10,7 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/runtime/keyboard_mod_state.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
+#include "users/noah/lib/state/runtime/runtime_context.h"
 #include "users/noah/lib/state/runtime/runtime_shared_state.h"
 #include "users/noah/lib/state/runtime/runtime_trace.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
@@ -64,9 +65,7 @@ static void test_reset_stubs(void) {
     rpc_last_packet         = (split_runtime_sync_packet_t){0};
     layer_state             = 0;
 
-    runtime_shared_state_reset(&noah_runtime_shared_state);
-    noah_runtime_trace_reset();
-    layer_ownership_reset_for_test();
+    noah_runtime_context_reset_for_test(noah_runtime_context());
 }
 
 uint32_t timer_read32(void) {

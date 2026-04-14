@@ -25,6 +25,8 @@ typedef struct {
     pd_mode_runtime_shared_state_t pd;
 } runtime_shared_state_t;
 
-extern runtime_shared_state_t noah_runtime_shared_state;
+runtime_shared_state_t *noah_runtime_shared_state_ptr(void);
+
+#define noah_runtime_shared_state (*noah_runtime_shared_state_ptr())
 
 void runtime_shared_state_reset(runtime_shared_state_t *state);

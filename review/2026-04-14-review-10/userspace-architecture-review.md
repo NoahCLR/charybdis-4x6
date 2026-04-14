@@ -34,9 +34,9 @@ The strongest parts of the design are:
 The main long-term risks are not correctness bugs in the current tree. They are
 architecture scaling risks:
 
-1. runtime state ownership is split between one global aggregate and several
-   private module statics, so reset/debug/integration logic has to know too
-   much about every subsystem
+1. runtime state ownership now has a canonical singleton context, but the old
+   aggregate still leaks through compatibility reads in several repo-owned
+   modules, so boundary cleanup is incomplete
 2. action-kind extensibility is still a manually synchronized closed set,
    unlike the more scalable manifest-driven pd-mode design
 3. hook-level orchestration is centralized and order-sensitive, so adding new
@@ -90,91 +90,65 @@ is the best local template for other extensibility work.
 better regression resistance than most firmware codebases. The tests are broad
 enough that architecture work can be done safely if the seams stay coherent.
 
+### Runtime state now has a canonical owner
+
+Milestone 1 of the runtime-state refactor is now landed:
+
+- `users/noah/lib/state/runtime/runtime_context.h:1-57`
+- `users/noah/lib/state/runtime/runtime_shared_state.h:16-32`
+- `users/noah/lib/state/runtime/runtime_shared_state.c:7-38`
+- `users/noah/lib/state/runtime/runtime_debug.c:118-226`
+
+The runtime singleton now owns the shared key/pd aggregate, layer ownership,
+held-action ownership, held-repeat ownership, keyboard modifier ownership, and
+the runtime trace ring. The old public module APIs still exist, but they now
+forward into that one owner instead of maintaining separate mutable statics.
+
 ## Findings
 
-### 1. Runtime state ownership is split across incompatible models
+### 1. Milestone 1 fixed the worst ownership split, but compatibility reads still leak the old aggregate
 
 Severity: should-fix
 
 References:
 
+- `users/noah/lib/state/runtime/runtime_context.h:1-57`
 - `users/noah/lib/state/runtime/runtime_shared_state.h:16-30`
-- `users/noah/lib/state/runtime/runtime_shared_state.c:7-20`
-- `users/noah/lib/state/runtime/runtime_debug.c:49-91`
-- `users/noah/lib/state/runtime/runtime_debug.c:173-187`
-- `users/noah/lib/state/ownership/layer_ownership.c:20-22`
-- `users/noah/lib/state/ownership/layer_ownership.c:187-212`
-- `users/noah/lib/key/ownership/held_action.c:34-36`
-- `users/noah/lib/key/ownership/held_action.c:297-320`
-- `users/noah/lib/state/ownership/keyboard_mod_ownership.c:38-39`
-- `users/noah/lib/state/ownership/keyboard_mod_ownership.c:192-214`
+- `users/noah/lib/state/runtime/runtime_shared_state.c:7-38`
+- `users/noah/lib/state/runtime/runtime_debug.c:118-226`
+- `users/noah/lib/pointing/runtime/pd_mode_state.c:13-16`
+- `users/noah/lib/pointing/runtime/pd_mode_snapshot.c:47-54`
 
 What I observed:
 
-- key runtime and pd-mode state live in the global
-  `noah_runtime_shared_state`
-- layer ownership, held-action ownership, held-repeat ownership, and keyboard
-  modifier ownership keep their own private static storage
-- `noah_runtime_debug_snapshot()` has to assemble a synthetic whole-system
-  snapshot by calling into every subsystem
-- `noah_runtime_reset_for_test()` has to remember every subsystem reset
-  function explicitly
+- runtime-owned mutable state now lives under one
+  `noah_runtime_context_t` singleton
+- the old `noah_runtime_shared_state` name is now a compatibility alias into
+  that context rather than an independent owner
+- `noah_runtime_debug_snapshot()` and
+  `noah_runtime_context_reset_for_test()` now work over the context directly
+  instead of assembling or resetting state by calling each subsystem manually
+- the main remaining leak is that repo-owned code can still read the
+  compatibility alias directly, especially in pd-mode runtime helpers
 
 Why this matters:
 
-- The current design is testable, but only because the debug layer knows too
-  much about every subsystem.
-- This creates hidden integration work for every future feature. A new
-  ownership-bearing subsystem will need:
-  - its own static storage
-  - its own debug snapshot function
-  - its own reset hook
-  - manual wiring into the aggregate debug/reset surface
-- It also makes simulation harder than it needs to be. There is no single
-  runtime context object that could be instantiated twice, swapped, or passed
-  through a deterministic harness.
-
-Why this is architectural debt rather than just an implementation detail:
-
-- The problem is not that globals exist. In firmware, a singleton is normal.
-- The problem is that some modules behave like slices of one runtime object and
-  some behave like hidden process-wide services. That mixed ownership model is
-  what makes boundaries unclear.
+- Milestone 1 removed the biggest scaling tax: new runtime-owned subsystems no
+  longer need their own private static store plus bespoke debug/reset wiring.
+- The remaining cost is boundary ambiguity. As long as repo-owned modules can
+  still reach for `noah_runtime_shared_state` directly, the context exists but
+  is not yet the only obvious path.
+- That matters because it keeps the old ownership mental model alive in call
+  sites that should instead treat shared state as one slice of the context.
 
 Recommended direction:
 
-- Introduce one top-level `noah_runtime_context_t` that owns all persistent
-  runtime state slices.
-- Keep a singleton instance for real QMK execution if you want zero behavior
-  change.
-- Convert ownership/state modules to operate on explicit state slices instead of
-  private file statics.
-
-Example direction:
-
-```c
-typedef struct {
-    key_runtime_shared_state_t key;
-    pd_mode_runtime_shared_state_t pd;
-    layer_ownership_state_t layers;
-    held_action_state_t held_actions;
-    held_repeat_state_t held_repeats;
-    keyboard_mod_ownership_state_t mods;
-} noah_runtime_context_t;
-
-extern noah_runtime_context_t noah_runtime;
-
-void noah_runtime_reset(noah_runtime_context_t *ctx);
-void noah_runtime_debug_snapshot(const noah_runtime_context_t *ctx,
-                                 noah_runtime_debug_snapshot_t *out);
-```
-
-Pragmatic migration plan:
-
-1. Move one ownership subsystem at a time behind a state struct.
-2. Keep public APIs stable initially by having them forward to the singleton.
-3. Only after the migration, simplify `runtime_debug.c` into a true context
-   snapshot instead of a manual cross-module reset/snapshot script.
+- Milestone 2 should remove repo-owned direct reads and writes of the
+  compatibility alias outside the runtime layer.
+- `runtime_shared_state.h` should become an explicitly temporary compatibility
+  shim, not a surface that new code treats as a primary owner.
+- New runtime code should reach shared key/pd state through the context-backed
+  helpers and let only the compatibility layer expose the legacy alias.
 
 ### 2. Action extensibility is still a manually synchronized closed set
 
