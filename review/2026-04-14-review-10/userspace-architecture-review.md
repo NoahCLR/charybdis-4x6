@@ -1,0 +1,512 @@
+# Userspace Architecture Review
+
+Date: 2026-04-14
+
+Status: deep architecture review of the current `charybdis-4x6` userspace with
+focus on software structure, extension seams, and long-term maintainability for
+fixed hardware.
+
+Scope:
+
+- `users/noah/` runtime architecture and ownership boundaries
+- authored keymap data surfaces under
+  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/`
+- extension cost for new behaviors, layers, modes, and runtime features
+- state management, testing, and debug surfaces
+
+Out of scope:
+
+- hardware changes
+- switch/trackball physical redesign
+- upstream QMK architecture outside the local userspace unless it directly
+  shapes a userspace boundary
+
+## Executive Summary
+
+This userspace is substantially more disciplined than a typical QMK keymap.
+The strongest parts of the design are:
+
+- the hard boundary between authored keymap data and reusable runtime code
+- the reducer/effect-plan shape inside the handled-key engine
+- the pd-mode manifest and command/snapshot split
+- the unusually strong host-test and compile-gate coverage
+
+The main long-term risks are not correctness bugs in the current tree. They are
+architecture scaling risks:
+
+1. runtime state ownership is split between one global aggregate and several
+   private module statics, so reset/debug/integration logic has to know too
+   much about every subsystem
+2. action-kind extensibility is still a manually synchronized closed set,
+   unlike the more scalable manifest-driven pd-mode design
+3. hook-level orchestration is centralized and order-sensitive, so adding new
+   subsystems still means editing core pipelines instead of registering
+   capabilities
+4. the authored keymap surface is intentionally data-only, but too much of that
+   data still lives in one large `keymap.c`, which will get harder to review
+   and evolve as behavior count grows
+
+## What Is Already Working Well
+
+### Strong runtime/data boundary
+
+The repo-specific boundary between authored keymap data and shared runtime code
+is real, not aspirational:
+
+- `users/noah/noah_runtime.h:1-25`
+- `users/noah/noah_keymap.h:1-17`
+- `tests/host/run_feature_gate_compile_tests.sh:12-30`
+
+That is one of the highest-value design decisions in the repo. It keeps the
+QMK hook surface narrow and stops keymap-owned translation units from reaching
+back into runtime internals.
+
+### The handled-key engine is a real state machine
+
+The key runtime is not just ad hoc `process_record_user()` branching. The slot
+engine has:
+
+- an event seam:
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_step.h:1-34`
+- transition planning:
+  `users/noah/lib/key/runtime/key_runtime_transition.c:70-121`
+- explicit effect execution:
+  `users/noah/lib/key/runtime/key_runtime_transition.c:78-120`
+
+That is the correct direction for tap/hold, multi-tap, owned-layer, and repeat
+behavior. Preserve this shape.
+
+### Pd modes are the best extensibility model in the tree
+
+`users/noah/lib/pointing/defs/pd_mode_manifest.h:5-10` and `:68-74` show the
+cleanest additive surface in the codebase. New pointing modes are defined once,
+then projected into ids, registry rows, traits, and lock actions. That pattern
+is the best local template for other extensibility work.
+
+### Test and compile discipline is strong
+
+`tests/host/run_all_host_tests.sh:7-44` and
+`tests/host/run_feature_gate_compile_tests.sh:12-58` give this userspace much
+better regression resistance than most firmware codebases. The tests are broad
+enough that architecture work can be done safely if the seams stay coherent.
+
+## Findings
+
+### 1. Runtime state ownership is split across incompatible models
+
+Severity: should-fix
+
+References:
+
+- `users/noah/lib/state/runtime/runtime_shared_state.h:16-30`
+- `users/noah/lib/state/runtime/runtime_shared_state.c:7-20`
+- `users/noah/lib/state/runtime/runtime_debug.c:49-91`
+- `users/noah/lib/state/runtime/runtime_debug.c:173-187`
+- `users/noah/lib/state/ownership/layer_ownership.c:20-22`
+- `users/noah/lib/state/ownership/layer_ownership.c:187-212`
+- `users/noah/lib/key/ownership/held_action.c:34-36`
+- `users/noah/lib/key/ownership/held_action.c:297-320`
+- `users/noah/lib/state/ownership/keyboard_mod_ownership.c:38-39`
+- `users/noah/lib/state/ownership/keyboard_mod_ownership.c:192-214`
+
+What I observed:
+
+- key runtime and pd-mode state live in the global
+  `noah_runtime_shared_state`
+- layer ownership, held-action ownership, held-repeat ownership, and keyboard
+  modifier ownership keep their own private static storage
+- `noah_runtime_debug_snapshot()` has to assemble a synthetic whole-system
+  snapshot by calling into every subsystem
+- `noah_runtime_reset_for_test()` has to remember every subsystem reset
+  function explicitly
+
+Why this matters:
+
+- The current design is testable, but only because the debug layer knows too
+  much about every subsystem.
+- This creates hidden integration work for every future feature. A new
+  ownership-bearing subsystem will need:
+  - its own static storage
+  - its own debug snapshot function
+  - its own reset hook
+  - manual wiring into the aggregate debug/reset surface
+- It also makes simulation harder than it needs to be. There is no single
+  runtime context object that could be instantiated twice, swapped, or passed
+  through a deterministic harness.
+
+Why this is architectural debt rather than just an implementation detail:
+
+- The problem is not that globals exist. In firmware, a singleton is normal.
+- The problem is that some modules behave like slices of one runtime object and
+  some behave like hidden process-wide services. That mixed ownership model is
+  what makes boundaries unclear.
+
+Recommended direction:
+
+- Introduce one top-level `noah_runtime_context_t` that owns all persistent
+  runtime state slices.
+- Keep a singleton instance for real QMK execution if you want zero behavior
+  change.
+- Convert ownership/state modules to operate on explicit state slices instead of
+  private file statics.
+
+Example direction:
+
+```c
+typedef struct {
+    key_runtime_shared_state_t key;
+    pd_mode_runtime_shared_state_t pd;
+    layer_ownership_state_t layers;
+    held_action_state_t held_actions;
+    held_repeat_state_t held_repeats;
+    keyboard_mod_ownership_state_t mods;
+} noah_runtime_context_t;
+
+extern noah_runtime_context_t noah_runtime;
+
+void noah_runtime_reset(noah_runtime_context_t *ctx);
+void noah_runtime_debug_snapshot(const noah_runtime_context_t *ctx,
+                                 noah_runtime_debug_snapshot_t *out);
+```
+
+Pragmatic migration plan:
+
+1. Move one ownership subsystem at a time behind a state struct.
+2. Keep public APIs stable initially by having them forward to the singleton.
+3. Only after the migration, simplify `runtime_debug.c` into a true context
+   snapshot instead of a manual cross-module reset/snapshot script.
+
+### 2. Action extensibility is still a manually synchronized closed set
+
+Severity: should-fix
+
+References:
+
+- `users/noah/lib/action/action_dispatch.h:59-177`
+- `users/noah/lib/action/action_kind.c:16-207`
+- `users/noah/lib/action/action_kind_dispatch.c:166-227`
+- `users/noah/lib/key/interaction/key_behavior_lookup.c:46-58`
+- `users/noah/lib/key/interaction/key_behavior_lookup.c:120-146`
+- `users/noah/lib/key/interaction/handled_key_policy.h:30-89`
+- contrast:
+  `users/noah/lib/pointing/defs/pd_mode_manifest.h:5-10`
+- contrast:
+  `users/noah/lib/pointing/defs/pd_mode_manifest.h:68-74`
+
+What I observed:
+
+- action kinds are defined by:
+  - an enum in `action_dispatch.h`
+  - a metadata table in `action_kind.c`
+  - a dispatch-op table in `action_kind_dispatch.c`
+  - descriptor classification logic in `action_kind.c`
+  - downstream policy checks in `key_behavior_lookup.c`
+  - downstream hold semantics in `handled_key_policy.h`
+- by comparison, pd modes use a single manifest row that fans out into the rest
+  of the subsystem
+
+Why this matters:
+
+- Adding a genuinely new action family is not additive today.
+- A new action kind or authored action semantic will require modifying core
+  runtime files instead of supplying a new row or module.
+- That is the opposite of the repo’s long-term goal of keeping authored
+  behavior declarative and the runtime modular.
+
+Practical examples of features that would feel expensive under the current
+design:
+
+- a new action class with custom hold-preview behavior
+- a new emitted-action family with its own press/release lifecycle
+- a richer declarative behavior like “chord window” or “deferred one-shot”
+  without reusing existing action categories
+
+Recommended direction:
+
+- Replace the current “enum + multiple parallel tables” shape with one
+  definition list or registry object.
+- Each action-kind spec should declare:
+  - classification predicate
+  - authored capabilities
+  - dispatch hooks
+  - hold-preview / feedback policy hooks
+
+Example direction:
+
+```c
+typedef struct {
+    noah_action_kind_t kind;
+    bool (*matches)(uint16_t action, noah_action_desc_t *out);
+    uint16_t caps;
+    noah_action_kind_dispatch_ops_t ops;
+    noah_action_policy_hooks_t policy;
+} noah_action_kind_spec_t;
+
+#define NOAH_ACTION_KIND_LIST(X) \
+    X(LITERAL, literal_spec) \
+    X(LAYER_LOCK, layer_lock_spec) \
+    X(LAYER_HOLD, layer_hold_spec) \
+    X(MACRO, macro_spec) \
+    X(PD_MODE_LOCK, pd_mode_lock_spec)
+```
+
+The pd-mode manifest is the local proof that this repo already benefits from
+single-source definition tables. Reusing that pattern here would remove the
+largest “modify core logic to add capability” bottleneck in the userspace.
+
+### 3. Hook-level orchestration is centralized and order-sensitive
+
+Severity: should-fix
+
+References:
+
+- `users/noah/lib/key/runtime/key_runtime_process.c:44-156`
+- `users/noah/runtime_init.c:28-40`
+- `users/noah/lib/rgb/core/rgb_runtime.c:23-64`
+
+What I observed:
+
+- `noah_process_record_user()` is a hard-coded ordered stage pipeline
+- `noah_matrix_scan_user()` and `noah_keyboard_post_init_user()` manually
+  sequence subsystem work
+- RGB rendering order is also centrally hard-coded in one function
+
+Why this matters:
+
+- The order is semantically important, but the order is encoded as imperative
+  code in several different places.
+- New subsystem insertion becomes risky because behavior depends on exact
+  placement relative to existing stages.
+- This means adding a feature like a new event interceptor, a tracing adapter,
+  a mode-local preflight rule, or a new RGB overlay still requires editing
+  central orchestration code instead of declaring participation.
+
+Why the current key runtime does not fully solve this:
+
+- Inside the handled-key engine, you already have a good reducer/effect-plan
+  architecture.
+- Outside that engine, the top-level userspace still behaves like a hand-wired
+  chain of privileged modules.
+
+Recommended direction:
+
+- Introduce small compile-time hook registries for:
+  - process-record phases
+  - matrix-scan tasks
+  - post-init tasks
+  - RGB render stages
+- Keep ordering explicit, but make it data-driven rather than open-coded.
+
+Example direction:
+
+```c
+typedef enum {
+    NOAH_PHASE_SYNTHETIC,
+    NOAH_PHASE_PREFLIGHT,
+    NOAH_PHASE_MODE_INTERCEPT,
+    NOAH_PHASE_HANDLED_KEY,
+    NOAH_PHASE_DIRECT_ACTION,
+    NOAH_PHASE_MACRO,
+} noah_process_phase_t;
+
+typedef struct {
+    noah_process_phase_t phase;
+    key_runtime_process_stage_fn_t fn;
+} noah_process_stage_spec_t;
+```
+
+This does not need a heavyweight event bus. A small declarative table would be
+enough. The important improvement is that extending the pipeline stops meaning
+“edit the core owner function and manually reason about every surrounding
+stage”.
+
+### 4. The authored keymap surface is data-driven, but too consolidated
+
+Severity: optional but worthwhile
+
+References:
+
+- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c:5-10`
+- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c:41-140`
+- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c:142-500`
+- `users/noah/noah_keymap.h:5-17`
+
+What I observed:
+
+- one translation unit owns:
+  - custom keycodes
+  - VIA macro defaults
+  - hardcoded macro payloads
+  - combos
+  - all key behaviors
+  - all layer layouts
+- the file is still data-only, which is good, but it is carrying too many
+  distinct authoring concerns in one place
+
+Why this matters:
+
+- Changes to macros, combos, and layer layouts all collide in one file
+  structurally and in review
+- discoverability is lower than it should be for a supposedly declarative
+  authoring surface
+- adding new layers or large behavior tables will keep increasing diff noise
+
+Recommended direction:
+
+- Keep the authored-data boundary exactly where it is today, but split the data
+  itself into domain files or `.inc` fragments.
+- One reasonable structure:
+  - `keymap_data/custom_keycodes.inc`
+  - `keymap_data/via_macros.inc`
+  - `keymap_data/hardcoded_macros.inc`
+  - `keymap_data/combos.inc`
+  - `keymap_data/key_behaviors.inc`
+  - `keymap_data/layers.inc`
+- Keep `MATERIALIZE_KEYMAP_DATA()` in one small assembly TU so the runtime
+  symbols remain easy to find.
+
+This is not about style. It is about reducing the size of the “one file you
+must touch for every kind of authored change”.
+
+## Requested Priority Assessment
+
+### 1. Architecture & Separation of Concerns
+
+Assessment:
+
+- Good inside the handled-key runtime and pd-mode subsystem.
+- Less good at the whole-userspace level because state and orchestration remain
+  partly centralized and partly hidden.
+
+Most important architectural boundary that should be preserved:
+
+- `noah_runtime.h` vs `noah_keymap.h`
+
+Most important architectural boundary that should improve:
+
+- runtime state ownership should become explicit and uniform
+
+### 2. Modularity & Extensibility
+
+Adding a new pd mode:
+
+- relatively good today because of the manifest-driven design
+
+Adding a new key behavior or action family:
+
+- still invasive because action classification, capability metadata, dispatch,
+  and hold semantics are spread across multiple core files
+
+Adding a new hook-level subsystem:
+
+- still requires editing top-level orchestration in `runtime_init.c`,
+  `key_runtime_process.c`, and sometimes `rgb_runtime.c`
+
+### 3. Abstractions & Interfaces
+
+Strong abstractions:
+
+- hook-entry boundary in `noah_runtime.h`
+- authored-data boundary in `noah_keymap.h`
+- pd-mode command/snapshot split
+
+Leaky abstractions:
+
+- the aggregate debug/reset surface currently compensates for hidden state
+  rather than reflecting a single coherent runtime context
+- action-kind abstractions are meaningful, but their implementation is too
+  scattered to count as a minimal stable interface yet
+
+### 4. Code Organization & Structure
+
+Good:
+
+- domain-oriented layout under `users/noah/lib/`
+- slot runtime decomposition is consistent
+- compat surfaces are centralized under `users/noah/lib/compat/`
+
+Needs improvement:
+
+- `keymap.c` is still too dense as an authored-data home
+- top-level orchestration lives in small files, but each one owns too much
+  privilege over module ordering
+
+### 5. State Management & Flow
+
+Good:
+
+- key runtime slot phases are explicit
+- pd-mode commands and snapshots make transitions readable
+
+Risky:
+
+- ownership state is spread across private static tables
+- whole-system reset/debug is manual integration code instead of a native
+  property of one runtime object
+
+### 6. Scalability of the Design
+
+Likely to scale well:
+
+- new authored rows in existing key-behavior/pd-mode patterns
+- more tests
+- more slot-level key-runtime nuance
+
+Likely bottlenecks:
+
+- new action kinds
+- new hook-level subsystems
+- more cross-cutting ownership/state modules
+- further growth of the monolithic authored keymap TU
+
+### 7. Testing & Debuggability
+
+Assessment:
+
+- test coverage is a major strength
+- compile gates correctly enforce header boundaries and feature wiring
+
+Specific improvement area:
+
+- move from “global reset plus broad debug snapshot” toward module-local query
+  seams backed by one explicit runtime context
+- keep `runtime_trace` small and structured; it is the right debugging style
+
+## Concrete Refactoring Sequence
+
+If I were sequencing architecture work here, I would do it in this order:
+
+1. Unify runtime state ownership behind a single context type while preserving
+   the current singleton execution path.
+2. Convert action kinds to a single-source definition list, borrowing the
+   pd-mode manifest pattern.
+3. Replace top-level imperative hook ordering with small declarative stage
+   tables for process-record, scan, post-init, and RGB render.
+4. Split the authored keymap data into smaller data-only files without moving
+   runtime logic back into the keymap layer.
+
+That order matters:
+
+- state unification reduces future cross-module wiring cost
+- action unification reduces the largest extensibility bottleneck
+- pipeline registration then becomes easier because subsystems have cleaner
+  interfaces
+- authoring-file decomposition is valuable, but it is lower risk and can land
+  independently after the runtime seams improve
+
+## Verification
+
+Commands run for this review:
+
+- `git status --short`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Results:
+
+- full host suite passed
+- firmware build passed and produced `.build/bastardkb_charybdis_4x6_noah.uf2`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
