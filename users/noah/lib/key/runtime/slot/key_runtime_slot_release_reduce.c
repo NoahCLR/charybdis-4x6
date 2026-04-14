@@ -9,7 +9,7 @@
 #include "key_runtime_slot_result_internal.h"
 
 key_runtime_slot_result_t key_runtime_slot_reduce_handled_release(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution) {
-    key_runtime_slot_result_t result = {0};
+    key_runtime_slot_result_t  result       = {0};
     handled_key_materialized_t materialized = handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
 
     if (slot) {

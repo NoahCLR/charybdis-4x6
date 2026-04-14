@@ -8,7 +8,6 @@
 
 #    include "../../action/action_dispatch.h"
 #    include "../../state/ownership/keyboard_mod_ownership.h"
-#    include "../../state/runtime/keyboard_mod_state.h"
 #    include "pd_mode_handler_common.h"
 
 #    define ARROW_VERTICAL_MASKED_MODS (MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_RIGHT_ALT))
@@ -27,21 +26,8 @@ static bool                 arrow_axis_is_x     = true;
 static uint8_t              arrow_shift_buttons = 0;
 static bool                 arrow_shift_held    = false;
 
-static keyboard_mod_state_t keyboard_mod_state_without_mods(keyboard_mod_state_t state, uint8_t mods) {
-    state.real &= (uint8_t)~mods;
-    state.weak &= (uint8_t)~mods;
-    state.oneshot &= (uint8_t)~mods;
-    state.oneshot_locked &= (uint8_t)~mods;
-    return state;
-}
-
 static void arrow_vertical_tap_code(uint16_t keycode) {
-    keyboard_mod_state_t saved    = keyboard_mod_state_suspend();
-    keyboard_mod_state_t filtered = keyboard_mod_state_without_mods(saved, ARROW_VERTICAL_MASKED_MODS);
-
-    keyboard_mod_state_apply(filtered);
-    noah_emit_synthetic_qmk_tap(keycode, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
-    keyboard_mod_state_apply(saved);
+    noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(keycode, ARROW_VERTICAL_MASKED_MODS, true);
 }
 
 static void arrow_shift_sync(void) {

@@ -164,14 +164,14 @@ static void noah_action_release_qmk_behavior(noah_action_desc_t desc, keypos_t k
 }
 
 static const noah_action_kind_dispatch_ops_t noah_action_kind_dispatch_ops[NOAH_ACTION_KIND_COUNT] = {
-    #define NOAH_ACTION_KIND_DEF(name, priority, matcher, cap_mask, feedback_kept, uses_desc_layer_preview, dispatch_mask, policy_mask, tap_impl, press_impl, release_impl) \
-        [NOAH_ACTION_KIND_##name] = { \
-            .tap     = tap_impl, \
-            .press   = press_impl, \
-            .release = release_impl, \
-        },
+#define NOAH_ACTION_KIND_DEF(name, priority, matcher, cap_mask, feedback_kept, uses_desc_layer_preview, dispatch_mask, policy_mask, tap_impl, press_impl, release_impl) \
+    [NOAH_ACTION_KIND_##name] = {                                                                                                                                       \
+        .tap     = tap_impl,                                                                                                                                            \
+        .press   = press_impl,                                                                                                                                          \
+        .release = release_impl,                                                                                                                                        \
+    },
     NOAH_ACTION_KIND_REGISTRY(NOAH_ACTION_KIND_DEF)
-    #undef NOAH_ACTION_KIND_DEF
+#undef NOAH_ACTION_KIND_DEF
 };
 
 static bool noah_action_kind_dispatch_ops_complete(const noah_action_kind_dispatch_ops_t *ops) {

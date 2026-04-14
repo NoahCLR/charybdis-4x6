@@ -253,11 +253,11 @@ static void test_automouse_progress_quantizes_concrete_boundaries(void) {
 
 static void test_slave_rpc_applies_exact_packet_and_snapshot(void) {
     split_runtime_sync_packet_t packet = {
-        .automouse_progress   = 42u,
-        .active_mode_id       = pd_mode_id_from_mask(PD_MODE_ARROW),
-        .locked_mode_id       = pd_mode_id_from_mask(PD_MODE_VOLUME),
-        .key_feedback_flags   = KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE,
-        .key_preview_layer    = 6u,
+        .automouse_progress = 42u,
+        .active_mode_id     = pd_mode_id_from_mask(PD_MODE_ARROW),
+        .locked_mode_id     = pd_mode_id_from_mask(PD_MODE_VOLUME),
+        .key_feedback_flags = KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE,
+        .key_preview_layer  = 6u,
     };
 
     test_reset_stubs();

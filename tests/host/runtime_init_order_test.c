@@ -69,6 +69,10 @@ void split_runtime_sync_tick(void) {
     test_log_stage("split_runtime_sync_tick");
 }
 
+void held_repeat_tick(void) {
+    test_log_stage("held_repeat_tick");
+}
+
 void macro_dispatch_validate_all(void) {
     test_log_stage("macro_dispatch_validate_all");
 }
@@ -114,11 +118,7 @@ static void test_matrix_scan_order(void) {
 
 static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
-        "macro_dispatch_validate_all",
-        "keymap_validate",
-        "via_macro_defaults_keyboard_post_init",
-        "rgb_runtime_post_init",
-        "split_runtime_sync_init",
+        "macro_dispatch_validate_all", "keymap_validate", "via_macro_defaults_keyboard_post_init", "rgb_runtime_post_init", "split_runtime_sync_init",
     };
 
     test_log_reset();
@@ -126,9 +126,20 @@ static void test_keyboard_post_init_order(void) {
     test_expect_sequence(expected, ARRAY_SIZE(expected));
 }
 
+static void test_housekeeping_order(void) {
+    static const char *const expected[] = {
+        "held_repeat_tick",
+    };
+
+    test_log_reset();
+    noah_housekeeping_task_user();
+    test_expect_sequence(expected, ARRAY_SIZE(expected));
+}
+
 int main(void) {
     test_eeconfig_init_order();
     test_matrix_scan_order();
+    test_housekeeping_order();
     test_keyboard_post_init_order();
 
     puts("runtime_init_order host tests passed");

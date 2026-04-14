@@ -192,6 +192,12 @@ Typical pattern:
 Many vertical threshold modes can reuse helpers from
 [`pd_mode_handler_common.h`](../users/noah/lib/pointing/modes/pd_mode_handler_common.h),
 but bespoke modes should still keep their own state in the per-mode file.
+If a mode needs to send a synthetic QMK tap while temporarily ignoring a subset
+of ambient keyboard modifiers, prefer
+[`noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(...)`](../users/noah/lib/action/action_dispatch.h)
+instead of open-coding `keyboard_mod_state_suspend()` / `keyboard_mod_state_apply()`
+around the emit. That keeps fallback-hold settlement and mod filtering in the
+shared output seam.
 
 Minimal skeleton:
 

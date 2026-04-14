@@ -20,6 +20,10 @@ __attribute__((weak)) void matrix_scan_user(void) {
     noah_matrix_scan_user();
 }
 
+__attribute__((weak)) void housekeeping_task_user(void) {
+    noah_housekeeping_task_user();
+}
+
 __attribute__((weak)) void keyboard_post_init_user(void) {
     noah_keyboard_post_init_user();
 }

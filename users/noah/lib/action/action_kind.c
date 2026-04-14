@@ -10,23 +10,22 @@
 
 #include "noah_keymap_ids.h"
 
-#define NOAH_ACTION_DISPATCH_STANDARD \
-    (NOAH_ACTION_DISPATCH_MACRO_PREFLIGHT | NOAH_ACTION_DISPATCH_PD_PRESS_INTERCEPT | NOAH_ACTION_DISPATCH_PD_RELEASE_INTERCEPT)
+#define NOAH_ACTION_DISPATCH_STANDARD (NOAH_ACTION_DISPATCH_MACRO_PREFLIGHT | NOAH_ACTION_DISPATCH_PD_PRESS_INTERCEPT | NOAH_ACTION_DISPATCH_PD_RELEASE_INTERCEPT)
 
 static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT] = {
-    #define NOAH_ACTION_KIND_DEF(name, priority, matcher, cap_mask, feedback_kept, uses_desc_layer_preview, dispatch_mask, policy_mask, tap_impl, press_impl, release_impl) \
-        [NOAH_ACTION_KIND_##name] = { \
-            .defined                       = true, \
-            .caps                          = (uint16_t)(cap_mask), \
-            .keeps_registered_feedback     = (feedback_kept), \
-            .preview_layer_uses_desc_layer = (uses_desc_layer_preview), \
-            .dispatch_flags                = (uint8_t)(dispatch_mask), \
-            .policy_flags                  = (uint16_t)(policy_mask), \
-            .match_priority                = (uint8_t)(priority), \
-            .match                         = matcher, \
-        },
+#define NOAH_ACTION_KIND_DEF(name, priority, matcher, cap_mask, feedback_kept, uses_desc_layer_preview, dispatch_mask, policy_mask, tap_impl, press_impl, release_impl) \
+    [NOAH_ACTION_KIND_##name] = {                                                                                                                                       \
+        .defined                       = true,                                                                                                                          \
+        .caps                          = (uint16_t)(cap_mask),                                                                                                          \
+        .keeps_registered_feedback     = (feedback_kept),                                                                                                               \
+        .preview_layer_uses_desc_layer = (uses_desc_layer_preview),                                                                                                     \
+        .dispatch_flags                = (uint8_t)(dispatch_mask),                                                                                                      \
+        .policy_flags                  = (uint16_t)(policy_mask),                                                                                                       \
+        .match_priority                = (uint8_t)(priority),                                                                                                           \
+        .match                         = matcher,                                                                                                                       \
+    },
     NOAH_ACTION_KIND_REGISTRY(NOAH_ACTION_KIND_DEF)
-    #undef NOAH_ACTION_KIND_DEF
+#undef NOAH_ACTION_KIND_DEF
 };
 
 static const noah_action_kind_def_t *noah_action_desc_kind_def(noah_action_desc_t desc) {

@@ -10,6 +10,7 @@ void           eeconfig_init_user(void);
 bool           get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
 bool           process_record_user(uint16_t keycode, keyrecord_t *record);
 void           matrix_scan_user(void);
+void           housekeeping_task_user(void);
 void           keyboard_post_init_user(void);
 layer_state_t  layer_state_set_user(layer_state_t state);
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report);
@@ -24,6 +25,7 @@ typedef struct {
     unsigned hold_calls;
     unsigned process_calls;
     unsigned scan_calls;
+    unsigned housekeeping_calls;
     unsigned post_init_calls;
     unsigned layer_state_calls;
     unsigned pointing_task_calls;
@@ -57,6 +59,7 @@ typedef struct {
     unsigned      hold_calls;
     unsigned      process_calls;
     unsigned      scan_calls;
+    unsigned      housekeeping_calls;
     unsigned      post_init_calls;
     unsigned      layer_state_calls;
     unsigned      pointing_task_calls;
@@ -121,6 +124,10 @@ void noah_matrix_scan_user(void) {
     noah_hook_stub_state.scan_calls++;
 }
 
+void noah_housekeeping_task_user(void) {
+    noah_hook_stub_state.housekeeping_calls++;
+}
+
 void noah_keyboard_post_init_user(void) {
     noah_hook_stub_state.post_init_calls++;
 }
@@ -174,6 +181,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 void matrix_scan_user(void) {
     hook_override_state.scan_calls++;
     noah_matrix_scan_user();
+}
+
+void housekeeping_task_user(void) {
+    hook_override_state.housekeeping_calls++;
+    noah_housekeeping_task_user();
 }
 
 void keyboard_post_init_user(void) {
@@ -252,6 +264,9 @@ static void test_weak_defaults_delegate_to_noah_helpers(void) {
     matrix_scan_user();
     CHECK(noah_hook_stub_state.scan_calls == 1);
 
+    housekeeping_task_user();
+    CHECK(noah_hook_stub_state.housekeeping_calls == 1);
+
     keyboard_post_init_user();
     CHECK(noah_hook_stub_state.post_init_calls == 1);
 
@@ -320,6 +335,10 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     matrix_scan_user();
     CHECK(hook_override_state.scan_calls == 1);
     CHECK(noah_hook_stub_state.scan_calls == 1);
+
+    housekeeping_task_user();
+    CHECK(hook_override_state.housekeeping_calls == 1);
+    CHECK(noah_hook_stub_state.housekeeping_calls == 1);
 
     keyboard_post_init_user();
     CHECK(hook_override_state.post_init_calls == 1);

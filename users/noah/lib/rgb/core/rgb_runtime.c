@@ -60,11 +60,7 @@ void noah_rgb_runtime_invalidate_layer_maps(void) {
 void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
     static const rgb_runtime_stage_fn_t stages[] = {
-        noah_rgb_validate_config,
-        rgb_runtime_layer_stage_post_init,
-        rgb_runtime_automouse_stage_post_init,
-        rgb_runtime_pd_mode_stage_post_init,
-        rgb_runtime_key_feedback_stage_post_init,
+        noah_rgb_validate_config, rgb_runtime_layer_stage_post_init, rgb_runtime_automouse_stage_post_init, rgb_runtime_pd_mode_stage_post_init, rgb_runtime_key_feedback_stage_post_init,
     };
 
     for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {

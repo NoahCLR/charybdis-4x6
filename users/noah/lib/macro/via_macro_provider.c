@@ -74,9 +74,9 @@ static bool via_macro_provider_find_slot(uint8_t slot, uint16_t *offset, uint16_
 }
 
 static bool via_macro_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir, void *context) {
-    uint16_t                   offset    = 0;
-    uint16_t                   remaining = 0;
-    via_macro_provider_reader_t reader   = {0};
+    uint16_t                    offset    = 0;
+    uint16_t                    remaining = 0;
+    via_macro_provider_reader_t reader    = {0};
 
     (void)context;
 

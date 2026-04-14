@@ -85,7 +85,7 @@ static void keyboard_mod_ownership_validate_state(const char *context) {
 
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
-    int8_t index = keyboard_mod_ownership_index_for_keycode(keycode);
+    int8_t                               index = keyboard_mod_ownership_index_for_keycode(keycode);
 
     if (index < 0 || !record || IS_NOEVENT(record->event)) {
         return;
@@ -104,7 +104,7 @@ void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyre
 
 bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
     noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
-    int8_t index = keyboard_mod_ownership_index_for_keycode(keycode);
+    int8_t                               index = keyboard_mod_ownership_index_for_keycode(keycode);
 
     if (index < 0 || !record || record->event.pressed) {
         return false;
@@ -115,8 +115,8 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
 }
 
 void keyboard_mod_ownership_register_mods(uint8_t mods) {
-    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
-    bool report_needed = false;
+    noah_keyboard_mod_ownership_state_t *state         = keyboard_mod_ownership_state();
+    bool                                 report_needed = false;
 
     if (mods == 0) {
         return;
@@ -149,8 +149,8 @@ void keyboard_mod_ownership_register_mods(uint8_t mods) {
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
-    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
-    bool report_needed = false;
+    noah_keyboard_mod_ownership_state_t *state         = keyboard_mod_ownership_state();
+    bool                                 report_needed = false;
 
     if (mods == 0) {
         return;

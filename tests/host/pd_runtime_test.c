@@ -350,9 +350,9 @@ static void test_pointing_device_task_dispatches_active_local_mode_and_tracks_la
 static void test_pointing_device_task_suppresses_idle_noise_after_quiet_window(void) {
     test_reset_stubs();
     noah_pointing_device_init_user();
-    fake_timer_ms             = 300000u;
-    fake_last_input_idle_ms   = 1000u;
-    fake_last_matrix_idle_ms  = 300000u;
+    fake_timer_ms            = 300000u;
+    fake_last_input_idle_ms  = 1000u;
+    fake_last_matrix_idle_ms = 300000u;
 
     report_mouse_t input = {.x = -1, .y = 1, .h = 0, .v = 0, .buttons = 0};
 
@@ -372,9 +372,9 @@ static void test_pointing_device_task_keeps_small_motion_while_recently_active(v
 static void test_pointing_device_task_keeps_small_motion_with_buttons_after_quiet_window(void) {
     test_reset_stubs();
     noah_pointing_device_init_user();
-    fake_timer_ms             = 300000u;
-    fake_last_input_idle_ms   = 5000u;
-    fake_last_matrix_idle_ms  = 300000u;
+    fake_timer_ms            = 300000u;
+    fake_last_input_idle_ms  = 5000u;
+    fake_last_matrix_idle_ms = 300000u;
 
     report_mouse_t input = {.x = 1, .y = 0, .h = 0, .v = 0, .buttons = 1};
 
@@ -384,9 +384,9 @@ static void test_pointing_device_task_keeps_small_motion_with_buttons_after_quie
 static void test_pointing_device_task_keeps_larger_motion_after_quiet_window(void) {
     test_reset_stubs();
     noah_pointing_device_init_user();
-    fake_timer_ms             = 300000u;
-    fake_last_input_idle_ms   = 5000u;
-    fake_last_matrix_idle_ms  = 300000u;
+    fake_timer_ms            = 300000u;
+    fake_last_input_idle_ms  = 5000u;
+    fake_last_matrix_idle_ms = 300000u;
 
     report_mouse_t input = {.x = 2, .y = 1, .h = 0, .v = 0, .buttons = 0};
 
@@ -396,9 +396,9 @@ static void test_pointing_device_task_keeps_larger_motion_after_quiet_window(voi
 static void test_pointing_device_task_keeps_small_motion_in_active_local_mode(void) {
     test_reset_stubs();
     noah_pointing_device_init_user();
-    fake_timer_ms             = 300000u;
-    fake_last_input_idle_ms   = 5000u;
-    fake_last_matrix_idle_ms  = 300000u;
+    fake_timer_ms            = 300000u;
+    fake_last_input_idle_ms  = 5000u;
+    fake_last_matrix_idle_ms = 300000u;
     CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
 
     report_mouse_t input = {.x = 1, .y = 0, .h = 0, .v = 0, .buttons = 0};
@@ -410,9 +410,9 @@ static void test_pointing_device_task_keeps_small_motion_in_active_local_mode(vo
 static void test_pointing_device_task_keeps_small_motion_before_arm_window_elapses(void) {
     test_reset_stubs();
     noah_pointing_device_init_user();
-    fake_timer_ms             = 299999u;
-    fake_last_input_idle_ms   = 1000u;
-    fake_last_matrix_idle_ms  = 300000u;
+    fake_timer_ms            = 299999u;
+    fake_last_input_idle_ms  = 1000u;
+    fake_last_matrix_idle_ms = 300000u;
 
     report_mouse_t input = {.x = -1, .y = 1, .h = 0, .v = 0, .buttons = 0};
 
@@ -422,9 +422,9 @@ static void test_pointing_device_task_keeps_small_motion_before_arm_window_elaps
 static void test_pointing_device_task_trusted_pointer_activity_delays_arm_window(void) {
     test_reset_stubs();
     noah_pointing_device_init_user();
-    fake_timer_ms             = 300000u;
-    fake_last_input_idle_ms   = 5000u;
-    fake_last_matrix_idle_ms  = 300000u;
+    fake_timer_ms            = 300000u;
+    fake_last_input_idle_ms  = 5000u;
+    fake_last_matrix_idle_ms = 300000u;
 
     report_mouse_t large_input = {.x = 3, .y = 0, .h = 0, .v = 0, .buttons = 0};
     report_mouse_t small_input = {.x = 1, .y = 0, .h = 0, .v = 0, .buttons = 0};
@@ -441,9 +441,9 @@ static void test_pointing_device_task_trusted_pointer_activity_delays_arm_window
 static void test_pointing_device_task_recent_matrix_activity_delays_arm_window(void) {
     test_reset_stubs();
     noah_pointing_device_init_user();
-    fake_timer_ms             = 300000u;
-    fake_last_input_idle_ms   = 1000u;
-    fake_last_matrix_idle_ms  = 10u;
+    fake_timer_ms            = 300000u;
+    fake_last_input_idle_ms  = 1000u;
+    fake_last_matrix_idle_ms = 10u;
 
     report_mouse_t input = {.x = -1, .y = 1, .h = 0, .v = 0, .buttons = 0};
 

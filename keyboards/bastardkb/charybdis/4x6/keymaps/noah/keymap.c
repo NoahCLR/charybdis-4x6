@@ -15,6 +15,7 @@
 // processing lives in the userspace runtime modules under users/noah/lib/.
 // ────────────────────────────────────────────────────────────────────────────
 
+#include "keycodes.h"
 #include "noah_keymap.h"
 
 // ─── Keymap-Local Custom Keycodes ──────────────────────────────────────────
@@ -293,7 +294,7 @@ enum keymap_custom_keycodes {
 const key_behavior_t
     key_behaviors[] =
         {
-            // Number row, shifted symbols on hold, media on double-tap
+            // Typing keys: number row, punctuation, and base typing layer-taps.
             {.keycode = KC_1, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)}}},
             {.keycode = KC_2, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_AT)}}},
             {.keycode = KC_3, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_HASH)}}},
@@ -304,34 +305,51 @@ const key_behavior_t
             {.keycode = KC_8, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR)}, [1] = {.tap = TAP_SENDS(KC_MPRV), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)}}},
             {.keycode = KC_9, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LPRN)}}},
             {.keycode = KC_0, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RPRN)}}},
-
-            // Punctuation → shifted variants
             {.keycode = KC_MINS, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)}}},
-            {.keycode = KC_LBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)}}},
-            {.keycode = KC_RBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)}}},
             {.keycode = KC_BSLS, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_PIPE)}}},
             {.keycode = KC_SCLN, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_COLN)}}},
             {.keycode = KC_QUOT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)}}},
             {.keycode = KC_COMM, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)}}},
             {.keycode = KC_DOT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)}}},
+            {.keycode = KC_LBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)}}},
+            {.keycode = KC_RBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)}}},
 
-            // Escape → Force Quit on hold, tilde on double-tap
+            // Editing / system keys.
             {.keycode = KC_ESC, .tap_counts = {[0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))}, [1] = {.tap = TAP_SENDS(S(KC_GRV))}}},
-
-            // Enter → Shift+Enter (new line without send in chat apps)
+            {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
+            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
 
-            // Left Shift keys: tap for Caps Lock, otherwise hold as normal Shift.
-            {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
+            // Layer-tap keys that also have tap overrides.
+            {.keycode = LT(LAYER_NAV, KC_SLSH), .tap_hold_term = 100, .tap_counts = {[1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))}}},
 
-            // Typing-layer pointer buttons to support arrow mode
-            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
-
-            // Arrows, release-based hold plus immediate long hold
+            // Navigation-layer overrides.
             {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
             {.keycode = KC_RIGHT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))}}},
 
-            // Layer keys, tap override on single tap, media on multi-tap, layer lock or repeat on hold
+            // Pointer-mode keys and tools.
+            {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_H)}}},
+            {
+                .keycode = PINCH_MODE,
+                .tap_counts =
+                    {
+                        [0] = {.tap = TAP_SENDS(KC_J)},
+                        [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
+                    },
+            },
+            {.keycode = VOLUME_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_N)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
+
+            // Dragscroll: single tap '.', hold = momentary, double-tap hold = lock.
+            {
+                .keycode = DRAGSCROLL,
+                .tap_counts =
+                    {
+                        [0] = {.tap = TAP_SENDS(KC_DOT)},
+                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))},
+                    },
+            },
+
+            // Custom keycodes, including combo-only outputs.
             {
                 .keycode = LEFT_THUMB,
                 .tap_counts =
@@ -348,7 +366,7 @@ const key_behavior_t
                 .tap_hold_term = 100,
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))},
+                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV)), .hold = KC_ESCAPE, .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))},
                         [1] = {.tap = TAP_SENDS(KC_MPLY), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
@@ -361,42 +379,6 @@ const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.hold = REPEAT_WHILE_HELD(MS_BTN1, 100)},
-                    },
-            },
-
-            // layer-tap key, double-tap hold locks LAYER_NAV.
-            {
-                .keycode       = LT(LAYER_NAV, KC_SLSH),
-                .tap_hold_term = 100,
-                .tap_counts =
-                    {
-                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))},
-                    },
-            },
-
-            // Pointing-device mode keys.
-            // Plain pd-mode keycodes already work as default momentary holds.
-            // These rows only add authored taps or higher-tap branches on top.
-            // If [0].tap is omitted, a quick single tap sends nothing.
-            // If [0].hold is omitted, single hold still uses the key's default momentary pd-mode.
-            {.keycode = VOLUME_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_N)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
-            {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_H)}}},
-            {
-                .keycode = PINCH_MODE,
-                .tap_counts =
-                    {
-                        [0] = {.tap = TAP_SENDS(KC_J)},
-                        [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
-                    },
-            },
-
-            // Dragscroll: single tap '.', hold = momentary, double-tap hold = lock.
-            {
-                .keycode = DRAGSCROLL,
-                .tap_counts =
-                    {
-                        [0] = {.tap = TAP_SENDS(KC_DOT)},
-                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))},
                     },
             },
 };

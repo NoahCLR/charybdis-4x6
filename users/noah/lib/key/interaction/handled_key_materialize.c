@@ -25,18 +25,18 @@ handled_key_materialized_t handled_key_materialize(handled_key_resolution_t reso
     handled_key_materialized_t       materialized     = handled_key_materialized_default(resolution);
 
     if (tap_source.found) {
-        materialized.tap_action       = handled_key_tap_action_behavior(tap_source.resolution);
-        materialized.tap_repeat_count = handled_key_tap_repeat_count_behavior(tap_source.resolution, materialized.tap_action);
-        materialized.tap_has_more_taps = tap_source.resolution.has_more_taps;
+        materialized.tap_action            = handled_key_tap_action_behavior(tap_source.resolution);
+        materialized.tap_repeat_count      = handled_key_tap_repeat_count_behavior(tap_source.resolution, materialized.tap_action);
+        materialized.tap_has_more_taps     = tap_source.resolution.has_more_taps;
         materialized.tap_resolves_on_press = handled_key_tap_resolves_on_press_behavior(tap_source.resolution);
     }
 
-    materialized.hold                  = hold_source.found ? handled_key_hold_behavior(hold_source.resolution) : hold_behavior_none();
-    materialized.long_hold             = long_hold_source.found ? long_hold_source.resolution.step.long_hold : hold_behavior_none();
-    materialized.hold_strategy         = hold_source.found ? handled_key_hold_strategy_behavior(hold_source.resolution) : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
-    materialized.layer                 = hold_source.found ? handled_key_resolution_source_layer(hold_source.resolution) : UINT8_MAX;
-    materialized.pd_mode               = hold_source.found ? hold_source.resolution.pd_mode : 0;
-    materialized.flags                 = resolution.flags & (uint16_t)~(HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
+    materialized.hold          = hold_source.found ? handled_key_hold_behavior(hold_source.resolution) : hold_behavior_none();
+    materialized.long_hold     = long_hold_source.found ? long_hold_source.resolution.step.long_hold : hold_behavior_none();
+    materialized.hold_strategy = hold_source.found ? handled_key_hold_strategy_behavior(hold_source.resolution) : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
+    materialized.layer         = hold_source.found ? handled_key_resolution_source_layer(hold_source.resolution) : UINT8_MAX;
+    materialized.pd_mode       = hold_source.found ? hold_source.resolution.pd_mode : 0;
+    materialized.flags         = resolution.flags & (uint16_t)~(HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
 
     if (hold_source.found && handled_key_resolution_source_is_momentary_layer(hold_source.resolution)) {
         materialized.flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER;

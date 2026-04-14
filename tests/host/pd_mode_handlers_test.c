@@ -129,6 +129,36 @@ void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
     noah_dispatch_synthetic_qmk_tap(keycode);
 }
 
+void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds) {
+    keyboard_mod_state_t saved = {
+        .real           = fake_mods,
+        .weak           = fake_weak_mods,
+        .oneshot        = fake_oneshot_mods,
+        .oneshot_locked = fake_oneshot_locked_mods,
+    };
+    keyboard_mod_state_t filtered = saved;
+
+    if (settle_pending_fallback_holds) {
+        noah_key_runtime_settle_pending_fallback_hold();
+        saved = (keyboard_mod_state_t){
+            .real           = fake_mods,
+            .weak           = fake_weak_mods,
+            .oneshot        = fake_oneshot_mods,
+            .oneshot_locked = fake_oneshot_locked_mods,
+        };
+        filtered = saved;
+    }
+
+    filtered.real &= (uint8_t)~masked_mods;
+    filtered.weak &= (uint8_t)~masked_mods;
+    filtered.oneshot &= (uint8_t)~masked_mods;
+    filtered.oneshot_locked &= (uint8_t)~masked_mods;
+
+    keyboard_mod_state_apply(filtered);
+    noah_dispatch_synthetic_qmk_tap(keycode);
+    keyboard_mod_state_apply(saved);
+}
+
 void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
     if (policy.settle_pending_fallback_holds) {
         noah_key_runtime_settle_pending_fallback_hold();
@@ -536,7 +566,7 @@ static void test_vertical_arrow_tap_masks_alt_and_restores_mod_state(void) {
     CHECK(fake_oneshot_mods == MOD_BIT(KC_LEFT_ALT));
     CHECK(fake_oneshot_locked_mods == (MOD_BIT(KC_RIGHT_ALT) | MOD_BIT(KC_RIGHT_SHIFT)));
     CHECK(fallback_hold_activation_count == 1);
-    CHECK(runtime_fixture.send_keyboard_report_count == 3);
+    CHECK(runtime_fixture.send_keyboard_report_count == 2);
 }
 
 static void test_arrow_mode_selection_button_holds_and_releases_shift(void) {

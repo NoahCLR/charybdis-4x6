@@ -49,11 +49,11 @@ static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_
         .automouse_progress = 0,
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
-        .active_mode_id   = pd_mode_id_from_mask(pd_mode_local_active_snapshot()),
-        .locked_mode_id   = pd_mode_id_from_mask(pd_mode_local_locked_snapshot()),
+        .active_mode_id = pd_mode_id_from_mask(pd_mode_local_active_snapshot()),
+        .locked_mode_id = pd_mode_id_from_mask(pd_mode_local_locked_snapshot()),
 #    else
-        .active_mode_id   = PD_MODE_ID_NONE,
-        .locked_mode_id   = PD_MODE_ID_NONE,
+        .active_mode_id = PD_MODE_ID_NONE,
+        .locked_mode_id = PD_MODE_ID_NONE,
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
         .key_feedback_flags = key_feedback_pack(),

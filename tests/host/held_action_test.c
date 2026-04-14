@@ -278,7 +278,7 @@ static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void)
     CHECK(tap_call_count == 2);
 }
 
-static void test_repeat_binding_catches_up_after_scan_gap(void) {
+static void test_repeat_binding_drops_backlog_after_scan_gap(void) {
     keypos_t key_pos = test_keypos(6, 6);
 
     test_reset_stubs();
@@ -289,10 +289,17 @@ static void test_repeat_binding_catches_up_after_scan_gap(void) {
     fake_time = (uint16_t)(fake_time + 120);
     held_repeat_tick();
 
-    CHECK(tap_call_count == 4);
+    CHECK(tap_call_count == 2);
     CHECK(tap_calls[1].action == TEST_SECOND_ACTION);
+
+    fake_time = (uint16_t)(fake_time + 39);
+    held_repeat_tick();
+    CHECK(tap_call_count == 2);
+
+    fake_time = (uint16_t)(fake_time + 1);
+    held_repeat_tick();
+    CHECK(tap_call_count == 3);
     CHECK(tap_calls[2].action == TEST_SECOND_ACTION);
-    CHECK(tap_calls[3].action == TEST_SECOND_ACTION);
 }
 
 static void test_repeat_binding_rejects_rates_above_supported_range(void) {
@@ -314,7 +321,7 @@ int main(void) {
     test_rebinding_same_key_releases_old_action_before_pressing_new();
     test_release_owned_by_key_reports_missing_bindings();
     test_repeat_binding_taps_immediately_and_on_tick_until_release();
-    test_repeat_binding_catches_up_after_scan_gap();
+    test_repeat_binding_drops_backlog_after_scan_gap();
     test_repeat_binding_rejects_rates_above_supported_range();
 
     puts("held_action host tests passed");

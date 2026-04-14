@@ -87,8 +87,8 @@ static inline void key_runtime_shared_state_reset(key_runtime_shared_state_t *st
         return;
     }
 
-    *state = (key_runtime_shared_state_t){0};
-    state->index.preview_owner_slot   = UINT8_MAX;
+    *state                             = (key_runtime_shared_state_t){0};
+    state->index.preview_owner_slot    = UINT8_MAX;
     state->index.pending_fallback_slot = UINT8_MAX;
 
     for (uint16_t index = 0; index < KEY_RUNTIME_SLOT_TABLE_CAPACITY; index++) {

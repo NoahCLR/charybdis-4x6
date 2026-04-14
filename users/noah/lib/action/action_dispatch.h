@@ -58,10 +58,10 @@ static inline bool noah_action_keycode_is_qmk_behavior(uint16_t action) {
 }
 
 typedef enum {
-    #define NOAH_ACTION_KIND_ENUM(name, priority, matcher, caps, keeps_feedback, preview_uses_desc_layer, dispatch_flags, policy_flags, tap, press, release) NOAH_ACTION_KIND_##name,
+#define NOAH_ACTION_KIND_ENUM(name, priority, matcher, caps, keeps_feedback, preview_uses_desc_layer, dispatch_flags, policy_flags, tap, press, release) NOAH_ACTION_KIND_##name,
     NOAH_ACTION_KIND_REGISTRY(NOAH_ACTION_KIND_ENUM)
-    #undef NOAH_ACTION_KIND_ENUM
-    NOAH_ACTION_KIND_COUNT,
+#undef NOAH_ACTION_KIND_ENUM
+        NOAH_ACTION_KIND_COUNT,
 } noah_action_kind_t;
 
 typedef enum {
@@ -89,20 +89,20 @@ typedef struct {
     pd_mode_mask_t     pd_mode;
 } noah_action_desc_t;
 
-bool noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability);
-bool noah_action_desc_is_runtime_handled_keycode(noah_action_desc_t desc);
-bool noah_action_desc_is_momentary_layer_keycode(noah_action_desc_t desc);
-bool noah_action_desc_uses_authored_layer_tap_contract(noah_action_desc_t desc);
-bool noah_action_desc_releases_momentary_layer_before_action(noah_action_desc_t desc);
-bool noah_action_desc_uses_held_lifecycle_for_press_and_hold(noah_action_desc_t desc);
-bool noah_action_desc_default_tap_uses_layer_tap_keycode(noah_action_desc_t desc);
-bool noah_action_desc_default_tap_uses_action_keycode(noah_action_desc_t desc);
-bool noah_action_desc_is_pure_modifier_literal(noah_action_desc_t desc);
-bool noah_action_desc_source_sets_momentary_layer_flag(noah_action_desc_t desc);
-bool noah_action_desc_source_sets_layer_tap_flag(noah_action_desc_t desc);
-bool noah_action_desc_supports_fallback_hold(noah_action_desc_t desc);
-bool noah_action_desc_source_layer_uses_desc_layer(noah_action_desc_t desc);
-uint8_t noah_action_desc_source_layer(noah_action_desc_t desc);
+bool     noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability);
+bool     noah_action_desc_is_runtime_handled_keycode(noah_action_desc_t desc);
+bool     noah_action_desc_is_momentary_layer_keycode(noah_action_desc_t desc);
+bool     noah_action_desc_uses_authored_layer_tap_contract(noah_action_desc_t desc);
+bool     noah_action_desc_releases_momentary_layer_before_action(noah_action_desc_t desc);
+bool     noah_action_desc_uses_held_lifecycle_for_press_and_hold(noah_action_desc_t desc);
+bool     noah_action_desc_default_tap_uses_layer_tap_keycode(noah_action_desc_t desc);
+bool     noah_action_desc_default_tap_uses_action_keycode(noah_action_desc_t desc);
+bool     noah_action_desc_is_pure_modifier_literal(noah_action_desc_t desc);
+bool     noah_action_desc_source_sets_momentary_layer_flag(noah_action_desc_t desc);
+bool     noah_action_desc_source_sets_layer_tap_flag(noah_action_desc_t desc);
+bool     noah_action_desc_supports_fallback_hold(noah_action_desc_t desc);
+bool     noah_action_desc_source_layer_uses_desc_layer(noah_action_desc_t desc);
+uint8_t  noah_action_desc_source_layer(noah_action_desc_t desc);
 uint16_t noah_action_desc_default_tap_action(noah_action_desc_t desc);
 
 static inline bool noah_action_desc_is_layer_lock(noah_action_desc_t desc) {
@@ -183,8 +183,9 @@ static inline bool noah_action_desc_consumes_direct_press(noah_action_desc_t des
 }
 
 noah_action_desc_t noah_action_describe(uint16_t action);
-bool action_dispatch_layer_is_locked(uint8_t layer);
-void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy);
-void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy);
-void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy);
-void action_dispatch(uint16_t action);
+bool               action_dispatch_layer_is_locked(uint8_t layer);
+void               noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy);
+void               noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy);
+void               noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds);
+void               noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy);
+void               action_dispatch(uint16_t action);

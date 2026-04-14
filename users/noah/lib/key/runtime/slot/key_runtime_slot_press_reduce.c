@@ -19,14 +19,14 @@ static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavi
 }
 
 static handled_key_materialized_t key_runtime_slot_press_materialized(handled_key_materialized_t materialized, uint16_t tap_action, uint8_t tap_repeat_count, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_hold_strategy_t hold_strategy) {
-    materialized.tap_action              = tap_action;
-    materialized.tap_repeat_count        = tap_repeat_count;
-    materialized.hold                    = hold;
-    materialized.long_hold               = long_hold;
-    materialized.authored.tap_hold_term  = tap_hold_term;
+    materialized.tap_action                = tap_action;
+    materialized.tap_repeat_count          = tap_repeat_count;
+    materialized.hold                      = hold;
+    materialized.long_hold                 = long_hold;
+    materialized.authored.tap_hold_term    = tap_hold_term;
     materialized.authored.longer_hold_term = longer_hold_term;
-    materialized.authored.multi_tap_term = multi_tap_term;
-    materialized.hold_strategy           = hold_strategy;
+    materialized.authored.multi_tap_term   = multi_tap_term;
+    materialized.hold_strategy             = hold_strategy;
     return handled_key_materialized_refresh_contract(materialized);
 }
 
@@ -59,20 +59,20 @@ typedef enum {
 } key_runtime_slot_press_outcome_t;
 
 typedef struct {
-    active_key_state_t              *slot;
-    uint16_t                         keycode;
-    keypos_t                         key_pos;
-    handled_key_resolution_t         resolution;
-    handled_key_materialized_t       materialized;
-    key_runtime_slot_binding_t       binding;
-    uint16_t                         tap_hold_term;
-    uint16_t                         longer_hold_term;
-    uint16_t                         multi_tap_term;
-    bool                             matching_pending_multi_tap;
-    bool                             flush_pending_multi_tap;
-    bool                             needs_layer_press;
-    bool                             reclaim_active_slot;
-    bool                             active_held_action_survives_flush;
+    active_key_state_t        *slot;
+    uint16_t                   keycode;
+    keypos_t                   key_pos;
+    handled_key_resolution_t   resolution;
+    handled_key_materialized_t materialized;
+    key_runtime_slot_binding_t binding;
+    uint16_t                   tap_hold_term;
+    uint16_t                   longer_hold_term;
+    uint16_t                   multi_tap_term;
+    bool                       matching_pending_multi_tap;
+    bool                       flush_pending_multi_tap;
+    bool                       needs_layer_press;
+    bool                       reclaim_active_slot;
+    bool                       active_held_action_survives_flush;
 } key_runtime_slot_press_context_t;
 
 static key_runtime_slot_press_context_t key_runtime_slot_press_context(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush) {
@@ -126,10 +126,10 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_reuse_pending_mul
     }
 
     if (key_runtime_slot_pending_multi_tap_pending_hold(context->slot) || context->needs_layer_press) {
-        handled_key_resolution_t current_tap                  = key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? handled_key_lookup_tap_count(context->keycode, context->slot->pending_multi_tap.count) : context->resolution;
-        handled_key_materialized_t current_materialized       = key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? handled_key_materialize(current_tap, handled_key_resolution_ctx_live(context->key_pos)) : context->materialized;
-        bool                     pending_hold                 = key_runtime_slot_pending_multi_tap_pending_hold(context->slot);
-        bool                     pending_layer_press          = (current_materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
+        handled_key_resolution_t     current_tap          = key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? handled_key_lookup_tap_count(context->keycode, context->slot->pending_multi_tap.count) : context->resolution;
+        handled_key_materialized_t   current_materialized = key_runtime_slot_pending_multi_tap_pending_hold(context->slot) ? handled_key_materialize(current_tap, handled_key_resolution_ctx_live(context->key_pos)) : context->materialized;
+        bool                         pending_hold         = key_runtime_slot_pending_multi_tap_pending_hold(context->slot);
+        bool                         pending_layer_press  = (current_materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
         key_runtime_effect_builder_t begin_builder;
 
         if (pending_layer_press && !context->needs_layer_press) {

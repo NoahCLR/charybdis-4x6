@@ -44,12 +44,12 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 static void test_reset_state(void) {
     memset(macro_buffer, 0, sizeof(macro_buffer));
-    fake_via_eeprom_valid           = true;
-    rgb_invalidate_count            = 0;
-    dynamic_keymap_set_buffer_calls = 0;
-    macro_payload_compile_calls     = 0;
+    fake_via_eeprom_valid               = true;
+    rgb_invalidate_count                = 0;
+    dynamic_keymap_set_buffer_calls     = 0;
+    macro_payload_compile_calls         = 0;
     macro_payload_encode_ir_write_calls = 0;
-    macro_payload_encode_write_calls = 0;
+    macro_payload_encode_write_calls    = 0;
 }
 
 uint16_t dynamic_keymap_macro_get_buffer_size(void) {
@@ -251,19 +251,19 @@ static void test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan(void) {
 }
 
 static void test_provider_encode_write_uses_cached_load_state(void) {
-    macro_slot_cache_t           cache[1]  = {0};
-    macro_slot_provider_t        provider  = {
+    macro_slot_cache_t    cache[1] = {0};
+    macro_slot_provider_t provider = {
         .slot_count     = 1,
         .load_ir        = test_provider_load_ir,
         .lookup_payload = test_provider_lookup_payload,
     };
-    test_provider_sink_t         sink      = {0};
-    uint16_t                     written   = 0;
+    test_provider_sink_t sink    = {0};
+    uint16_t             written = 0;
 
-    test_provider_load_ir_calls = 0;
-    test_provider_lookup_calls  = 0;
+    test_provider_load_ir_calls         = 0;
+    test_provider_lookup_calls          = 0;
     macro_payload_encode_ir_write_calls = 0;
-    macro_payload_encode_write_calls = 0;
+    macro_payload_encode_write_calls    = 0;
 
     CHECK(macro_slot_provider_encode_write(&provider, cache, 0, test_provider_sink_write_byte, &sink, &written));
     CHECK(test_provider_load_ir_calls == 1);
@@ -289,10 +289,10 @@ static void test_provider_encode_write_reloads_after_invalidate(void) {
         .load_ir        = test_provider_load_ir,
         .lookup_payload = test_provider_lookup_payload,
     };
-    test_provider_sink_t  sink = {0};
+    test_provider_sink_t sink = {0};
 
-    test_provider_load_ir_calls = 0;
-    test_provider_lookup_calls  = 0;
+    test_provider_load_ir_calls         = 0;
+    test_provider_lookup_calls          = 0;
     macro_payload_encode_ir_write_calls = 0;
 
     CHECK(macro_slot_provider_encode_write(&provider, cache, 0, test_provider_sink_write_byte, &sink, NULL));

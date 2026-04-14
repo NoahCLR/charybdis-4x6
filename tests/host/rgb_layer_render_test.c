@@ -427,14 +427,14 @@ static void test_slave_feedback_uses_remote_flags_and_flash_phase(void) {
 static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_when_feedback_flash_is_hidden(void) {
     test_reset();
 
-    fake_is_master                                 = false;
-    test_keymap[LAYER_NUM][0][0]                   = 0x0020u;
-    test_keymap[LAYER_NUM][0][1]                   = 0x0021u;
-    test_keymap[LAYER_NUM][1][0]                   = 0x0022u;
-    layer_state                                    = (layer_state_t)1u << LAYER_SYM;
-    split_runtime_sync_remote.key_preview_layer    = LAYER_NUM;
-    split_runtime_sync_remote.locked_mode_id       = pd_mode_id_from_mask(PD_MODE_VOLUME);
-    split_runtime_sync_remote.key_feedback_flags   = KEY_FEEDBACK_FLAG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LEVEL_FLASH;
+    fake_is_master                               = false;
+    test_keymap[LAYER_NUM][0][0]                 = 0x0020u;
+    test_keymap[LAYER_NUM][0][1]                 = 0x0021u;
+    test_keymap[LAYER_NUM][1][0]                 = 0x0022u;
+    layer_state                                  = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.key_preview_layer  = LAYER_NUM;
+    split_runtime_sync_remote.locked_mode_id     = pd_mode_id_from_mask(PD_MODE_VOLUME);
+    split_runtime_sync_remote.key_feedback_flags = KEY_FEEDBACK_FLAG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LEVEL_FLASH;
 
     CHECK(render_output());
 
@@ -449,14 +449,14 @@ static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_wh
 static void test_slave_full_scene_feedback_overrides_remote_preview_and_locked_pd_mode(void) {
     test_reset();
 
-    fake_is_master                                 = false;
-    test_keymap[LAYER_NUM][0][0]                   = 0x0020u;
-    test_keymap[LAYER_NUM][0][1]                   = 0x0021u;
-    test_keymap[LAYER_NUM][1][0]                   = 0x0022u;
-    layer_state                                    = (layer_state_t)1u << LAYER_SYM;
-    split_runtime_sync_remote.key_preview_layer    = LAYER_NUM;
-    split_runtime_sync_remote.locked_mode_id       = pd_mode_id_from_mask(PD_MODE_VOLUME);
-    split_runtime_sync_remote.key_feedback_flags   = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+    fake_is_master                               = false;
+    test_keymap[LAYER_NUM][0][0]                 = 0x0020u;
+    test_keymap[LAYER_NUM][0][1]                 = 0x0021u;
+    test_keymap[LAYER_NUM][1][0]                 = 0x0022u;
+    layer_state                                  = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.key_preview_layer  = LAYER_NUM;
+    split_runtime_sync_remote.locked_mode_id     = pd_mode_id_from_mask(PD_MODE_VOLUME);
+    split_runtime_sync_remote.key_feedback_flags = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
 
     CHECK(render_output());
 
@@ -572,8 +572,8 @@ static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
 static void test_slave_pointer_mode_overlay_uses_remote_display_state(void) {
     test_reset();
 
-    fake_is_master                          = false;
-    layer_state                             = (layer_state_t)1u << LAYER_SYM;
+    fake_is_master                           = false;
+    layer_state                              = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_VOLUME);
 
     CHECK(render_output());
@@ -733,14 +733,14 @@ static void test_slave_timeout_window_renders_without_live_auto_mouse_active_fla
 static void test_slave_locked_pd_mode_clamps_remote_automouse_progress(void) {
     test_reset();
 
-    fake_is_master                                 = false;
-    ws2812_leds[0]                                 = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
-    ws2812_leds[1]                                 = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
-    test_keymap[LAYER_POINTER][0][0]               = 0x0040u;
-    test_keymap[LAYER_POINTER][0][1]               = 0x0041u;
-    layer_state                                    = (layer_state_t)1u << LAYER_POINTER;
-    split_runtime_sync_remote.automouse_progress   = AUTOMOUSE_RGB_ACTIVE_SPAN / 2u;
-    split_runtime_sync_remote.locked_mode_id       = pd_mode_id_from_mask(PD_MODE_VOLUME);
+    fake_is_master                               = false;
+    ws2812_leds[0]                               = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    ws2812_leds[1]                               = (ws2812_led_t){.r = 8, .g = 9, .b = 10};
+    test_keymap[LAYER_POINTER][0][0]             = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1]             = 0x0041u;
+    layer_state                                  = (layer_state_t)1u << LAYER_POINTER;
+    split_runtime_sync_remote.automouse_progress = AUTOMOUSE_RGB_ACTIVE_SPAN / 2u;
+    split_runtime_sync_remote.locked_mode_id     = pd_mode_id_from_mask(PD_MODE_VOLUME);
 
     CHECK(render_output());
 

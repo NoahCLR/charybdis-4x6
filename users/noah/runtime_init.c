@@ -10,6 +10,7 @@
 
 #include "noah_runtime.h"
 
+#include "lib/key/ownership/held_repeat.h"
 #include "lib/key/runtime/key_runtime_api.h"
 #include "lib/key/interaction/keymap_validation.h"
 #include "lib/macro/macro_dispatch.h"
@@ -48,13 +49,19 @@ void noah_matrix_scan_user(void) {
     }
 }
 
+void noah_housekeeping_task_user(void) {
+    static const noah_runtime_init_stage_fn_t stages[] = {
+        held_repeat_tick,
+    };
+
+    for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {
+        stages[index]();
+    }
+}
+
 void noah_keyboard_post_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
-        macro_dispatch_validate_all,
-        noah_keymap_validate,
-        noah_via_macro_defaults_keyboard_post_init,
-        noah_rgb_runtime_post_init,
-        split_runtime_sync_init,
+        macro_dispatch_validate_all, noah_keymap_validate, noah_via_macro_defaults_keyboard_post_init, noah_rgb_runtime_post_init, split_runtime_sync_init,
     };
 
     for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {

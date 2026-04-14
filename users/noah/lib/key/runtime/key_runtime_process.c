@@ -23,7 +23,7 @@ typedef enum {
 typedef struct key_runtime_process_ctx_t key_runtime_process_ctx_t;
 typedef key_runtime_process_stage_outcome_t (*key_runtime_process_stage_fn_t)(key_runtime_process_ctx_t *ctx);
 typedef struct {
-    const char *name;
+    const char                    *name;
     key_runtime_process_stage_fn_t handler;
 } key_runtime_process_stage_entry_t;
 
@@ -128,13 +128,7 @@ bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough},
-        {.name = "preflight", .handler = key_runtime_process_stage_preflight},
-        {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode},
-        {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode},
-        {.name = "handled_key", .handler = key_runtime_process_stage_handled_key},
-        {.name = "direct_action", .handler = key_runtime_process_stage_direct_action},
-        {.name = "macro_dispatch", .handler = key_runtime_process_stage_macro_dispatch},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "macro_dispatch", .handler = key_runtime_process_stage_macro_dispatch},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,

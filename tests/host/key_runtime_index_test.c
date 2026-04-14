@@ -51,8 +51,8 @@ static active_key_state_t *test_slot(keypos_t key_pos) {
 
 static key_runtime_slot_interaction_t test_interaction(uint8_t preview_layer, uint16_t flags) {
     key_runtime_slot_interaction_t interaction = key_runtime_slot_interaction_default();
-    interaction.flags                         = flags;
-    interaction.contract.hold.preview_layer  = preview_layer;
+    interaction.flags                          = flags;
+    interaction.contract.hold.preview_layer    = preview_layer;
     return interaction;
 }
 

@@ -73,18 +73,18 @@ typedef struct {
 } handled_key_resolution_ctx_t;
 
 typedef struct {
-    handled_key_resolution_t      authored;
-    uint16_t                      tap_action;
-    uint8_t                       tap_repeat_count;
-    bool                          tap_has_more_taps;
-    hold_behavior_t               hold;
-    hold_behavior_t               long_hold;
+    handled_key_resolution_t         authored;
+    uint16_t                         tap_action;
+    uint8_t                          tap_repeat_count;
+    bool                             tap_has_more_taps;
+    hold_behavior_t                  hold;
+    hold_behavior_t                  long_hold;
     key_runtime_slot_hold_strategy_t hold_strategy;
-    uint8_t                       layer;
-    pd_mode_mask_t                pd_mode;
-    uint16_t                      flags;
-    bool                          tap_resolves_on_press;
-    handled_key_behavior_contract_t contract;
+    uint8_t                          layer;
+    pd_mode_mask_t                   pd_mode;
+    uint16_t                         flags;
+    bool                             tap_resolves_on_press;
+    handled_key_behavior_contract_t  contract;
 } handled_key_materialized_t;
 
 static inline handled_key_resolution_ctx_t handled_key_resolution_ctx_make(keypos_t key_pos, layer_state_t active_layers) {

@@ -77,13 +77,13 @@ static inline handled_key_hold_contract_t handled_key_hold_contract_for_behavior
 
 static inline handled_key_behavior_contract_t handled_key_behavior_contract(key_runtime_slot_hold_strategy_t hold_strategy, uint16_t flags, uint16_t tap_action, pd_mode_mask_t pd_mode, hold_behavior_t hold, hold_behavior_t long_hold) {
     return (handled_key_behavior_contract_t){
-        .hold                                      = handled_key_hold_semantics_for_behavior(hold_strategy, flags, hold),
-        .long_hold                                 = handled_key_hold_semantics_for_behavior(hold_strategy, flags, long_hold),
-        .quick_tap_pd_mode_lock                    = pd_mode,
-        .suppress_tap_on_layer_interrupt           = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0,
-        .buffered_base_tap_dispatches_tap          = (flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0 && tap_action == KC_NO,
+        .hold                                           = handled_key_hold_semantics_for_behavior(hold_strategy, flags, hold),
+        .long_hold                                      = handled_key_hold_semantics_for_behavior(hold_strategy, flags, long_hold),
+        .quick_tap_pd_mode_lock                         = pd_mode,
+        .suppress_tap_on_layer_interrupt                = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0,
+        .buffered_base_tap_dispatches_tap               = (flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0 && tap_action == KC_NO,
         .quick_release_of_immediate_hold_dispatches_tap = hold_registers_on_press(hold),
-        .fallback_hold_suppresses_nonquick_release = (flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0,
-        .nonquick_release_dispatches_tap           = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) == 0 && tap_action != KC_NO,
+        .fallback_hold_suppresses_nonquick_release      = (flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0,
+        .nonquick_release_dispatches_tap                = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) == 0 && tap_action != KC_NO,
     };
 }

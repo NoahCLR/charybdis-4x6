@@ -13,10 +13,10 @@ typedef bool (*macro_slot_provider_load_ir_fn)(uint8_t slot, macro_payload_ir_t 
 typedef bool (*macro_slot_provider_lookup_payload_fn)(uint8_t slot, const char **payload, void *context);
 
 typedef struct {
-    uint8_t                              slot_count;
-    macro_slot_provider_load_ir_fn       load_ir;
+    uint8_t                               slot_count;
+    macro_slot_provider_load_ir_fn        load_ir;
     macro_slot_provider_lookup_payload_fn lookup_payload;
-    void                                *context;
+    void                                 *context;
 } macro_slot_provider_t;
 
 typedef enum {

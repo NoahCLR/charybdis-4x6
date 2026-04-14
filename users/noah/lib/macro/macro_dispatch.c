@@ -54,7 +54,7 @@ static void macro_dispatch_log_invalid_payload(uint8_t slot, const char *payload
 }
 
 static bool macro_dispatch_validate_slot(uint8_t slot) {
-    const char                *payload = hardcoded_macro_payloads[slot];
+    const char              *payload = hardcoded_macro_payloads[slot];
     macro_slot_cache_state_t before  = hardcoded_macro_slots[slot].state;
 
     if (macro_slot_provider_load(&macro_dispatch_provider, hardcoded_macro_slots, slot)) {

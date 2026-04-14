@@ -17,7 +17,7 @@ enum {
 };
 
 static uint16_t fake_time;
-layer_state_t    layer_state;
+layer_state_t   layer_state;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);

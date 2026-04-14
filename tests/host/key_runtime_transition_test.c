@@ -210,14 +210,7 @@ static multi_tap_t *test_default_multi_tap(void) {
 }
 
 static key_runtime_slot_interaction_t test_stage_slot_interaction(key_runtime_slot_interaction_t interaction) {
-    if (interaction.selection.keycode == KC_NO &&
-        interaction.binding.tap_action == KC_NO &&
-        interaction.binding.tap_hold_term == 0 &&
-        interaction.binding.longer_hold_term == 0 &&
-        interaction.binding.multi_tap_term == 0 &&
-        interaction.flags == 0 &&
-        interaction.layer == 0 &&
-        interaction.pd_mode == 0) {
+    if (interaction.selection.keycode == KC_NO && interaction.binding.tap_action == KC_NO && interaction.binding.tap_hold_term == 0 && interaction.binding.longer_hold_term == 0 && interaction.binding.multi_tap_term == 0 && interaction.flags == 0 && interaction.layer == 0 && interaction.pd_mode == 0) {
         return key_runtime_slot_interaction_default();
     }
 
@@ -267,7 +260,7 @@ static void active_key_reset(void) {
 }
 
 static void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
-    handled_key_resolution_t      resolution = test_cached_resolution(keycode, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, 0, HANDLED_KEY_FLAG_HANDLED);
+    handled_key_resolution_t       resolution = test_cached_resolution(keycode, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, 0, HANDLED_KEY_FLAG_HANDLED);
     key_runtime_slot_interaction_t interaction;
 
     CHECK(hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
@@ -554,17 +547,17 @@ static void test_flush_multi_tap_replays_single_action(void) {
 
     test_reset_stubs();
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .pending_multi_tap =
-            {
-                .keycode                   = TEST_MULTI_TAP_KEY,
-                .count                     = 3,
-                .single_action             = TEST_FALLBACK_TAP_ACTION,
-                .saved_mods                = 0x11,
-                .saved_weak_mods           = 0x22,
-                .saved_oneshot_mods        = 0x33,
-                .saved_oneshot_locked_mods = 0x44,
-            },
-    });
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode                   = TEST_MULTI_TAP_KEY,
+                                                           .count                     = 3,
+                                                           .single_action             = TEST_FALLBACK_TAP_ACTION,
+                                                           .saved_mods                = 0x11,
+                                                           .saved_weak_mods           = 0x22,
+                                                           .saved_oneshot_mods        = 0x33,
+                                                           .saved_oneshot_locked_mods = 0x44,
+                                                       },
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_flush_multi_tap(&plan);
@@ -597,15 +590,15 @@ static void test_flush_multi_tap_prefers_exact_step_tap(void) {
                            });
 
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .pending_multi_tap =
-            {
-                .keycode          = TEST_MULTI_TAP_KEY,
-                .count            = 2,
-                .single_action    = TEST_FALLBACK_TAP_ACTION,
-                .tap_action       = TEST_MULTI_STEP_ACTION,
-                .tap_repeat_count = 1,
-            },
-    });
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode          = TEST_MULTI_TAP_KEY,
+                                                           .count            = 2,
+                                                           .single_action    = TEST_FALLBACK_TAP_ACTION,
+                                                           .tap_action       = TEST_MULTI_STEP_ACTION,
+                                                           .tap_repeat_count = 1,
+                                                       },
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_flush_multi_tap(&plan);
@@ -623,23 +616,23 @@ static void test_flush_multi_tap_flushes_each_active_slot_in_order(void) {
 
     test_reset_stubs();
     test_stage_slot_state(key_runtime_slot_for_position(test_keypos(0, 0)), (active_key_state_t){
-        .pending_multi_tap =
-            {
-                .keycode       = TEST_MULTI_TAP_KEY,
-                .key_pos       = test_keypos(0, 0),
-                .count         = 1,
-                .single_action = TEST_PREVIOUS_TAP_ACTION,
-            },
-    });
+                                                                                .pending_multi_tap =
+                                                                                    {
+                                                                                        .keycode       = TEST_MULTI_TAP_KEY,
+                                                                                        .key_pos       = test_keypos(0, 0),
+                                                                                        .count         = 1,
+                                                                                        .single_action = TEST_PREVIOUS_TAP_ACTION,
+                                                                                    },
+                                                                            });
     test_stage_slot_state(key_runtime_slot_for_position(test_keypos(0, 1)), (active_key_state_t){
-        .pending_multi_tap =
-            {
-                .keycode       = KC_RIGHT_ALT,
-                .key_pos       = test_keypos(0, 1),
-                .count         = 2,
-                .single_action = TEST_FALLBACK_TAP_ACTION,
-            },
-    });
+                                                                                .pending_multi_tap =
+                                                                                    {
+                                                                                        .keycode       = KC_RIGHT_ALT,
+                                                                                        .key_pos       = test_keypos(0, 1),
+                                                                                        .count         = 2,
+                                                                                        .single_action = TEST_FALLBACK_TAP_ACTION,
+                                                                                    },
+                                                                            });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_flush_multi_tap(&plan);
@@ -667,21 +660,20 @@ static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
     test_set_default_slot_key_pos(record.event.key);
 
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer                                 = (uint16_t)(fake_time - 50),
-        .owner.keycode                         = TEST_PD_MODE_KEY,
-        .owner.key_pos                         = record.event.key,
-        .lifecycle.held_action_keycode         = TEST_PD_MODE_KEY,
-        .lifecycle.pd_mode_was_locked_on_press = true,
-        .interaction = host_key_runtime_slot_interaction_from_authored_resolution(
-            test_cached_resolution(TEST_PD_MODE_KEY, KC_NO,
-                                   (hold_behavior_t){
-                                       .present = true,
-                                       .action  = TEST_PD_MODE_KEY,
-                                       .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                                   },
-                                   hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, PD_MODE_VOLUME, HANDLED_KEY_FLAG_HANDLED),
-            handled_key_resolution_ctx_make(record.event.key, layer_state)),
-    });
+                                                   .timer                                 = (uint16_t)(fake_time - 50),
+                                                   .owner.keycode                         = TEST_PD_MODE_KEY,
+                                                   .owner.key_pos                         = record.event.key,
+                                                   .lifecycle.held_action_keycode         = TEST_PD_MODE_KEY,
+                                                   .lifecycle.pd_mode_was_locked_on_press = true,
+                                                   .interaction                           = host_key_runtime_slot_interaction_from_authored_resolution(test_cached_resolution(TEST_PD_MODE_KEY, KC_NO,
+                                                                                                                                                                              (hold_behavior_t){
+                                                                                                                                                                                  .present = true,
+                                                                                                                                                                                  .action  = TEST_PD_MODE_KEY,
+                                                                                                                                                                                  .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                                                                                                                                                              },
+                                                                                                                                                                              hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, PD_MODE_VOLUME, HANDLED_KEY_FLAG_HANDLED),
+                                                                                                                                                       handled_key_resolution_ctx_make(record.event.key, layer_state)),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_PD_MODE_KEY, &record, key, &plan));
@@ -709,18 +701,18 @@ static void test_quick_release_immediate_hold_unregisters_then_taps(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(record.event.key);
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer                         = (uint16_t)(fake_time - 50),
-        .owner.keycode                 = TEST_NEW_KEY,
-        .owner.key_pos                 = record.event.key,
-        .lifecycle.held_action_keycode = TEST_IMMEDIATE_HOLD,
-        .interaction                   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION,
-                                                                 (hold_behavior_t){
-                                                                     .present = true,
-                                                                     .action  = TEST_IMMEDIATE_HOLD,
-                                                                     .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                                                                 },
-                                                                 hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-    });
+                                                   .timer                         = (uint16_t)(fake_time - 50),
+                                                   .owner.keycode                 = TEST_NEW_KEY,
+                                                   .owner.key_pos                 = record.event.key,
+                                                   .lifecycle.held_action_keycode = TEST_IMMEDIATE_HOLD,
+                                                   .interaction                   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION,
+                                                                                                            (hold_behavior_t){
+                                                                                                                .present = true,
+                                                                                                                .action  = TEST_IMMEDIATE_HOLD,
+                                                                                                                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                                                                                            },
+                                                                                                            hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_NEW_KEY, &record, key, &plan));
@@ -868,11 +860,11 @@ static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(2, 2));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .owner.keycode   = TEST_PLAIN_KEY,
-        .owner.key_pos   = test_keypos(2, 2),
-        .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
-        .interaction     = test_cached_interaction(KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-    });
+                                                   .owner.keycode   = TEST_PLAIN_KEY,
+                                                   .owner.key_pos   = test_keypos(2, 2),
+                                                   .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+                                                   .interaction     = test_cached_interaction(KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
     fallback_resolution = test_cached_resolution(TEST_PLAIN_KEY, TEST_PLAIN_KEY, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED);
     test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(fallback_resolution, test_default_slot_key_pos));
 
@@ -899,9 +891,9 @@ static void test_interrupt_other_press_marks_layer_interrupted(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(2, 5));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .owner.keycode = LT(2, TEST_FALLBACK_TAP_ACTION),
-        .owner.key_pos = test_keypos(2, 5),
-    });
+                                                   .owner.keycode = LT(2, TEST_FALLBACK_TAP_ACTION),
+                                                   .owner.key_pos = test_keypos(2, 5),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_interrupt_active_key_on_other_press(&plan);
@@ -959,12 +951,12 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
     test_set_default_slot_key_pos(record.event.key);
 
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer                       = (uint16_t)(fake_time - 30),
-        .owner.keycode               = layer_tap_keycode,
-        .owner.key_pos               = record.event.key,
-        .interaction                 = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-        .lifecycle.layer_interrupted = true,
-    });
+                                                   .timer                       = (uint16_t)(fake_time - 30),
+                                                   .owner.keycode               = layer_tap_keycode,
+                                                   .owner.key_pos               = record.event.key,
+                                                   .interaction                 = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                                   .lifecycle.layer_interrupted = true,
+                                               });
     interrupted_layer_resolution = test_cached_resolution(layer_tap_keycode, TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
     test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(interrupted_layer_resolution, record.event.key));
 
@@ -992,11 +984,11 @@ static void test_release_hold_prefers_long_hold_after_longer_term(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(record.event.key);
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 260),
-        .owner.keycode = TEST_NEW_KEY,
-        .owner.key_pos = record.event.key,
-        .interaction   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_THRESHOLD_HOLD)), HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_MULTI_STEP_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
-    });
+                                                   .timer         = (uint16_t)(fake_time - 260),
+                                                   .owner.keycode = TEST_NEW_KEY,
+                                                   .owner.key_pos = record.event.key,
+                                                   .interaction   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_THRESHOLD_HOLD)), HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_MULTI_STEP_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_NEW_KEY, &record, key, &plan));
@@ -1014,13 +1006,13 @@ static void test_release_repeat_hold_releases_owned_state(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(record.event.key);
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer                           = (uint16_t)(fake_time - 160),
-        .owner.keycode                   = TEST_NEW_KEY,
-        .owner.key_pos                   = record.event.key,
-        .lifecycle.phase                 = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-        .lifecycle.repeat_binding_active = true,
-        .interaction                     = test_cached_interaction(KC_NO, HOLD_LIT(REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25)), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-    });
+                                                   .timer                           = (uint16_t)(fake_time - 160),
+                                                   .owner.keycode                   = TEST_NEW_KEY,
+                                                   .owner.key_pos                   = record.event.key,
+                                                   .lifecycle.phase                 = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+                                                   .lifecycle.repeat_binding_active = true,
+                                                   .interaction                     = test_cached_interaction(KC_NO, HOLD_LIT(REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25)), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_NEW_KEY, &record, key, &plan));
@@ -1043,9 +1035,9 @@ static void test_mismatched_release_releases_owned_held_action(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(7, 6));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .owner.keycode = TEST_NEW_KEY,
-        .owner.key_pos = test_keypos(7, 6),
-    });
+                                                   .owner.keycode = TEST_NEW_KEY,
+                                                   .owner.key_pos = test_keypos(7, 6),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_NEW_KEY, &record, key, &plan));
@@ -1106,13 +1098,13 @@ static void test_press_on_third_position_keeps_existing_positions_active(void) {
     test_reset_stubs();
     active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
     test_stage_slot_state(other_slot, (active_key_state_t){
-        .timer                         = fake_time,
-        .owner.keycode                 = TEST_PLAIN_KEY,
-        .owner.key_pos                 = test_keypos(0, 2),
-        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-        .interaction                   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-        .lifecycle.held_action_keycode = TEST_PLAIN_KEY,
-    });
+                                          .timer                         = fake_time,
+                                          .owner.keycode                 = TEST_PLAIN_KEY,
+                                          .owner.key_pos                 = test_keypos(0, 2),
+                                          .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+                                          .interaction                   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                          .lifecycle.held_action_keycode = TEST_PLAIN_KEY,
+                                      });
 
     key.step.hold = (hold_behavior_t){
         .present = true,
@@ -1148,11 +1140,11 @@ static void test_release_on_other_position_leaves_existing_position_active(void)
     test_reset_stubs();
     active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
     test_stage_slot_state(released_slot, (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 40),
-        .owner.keycode = TEST_NEW_KEY,
-        .owner.key_pos = record.event.key,
-        .interaction   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-    });
+                                             .timer         = (uint16_t)(fake_time - 40),
+                                             .owner.keycode = TEST_NEW_KEY,
+                                             .owner.key_pos = record.event.key,
+                                             .interaction   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                         });
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_NEW_KEY, &record, key, &plan));
@@ -1174,20 +1166,20 @@ static void test_release_on_other_position_starts_independent_multi_tap_chain(vo
     test_reset_stubs();
     test_handled_key_enable_multi_tap(&key);
     test_stage_slot_state(test_slot_for_position(test_keypos(0, 1)), (active_key_state_t){
-        .pending_multi_tap =
-            {
-                .keycode       = TEST_MULTI_TAP_KEY,
-                .key_pos       = test_keypos(0, 1),
-                .count         = 1,
-                .single_action = TEST_PREVIOUS_TAP_ACTION,
-            },
-    });
+                                                                         .pending_multi_tap =
+                                                                             {
+                                                                                 .keycode       = TEST_MULTI_TAP_KEY,
+                                                                                 .key_pos       = test_keypos(0, 1),
+                                                                                 .count         = 1,
+                                                                                 .single_action = TEST_PREVIOUS_TAP_ACTION,
+                                                                             },
+                                                                     });
     test_stage_slot_state(released_slot, (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 40),
-        .owner.keycode = TEST_MULTI_TAP_KEY,
-        .owner.key_pos = record.event.key,
-        .interaction   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, 150),
-    });
+                                             .timer         = (uint16_t)(fake_time - 40),
+                                             .owner.keycode = TEST_MULTI_TAP_KEY,
+                                             .owner.key_pos = record.event.key,
+                                             .interaction   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, 150),
+                                         });
     key_runtime_slot_interaction_t pending_tap_interaction = released_slot->interaction;
     pending_tap_interaction.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
     pending_tap_interaction.binding.has_more_taps = true;
@@ -1217,14 +1209,14 @@ static void test_press_on_new_position_preserves_existing_pending_multi_tap(void
     test_reset_stubs();
     active_key_track(TEST_PREVIOUS_KEY, test_keypos(0, 1), TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW, KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
     test_stage_slot_state(test_slot_for_position(test_keypos(0, 2)), (active_key_state_t){
-        .pending_multi_tap =
-            {
-                .keycode       = TEST_MULTI_TAP_KEY,
-                .key_pos       = test_keypos(0, 2),
-                .count         = 1,
-                .single_action = TEST_FALLBACK_TAP_ACTION,
-            },
-    });
+                                                                         .pending_multi_tap =
+                                                                             {
+                                                                                 .keycode       = TEST_MULTI_TAP_KEY,
+                                                                                 .key_pos       = test_keypos(0, 2),
+                                                                                 .count         = 1,
+                                                                                 .single_action = TEST_FALLBACK_TAP_ACTION,
+                                                                             },
+                                                                     });
 
     key.step.hold = (hold_behavior_t){
         .present = true,
@@ -1252,24 +1244,24 @@ static void test_scan_fires_hold_for_independent_position_slot(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(1, 1));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer           = fake_time,
-        .owner.keycode   = TEST_PREVIOUS_KEY,
-        .owner.key_pos   = test_keypos(1, 1),
-        .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-    });
+                                                   .timer           = fake_time,
+                                                   .owner.keycode   = TEST_PREVIOUS_KEY,
+                                                   .owner.key_pos   = test_keypos(1, 1),
+                                                   .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+                                               });
     test_stage_slot_state(other_slot, (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 170),
-        .owner.keycode = TEST_NEW_KEY,
-        .owner.key_pos = test_keypos(6, 3),
-        .interaction   = test_cached_interaction(KC_NO,
-                                                 (hold_behavior_t){
-                                                     .present   = true,
-                                                     .action    = TEST_THRESHOLD_HOLD,
-                                                     .repeat_hz = 25,
-                                                     .mode      = HOLD_BEHAVIOR_REPEAT_WHILE_HELD,
-                                                 },
-                                                 hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-    });
+                                          .timer         = (uint16_t)(fake_time - 170),
+                                          .owner.keycode = TEST_NEW_KEY,
+                                          .owner.key_pos = test_keypos(6, 3),
+                                          .interaction   = test_cached_interaction(KC_NO,
+                                                                                   (hold_behavior_t){
+                                                                                       .present   = true,
+                                                                                       .action    = TEST_THRESHOLD_HOLD,
+                                                                                       .repeat_hz = 25,
+                                                                                       .mode      = HOLD_BEHAVIOR_REPEAT_WHILE_HELD,
+                                                                                   },
+                                                                                   hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                      });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1291,22 +1283,22 @@ static void test_release_pending_multi_tap_hold_registers_then_unregisters_held_
     test_reset_stubs();
     test_set_default_slot_key_pos(record.event.key);
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 200),
-        .owner.keycode = TEST_MULTI_TAP_KEY,
-        .owner.key_pos = record.event.key,
-        .interaction   = test_cached_interaction(KC_NO, HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD)), hold_behavior_none(), 120, 240, CUSTOM_MULTI_TAP_TERM),
-        .pending_multi_tap =
-            {
-                .keycode       = TEST_MULTI_TAP_KEY,
-                .key_pos       = record.event.key,
-                .timer         = (uint16_t)(fake_time - 150),
-                .count         = 2,
-                .pending_hold  = true,
-                .tap_hold_term = 120,
-                .hold          = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD),
-                .long_hold     = hold_behavior_none(),
-            },
-    });
+                                                   .timer         = (uint16_t)(fake_time - 200),
+                                                   .owner.keycode = TEST_MULTI_TAP_KEY,
+                                                   .owner.key_pos = record.event.key,
+                                                   .interaction   = test_cached_interaction(KC_NO, HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD)), hold_behavior_none(), 120, 240, CUSTOM_MULTI_TAP_TERM),
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode       = TEST_MULTI_TAP_KEY,
+                                                           .key_pos       = record.event.key,
+                                                           .timer         = (uint16_t)(fake_time - 150),
+                                                           .count         = 2,
+                                                           .pending_hold  = true,
+                                                           .tap_hold_term = 120,
+                                                           .hold          = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD),
+                                                           .long_hold     = hold_behavior_none(),
+                                                       },
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(TEST_MULTI_TAP_KEY, &record, key, &plan));
@@ -1357,27 +1349,27 @@ static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_laye
     test_set_default_slot_key_pos(record.event.key);
 
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 50),
-        .owner.keycode = MO(2),
-        .owner.key_pos = record.event.key,
-        .interaction   = test_cached_interaction(KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
-        .pending_multi_tap =
-            {
-                .keycode          = MO(2),
-                .key_pos          = record.event.key,
-                .timer            = (uint16_t)(fake_time - 50),
-                .count            = 2,
-                .pending_hold     = true,
-                .tap_action       = TEST_MULTI_STEP_ACTION,
-                .tap_repeat_count = 1,
-                .single_action    = TEST_FALLBACK_TAP_ACTION,
-                .has_more_taps    = true,
-                .tap_hold_term    = 120,
-                .multi_tap_term   = 150,
-                .long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
-            },
-    });
-    layered_multi_tap_resolution = test_cached_resolution(MO(2), KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER);
+                                                   .timer         = (uint16_t)(fake_time - 50),
+                                                   .owner.keycode = MO(2),
+                                                   .owner.key_pos = record.event.key,
+                                                   .interaction   = test_cached_interaction(KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode          = MO(2),
+                                                           .key_pos          = record.event.key,
+                                                           .timer            = (uint16_t)(fake_time - 50),
+                                                           .count            = 2,
+                                                           .pending_hold     = true,
+                                                           .tap_action       = TEST_MULTI_STEP_ACTION,
+                                                           .tap_repeat_count = 1,
+                                                           .single_action    = TEST_FALLBACK_TAP_ACTION,
+                                                           .has_more_taps    = true,
+                                                           .tap_hold_term    = 120,
+                                                           .multi_tap_term   = 150,
+                                                           .long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
+                                                       },
+                                               });
+    layered_multi_tap_resolution               = test_cached_resolution(MO(2), KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER);
     layered_multi_tap_resolution.layer         = 2;
     layered_multi_tap_resolution.has_more_taps = true;
     test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(layered_multi_tap_resolution, record.event.key));
@@ -1409,22 +1401,22 @@ static void test_scan_promotes_pending_multi_tap_hold(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(6, 2));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 200),
-        .owner.keycode = TEST_MULTI_TAP_KEY,
-        .owner.key_pos = test_keypos(6, 2),
-        .interaction   = test_cached_interaction(KC_NO, HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD)), hold_behavior_none(), 120, 240, CUSTOM_MULTI_TAP_TERM),
-        .pending_multi_tap =
-            {
-                .keycode       = TEST_MULTI_TAP_KEY,
-                .key_pos       = test_keypos(6, 2),
-                .timer         = (uint16_t)(fake_time - 150),
-                .count         = 2,
-                .pending_hold  = true,
-                .tap_hold_term = 120,
-                .hold          = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD),
-                .long_hold     = hold_behavior_none(),
-            },
-    });
+                                                   .timer         = (uint16_t)(fake_time - 200),
+                                                   .owner.keycode = TEST_MULTI_TAP_KEY,
+                                                   .owner.key_pos = test_keypos(6, 2),
+                                                   .interaction   = test_cached_interaction(KC_NO, HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD)), hold_behavior_none(), 120, 240, CUSTOM_MULTI_TAP_TERM),
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode       = TEST_MULTI_TAP_KEY,
+                                                           .key_pos       = test_keypos(6, 2),
+                                                           .timer         = (uint16_t)(fake_time - 150),
+                                                           .count         = 2,
+                                                           .pending_hold  = true,
+                                                           .tap_hold_term = 120,
+                                                           .hold          = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_MULTI_TAP_HOLD),
+                                                           .long_hold     = hold_behavior_none(),
+                                                       },
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1444,22 +1436,22 @@ static void test_scan_promotes_pending_multi_tap_momentary_hold_without_feedback
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(6, 2));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 200),
-        .owner.keycode = TEST_MULTI_TAP_KEY,
-        .owner.key_pos = test_keypos(6, 2),
-        .interaction   = test_cached_interaction(KC_NO, HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(MO(3))), hold_behavior_none(), 120, 240, CUSTOM_MULTI_TAP_TERM),
-        .pending_multi_tap =
-            {
-                .keycode       = TEST_MULTI_TAP_KEY,
-                .key_pos       = test_keypos(6, 2),
-                .timer         = (uint16_t)(fake_time - 150),
-                .count         = 2,
-                .pending_hold  = true,
-                .tap_hold_term = 120,
-                .hold          = PRESS_AND_HOLD_UNTIL_RELEASE(MO(3)),
-                .long_hold     = hold_behavior_none(),
-            },
-    });
+                                                   .timer         = (uint16_t)(fake_time - 200),
+                                                   .owner.keycode = TEST_MULTI_TAP_KEY,
+                                                   .owner.key_pos = test_keypos(6, 2),
+                                                   .interaction   = test_cached_interaction(KC_NO, HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(MO(3))), hold_behavior_none(), 120, 240, CUSTOM_MULTI_TAP_TERM),
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode       = TEST_MULTI_TAP_KEY,
+                                                           .key_pos       = test_keypos(6, 2),
+                                                           .timer         = (uint16_t)(fake_time - 150),
+                                                           .count         = 2,
+                                                           .pending_hold  = true,
+                                                           .tap_hold_term = 120,
+                                                           .hold          = PRESS_AND_HOLD_UNTIL_RELEASE(MO(3)),
+                                                           .long_hold     = hold_behavior_none(),
+                                                       },
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1484,22 +1476,22 @@ static void test_scan_promotes_pending_multi_tap_momentary_long_hold_without_fee
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(6, 3));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 260),
-        .owner.keycode = TEST_MULTI_TAP_KEY,
-        .owner.key_pos = test_keypos(6, 3),
-        .interaction   = test_cached_interaction(KC_NO, hold_behavior_none(), HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(MO(4))), 120, 240, CUSTOM_MULTI_TAP_TERM),
-        .pending_multi_tap =
-            {
-                .keycode       = TEST_MULTI_TAP_KEY,
-                .key_pos       = test_keypos(6, 3),
-                .timer         = (uint16_t)(fake_time - 250),
-                .count         = 2,
-                .pending_hold  = true,
-                .tap_hold_term = 120,
-                .hold          = hold_behavior_none(),
-                .long_hold     = PRESS_AND_HOLD_UNTIL_RELEASE(MO(4)),
-            },
-    });
+                                                   .timer         = (uint16_t)(fake_time - 260),
+                                                   .owner.keycode = TEST_MULTI_TAP_KEY,
+                                                   .owner.key_pos = test_keypos(6, 3),
+                                                   .interaction   = test_cached_interaction(KC_NO, hold_behavior_none(), HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(MO(4))), 120, 240, CUSTOM_MULTI_TAP_TERM),
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode       = TEST_MULTI_TAP_KEY,
+                                                           .key_pos       = test_keypos(6, 3),
+                                                           .timer         = (uint16_t)(fake_time - 250),
+                                                           .count         = 2,
+                                                           .pending_hold  = true,
+                                                           .tap_hold_term = 120,
+                                                           .hold          = hold_behavior_none(),
+                                                           .long_hold     = PRESS_AND_HOLD_UNTIL_RELEASE(MO(4)),
+                                                       },
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1524,16 +1516,16 @@ static void test_scan_flushes_expired_pending_multi_tap_chain(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(6, 4));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .pending_multi_tap =
-            {
-                .keycode        = TEST_MULTI_TAP_KEY,
-                .key_pos        = test_keypos(6, 4),
-                .timer          = (uint16_t)(fake_time - 200),
-                .count          = 2,
-                .single_action  = TEST_FALLBACK_TAP_ACTION,
-                .multi_tap_term = 150,
-            },
-    });
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode        = TEST_MULTI_TAP_KEY,
+                                                           .key_pos        = test_keypos(6, 4),
+                                                           .timer          = (uint16_t)(fake_time - 200),
+                                                           .count          = 2,
+                                                           .single_action  = TEST_FALLBACK_TAP_ACTION,
+                                                           .multi_tap_term = 150,
+                                                       },
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1552,11 +1544,11 @@ static void test_scan_starts_repeat_hold_at_threshold(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(6, 3));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 170),
-        .owner.keycode = TEST_NEW_KEY,
-        .owner.key_pos = test_keypos(6, 3),
-        .interaction   = test_cached_interaction(KC_NO, HOLD_LIT(REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25)), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-    });
+                                                   .timer         = (uint16_t)(fake_time - 170),
+                                                   .owner.keycode = TEST_NEW_KEY,
+                                                   .owner.key_pos = test_keypos(6, 3),
+                                                   .interaction   = test_cached_interaction(KC_NO, HOLD_LIT(REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25)), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1585,19 +1577,19 @@ static void test_scan_commits_immediate_hold_threshold_with_feedback(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(5, 0));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer                         = (uint16_t)(fake_time - 170),
-        .owner.keycode                 = TEST_NEW_KEY,
-        .owner.key_pos                 = test_keypos(5, 0),
-        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
-        .lifecycle.held_action_keycode = TEST_IMMEDIATE_HOLD,
-        .interaction                   = test_cached_interaction(KC_NO,
-                                                                 (hold_behavior_t){
-                                                                     .present = true,
-                                                                     .action  = TEST_IMMEDIATE_HOLD,
-                                                                     .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                                                                 },
-                                                                 hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-    });
+                                                   .timer                         = (uint16_t)(fake_time - 170),
+                                                   .owner.keycode                 = TEST_NEW_KEY,
+                                                   .owner.key_pos                 = test_keypos(5, 0),
+                                                   .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+                                                   .lifecycle.held_action_keycode = TEST_IMMEDIATE_HOLD,
+                                                   .interaction                   = test_cached_interaction(KC_NO,
+                                                                                                            (hold_behavior_t){
+                                                                                                                .present = true,
+                                                                                                                .action  = TEST_IMMEDIATE_HOLD,
+                                                                                                                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                                                                                            },
+                                                                                                            hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1620,19 +1612,19 @@ static void test_scan_commits_implicit_hold_without_feedback(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(5, 1));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer                         = (uint16_t)(fake_time - 170),
-        .owner.keycode                 = TEST_PD_MODE_KEY,
-        .owner.key_pos                 = test_keypos(5, 1),
-        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
-        .lifecycle.held_action_keycode = TEST_PD_MODE_KEY,
-        .interaction                   = test_cached_interaction(KC_NO,
-                                                                 (hold_behavior_t){
-                                                                     .present = true,
-                                                                     .action  = TEST_PD_MODE_KEY,
-                                                                     .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                                                                 },
-                                                                 hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-    });
+                                                   .timer                         = (uint16_t)(fake_time - 170),
+                                                   .owner.keycode                 = TEST_PD_MODE_KEY,
+                                                   .owner.key_pos                 = test_keypos(5, 1),
+                                                   .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+                                                   .lifecycle.held_action_keycode = TEST_PD_MODE_KEY,
+                                                   .interaction                   = test_cached_interaction(KC_NO,
+                                                                                                            (hold_behavior_t){
+                                                                                                                .present = true,
+                                                                                                                .action  = TEST_PD_MODE_KEY,
+                                                                                                                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                                                                                            },
+                                                                                                            hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
     implicit_hold_resolution = test_cached_resolution(TEST_PD_MODE_KEY, KC_NO,
                                                       (hold_behavior_t){
                                                           .present = true,
@@ -1656,13 +1648,13 @@ static void test_scan_promotes_to_long_hold_and_replaces_held_action(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(3, 0));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer                         = (uint16_t)(fake_time - 260),
-        .owner.keycode                 = TEST_NEW_KEY,
-        .owner.key_pos                 = test_keypos(3, 0),
-        .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
-        .lifecycle.held_action_keycode = TEST_THRESHOLD_HOLD,
-        .interaction                   = test_cached_interaction(KC_NO, HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_THRESHOLD_HOLD)), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
-    });
+                                                   .timer                         = (uint16_t)(fake_time - 260),
+                                                   .owner.keycode                 = TEST_NEW_KEY,
+                                                   .owner.key_pos                 = test_keypos(3, 0),
+                                                   .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
+                                                   .lifecycle.held_action_keycode = TEST_THRESHOLD_HOLD,
+                                                   .interaction                   = test_cached_interaction(KC_NO, HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_THRESHOLD_HOLD)), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1693,13 +1685,13 @@ static void test_scan_promotes_repeat_hold_to_long_hold(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(3, 1));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer                           = (uint16_t)(fake_time - 260),
-        .owner.keycode                   = TEST_NEW_KEY,
-        .owner.key_pos                   = test_keypos(3, 1),
-        .lifecycle.phase                 = KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
-        .lifecycle.repeat_binding_active = true,
-        .interaction                     = test_cached_interaction(KC_NO, HOLD_LIT(REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25)), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
-    });
+                                                   .timer                           = (uint16_t)(fake_time - 260),
+                                                   .owner.keycode                   = TEST_NEW_KEY,
+                                                   .owner.key_pos                   = test_keypos(3, 1),
+                                                   .lifecycle.phase                 = KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
+                                                   .lifecycle.repeat_binding_active = true,
+                                                   .interaction                     = test_cached_interaction(KC_NO, HOLD_LIT(REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25)), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_MULTI_STEP_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1730,22 +1722,22 @@ static void test_scan_pending_multi_tap_long_hold_releases_layer_before_lock(voi
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(6, 5));
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-        .timer         = (uint16_t)(fake_time - 260),
-        .owner.keycode = LT(1, TEST_FALLBACK_TAP_ACTION),
-        .owner.key_pos = test_keypos(6, 5),
-        .interaction   = test_cached_interaction(KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
-        .pending_multi_tap =
-            {
-                .keycode       = TEST_MULTI_TAP_KEY,
-                .key_pos       = test_keypos(6, 5),
-                .timer         = (uint16_t)(fake_time - 250),
-                .count         = 2,
-                .pending_hold  = true,
-                .tap_hold_term = 120,
-                .hold          = hold_behavior_none(),
-                .long_hold     = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
-            },
-    });
+                                                   .timer         = (uint16_t)(fake_time - 260),
+                                                   .owner.keycode = LT(1, TEST_FALLBACK_TAP_ACTION),
+                                                   .owner.key_pos = test_keypos(6, 5),
+                                                   .interaction   = test_cached_interaction(KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM),
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode       = TEST_MULTI_TAP_KEY,
+                                                           .key_pos       = test_keypos(6, 5),
+                                                           .timer         = (uint16_t)(fake_time - 250),
+                                                           .count         = 2,
+                                                           .pending_hold  = true,
+                                                           .tap_hold_term = 120,
+                                                           .hold          = hold_behavior_none(),
+                                                           .long_hold     = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
+                                                       },
+                                               });
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);
@@ -1772,25 +1764,24 @@ static void test_interrupt_plan_capacity_boundary_does_not_overflow(void) {
         keypos_t            key_pos = test_keypos((uint8_t)(index / MATRIX_COLS), (uint8_t)(index % MATRIX_COLS));
         active_key_state_t *slot    = test_slot_for_position(key_pos);
 
-        key_runtime_slot_track(slot,
-                               (uint16_t)(TEST_NEW_KEY + index),
-                               key_pos,
-                               host_key_runtime_slot_interaction_from_authored_resolution((handled_key_resolution_t){
-                                                                                              .keycode   = TEST_PLAIN_KEY,
-                                                                                              .tap_count = 1,
-                                                                                              .step =
-                                                                                                  {
-                                                                                                      .tap = TAP_SENDS(KC_NO),
-                                                                                                  },
-                                                                                              .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-                                                                                              .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-                                                                                              .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-                                                                                              .layer            = UINT8_MAX,
-                                                                                              .pd_mode          = 0,
-                                                                                              .has_more_taps    = false,
-                                                                                              .flags            = HANDLED_KEY_FLAG_HANDLED,
-                                                                                          },
-                                                                                          handled_key_resolution_ctx_make(key_pos, layer_state)),
+        key_runtime_slot_track(slot, (uint16_t)(TEST_NEW_KEY + index), key_pos,
+                               host_key_runtime_slot_interaction_from_authored_resolution(
+                                   (handled_key_resolution_t){
+                                       .keycode   = TEST_PLAIN_KEY,
+                                       .tap_count = 1,
+                                       .step =
+                                           {
+                                               .tap = TAP_SENDS(KC_NO),
+                                           },
+                                       .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+                                       .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+                                       .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+                                       .layer            = UINT8_MAX,
+                                       .pd_mode          = 0,
+                                       .has_more_taps    = false,
+                                       .flags            = HANDLED_KEY_FLAG_HANDLED,
+                                   },
+                                   handled_key_resolution_ctx_make(key_pos, layer_state)),
                                KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
     }
 

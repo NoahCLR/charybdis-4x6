@@ -95,7 +95,7 @@ static bool layer_ownership_remove_slot(uint16_t slot) {
         return false;
     }
 
-    uint8_t layer              = state->bindings[slot].layer;
+    uint8_t layer                = state->bindings[slot].layer;
     state->bindings[slot].active = false;
     state->bindings[slot].layer  = 0;
 
@@ -181,7 +181,7 @@ void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
 
 bool layer_ownership_momentary_release(keypos_t key_pos) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
-    int16_t slot = layer_ownership_find_slot_for_key(key_pos);
+    int16_t                       slot  = layer_ownership_find_slot_for_key(key_pos);
 
     if (slot < 0) {
         return false;

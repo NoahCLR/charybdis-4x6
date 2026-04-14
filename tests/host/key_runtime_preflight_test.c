@@ -365,22 +365,23 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
 
     test_reset_state();
     test_track_active_slot(KC_RIGHT_ALT, stored,
-                           host_key_runtime_slot_interaction_from_authored_resolution((handled_key_resolution_t){
-                                                                                           .keycode   = KC_RIGHT_ALT,
-                                                                                           .tap_count = 1,
-                                                                                           .step =
-                                                                                               {
-                                                                                                   .tap = TAP_SENDS(KC_NO),
-                                                                                               },
-                                                                                           .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-                                                                                           .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-                                                                                           .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-                                                                                           .layer            = UINT8_MAX,
-                                                                                           .pd_mode          = 0,
-                                                                                           .has_more_taps    = false,
-                                                                                           .flags            = HANDLED_KEY_FLAG_HANDLED,
-                                                                                       },
-                                                                                       handled_key_resolution_ctx_make(stored, (layer_state_t)1u << 0)),
+                           host_key_runtime_slot_interaction_from_authored_resolution(
+                               (handled_key_resolution_t){
+                                   .keycode   = KC_RIGHT_ALT,
+                                   .tap_count = 1,
+                                   .step =
+                                       {
+                                           .tap = TAP_SENDS(KC_NO),
+                                       },
+                                   .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+                                   .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+                                   .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+                                   .layer            = UINT8_MAX,
+                                   .pd_mode          = 0,
+                                   .has_more_taps    = false,
+                                   .flags            = HANDLED_KEY_FLAG_HANDLED,
+                               },
+                               handled_key_resolution_ctx_make(stored, (layer_state_t)1u << 0)),
                            KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_preflight_record(KC_LEFT_CTRL, &record));
@@ -393,7 +394,7 @@ static void test_handled_press_keeps_foreign_multi_tap_pending(void) {
     keyrecord_t record = test_record(test_keypos(3, 4), true);
 
     test_reset_state();
-    handled_key_stub_is_handled                                         = true;
+    handled_key_stub_is_handled = true;
     key_runtime_slot_begin_pending_multi_tap(key_runtime_slot_for_position(test_keypos(3, 3)), KC_RIGHT_ALT, test_keypos(3, 3), KC_NO, 0, CUSTOM_TAP_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
 
     CHECK(test_preflight_record(KC_LEFT_CTRL, &record));

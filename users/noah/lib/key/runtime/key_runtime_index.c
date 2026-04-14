@@ -86,8 +86,8 @@ static void key_runtime_index_refresh_single_owner_answers(key_runtime_shared_st
     state->index.pending_fallback_slot = UINT8_MAX;
 
     for (uint8_t order = 0; order < state->index.active_slot_count; order++) {
-        uint8_t            slot_index = state->index.active_slots[order];
-        active_key_state_t *slot      = &state->slots_by_position[slot_index];
+        uint8_t             slot_index = state->index.active_slots[order];
+        active_key_state_t *slot       = &state->slots_by_position[slot_index];
 
         if (state->index.preview_owner_slot == UINT8_MAX && key_runtime_index_slot_preview_owner_candidate(slot)) {
             state->index.preview_owner_slot = slot_index;
@@ -175,7 +175,7 @@ active_key_state_t *key_runtime_pending_fallback_slot(void) {
 
 uint8_t key_runtime_index_snapshot_active_slots(active_key_state_t **out_slots, uint8_t capacity) {
     const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
-    uint8_t                         count = index ? index->active_slot_count : 0;
+    uint8_t                          count = index ? index->active_slot_count : 0;
 
     if (count > capacity) {
         count = capacity;
@@ -190,7 +190,7 @@ uint8_t key_runtime_index_snapshot_active_slots(active_key_state_t **out_slots, 
 
 uint8_t key_runtime_index_snapshot_pending_multi_tap_slots(active_key_state_t **out_slots, uint8_t capacity) {
     const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
-    uint8_t                         count = index ? index->pending_multi_tap_count : 0;
+    uint8_t                          count = index ? index->pending_multi_tap_count : 0;
 
     if (count > capacity) {
         count = capacity;

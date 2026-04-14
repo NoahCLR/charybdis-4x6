@@ -87,9 +87,9 @@ bool held_repeat_release_owned_by_key(keypos_t key_pos) {
 }
 
 void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
-    noah_held_repeat_state_t *state = held_repeat_state();
-    uint16_t interval_ms          = held_repeat_interval_from_hz(repeat_hz);
-    bool     anchor_needs_refresh = true;
+    noah_held_repeat_state_t *state                = held_repeat_state();
+    uint16_t                  interval_ms          = held_repeat_interval_from_hz(repeat_hz);
+    bool                      anchor_needs_refresh = true;
 
     if (interval_ms == 0) {
         held_repeat_log_invalid_rate(key_pos, action);
@@ -132,8 +132,9 @@ void held_repeat_tick(void) {
             continue;
         }
 
-        while (timer_elapsed(state->bindings[i].last_fire_time) >= state->bindings[i].interval_ms) {
-            state->bindings[i].last_fire_time = (uint16_t)(state->bindings[i].last_fire_time + state->bindings[i].interval_ms);
+        uint16_t now = timer_read();
+        if (timer_elapsed(state->bindings[i].last_fire_time) >= state->bindings[i].interval_ms) {
+            state->bindings[i].last_fire_time = now;
             noah_emit_action_tap(state->bindings[i].action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
         }
     }

@@ -151,8 +151,11 @@ Those scan reducers handle threshold firing, long-hold promotion, and
 pending-multi-tap expiry through the same transition-plan mechanism as press
 and release.
 
-After the transition plan executes, [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c)
-advances time-based repeat bindings and dispatches any repeat taps that are due.
+Time-based repeat bindings now advance from the userspace housekeeping hook in
+[`runtime_init.c`](../users/noah/runtime_init.c), after QMK has already
+processed matrix changes for the loop. [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c)
+therefore schedules repeats from a post-event phase instead of the matrix-scan
+phase.
 
 ## Slot Model
 
@@ -265,7 +268,10 @@ These are the easiest runtime rules to break by accident:
 - New emitters should prefer the explicit helpers in
   [`action_dispatch.h`](../users/noah/lib/action/action_dispatch.h) so they
   state whether they settle pending fallback holds or preserve keyboard mod
-  state.
+  state. If a helper needs to ignore specific ambient modifiers for one
+  synthetic QMK tap, prefer
+  `noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(...)` over manual
+  mod suspend/apply sequences in the caller.
 - `action_dispatch()` now exists as the compatibility wrapper for the
   runtime-default authored tap path. New code should not treat it as the only
   output seam.

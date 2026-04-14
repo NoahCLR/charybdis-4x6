@@ -11,23 +11,23 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 
 enum {
-    TEST_LAYER_TAP_KEY                = 0x04,
-    TEST_AUTHORED_LAYER_TAP           = LT(2, TEST_LAYER_TAP_KEY),
-    TEST_BARE_LAYER_TAP               = LT(3, TEST_LAYER_TAP_KEY),
-    TEST_PD_MODE_KEY                  = SAFE_RANGE + 0x0Fu,
-    TEST_TAP_ACTION                   = SAFE_RANGE + 0x10u,
-    TEST_PD_MODE_LOCK_KEY             = SAFE_RANGE + 0x11u,
-    TEST_TRANSPARENT_PD_KEY           = SAFE_RANGE + 0x12u,
-    TEST_TRANSPARENT_KEY              = SAFE_RANGE + 0x13u,
-    TEST_MULTI_TAP_KEY                = SAFE_RANGE + 0x14u,
-    TEST_TRANSPARENT_HOLD_KEY         = SAFE_RANGE + 0x15u,
-    TEST_TRANSPARENT_HOLD_OTHER_KEY   = SAFE_RANGE + 0x16u,
-    TEST_TRANSPARENT_LONG_HOLD_KEY    = SAFE_RANGE + 0x17u,
-    TEST_HOLD_ACTION                  = SAFE_RANGE + 0x18u,
-    TEST_LONG_HOLD_ACTION             = SAFE_RANGE + 0x19u,
-    TEST_HOLD_BEHAVIOR_KEY            = SAFE_RANGE + 0x1Au,
-    TEST_LONG_HOLD_BEHAVIOR_KEY       = SAFE_RANGE + 0x1Bu,
-    TEST_CHAIN_MULTI_TAP_KEY          = SAFE_RANGE + 0x1Cu,
+    TEST_LAYER_TAP_KEY              = 0x04,
+    TEST_AUTHORED_LAYER_TAP         = LT(2, TEST_LAYER_TAP_KEY),
+    TEST_BARE_LAYER_TAP             = LT(3, TEST_LAYER_TAP_KEY),
+    TEST_PD_MODE_KEY                = SAFE_RANGE + 0x0Fu,
+    TEST_TAP_ACTION                 = SAFE_RANGE + 0x10u,
+    TEST_PD_MODE_LOCK_KEY           = SAFE_RANGE + 0x11u,
+    TEST_TRANSPARENT_PD_KEY         = SAFE_RANGE + 0x12u,
+    TEST_TRANSPARENT_KEY            = SAFE_RANGE + 0x13u,
+    TEST_MULTI_TAP_KEY              = SAFE_RANGE + 0x14u,
+    TEST_TRANSPARENT_HOLD_KEY       = SAFE_RANGE + 0x15u,
+    TEST_TRANSPARENT_HOLD_OTHER_KEY = SAFE_RANGE + 0x16u,
+    TEST_TRANSPARENT_LONG_HOLD_KEY  = SAFE_RANGE + 0x17u,
+    TEST_HOLD_ACTION                = SAFE_RANGE + 0x18u,
+    TEST_LONG_HOLD_ACTION           = SAFE_RANGE + 0x19u,
+    TEST_HOLD_BEHAVIOR_KEY          = SAFE_RANGE + 0x1Au,
+    TEST_LONG_HOLD_BEHAVIOR_KEY     = SAFE_RANGE + 0x1Bu,
+    TEST_CHAIN_MULTI_TAP_KEY        = SAFE_RANGE + 0x1Cu,
 };
 
 layer_state_t   layer_state;
@@ -323,7 +323,7 @@ static void test_repeat_rate_validation_helper_enforces_supported_range(void) {
 }
 
 static void test_transparent_tap_uses_lower_active_layer_tap_action(void) {
-    keypos_t                   key_pos     = test_keypos(0, 0);
+    keypos_t                   key_pos = test_keypos(0, 0);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -337,7 +337,7 @@ static void test_transparent_tap_uses_lower_active_layer_tap_action(void) {
 }
 
 static void test_transparent_tap_falls_back_to_base_layer_tap_action(void) {
-    keypos_t                   key_pos     = test_keypos(0, 1);
+    keypos_t                   key_pos = test_keypos(0, 1);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -350,7 +350,7 @@ static void test_transparent_tap_falls_back_to_base_layer_tap_action(void) {
 }
 
 static void test_transparent_tap_resolves_bare_lt_to_its_tap_keycode(void) {
-    keypos_t                   key_pos     = test_keypos(0, 2);
+    keypos_t                   key_pos = test_keypos(0, 2);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -363,7 +363,7 @@ static void test_transparent_tap_resolves_bare_lt_to_its_tap_keycode(void) {
 }
 
 static void test_transparent_tap_stops_at_plain_pd_mode_key_without_tap_output(void) {
-    keypos_t                   key_pos     = test_keypos(0, 3);
+    keypos_t                   key_pos = test_keypos(0, 3);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -377,7 +377,7 @@ static void test_transparent_tap_stops_at_plain_pd_mode_key_without_tap_output(v
 }
 
 static void test_transparent_tap_chains_through_lower_authored_transparency(void) {
-    keypos_t                   key_pos     = test_keypos(0, 4);
+    keypos_t                   key_pos = test_keypos(0, 4);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -391,7 +391,7 @@ static void test_transparent_tap_chains_through_lower_authored_transparency(void
 }
 
 static void test_transparent_tap_uses_current_tap_count_for_lower_handled_key(void) {
-    keypos_t                   key_pos     = test_keypos(0, 5);
+    keypos_t                   key_pos = test_keypos(0, 5);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -405,7 +405,7 @@ static void test_transparent_tap_uses_current_tap_count_for_lower_handled_key(vo
 }
 
 static void test_transparent_tap_inherits_lower_press_resolve_contract(void) {
-    keypos_t                   key_pos     = test_keypos(0, 6);
+    keypos_t                   key_pos = test_keypos(0, 6);
     handled_key_materialized_t first_tap;
     handled_key_materialized_t second_tap;
     multi_tap_t                chain = {0};
@@ -427,7 +427,7 @@ static void test_transparent_tap_inherits_lower_press_resolve_contract(void) {
 }
 
 static void test_transparent_tap_inherits_lower_release_resolve_contract(void) {
-    keypos_t                   key_pos     = test_keypos(0, 7);
+    keypos_t                   key_pos = test_keypos(0, 7);
     handled_key_materialized_t first_tap;
     handled_key_materialized_t second_tap;
     multi_tap_t                chain = {0};
@@ -453,7 +453,7 @@ static void test_transparent_tap_inherits_lower_release_resolve_contract(void) {
 }
 
 static void test_transparent_hold_uses_lower_plain_key_normal_hold_behavior(void) {
-    keypos_t                   key_pos     = test_keypos(1, 0);
+    keypos_t                   key_pos = test_keypos(1, 0);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -466,7 +466,7 @@ static void test_transparent_hold_uses_lower_plain_key_normal_hold_behavior(void
 }
 
 static void test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata(void) {
-    keypos_t                   key_pos     = test_keypos(1, 1);
+    keypos_t                   key_pos = test_keypos(1, 1);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -483,7 +483,7 @@ static void test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata(void)
 }
 
 static void test_transparent_hold_uses_lower_layer_tap_metadata(void) {
-    keypos_t                   key_pos     = test_keypos(1, 2);
+    keypos_t                   key_pos = test_keypos(1, 2);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -500,7 +500,7 @@ static void test_transparent_hold_uses_lower_layer_tap_metadata(void) {
 }
 
 static void test_transparent_hold_other_uses_lower_layer_tap_metadata(void) {
-    keypos_t                   key_pos     = test_keypos(1, 3);
+    keypos_t                   key_pos = test_keypos(1, 3);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -515,7 +515,7 @@ static void test_transparent_hold_other_uses_lower_layer_tap_metadata(void) {
 }
 
 static void test_transparent_hold_chains_through_lower_authored_transparency(void) {
-    keypos_t                   key_pos     = test_keypos(1, 4);
+    keypos_t                   key_pos = test_keypos(1, 4);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -531,7 +531,7 @@ static void test_transparent_hold_chains_through_lower_authored_transparency(voi
 }
 
 static void test_transparent_hold_uses_current_tap_count_for_lower_handled_key(void) {
-    keypos_t                   key_pos     = test_keypos(1, 5);
+    keypos_t                   key_pos = test_keypos(1, 5);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
@@ -546,7 +546,7 @@ static void test_transparent_hold_uses_current_tap_count_for_lower_handled_key(v
 }
 
 static void test_transparent_long_hold_uses_lower_explicit_long_hold_action(void) {
-    keypos_t                   key_pos     = test_keypos(1, 6);
+    keypos_t                   key_pos = test_keypos(1, 6);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();

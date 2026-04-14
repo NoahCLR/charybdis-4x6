@@ -20,6 +20,10 @@ static uint8_t fake_weak_mods;
 static uint8_t fake_oneshot_mods;
 static uint8_t fake_oneshot_locked_mods;
 static uint8_t send_keyboard_report_count;
+static uint8_t fallback_hold_settle_real_mods;
+static uint8_t fallback_hold_settle_weak_mods;
+static uint8_t fallback_hold_settle_oneshot_mods;
+static uint8_t fallback_hold_settle_oneshot_locked_mods;
 
 static uint8_t fallback_hold_activation_count;
 static bool    fallback_hold_active;
@@ -47,19 +51,23 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset_stubs(void) {
-    fake_mods                      = 0;
-    fake_weak_mods                 = 0;
-    fake_oneshot_mods              = 0;
-    fake_oneshot_locked_mods       = 0;
-    send_keyboard_report_count     = 0;
-    fallback_hold_activation_count = 0;
-    fallback_hold_active           = false;
-    action_tap_call                = (tap_call_t){0};
-    synthetic_qmk_tap_call         = (tap_call_t){0};
-    literal_tap_call               = (tap_call_t){0};
-    action_tap_call_count          = 0;
-    synthetic_qmk_tap_call_count   = 0;
-    literal_tap_call_count         = 0;
+    fake_mods                                = 0;
+    fake_weak_mods                           = 0;
+    fake_oneshot_mods                        = 0;
+    fake_oneshot_locked_mods                 = 0;
+    send_keyboard_report_count               = 0;
+    fallback_hold_settle_real_mods           = 0;
+    fallback_hold_settle_weak_mods           = 0;
+    fallback_hold_settle_oneshot_mods        = 0;
+    fallback_hold_settle_oneshot_locked_mods = 0;
+    fallback_hold_activation_count           = 0;
+    fallback_hold_active                     = false;
+    action_tap_call                          = (tap_call_t){0};
+    synthetic_qmk_tap_call                   = (tap_call_t){0};
+    literal_tap_call                         = (tap_call_t){0};
+    action_tap_call_count                    = 0;
+    synthetic_qmk_tap_call_count             = 0;
+    literal_tap_call_count                   = 0;
 
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         layer_locked_state[layer] = false;
@@ -132,6 +140,10 @@ void send_keyboard_report(void) {
 bool noah_key_runtime_settle_pending_fallback_hold(void) {
     fallback_hold_activation_count++;
     fallback_hold_active = true;
+    fake_mods |= fallback_hold_settle_real_mods;
+    fake_weak_mods |= fallback_hold_settle_weak_mods;
+    fake_oneshot_mods |= fallback_hold_settle_oneshot_mods;
+    fake_oneshot_locked_mods |= fallback_hold_settle_oneshot_locked_mods;
     return true;
 }
 
@@ -459,6 +471,31 @@ static void test_synthetic_qmk_emit_settles_fallback_hold_without_touching_mod_s
     CHECK(send_keyboard_report_count == 0);
 }
 
+static void test_masked_synthetic_qmk_emit_settles_fallback_hold_and_restores_post_settlement_mod_state(void) {
+    test_reset_stubs();
+    fake_mods                                = MOD_BIT(KC_LEFT_SHIFT);
+    fake_weak_mods                           = MOD_BIT(KC_RIGHT_ALT);
+    fake_oneshot_mods                        = MOD_BIT(KC_LEFT_GUI);
+    fallback_hold_settle_real_mods           = MOD_BIT(KC_LEFT_ALT);
+    fallback_hold_settle_oneshot_locked_mods = MOD_BIT(KC_RIGHT_ALT);
+
+    noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(KC_DOWN, (MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_RIGHT_ALT)), true);
+
+    CHECK(fallback_hold_activation_count == 1);
+    CHECK(synthetic_qmk_tap_call_count == 1);
+    CHECK(synthetic_qmk_tap_call.keycode == KC_DOWN);
+    CHECK(synthetic_qmk_tap_call.fallback_hold_active);
+    CHECK(synthetic_qmk_tap_call.real == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(synthetic_qmk_tap_call.weak == 0);
+    CHECK(synthetic_qmk_tap_call.oneshot == MOD_BIT(KC_LEFT_GUI));
+    CHECK(synthetic_qmk_tap_call.oneshot_locked == 0);
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_ALT)));
+    CHECK(fake_weak_mods == MOD_BIT(KC_RIGHT_ALT));
+    CHECK(fake_oneshot_mods == MOD_BIT(KC_LEFT_GUI));
+    CHECK(fake_oneshot_locked_mods == MOD_BIT(KC_RIGHT_ALT));
+    CHECK(send_keyboard_report_count == 2);
+}
+
 static void test_literal_emit_can_suspend_and_restore_mods(void) {
     test_reset_stubs();
     fake_mods                = MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_LEFT_SHIFT);
@@ -488,6 +525,7 @@ int main(void) {
     test_action_dispatch_keeps_runtime_default_policy();
     test_explicit_action_emit_can_skip_fallback_hold_settlement();
     test_synthetic_qmk_emit_settles_fallback_hold_without_touching_mod_state();
+    test_masked_synthetic_qmk_emit_settles_fallback_hold_and_restores_post_settlement_mod_state();
     test_literal_emit_can_suspend_and_restore_mods();
 
     puts("action_dispatch host tests passed");

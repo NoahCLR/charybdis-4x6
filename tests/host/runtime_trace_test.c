@@ -142,6 +142,12 @@ void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
     (void)policy;
 }
 
+void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds) {
+    (void)keycode;
+    (void)masked_mods;
+    (void)settle_pending_fallback_holds;
+}
+
 void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
     (void)keycode;
     (void)policy;
