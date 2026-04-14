@@ -12,6 +12,7 @@ AUTOMOUSE_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_AUTOMOUSE
 
 POINTING_TEST_FLAGS="-DPOINTING_DEVICE_ENABLE -DDPI_MOD=0x5201u -DDPI_RMOD=0x5202u -DS_D_MOD=0x5203u -DS_D_RMOD=0x5204u"
 RGB_TEST_FLAGS="-DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812"
+REPO_OWNED_PRODUCTION_PATHS="users/noah keyboards/bastardkb/charybdis/4x6/keymaps/noah"
 
 check_header_boundaries() {
     if rg -n '#include "(users/noah/)?noah_keymap.h"' "$ROOT/users/noah" --glob '!noah_keymap.h' >/dev/null; then
@@ -84,12 +85,16 @@ check_runtime_sealing_boundaries() {
 
     if (
         cd "$ROOT"
-        rg -n '#include ".*key_runtime_(state|process|index)\.h"' users/noah tests/host
+        # Intentional word splitting for repo-owned production path list.
+        # shellcheck disable=SC2086
+        rg -n '#include ".*key_runtime_(state|process|index)\.h"' $REPO_OWNED_PRODUCTION_PATHS tests/host
     ) >/dev/null; then
         echo "repo-owned code must not include removed key-runtime aggregate/index headers" >&2
         (
             cd "$ROOT"
-            rg -n '#include ".*key_runtime_(state|process|index)\.h"' users/noah tests/host
+            # Intentional word splitting for repo-owned production path list.
+            # shellcheck disable=SC2086
+            rg -n '#include ".*key_runtime_(state|process|index)\.h"' $REPO_OWNED_PRODUCTION_PATHS tests/host
         ) >&2
         exit 1
     fi
@@ -108,10 +113,12 @@ check_runtime_sealing_boundaries() {
     key_runtime_internal_prod_allowlist='^(users/noah/lib/key/runtime/|users/noah/lib/state/runtime/runtime_shared_state_internal\.h:)'
     key_runtime_internal_prod_violations="$(
         cd "$ROOT"
-        rg -n '#include ".*(key_runtime_internal\.h|key_runtime_process_internal\.h|key_runtime_shared_state\.h)"' users/noah | grep -Ev "$key_runtime_internal_prod_allowlist" || true
+        # Intentional word splitting for repo-owned production path list.
+        # shellcheck disable=SC2086
+        rg -n '#include ".*(key_runtime_internal\.h|key_runtime_process_internal\.h|key_runtime_shared_state\.h)"' $REPO_OWNED_PRODUCTION_PATHS | grep -Ev "$key_runtime_internal_prod_allowlist" || true
     )"
     if [ -n "$key_runtime_internal_prod_violations" ]; then
-        echo "only key-runtime owner modules and the aggregate runtime storage wrapper may include key-runtime internal headers" >&2
+        echo "only key-runtime owner modules and the aggregate runtime storage wrapper may include key-runtime internal headers in repo-owned production code" >&2
         printf '%s\n' "$key_runtime_internal_prod_violations" >&2
         exit 1
     fi
@@ -130,10 +137,12 @@ check_runtime_sealing_boundaries() {
     key_runtime_index_internal_prod_allowlist='^(users/noah/lib/key/runtime/)'
     key_runtime_index_internal_prod_violations="$(
         cd "$ROOT"
-        rg -n '#include ".*key_runtime_index_internal\.h"' users/noah | grep -Ev "$key_runtime_index_internal_prod_allowlist" || true
+        # Intentional word splitting for repo-owned production path list.
+        # shellcheck disable=SC2086
+        rg -n '#include ".*key_runtime_index_internal\.h"' $REPO_OWNED_PRODUCTION_PATHS | grep -Ev "$key_runtime_index_internal_prod_allowlist" || true
     )"
     if [ -n "$key_runtime_index_internal_prod_violations" ]; then
-        echo "only key-runtime owner modules may include key_runtime_index_internal.h" >&2
+        echo "only key-runtime owner modules may include key_runtime_index_internal.h in repo-owned production code" >&2
         printf '%s\n' "$key_runtime_index_internal_prod_violations" >&2
         exit 1
     fi
