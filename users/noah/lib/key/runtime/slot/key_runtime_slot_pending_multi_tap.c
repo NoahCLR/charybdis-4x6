@@ -260,7 +260,7 @@ static bool key_runtime_slot_pending_multi_tap_hold_elapsed(const active_key_sta
 }
 
 static bool key_runtime_slot_pending_multi_tap_scan_releases_layer_before_action(const active_key_state_t *slot, uint16_t action) {
-    return slot && is_layer_key(slot->owner.keycode) && noah_action_desc_is_layer_lock(noah_action_describe(action));
+    return slot && is_layer_key(slot->owner.keycode) && noah_action_desc_releases_momentary_layer_before_action(noah_action_describe(action));
 }
 
 typedef enum {

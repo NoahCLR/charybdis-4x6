@@ -249,6 +249,12 @@ static void test_invalid_action_kind_is_rejected_consistently(void) {
     CHECK(!noah_action_desc_intercepts_pd_mode_release(invalid));
     CHECK(!noah_action_desc_keeps_registered_feedback(invalid));
     CHECK(noah_action_desc_preview_layer(invalid) == UINT8_MAX);
+    CHECK(!noah_action_desc_is_runtime_handled_keycode(invalid));
+    CHECK(!noah_action_desc_is_momentary_layer_keycode(invalid));
+    CHECK(!noah_action_desc_uses_authored_layer_tap_contract(invalid));
+    CHECK(!noah_action_desc_releases_momentary_layer_before_action(invalid));
+    CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(invalid));
+    CHECK(!noah_action_desc_default_tap_uses_layer_tap_keycode(invalid));
     CHECK(!noah_action_desc_has_dispatch_ops(invalid));
     CHECK(!noah_action_kind_dispatch_has_complete_ops(invalid.kind));
 }

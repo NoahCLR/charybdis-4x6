@@ -38,7 +38,7 @@ static inline handled_key_hold_semantics_t handled_key_hold_semantics_for_behavi
 
     noah_action_desc_t desc = noah_action_describe(hold.action);
 
-    semantics.release_layer_before_action = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0 && noah_action_desc_is_layer_lock(desc);
+    semantics.release_layer_before_action = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0 && noah_action_desc_releases_momentary_layer_before_action(desc);
     semantics.preview_layer               = handled_key_hold_preview_layer(hold_strategy, hold, desc);
 
     switch (hold.mode) {
@@ -49,7 +49,7 @@ static inline handled_key_hold_semantics_t handled_key_hold_semantics_for_behavi
         case HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE:
             semantics.threshold                 = HANDLED_KEY_HOLD_THRESHOLD_REGISTER_HELD;
             semantics.threshold_action          = hold.action;
-            semantics.uses_held_lifecycle       = !noah_action_desc_is_press_only(desc);
+            semantics.uses_held_lifecycle       = noah_action_desc_uses_held_lifecycle_for_press_and_hold(desc);
             semantics.keeps_registered_feedback = handled_key_hold_action_keeps_registered_feedback(desc);
             return semantics;
         case HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD:

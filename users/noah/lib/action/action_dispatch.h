@@ -58,7 +58,7 @@ static inline bool noah_action_keycode_is_qmk_behavior(uint16_t action) {
 }
 
 typedef enum {
-    #define NOAH_ACTION_KIND_ENUM(name, priority, matcher, caps, keeps_feedback, preview_uses_desc_layer, dispatch_flags, tap, press, release) NOAH_ACTION_KIND_##name,
+    #define NOAH_ACTION_KIND_ENUM(name, priority, matcher, caps, keeps_feedback, preview_uses_desc_layer, dispatch_flags, policy_flags, tap, press, release) NOAH_ACTION_KIND_##name,
     NOAH_ACTION_KIND_REGISTRY(NOAH_ACTION_KIND_ENUM)
     #undef NOAH_ACTION_KIND_ENUM
     NOAH_ACTION_KIND_COUNT,
@@ -90,6 +90,12 @@ typedef struct {
 } noah_action_desc_t;
 
 bool noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability);
+bool noah_action_desc_is_runtime_handled_keycode(noah_action_desc_t desc);
+bool noah_action_desc_is_momentary_layer_keycode(noah_action_desc_t desc);
+bool noah_action_desc_uses_authored_layer_tap_contract(noah_action_desc_t desc);
+bool noah_action_desc_releases_momentary_layer_before_action(noah_action_desc_t desc);
+bool noah_action_desc_uses_held_lifecycle_for_press_and_hold(noah_action_desc_t desc);
+bool noah_action_desc_default_tap_uses_layer_tap_keycode(noah_action_desc_t desc);
 
 static inline bool noah_action_desc_is_layer_lock(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_LAYER_LOCK;

@@ -14,13 +14,14 @@
     (NOAH_ACTION_DISPATCH_MACRO_PREFLIGHT | NOAH_ACTION_DISPATCH_PD_PRESS_INTERCEPT | NOAH_ACTION_DISPATCH_PD_RELEASE_INTERCEPT)
 
 static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT] = {
-    #define NOAH_ACTION_KIND_DEF(name, priority, matcher, cap_mask, feedback_kept, uses_desc_layer_preview, dispatch_mask, tap_impl, press_impl, release_impl) \
+    #define NOAH_ACTION_KIND_DEF(name, priority, matcher, cap_mask, feedback_kept, uses_desc_layer_preview, dispatch_mask, policy_mask, tap_impl, press_impl, release_impl) \
         [NOAH_ACTION_KIND_##name] = { \
             .defined                       = true, \
             .caps                          = (uint16_t)(cap_mask), \
             .keeps_registered_feedback     = (feedback_kept), \
             .preview_layer_uses_desc_layer = (uses_desc_layer_preview), \
             .dispatch_flags                = (uint8_t)(dispatch_mask), \
+            .policy_flags                  = (uint8_t)(policy_mask), \
             .match_priority                = (uint8_t)(priority), \
             .match                         = matcher, \
         },
@@ -37,6 +38,11 @@ static bool noah_action_desc_has_dispatch_flag(noah_action_desc_t desc, noah_act
     return def && (def->dispatch_flags & (uint8_t)flag) != 0;
 }
 
+static bool noah_action_desc_has_policy_flag(noah_action_desc_t desc, noah_action_policy_flag_t flag) {
+    const noah_action_kind_def_t *def = noah_action_desc_kind_def(desc);
+    return def && (def->policy_flags & (uint8_t)flag) != 0;
+}
+
 bool noah_action_kind_metadata_defined(noah_action_kind_t kind) {
     const noah_action_kind_def_t *def = noah_action_kind_def(kind);
     return def && def->defined;
@@ -45,6 +51,30 @@ bool noah_action_kind_metadata_defined(noah_action_kind_t kind) {
 bool noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability) {
     const noah_action_kind_def_t *def = noah_action_desc_kind_def(desc);
     return def && (def->caps & (uint16_t)capability) != 0;
+}
+
+bool noah_action_desc_is_runtime_handled_keycode(noah_action_desc_t desc) {
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_RUNTIME_HANDLED_KEYCODE);
+}
+
+bool noah_action_desc_is_momentary_layer_keycode(noah_action_desc_t desc) {
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_MOMENTARY_LAYER_KEYCODE);
+}
+
+bool noah_action_desc_uses_authored_layer_tap_contract(noah_action_desc_t desc) {
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_AUTHORED_LAYER_TAP_CONTRACT);
+}
+
+bool noah_action_desc_releases_momentary_layer_before_action(noah_action_desc_t desc) {
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_RELEASES_MOMENTARY_LAYER_BEFORE_ACTION);
+}
+
+bool noah_action_desc_uses_held_lifecycle_for_press_and_hold(noah_action_desc_t desc) {
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_PRESS_AND_HOLD_USES_HELD_LIFECYCLE);
+}
+
+bool noah_action_desc_default_tap_uses_layer_tap_keycode(noah_action_desc_t desc) {
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_DEFAULT_TAP_USES_LAYER_TAP_KEYCODE);
 }
 
 bool noah_action_desc_dispatches_macro_preflight(noah_action_desc_t desc) {

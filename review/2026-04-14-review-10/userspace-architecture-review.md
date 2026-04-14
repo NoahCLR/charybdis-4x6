@@ -37,9 +37,9 @@ architecture scaling risks:
 1. runtime state ownership now has a canonical singleton context, but
    `runtime_shared_state.h` still exists as a compatibility shim and should not
    regain status as a primary runtime surface
-2. action-kind identity, classification, metadata, and dispatch are now
-   registry-backed, but action policy extensibility still stops at that
-   boundary, so novel action families still spill into downstream runtime logic
+2. action-kind identity, classification, metadata, dispatch, and the first
+   layer of runtime policy are now registry-backed, but fallback-hold and some
+   default-action policy still spill into downstream runtime logic
 3. hook-level orchestration is centralized and order-sensitive, so adding new
    subsystems still means editing core pipelines instead of registering
    capabilities
@@ -113,11 +113,11 @@ The action system has also moved in the right direction:
 - `users/noah/lib/action/action_kind.c:16-190`
 - `users/noah/lib/action/action_kind_dispatch.c:19-248`
 
-Enum identity, classification priority, metadata, and dispatch ops are now
-generated from one registry list instead of being maintained as separate,
-manually synchronized tables. That makes the core action surface much closer to
-the manifest-driven pd-mode pattern that was already the cleanest extensibility
-surface in the tree.
+Enum identity, classification priority, metadata, dispatch ops, and several
+runtime policy flags are now generated from one registry list instead of being
+maintained as separate, manually synchronized tables. That makes the action
+surface much closer to the manifest-driven pd-mode pattern that was already the
+cleanest extensibility surface in the tree.
 
 ## Findings
 
@@ -165,7 +165,7 @@ Recommended direction:
 - New runtime code should reach shared key/pd state through the context-backed
   helpers and let only the compatibility layer expose the legacy alias.
 
-### 2. The core action-kind surface is now registry-backed, but action policy is still only partly declarative
+### 2. The action-kind core now owns more runtime policy, but fallback-hold and transparency/default-action rules are still only partly declarative
 
 Severity: should-fix
 
@@ -178,6 +178,8 @@ References:
 - `users/noah/lib/key/interaction/key_behavior_lookup.c:46-58`
 - `users/noah/lib/key/interaction/key_behavior_lookup.c:120-146`
 - `users/noah/lib/key/interaction/handled_key_policy.h:30-89`
+- `users/noah/lib/key/interaction/handled_key_defaults.c:41-88`
+- `users/noah/lib/key/interaction/handled_key_transparency.c:34-43`
 - contrast:
   `users/noah/lib/pointing/defs/pd_mode_manifest.h:5-10`
 - contrast:
@@ -190,9 +192,17 @@ What I observed:
   - the enum in `action_dispatch.h`
   - the metadata and classification table in `action_kind.c`
   - the dispatch-op table in `action_kind_dispatch.c`
-- downstream policy checks still live outside that registry in:
-  - `key_behavior_lookup.c`
-  - `handled_key_policy.h`
+- the registry now also owns policy flags for:
+  - direct runtime-handled keycodes
+  - momentary-layer keycodes
+  - authored layer-tap contracts
+  - release-layer-before-action behavior
+  - press-and-hold held-lifecycle behavior
+  - default tap extraction for layer taps
+- downstream action policy still exists in:
+  - fallback-hold eligibility in `handled_key_defaults.c`
+  - transparency/default-action derivation in `handled_key_transparency.c`
+  - a smaller amount of lookup glue in `key_behavior_lookup.c`
 - by comparison, pd modes use a single manifest row that fans out into the rest
   of the subsystem
 
@@ -201,10 +211,13 @@ Why this matters:
 - The registry change removed a real scaling tax: enum membership,
   classification order, metadata, and dispatch ops no longer need manual
   synchronization across parallel core files.
-- But adding a genuinely new action family with novel hold-preview, feedback, or
-  authored-behavior semantics is still not fully additive.
-- The remaining cost lives in downstream policy code, not in the action-kind
-  core itself.
+- The latest pass removed another real scaling tax: handled-key runtime code no
+  longer needs to know that “layer lock means release the momentary layer first”
+  or that “pd-mode hold is directly handled” by hard-coded kind checks.
+- But adding a genuinely new action family with novel fallback-hold or
+  transparency/default-action semantics is still not fully additive.
+- The remaining cost is now narrower and more localized, but it still lives in
+  downstream policy code rather than entirely in the action-kind registry.
 
 Practical examples of features that would feel expensive under the current
 design:
@@ -222,6 +235,9 @@ Recommended direction:
   - authored capabilities
   - dispatch hooks
   - hold-preview / feedback policy hooks
+- Then move fallback-hold eligibility and default-action extraction behind that
+  same policy surface, so handled-key runtime code stops encoding action-family
+  knowledge locally.
 - That lets the next action-family addition be “add a row” much more often than
   “edit three policy files and re-derive behavior by hand”.
 
@@ -410,9 +426,9 @@ Leaky abstractions:
 - the compatibility `runtime_shared_state` surface is still visible enough that
   new code could regress toward aggregate access if the boundary is not kept
   narrow
-- action-kind abstractions are meaningful, but their implementation is too
-  distributed across registry rows plus downstream policy files to count as a
-  fully minimal stable interface yet
+- action-kind abstractions are much healthier now, but fallback-hold and
+  transparency/default-action policy still sit outside the registry-backed
+  descriptor surface
 
 ### 4. Code Organization & Structure
 
@@ -440,8 +456,8 @@ Risky:
 - the runtime context solved the old “private mutable statics everywhere”
   problem, but the compatibility alias still needs to remain secondary or that
   ownership model will drift back
-- action lifecycle policy is still split between registry-backed kind metadata
-  and downstream handled-key / authored-behavior logic
+- action lifecycle policy is mostly registry-backed now, but fallback-hold and
+  transparent/default tap derivation still live in downstream handled-key code
 
 ### 6. Scalability of the Design
 
@@ -478,8 +494,8 @@ If I were sequencing architecture work here, I would do it in this order:
 1. Keep the runtime context as the only primary state owner and continue
    narrowing the compatibility shim so new code cannot drift back onto legacy
    aggregate access.
-2. Extend the new action-kind registry so per-kind policy hooks live with the
-   kind definitions, not only classification/metadata/dispatch.
+2. Finish pulling the remaining fallback-hold and default-action policy into
+   the new action-kind registry so per-kind behavior is fully declarative.
 3. Replace top-level imperative hook ordering with small declarative stage
    tables for process-record, scan, post-init, and RGB render.
 4. Split the authored keymap data into smaller data-only files without moving
@@ -489,7 +505,8 @@ That order matters:
 
 - state unification already reduced future cross-module wiring cost
 - the landed action registry removed the worst synchronization debt, and the
-  next pass should finish pulling policy into that same declarative surface
+  next pass should finish pulling the remaining handled-key policy into that
+  same declarative surface
 - pipeline registration then becomes easier because subsystems have cleaner
   interfaces
 - authoring-file decomposition is valuable, but it is lower risk and can land

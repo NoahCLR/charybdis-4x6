@@ -76,7 +76,7 @@ static uint16_t handled_key_default_tap_action(handled_key_resolution_t resoluti
         return KC_NO;
     }
 
-    if (noah_action_desc_is_layer_tap(desc)) {
+    if (noah_action_desc_default_tap_uses_layer_tap_keycode(desc)) {
         return QK_LAYER_TAP_GET_TAP_KEYCODE(resolution.keycode);
     }
 

@@ -37,7 +37,7 @@ static bool key_runtime_slot_policy_hold_activation_needs_pulse(hold_behavior_t 
         return true;
     }
 
-    if (noah_action_desc_is_owned_momentary_layer(desc)) {
+    if (noah_action_desc_is_momentary_layer_keycode(desc)) {
         return pulse_momentary_layer_action;
     }
 

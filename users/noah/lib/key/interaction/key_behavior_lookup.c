@@ -120,7 +120,7 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     const key_behavior_t *config    = key_behavior_config_lookup(keycode);
     noah_action_desc_t    desc      = noah_action_describe(keycode);
-    bool                  custom_lt = noah_action_desc_is_layer_tap(desc) && config;
+    bool                  custom_lt = config && noah_action_desc_uses_authored_layer_tap_contract(desc);
 
     uint16_t tap_term = CUSTOM_TAP_HOLD_TERM;
     if (config && config->tap_hold_term) {
@@ -135,8 +135,8 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .config             = config,
         .keycode            = keycode,
-        .handled            = config || noah_action_desc_is_owned_momentary_layer(desc) || desc.pd_mode != 0,
-        .is_momentary_layer = noah_action_desc_is_owned_momentary_layer(desc) || custom_lt,
+        .handled            = config || noah_action_desc_is_runtime_handled_keycode(desc),
+        .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc) || custom_lt,
         .is_layer_tap       = custom_lt,
         .has_multi_tap      = key_behavior_has_multi_tap_in_config(config),
         .tap_hold_term      = tap_term,

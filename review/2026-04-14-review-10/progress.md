@@ -252,6 +252,83 @@ Workspace scope for this pass:
 Next steps:
 
 - keep the registry as the single source for action-kind identity and wiring
-- pull per-kind hold-preview, feedback, and authored-policy decisions into
+- pull the remaining fallback-hold and default-action policy into
   registry-backed hooks or policy descriptors
+- only after that, move on to declarative hook registration
+
+### Action policy flags
+
+Completed in this pass:
+
+- extended `users/noah/lib/action/action_kind_registry_list.h` with explicit
+  action policy flags for:
+  - direct runtime-handled keycodes
+  - momentary-layer keycodes
+  - authored layer-tap contracts
+  - release-layer-before-action behavior
+  - press-and-hold held-lifecycle behavior
+  - default tap extraction for layer taps
+- added public descriptor helpers in
+  `users/noah/lib/action/action_dispatch.h` /
+  `users/noah/lib/action/action_kind.c` so downstream runtime code can ask the
+  action registry for those semantics directly
+- moved handled-key lookup onto those helpers in
+  `users/noah/lib/key/interaction/key_behavior_lookup.c`
+- moved handled-key hold semantics onto those helpers in
+  `users/noah/lib/key/interaction/handled_key_policy.h`
+- moved pending multi-tap layer-release ordering onto those helpers in
+  `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c`
+- moved default layer-tap tap-key extraction onto those helpers in
+  `users/noah/lib/key/interaction/handled_key_defaults.c`
+- added host assertions for the new helper surface in
+  `tests/host/action_dispatch_test.c` and `tests/host/action_lifecycle_test.c`
+
+Architecture result after this pass:
+
+- the action registry now owns more than enum/metadata/dispatch; it also owns
+  the first layer of handled-key/runtime action policy
+- handled-key runtime code no longer needs to hard-code several action-family
+  facts like “layer lock releases the momentary layer first” or “pd-mode hold
+  is directly handled”
+- the remaining action-policy debt is now narrower: fallback-hold eligibility
+  and some transparency/default-action derivation still live downstream
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted action, key-behavior, integration, and compile-gate runners passed
+- full host suite passed
+- firmware build passed and produced
+  `.build/bastardkb_charybdis_4x6_noah.uf2`
+
+Workspace scope for this pass:
+
+- no sibling workspace folders were edited
+- changes are confined to `charybdis-4x6/`
+- action metadata, handled-key runtime call sites, host tests, and the active
+  review folder were updated together
+
+Next steps:
+
+- keep the action registry as the primary source of action-family semantics
+- move fallback-hold eligibility and remaining transparency/default-action rules
+  behind registry-backed policy hooks
 - only after that, move on to declarative hook registration
