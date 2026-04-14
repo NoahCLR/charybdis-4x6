@@ -340,6 +340,30 @@ If you are changing one of these categories, start here:
 If a change crosses those boundaries, it is probably architectural enough to
 deserve updates to this doc and to the active review log in `review/`.
 
+## Validation And Compile Gates
+
+Two post-init validation layers protect authored runtime data before normal
+use:
+
+- [`key_behavior_validate_all()`](../users/noah/lib/key/interaction/key_behavior_lookup.c)
+  checks duplicate `key_behaviors[]` rows, unsupported handled-key keycodes,
+  unsupported authored tap/hold actions, and invalid
+  `REPEAT_WHILE_HELD(...)` rates
+- [`noah_keymap_validate()`](../users/noah/lib/key/interaction/keymap_validation.c)
+  checks unsupported raw layer actions in `keymaps[][]`, unsupported raw
+  layer-action combo outputs, and unreachable `key_behaviors[]` rows that are
+  not referenced by either `keymaps[][]` or combo outputs
+
+Those validations run during `noah_keyboard_post_init_user()`, after
+`macro_dispatch_validate_all()` and before VIA default post-init work, RGB
+runtime init, and split-sync init.
+
+The most direct host checks for that surface are:
+
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_keymap_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
 ## Debugging And Tests
 
 For higher-level debugging, use the live query helpers in

@@ -80,13 +80,13 @@ These are the rules most likely to break the system if you miss one.
    Do not hand-edit the generated pd-mode section in [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h).
 3. `LOCK_PD_MODE(mode_keycode_)` token-pastes to the generated `<MODE>_LOCK`
    keycode, so authored mode keycodes must use the manifest-generated symbolic names.
-4. Mode flags and split sync now use `pd_mode_mask_t` / `uint16_t` storage:
+4. Mode flags use `pd_mode_mask_t`, and split sync mirrors the active and
+   locked modes as `pd_mode_id_t` values:
    [`users/noah/lib/pointing/defs/pd_mode_flags.h`](../users/noah/lib/pointing/defs/pd_mode_flags.h) and [`users/noah/lib/state/runtime/split_runtime_sync.h`](../users/noah/lib/state/runtime/split_runtime_sync.h).
-   The current design supports up to 16 modes.
+   The current `pd_mode_mask_t` storage caps `PD_MODE_COUNT` at 16.
 
 If you add a 17th mode, you must widen the flag storage and the
-[`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c) packet
-before the new mode is safe.
+split-sync assumptions before the new mode is safe.
 
 ## Files You Usually Touch
 
@@ -428,9 +428,10 @@ This is the actual control path for pd modes:
 7. [`users/noah/lib/pointing/policy/pointer_layer_policy.c`](../users/noah/lib/pointing/policy/pointer_layer_policy.c) keeps the configured
    auto-mouse target layer alive while modes are active or locked.
 8. [`users/noah/lib/state/runtime/split_runtime_sync.c`](../users/noah/lib/state/runtime/split_runtime_sync.c) mirrors active and locked
-   mode identity through compatibility flags to the other half, and
+   mode ids, auto-mouse progress, key-feedback flags, and preview-layer state
+   to the other half, and
    [`pd_mode_state.c`](../users/noah/lib/pointing/runtime/pd_mode_state.c)
-   exposes those as display-state queries for UI consumers.
+   exposes the mirrored mode state as display-state queries for UI consumers.
 9. [`users/noah/lib/rgb/core/rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c) orchestrates stage order, and
    [`users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/stages/rgb_pd_mode_stage.c) renders the mode overlay on the right half.
 

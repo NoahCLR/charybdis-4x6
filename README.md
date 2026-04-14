@@ -67,7 +67,7 @@ to understand and easy to change:
   call the matching `noah_*` helper to keep the shared behavior unless you are
   intentionally replacing it (see
   [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md))
-- `split_runtime_sync` syncs active and locked pointing-device mode flags,
+- `split_runtime_sync` syncs active and locked pointing-device mode ids,
   auto-mouse progress, key-feedback flags, and preview-layer state from master
   to slave so both halves render consistently
 
@@ -128,6 +128,36 @@ In other words:
 - if you want to add a shared pointing-device mode, start in [`pd_mode_manifest.h`](./users/noah/lib/pointing/defs/pd_mode_manifest.h) and the matching mode-owned files under [`users/noah/lib/pointing/modes/`](./users/noah/lib/pointing/modes/)
 - if you add a new shared userspace `.c` file, wire it into [`users/noah/source_manifest.mk`](./users/noah/source_manifest.mk) in the same pass
 - if you want to change board plumbing, start in [`users/noah/config.h`](./users/noah/config.h)
+
+## Build Wiring And Boundaries
+
+The shared userspace build surface is centered on
+[`users/noah/rules.mk`](./users/noah/rules.mk) and
+[`users/noah/source_manifest.mk`](./users/noah/source_manifest.mk).
+
+- [`rules.mk`](./users/noah/rules.mk) pulls in the canonical source manifest
+  and enables the current shared feature set (`VIA_ENABLE`, `COMBO_ENABLE`,
+  `LTO_ENABLE`)
+- [`source_manifest.mk`](./users/noah/source_manifest.mk) splits the userspace
+  into `NOAH_COMMON_SOURCES`, `NOAH_POINTING_SOURCES`,
+  `NOAH_AUTOMOUSE_SOURCES`, and `NOAH_RGB_KEYMAP_SOURCES`, so firmware builds
+  and host compile gates share one source inventory
+- [`keymap_materialize.h`](./users/noah/keymap_materialize.h) turns the
+  declarative blocks in
+  [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
+  into the runtime symbols consumed by the macro system, combo output checks,
+  and key-behavior lookup
+
+One important compile-gated boundary in this repo:
+
+- runtime modules under [`users/noah/`](./users/noah/) must not include
+  [`noah_keymap.h`](./users/noah/noah_keymap.h) directly
+- keymap-owned translation units under
+  [`keyboards/.../keymaps/noah/`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/)
+  must not include [`noah_runtime.h`](./users/noah/noah_runtime.h) directly
+
+That boundary, plus several internal-runtime sealing rules, is enforced by
+[`sh tests/host/run_feature_gate_compile_tests.sh`](./tests/host/run_feature_gate_compile_tests.sh).
 
 ## Layer Model And VIA
 
