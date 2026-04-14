@@ -7,9 +7,8 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/owned_keycode.h"
+#include "users/noah/lib/key/interaction/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
-#include "users/noah/lib/key/runtime/key_runtime_process.h"
-#include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_reset.h"
@@ -182,8 +181,12 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
-        .keycode = keycode,
-        .handled = true,
+        .keycode          = keycode,
+        .handled          = true,
+        .has_multi_tap    = keycode == TEST_MULTI_TAP_KEY,
+        .tap_hold_term    = keycode == TEST_MULTI_TAP_KEY ? 120 : 0,
+        .longer_hold_term = keycode == TEST_MULTI_TAP_KEY ? 240 : 0,
+        .multi_tap_term   = keycode == TEST_MULTI_TAP_KEY ? 150 : 0,
     };
 }
 
@@ -266,27 +269,41 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
     (void)action;
 }
 
+bool noah_synthetic_record_active(void) {
+    return false;
+}
+
+bool macro_dispatch(uint16_t keycode) {
+    (void)keycode;
+    return false;
+}
+
+bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return false;
+}
+
 static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifier, uint8_t expected_mask) {
-    handled_key_resolution_t      key        = key_runtime_integration_multi_tap_handled_key(TEST_MULTI_TAP_KEY, 120, 240, 150);
-    keypos_t                      source_pos = test_keypos(1, 1);
+    keypos_t source_pos = test_keypos(1, 1);
 
     integration_hold_modifier = modifier;
     integration_expected_mask = expected_mask;
     test_reset_state();
 
-    CHECK(key_runtime_integration_process_handled_press(TEST_MULTI_TAP_KEY, source_pos, key));
-    CHECK(key_runtime_integration_process_handled_release(TEST_MULTI_TAP_KEY, source_pos, key));
+    CHECK(!key_runtime_integration_process_record(TEST_MULTI_TAP_KEY, source_pos, true));
+    CHECK(!key_runtime_integration_process_record(TEST_MULTI_TAP_KEY, source_pos, false));
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(source_pos) == 1);
     CHECK(get_mods() == 0);
 
     key_runtime_integration_advance(&fake_time, 40);
-    CHECK(key_runtime_integration_process_handled_press(TEST_MULTI_TAP_KEY, source_pos, key));
-    CHECK(key_runtime_integration_process_handled_release(TEST_MULTI_TAP_KEY, source_pos, key));
+    CHECK(!key_runtime_integration_process_record(TEST_MULTI_TAP_KEY, source_pos, true));
+    CHECK(!key_runtime_integration_process_record(TEST_MULTI_TAP_KEY, source_pos, false));
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(source_pos) == 2);
     CHECK(get_mods() == 0);
 
     key_runtime_integration_advance(&fake_time, 40);
-    CHECK(key_runtime_integration_process_handled_press(TEST_MULTI_TAP_KEY, source_pos, key));
+    CHECK(!key_runtime_integration_process_record(TEST_MULTI_TAP_KEY, source_pos, true));
     CHECK(noah_runtime_debug_slot_pending_multi_tap_holding(source_pos));
     CHECK(noah_runtime_debug_slot_owner_keycode(source_pos) == TEST_MULTI_TAP_KEY);
     CHECK(get_mods() == 0);
@@ -308,7 +325,7 @@ static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifie
     CHECK(last_unregistered_keycode == TEST_CHORD_KEY);
     CHECK((last_unregistered_mods & integration_expected_mask) != 0);
 
-    CHECK(key_runtime_integration_process_handled_release(TEST_MULTI_TAP_KEY, source_pos, key));
+    CHECK(!key_runtime_integration_process_record(TEST_MULTI_TAP_KEY, source_pos, false));
     CHECK((test_snapshot_real_mods() & integration_expected_mask) == 0);
     CHECK((get_mods() & integration_expected_mask) == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(source_pos) == KC_NO);

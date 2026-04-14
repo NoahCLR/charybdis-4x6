@@ -1,6 +1,6 @@
 #include "key_runtime_integration_harness.h"
 
-#include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/key/runtime/key_runtime_api.h"
 #include "users/noah/noah_runtime.h"
 
 __attribute__((weak)) layer_state_t layer_state;
@@ -72,24 +72,4 @@ void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_s
                 break;
         }
     }
-}
-
-handled_key_resolution_t key_runtime_integration_multi_tap_handled_key(uint16_t keycode, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
-    handled_key_resolution_t resolution = handled_key_lookup(keycode);
-
-    resolution.flags |= HANDLED_KEY_FLAG_MULTI_TAP;
-    resolution.tap_hold_term    = tap_hold_term;
-    resolution.longer_hold_term = longer_hold_term;
-    resolution.multi_tap_term   = multi_tap_term;
-    return resolution;
-}
-
-bool key_runtime_integration_process_handled_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution) {
-    keyrecord_t record = key_runtime_integration_record(key_pos, true);
-    return key_runtime_process_handled_key_press(keycode, &record, resolution);
-}
-
-bool key_runtime_integration_process_handled_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution) {
-    keyrecord_t record = key_runtime_integration_record(key_pos, false);
-    return key_runtime_process_handled_key_release(keycode, &record, resolution);
 }

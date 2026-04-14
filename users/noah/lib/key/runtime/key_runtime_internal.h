@@ -17,8 +17,6 @@
 #include "../interaction/handled_key.h"
 #include "../interaction/key_behavior_lookup.h"
 
-void noah_key_runtime_scan(void);
-
 typedef struct {
     bool                  handled;
     uint16_t              action;
@@ -63,7 +61,6 @@ void                                       key_runtime_slot_reset_pending_multi_
 void                                       key_runtime_slot_set_held_action_keycode(active_key_state_t *slot, uint16_t held_action_keycode);
 void                                       key_runtime_slot_set_repeat_binding_active(active_key_state_t *slot, bool active);
 bool                                       key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot);
-bool                                       key_runtime_activate_pending_fallback_hold(void);
 void                                       key_runtime_slot_set_release_hold_pending(active_key_state_t *slot);
 void                                       key_runtime_slot_commit_hold_phase(active_key_state_t *slot, bool completes_hold);
 

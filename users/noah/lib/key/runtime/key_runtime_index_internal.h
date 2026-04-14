@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "key_runtime_state.h"
+#include "key_runtime_internal.h"
 
 void key_runtime_index_sync_slot(active_key_state_t *slot);
 uint8_t key_runtime_index_snapshot_active_slots(active_key_state_t **out_slots, uint8_t capacity);

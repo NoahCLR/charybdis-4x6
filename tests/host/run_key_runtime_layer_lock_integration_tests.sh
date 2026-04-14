@@ -49,7 +49,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_transition.c" \
     "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_debug.c" \
+    "$ROOT/users/noah/lib/key/runtime/key_runtime_debug.c" \
     "$ROOT/users/noah/lib/state/runtime/keyboard_mod_state.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \

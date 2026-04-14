@@ -6,7 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "../interaction/handled_key.h"
-#include "key_runtime_process.h"
+#include "key_runtime_process_internal.h"
 #include "key_runtime_trace.h"
 #include "key_runtime_transition.h"
 #include "../../state/runtime/split_runtime_sync.h"

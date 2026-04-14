@@ -15,7 +15,7 @@
 #include "key_runtime_index.h"
 #include "key_runtime_index_internal.h"
 #include "slot/key_runtime_slot_step.h"
-#include "key_runtime_state.h"
+#include "key_runtime_internal.h"
 #include "key_runtime_trace.h"
 #include "../../action/action_dispatch.h"
 #include "../../action/action_lifecycle.h"

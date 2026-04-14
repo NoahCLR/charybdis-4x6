@@ -60,7 +60,7 @@ NOAH_COMMON_SOURCES := \
     lib/state/runtime/keyboard_mod_state.c \
     lib/state/ownership/keyboard_mod_ownership.c \
     lib/state/ownership/layer_ownership.c \
-    lib/state/runtime/runtime_debug.c \
+    lib/key/runtime/key_runtime_debug.c \
     lib/state/runtime/runtime_trace.c \
     lib/state/runtime/runtime_shared_state.c \
     lib/state/runtime/split_runtime_sync.c \

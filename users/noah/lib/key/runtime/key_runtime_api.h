@@ -1,15 +1,14 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Key Runtime Slot Press Reducer
+// Key Runtime API
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Internal handled-press reducer helpers. This keeps press-phase setup and
-// pending-multi-tap reuse/flush policy out of the main slot-step event router
-// while preserving the single public `key_runtime_slot_step(...)` seam.
+// Narrow cross-module entry surface for key-runtime-owned behavior.
+// Production code outside the key-runtime owner layer should stay on this
+// header instead of depending on slot storage or process internals.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "../../interaction/handled_key.h"
-#include "key_runtime_slot_result.h"
-#include "../key_runtime_internal.h"
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
-key_runtime_slot_result_t key_runtime_slot_reduce_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush);
+void noah_key_runtime_scan(void);
+bool noah_key_runtime_settle_pending_fallback_hold(void);

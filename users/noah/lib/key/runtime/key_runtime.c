@@ -6,8 +6,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "../interaction/handled_key.h"
+#include "key_runtime_api.h"
 #include "key_runtime_index.h"
-#include "key_runtime_state.h"
+#include "key_runtime_internal.h"
 #include "../ownership/held_action.h"
 
 bool key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot) {
@@ -21,6 +22,10 @@ bool key_runtime_slot_activate_pending_fallback_hold(active_key_state_t *slot) {
     return true;
 }
 
-bool key_runtime_activate_pending_fallback_hold(void) {
+static bool key_runtime_activate_pending_fallback_hold(void) {
     return key_runtime_slot_activate_pending_fallback_hold(key_runtime_pending_fallback_slot());
+}
+
+bool noah_key_runtime_settle_pending_fallback_hold(void) {
+    return key_runtime_activate_pending_fallback_hold();
 }

@@ -6,7 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "../key_runtime_state.h"
+#include "../key_runtime_internal.h"
 
 typedef enum {
     KEY_RUNTIME_EFFECT_BUILDER_NONE = 0,

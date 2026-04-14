@@ -129,7 +129,7 @@ void send_keyboard_report(void) {
     send_keyboard_report_count++;
 }
 
-bool key_runtime_activate_pending_fallback_hold(void) {
+bool noah_key_runtime_settle_pending_fallback_hold(void) {
     fallback_hold_activation_count++;
     fallback_hold_active = true;
     return true;

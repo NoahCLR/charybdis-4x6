@@ -7,7 +7,7 @@
 // not depend on the raw shared-state layout.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "../key_runtime_state.h"
+#include "../key_runtime_internal.h"
 #include "../key_runtime_index_internal.h"
 #include "../../interaction/key_behavior_lookup.h"
 

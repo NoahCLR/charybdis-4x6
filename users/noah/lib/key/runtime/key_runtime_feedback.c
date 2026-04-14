@@ -2,7 +2,7 @@
 // Key Runtime Feedback
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_state.h"
+#include "key_runtime_internal.h"
 #include "key_runtime_feedback.h"
 #include "key_runtime_index.h"
 #include "../interaction/handled_key_policy.h"

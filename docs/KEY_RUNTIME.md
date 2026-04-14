@@ -41,7 +41,8 @@ These files are the core map of the runtime:
 | --- | --- |
 | [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h), [`handled_key_lookup.c`](../users/noah/lib/key/interaction/handled_key_lookup.c), [`handled_key_materialize.c`](../users/noah/lib/key/interaction/handled_key_materialize.c), [`handled_key_defaults.c`](../users/noah/lib/key/interaction/handled_key_defaults.c), and [`handled_key_resolution_accessors.c`](../users/noah/lib/key/interaction/handled_key_resolution_accessors.c) | Resolve authored behavior into a `handled_key_resolution_t`, then materialize it into slot-owned interaction metadata, transparency defaults, and release-policy helpers |
 | [`key_runtime_interaction.h`](../users/noah/lib/key/runtime/key_runtime_interaction.h) | Materialize authored handled-key resolution into the slot-owned `key_runtime_slot_interaction_t` contract: cached binding, hold strategy, release semantics, and preview/feedback policy |
-| [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h), [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), [`key_runtime_shared_state.h`](../users/noah/lib/key/runtime/key_runtime_shared_state.h), and the pd-mode read APIs in [`pd_mode_flags.h`](../users/noah/lib/pointing/defs/pd_mode_flags.h) / [`pd_modes.h`](../users/noah/lib/pointing/defs/pd_modes.h) | Public runtime reset seam, key-runtime observation helpers, slot-state implementation detail, and semantic pd-mode read state |
+| [`key_runtime_api.h`](../users/noah/lib/key/runtime/key_runtime_api.h), [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h), [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), and the pd-mode read APIs in [`pd_mode_flags.h`](../users/noah/lib/pointing/defs/pd_mode_flags.h) / [`pd_modes.h`](../users/noah/lib/pointing/defs/pd_modes.h) | Public cross-module key-runtime entry seam, public runtime reset seam, public key-runtime observation helpers, and semantic pd-mode read state |
+| [`key_runtime_internal.h`](../users/noah/lib/key/runtime/key_runtime_internal.h), [`key_runtime_process_internal.h`](../users/noah/lib/key/runtime/key_runtime_process_internal.h), and [`key_runtime_shared_state.h`](../users/noah/lib/key/runtime/key_runtime_shared_state.h) | Key-runtime-owned slot/process/storage internals for runtime modules and allowlisted white-box host suites |
 | [`key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c) | `process_record_user` entry flow and top-level branching |
 | [`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c) | Physical-event preflight, modifier suppression, active-slot interrupts, and pending-multi-tap flushing |
 | [`key_runtime_press.c`](../users/noah/lib/key/runtime/key_runtime_press.c), [`key_runtime_release.c`](../users/noah/lib/key/runtime/key_runtime_release.c), and [`key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c) | Outer orchestration for press, release, and scan passes |
@@ -158,7 +159,8 @@ advances time-based repeat bindings and dispatches any repeat taps that are due.
 The central slot storage lives in
 [`key_runtime_shared_state.h`](../users/noah/lib/key/runtime/key_runtime_shared_state.h)
 and is composed into the internal runtime owner layer from
-`runtime_context_internal.h`. Each slot owns one physical position's active
+[`runtime_shared_state_internal.h`](../users/noah/lib/state/runtime/runtime_shared_state_internal.h).
+Each slot owns one physical position's active
 press state plus any deferred multi-tap chain that still belongs to that
 position.
 
@@ -248,9 +250,9 @@ These are the easiest runtime rules to break by accident:
 - `handled_key_resolution_t` is the authored handled-key resolution contract,
   while `key_runtime_slot_interaction_t` is the slot-owned cached interaction
   contract. Keep that boundary explicit and prefer
-  [`key_runtime_slot_materialize(...)`](../users/noah/lib/key/runtime/key_runtime_interaction.h)
-  or
-  [`key_runtime_slot_interaction_from_resolution(...)`](../users/noah/lib/key/runtime/key_runtime_interaction.h)
+  [`handled_key_materialize(...)`](../users/noah/lib/key/interaction/handled_key.h)
+  plus
+  [`key_runtime_slot_interaction_from_materialized(...)`](../users/noah/lib/key/runtime/key_runtime_interaction.h)
   when you need a synthetic slot interaction instead of re-deriving release or
   hold policy by hand.
 - `key_runtime_slot_interaction(...)` and
@@ -295,6 +297,8 @@ If you are changing one of these categories, start here:
   [`key_runtime_press.c`](../users/noah/lib/key/runtime/key_runtime_press.c),
   [`key_runtime_release.c`](../users/noah/lib/key/runtime/key_runtime_release.c), and
   [`key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c)
+- public cross-module key-runtime entry points:
+  [`key_runtime_api.h`](../users/noah/lib/key/runtime/key_runtime_api.h)
 - slot press/release/scan behavior:
   [`key_runtime_slot_step.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_step.c),
   [`key_runtime_slot_press_reduce.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c),
@@ -321,8 +325,10 @@ If you are changing one of these categories, start here:
   one explicit ownership module plus the public observation/reset seams in
   [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h) and
   [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h).
-  Internal aggregate composition lives in `runtime_context_internal.h` and the
-  pd-mode storage slice in `pd_mode_runtime_shared_state_internal.h`.
+  Internal aggregate composition lives in
+  [`runtime_shared_state_internal.h`](../users/noah/lib/state/runtime/runtime_shared_state_internal.h)
+  and the pd-mode storage slice in
+  [`pd_mode_runtime_shared_state_internal.h`](../users/noah/lib/pointing/runtime/pd_mode_runtime_shared_state_internal.h).
 - new runtime translation units or build wiring:
   [`users/noah/source_manifest.mk`](../users/noah/source_manifest.mk) plus
   `sh tests/host/run_feature_gate_compile_tests.sh`

@@ -486,6 +486,33 @@ static void test_render_order_preview_then_pd_mode_then_pd_group(void) {
     check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
 }
 
+static void test_render_order_base_then_preview_then_pd_mode_then_feedback(void) {
+    test_reset();
+
+    test_keymap[LAYER_NUM][0][0] = 0x0020u;
+    test_keymap[LAYER_NUM][1][2] = 0x0021u;
+    layer_state                  = (layer_state_t)1u << LAYER_SYM;
+    fake_preview_layer           = LAYER_NUM;
+    fake_pd_active_mode          = PD_MODE_VOLUME;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
+
+    memset(led_output, 0, sizeof(led_output));
+    fake_feedback_flags = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+}
+
 static void test_multi_tap_pending_feedback_overrides_preview_and_pd_mode(void) {
     test_reset();
 
@@ -898,6 +925,7 @@ int main(void) {
     test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_when_feedback_flash_is_hidden();
     test_slave_full_scene_feedback_overrides_remote_preview_and_locked_pd_mode();
     test_render_order_preview_then_pd_mode_then_pd_group();
+    test_render_order_base_then_preview_then_pd_mode_then_feedback();
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();
     test_hold_pending_feedback_overrides_preview_and_pd_mode();
     test_pointer_mode_overlay_paints_right_half_and_groups();

@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "key_runtime_state.h"
+#include "key_runtime_internal.h"
 
 uint8_t                          key_runtime_active_slot_count(void);
 uint8_t                          key_runtime_pending_multi_tap_slot_count(void);

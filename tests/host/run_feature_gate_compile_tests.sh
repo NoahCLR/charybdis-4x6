@@ -81,6 +81,51 @@ check_runtime_sealing_boundaries() {
         ) >&2
         exit 1
     fi
+
+    if (
+        cd "$ROOT"
+        rg -n '#include ".*key_runtime_(state|process)\.h"' users/noah tests/host
+    ) >/dev/null; then
+        echo "repo-owned code must not include removed key-runtime aggregate headers" >&2
+        (
+            cd "$ROOT"
+            rg -n '#include ".*key_runtime_(state|process)\.h"' users/noah tests/host
+        ) >&2
+        exit 1
+    fi
+
+    key_runtime_internal_test_allowlist='^(tests/host/(key_runtime_feedback_test|key_runtime_index_test|key_runtime_preflight_test|key_runtime_slot_test|key_runtime_transition_test)\.c:|tests/host/key_runtime_admission_test\.c:)'
+    key_runtime_internal_test_violations="$(
+        cd "$ROOT"
+        rg -n '#include ".*(key_runtime_internal\.h|key_runtime_process_internal\.h|key_runtime_shared_state\.h)"' tests/host | grep -Ev "$key_runtime_internal_test_allowlist" || true
+    )"
+    if [ -n "$key_runtime_internal_test_violations" ]; then
+        echo "only low-level white-box host suites may include key-runtime internal headers" >&2
+        printf '%s\n' "$key_runtime_internal_test_violations" >&2
+        exit 1
+    fi
+
+    key_runtime_internal_prod_allowlist='^(users/noah/lib/key/runtime/|users/noah/lib/state/runtime/runtime_shared_state_internal\.h:)'
+    key_runtime_internal_prod_violations="$(
+        cd "$ROOT"
+        rg -n '#include ".*(key_runtime_internal\.h|key_runtime_process_internal\.h|key_runtime_shared_state\.h)"' users/noah | grep -Ev "$key_runtime_internal_prod_allowlist" || true
+    )"
+    if [ -n "$key_runtime_internal_prod_violations" ]; then
+        echo "only key-runtime owner modules and the aggregate runtime storage wrapper may include key-runtime internal headers" >&2
+        printf '%s\n' "$key_runtime_internal_prod_violations" >&2
+        exit 1
+    fi
+
+    key_runtime_index_test_allowlist='^(tests/host/(key_runtime_admission_test|key_runtime_feedback_test|key_runtime_index_test|key_runtime_preflight_test|key_runtime_transition_test)\.c:)'
+    key_runtime_index_test_violations="$(
+        cd "$ROOT"
+        rg -n '#include ".*key_runtime_index\.h"' tests/host | grep -Ev "$key_runtime_index_test_allowlist" || true
+    )"
+    if [ -n "$key_runtime_index_test_violations" ]; then
+        echo "only low-level white-box host suites may include key_runtime_index.h" >&2
+        printf '%s\n' "$key_runtime_index_test_violations" >&2
+        exit 1
+    fi
 }
 
 compile_variant() {

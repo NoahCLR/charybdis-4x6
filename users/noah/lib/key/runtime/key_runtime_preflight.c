@@ -6,11 +6,11 @@
 // runs.
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_process.h"
+#include "key_runtime_process_internal.h"
 #include "../interaction/handled_key.h"
 #include "key_runtime_admission.h"
 #include "key_runtime_index.h"
-#include "key_runtime_state.h"
+#include "key_runtime_internal.h"
 #include "key_runtime_trace.h"
 #include "key_runtime_transition.h"
 #include "../../action/action_dispatch.h"

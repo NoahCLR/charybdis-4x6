@@ -88,7 +88,7 @@ static void test_reset_stubs(void) {
 
 HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(runtime_fixture)
 
-bool key_runtime_activate_pending_fallback_hold(void) {
+bool noah_key_runtime_settle_pending_fallback_hold(void) {
     fallback_hold_activation_count++;
     fallback_hold_active = true;
     return true;
@@ -119,7 +119,7 @@ void tap_code16(uint16_t keycode) {
 
 void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
     if (policy.settle_pending_fallback_holds) {
-        key_runtime_activate_pending_fallback_hold();
+        noah_key_runtime_settle_pending_fallback_hold();
     }
 
     if (policy.preserve_keyboard_mod_state) {
@@ -131,7 +131,7 @@ void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
 
 void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
     if (policy.settle_pending_fallback_holds) {
-        key_runtime_activate_pending_fallback_hold();
+        noah_key_runtime_settle_pending_fallback_hold();
     }
 
     if (policy.preserve_keyboard_mod_state) {

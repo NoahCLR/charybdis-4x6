@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "../key_runtime_state.h"
+#include "../key_runtime_internal.h"
 
 typedef enum {
     KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE = 0,

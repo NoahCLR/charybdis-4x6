@@ -7,7 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "key_runtime_state.h"
+#include "key_runtime_internal.h"
 
 active_key_state_t *key_runtime_first_active_slot(void);
 active_key_state_t *key_runtime_find_slot_by_position(keypos_t key_pos);

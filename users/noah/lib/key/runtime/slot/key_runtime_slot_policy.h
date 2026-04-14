@@ -9,7 +9,7 @@
 #pragma once
 
 #include "key_runtime_slot_effect.h"
-#include "../key_runtime_state.h"
+#include "../key_runtime_internal.h"
 
 key_runtime_effect_builder_t key_runtime_slot_policy_activate_pending_fallback_hold(active_key_state_t *slot);
 key_runtime_effect_builder_t key_runtime_slot_policy_interrupt_on_other_press(active_key_state_t *slot, keypos_t other_key_pos);

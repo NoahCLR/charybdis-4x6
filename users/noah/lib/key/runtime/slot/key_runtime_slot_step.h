@@ -10,7 +10,7 @@
 
 #include "../../interaction/handled_key.h"
 #include "key_runtime_slot_result.h"
-#include "../key_runtime_state.h"
+#include "../key_runtime_internal.h"
 
 typedef enum {
     KEY_RUNTIME_SLOT_EVENT_NONE = 0,

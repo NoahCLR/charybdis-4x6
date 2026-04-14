@@ -15,7 +15,7 @@
 
 #include "../interaction/handled_key.h"
 #include "effects/key_runtime_effect_queue.h"
-#include "key_runtime_state.h"
+#include "key_runtime_internal.h"
 
 #define KEY_RUNTIME_TRANSITION_PLAN_CAPACITY 16
 

@@ -5,6 +5,7 @@
 // Matrix-scan hold promotion, repeat dispatch, and multi-tap expiry handling.
 // ────────────────────────────────────────────────────────────────────────────
 
+#include "key_runtime_api.h"
 #include "key_runtime_feedback.h"
 #include "../ownership/held_repeat.h"
 #include "key_runtime_trace.h"

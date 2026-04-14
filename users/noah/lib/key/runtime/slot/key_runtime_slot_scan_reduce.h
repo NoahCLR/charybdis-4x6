@@ -9,6 +9,6 @@
 #pragma once
 
 #include "key_runtime_slot_result.h"
-#include "../key_runtime_state.h"
+#include "../key_runtime_internal.h"
 
 key_runtime_slot_result_t key_runtime_slot_reduce_active_scan(active_key_state_t *slot);

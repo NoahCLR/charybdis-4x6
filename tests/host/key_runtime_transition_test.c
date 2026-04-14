@@ -8,7 +8,7 @@
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/key_runtime_admission.h"
 #include "users/noah/lib/key/runtime/key_runtime_index.h"
-#include "users/noah/lib/key/runtime/key_runtime_state.h"
+#include "users/noah/lib/key/runtime/key_runtime_internal.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"
 #include "host_handled_key_fixture.h"
 #include "host_runtime_reset_fixture.h"

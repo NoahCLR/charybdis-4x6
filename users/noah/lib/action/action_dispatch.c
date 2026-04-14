@@ -6,7 +6,7 @@
 
 #include "action_lifecycle.h"
 #include "synthetic_record.h"
-#include "../key/runtime/key_runtime_state.h"
+#include "../key/runtime/key_runtime_api.h"
 #include "../state/runtime/keyboard_mod_state.h"
 #include "../state/ownership/layer_ownership.h"
 #include "action_dispatch.h"
@@ -17,7 +17,7 @@ static void noah_emit_run(uint16_t keycode, noah_emit_tap_fn_t emit, noah_emit_p
     keyboard_mod_state_t saved_mod_state = {0};
 
     if (policy.settle_pending_fallback_holds) {
-        key_runtime_activate_pending_fallback_hold();
+        noah_key_runtime_settle_pending_fallback_hold();
     }
 
     if (policy.preserve_keyboard_mod_state) {

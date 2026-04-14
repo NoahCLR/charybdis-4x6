@@ -5,10 +5,11 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/key/interaction/handled_key.h"
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/ownership/held_repeat.h"
+#include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
-#include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
@@ -16,10 +17,11 @@
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_reset.h"
 #include "users/noah/lib/state/runtime/runtime_trace.h"
-#include "host_handled_key_fixture.h"
+#include "users/noah/noah_runtime.h"
 
 enum {
-    TEST_ACTION = SAFE_RANGE + 0x10,
+    TEST_ACTION                = SAFE_RANGE + 0x10,
+    TEST_PENDING_MULTI_TAP_KEY = SAFE_RANGE + 0x11,
 };
 
 static uint16_t fake_time;
@@ -100,17 +102,23 @@ static const held_repeat_binding_snapshot_t *test_find_held_repeat_binding(const
 }
 
 static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, uint8_t tap_count) {
+    uint16_t flags = HANDLED_KEY_FLAG_HANDLED;
+
+    if (keycode == TEST_PENDING_MULTI_TAP_KEY) {
+        flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    }
+
     return (handled_key_resolution_t){
         .keycode          = keycode,
         .tap_count        = tap_count,
         .step             = {.tap = TAP_SENDS(keycode)},
-        .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+        .tap_hold_term    = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
         .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+        .multi_tap_term   = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
         .layer            = UINT8_MAX,
         .pd_mode          = 0,
         .has_more_taps    = false,
-        .flags            = HANDLED_KEY_FLAG_HANDLED,
+        .flags            = flags,
     };
 }
 
@@ -205,62 +213,6 @@ handled_key_resolution_t handled_key_lookup(uint16_t keycode) {
 
 handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
     return test_handled_key_resolution(keycode, tap_count);
-}
-
-hold_behavior_t handled_key_resolution_hold(handled_key_resolution_t key) {
-    return key.step.hold;
-}
-
-hold_behavior_t handled_key_resolution_long_hold(handled_key_resolution_t key) {
-    return key.step.long_hold;
-}
-
-key_runtime_slot_hold_strategy_t handled_key_resolution_hold_strategy(handled_key_resolution_t key) {
-    (void)key;
-    return KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
-}
-
-uint16_t handled_key_resolution_tap_action(handled_key_resolution_t key) {
-    return key.step.tap.present ? key.step.tap.action : KC_NO;
-}
-
-uint8_t handled_key_resolution_tap_repeat_count(handled_key_resolution_t key) {
-    return handled_key_resolution_tap_action(key) == KC_NO ? 0 : 1;
-}
-
-bool handled_key_resolution_tap_resolves_on_press(handled_key_resolution_t key) {
-    (void)key;
-    return false;
-}
-
-bool handled_key_resolution_uses_fallback_hold(handled_key_resolution_t key) {
-    (void)key;
-    return false;
-}
-
-bool handled_key_resolution_uses_implicit_hold(handled_key_resolution_t key) {
-    (void)key;
-    return false;
-}
-
-bool handled_key_resolution_has_multi_tap(handled_key_resolution_t key) {
-    return (key.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0;
-}
-
-bool handled_key_resolution_is_momentary_layer(handled_key_resolution_t key) {
-    return (key.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
-}
-
-bool handled_key_resolution_is_layer_tap(handled_key_resolution_t key) {
-    return (key.flags & HANDLED_KEY_FLAG_LAYER_TAP) != 0;
-}
-
-uint8_t handled_key_resolution_layer(handled_key_resolution_t key) {
-    return key.layer;
-}
-
-pd_mode_mask_t handled_key_resolution_pd_mode(handled_key_resolution_t key) {
-    return key.pd_mode;
 }
 
 handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
@@ -395,19 +347,55 @@ void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     (void)policy;
 }
 
+void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
+    (void)action;
+    (void)mods;
+}
+
 void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     (void)action;
     (void)pressed;
 }
 
-static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
-    active_key_state_t *slot = NULL;
+bool noah_synthetic_record_active(void) {
+    return false;
+}
 
-    CHECK(key_pos.row == 0);
-    CHECK(key_pos.col == 0);
-    slot = key_runtime_slot_at(0);
-    CHECK(slot != NULL);
-    key_runtime_slot_track(slot, keycode, key_pos, host_key_runtime_slot_interaction_from_authored_resolution(test_handled_key_resolution(keycode, 1), handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0)), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+bool macro_dispatch(uint16_t keycode) {
+    (void)keycode;
+    return false;
+}
+
+bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return false;
+}
+
+void split_runtime_sync(void) {}
+
+static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
+    return (keyrecord_t){
+        .event =
+            {
+                .key     = key_pos,
+                .pressed = pressed,
+            },
+    };
+}
+
+static bool test_process_record(uint16_t keycode, keypos_t key_pos, bool pressed) {
+    keyrecord_t record = test_record(key_pos, pressed);
+    return noah_process_record_user(keycode, &record);
+}
+
+static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
+    CHECK(!test_process_record(keycode, key_pos, true));
+}
+
+static void test_stage_pending_multi_tap(keypos_t key_pos) {
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, true));
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, false));
 }
 
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
@@ -437,7 +425,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     });
     pd_mode_apply_remote_snapshot(PD_MODE_ARROW, 0);
     test_stage_active_slot(KC_C, active_key);
-    key_runtime_slot_begin_pending_multi_tap(key_runtime_slot_at(1), TEST_ACTION, pending_key, TEST_ACTION, 1, 120, 180, false);
+    test_stage_pending_multi_tap(pending_key);
     noah_runtime_trace_reset();
 
     layer_ownership_set_lock_state(3, true);

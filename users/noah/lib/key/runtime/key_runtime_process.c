@@ -6,8 +6,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "../interaction/handled_key.h"
-#include "key_runtime_process.h"
-#include "key_runtime_state.h"
+#include "key_runtime_process_internal.h"
+#include "key_runtime_internal.h"
 #include "key_runtime_trace.h"
 #include "noah_runtime.h"
 #include "../../macro/macro_dispatch.h"
@@ -22,6 +22,10 @@ typedef enum {
 
 typedef struct key_runtime_process_ctx_t key_runtime_process_ctx_t;
 typedef key_runtime_process_stage_outcome_t (*key_runtime_process_stage_fn_t)(key_runtime_process_ctx_t *ctx);
+typedef struct {
+    const char *name;
+    key_runtime_process_stage_fn_t handler;
+} key_runtime_process_stage_entry_t;
 
 struct key_runtime_process_ctx_t {
     uint16_t                 keycode;
@@ -123,14 +127,14 @@ bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
-    static const key_runtime_process_stage_fn_t handlers[] = {
-        key_runtime_process_stage_synthetic_passthrough,
-        key_runtime_process_stage_preflight,
-        key_runtime_process_stage_release_slot_keycode,
-        key_runtime_process_stage_pd_mode,
-        key_runtime_process_stage_handled_key,
-        key_runtime_process_stage_direct_action,
-        key_runtime_process_stage_macro_dispatch,
+    static const key_runtime_process_stage_entry_t stages[] = {
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough},
+        {.name = "preflight", .handler = key_runtime_process_stage_preflight},
+        {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode},
+        {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode},
+        {.name = "handled_key", .handler = key_runtime_process_stage_handled_key},
+        {.name = "direct_action", .handler = key_runtime_process_stage_direct_action},
+        {.name = "macro_dispatch", .handler = key_runtime_process_stage_macro_dispatch},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,
@@ -140,14 +144,17 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
     key_runtime_trace_record("process:entry", keycode, record);
 
-    for (uint8_t index = 0; index < ARRAY_SIZE(handlers); index++) {
-        switch (handlers[index](&ctx)) {
+    for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {
+        const key_runtime_process_stage_entry_t *stage = &stages[index];
+
+        switch (stage->handler(&ctx)) {
             case KEY_RUNTIME_PROCESS_RETURN_TRUE:
                 return key_runtime_process_finish(&ctx, true);
             case KEY_RUNTIME_PROCESS_RETURN_FALSE:
                 return key_runtime_process_finish(&ctx, false);
             case KEY_RUNTIME_PROCESS_NEXT:
             default:
+                (void)stage->name;
                 break;
         }
     }
