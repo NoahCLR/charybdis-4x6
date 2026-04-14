@@ -253,6 +253,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_is_runtime_handled_keycode(layer_lock));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(layer_lock));
     CHECK(!noah_action_desc_is_pure_modifier_literal(layer_lock));
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(layer_lock));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(layer_lock));
     CHECK(!noah_action_desc_supports_fallback_hold(layer_lock));
     CHECK(!noah_action_desc_source_layer_uses_desc_layer(layer_lock));
     CHECK(noah_action_desc_source_layer(layer_lock) == UINT8_MAX);
@@ -270,6 +272,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_is_runtime_handled_keycode(momentary));
     CHECK(noah_action_desc_is_momentary_layer_keycode(momentary));
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(momentary));
+    CHECK(noah_action_desc_source_sets_momentary_layer_flag(momentary));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(momentary));
     CHECK(noah_action_desc_source_layer_uses_desc_layer(momentary));
     CHECK(noah_action_desc_source_layer(momentary) == 3);
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(momentary));
@@ -287,6 +291,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supported_as_authored_action(layer_tap, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(noah_action_desc_uses_authored_layer_tap_contract(layer_tap));
     CHECK(noah_action_desc_default_tap_uses_layer_tap_keycode(layer_tap));
+    CHECK(noah_action_desc_source_sets_momentary_layer_flag(layer_tap));
+    CHECK(noah_action_desc_source_sets_layer_tap_flag(layer_tap));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(layer_tap));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(layer_tap));
     CHECK(!noah_action_desc_is_pure_modifier_literal(layer_tap));
@@ -306,6 +312,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_uses_authored_layer_tap_contract(layer_jump));
     CHECK(noah_action_desc_default_tap_uses_action_keycode(layer_jump));
     CHECK(!noah_action_desc_is_pure_modifier_literal(layer_jump));
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(layer_jump));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(layer_jump));
     CHECK(noah_action_desc_supports_fallback_hold(layer_jump));
     CHECK(!noah_action_desc_source_layer_uses_desc_layer(layer_jump));
     CHECK(noah_action_desc_source_layer(layer_jump) == UINT8_MAX);
@@ -320,6 +328,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(qmk_behavior));
     CHECK(noah_action_desc_default_tap_uses_action_keycode(qmk_behavior));
     CHECK(!noah_action_desc_is_pure_modifier_literal(qmk_behavior));
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(qmk_behavior));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(qmk_behavior));
     CHECK(!noah_action_desc_supports_fallback_hold(qmk_behavior));
     CHECK(noah_action_desc_default_tap_action(qmk_behavior) == OSM(MOD_LSFT));
 
@@ -335,6 +345,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_key));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(pd_key));
     CHECK(!noah_action_desc_is_pure_modifier_literal(pd_key));
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(pd_key));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(pd_key));
     CHECK(!noah_action_desc_supports_fallback_hold(pd_key));
     CHECK(noah_action_desc_default_tap_action(pd_key) == KC_NO);
 
@@ -346,6 +358,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_lock));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(pd_lock));
     CHECK(!noah_action_desc_is_pure_modifier_literal(pd_lock));
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(pd_lock));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(pd_lock));
     CHECK(!noah_action_desc_supports_fallback_hold(pd_lock));
     CHECK(noah_action_desc_default_tap_action(pd_lock) == KC_NO);
 
@@ -359,6 +373,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(macro_action));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(macro_action));
     CHECK(!noah_action_desc_is_pure_modifier_literal(macro_action));
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(macro_action));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(macro_action));
     CHECK(!noah_action_desc_supports_fallback_hold(macro_action));
     CHECK(noah_action_desc_default_tap_action(macro_action) == KC_NO);
 
@@ -370,6 +386,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(custom));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(custom));
     CHECK(!noah_action_desc_is_pure_modifier_literal(custom));
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(custom));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(custom));
     CHECK(!noah_action_desc_supports_fallback_hold(custom));
     CHECK(noah_action_desc_default_tap_action(custom) == KC_NO);
 
@@ -387,6 +405,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_is_runtime_handled_keycode(literal));
     CHECK(noah_action_desc_default_tap_uses_action_keycode(literal));
     CHECK(!noah_action_desc_is_pure_modifier_literal(literal));
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(literal));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(literal));
     CHECK(noah_action_desc_supports_fallback_hold(literal));
     CHECK(!noah_action_desc_source_layer_uses_desc_layer(literal));
     CHECK(noah_action_desc_source_layer(literal) == UINT8_MAX);

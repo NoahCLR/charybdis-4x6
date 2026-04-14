@@ -41,7 +41,7 @@ handled_key_materialized_t handled_key_materialize(handled_key_resolution_t reso
     if (hold_source.found && handled_key_resolution_source_is_momentary_layer(hold_source.resolution)) {
         materialized.flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER;
     }
-    if (hold_source.found && (handled_key_resolution_source_is_layer_tap(hold_source.resolution) || handled_key_resolution_is_layer_tap(hold_source.resolution))) {
+    if (hold_source.found && handled_key_resolution_source_is_layer_tap(hold_source.resolution)) {
         materialized.flags |= HANDLED_KEY_FLAG_LAYER_TAP;
     }
 

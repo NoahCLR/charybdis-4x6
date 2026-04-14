@@ -101,6 +101,14 @@ bool noah_action_desc_is_pure_modifier_literal(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_LITERAL && noah_action_keycode_is_pure_modifier_literal(desc.action);
 }
 
+bool noah_action_desc_source_sets_momentary_layer_flag(noah_action_desc_t desc) {
+    return noah_action_desc_source_layer_uses_desc_layer(desc);
+}
+
+bool noah_action_desc_source_sets_layer_tap_flag(noah_action_desc_t desc) {
+    return noah_action_desc_default_tap_uses_layer_tap_keycode(desc);
+}
+
 bool noah_action_desc_supports_fallback_hold(noah_action_desc_t desc) {
     return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_SUPPORTS_FALLBACK_HOLD);
 }

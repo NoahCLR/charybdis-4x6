@@ -479,3 +479,72 @@ Next steps:
   policy
 - if they stay local, shift the next architecture pass to hook registration
   instead of continuing to chase smaller handled-key cleanup
+
+### Transparency metadata projection cleanup
+
+Completed in this pass:
+
+- added `noah_action_desc_source_sets_momentary_layer_flag()` and
+  `noah_action_desc_source_sets_layer_tap_flag()` to
+  `users/noah/lib/action/action_dispatch.h` /
+  `users/noah/lib/action/action_kind.c`
+- moved the remaining action-family projection out of
+  `users/noah/lib/key/interaction/handled_key_transparency.c` so that module
+  no longer decides for itself which action families should set handled-key
+  momentary-layer or layer-tap metadata
+- simplified `users/noah/lib/key/interaction/handled_key_materialize.c` to use
+  the transparency helper directly instead of compensating with an extra local
+  layer-tap check
+- extended descriptor host coverage in
+  `tests/host/action_dispatch_test.c` and
+  `tests/host/action_lifecycle_test.c` for the new source-metadata helpers
+
+Architecture result after this pass:
+
+- the action descriptor surface now owns the remaining action-family metadata
+  projection that was still leaking through handled-key transparency logic
+- the residual code in `handled_key_transparency.c` is now mostly local
+  traversal, field extraction, and authored-resolution override behavior
+- this is a reasonable stopping point for the action-policy refactor; the next
+  higher-value architecture target is hook registration, not more registry
+  expansion
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted action, transparency-sensitive handled-key, integration, validation,
+  and compile-gate runners passed
+- full host suite passed
+- firmware build passed and produced
+  `.build/bastardkb_charybdis_4x6_noah.uf2`
+
+Workspace scope for this pass:
+
+- no sibling workspace folders were edited
+- changes are confined to `charybdis-4x6/`
+- action metadata/helpers, handled-key transparency/materialization logic, host
+  tests, and the active review folder were updated together
+
+Next steps:
+
+- treat the remaining transparency traversal helpers as local unless a future
+  feature proves they still encode action-family policy
+- move the next architecture pass to declarative hook registration

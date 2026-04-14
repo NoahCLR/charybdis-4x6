@@ -38,9 +38,9 @@ architecture scaling risks:
    `runtime_shared_state.h` still exists as a compatibility shim and should not
    regain status as a primary runtime surface
 2. action-kind identity, classification, metadata, dispatch, and most handled-
-   key runtime policy are now registry-backed, but a thin layer of explicit
-   authored-resolution overrides and transparent-field extraction still lives
-   in local handled-key code
+   key runtime policy are now registry-backed; the remaining transparency code
+   is mostly resolution-local traversal and authored-resolution override logic
+   rather than hidden action-family policy
 3. hook-level orchestration is centralized and order-sensitive, so adding new
    subsystems still means editing core pipelines instead of registering
    capabilities
@@ -167,9 +167,9 @@ Recommended direction:
 - New runtime code should reach shared key/pd state through the context-backed
   helpers and let only the compatibility layer expose the legacy alias.
 
-### 2. The action-kind core now owns most handled-key runtime policy, but a few handled-key heuristics are still local
+### 2. The action-kind core now owns handled-key action-family policy; the remaining transparency logic is local by design
 
-Severity: should-fix
+Severity: much lower now
 
 References:
 
@@ -203,10 +203,10 @@ What I observed:
   - fallback-hold eligibility
   - default tap extraction for literal and layer-tap actions
   - descriptor-layer source semantics for layer-hold and layer-tap actions
-- downstream action policy still exists in:
+- downstream transparency logic still exists in:
   - explicit authored-resolution momentary-layer and layer-tap override
     handling in `handled_key_transparency.c`
-  - field-level transparent-source extraction in
+  - field-level transparent-source extraction and lower-layer traversal in
     `handled_key_transparency.c`
   - a small amount of lookup glue in `key_behavior_lookup.c`
 - by comparison, pd modes use a single manifest row that fans out into the rest
@@ -220,14 +220,12 @@ Why this matters:
 - The latest pass removed another real scaling tax: handled-key runtime code no
   longer needs to know that “layer lock means release the momentary layer first”
   or that “pd-mode hold is directly handled” by hard-coded kind checks.
-- The latest pass removed another narrow but real tax: handled-key defaults no
-  longer maintain their own pure-modifier list or default-tap extraction
-  logic, and transparent tap-source checks now reuse descriptor-backed default
-  tap semantics.
-- The remaining cost is now much narrower and more localized. It mostly lives
-  in downstream handled-key code as authored-resolution overrides and
-  transparent-field extraction rather than as open-coded action-family
-  branching.
+- The latest pass removed the last meaningful action-family leak in the
+  transparency path: handled-key code no longer has to infer for itself which
+  action families should project momentary-layer or layer-tap metadata.
+- What remains is narrower and qualitatively different. It is mostly
+  resolution-local traversal and authored-resolution override handling, not
+  hidden action-family branching.
 
 Practical examples of features that would feel expensive under the current
 design:
@@ -239,18 +237,13 @@ design:
 
 Recommended direction:
 
-- Keep `action_kind_registry_list.h` as the root and extend it one step
-  further.
-- Each action-kind spec should eventually own:
-  - classification predicate
-  - authored capabilities
-  - dispatch hooks
-  - hold-preview / feedback policy hooks
-- Then decide whether the last authored-resolution and transparent-field
-  helpers belong in the registry surface or whether they should stay local as
-  intentionally non-action-family policy.
-- That lets the next action-family addition be “add a row” much more often than
-  “edit three policy files and re-derive behavior by hand”.
+- Keep `action_kind_registry_list.h` as the root for action-family semantics.
+- Do not keep widening it just to absorb transparency traversal code that is
+  not actually action-family policy.
+- Treat the remaining helpers in `handled_key_transparency.c` as local unless a
+  future feature proves they still encode per-kind behavior.
+- That lets the next action-family addition stay “add a row” without turning
+  the registry into a grab-bag for every handled-key concern.
 
 Example direction:
 
@@ -437,9 +430,9 @@ Leaky abstractions:
 - the compatibility `runtime_shared_state` surface is still visible enough that
   new code could regress toward aggregate access if the boundary is not kept
   narrow
-- action-kind abstractions are much healthier now, but buffered-modifier
-  fallback and field-level transparent-source policy still sit outside the
-  registry-backed descriptor surface
+- action-kind abstractions are much healthier now, and the remaining
+  transparency helpers sit outside the registry mostly because they are local
+  resolution logic rather than missing action-family descriptors
 
 ### 4. Code Organization & Structure
 
@@ -467,9 +460,9 @@ Risky:
 - the runtime context solved the old “private mutable statics everywhere”
   problem, but the compatibility alias still needs to remain secondary or that
   ownership model will drift back
-- action lifecycle policy is mostly registry-backed now, but buffered-modifier
-  fallback and field-level transparent-source rules still live in downstream
-  handled-key code
+- action lifecycle policy is now effectively registry-backed; the remaining
+  downstream handled-key code is primarily transparency traversal and explicit
+  authored-resolution override logic
 
 ### 6. Scalability of the Design
 
@@ -506,22 +499,21 @@ If I were sequencing architecture work here, I would do it in this order:
 1. Keep the runtime context as the only primary state owner and continue
    narrowing the compatibility shim so new code cannot drift back onto legacy
    aggregate access.
-2. Finish pulling the remaining buffered-modifier fallback and transparent-
-   source edge-case policy into the action registry so per-kind behavior is as
-   declarative as the current design allows.
-3. Replace top-level imperative hook ordering with small declarative stage
+2. Replace top-level imperative hook ordering with small declarative stage
    tables for process-record, scan, post-init, and RGB render.
-4. Split the authored keymap data into smaller data-only files without moving
+3. Split the authored keymap data into smaller data-only files without moving
    runtime logic back into the keymap layer.
+4. Only widen the action registry again if a future feature exposes new
+   action-family semantics that still leak into handled-key local code.
 
 That order matters:
 
 - state unification already reduced future cross-module wiring cost
 - the landed action registry removed the worst synchronization debt, and the
-  next pass should finish pulling the remaining handled-key policy into that
-  same declarative surface
-- pipeline registration then becomes easier because subsystems have cleaner
-  interfaces
+  transparency pass appears to have finished the action-family cleanup that was
+  still worth doing there
+- pipeline registration is now the higher-value next step because subsystem
+  interfaces are cleaner
 - authoring-file decomposition is valuable, but it is lower risk and can land
   independently after the runtime seams improve
 

@@ -43,11 +43,11 @@ static noah_action_desc_t handled_key_resolution_action_desc(handled_key_resolut
 }
 
 bool handled_key_resolution_source_is_layer_tap(handled_key_resolution_t resolution) {
-    return noah_action_desc_default_tap_uses_layer_tap_keycode(handled_key_resolution_action_desc(resolution));
+    return handled_key_resolution_is_layer_tap(resolution) || noah_action_desc_source_sets_layer_tap_flag(handled_key_resolution_action_desc(resolution));
 }
 
 bool handled_key_resolution_source_is_momentary_layer(handled_key_resolution_t resolution) {
-    return handled_key_resolution_is_momentary_layer(resolution) || noah_action_desc_source_layer_uses_desc_layer(handled_key_resolution_action_desc(resolution));
+    return handled_key_resolution_is_momentary_layer(resolution) || noah_action_desc_source_sets_momentary_layer_flag(handled_key_resolution_action_desc(resolution));
 }
 
 uint8_t handled_key_resolution_source_layer(handled_key_resolution_t resolution) {
