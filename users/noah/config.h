@@ -86,9 +86,21 @@
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
 
 // Shared idle-noise filter for tiny trackball motion seen while the board is
-// otherwise untouched. Comment out the enable define to compile this path out
-// entirely; when enabled, matching reports are zeroed before they can refresh
-// RGB activity or drift into auto-mouse activation.
+// otherwise untouched. This exists for the transparent trackball setup here:
+// the sensor can occasionally emit a small mouse report even when the board is
+// idle. These mini reports are not noticeable during normal use, but they can
+// keep RGB activity alive and delay sleep.
+//
+// Comment out the enable define to compile this path out entirely. Leave it
+// off if your sensor is clean and produces no idle noise at all.
+//
+// IDLE_MS:
+//   Short quiet gap required before a tiny report can be treated as noise.
+// ARM_IDLE_MS:
+//   Longer "really idle" window before the filter is allowed to start
+//   suppressing tiny reports.
+// ABS_MAX:
+//   Maximum total absolute motion still considered idle noise.
 #    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE
 #    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS 1000
 #    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ARM_IDLE_MS 300000
