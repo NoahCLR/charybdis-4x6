@@ -61,6 +61,8 @@
   - extended `tests/host/hook_chaining_test.c` with an explicit pass-through-false chaining shape so a future `if (!noah_process_record_user(...)) return false;` override still has mechanical coverage for the finalize-before-return rule,
   - updated the weak default `noah_post_process_record_user(...)` in `tests/host/key_runtime_integration_harness.c` to finalize the `true` path just like production,
   - added `tests/host/key_runtime_integration_harness_test.c` plus `run_key_runtime_integration_harness_tests.sh` so the harness default `post -> finalize(true)` behavior is now enforced by the host suite instead of relying on inspection.
+- Re-ran the follow-up architecture audit on that last cleanup using `prompts/follow-up-architecture-audit.md`.
+- The rerun found no new remediation-specific findings. The contract wording, strong-override coverage, default harness behavior, host-suite enforcement, and active review notes now agree on the landed structure.
 
 ## Findings Snapshot
 
