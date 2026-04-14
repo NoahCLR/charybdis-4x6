@@ -31,7 +31,7 @@ bool noah_action_desc_intercepts_pd_mode_release(noah_action_desc_t desc);
 
 static inline bool noah_action_desc_keeps_registered_feedback(noah_action_desc_t desc) {
     const noah_action_kind_def_t *def = noah_action_kind_def(desc.kind);
-    return def ? def->keeps_registered_feedback : true;
+    return def ? def->keeps_registered_feedback : false;
 }
 
 static inline uint8_t noah_action_desc_preview_layer(noah_action_desc_t desc) {

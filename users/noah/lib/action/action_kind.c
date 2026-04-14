@@ -135,11 +135,7 @@ bool noah_action_kind_metadata_defined(noah_action_kind_t kind) {
 }
 
 const noah_action_kind_def_t *noah_action_kind_def(noah_action_kind_t kind) {
-    if (!noah_action_kind_metadata_defined(kind)) {
-        kind = NOAH_ACTION_KIND_LITERAL;
-    }
-
-    return &noah_action_kind_defs[kind];
+    return noah_action_kind_metadata_defined(kind) ? &noah_action_kind_defs[kind] : NULL;
 }
 
 bool noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability) {

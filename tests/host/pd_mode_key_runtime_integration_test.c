@@ -260,10 +260,30 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
     (void)keycode;
 }
 
+void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (keyboard_mod_ownership_debug_snapshot_t){0};
+}
+
+void keyboard_mod_ownership_reset_for_test(void) {}
+
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     (void)key_pos;
     (void)layer;
 }
+
+void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (layer_ownership_debug_snapshot_t){0};
+}
+
+void layer_ownership_reset_for_test(void) {}
 
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
     (void)layer;

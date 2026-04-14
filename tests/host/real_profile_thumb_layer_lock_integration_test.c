@@ -472,6 +472,16 @@ void held_action_register(keypos_t key_pos, uint16_t action) {
     (void)action;
 }
 
+void held_action_debug_snapshot(held_action_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (held_action_debug_snapshot_t){0};
+}
+
+void held_action_reset_for_test(void) {}
+
 void held_action_unregister(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;
@@ -493,6 +503,16 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     (void)repeat_hz;
 }
 
+void held_repeat_debug_snapshot(held_repeat_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (held_repeat_debug_snapshot_t){0};
+}
+
+void held_repeat_reset_for_test(void) {}
+
 void held_repeat_tick(void) {}
 
 bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
@@ -512,6 +532,16 @@ uint8_t key_feedback_pack(void) {
 uint8_t key_feedback_preview_layer(void) {
     return UINT8_MAX;
 }
+
+void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (keyboard_mod_ownership_debug_snapshot_t){0};
+}
+
+void keyboard_mod_ownership_reset_for_test(void) {}
 
 void split_runtime_sync(void) {}
 

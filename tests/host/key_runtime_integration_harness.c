@@ -22,50 +22,6 @@ __attribute__((weak)) bool noah_process_record_user(uint16_t keycode, keyrecord_
     return true;
 }
 
-__attribute__((weak)) void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (layer_ownership_debug_snapshot_t){0};
-}
-
-__attribute__((weak)) void held_action_debug_snapshot(held_action_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (held_action_debug_snapshot_t){0};
-}
-
-__attribute__((weak)) void held_repeat_debug_snapshot(held_repeat_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (held_repeat_debug_snapshot_t){0};
-}
-
-__attribute__((weak)) void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    *out = (keyboard_mod_ownership_debug_snapshot_t){0};
-}
-
-__attribute__((weak)) void layer_ownership_reset_for_test(void) {
-}
-
-__attribute__((weak)) void held_action_reset_for_test(void) {
-}
-
-__attribute__((weak)) void held_repeat_reset_for_test(void) {
-}
-
-__attribute__((weak)) void keyboard_mod_ownership_reset_for_test(void) {
-}
-
 static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed) {
     return (keyrecord_t){
         .event =

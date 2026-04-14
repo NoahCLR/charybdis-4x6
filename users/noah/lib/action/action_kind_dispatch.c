@@ -26,6 +26,9 @@ typedef struct {
     noah_action_release_impl_t release;
 } noah_action_kind_dispatch_ops_t;
 
+static volatile bool               noah_action_dispatch_fault_seen;
+static volatile noah_action_kind_t noah_action_dispatch_fault_kind = NOAH_ACTION_KIND_COUNT;
+
 static void noah_action_tap_noop(noah_action_desc_t desc) {
     (void)desc;
 }
@@ -231,7 +234,27 @@ bool noah_action_kind_dispatch_has_complete_ops(noah_action_kind_t kind) {
     return kind < NOAH_ACTION_KIND_COUNT && noah_action_kind_dispatch_ops_complete(&noah_action_kind_dispatch_ops[kind]);
 }
 
+bool noah_action_desc_has_dispatch_ops(noah_action_desc_t desc) {
+    return noah_action_kind_metadata_defined(desc.kind) && noah_action_kind_dispatch_has_complete_ops(desc.kind);
+}
+
+bool noah_action_kind_dispatch_faulted(void) {
+    return noah_action_dispatch_fault_seen;
+}
+
+noah_action_kind_t noah_action_kind_last_dispatch_fault_kind(void) {
+    return (noah_action_kind_t)noah_action_dispatch_fault_kind;
+}
+
+void noah_action_kind_dispatch_clear_fault_for_test(void) {
+    noah_action_dispatch_fault_seen = false;
+    noah_action_dispatch_fault_kind = NOAH_ACTION_KIND_COUNT;
+}
+
 static void noah_action_log_missing_dispatch_ops(noah_action_kind_t kind) {
+    noah_action_dispatch_fault_seen = true;
+    noah_action_dispatch_fault_kind = kind;
+
 #ifdef CONSOLE_ENABLE
     uprintf("Missing action dispatch ops for kind %u\n", (unsigned int)kind);
 #else
@@ -249,7 +272,7 @@ static void noah_action_fail_host_missing_dispatch_ops(noah_action_kind_t kind) 
 }
 
 static const noah_action_kind_dispatch_ops_t *noah_action_desc_dispatch_ops(noah_action_desc_t desc) {
-    if (!noah_action_kind_metadata_defined(desc.kind) || !noah_action_kind_dispatch_has_complete_ops(desc.kind)) {
+    if (!noah_action_desc_has_dispatch_ops(desc)) {
         noah_action_log_missing_dispatch_ops(desc.kind);
         noah_action_fail_host_missing_dispatch_ops(desc.kind);
         return &noah_action_kind_dispatch_noop_ops;

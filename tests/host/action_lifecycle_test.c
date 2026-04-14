@@ -236,6 +236,23 @@ static void test_every_action_kind_has_metadata_and_dispatch_coverage(void) {
     }
 }
 
+static void test_invalid_action_kind_is_rejected_consistently(void) {
+    noah_action_desc_t invalid = {
+        .kind   = NOAH_ACTION_KIND_COUNT,
+        .action = KC_C,
+    };
+
+    CHECK(!noah_action_kind_metadata_defined(invalid.kind));
+    CHECK(!noah_action_desc_has_capability(invalid, NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED));
+    CHECK(!noah_action_desc_dispatches_macro_preflight(invalid));
+    CHECK(!noah_action_desc_intercepts_pd_mode_press(invalid));
+    CHECK(!noah_action_desc_intercepts_pd_mode_release(invalid));
+    CHECK(!noah_action_desc_keeps_registered_feedback(invalid));
+    CHECK(noah_action_desc_preview_layer(invalid) == UINT8_MAX);
+    CHECK(!noah_action_desc_has_dispatch_ops(invalid));
+    CHECK(!noah_action_kind_dispatch_has_complete_ops(invalid.kind));
+}
+
 static void test_tap_handles_layer_lock_and_pd_lock(void) {
     test_reset_stubs();
 
@@ -450,6 +467,7 @@ static void test_release_ignores_raw_layer_actions(void) {
 int main(void) {
     test_descriptor_classifies_dispatch_shapes();
     test_every_action_kind_has_metadata_and_dispatch_coverage();
+    test_invalid_action_kind_is_rejected_consistently();
     test_tap_handles_layer_lock_and_pd_lock();
     test_tap_routes_macro_custom_qmk_and_plain_actions();
     test_tap_ignores_raw_layer_actions();

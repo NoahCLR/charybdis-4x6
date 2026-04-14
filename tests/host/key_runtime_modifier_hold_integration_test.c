@@ -253,6 +253,16 @@ void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     (void)layer;
 }
 
+void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (layer_ownership_debug_snapshot_t){0};
+}
+
+void layer_ownership_reset_for_test(void) {}
+
 bool layer_ownership_momentary_release(keypos_t key_pos) {
     (void)key_pos;
     return false;
