@@ -14,6 +14,7 @@ Use this repo like production firmware, not a scratch keymap.
 - For doc fixes, doc updates, doc audits, or user-facing explanation work, check `README.md` and the relevant files under `docs/` first.
 - Review folders under `review/` are internal architecture/planning notes, not the default target for normal documentation requests.
 - For refactors or runtime architecture work, read the newest review folder under `review/` first. The newest review folder is the primary source of truth for that architecture work.
+- If the newest review folder is internally contradictory, reconcile it before using it as the source of truth for follow-up work on the same thread.
 - Name new review folders with a sortable ISO date prefix. For distinct reviews opened on the same day, append a zero-padded review sequence such as `review/2026-04-11-review-01/`, `review/2026-04-11-review-02/`, and `review/2026-04-11-review-03/` so "newest review" is unambiguous.
 - If work belongs to an existing review, continue in that folder instead of creating a same-day duplicate with a different naming pattern.
 - Each new review lives in its own folder under `review/` and must include:
@@ -71,4 +72,63 @@ Repo-specific guardrails:
 - When adding a new firmware source file that should participate in the userspace build, wire it into `users/noah/rules.mk` in the same pass. If host compile gates or test runners mirror that build surface, update them too.
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update `README.md` and the relevant files under `docs/` in the same pass.
-- If architectural work lands, update the active review folder's `progress.md`, do this in a structured way so it is a clear history in the same pass always include next steps. If the intended structure or tradeoffs changed, update `userspace-architecture-review.md` too.
+- If architectural work lands, update the active review folder's `progress.md` in the same pass.
+- Keep `progress.md` structured so it reads as clear history.
+- Always include next steps.
+- If the intended structure or tradeoffs changed, update `userspace-architecture-review.md` in the same pass.
+
+## Active Review Thread
+
+- For one architecture/refactor thread, keep one active review folder until the thread is closed.
+- Routine remediation, re-audit, and closure verification for the same thread belong in the active review folder, not a new same-day folder.
+- Create a new review folder only when:
+  - the architecture topic is materially different, or
+  - the previous thread is explicitly closed and a new thread is starting.
+- If you create a new review folder, state in `progress.md` why the active folder was not continued.
+
+## Review Integrity Rules
+
+- A review folder must be internally coherent for the tree it describes.
+- If later remediation lands after an audit, either:
+  - update the active review folder so its findings and landed state agree, or
+  - add an explicit `Reconciliation Note` that labels older findings as audit-time snapshot only.
+- Never leave a review folder containing both:
+  - “this has landed”, and
+  - stale open findings about the same issue,
+  without an explicit reconciliation note.
+
+## Required Review Structure
+
+- For follow-up architecture reviews, include a `Prior Finding Status` section.
+- For each major prior finding, mark it as:
+  - `open`
+  - `partially resolved`
+  - `resolved`
+  - `regressed`
+- When marking a finding `resolved`, include:
+  - code references
+  - enforcement references such as compile gates or tests
+  - verification commands that passed
+
+## Finding Lifecycle
+
+- Track each major finding across follow-up passes as one of:
+  - `open`
+  - `partially resolved`
+  - `resolved`
+  - `regressed`
+- Do not mark a finding `resolved` because the code looks cleaner. Mark it `resolved` only when the closure bar below is met.
+
+## Closure Bar
+
+- Do not call architecture work resolved because it looks cleaner.
+- A seam/boundary/API finding is only resolved when:
+  - the current code matches the intended design
+  - compile gates or tests mechanically enforce the claim
+  - docs and the active review note match the current tree
+  - `sh tests/host/run_all_host_tests.sh` passes
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes
+
+## Review Before New Review
+
+- If the newest review folder is contradictory, reconcile it before opening another follow-up review on the same thread.
