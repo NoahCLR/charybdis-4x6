@@ -230,6 +230,8 @@ The buffered-tap work itself is in good shape and the active notes no longer con
 
 `keep thread open`
 
+I reran the closure verification after the later hook/harness cleanup. The verdict does not change. The remediation-specific findings for the final-outcome cleanup are now closed, but the thread still fails the closure bar because the original open `should-fix` items are still present: the registry DSLs remain positional and `users/noah/lib/key/runtime/key_runtime_internal.h` is still a broad internal seam. No new correctness or review-integrity blockers were found in the rerun.
+
 ## Remaining Open Findings
 
 - Move the registry-style action and pd-mode manifests toward more explicit row shapes or named initializer tables.

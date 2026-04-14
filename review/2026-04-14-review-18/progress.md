@@ -63,6 +63,8 @@
   - added `tests/host/key_runtime_integration_harness_test.c` plus `run_key_runtime_integration_harness_tests.sh` so the harness default `post -> finalize(true)` behavior is now enforced by the host suite instead of relying on inspection.
 - Re-ran the follow-up architecture audit on that last cleanup using `prompts/follow-up-architecture-audit.md`.
 - The rerun found no new remediation-specific findings. The contract wording, strong-override coverage, default harness behavior, host-suite enforcement, and active review notes now agree on the landed structure.
+- Re-ran the closure review using `prompts/closure-verification-review.md`.
+- Closure verdict is unchanged: this thread is still not ready to close because the original `should-fix` findings on the registry DSLs and `key_runtime_internal.h` remain open, even though the remediation-specific hook/harness findings are now resolved.
 
 ## Findings Snapshot
 
