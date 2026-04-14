@@ -42,15 +42,16 @@ static pd_mode_snapshot_view_t pd_mode_snapshot_build_view(pd_mode_mask_t active
 }
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {
+    const pd_mode_runtime_shared_state_t *state = pd_mode_runtime_shared_state();
     pd_mode_snapshot_t snapshot;
 
-    snapshot.local = pd_mode_snapshot_build_view(noah_runtime_shared_state.pd.local_active_mode, noah_runtime_shared_state.pd.local_locked_mode);
+    snapshot.local = pd_mode_snapshot_build_view(state->local_active_mode, state->local_locked_mode);
 
     if (is_keyboard_master()) {
         snapshot.display = snapshot.local;
         return snapshot;
     }
 
-    snapshot.display = pd_mode_snapshot_build_view(noah_runtime_shared_state.pd.remote_display_active_mode, noah_runtime_shared_state.pd.remote_display_locked_mode);
+    snapshot.display = pd_mode_snapshot_build_view(state->remote_display_active_mode, state->remote_display_locked_mode);
     return snapshot;
 }

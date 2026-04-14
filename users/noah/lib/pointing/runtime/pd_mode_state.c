@@ -10,10 +10,14 @@
 #include "../policy/pd_mode_policy.h"
 #include "pd_mode_internal.h"
 
-#define PD_MODE_LOCAL_ACTIVE_MODE (noah_runtime_shared_state.pd.local_active_mode)
-#define PD_MODE_LOCAL_LOCKED_MODE (noah_runtime_shared_state.pd.local_locked_mode)
-#define PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE (noah_runtime_shared_state.pd.remote_display_active_mode)
-#define PD_MODE_REMOTE_DISPLAY_LOCKED_MODE (noah_runtime_shared_state.pd.remote_display_locked_mode)
+static pd_mode_runtime_shared_state_t *pd_mode_shared_state(void) {
+    return pd_mode_runtime_shared_state();
+}
+
+#define PD_MODE_LOCAL_ACTIVE_MODE (pd_mode_shared_state()->local_active_mode)
+#define PD_MODE_LOCAL_LOCKED_MODE (pd_mode_shared_state()->local_locked_mode)
+#define PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE (pd_mode_shared_state()->remote_display_active_mode)
+#define PD_MODE_REMOTE_DISPLAY_LOCKED_MODE (pd_mode_shared_state()->remote_display_locked_mode)
 
 static bool pd_mode_snapshot_view_changed(pd_mode_snapshot_view_t before, pd_mode_snapshot_view_t after) {
     return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode;

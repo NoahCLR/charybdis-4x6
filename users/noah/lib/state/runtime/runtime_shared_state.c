@@ -20,6 +20,10 @@ runtime_shared_state_t *noah_runtime_shared_state_ptr(void) {
     return &noah_runtime_context()->shared;
 }
 
+pd_mode_runtime_shared_state_t *pd_mode_runtime_shared_state(void) {
+    return &noah_runtime_context()->shared.pd;
+}
+
 key_runtime_shared_state_t *key_runtime_shared_state(void) {
     return &noah_runtime_context()->shared.key;
 }

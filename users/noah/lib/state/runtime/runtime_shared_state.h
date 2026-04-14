@@ -5,6 +5,8 @@
 // Aggregate runtime-owned state shared across the split key engine and pd-mode
 // modules. Key-runtime storage lives under key/runtime; this layer owns the
 // cross-domain aggregate that other userspace state modules can snapshot.
+// The old noah_runtime_shared_state name is kept only as a compatibility alias;
+// new code should prefer the slice accessors below.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -26,6 +28,7 @@ typedef struct {
 } runtime_shared_state_t;
 
 runtime_shared_state_t *noah_runtime_shared_state_ptr(void);
+pd_mode_runtime_shared_state_t *pd_mode_runtime_shared_state(void);
 
 #define noah_runtime_shared_state (*noah_runtime_shared_state_ptr())
 

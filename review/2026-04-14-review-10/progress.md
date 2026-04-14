@@ -103,6 +103,43 @@ Architecture result after this pass:
   boundary cleanup around the compatibility alias and a few direct shared-state
   reads that still need to be narrowed in Milestone 2
 
+### Runtime context Milestone 2 boundary cleanup
+
+Completed in this pass:
+
+- added `pd_mode_runtime_shared_state()` as the pd-mode slice accessor in
+  `users/noah/lib/state/runtime/runtime_shared_state.h`
+- moved `pd_mode_state.c` and `pd_mode_snapshot.c` off direct
+  `noah_runtime_shared_state` reads/writes and onto the pd-mode slice accessor
+- tightened the compatibility intent in `runtime_shared_state.h` so new code is
+  steered toward slice accessors instead of the legacy aggregate alias
+
+Architecture result after this pass:
+
+- repo-owned runtime code no longer reads the shared-state compatibility alias
+  directly
+- the compatibility shim still exists, but it is now isolated to the runtime
+  layer instead of leaking into pd-mode call sites
+- the next runtime-state step is now mostly policy and cleanup: keep the shim
+  narrow rather than chasing more hidden storage owners
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted pd-mode and compile-gate checks passed
+- full host suite passed
+- firmware build passed and produced
+  `.build/bastardkb_charybdis_4x6_noah.uf2`
+
 Verification run in this pass:
 
 - `git status --short`
@@ -143,9 +180,8 @@ Workspace scope for this pass:
 
 Next steps:
 
-- Milestone 2: remove remaining repo-owned direct reads of the compatibility
-  alias, especially in pd-mode/runtime helpers, and narrow
-  `runtime_shared_state.h` to an explicit compatibility shim
+- keep `runtime_shared_state.h` narrow as an explicit compatibility shim and
+  avoid adding new direct aggregate call sites
 - after that, convert action kinds to a single-source definition list, reusing
   the pd-mode manifest pattern where possible
 - only then tackle declarative hook registration and authored keymap file

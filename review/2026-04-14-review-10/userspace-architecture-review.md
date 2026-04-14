@@ -34,9 +34,9 @@ The strongest parts of the design are:
 The main long-term risks are not correctness bugs in the current tree. They are
 architecture scaling risks:
 
-1. runtime state ownership now has a canonical singleton context, but the old
-   aggregate still leaks through compatibility reads in several repo-owned
-   modules, so boundary cleanup is incomplete
+1. runtime state ownership now has a canonical singleton context, but
+   `runtime_shared_state.h` still exists as a compatibility shim and should not
+   regain status as a primary runtime surface
 2. action-kind extensibility is still a manually synchronized closed set,
    unlike the more scalable manifest-driven pd-mode design
 3. hook-level orchestration is centralized and order-sensitive, so adding new
@@ -106,7 +106,7 @@ forward into that one owner instead of maintaining separate mutable statics.
 
 ## Findings
 
-### 1. Milestone 1 fixed the worst ownership split, but compatibility reads still leak the old aggregate
+### 1. Milestone 1 is landed and the first Milestone 2 boundary cleanup is done, but the compatibility shim still needs to stay narrow
 
 Severity: should-fix
 
@@ -114,10 +114,10 @@ References:
 
 - `users/noah/lib/state/runtime/runtime_context.h:1-57`
 - `users/noah/lib/state/runtime/runtime_shared_state.h:16-30`
-- `users/noah/lib/state/runtime/runtime_shared_state.c:7-38`
+- `users/noah/lib/state/runtime/runtime_shared_state.c:7-42`
 - `users/noah/lib/state/runtime/runtime_debug.c:118-226`
-- `users/noah/lib/pointing/runtime/pd_mode_state.c:13-16`
-- `users/noah/lib/pointing/runtime/pd_mode_snapshot.c:47-54`
+- `users/noah/lib/pointing/runtime/pd_mode_state.c:13-20`
+- `users/noah/lib/pointing/runtime/pd_mode_snapshot.c:45-53`
 
 What I observed:
 
@@ -128,23 +128,23 @@ What I observed:
 - `noah_runtime_debug_snapshot()` and
   `noah_runtime_context_reset_for_test()` now work over the context directly
   instead of assembling or resetting state by calling each subsystem manually
-- the main remaining leak is that repo-owned code can still read the
-  compatibility alias directly, especially in pd-mode runtime helpers
+- repo-owned pd-mode runtime code no longer reads the compatibility alias
+  directly; it now goes through `pd_mode_runtime_shared_state()`
+- the remaining concern is policy, not mechanism: keep new code on the slice
+  accessors and avoid letting the compatibility shim expand again
 
 Why this matters:
 
 - Milestone 1 removed the biggest scaling tax: new runtime-owned subsystems no
   longer need their own private static store plus bespoke debug/reset wiring.
-- The remaining cost is boundary ambiguity. As long as repo-owned modules can
-  still reach for `noah_runtime_shared_state` directly, the context exists but
-  is not yet the only obvious path.
-- That matters because it keeps the old ownership mental model alive in call
-  sites that should instead treat shared state as one slice of the context.
+- The remaining cost is boundary drift risk. If new runtime code keeps using
+  the compatibility alias instead of slice accessors, the old ownership model
+  will quietly grow back around the new context.
+- That matters because Milestone 1 only pays off long term if the compatibility
+  layer stays visibly secondary to the runtime context and its slice helpers.
 
 Recommended direction:
 
-- Milestone 2 should remove repo-owned direct reads and writes of the
-  compatibility alias outside the runtime layer.
 - `runtime_shared_state.h` should become an explicitly temporary compatibility
   shim, not a surface that new code treats as a primary owner.
 - New runtime code should reach shared key/pd state through the context-backed
