@@ -5,7 +5,10 @@
 // Shared userspace helpers for the noah keymaps' standard QMK hooks.
 // users/noah/hooks.c provides weak default *_user implementations that call
 // these helpers, and any keymap-local override can call back into them to keep
-// the shared userspace behavior.
+// the shared userspace behavior. If an override narrows the result of
+// noah_process_record_user(...), it must call
+// noah_process_record_user_finalize(..., false) before returning false because
+// QMK will not run post_process_record_user() on a final false result.
 // Keymap-authored data files should stay on noah_keymap.h instead of including
 // this runtime entry-point surface directly.
 // ────────────────────────────────────────────────────────────────────────────
@@ -15,7 +18,10 @@
 
 void           noah_eeconfig_init_user(void);
 bool           noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
+bool           noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record);
 bool           noah_process_record_user(uint16_t keycode, keyrecord_t *record);
+void           noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing);
+void           noah_post_process_record_user(uint16_t keycode, keyrecord_t *record);
 void           noah_matrix_scan_user(void);
 void           noah_housekeeping_task_user(void);
 void           noah_keyboard_post_init_user(void);

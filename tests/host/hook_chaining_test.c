@@ -8,7 +8,9 @@
 
 void           eeconfig_init_user(void);
 bool           get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
+bool           pre_process_record_user(uint16_t keycode, keyrecord_t *record);
 bool           process_record_user(uint16_t keycode, keyrecord_t *record);
+void           post_process_record_user(uint16_t keycode, keyrecord_t *record);
 void           matrix_scan_user(void);
 void           housekeeping_task_user(void);
 void           keyboard_post_init_user(void);
@@ -23,7 +25,10 @@ layer_state_t layer_state;
 typedef struct {
     unsigned eeconfig_calls;
     unsigned hold_calls;
+    unsigned pre_process_calls;
     unsigned process_calls;
+    unsigned finalize_calls;
+    unsigned post_process_calls;
     unsigned scan_calls;
     unsigned housekeeping_calls;
     unsigned post_init_calls;
@@ -36,9 +41,17 @@ typedef struct {
     uint16_t       hold_keycode;
     keyrecord_t   *hold_record;
     bool           hold_return_value;
+    uint16_t       pre_process_keycode;
+    keyrecord_t   *pre_process_record;
+    bool           pre_process_return_value;
     uint16_t       process_keycode;
     keyrecord_t   *process_record;
     bool           process_return_value;
+    uint16_t       finalize_keycode;
+    keyrecord_t   *finalize_record;
+    bool           finalize_keep_processing;
+    uint16_t       post_process_keycode;
+    keyrecord_t   *post_process_record;
     layer_state_t  layer_state_input;
     layer_state_t  layer_state_return_value;
     report_mouse_t pointing_task_input;
@@ -57,7 +70,9 @@ static noah_hook_stub_state_t noah_hook_stub_state;
 typedef struct {
     unsigned      eeconfig_calls;
     unsigned      hold_calls;
+    unsigned      pre_process_calls;
     unsigned      process_calls;
+    unsigned      post_process_calls;
     unsigned      scan_calls;
     unsigned      housekeeping_calls;
     unsigned      post_init_calls;
@@ -67,6 +82,7 @@ typedef struct {
     unsigned      mouse_record_calls;
     unsigned      rgb_calls;
     bool          hold_force_true;
+    bool          pre_process_keep_processing;
     bool          process_keep_processing;
     layer_state_t layer_state_extra_bits;
     int8_t        pointing_task_x_delta;
@@ -113,11 +129,32 @@ bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     return noah_hook_stub_state.hold_return_value;
 }
 
+bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    noah_hook_stub_state.pre_process_calls++;
+    noah_hook_stub_state.pre_process_keycode = keycode;
+    noah_hook_stub_state.pre_process_record  = record;
+    return noah_hook_stub_state.pre_process_return_value;
+}
+
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     noah_hook_stub_state.process_calls++;
     noah_hook_stub_state.process_keycode = keycode;
     noah_hook_stub_state.process_record  = record;
     return noah_hook_stub_state.process_return_value;
+}
+
+void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    noah_hook_stub_state.post_process_calls++;
+    noah_hook_stub_state.post_process_keycode = keycode;
+    noah_hook_stub_state.post_process_record  = record;
+    noah_process_record_user_finalize(keycode, record, true);
+}
+
+void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
+    noah_hook_stub_state.finalize_calls++;
+    noah_hook_stub_state.finalize_keycode         = keycode;
+    noah_hook_stub_state.finalize_record          = record;
+    noah_hook_stub_state.finalize_keep_processing = keep_processing;
 }
 
 void noah_matrix_scan_user(void) {
@@ -173,9 +210,26 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     return noah_get_hold_on_other_key_press(keycode, record) || hook_override_state.hold_force_true;
 }
 
+bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    hook_override_state.pre_process_calls++;
+    return noah_pre_process_record_user(keycode, record) && hook_override_state.pre_process_keep_processing;
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    bool keep_processing;
+
     hook_override_state.process_calls++;
-    return noah_process_record_user(keycode, record) && hook_override_state.process_keep_processing;
+    keep_processing = noah_process_record_user(keycode, record) && hook_override_state.process_keep_processing;
+    if (!keep_processing) {
+        noah_process_record_user_finalize(keycode, record, false);
+    }
+
+    return keep_processing;
+}
+
+void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    hook_override_state.post_process_calls++;
+    noah_post_process_record_user(keycode, record);
 }
 
 void matrix_scan_user(void) {
@@ -242,6 +296,7 @@ static void test_weak_defaults_delegate_to_noah_helpers(void) {
     report_mouse_t input_report = {.x = 1, .y = -2, .h = 3, .v = -4, .buttons = 5};
 
     noah_hook_stub_state.hold_return_value          = true;
+    noah_hook_stub_state.pre_process_return_value   = true;
     noah_hook_stub_state.process_return_value       = false;
     noah_hook_stub_state.layer_state_return_value   = 0x00000034u;
     noah_hook_stub_state.pointing_task_return_value = (report_mouse_t){.x = -5, .y = 6, .h = -7, .v = 8, .buttons = 9};
@@ -256,10 +311,28 @@ static void test_weak_defaults_delegate_to_noah_helpers(void) {
     CHECK(noah_hook_stub_state.hold_keycode == 0x1234u);
     CHECK(noah_hook_stub_state.hold_record == &record);
 
+    CHECK(pre_process_record_user(0x2222u, &record));
+    CHECK(noah_hook_stub_state.pre_process_calls == 1);
+    CHECK(noah_hook_stub_state.pre_process_keycode == 0x2222u);
+    CHECK(noah_hook_stub_state.pre_process_record == &record);
+
     CHECK(!process_record_user(0x2345u, &record));
     CHECK(noah_hook_stub_state.process_calls == 1);
     CHECK(noah_hook_stub_state.process_keycode == 0x2345u);
     CHECK(noah_hook_stub_state.process_record == &record);
+    CHECK(noah_hook_stub_state.finalize_calls == 1);
+    CHECK(noah_hook_stub_state.finalize_keycode == 0x2345u);
+    CHECK(noah_hook_stub_state.finalize_record == &record);
+    CHECK(!noah_hook_stub_state.finalize_keep_processing);
+
+    post_process_record_user(0x2456u, &record);
+    CHECK(noah_hook_stub_state.post_process_calls == 1);
+    CHECK(noah_hook_stub_state.post_process_keycode == 0x2456u);
+    CHECK(noah_hook_stub_state.post_process_record == &record);
+    CHECK(noah_hook_stub_state.finalize_calls == 2);
+    CHECK(noah_hook_stub_state.finalize_keycode == 0x2456u);
+    CHECK(noah_hook_stub_state.finalize_record == &record);
+    CHECK(noah_hook_stub_state.finalize_keep_processing);
 
     matrix_scan_user();
     CHECK(noah_hook_stub_state.scan_calls == 1);
@@ -301,6 +374,7 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     report_mouse_t input_report = {.x = 10, .y = 11, .h = 12, .v = 13, .buttons = 14};
 
     noah_hook_stub_state.hold_return_value          = false;
+    noah_hook_stub_state.pre_process_return_value   = true;
     noah_hook_stub_state.process_return_value       = true;
     noah_hook_stub_state.layer_state_return_value   = 0x00000040u;
     noah_hook_stub_state.pointing_task_return_value = (report_mouse_t){.x = 1, .y = 2, .h = 3, .v = 4, .buttons = 5};
@@ -308,6 +382,7 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     noah_hook_stub_state.rgb_return_value           = false;
 
     hook_override_state.hold_force_true             = true;
+    hook_override_state.pre_process_keep_processing = false;
     hook_override_state.process_keep_processing     = false;
     hook_override_state.layer_state_extra_bits      = 0x00000080u;
     hook_override_state.pointing_task_x_delta       = 6;
@@ -326,11 +401,31 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     CHECK(noah_hook_stub_state.hold_keycode == 0x4567u);
     CHECK(noah_hook_stub_state.hold_record == &record);
 
+    CHECK(!pre_process_record_user(0x5555u, &record));
+    CHECK(hook_override_state.pre_process_calls == 1);
+    CHECK(noah_hook_stub_state.pre_process_calls == 1);
+    CHECK(noah_hook_stub_state.pre_process_keycode == 0x5555u);
+    CHECK(noah_hook_stub_state.pre_process_record == &record);
+
     CHECK(!process_record_user(0x5678u, &record));
     CHECK(hook_override_state.process_calls == 1);
     CHECK(noah_hook_stub_state.process_calls == 1);
     CHECK(noah_hook_stub_state.process_keycode == 0x5678u);
     CHECK(noah_hook_stub_state.process_record == &record);
+    CHECK(noah_hook_stub_state.finalize_calls == 1);
+    CHECK(noah_hook_stub_state.finalize_keycode == 0x5678u);
+    CHECK(noah_hook_stub_state.finalize_record == &record);
+    CHECK(!noah_hook_stub_state.finalize_keep_processing);
+
+    post_process_record_user(0x5789u, &record);
+    CHECK(hook_override_state.post_process_calls == 1);
+    CHECK(noah_hook_stub_state.post_process_calls == 1);
+    CHECK(noah_hook_stub_state.post_process_keycode == 0x5789u);
+    CHECK(noah_hook_stub_state.post_process_record == &record);
+    CHECK(noah_hook_stub_state.finalize_calls == 2);
+    CHECK(noah_hook_stub_state.finalize_keycode == 0x5789u);
+    CHECK(noah_hook_stub_state.finalize_record == &record);
+    CHECK(noah_hook_stub_state.finalize_keep_processing);
 
     matrix_scan_user();
     CHECK(hook_override_state.scan_calls == 1);

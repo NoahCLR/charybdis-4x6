@@ -12,8 +12,22 @@ __attribute__((weak)) bool get_hold_on_other_key_press(uint16_t keycode, keyreco
     return noah_get_hold_on_other_key_press(keycode, record);
 }
 
+__attribute__((weak)) bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    return noah_pre_process_record_user(keycode, record);
+}
+
 __attribute__((weak)) bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    return noah_process_record_user(keycode, record);
+    bool keep_processing = noah_process_record_user(keycode, record);
+
+    if (!keep_processing) {
+        noah_process_record_user_finalize(keycode, record, false);
+    }
+
+    return keep_processing;
+}
+
+__attribute__((weak)) void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    noah_post_process_record_user(keycode, record);
 }
 
 __attribute__((weak)) void matrix_scan_user(void) {

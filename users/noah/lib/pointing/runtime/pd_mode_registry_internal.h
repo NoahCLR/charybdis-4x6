@@ -16,6 +16,7 @@ struct pd_mode_lifecycle_hooks {
     void (*on_deactivate)(pd_mode_mask_t mode);
     void (*on_lock)(pd_mode_mask_t mode);
     void (*on_unlock)(pd_mode_mask_t mode);
+    uint8_t (*keyboard_event_masked_real_mods)(pd_mode_mask_t mode);
     uint8_t (*buffered_tap_masked_real_mods)(pd_mode_mask_t mode);
 };
 

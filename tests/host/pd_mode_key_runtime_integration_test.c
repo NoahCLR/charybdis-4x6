@@ -13,6 +13,7 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_reset.h"
+#include "users/noah/noah_runtime.h"
 
 #ifndef KC_J
 #    define KC_J 0x000Du
@@ -139,6 +140,16 @@ static void test_reset_state(void) {
     delayed_action_count     = 0;
     last_delayed_action      = KC_NO;
     last_delayed_mods        = (delayed_action_mods_t){0};
+}
+
+static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
+    return (keyrecord_t){
+        .event =
+            {
+                .key     = key_pos,
+                .pressed = pressed,
+            },
+    };
 }
 
 uint16_t timer_read(void) {
@@ -383,11 +394,25 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
 }
 
 keyboard_mod_state_t keyboard_mod_state_suspend(void) {
-    return (keyboard_mod_state_t){0};
+    keyboard_mod_state_t saved = {
+        .real           = fake_mods,
+        .weak           = fake_weak_mods,
+        .oneshot        = fake_oneshot_mods,
+        .oneshot_locked = fake_oneshot_locked_mods,
+    };
+
+    fake_mods                = 0;
+    fake_weak_mods           = 0;
+    fake_oneshot_mods        = 0;
+    fake_oneshot_locked_mods = 0;
+    return saved;
 }
 
 void keyboard_mod_state_apply(keyboard_mod_state_t state) {
-    (void)state;
+    fake_mods                = state.real;
+    fake_weak_mods           = state.weak;
+    fake_oneshot_mods        = state.oneshot;
+    fake_oneshot_locked_mods = state.oneshot_locked;
 }
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
@@ -664,6 +689,53 @@ static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_repla
     CHECK(last_delayed_mods.oneshot_locked == 0);
 }
 
+static void test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processing(void) {
+    keypos_t pinch_key_pos = test_keypos(2, 4);
+    keypos_t plain_key_pos = test_keypos(0, 1);
+    keyrecord_t plain_press = test_record(plain_key_pos, true);
+
+    test_reset_state();
+    test_configure_pinch_transparent_profile_path(pinch_key_pos);
+    fake_mods = MOD_BIT(KC_LEFT_SHIFT);
+
+    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_key_pos, true));
+    CHECK(pd_mode_local_active(PD_MODE_PINCH));
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+
+    CHECK(noah_pre_process_record_user(KC_C, &plain_press));
+    CHECK(noah_process_record_user(KC_C, &plain_press));
+    CHECK(fake_mods == MOD_BIT(KC_LEFT_SHIFT));
+
+    noah_post_process_record_user(KC_C, &plain_press);
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+}
+
+static void test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain_key_processing(void) {
+    keypos_t pinch_key_pos = test_keypos(2, 4);
+    keypos_t gui_key_pos   = test_keypos(0, 0);
+    keypos_t plain_key_pos = test_keypos(0, 1);
+    keyrecord_t gui_press   = test_record(gui_key_pos, true);
+    keyrecord_t plain_press = test_record(plain_key_pos, true);
+
+    test_reset_state();
+    test_configure_pinch_transparent_profile_path(pinch_key_pos);
+    fake_mods = MOD_BIT(KC_LEFT_SHIFT);
+
+    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_key_pos, true));
+    CHECK(pd_mode_local_active(PD_MODE_PINCH));
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+
+    CHECK(noah_pre_process_record_user(KC_LEFT_GUI, &gui_press));
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+
+    CHECK(noah_pre_process_record_user(KC_C, &plain_press));
+    CHECK(noah_process_record_user(KC_C, &plain_press));
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+
+    noah_post_process_record_user(KC_C, &plain_press);
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+}
+
 int main(void) {
     test_authored_single_press_preserves_default_pd_mode_hold();
     test_authored_hold_action_activates_pd_mode_while_held();
@@ -671,6 +743,8 @@ int main(void) {
     test_authored_second_press_hold_branches_into_other_pd_mode();
     test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay();
     test_pinch_single_tap_preserves_physically_held_gui_on_delayed_replay();
+    test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processing();
+    test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain_key_processing();
 
     puts("pd_mode_key_runtime_integration host tests passed");
     return 0;

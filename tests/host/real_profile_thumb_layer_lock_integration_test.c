@@ -316,6 +316,11 @@ void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
     (void)mods;
 }
 
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
+    (void)mods;
+    return 0;
+}
+
 void keyboard_mod_state_apply(keyboard_mod_state_t state) {
     (void)state;
 }

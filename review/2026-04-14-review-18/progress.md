@@ -40,6 +40,22 @@
   - `tests/host/pd_mode_key_runtime_integration_test.c` now authors `PINCH_MODE` as `TAP_SENDS(KC_TRNS)` like the shipped profile,
   - the integration harness now provides a local pointer-layer-to-base-layer transparent source path with a lower raw `LT(..., KC_J)` key,
   - the pinch replay assertions now verify the delayed action resolves to `KC_J` through transparent lookup instead of using a synthetic `KC_C` stand-in.
+- Landed concurrent keyboard-event masking for mode-owned real modifiers:
+  - added `noah_pre_process_record_user(...)` and `noah_post_process_record_user(...)` to the shared hook surface so userspace can track physical modifier presses before `process_record_user()` and restore any temporarily masked mode-owned real mods after the event,
+  - added a private pd-mode keyboard-event masking query and used it from `key_runtime_process.c` so concurrent key processing hides only the managed-only subset of active mode-owned real modifiers,
+  - kept `PINCH_MODE` as the owner of the managed-only `GUI` policy for both buffered tap replay and concurrent keyboard events,
+  - removed the redundant file-static pinch registration latch and moved transient keyboard-event mask state into key-runtime shared state so resets and test fixtures do not depend on translation-unit statics,
+  - updated `docs/ADDING_PD_MODE.md` so mode authors know that lifecycle hooks can also own concurrent keyboard-event masking policy.
+- Aligned the wider host test matrix with the new hook/runtime ownership:
+  - added a weak no-op fallback for the private pd-mode keyboard-event masking query in `key_runtime_process.c` so host runners that compile key runtime without the full pd registry still link cleanly,
+  - added `keyboard_mod_state.c` to the shared host key-runtime source bundle,
+  - updated the scenario, layer-lock, and real-profile host harnesses with only the ownership/state stubs they still own locally,
+  - updated `key_runtime_preflight_test.c` so it now expects physical modifier tracking to happen in `pre_process_record_user()` instead of inside preflight.
+- Landed final-outcome cleanup for concurrent keyboard-event masking:
+  - added `noah_process_record_user_finalize(...)` to the shared runtime hook surface so cleanup now follows the final QMK event result instead of the helper-local `noah_process_record_user(...)` result,
+  - updated the weak `process_record_user()` wrapper and the documented chaining pattern so keymap-local overrides that narrow the shared result to `false` finalize immediately instead of leaking the temporary keyboard-event mask,
+  - moved the common key-runtime integration and scenario harnesses onto full QMK-style `pre/process/finalize-or-post` flow instead of calling `noah_process_record_user()` directly,
+  - dropped the bespoke pre/post wrappers from the pd-mode integration test and kept only the direct low-level helper calls that intentionally inspect mid-event masking state.
 
 ## Findings Snapshot
 
@@ -83,10 +99,35 @@
   - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during concurrent keyboard-event masking remediation:
+  - `sh tests/host/run_pd_mode_tests.sh`
+  - `sh tests/host/run_hook_chaining_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+- Passed during host-matrix follow-up for concurrent keyboard-event masking:
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_key_runtime_preflight_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during final-outcome cleanup for concurrent keyboard-event masking:
+  - `sh tests/host/run_hook_chaining_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
-1. Re-audit whether any other pd mode will need mode-owned buffered tap masking before adding more special policy to the private pd-mode hook surface.
+1. Re-audit whether any other pd mode will need mode-owned modifier masking for buffered replay or concurrent keyboard events before adding more special policy to the private pd-mode hook surfaces.
 2. Resume the original architecture thread by narrowing `key_runtime_internal.h` or making the registry rows more explicit; those `should-fix` items are still open.
 3. Keep this review folder as the active thread history for both reliability follow-ups and future architecture cleanup on the same userspace seam.

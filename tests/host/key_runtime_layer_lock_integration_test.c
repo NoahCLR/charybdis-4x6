@@ -315,6 +315,11 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
     return false;
 }
 
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
+    (void)mods;
+    return 0;
+}
+
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
     return (delayed_action_mods_t){
         .real           = mt->saved_mods,

@@ -79,6 +79,23 @@ static keyrecord_t key_runtime_scenario_record(keypos_t key_pos, bool pressed) {
     };
 }
 
+static bool key_runtime_scenario_process_record(uint16_t keycode, keyrecord_t *record) {
+    bool keep_processing;
+
+    if (!noah_pre_process_record_user(keycode, record)) {
+        return false;
+    }
+
+    keep_processing = noah_process_record_user(keycode, record);
+    if (!keep_processing) {
+        noah_process_record_user_finalize(keycode, record, false);
+        return false;
+    }
+
+    noah_post_process_record_user(keycode, record);
+    return true;
+}
+
 static key_behavior_view_t key_runtime_scenario_default_behavior(uint16_t keycode) {
     return (key_behavior_view_t){
         .keycode            = keycode,
@@ -202,12 +219,12 @@ void key_runtime_scenario_run(const key_runtime_scenario_step_t *steps, uint8_t 
         switch (steps[index].kind) {
             case KEY_RUNTIME_SCENARIO_STEP_PRESS: {
                 keyrecord_t record = key_runtime_scenario_record(steps[index].data.key_event.key_pos, true);
-                (void)noah_process_record_user(steps[index].data.key_event.keycode, &record);
+                (void)key_runtime_scenario_process_record(steps[index].data.key_event.keycode, &record);
                 break;
             }
             case KEY_RUNTIME_SCENARIO_STEP_RELEASE: {
                 keyrecord_t record = key_runtime_scenario_record(steps[index].data.key_event.key_pos, false);
-                (void)noah_process_record_user(steps[index].data.key_event.keycode, &record);
+                (void)key_runtime_scenario_process_record(steps[index].data.key_event.keycode, &record);
                 break;
             }
             case KEY_RUNTIME_SCENARIO_STEP_ADVANCE_MS:
@@ -334,6 +351,11 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
     (void)keycode;
     (void)record;
     return false;
+}
+
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
+    (void)mods;
+    return 0;
 }
 
 bool action_dispatch_layer_is_locked(uint8_t layer) {

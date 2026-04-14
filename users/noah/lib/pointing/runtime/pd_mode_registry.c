@@ -8,6 +8,7 @@
 #include "../defs/pd_mode_manifest.h"
 #include "pd_mode_internal.h"
 #include "pd_mode_buffered_tap_internal.h"
+#include "pd_mode_keyboard_event_internal.h"
 #include "pd_mode_registry_internal.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 
@@ -86,6 +87,11 @@ static uint8_t pd_mode_lifecycle_buffered_tap_masked_real_mods(pd_mode_mask_t mo
     return hooks && hooks->buffered_tap_masked_real_mods ? hooks->buffered_tap_masked_real_mods(mode) : 0;
 }
 
+static uint8_t pd_mode_lifecycle_keyboard_event_masked_real_mods(pd_mode_mask_t mode) {
+    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
+    return hooks && hooks->keyboard_event_masked_real_mods ? hooks->keyboard_event_masked_real_mods(mode) : 0;
+}
+
 static void pd_mode_run_lifecycle_callback(void (*callback)(pd_mode_mask_t mode), pd_mode_mask_t mode) {
     if (callback) {
         callback(mode);
@@ -148,4 +154,9 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
 uint8_t pd_mode_buffered_tap_masked_real_mods(uint16_t keycode) {
     pd_mode_mask_t mode = pd_mode_for_keycode(keycode);
     return mode != 0 ? pd_mode_lifecycle_buffered_tap_masked_real_mods(mode) : 0;
+}
+
+uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
+    pd_mode_mask_t mode = pd_mode_local_active_snapshot();
+    return mode != 0 ? pd_mode_lifecycle_keyboard_event_masked_real_mods(mode) : 0;
 }

@@ -51,6 +51,22 @@ Additional pd-mode remediation also landed after that snapshot without changing 
 
 This keeps the policy with the pd mode that owns the modifier while leaving the generic key runtime responsible only for snapshot timing. The change was covered by `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_real_profile_validation_tests.sh`, `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`, `sh tests/host/run_key_runtime_transition_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
 
+Another pd-mode/runtime remediation landed after that buffered-tap work without changing the broader architecture assessment:
+
+- the shared QMK hook surface in `users/noah/noah_runtime.h`, `users/noah/hooks.c`, and `users/noah/lib/key/runtime/key_runtime_process.c` now includes `pre_process_record_user()` and `post_process_record_user()` so userspace can track physically pressed modifiers before `process_record_user()` and restore any temporarily masked mode-owned real modifiers after the event;
+- the private pd-mode hook surface now also owns concurrent keyboard-event masking policy through `users/noah/lib/pointing/runtime/pd_mode_keyboard_event_internal.h`, `users/noah/lib/pointing/runtime/pd_mode_registry_internal.h`, and `users/noah/lib/pointing/runtime/pd_mode_registry.c`, while `users/noah/lib/key/runtime/key_runtime_process.c` remains the only generic runtime caller;
+- `users/noah/lib/pointing/modes/pd_mode_pinch.c` now reuses the same managed-only `GUI` policy for both buffered tap replay and concurrent keyboard-event masking, and the transient keyboard-event mask state lives in `users/noah/lib/key/runtime/key_runtime_shared_state.h` instead of a process-local static.
+
+This is an intentional strengthening of the existing centralized-hook and mode-owned-policy design. It keeps the mode-owned modifier scoped to pointing behavior without stripping a physically held user modifier, and it removes a redundant pinch-specific static latch that was only compensating for behavior the pd-mode lifecycle already guarantees. The change was covered by `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_hook_chaining_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+
+One more runtime follow-up landed after that hook expansion without changing the broader architecture assessment:
+
+- the shared hook surface in `users/noah/noah_runtime.h`, `users/noah/hooks.c`, and `users/noah/lib/key/runtime/key_runtime_process.c` now includes an explicit `noah_process_record_user_finalize(...)` helper so temporary keyboard-event masking is finalized on the final QMK result instead of the helper-local `noah_process_record_user(...)` result;
+- the common integration/scenario host harnesses in `tests/host/key_runtime_integration_harness.c` and `tests/host/key_runtime_scenario_harness.c` now model real QMK `pre/process/finalize-or-post` flow instead of calling `noah_process_record_user()` directly;
+- the strong chaining contract is now explicit: overrides may still narrow the shared result, but if they return `false` after chaining they must finalize the shared runtime first, and `tests/host/hook_chaining_test.c` now covers that exact false-after-chain pattern.
+
+This keeps the QMK-shaped `pre/process/post` hooks intact while giving the shared runtime one repo-local seam for final outcome cleanup. That is cleaner than pushing the fix into upstream `process_record_kb()` or relying on keymap-local overrides to remember post-hook semantics that QMK itself will skip on final `false`. The change was covered by `sh tests/host/run_hook_chaining_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+
 ## Follow-Up Audit
 
 Date: 2026-04-14  

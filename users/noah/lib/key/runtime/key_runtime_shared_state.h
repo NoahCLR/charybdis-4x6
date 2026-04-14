@@ -65,6 +65,11 @@ typedef struct {
     bool     long_hold_level;
 } key_runtime_feedback_state_t;
 
+typedef struct {
+    bool    active;
+    uint8_t masked_real_mods;
+} key_runtime_keyboard_event_mask_state_t;
+
 #define ACTIVE_KEY_STATE_INIT                                                    \
     {                                                                            \
         .owner.keycode                 = KC_NO,                                  \
@@ -78,6 +83,7 @@ typedef struct {
     key_runtime_slot_state_t     slots_by_position[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
     key_runtime_index_state_t    index;
     key_runtime_feedback_state_t feedback;
+    key_runtime_keyboard_event_mask_state_t keyboard_event_mask;
 } key_runtime_shared_state_t;
 
 key_runtime_shared_state_t *key_runtime_shared_state(void);

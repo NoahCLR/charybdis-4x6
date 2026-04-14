@@ -12,7 +12,14 @@
 #include "noah_runtime.h"
 #include "../../macro/macro_dispatch.h"
 #include "../../pointing/defs/pd_modes.h"
+#include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"
 #include "../../action/synthetic_record.h"
+#include "../../state/ownership/keyboard_mod_ownership.h"
+#include "../../state/runtime/keyboard_mod_state.h"
+
+__attribute__((weak)) uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
+    return 0;
+}
 
 typedef enum {
     KEY_RUNTIME_PROCESS_NEXT = 0,
@@ -35,6 +42,59 @@ struct key_runtime_process_ctx_t {
     handled_key_resolution_t resolution;
     bool                     resolution_loaded;
 };
+
+static keyboard_mod_state_t key_runtime_keyboard_mod_state_current(void) {
+    return (keyboard_mod_state_t){
+        .real           = get_mods(),
+        .weak           = get_weak_mods(),
+        .oneshot        = get_oneshot_mods(),
+        .oneshot_locked = get_oneshot_locked_mods(),
+    };
+}
+
+static key_runtime_keyboard_event_mask_state_t *key_runtime_keyboard_event_mask_state(void) {
+    return &key_runtime_shared_state()->keyboard_event_mask;
+}
+
+static void key_runtime_process_end_keyboard_event_mod_mask(void) {
+    key_runtime_keyboard_event_mask_state_t *mask_state = key_runtime_keyboard_event_mask_state();
+    keyboard_mod_state_t restored;
+
+    if (!mask_state->active) {
+        return;
+    }
+
+    restored      = key_runtime_keyboard_mod_state_current();
+    restored.real = (uint8_t)(restored.real | keyboard_mod_ownership_managed_only_mask(mask_state->masked_real_mods));
+    keyboard_mod_state_apply(restored);
+    mask_state->active           = false;
+    mask_state->masked_real_mods = 0;
+}
+
+static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
+    key_runtime_keyboard_event_mask_state_t *mask_state = key_runtime_keyboard_event_mask_state();
+    keyboard_mod_state_t filtered;
+    uint8_t masked_real_mods;
+
+    if (mask_state->active) {
+        return;
+    }
+
+    masked_real_mods = pd_mode_active_keyboard_event_masked_real_mods();
+    if (masked_real_mods == 0) {
+        return;
+    }
+
+    filtered = key_runtime_keyboard_mod_state_current();
+    if ((filtered.real & masked_real_mods) == 0) {
+        return;
+    }
+
+    filtered.real &= (uint8_t)~masked_real_mods;
+    keyboard_mod_state_apply(filtered);
+    mask_state->masked_real_mods = masked_real_mods;
+    mask_state->active           = true;
+}
 
 static handled_key_resolution_t key_runtime_process_resolution(key_runtime_process_ctx_t *ctx) {
     if (!ctx->resolution_loaded) {
@@ -116,7 +176,7 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_macro_dispa
 }
 
 static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep_processing) {
-    key_runtime_trace_bool_result("process:return", ctx->keycode, ctx->record, keep_processing);
+    (void)ctx;
     return keep_processing;
 }
 
@@ -124,6 +184,15 @@ bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
     return false;
+}
+
+bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (noah_synthetic_record_active()) {
+        return true;
+    }
+
+    keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
+    return true;
 }
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -138,7 +207,19 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
     key_runtime_trace_record("process:entry", keycode, record);
 
-    for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {
+    switch (key_runtime_process_stage_synthetic_passthrough(&ctx)) {
+        case KEY_RUNTIME_PROCESS_RETURN_TRUE:
+            return key_runtime_process_finish(&ctx, true);
+        case KEY_RUNTIME_PROCESS_RETURN_FALSE:
+            return key_runtime_process_finish(&ctx, false);
+        case KEY_RUNTIME_PROCESS_NEXT:
+        default:
+            break;
+    }
+
+    key_runtime_process_begin_keyboard_event_mod_mask();
+
+    for (uint8_t index = 1; index < ARRAY_SIZE(stages); index++) {
         const key_runtime_process_stage_entry_t *stage = &stages[index];
 
         switch (stage->handler(&ctx)) {
@@ -154,4 +235,13 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     return key_runtime_process_finish(&ctx, true);
+}
+
+void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
+    key_runtime_process_end_keyboard_event_mod_mask();
+    key_runtime_trace_bool_result("process:return", keycode, record, keep_processing);
+}
+
+void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    noah_process_record_user_finalize(keycode, record, true);
 }

@@ -22,6 +22,23 @@ __attribute__((weak)) bool noah_process_record_user(uint16_t keycode, keyrecord_
     return true;
 }
 
+__attribute__((weak)) bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return true;
+}
+
+__attribute__((weak)) void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
+    (void)keycode;
+    (void)record;
+    (void)keep_processing;
+}
+
+__attribute__((weak)) void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
 static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed) {
     return (keyrecord_t){
         .event =
@@ -46,7 +63,20 @@ void key_runtime_integration_scan(void) {
 
 bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed) {
     keyrecord_t record = key_runtime_integration_record(key_pos, pressed);
-    return noah_process_record_user(keycode, &record);
+    bool        keep_processing;
+
+    if (!noah_pre_process_record_user(keycode, &record)) {
+        return false;
+    }
+
+    keep_processing = noah_process_record_user(keycode, &record);
+    if (!keep_processing) {
+        noah_process_record_user_finalize(keycode, &record, false);
+        return false;
+    }
+
+    noah_post_process_record_user(keycode, &record);
+    return true;
 }
 
 void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_step_t *steps, uint8_t step_count) {

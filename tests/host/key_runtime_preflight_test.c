@@ -331,7 +331,7 @@ static void test_active_handled_release_bypasses_modifier_suppression(void) {
     test_track_active_slot(KC_RIGHT_ALT, record.event.key, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_preflight_record(KC_RIGHT_ALT, &record));
-    CHECK(tracked_physical_event);
+    CHECK(!tracked_physical_event);
 }
 
 static void test_unrelated_release_stays_suppressed(void) {
@@ -343,7 +343,7 @@ static void test_unrelated_release_stays_suppressed(void) {
     test_track_active_slot(KC_RIGHT_ALT, stored, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(!test_preflight_record(KC_RIGHT_ALT, &record));
-    CHECK(tracked_physical_event);
+    CHECK(!tracked_physical_event);
 }
 
 static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
@@ -356,7 +356,7 @@ static void test_inactive_handled_release_bypasses_modifier_suppression(void) {
     test_track_active_slot(KC_LEFT_CTRL, stored, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_preflight_record(KC_RIGHT_ALT, &record));
-    CHECK(tracked_physical_event);
+    CHECK(!tracked_physical_event);
 }
 
 static void test_other_press_interrupts_active_key_through_transition_plan(void) {
@@ -385,7 +385,7 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
                            KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 
     CHECK(test_preflight_record(KC_LEFT_CTRL, &record));
-    CHECK(tracked_physical_event);
+    CHECK(!tracked_physical_event);
     CHECK(interrupted_active_key);
     CHECK(executed_transition_plan_count == 1);
 }
