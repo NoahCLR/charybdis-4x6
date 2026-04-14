@@ -22,6 +22,14 @@ Use this repo like production firmware, not a scratch keymap.
   - `progress.md`: completed work, in-flight work, verification, and next steps
 - Do not recreate deleted root-level review files if the active review has moved into a subfolder.
 
+## Review Prompt Templates
+
+- Review prompt templates live under `prompts/`, when using one of these files always mention it in the chat!!.
+- Use `prompts/initial-architecture-review.md` for the first architecture pass on a new thread.
+- Use `prompts/follow-up-architecture-audit.md` for critical audits of landed refactor work.
+- Use `prompts/closure-verification-review.md` to decide whether an active review thread is actually ready to close.
+- Prefer referencing these files by path in requests instead of pasting prompt text into the chat.
+
 ## Repo Boundaries
 
 - Keep `keyboards/bastardkb/charybdis/4x6/keymaps/noah/` mainly data-driven. That path should primarily hold authored profile data such as layers, combos, `key_behaviors[]`, RGB tables, macros, and other keymap configuration.
