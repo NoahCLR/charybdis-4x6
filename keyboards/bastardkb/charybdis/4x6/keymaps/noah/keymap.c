@@ -295,7 +295,7 @@ enum keymap_custom_keycodes {
 const key_behavior_t
     key_behaviors[] =
         {
-            // Typing keys: number row, punctuation, and base typing layer-taps.
+            // ─── Typing Keys ─────────────────────────────────────────────────────────────────
             {.keycode = KC_1, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)}}},
             {.keycode = KC_2, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_AT)}}},
             {.keycode = KC_3, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_HASH)}}},
@@ -315,42 +315,42 @@ const key_behavior_t
             {.keycode = KC_LBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)}}},
             {.keycode = KC_RBRC, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)}}},
 
-            // Editing / system keys.
+            // ─── Editing / System Keys ───────────────────────────────────────────────────────
             {.keycode = KC_ESC, .tap_counts = {[0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))}, [1] = {.tap = TAP_SENDS(S(KC_GRV))}}},
             {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
             {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
 
-            // Layer-tap keys that also have tap overrides.
+            // ─── Layer-Tap Keys ──────────────────────────────────────────────────────────────
             {.keycode = LT(LAYER_NAV, KC_SLSH), .tap_hold_term = 100, .tap_counts = {[1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))}}},
 
-            // Navigation-layer overrides.
+            // ─── Navigation-Layer Overrides ─────────────────────────────────────────────────
             {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
             {.keycode = KC_RIGHT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))}}},
 
-            // Pointer-mode keys and tools.
-            {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_H)}}},
+            // ─── Pointer-Mode Keys ──────────────────────────────────────────────────────────
+            {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}}},
             {
                 .keycode = PINCH_MODE,
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(KC_J)},
+                        [0] = {.tap = TAP_SENDS(KC_TRNS)},
                         [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
                     },
             },
-            {.keycode = VOLUME_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_N)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
+            {.keycode = VOLUME_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
 
             // Dragscroll: single tap '.', hold = momentary, double-tap hold = lock.
             {
                 .keycode = DRAGSCROLL,
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(KC_DOT)},
+                        [0] = {.tap = TAP_SENDS(KC_TRNS)},
                         [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))},
                     },
             },
 
-            // Custom keycodes, including combo-only outputs.
+            // ─── Custom Keycodes ────────────────────────────────────────────────────────────
             {
                 .keycode = LEFT_THUMB,
                 .tap_counts =
