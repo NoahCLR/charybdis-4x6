@@ -91,6 +91,7 @@
 // RGB activity or drift into auto-mouse activation.
 #    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE
 #    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS 1000
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ARM_IDLE_MS 300000
 #    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX 2
 
 // Local drag-scroll tuning (DPI for the scroll speed lives in the keymap config).

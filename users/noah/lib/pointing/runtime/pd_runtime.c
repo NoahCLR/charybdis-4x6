@@ -14,9 +14,15 @@
 #        error "NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS must be defined when NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE is set"
 #    endif
 
+#    if !defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ARM_IDLE_MS)
+#        error "NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ARM_IDLE_MS must be defined when NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE is set"
+#    endif
+
 #    if !defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX)
 #        error "NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX must be defined when NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE is set"
 #    endif
+
+static uint32_t pd_runtime_idle_noise_last_pointer_activity_ms;
 
 static inline bool pd_runtime_report_has_motion(report_mouse_t report) {
     return report.x != 0 || report.y != 0 || report.h != 0 || report.v != 0;
@@ -32,21 +38,42 @@ static inline uint16_t pd_runtime_report_abs_total(report_mouse_t report) {
 
     return total;
 }
+
+static inline void pd_runtime_idle_noise_note_pointer_activity(void) {
+    pd_runtime_idle_noise_last_pointer_activity_ms = timer_read32();
+}
+
+static inline uint32_t pd_runtime_idle_noise_any_activity_elapsed(void) {
+    // Do not trust last_input_activity_elapsed() here: unsuppressed tiny
+    // pointer drift can refresh it and prevent the long arm window from aging.
+    uint32_t elapsed = timer_elapsed32(pd_runtime_idle_noise_last_pointer_activity_ms);
+    uint32_t matrix  = last_matrix_activity_elapsed();
+
+    if (matrix < elapsed) {
+        elapsed = matrix;
+    }
+
+    return elapsed;
+}
+#endif
+
+void noah_pointing_device_init_user(void) {
+#if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
+    pd_runtime_idle_noise_note_pointer_activity();
 #endif
 
 #if defined(POINTING_DEVICE_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
-void noah_pointing_device_init_user(void) {
     noah_qmk_contract_auto_mouse_set_layer(AUTO_MOUSE_DEFAULT_LAYER);
     noah_qmk_contract_auto_mouse_set_enable(true);
+#endif
 }
 
+#if defined(POINTING_DEVICE_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
     (void)record;
     return pointer_layer_policy_is_mouse_record(keycode);
 }
 #else
-void noah_pointing_device_init_user(void) {}
-
 bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
@@ -60,7 +87,14 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
     const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
 
 #    if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
-    if (snapshot.local.active_mode == 0 && mouse_report.buttons == 0 && pd_runtime_report_has_motion(mouse_report) && last_input_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS && pd_runtime_report_abs_total(mouse_report) <= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
+    bool     has_motion = pd_runtime_report_has_motion(mouse_report);
+    uint16_t abs_total  = has_motion ? pd_runtime_report_abs_total(mouse_report) : 0;
+
+    if (snapshot.local.active_mode != 0 || mouse_report.buttons != 0 || abs_total > NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
+        pd_runtime_idle_noise_note_pointer_activity();
+    }
+
+    if (snapshot.local.active_mode == 0 && mouse_report.buttons == 0 && has_motion && last_input_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS && pd_runtime_idle_noise_any_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ARM_IDLE_MS && abs_total <= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
         return (report_mouse_t){0};
     }
 #    endif
