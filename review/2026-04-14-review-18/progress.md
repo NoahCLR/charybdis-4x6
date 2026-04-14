@@ -56,6 +56,11 @@
   - updated the weak `process_record_user()` wrapper and the documented chaining pattern so keymap-local overrides that narrow the shared result to `false` finalize immediately instead of leaking the temporary keyboard-event mask,
   - moved the common key-runtime integration and scenario harnesses onto full QMK-style `pre/process/finalize-or-post` flow instead of calling `noah_process_record_user()` directly,
   - dropped the bespoke pre/post wrappers from the pd-mode integration test and kept only the direct low-level helper calls that intentionally inspect mid-event masking state.
+- Closed the follow-up review gaps in that final-outcome cleanup:
+  - broadened the shared hook contract comment so any override that chains `noah_process_record_user(...)` and returns a final `false` must finalize first, not just `&&`-style narrowing overrides,
+  - extended `tests/host/hook_chaining_test.c` with an explicit pass-through-false chaining shape so a future `if (!noah_process_record_user(...)) return false;` override still has mechanical coverage for the finalize-before-return rule,
+  - updated the weak default `noah_post_process_record_user(...)` in `tests/host/key_runtime_integration_harness.c` to finalize the `true` path just like production,
+  - added `tests/host/key_runtime_integration_harness_test.c` plus `run_key_runtime_integration_harness_tests.sh` so the harness default `post -> finalize(true)` behavior is now enforced by the host suite instead of relying on inspection.
 
 ## Findings Snapshot
 
@@ -116,6 +121,7 @@
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Passed during final-outcome cleanup for concurrent keyboard-event masking:
   - `sh tests/host/run_hook_chaining_tests.sh`
+  - `sh tests/host/run_key_runtime_integration_harness_tests.sh`
   - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
   - `sh tests/host/run_key_runtime_scenario_tests.sh`
   - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`

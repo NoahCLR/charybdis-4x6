@@ -35,8 +35,7 @@ __attribute__((weak)) void noah_process_record_user_finalize(uint16_t keycode, k
 }
 
 __attribute__((weak)) void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
+    noah_process_record_user_finalize(keycode, record, true);
 }
 
 static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed) {

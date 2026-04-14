@@ -5,8 +5,9 @@
 // Shared userspace helpers for the noah keymaps' standard QMK hooks.
 // users/noah/hooks.c provides weak default *_user implementations that call
 // these helpers, and any keymap-local override can call back into them to keep
-// the shared userspace behavior. If an override narrows the result of
-// noah_process_record_user(...), it must call
+// the shared userspace behavior. If an override calls
+// noah_process_record_user(...) and then returns false for the final event
+// result, it must call
 // noah_process_record_user_finalize(..., false) before returning false because
 // QMK will not run post_process_record_user() on a final false result.
 // Keymap-authored data files should stay on noah_keymap.h instead of including

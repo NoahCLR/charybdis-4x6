@@ -67,6 +67,11 @@ typedef struct {
 static noah_hook_stub_state_t noah_hook_stub_state;
 
 #ifdef HOOK_CHAINING_TEST_STRONG_OVERRIDE
+typedef enum {
+    HOOK_PROCESS_CHAIN_AND_NARROW = 0,
+    HOOK_PROCESS_CHAIN_PASSTHROUGH_FALSE,
+} hook_process_chain_style_t;
+
 typedef struct {
     unsigned      eeconfig_calls;
     unsigned      hold_calls;
@@ -84,6 +89,7 @@ typedef struct {
     bool          hold_force_true;
     bool          pre_process_keep_processing;
     bool          process_keep_processing;
+    hook_process_chain_style_t process_chain_style;
     layer_state_t layer_state_extra_bits;
     int8_t        pointing_task_x_delta;
     int8_t        pointing_task_y_delta;
@@ -216,10 +222,27 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    bool shared_keep_processing;
     bool keep_processing;
 
     hook_override_state.process_calls++;
-    keep_processing = noah_process_record_user(keycode, record) && hook_override_state.process_keep_processing;
+    shared_keep_processing = noah_process_record_user(keycode, record);
+
+    if (hook_override_state.process_chain_style == HOOK_PROCESS_CHAIN_PASSTHROUGH_FALSE) {
+        if (!shared_keep_processing) {
+            noah_process_record_user_finalize(keycode, record, false);
+            return false;
+        }
+
+        if (!hook_override_state.process_keep_processing) {
+            noah_process_record_user_finalize(keycode, record, false);
+            return false;
+        }
+
+        return true;
+    }
+
+    keep_processing = shared_keep_processing && hook_override_state.process_keep_processing;
     if (!keep_processing) {
         noah_process_record_user_finalize(keycode, record, false);
     }
@@ -472,6 +495,27 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     CHECK(noah_hook_stub_state.rgb_led_min == 2);
     CHECK(noah_hook_stub_state.rgb_led_max == 7);
 }
+
+static void test_strong_override_passthrough_false_path_finalizes_without_post(void) {
+    test_reset();
+
+    keyrecord_t record = test_record(6, 1, true);
+
+    noah_hook_stub_state.process_return_value       = false;
+    hook_override_state.process_keep_processing     = true;
+    hook_override_state.process_chain_style         = HOOK_PROCESS_CHAIN_PASSTHROUGH_FALSE;
+
+    CHECK(!process_record_user(0x6123u, &record));
+    CHECK(hook_override_state.process_calls == 1);
+    CHECK(noah_hook_stub_state.process_calls == 1);
+    CHECK(noah_hook_stub_state.process_keycode == 0x6123u);
+    CHECK(noah_hook_stub_state.process_record == &record);
+    CHECK(noah_hook_stub_state.finalize_calls == 1);
+    CHECK(noah_hook_stub_state.finalize_keycode == 0x6123u);
+    CHECK(noah_hook_stub_state.finalize_record == &record);
+    CHECK(!noah_hook_stub_state.finalize_keep_processing);
+    CHECK(noah_hook_stub_state.post_process_calls == 0);
+}
 #endif
 
 int main(void) {
@@ -479,6 +523,7 @@ int main(void) {
     test_weak_defaults_delegate_to_noah_helpers();
 #else
     test_strong_overrides_can_chain_to_noah_helpers();
+    test_strong_override_passthrough_false_path_finalizes_without_post();
 #endif
     return 0;
 }
