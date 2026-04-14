@@ -403,3 +403,79 @@ Next steps:
 - move the remaining buffered-modifier fallback and transparent-source edge
   heuristics behind registry-backed policy hooks
 - only after that, move on to declarative hook registration
+
+### Descriptor-backed default tap and modifier semantics
+
+Completed in this pass:
+
+- added `noah_action_desc_is_pure_modifier_literal()` and
+  `noah_action_desc_default_tap_action()` to
+  `users/noah/lib/action/action_dispatch.h` /
+  `users/noah/lib/action/action_kind.c`
+- moved the pure-modifier single-step buffer heuristic in
+  `users/noah/lib/key/interaction/handled_key_defaults.c` off a local
+  `SAFE_RANGE` / modifier switch and onto the action descriptor helper surface
+- moved default tap extraction in
+  `users/noah/lib/key/interaction/handled_key_defaults.c` onto the descriptor
+  helper so handled-key code no longer re-derives layer-tap vs literal routing
+- narrowed `users/noah/lib/key/interaction/handled_key_transparency.c` so tap
+  transparency checks reuse descriptor-backed default tap extraction instead of
+  branching on action-family details locally
+- extended host descriptor coverage in
+  `tests/host/action_dispatch_test.c` and
+  `tests/host/action_lifecycle_test.c` for:
+  - pure modifier literal detection
+  - concrete default tap extraction across common action kinds
+  - invalid descriptor fallback behavior
+
+Architecture result after this pass:
+
+- handled-key defaults no longer own their own pure-modifier keycode list or
+  default tap extraction logic
+- transparent tap-source checks now reuse the same descriptor-backed default
+  tap semantics as the rest of the handled-key runtime
+- the remaining local handled-key policy is narrower again: explicit
+  authored-resolution overrides and field extraction still exist, but the
+  action-family branching moved further toward the action descriptor surface
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted action, handled-key, integration, validation, and compile-gate
+  runners passed
+- full host suite passed
+- firmware build passed and produced
+  `.build/bastardkb_charybdis_4x6_noah.uf2`
+
+Workspace scope for this pass:
+
+- no sibling workspace folders were edited
+- changes are confined to `charybdis-4x6/`
+- action metadata/helpers, handled-key defaults/transparency logic, host
+  tests, and the active review folder were updated together
+
+Next steps:
+
+- decide whether the remaining transparent-field extraction helpers belong in
+  the action descriptor surface or should stay local as non-action-family
+  policy
+- if they stay local, shift the next architecture pass to hook registration
+  instead of continuing to chase smaller handled-key cleanup

@@ -38,9 +38,9 @@ architecture scaling risks:
    `runtime_shared_state.h` still exists as a compatibility shim and should not
    regain status as a primary runtime surface
 2. action-kind identity, classification, metadata, dispatch, and most handled-
-   key runtime policy are now registry-backed, but buffered-modifier fallback
-   and field-level transparent-source semantics still live in local handled-key
-   code
+   key runtime policy are now registry-backed, but a thin layer of explicit
+   authored-resolution overrides and transparent-field extraction still lives
+   in local handled-key code
 3. hook-level orchestration is centralized and order-sensitive, so adding new
    subsystems still means editing core pipelines instead of registering
    capabilities
@@ -204,8 +204,10 @@ What I observed:
   - default tap extraction for literal and layer-tap actions
   - descriptor-layer source semantics for layer-hold and layer-tap actions
 - downstream action policy still exists in:
-  - buffered-modifier single-step fallback rules in `handled_key_defaults.c`
-  - field-level transparent-source behavior in `handled_key_transparency.c`
+  - explicit authored-resolution momentary-layer and layer-tap override
+    handling in `handled_key_transparency.c`
+  - field-level transparent-source extraction in
+    `handled_key_transparency.c`
   - a small amount of lookup glue in `key_behavior_lookup.c`
 - by comparison, pd modes use a single manifest row that fans out into the rest
   of the subsystem
@@ -218,11 +220,14 @@ Why this matters:
 - The latest pass removed another real scaling tax: handled-key runtime code no
   longer needs to know that “layer lock means release the momentary layer first”
   or that “pd-mode hold is directly handled” by hard-coded kind checks.
-- But adding a genuinely new action family with novel buffered-modifier or
-  field-level transparent-source semantics is still not fully additive.
-- The remaining cost is now much narrower and more localized, but it still
-  lives in downstream handled-key policy code rather than entirely in the
-  action-kind registry.
+- The latest pass removed another narrow but real tax: handled-key defaults no
+  longer maintain their own pure-modifier list or default-tap extraction
+  logic, and transparent tap-source checks now reuse descriptor-backed default
+  tap semantics.
+- The remaining cost is now much narrower and more localized. It mostly lives
+  in downstream handled-key code as authored-resolution overrides and
+  transparent-field extraction rather than as open-coded action-family
+  branching.
 
 Practical examples of features that would feel expensive under the current
 design:
@@ -234,15 +239,16 @@ design:
 
 Recommended direction:
 
-- Keep `action_kind_registry_list.h` as the root and extend it one step further.
+- Keep `action_kind_registry_list.h` as the root and extend it one step
+  further.
 - Each action-kind spec should eventually own:
   - classification predicate
   - authored capabilities
   - dispatch hooks
   - hold-preview / feedback policy hooks
-- Then move the remaining buffered-modifier fallback and transparent-source
-  heuristics behind that same policy surface, so handled-key runtime code stops
-  encoding even edge-case action-family knowledge locally.
+- Then decide whether the last authored-resolution and transparent-field
+  helpers belong in the registry surface or whether they should stay local as
+  intentionally non-action-family policy.
 - That lets the next action-family addition be “add a row” much more often than
   “edit three policy files and re-derive behavior by hand”.
 

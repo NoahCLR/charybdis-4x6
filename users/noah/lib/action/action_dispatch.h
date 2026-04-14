@@ -97,9 +97,11 @@ bool noah_action_desc_releases_momentary_layer_before_action(noah_action_desc_t 
 bool noah_action_desc_uses_held_lifecycle_for_press_and_hold(noah_action_desc_t desc);
 bool noah_action_desc_default_tap_uses_layer_tap_keycode(noah_action_desc_t desc);
 bool noah_action_desc_default_tap_uses_action_keycode(noah_action_desc_t desc);
+bool noah_action_desc_is_pure_modifier_literal(noah_action_desc_t desc);
 bool noah_action_desc_supports_fallback_hold(noah_action_desc_t desc);
 bool noah_action_desc_source_layer_uses_desc_layer(noah_action_desc_t desc);
 uint8_t noah_action_desc_source_layer(noah_action_desc_t desc);
+uint16_t noah_action_desc_default_tap_action(noah_action_desc_t desc);
 
 static inline bool noah_action_desc_is_layer_lock(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_LAYER_LOCK;

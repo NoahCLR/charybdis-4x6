@@ -43,6 +43,22 @@ static bool noah_action_desc_has_policy_flag(noah_action_desc_t desc, noah_actio
     return def && (def->policy_flags & (uint16_t)flag) != 0;
 }
 
+static bool noah_action_keycode_is_pure_modifier_literal(uint16_t action) {
+    switch (action) {
+        case KC_LEFT_CTRL:
+        case KC_LEFT_SHIFT:
+        case KC_LEFT_ALT:
+        case KC_LEFT_GUI:
+        case KC_RIGHT_CTRL:
+        case KC_RIGHT_SHIFT:
+        case KC_RIGHT_ALT:
+        case KC_RIGHT_GUI:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool noah_action_kind_metadata_defined(noah_action_kind_t kind) {
     const noah_action_kind_def_t *def = noah_action_kind_def(kind);
     return def && def->defined;
@@ -81,6 +97,10 @@ bool noah_action_desc_default_tap_uses_action_keycode(noah_action_desc_t desc) {
     return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE);
 }
 
+bool noah_action_desc_is_pure_modifier_literal(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_LITERAL && noah_action_keycode_is_pure_modifier_literal(desc.action);
+}
+
 bool noah_action_desc_supports_fallback_hold(noah_action_desc_t desc) {
     return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_SUPPORTS_FALLBACK_HOLD);
 }
@@ -91,6 +111,18 @@ bool noah_action_desc_source_layer_uses_desc_layer(noah_action_desc_t desc) {
 
 uint8_t noah_action_desc_source_layer(noah_action_desc_t desc) {
     return noah_action_desc_source_layer_uses_desc_layer(desc) ? desc.layer : UINT8_MAX;
+}
+
+uint16_t noah_action_desc_default_tap_action(noah_action_desc_t desc) {
+    if (noah_action_desc_default_tap_uses_layer_tap_keycode(desc)) {
+        return QK_LAYER_TAP_GET_TAP_KEYCODE(desc.action);
+    }
+
+    if (noah_action_desc_default_tap_uses_action_keycode(desc)) {
+        return desc.action;
+    }
+
+    return KC_NO;
 }
 
 bool noah_action_desc_dispatches_macro_preflight(noah_action_desc_t desc) {

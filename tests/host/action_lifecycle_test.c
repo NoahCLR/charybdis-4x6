@@ -256,9 +256,11 @@ static void test_invalid_action_kind_is_rejected_consistently(void) {
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(invalid));
     CHECK(!noah_action_desc_default_tap_uses_layer_tap_keycode(invalid));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(invalid));
+    CHECK(!noah_action_desc_is_pure_modifier_literal(invalid));
     CHECK(!noah_action_desc_supports_fallback_hold(invalid));
     CHECK(!noah_action_desc_source_layer_uses_desc_layer(invalid));
     CHECK(noah_action_desc_source_layer(invalid) == UINT8_MAX);
+    CHECK(noah_action_desc_default_tap_action(invalid) == KC_NO);
     CHECK(!noah_action_desc_has_dispatch_ops(invalid));
     CHECK(!noah_action_kind_dispatch_has_complete_ops(invalid.kind));
 }

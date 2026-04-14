@@ -21,17 +21,21 @@ static handled_key_transparent_source_t handled_key_transparent_source_current(h
     };
 }
 
-bool handled_key_resolution_uses_transparent_source(handled_key_resolution_t resolution, handled_key_transparent_field_t field) {
+static uint16_t handled_key_resolution_transparent_field_action(handled_key_resolution_t resolution, handled_key_transparent_field_t field) {
     switch (field) {
         case HANDLED_KEY_TRANSPARENT_FIELD_TAP:
-            return handled_key_tap_action_behavior(resolution) == KC_TRNS;
+            return resolution.step.tap.present ? resolution.step.tap.action : noah_action_desc_default_tap_action(noah_action_describe(resolution.keycode));
         case HANDLED_KEY_TRANSPARENT_FIELD_HOLD:
-            return resolution.step.hold.present && resolution.step.hold.action == KC_TRNS;
+            return resolution.step.hold.present ? resolution.step.hold.action : KC_NO;
         case HANDLED_KEY_TRANSPARENT_FIELD_LONG_HOLD:
-            return resolution.step.long_hold.present && resolution.step.long_hold.action == KC_TRNS;
+            return resolution.step.long_hold.present ? resolution.step.long_hold.action : KC_NO;
         default:
-            return false;
+            return KC_NO;
     }
+}
+
+bool handled_key_resolution_uses_transparent_source(handled_key_resolution_t resolution, handled_key_transparent_field_t field) {
+    return handled_key_resolution_transparent_field_action(resolution, field) == KC_TRNS;
 }
 
 static noah_action_desc_t handled_key_resolution_action_desc(handled_key_resolution_t resolution) {

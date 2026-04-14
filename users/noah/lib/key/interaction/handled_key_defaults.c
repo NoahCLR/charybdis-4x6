@@ -4,30 +4,12 @@
 
 #include "handled_key_internal.h"
 
-#include "../../pointing/defs/pd_modes.h"
-
 uint8_t behavior_get_layer(uint16_t keycode) {
     return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
 }
 
 bool is_layer_key(uint16_t keycode) {
     return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
-}
-
-static bool handled_key_keycode_is_pure_modifier(uint16_t keycode) {
-    switch (keycode) {
-        case KC_LEFT_CTRL:
-        case KC_LEFT_SHIFT:
-        case KC_LEFT_ALT:
-        case KC_LEFT_GUI:
-        case KC_RIGHT_CTRL:
-        case KC_RIGHT_SHIFT:
-        case KC_RIGHT_ALT:
-        case KC_RIGHT_GUI:
-            return true;
-        default:
-            return false;
-    }
 }
 
 pd_mode_mask_t handled_key_pd_mode_for_behavior(key_behavior_view_t behavior) {
@@ -39,11 +21,13 @@ bool handled_key_resolution_step_present(handled_key_resolution_t resolution) {
 }
 
 static bool handled_key_resolution_uses_buffered_modifier_single_step(handled_key_resolution_t resolution) {
+    noah_action_desc_t desc = noah_action_describe(resolution.keycode);
+
     if (handled_key_resolution_step_present(resolution) || handled_key_resolution_is_momentary_layer(resolution)) {
         return false;
     }
 
-    return handled_key_resolution_has_multi_tap(resolution) && resolution.keycode < SAFE_RANGE && handled_key_keycode_is_pure_modifier(resolution.keycode);
+    return handled_key_resolution_has_multi_tap(resolution) && noah_action_desc_is_pure_modifier_literal(desc);
 }
 
 bool handled_key_resolution_uses_fallback_hold_behavior(handled_key_resolution_t resolution) {
@@ -63,17 +47,7 @@ bool handled_key_resolution_uses_fallback_hold_behavior(handled_key_resolution_t
 }
 
 static uint16_t handled_key_default_tap_action(handled_key_resolution_t resolution) {
-    noah_action_desc_t desc = noah_action_describe(resolution.keycode);
-
-    if (noah_action_desc_default_tap_uses_layer_tap_keycode(desc)) {
-        return QK_LAYER_TAP_GET_TAP_KEYCODE(resolution.keycode);
-    }
-
-    if (noah_action_desc_default_tap_uses_action_keycode(desc)) {
-        return resolution.keycode;
-    }
-
-    return KC_NO;
+    return noah_action_desc_default_tap_action(noah_action_describe(resolution.keycode));
 }
 
 static uint16_t handled_key_single_tap_action(handled_key_resolution_t resolution) {
