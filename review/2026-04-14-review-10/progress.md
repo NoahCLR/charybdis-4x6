@@ -182,7 +182,76 @@ Next steps:
 
 - keep `runtime_shared_state.h` narrow as an explicit compatibility shim and
   avoid adding new direct aggregate call sites
-- after that, convert action kinds to a single-source definition list, reusing
-  the pd-mode manifest pattern where possible
+- extend the new action-kind registry so hold-preview, feedback, and authored
+  policy hooks can live with kind definitions instead of only in downstream
+  runtime policy files
 - only then tackle declarative hook registration and authored keymap file
   decomposition
+
+### Action-kind registry foundation
+
+Completed in this pass:
+
+- added `users/noah/lib/action/action_kind_registry_list.h` as the single-source
+  action-kind definition list
+- moved the `noah_action_kind_t` enum generation in
+  `users/noah/lib/action/action_dispatch.h` onto that registry list
+- moved metadata initialization and descriptor classification in
+  `users/noah/lib/action/action_kind.c` onto the same registry rows
+- moved dispatch-op initialization in
+  `users/noah/lib/action/action_kind_dispatch.c` onto the same registry rows
+- kept metadata ownership in `action_kind.c` and dispatch-op ownership in
+  `action_kind_dispatch.c` so existing host runners that intentionally compile
+  only the metadata surface do not need broader link wiring
+- changed `noah_action_describe()` from a hard-coded ordered branch chain to a
+  registry-driven matcher/priority scan without changing authored behavior
+
+Architecture result after this pass:
+
+- enum identity, classification order, metadata, and dispatch ops are now
+  synchronized from one list instead of parallel hand-maintained tables
+- the action-kind core is materially easier to extend safely than it was at the
+  start of the day
+- the remaining action extensibility debt has shifted downstream: hold-preview,
+  feedback, and authored-policy semantics still live outside the registry in
+  central runtime policy files
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted action, validation, integration, and compile-gate runners passed
+- full host suite passed
+- firmware build passed and produced
+  `.build/bastardkb_charybdis_4x6_noah.uf2`
+
+Workspace scope for this pass:
+
+- no sibling workspace folders were edited
+- changes are confined to `charybdis-4x6/`
+- action metadata, action dispatch, and the active review folder were updated
+  together
+
+Next steps:
+
+- keep the registry as the single source for action-kind identity and wiring
+- pull per-kind hold-preview, feedback, and authored-policy decisions into
+  registry-backed hooks or policy descriptors
+- only after that, move on to declarative hook registration

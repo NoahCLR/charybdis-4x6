@@ -164,66 +164,14 @@ static void noah_action_release_qmk_behavior(noah_action_desc_t desc, keypos_t k
 }
 
 static const noah_action_kind_dispatch_ops_t noah_action_kind_dispatch_ops[NOAH_ACTION_KIND_COUNT] = {
-    [NOAH_ACTION_KIND_LITERAL] =
-        {
-            .tap     = noah_action_tap_literal,
-            .press   = noah_action_press_literal,
-            .release = noah_action_release_literal,
+    #define NOAH_ACTION_KIND_DEF(name, priority, matcher, cap_mask, feedback_kept, uses_desc_layer_preview, dispatch_mask, tap_impl, press_impl, release_impl) \
+        [NOAH_ACTION_KIND_##name] = { \
+            .tap     = tap_impl, \
+            .press   = press_impl, \
+            .release = release_impl, \
         },
-    [NOAH_ACTION_KIND_LAYER_LOCK] =
-        {
-            .tap     = noah_action_tap_layer_lock,
-            .press   = noah_action_press_layer_lock,
-            .release = noah_action_release_noop,
-        },
-    [NOAH_ACTION_KIND_LAYER_HOLD] =
-        {
-            .tap     = noah_action_tap_unsupported_layer,
-            .press   = noah_action_press_owned_momentary_layer,
-            .release = noah_action_release_owned_momentary_layer,
-        },
-    [NOAH_ACTION_KIND_LAYER_TAP] =
-        {
-            .tap     = noah_action_tap_unsupported_layer,
-            .press   = noah_action_press_unsupported_layer,
-            .release = noah_action_release_unsupported_layer,
-        },
-    [NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION] =
-        {
-            .tap     = noah_action_tap_unsupported_layer,
-            .press   = noah_action_press_unsupported_layer,
-            .release = noah_action_release_unsupported_layer,
-        },
-    [NOAH_ACTION_KIND_MACRO] =
-        {
-            .tap     = noah_action_tap_noop,
-            .press   = noah_action_press_noop,
-            .release = noah_action_release_noop,
-        },
-    [NOAH_ACTION_KIND_QMK_BEHAVIOR] =
-        {
-            .tap     = noah_action_tap_qmk_behavior,
-            .press   = noah_action_press_qmk_behavior,
-            .release = noah_action_release_qmk_behavior,
-        },
-    [NOAH_ACTION_KIND_KEYMAP_CUSTOM] =
-        {
-            .tap     = noah_action_tap_keymap_custom,
-            .press   = noah_action_press_keymap_custom,
-            .release = noah_action_release_keymap_custom,
-        },
-    [NOAH_ACTION_KIND_PD_MODE_HOLD] =
-        {
-            .tap     = noah_action_tap_literal,
-            .press   = noah_action_press_literal,
-            .release = noah_action_release_literal,
-        },
-    [NOAH_ACTION_KIND_PD_MODE_LOCK] =
-        {
-            .tap     = noah_action_tap_pd_mode_lock,
-            .press   = noah_action_press_pd_mode_lock,
-            .release = noah_action_release_noop,
-        },
+    NOAH_ACTION_KIND_REGISTRY(NOAH_ACTION_KIND_DEF)
+    #undef NOAH_ACTION_KIND_DEF
 };
 
 static bool noah_action_kind_dispatch_ops_complete(const noah_action_kind_dispatch_ops_t *ops) {

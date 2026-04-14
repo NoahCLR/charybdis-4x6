@@ -21,6 +21,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "action_kind_registry_list.h"
 #include "../pointing/defs/pd_modes.h"
 
 typedef struct {
@@ -57,16 +58,9 @@ static inline bool noah_action_keycode_is_qmk_behavior(uint16_t action) {
 }
 
 typedef enum {
-    NOAH_ACTION_KIND_LITERAL = 0,
-    NOAH_ACTION_KIND_LAYER_LOCK,
-    NOAH_ACTION_KIND_LAYER_HOLD,
-    NOAH_ACTION_KIND_LAYER_TAP,
-    NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION,
-    NOAH_ACTION_KIND_MACRO,
-    NOAH_ACTION_KIND_QMK_BEHAVIOR,
-    NOAH_ACTION_KIND_KEYMAP_CUSTOM,
-    NOAH_ACTION_KIND_PD_MODE_HOLD,
-    NOAH_ACTION_KIND_PD_MODE_LOCK,
+    #define NOAH_ACTION_KIND_ENUM(name, priority, matcher, caps, keeps_feedback, preview_uses_desc_layer, dispatch_flags, tap, press, release) NOAH_ACTION_KIND_##name,
+    NOAH_ACTION_KIND_REGISTRY(NOAH_ACTION_KIND_ENUM)
+    #undef NOAH_ACTION_KIND_ENUM
     NOAH_ACTION_KIND_COUNT,
 } noah_action_kind_t;
 

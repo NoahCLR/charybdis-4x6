@@ -37,8 +37,9 @@ architecture scaling risks:
 1. runtime state ownership now has a canonical singleton context, but
    `runtime_shared_state.h` still exists as a compatibility shim and should not
    regain status as a primary runtime surface
-2. action-kind extensibility is still a manually synchronized closed set,
-   unlike the more scalable manifest-driven pd-mode design
+2. action-kind identity, classification, metadata, and dispatch are now
+   registry-backed, but action policy extensibility still stops at that
+   boundary, so novel action families still spill into downstream runtime logic
 3. hook-level orchestration is centralized and order-sensitive, so adding new
    subsystems still means editing core pipelines instead of registering
    capabilities
@@ -104,6 +105,20 @@ held-action ownership, held-repeat ownership, keyboard modifier ownership, and
 the runtime trace ring. The old public module APIs still exist, but they now
 forward into that one owner instead of maintaining separate mutable statics.
 
+### Action kinds now have a single source of truth
+
+The action system has also moved in the right direction:
+
+- `users/noah/lib/action/action_kind_registry_list.h:1-83`
+- `users/noah/lib/action/action_kind.c:16-190`
+- `users/noah/lib/action/action_kind_dispatch.c:19-248`
+
+Enum identity, classification priority, metadata, and dispatch ops are now
+generated from one registry list instead of being maintained as separate,
+manually synchronized tables. That makes the core action surface much closer to
+the manifest-driven pd-mode pattern that was already the cleanest extensibility
+surface in the tree.
+
 ## Findings
 
 ### 1. Milestone 1 is landed and the first Milestone 2 boundary cleanup is done, but the compatibility shim still needs to stay narrow
@@ -150,15 +165,16 @@ Recommended direction:
 - New runtime code should reach shared key/pd state through the context-backed
   helpers and let only the compatibility layer expose the legacy alias.
 
-### 2. Action extensibility is still a manually synchronized closed set
+### 2. The core action-kind surface is now registry-backed, but action policy is still only partly declarative
 
 Severity: should-fix
 
 References:
 
 - `users/noah/lib/action/action_dispatch.h:59-177`
-- `users/noah/lib/action/action_kind.c:16-207`
-- `users/noah/lib/action/action_kind_dispatch.c:166-227`
+- `users/noah/lib/action/action_kind_registry_list.h:1-83`
+- `users/noah/lib/action/action_kind.c:16-190`
+- `users/noah/lib/action/action_kind_dispatch.c:19-248`
 - `users/noah/lib/key/interaction/key_behavior_lookup.c:46-58`
 - `users/noah/lib/key/interaction/key_behavior_lookup.c:120-146`
 - `users/noah/lib/key/interaction/handled_key_policy.h:30-89`
@@ -169,23 +185,26 @@ References:
 
 What I observed:
 
-- action kinds are defined by:
-  - an enum in `action_dispatch.h`
-  - a metadata table in `action_kind.c`
-  - a dispatch-op table in `action_kind_dispatch.c`
-  - descriptor classification logic in `action_kind.c`
-  - downstream policy checks in `key_behavior_lookup.c`
-  - downstream hold semantics in `handled_key_policy.h`
+- action kinds are now rooted in one definition list,
+  `action_kind_registry_list.h`, which fans out into:
+  - the enum in `action_dispatch.h`
+  - the metadata and classification table in `action_kind.c`
+  - the dispatch-op table in `action_kind_dispatch.c`
+- downstream policy checks still live outside that registry in:
+  - `key_behavior_lookup.c`
+  - `handled_key_policy.h`
 - by comparison, pd modes use a single manifest row that fans out into the rest
   of the subsystem
 
 Why this matters:
 
-- Adding a genuinely new action family is not additive today.
-- A new action kind or authored action semantic will require modifying core
-  runtime files instead of supplying a new row or module.
-- That is the opposite of the repo’s long-term goal of keeping authored
-  behavior declarative and the runtime modular.
+- The registry change removed a real scaling tax: enum membership,
+  classification order, metadata, and dispatch ops no longer need manual
+  synchronization across parallel core files.
+- But adding a genuinely new action family with novel hold-preview, feedback, or
+  authored-behavior semantics is still not fully additive.
+- The remaining cost lives in downstream policy code, not in the action-kind
+  core itself.
 
 Practical examples of features that would feel expensive under the current
 design:
@@ -197,13 +216,14 @@ design:
 
 Recommended direction:
 
-- Replace the current “enum + multiple parallel tables” shape with one
-  definition list or registry object.
-- Each action-kind spec should declare:
+- Keep `action_kind_registry_list.h` as the root and extend it one step further.
+- Each action-kind spec should eventually own:
   - classification predicate
   - authored capabilities
   - dispatch hooks
   - hold-preview / feedback policy hooks
+- That lets the next action-family addition be “add a row” much more often than
+  “edit three policy files and re-derive behavior by hand”.
 
 Example direction:
 
@@ -358,7 +378,8 @@ Most important architectural boundary that should be preserved:
 
 Most important architectural boundary that should improve:
 
-- runtime state ownership should become explicit and uniform
+- keep the runtime context as the only real state owner and avoid drifting back
+  toward direct compatibility-alias usage
 
 ### 2. Modularity & Extensibility
 
@@ -386,10 +407,12 @@ Strong abstractions:
 
 Leaky abstractions:
 
-- the aggregate debug/reset surface currently compensates for hidden state
-  rather than reflecting a single coherent runtime context
+- the compatibility `runtime_shared_state` surface is still visible enough that
+  new code could regress toward aggregate access if the boundary is not kept
+  narrow
 - action-kind abstractions are meaningful, but their implementation is too
-  scattered to count as a minimal stable interface yet
+  distributed across registry rows plus downstream policy files to count as a
+  fully minimal stable interface yet
 
 ### 4. Code Organization & Structure
 
@@ -414,9 +437,11 @@ Good:
 
 Risky:
 
-- ownership state is spread across private static tables
-- whole-system reset/debug is manual integration code instead of a native
-  property of one runtime object
+- the runtime context solved the old “private mutable statics everywhere”
+  problem, but the compatibility alias still needs to remain secondary or that
+  ownership model will drift back
+- action lifecycle policy is still split between registry-backed kind metadata
+  and downstream handled-key / authored-behavior logic
 
 ### 6. Scalability of the Design
 
@@ -450,10 +475,11 @@ Specific improvement area:
 
 If I were sequencing architecture work here, I would do it in this order:
 
-1. Unify runtime state ownership behind a single context type while preserving
-   the current singleton execution path.
-2. Convert action kinds to a single-source definition list, borrowing the
-   pd-mode manifest pattern.
+1. Keep the runtime context as the only primary state owner and continue
+   narrowing the compatibility shim so new code cannot drift back onto legacy
+   aggregate access.
+2. Extend the new action-kind registry so per-kind policy hooks live with the
+   kind definitions, not only classification/metadata/dispatch.
 3. Replace top-level imperative hook ordering with small declarative stage
    tables for process-record, scan, post-init, and RGB render.
 4. Split the authored keymap data into smaller data-only files without moving
@@ -461,8 +487,9 @@ If I were sequencing architecture work here, I would do it in this order:
 
 That order matters:
 
-- state unification reduces future cross-module wiring cost
-- action unification reduces the largest extensibility bottleneck
+- state unification already reduced future cross-module wiring cost
+- the landed action registry removed the worst synchronization debt, and the
+  next pass should finish pulling policy into that same declarative surface
 - pipeline registration then becomes easier because subsystems have cleaner
   interfaces
 - authoring-file decomposition is valuable, but it is lower risk and can land
