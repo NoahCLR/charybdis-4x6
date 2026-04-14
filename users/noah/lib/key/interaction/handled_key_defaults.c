@@ -47,18 +47,11 @@ static bool handled_key_resolution_uses_buffered_modifier_single_step(handled_ke
 }
 
 bool handled_key_resolution_uses_fallback_hold_behavior(handled_key_resolution_t resolution) {
-    noah_action_desc_t desc;
-
     if (resolution.tap_count != 1) {
         return false;
     }
 
-    if (handled_key_resolution_is_momentary_layer(resolution) || resolution.keycode >= SAFE_RANGE) {
-        return false;
-    }
-
-    desc = noah_action_describe(resolution.keycode);
-    if (noah_action_desc_is_qmk_behavior_keycode(desc)) {
+    if (!noah_action_desc_supports_fallback_hold(noah_action_describe(resolution.keycode))) {
         return false;
     }
 
@@ -72,19 +65,15 @@ bool handled_key_resolution_uses_fallback_hold_behavior(handled_key_resolution_t
 static uint16_t handled_key_default_tap_action(handled_key_resolution_t resolution) {
     noah_action_desc_t desc = noah_action_describe(resolution.keycode);
 
-    if (resolution.pd_mode != 0) {
-        return KC_NO;
-    }
-
     if (noah_action_desc_default_tap_uses_layer_tap_keycode(desc)) {
         return QK_LAYER_TAP_GET_TAP_KEYCODE(resolution.keycode);
     }
 
-    if (handled_key_resolution_is_momentary_layer(resolution) || resolution.keycode >= SAFE_RANGE) {
-        return KC_NO;
+    if (noah_action_desc_default_tap_uses_action_keycode(desc)) {
+        return resolution.keycode;
     }
 
-    return resolution.keycode;
+    return KC_NO;
 }
 
 static uint16_t handled_key_single_tap_action(handled_key_resolution_t resolution) {

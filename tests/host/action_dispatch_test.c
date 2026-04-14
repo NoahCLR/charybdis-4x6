@@ -251,6 +251,10 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_releases_momentary_layer_before_action(layer_lock));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(layer_lock));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(layer_lock));
+    CHECK(!noah_action_desc_default_tap_uses_action_keycode(layer_lock));
+    CHECK(!noah_action_desc_supports_fallback_hold(layer_lock));
+    CHECK(!noah_action_desc_source_layer_uses_desc_layer(layer_lock));
+    CHECK(noah_action_desc_source_layer(layer_lock) == UINT8_MAX);
 
     CHECK(momentary.kind == NOAH_ACTION_KIND_LAYER_HOLD);
     CHECK(noah_action_desc_is_raw_qmk_layer_action(momentary));
@@ -264,6 +268,10 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_is_runtime_handled_keycode(momentary));
     CHECK(noah_action_desc_is_momentary_layer_keycode(momentary));
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(momentary));
+    CHECK(noah_action_desc_source_layer_uses_desc_layer(momentary));
+    CHECK(noah_action_desc_source_layer(momentary) == 3);
+    CHECK(!noah_action_desc_default_tap_uses_action_keycode(momentary));
+    CHECK(!noah_action_desc_supports_fallback_hold(momentary));
 
     CHECK(layer_tap.kind == NOAH_ACTION_KIND_LAYER_TAP);
     CHECK(noah_action_desc_is_raw_qmk_layer_action(layer_tap));
@@ -276,6 +284,10 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_uses_authored_layer_tap_contract(layer_tap));
     CHECK(noah_action_desc_default_tap_uses_layer_tap_keycode(layer_tap));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(layer_tap));
+    CHECK(!noah_action_desc_default_tap_uses_action_keycode(layer_tap));
+    CHECK(!noah_action_desc_supports_fallback_hold(layer_tap));
+    CHECK(noah_action_desc_source_layer_uses_desc_layer(layer_tap));
+    CHECK(noah_action_desc_source_layer(layer_tap) == 4);
 
     CHECK(layer_jump.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
     CHECK(noah_action_desc_is_raw_qmk_layer_action(layer_jump));
@@ -286,6 +298,10 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
     CHECK(!noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(!noah_action_desc_uses_authored_layer_tap_contract(layer_jump));
+    CHECK(noah_action_desc_default_tap_uses_action_keycode(layer_jump));
+    CHECK(noah_action_desc_supports_fallback_hold(layer_jump));
+    CHECK(!noah_action_desc_source_layer_uses_desc_layer(layer_jump));
+    CHECK(noah_action_desc_source_layer(layer_jump) == UINT8_MAX);
 
     CHECK(qmk_behavior.kind == NOAH_ACTION_KIND_QMK_BEHAVIOR);
     CHECK(!noah_action_desc_is_raw_qmk_layer_action(qmk_behavior));
@@ -294,6 +310,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supported_as_authored_action(qmk_behavior, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
     CHECK(noah_action_desc_supported_as_authored_action(qmk_behavior, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(qmk_behavior));
+    CHECK(noah_action_desc_default_tap_uses_action_keycode(qmk_behavior));
+    CHECK(!noah_action_desc_supports_fallback_hold(qmk_behavior));
 
     CHECK(pd_key.pd_mode == PD_MODE_ARROW);
     CHECK(pd_key.kind == NOAH_ACTION_KIND_PD_MODE_HOLD);
@@ -305,6 +323,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_consumes_direct_press(pd_key));
     CHECK(noah_action_desc_is_runtime_handled_keycode(pd_key));
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_key));
+    CHECK(!noah_action_desc_default_tap_uses_action_keycode(pd_key));
+    CHECK(!noah_action_desc_supports_fallback_hold(pd_key));
 
     CHECK(pd_lock.kind == NOAH_ACTION_KIND_PD_MODE_LOCK);
     CHECK(noah_action_desc_is_press_only(pd_lock));
@@ -312,6 +332,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_consumes_direct_press(pd_lock));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(pd_lock));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_lock));
+    CHECK(!noah_action_desc_default_tap_uses_action_keycode(pd_lock));
+    CHECK(!noah_action_desc_supports_fallback_hold(pd_lock));
 
     CHECK(macro_action.kind == NOAH_ACTION_KIND_MACRO);
     CHECK(noah_action_desc_is_press_only(macro_action));
@@ -321,6 +343,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supported_as_authored_action(macro_action, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(!noah_action_desc_consumes_direct_press(macro_action));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(macro_action));
+    CHECK(!noah_action_desc_default_tap_uses_action_keycode(macro_action));
+    CHECK(!noah_action_desc_supports_fallback_hold(macro_action));
 
     CHECK(custom.kind == NOAH_ACTION_KIND_KEYMAP_CUSTOM);
     CHECK(noah_action_desc_supported_as_behavior_keycode(custom));
@@ -328,6 +352,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
     CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(custom));
+    CHECK(!noah_action_desc_default_tap_uses_action_keycode(custom));
+    CHECK(!noah_action_desc_supports_fallback_hold(custom));
 
     CHECK(literal.kind == NOAH_ACTION_KIND_LITERAL);
     CHECK(!noah_action_desc_is_layer_lock(literal));
@@ -341,6 +367,10 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_consumes_direct_press(literal));
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(literal));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(literal));
+    CHECK(noah_action_desc_default_tap_uses_action_keycode(literal));
+    CHECK(noah_action_desc_supports_fallback_hold(literal));
+    CHECK(!noah_action_desc_source_layer_uses_desc_layer(literal));
+    CHECK(noah_action_desc_source_layer(literal) == UINT8_MAX);
 }
 
 static void test_action_dispatch_keeps_runtime_default_policy(void) {

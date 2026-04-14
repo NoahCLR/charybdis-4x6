@@ -24,6 +24,9 @@ typedef enum {
     NOAH_ACTION_POLICY_RELEASES_MOMENTARY_LAYER_BEFORE_ACTION = (1u << 3),
     NOAH_ACTION_POLICY_PRESS_AND_HOLD_USES_HELD_LIFECYCLE    = (1u << 4),
     NOAH_ACTION_POLICY_DEFAULT_TAP_USES_LAYER_TAP_KEYCODE    = (1u << 5),
+    NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE       = (1u << 6),
+    NOAH_ACTION_POLICY_SUPPORTS_FALLBACK_HOLD                = (1u << 7),
+    NOAH_ACTION_POLICY_SOURCE_LAYER_USES_DESC_LAYER          = (1u << 8),
 } noah_action_policy_flag_t;
 
 typedef struct {
@@ -32,7 +35,7 @@ typedef struct {
     bool                        keeps_registered_feedback;
     bool                        preview_layer_uses_desc_layer;
     uint8_t                     dispatch_flags;
-    uint8_t                     policy_flags;
+    uint16_t                    policy_flags;
     uint8_t                     match_priority;
     noah_action_kind_matcher_t  match;
 } noah_action_kind_def_t;

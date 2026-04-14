@@ -329,6 +329,77 @@ Workspace scope for this pass:
 Next steps:
 
 - keep the action registry as the primary source of action-family semantics
-- move fallback-hold eligibility and remaining transparency/default-action rules
-  behind registry-backed policy hooks
+- move the remaining buffered-modifier fallback and transparent-source edge
+  rules behind registry-backed policy hooks
+- only after that, move on to declarative hook registration
+
+### Fallback/default-tap/source-layer policy
+
+Completed in this pass:
+
+- extended `users/noah/lib/action/action_kind_registry_list.h` again with
+  explicit policy flags for:
+  - fallback-hold eligibility
+  - default tap routing to the original action keycode
+  - descriptor-layer source semantics for layer-producing actions
+- added public descriptor helpers in
+  `users/noah/lib/action/action_dispatch.h` /
+  `users/noah/lib/action/action_kind.c` for those new policy flags
+- moved fallback-hold eligibility and default tap routing in
+  `users/noah/lib/key/interaction/handled_key_defaults.c` onto those helpers
+- moved transparent-source layer derivation in
+  `users/noah/lib/key/interaction/handled_key_transparency.c` onto those
+  helpers while preserving the explicit authored-resolution momentary-layer
+  contract
+- extended descriptor host coverage in
+  `tests/host/action_dispatch_test.c` and `tests/host/action_lifecycle_test.c`
+  to assert the new helper surface directly
+
+Architecture result after this pass:
+
+- the action registry now owns most of the handled-key runtime’s action-family
+  policy, not just enum/metadata/dispatch
+- fallback-hold eligibility, default tap routing, and layer-source derivation
+  are no longer open-coded in handled-key runtime modules
+- the remaining local policy is narrower now: buffered-modifier fallback and
+  field-level transparent-source heuristics still live in handled-key code
+
+Verification run in this pass:
+
+- `git status --short`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- targeted action, key-behavior, runtime, and compile-gate runners passed
+- full host suite passed
+- firmware build passed and produced
+  `.build/bastardkb_charybdis_4x6_noah.uf2`
+
+Workspace scope for this pass:
+
+- no sibling workspace folders were edited
+- changes are confined to `charybdis-4x6/`
+- action metadata, handled-key defaults/transparency logic, host tests, and the
+  active review folder were updated together
+
+Next steps:
+
+- keep the action registry as the primary source of action-family semantics
+- move the remaining buffered-modifier fallback and transparent-source edge
+  heuristics behind registry-backed policy hooks
 - only after that, move on to declarative hook registration

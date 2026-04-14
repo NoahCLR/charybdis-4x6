@@ -39,11 +39,11 @@ static noah_action_desc_t handled_key_resolution_action_desc(handled_key_resolut
 }
 
 bool handled_key_resolution_source_is_layer_tap(handled_key_resolution_t resolution) {
-    return noah_action_desc_is_layer_tap(handled_key_resolution_action_desc(resolution));
+    return noah_action_desc_default_tap_uses_layer_tap_keycode(handled_key_resolution_action_desc(resolution));
 }
 
 bool handled_key_resolution_source_is_momentary_layer(handled_key_resolution_t resolution) {
-    return handled_key_resolution_is_momentary_layer(resolution) || handled_key_resolution_source_is_layer_tap(resolution);
+    return handled_key_resolution_is_momentary_layer(resolution) || noah_action_desc_source_layer_uses_desc_layer(handled_key_resolution_action_desc(resolution));
 }
 
 uint8_t handled_key_resolution_source_layer(handled_key_resolution_t resolution) {
@@ -51,11 +51,7 @@ uint8_t handled_key_resolution_source_layer(handled_key_resolution_t resolution)
         return resolution.layer;
     }
 
-    if (handled_key_resolution_source_is_layer_tap(resolution)) {
-        return QK_LAYER_TAP_GET_LAYER(resolution.keycode);
-    }
-
-    return UINT8_MAX;
+    return noah_action_desc_source_layer(handled_key_resolution_action_desc(resolution));
 }
 
 static int8_t handled_key_transparent_origin_layer(handled_key_resolution_t resolution, handled_key_resolution_ctx_t ctx) {

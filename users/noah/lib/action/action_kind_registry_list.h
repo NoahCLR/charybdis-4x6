@@ -16,7 +16,9 @@
           NOAH_ACTION_CAP_AUTHORED_HOLD_PRESS_AND_HOLD_SUPPORTED | \
           NOAH_ACTION_CAP_AUTHORED_HOLD_OTHER_SUPPORTED, \
       true, false, NOAH_ACTION_DISPATCH_STANDARD, \
-      NOAH_ACTION_POLICY_PRESS_AND_HOLD_USES_HELD_LIFECYCLE, \
+      NOAH_ACTION_POLICY_PRESS_AND_HOLD_USES_HELD_LIFECYCLE | \
+          NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE | \
+          NOAH_ACTION_POLICY_SUPPORTS_FALLBACK_HOLD, \
       noah_action_tap_literal, noah_action_press_literal, noah_action_release_literal) \
     X(LAYER_LOCK, 100u, noah_action_kind_match_layer_lock, \
       NOAH_ACTION_CAP_PRESS_ONLY | \
@@ -37,19 +39,22 @@
       false, true, NOAH_ACTION_DISPATCH_STANDARD, \
       NOAH_ACTION_POLICY_RUNTIME_HANDLED_KEYCODE | \
           NOAH_ACTION_POLICY_MOMENTARY_LAYER_KEYCODE | \
-          NOAH_ACTION_POLICY_PRESS_AND_HOLD_USES_HELD_LIFECYCLE, \
+          NOAH_ACTION_POLICY_PRESS_AND_HOLD_USES_HELD_LIFECYCLE | \
+          NOAH_ACTION_POLICY_SOURCE_LAYER_USES_DESC_LAYER, \
       noah_action_tap_unsupported_layer, noah_action_press_owned_momentary_layer, noah_action_release_owned_momentary_layer) \
     X(LAYER_TAP, 80u, noah_action_kind_match_layer_tap, \
       NOAH_ACTION_CAP_LAYER_AFFECTING | \
           NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED, \
       false, false, NOAH_ACTION_DISPATCH_STANDARD, \
       NOAH_ACTION_POLICY_AUTHORED_LAYER_TAP_CONTRACT | \
-          NOAH_ACTION_POLICY_DEFAULT_TAP_USES_LAYER_TAP_KEYCODE, \
+          NOAH_ACTION_POLICY_DEFAULT_TAP_USES_LAYER_TAP_KEYCODE | \
+          NOAH_ACTION_POLICY_SOURCE_LAYER_USES_DESC_LAYER, \
       noah_action_tap_unsupported_layer, noah_action_press_unsupported_layer, noah_action_release_unsupported_layer) \
     X(UNSUPPORTED_LAYER_ACTION, 70u, noah_action_kind_match_unsupported_layer_action, \
       NOAH_ACTION_CAP_LAYER_AFFECTING, \
       false, false, NOAH_ACTION_DISPATCH_STANDARD, \
-      NOAH_ACTION_POLICY_NONE, \
+      NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE | \
+          NOAH_ACTION_POLICY_SUPPORTS_FALLBACK_HOLD, \
       noah_action_tap_unsupported_layer, noah_action_press_unsupported_layer, noah_action_release_unsupported_layer) \
     X(MACRO, 40u, noah_action_kind_match_macro, \
       NOAH_ACTION_CAP_PRESS_ONLY | \
@@ -66,7 +71,8 @@
           NOAH_ACTION_CAP_AUTHORED_HOLD_PRESS_AND_HOLD_SUPPORTED | \
           NOAH_ACTION_CAP_AUTHORED_HOLD_OTHER_SUPPORTED, \
       true, false, NOAH_ACTION_DISPATCH_STANDARD, \
-      NOAH_ACTION_POLICY_PRESS_AND_HOLD_USES_HELD_LIFECYCLE, \
+      NOAH_ACTION_POLICY_PRESS_AND_HOLD_USES_HELD_LIFECYCLE | \
+          NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE, \
       noah_action_tap_qmk_behavior, noah_action_press_qmk_behavior, noah_action_release_qmk_behavior) \
     X(KEYMAP_CUSTOM, 20u, noah_action_kind_match_keymap_custom, \
       NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED | \
