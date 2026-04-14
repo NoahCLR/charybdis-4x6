@@ -360,21 +360,22 @@ static void test_other_press_interrupts_active_key_through_transition_plan(void)
     active_key.owner.keycode   = KC_RIGHT_ALT;
     active_key.owner.key_pos   = stored;
     active_key.lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
-    active_key.interaction     = key_runtime_slot_interaction_from_resolution((handled_key_resolution_t){
-        .keycode   = KC_RIGHT_ALT,
-        .tap_count = 1,
-        .step =
-            {
-                .tap = TAP_SENDS(KC_NO),
-            },
-        .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-        .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
-        .layer            = UINT8_MAX,
-        .pd_mode          = 0,
-        .has_more_taps    = false,
-        .flags            = HANDLED_KEY_FLAG_HANDLED,
-    });
+    active_key.interaction     = host_key_runtime_slot_interaction_from_authored_resolution((handled_key_resolution_t){
+                                           .keycode   = KC_RIGHT_ALT,
+                                           .tap_count = 1,
+                                           .step =
+                                               {
+                                                   .tap = TAP_SENDS(KC_NO),
+                                               },
+                                           .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+                                           .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+                                           .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+                                           .layer            = UINT8_MAX,
+                                           .pd_mode          = 0,
+                                           .has_more_taps    = false,
+                                           .flags            = HANDLED_KEY_FLAG_HANDLED,
+                                       },
+                                       handled_key_resolution_ctx_make(stored, (layer_state_t)1u << 0));
 
     CHECK(key_runtime_preflight_record(KC_LEFT_CTRL, &record));
     CHECK(tracked_physical_event);

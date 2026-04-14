@@ -137,3 +137,19 @@ Review note updates:
 Next steps:
 
 - none
+
+### Historical correction after review-03
+
+Follow-up audit `review/2026-04-14-review-03/` found that the
+audit-follow-up implementation above still left two cleanup seams open at the
+time it was recorded:
+
+- `macro_slot_provider_encode_write(...)` still reparsed payload text instead of
+  serializing provider-owned cached IR
+- `key_runtime_slot_interaction_from_resolution(...)` and
+  `key_runtime_slot_binding_from_resolution(...)` still remained in the public
+  runtime header for host-test use
+
+Those seams are corrected in the implementation pass tracked in
+`review/2026-04-14-review-03/progress.md`. This note keeps the historical
+record accurate without rewriting the original pass log.

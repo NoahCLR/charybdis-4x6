@@ -81,20 +81,6 @@ static inline key_runtime_slot_selection_t key_runtime_slot_selection_from_resol
     };
 }
 
-static inline key_runtime_slot_binding_t key_runtime_slot_binding_from_resolution(handled_key_resolution_t resolution) {
-    return (key_runtime_slot_binding_t){
-        .tap_action            = handled_key_resolution_tap_action(resolution),
-        .tap_repeat_count      = handled_key_resolution_tap_repeat_count(resolution),
-        .hold                  = handled_key_resolution_hold(resolution),
-        .long_hold             = handled_key_resolution_long_hold(resolution),
-        .tap_hold_term         = resolution.tap_hold_term,
-        .longer_hold_term      = resolution.longer_hold_term,
-        .multi_tap_term        = resolution.multi_tap_term,
-        .has_more_taps         = resolution.has_more_taps,
-        .tap_resolves_on_press = handled_key_resolution_tap_resolves_on_press(resolution),
-    };
-}
-
 static inline key_runtime_slot_binding_t key_runtime_slot_binding_from_materialized(handled_key_materialized_t materialized) {
     return (key_runtime_slot_binding_t){
         .tap_action            = materialized.tap_action,
@@ -194,14 +180,6 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_materialize(key_ru
     interaction.contract = handled_key_behavior_contract(interaction.hold_strategy, interaction.flags, interaction.binding.tap_action, interaction.pd_mode, interaction.binding.hold, interaction.binding.long_hold);
     interaction.release = key_runtime_slot_release_contract_build(interaction);
     return interaction;
-}
-
-static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_resolution(handled_key_resolution_t resolution) {
-    return key_runtime_slot_materialize((key_runtime_slot_materialize_args_t){
-        .resolution    = resolution,
-        .binding       = key_runtime_slot_binding_from_resolution(resolution),
-        .hold_strategy = handled_key_resolution_hold_strategy(resolution),
-    });
 }
 
 static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_materialized(handled_key_materialized_t materialized) {

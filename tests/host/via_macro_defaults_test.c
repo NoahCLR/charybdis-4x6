@@ -21,6 +21,8 @@ static uint8_t macro_buffer[TEST_MACRO_BUFFER_CAPACITY];
 static bool    fake_via_eeprom_valid;
 static uint8_t rgb_invalidate_count;
 static uint8_t dynamic_keymap_set_buffer_calls;
+static uint8_t macro_payload_compile_calls;
+static uint8_t macro_payload_encode_ir_write_calls;
 static uint8_t macro_payload_encode_write_calls;
 
 const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT] = {
@@ -45,6 +47,8 @@ static void test_reset_state(void) {
     fake_via_eeprom_valid           = true;
     rgb_invalidate_count            = 0;
     dynamic_keymap_set_buffer_calls = 0;
+    macro_payload_compile_calls     = 0;
+    macro_payload_encode_ir_write_calls = 0;
     macro_payload_encode_write_calls = 0;
 }
 
@@ -75,8 +79,18 @@ bool via_eeprom_is_valid(void) {
     return fake_via_eeprom_valid;
 }
 
-bool macro_payload_validate(const char *payload) {
-    return payload != NULL;
+bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
+    size_t length = 0;
+
+    macro_payload_compile_calls++;
+    CHECK(payload != NULL);
+    CHECK(ir != NULL);
+
+    length = strlen(payload);
+    CHECK(length <= sizeof(ir->bytes));
+    ir->length = (uint16_t)length;
+    memcpy(ir->bytes, payload, length);
+    return true;
 }
 
 bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval) {
@@ -86,21 +100,21 @@ bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_
     return true;
 }
 
-bool macro_payload_encode_write(const char *payload, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {
+bool macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {
     uint16_t count = 0;
 
-    macro_payload_encode_write_calls++;
+    macro_payload_encode_ir_write_calls++;
 
     if (written) {
         *written = 0;
     }
 
-    if (!payload || !write_byte) {
+    if (!ir || !write_byte) {
         return false;
     }
 
-    while (*payload) {
-        if (!write_byte((uint8_t)*payload++, context)) {
+    while (count < ir->length) {
+        if (!write_byte(ir->bytes[count], context)) {
             return false;
         }
         count++;
@@ -111,6 +125,15 @@ bool macro_payload_encode_write(const char *payload, macro_payload_write_byte_fn
     }
 
     return true;
+}
+
+bool macro_payload_encode_write(const char *payload, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {
+    (void)payload;
+    (void)write_byte;
+    (void)context;
+    (void)written;
+    macro_payload_encode_write_calls++;
+    return false;
 }
 
 typedef struct {
@@ -129,7 +152,9 @@ static bool test_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir, void *co
         return false;
     }
 
-    ir->length = 0;
+    ir->length   = 2;
+    ir->bytes[0] = 'X';
+    ir->bytes[1] = 'Y';
     return true;
 }
 
@@ -169,6 +194,9 @@ static void test_post_init_seeds_defaults_when_via_eeprom_is_invalid(void) {
     CHECK(macro_buffer[1] == 'B');
     CHECK(macro_buffer[2] == 0);
     CHECK(macro_buffer[3] == '{');
+    CHECK(macro_payload_compile_calls > 0);
+    CHECK(macro_payload_encode_ir_write_calls > 0);
+    CHECK(macro_payload_encode_write_calls == 0);
 }
 
 static void test_eeprom_init_seeds_defaults_immediately(void) {
@@ -234,21 +262,48 @@ static void test_provider_encode_write_uses_cached_load_state(void) {
 
     test_provider_load_ir_calls = 0;
     test_provider_lookup_calls  = 0;
+    macro_payload_encode_ir_write_calls = 0;
     macro_payload_encode_write_calls = 0;
 
     CHECK(macro_slot_provider_encode_write(&provider, cache, 0, test_provider_sink_write_byte, &sink, &written));
     CHECK(test_provider_load_ir_calls == 1);
-    CHECK(test_provider_lookup_calls == 1);
-    CHECK(macro_payload_encode_write_calls == 1);
+    CHECK(test_provider_lookup_calls == 0);
+    CHECK(macro_payload_encode_ir_write_calls == 1);
+    CHECK(macro_payload_encode_write_calls == 0);
     CHECK(written == 2);
     CHECK(sink.offset == 2);
-    CHECK(sink.bytes[0] == 'A');
-    CHECK(sink.bytes[1] == 'B');
+    CHECK(sink.bytes[0] == 'X');
+    CHECK(sink.bytes[1] == 'Y');
 
     CHECK(macro_slot_provider_encode_write(&provider, cache, 0, test_provider_sink_write_byte, &sink, NULL));
     CHECK(test_provider_load_ir_calls == 1);
-    CHECK(test_provider_lookup_calls == 2);
-    CHECK(macro_payload_encode_write_calls == 2);
+    CHECK(test_provider_lookup_calls == 0);
+    CHECK(macro_payload_encode_ir_write_calls == 2);
+    CHECK(macro_payload_encode_write_calls == 0);
+}
+
+static void test_provider_encode_write_reloads_after_invalidate(void) {
+    macro_slot_cache_t    cache[1] = {0};
+    macro_slot_provider_t provider = {
+        .slot_count     = 1,
+        .load_ir        = test_provider_load_ir,
+        .lookup_payload = test_provider_lookup_payload,
+    };
+    test_provider_sink_t  sink = {0};
+
+    test_provider_load_ir_calls = 0;
+    test_provider_lookup_calls  = 0;
+    macro_payload_encode_ir_write_calls = 0;
+
+    CHECK(macro_slot_provider_encode_write(&provider, cache, 0, test_provider_sink_write_byte, &sink, NULL));
+    CHECK(test_provider_load_ir_calls == 1);
+
+    macro_slot_provider_invalidate(&provider, cache, 0);
+
+    CHECK(macro_slot_provider_encode_write(&provider, cache, 0, test_provider_sink_write_byte, &sink, NULL));
+    CHECK(test_provider_load_ir_calls == 2);
+    CHECK(test_provider_lookup_calls == 0);
+    CHECK(macro_payload_encode_ir_write_calls == 2);
 }
 
 int main(void) {
@@ -258,6 +313,7 @@ int main(void) {
     test_keymap_reset_commands_invalidate_rgb();
     test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan();
     test_provider_encode_write_uses_cached_load_state();
+    test_provider_encode_write_reloads_after_invalidate();
 
     puts("via_macro_defaults host tests passed");
     return 0;

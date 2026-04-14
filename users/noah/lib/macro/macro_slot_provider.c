@@ -51,8 +51,6 @@ void macro_slot_provider_validate_all(const macro_slot_provider_t *provider, mac
 }
 
 bool macro_slot_provider_encode_write(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {
-    const char *payload = NULL;
-
     if (written) {
         *written = 0;
     }
@@ -61,15 +59,11 @@ bool macro_slot_provider_encode_write(const macro_slot_provider_t *provider, mac
         return false;
     }
 
-    if (!macro_slot_provider_lookup(provider, slot, &payload)) {
-        return false;
-    }
-
-    if (!payload || !*payload) {
+    if (cache[slot].ir.length == 0) {
         return true;
     }
 
-    return macro_payload_encode_write(payload, write_byte, context, written);
+    return macro_payload_encode_ir_write(&cache[slot].ir, write_byte, context, written);
 }
 
 bool macro_slot_provider_play(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval) {

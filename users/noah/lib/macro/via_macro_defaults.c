@@ -57,12 +57,7 @@ static bool via_macro_defaults_load_ir(uint8_t slot, macro_payload_ir_t *ir, voi
         return true;
     }
 
-    if (!macro_payload_validate(payload)) {
-        return false;
-    }
-
-    ir->length = 0;
-    return true;
+    return macro_payload_compile(payload, ir);
 }
 
 static const macro_slot_provider_t via_macro_defaults_provider = {

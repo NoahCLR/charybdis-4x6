@@ -339,7 +339,7 @@ static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
     CHECK(key_pos.col == 0);
     slot = key_runtime_slot_at(0);
     CHECK(slot != NULL);
-    key_runtime_slot_track(slot, keycode, key_pos, key_runtime_slot_interaction_from_resolution(test_handled_key_resolution(keycode, 1)), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_track(slot, keycode, key_pos, host_key_runtime_slot_interaction_from_authored_resolution(test_handled_key_resolution(keycode, 1), handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0)), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
 }
 
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {

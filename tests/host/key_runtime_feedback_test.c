@@ -45,7 +45,7 @@ static void test_reset_state(void) {
 }
 
 static key_runtime_slot_interaction_t test_cached_interaction(handled_key_resolution_t key) {
-    return key_runtime_slot_interaction_from_resolution(key);
+    return host_key_runtime_slot_interaction_from_authored_resolution(key, handled_key_resolution_ctx_make((keypos_t){0}, (layer_state_t)1u << 0));
 }
 
 static handled_key_resolution_t test_resolve_handled_key(key_behavior_view_t behavior);
