@@ -6,6 +6,15 @@
 
 #include "multi_tap_engine.h"
 
+#if defined(POINTING_DEVICE_ENABLE)
+#    include "../../pointing/runtime/pd_mode_buffered_tap_internal.h"
+
+__attribute__((weak)) uint8_t pd_mode_buffered_tap_masked_real_mods(uint16_t keycode) {
+    (void)keycode;
+    return 0;
+}
+#endif
+
 static bool multi_tap_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
 }
@@ -66,6 +75,9 @@ void multi_tap_begin(multi_tap_t *mt, uint16_t keycode, keypos_t key_pos, uint16
     mt->saved_weak_mods           = get_weak_mods();
     mt->saved_oneshot_mods        = get_oneshot_mods();
     mt->saved_oneshot_locked_mods = get_oneshot_locked_mods();
+#if defined(POINTING_DEVICE_ENABLE)
+    mt->saved_mods &= (uint8_t)~pd_mode_buffered_tap_masked_real_mods(keycode);
+#endif
 }
 
 static void multi_tap_dispatch_repeated(uint16_t action, uint8_t count, const multi_tap_t *mt, void (*dispatch)(uint16_t, const multi_tap_t *)) {

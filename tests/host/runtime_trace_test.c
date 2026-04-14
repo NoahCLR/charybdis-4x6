@@ -129,6 +129,10 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
     (void)keycode;
 }
 
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
+    return mods;
+}
+
 keyboard_mod_state_t keyboard_mod_state_suspend(void) {
     return (keyboard_mod_state_t){0};
 }

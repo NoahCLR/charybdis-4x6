@@ -195,6 +195,29 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
     keyboard_mod_ownership_unregister_mods(keyboard_mod_ownership_mod_masks[index]);
 }
 
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
+    uint8_t                              mask  = 0;
+
+    if (mods == 0) {
+        return 0;
+    }
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
+        uint8_t mod_mask = keyboard_mod_ownership_mod_masks[i];
+
+        if (!(mods & mod_mask)) {
+            continue;
+        }
+
+        if (state->managed_refcounts[i] > 0 && state->physical_refcounts[i] == 0) {
+            mask |= mod_mask;
+        }
+    }
+
+    return mask;
+}
+
 void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
     noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
 

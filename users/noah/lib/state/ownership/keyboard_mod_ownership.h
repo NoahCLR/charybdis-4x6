@@ -27,5 +27,6 @@ void keyboard_mod_ownership_register_mods(uint8_t mods);
 void keyboard_mod_ownership_unregister_mods(uint8_t mods);
 void keyboard_mod_ownership_register(uint16_t keycode);
 void keyboard_mod_ownership_unregister(uint16_t keycode);
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods);
 void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out);
 void keyboard_mod_ownership_reset_for_test(void);

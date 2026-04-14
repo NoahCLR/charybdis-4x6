@@ -168,6 +168,28 @@ check_runtime_sealing_boundaries() {
         printf '%s\n' "$key_runtime_index_internal_prod_violations" >&2
         exit 1
     fi
+
+    pd_mode_buffered_tap_internal_test_allowlist='^(tests/host/pd_mode_test\.c:)'
+    pd_mode_buffered_tap_internal_test_violations="$(
+        host_test_includes '#include ".*pd_mode_buffered_tap_internal\.h"' | grep -Ev "$pd_mode_buffered_tap_internal_test_allowlist" || true
+    )"
+    if [ -n "$pd_mode_buffered_tap_internal_test_violations" ]; then
+        echo "only the pd-mode white-box host suite may include pd_mode_buffered_tap_internal.h" >&2
+        printf '%s\n' "$pd_mode_buffered_tap_internal_test_violations" >&2
+        exit 1
+    fi
+
+    pd_mode_buffered_tap_internal_prod_allowlist='^(users/noah/lib/pointing/runtime/|users/noah/lib/key/interaction/multi_tap_engine\.c:)'
+    pd_mode_buffered_tap_internal_prod_violations="$(
+        repo_owned_production_include_violations \
+            '#include ".*pd_mode_buffered_tap_internal\.h"' \
+            "$pd_mode_buffered_tap_internal_prod_allowlist"
+    )"
+    if [ -n "$pd_mode_buffered_tap_internal_prod_violations" ]; then
+        echo "only pd runtime owner modules and multi_tap_engine.c may include pd_mode_buffered_tap_internal.h in repo-owned production code" >&2
+        printf '%s\n' "$pd_mode_buffered_tap_internal_prod_violations" >&2
+        exit 1
+    fi
 }
 
 compile_variant() {

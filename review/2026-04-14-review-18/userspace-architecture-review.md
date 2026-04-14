@@ -43,6 +43,14 @@ Reliability remediation landed after this initial review snapshot without changi
 
 This is an intentional strengthening of the existing “centralized hooks and centralized emit policy” design, not a boundary regression. The remediation was covered by `sh tests/host/run_hook_chaining_tests.sh`, `sh tests/host/run_runtime_init_order_tests.sh`, `sh tests/host/run_action_dispatch_tests.sh`, `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_held_action_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
 
+Additional pd-mode remediation also landed after that snapshot without changing the overall assessment:
+
+- the private pd-mode hook surface in `users/noah/lib/pointing/runtime/pd_mode_registry_internal.h`, `users/noah/lib/pointing/runtime/pd_mode_registry.c`, and `users/noah/lib/pointing/modes/pd_mode_pinch.c` now owns buffered single-tap replay masking for mode-owned real modifiers;
+- `users/noah/lib/key/interaction/multi_tap_engine.c` still owns the actual delayed-tap snapshot, but it now queries pd-mode policy through `pd_mode_buffered_tap_masked_real_mods(...)` instead of embedding pinch-specific behavior;
+- `users/noah/lib/state/ownership/keyboard_mod_ownership.c` provides the generic `keyboard_mod_ownership_managed_only_mask(...)` helper so buffered taps strip only managed-only modifiers and preserve physically held GUI state.
+
+This keeps the policy with the pd mode that owns the modifier while leaving the generic key runtime responsible only for snapshot timing. The change was covered by `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_real_profile_validation_tests.sh`, `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`, `sh tests/host/run_key_runtime_transition_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+
 ## Follow-Up Audit
 
 Date: 2026-04-14  
@@ -98,3 +106,116 @@ The remediation landed cleanly. It fixes the identified runtime hazards by stren
 - Passed: `sh tests/host/run_all_host_tests.sh`
 - Passed: `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
+
+## Follow-Up Audit
+
+Date: 2026-04-15  
+Prompt used: `prompts/follow-up-architecture-audit.md`
+
+### Findings
+
+#### must-fix
+
+- None in the landed buffered-tap remediation. The implementation moved policy out of the generic key runtime and into mode-owned pd hooks without regressing the verified runtime behavior.
+
+#### should-fix
+
+- None introduced by the seam narrowing pass. The buffered-tap policy query no longer leaks through the public pd-mode header.
+
+#### optional cleanup
+
+- The new regression coverage proves the masking mechanism, but it does not exercise the real authored transparent-tap path that triggered the user-visible bug. The shipped profile uses `TAP_SENDS(KC_TRNS)` for `PINCH_MODE` in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c:334-339`, while `tests/host/pd_mode_key_runtime_integration_test.c:43-50` substitutes `KC_C` and only verifies the delayed replay state in `tests/host/pd_mode_key_runtime_integration_test.c:543-632`. That still covers the core snapshot behavior, but a future regression in lower-layer transparent resolution would not be caught by the new pinch-specific test. Add one real-profile runtime scenario or a harness that resolves the transparent lower-layer tap directly.
+
+## Prior Finding Status
+
+- `open`: registry-style single sources of truth remain the main maintainability risk. `users/noah/lib/action/action_kind_registry_list.h:12-105` and `users/noah/lib/pointing/defs/pd_mode_manifest.h:12-74` are still positional registry DSLs, unchanged by this remediation.
+- `resolved`: the buffered-tap policy query no longer leaks through the public pd-mode API. The public declaration was removed from `users/noah/lib/pointing/defs/pd_modes.h:80-97`, the dedicated internal seam now lives in `users/noah/lib/pointing/runtime/pd_mode_buffered_tap_internal.h:1-13`, and the only repo-owned production callers are `users/noah/lib/pointing/runtime/pd_mode_registry.c:10,148-150` and `users/noah/lib/key/interaction/multi_tap_engine.c:10-15,79-80`. This is mechanically enforced by `tests/host/run_feature_gate_compile_tests.sh:170-191`, which restricts the new internal header to pd runtime owner modules plus `multi_tap_engine.c` in production and to `tests/host/pd_mode_test.c` in host tests. Verified with `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+- `open`: `users/noah/lib/key/runtime/key_runtime_internal.h:15-68` is still too broad for an internal seam. This remediation avoided widening that seam, but it did not narrow it.
+- `open`: the keymap materialization macros in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c:62-140` and `users/noah/keymap_materialize.h:6-32` remain the least inspectable part of the authoring surface.
+- `open`: `users/noah/lib/pointing/runtime/pd_runtime.c:60-126` still mixes pointing init defaults, mouse-record classification, idle-noise suppression, mode dispatch, and sniping handoff.
+
+## Solid Areas
+
+- The remediation did improve separation of concerns versus the earlier tactical fix. Mode-owned buffered tap policy now lives with `PINCH_MODE` in `users/noah/lib/pointing/modes/pd_mode_pinch.c:16-22,49-56`, while `users/noah/lib/key/interaction/multi_tap_engine.c:60-80` remains responsible only for delayed tap snapshot timing.
+- The narrowed internal seam now matches the intended ownership story. `users/noah/lib/pointing/runtime/pd_mode_buffered_tap_internal.h:1-13` is the only exported declaration for the query, `users/noah/lib/key/interaction/multi_tap_engine.c:10-15,79-80` uses that narrow seam, and the broader public pd-mode header no longer carries buffered-tap replay policy.
+- The modifier filtering logic was factored into a genuinely reusable ownership helper instead of another pinch-specific branch. `users/noah/lib/state/ownership/keyboard_mod_ownership.c:198-218` answers the generic “managed-only bits” question and is directly covered by `tests/host/keyboard_mod_ownership_test.c:121-164` and `sh tests/host/run_keyboard_mod_ownership_tests.sh`.
+- The new behavior claims are mechanically covered at both the pd-mode seam and the runtime integration seam. `tests/host/pd_mode_test.c:539-548` checks the mode-owned query itself, and `tests/host/pd_mode_key_runtime_integration_test.c:543-632` checks both “managed-only GUI masked” and “physically held GUI preserved.” This was verified with `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+- Review notes and user-facing docs now describe the landed structure instead of the discarded tactical fix. `docs/ADDING_PD_MODE.md:36-42,353-367` points mode authors at mode-owned lifecycle hooks for buffered tap replay policy, and the active review note’s reconciliation section now matches the current tree.
+
+## Current Conclusion
+
+The implementation is materially cleaner than the tactical pinch fix, and the follow-up seam narrowing finished the architecture cleanup that the prior audit asked for. Policy now lives with the pd mode that owns the modifier, the generic key runtime only applies that policy at the correct snapshot point, and the buffered-tap query is now sealed behind a dedicated internal header with compile-gate enforcement. The only remaining issue specific to this area is coverage depth: the exact real-profile transparent-tap path still lacks direct runtime regression coverage.
+
+## Remaining Open Findings
+
+- Add one runtime regression test that exercises the real `PINCH_MODE` transparent-tap path from the authored profile rather than a synthetic stand-in.
+- Move the registry-style action and pd-mode manifests toward more explicit row shapes or named initializer tables.
+- Split `users/noah/lib/key/runtime/key_runtime_internal.h` into narrower internal slice headers.
+- Revisit the authored keymap materialization macros if more authored surfaces are added.
+- Split `users/noah/lib/pointing/runtime/pd_runtime.c` when the next pointing feature lands instead of letting it accumulate more responsibilities.
+
+## Closure Verification Review
+
+Date: 2026-04-15  
+Prompt used: `prompts/closure-verification-review.md`
+
+### Findings
+
+#### must-fix
+
+- None. The active review folder, the user-facing pd-mode docs, the compile-gate allowlists, and the current buffered-tap implementation all describe the same landed structure. The thread is not blocked by a correctness regression or documentation mismatch; it stays open because earlier architecture findings are still unresolved.
+
+#### should-fix
+
+- The thread is not ready to close while the positional registry DSLs remain open. `users/noah/lib/action/action_kind_registry_list.h:12-22` and `users/noah/lib/pointing/defs/pd_mode_manifest.h:68-74` still pack multiple semantic fields into long positional macro rows that are expanded into dispatch, metadata, and identity surfaces elsewhere. This was the main maintainability finding from the initial review, and no later remediation has narrowed or mechanically enforced a safer row shape.
+
+- The thread is not ready to close while `users/noah/lib/key/runtime/key_runtime_internal.h:15-68` remains the same broad internal seam called out in the initial review. `tests/host/run_feature_gate_compile_tests.sh:128-169` still correctly treats that header family as privileged, but the seam itself still aggregates slot lookup, interaction queries, pending multi-tap mutation, preview hints, repeat binding mutation, and hold-state mutation through one include.
+
+#### optional cleanup
+
+- The user-visible pinch regression still lacks a direct runtime scenario for the authored transparent-tap path. The shipped profile uses `TAP_SENDS(KC_TRNS)` for `PINCH_MODE` in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c:334-339`, while `tests/host/pd_mode_key_runtime_integration_test.c:43-50` still substitutes `KC_C` and therefore does not exercise lower-layer transparent resolution directly.
+
+- The authoring materialization macros and the mixed-responsibility pointing bridge remain acceptable but unchanged growth hotspots. `users/noah/keymap_materialize.h:27-32` still expands authored macro and combo tables through preprocessor materialization, and `users/noah/lib/pointing/runtime/pd_runtime.c:60-126` still combines pointing init defaults, mouse-record classification, idle-noise suppression, mode dispatch, and sniping handoff in one bridge module.
+
+## Prior Finding Status
+
+- `open`: registry-style single sources of truth remain the main maintainability risk. `users/noah/lib/action/action_kind_registry_list.h:12-22` and `users/noah/lib/pointing/defs/pd_mode_manifest.h:68-74` are still positional registry DSLs, unchanged by the later remediation passes.
+- `resolved`: the buffered-tap policy query no longer leaks through the public pd-mode API. The public declaration is gone from `users/noah/lib/pointing/defs/pd_modes.h:74-97`, the dedicated internal seam now lives in `users/noah/lib/pointing/runtime/pd_mode_buffered_tap_internal.h:1-13`, and the only repo-owned production includes are `users/noah/lib/pointing/runtime/pd_mode_registry.c:10` and `users/noah/lib/key/interaction/multi_tap_engine.c:9-15`. This is mechanically enforced by `tests/host/run_feature_gate_compile_tests.sh:172-191`, and behavior remains covered by `tests/host/pd_mode_test.c:540-548` and `tests/host/pd_mode_key_runtime_integration_test.c:543-632`. Verified by the already-passed commands `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+- `open`: `users/noah/lib/key/runtime/key_runtime_internal.h:15-68` is still too broad for an internal seam. Later remediation avoided widening it, but the header has not been split.
+- `open`: the keymap materialization path in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c:62-140` and `users/noah/keymap_materialize.h:27-32` remains the least inspectable part of the authoring surface.
+- `open`: `users/noah/lib/pointing/runtime/pd_runtime.c:60-126` still mixes pointing init defaults, mouse-record classification, idle-noise suppression, mode dispatch, and sniping handoff.
+
+## Solid Areas
+
+- The buffered-tap remediation and the seam narrowing both remain mechanically enforced. `users/noah/lib/key/interaction/multi_tap_engine.c:9-15,60-80` still applies mode-owned policy only at delayed-tap snapshot time, and `tests/host/run_feature_gate_compile_tests.sh:172-191` still prevents that query from leaking back into broader production or host-test surfaces.
+
+- The active review folder is internally coherent after the follow-up audits. The current review notes, `docs/ADDING_PD_MODE.md:36-42,353-367`, and the landed pd-mode runtime files all describe the same ownership model: pd modes own buffered-tap replay policy, while the generic key runtime owns snapshot timing.
+
+- The closure bar evidence for the resolved buffered-tap seam work is present and specific. The latest green baseline in `review/2026-04-14-review-18/progress.md:66-72` includes the required full host suite and firmware compile, so there is no missing verification evidence for that resolved finding.
+
+## Verification Integrity
+
+- No new verification commands were run during this assessment-only pass.
+- Closure evidence still relies on the already-green implementation baseline recorded in `review/2026-04-14-review-18/progress.md:66-72`:
+  - `sh tests/host/run_pd_mode_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+## Current Conclusion
+
+The buffered-tap work itself is in good shape and the active notes no longer contain contradictory claims about that seam. This thread should still remain open, because the original architecture findings that were explicitly kept as `should-fix` work are still open: the positional registry DSLs have not been made more explicit, and `key_runtime_internal.h` has not been narrowed.
+
+## Closure Verdict
+
+`keep thread open`
+
+## Remaining Open Findings
+
+- Move the registry-style action and pd-mode manifests toward more explicit row shapes or named initializer tables.
+- Split `users/noah/lib/key/runtime/key_runtime_internal.h` into narrower internal slice headers.
+- Add one runtime regression test that exercises the real `PINCH_MODE` transparent-tap path from the authored profile rather than a synthetic stand-in.
+- Revisit the authored keymap materialization macros if more authored surfaces are added.
+- Split `users/noah/lib/pointing/runtime/pd_runtime.c` when the next pointing feature lands instead of letting it accumulate more responsibilities.

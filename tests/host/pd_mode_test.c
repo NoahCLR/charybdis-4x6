@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/pointing/runtime/pd_mode_buffered_tap_internal.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
 #include "host_runtime_reset_fixture.h"
@@ -39,6 +40,9 @@ static uint8_t  keyboard_mod_register_count;
 static uint8_t  keyboard_mod_unregister_count;
 static uint16_t last_registered_keycode;
 static uint16_t last_unregistered_keycode;
+static uint8_t  keyboard_mod_managed_only_mask_count;
+static uint8_t  last_managed_only_mask_request;
+static uint8_t  managed_only_mask_result;
 
 static uint8_t arrow_key_handler_count;
 static bool    arrow_key_handler_result;
@@ -87,6 +91,9 @@ static void test_reset_stubs(void) {
     keyboard_mod_unregister_count = 0;
     last_registered_keycode       = KC_NO;
     last_unregistered_keycode     = KC_NO;
+    keyboard_mod_managed_only_mask_count = 0;
+    last_managed_only_mask_request       = 0;
+    managed_only_mask_result             = 0;
     arrow_key_handler_count       = 0;
     arrow_key_handler_result      = false;
     reset_volume_count            = 0;
@@ -202,6 +209,12 @@ void keyboard_mod_ownership_register(uint16_t keycode) {
 void keyboard_mod_ownership_unregister(uint16_t keycode) {
     keyboard_mod_unregister_count++;
     last_unregistered_keycode = keycode;
+}
+
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
+    keyboard_mod_managed_only_mask_count++;
+    last_managed_only_mask_request = mods;
+    return (uint8_t)(mods & managed_only_mask_result);
 }
 
 report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
@@ -524,6 +537,18 @@ static void test_pinch_mode_registers_gui_and_dragscroll_side_effects(void) {
     CHECK(last_unregistered_keycode == KC_LEFT_GUI);
 }
 
+static void test_pinch_buffered_tap_mask_uses_managed_only_gui_policy(void) {
+    test_reset_stubs();
+    managed_only_mask_result = MOD_BIT(KC_LEFT_GUI);
+
+    CHECK(pd_mode_buffered_tap_masked_real_mods(PINCH_MODE) == MOD_BIT(KC_LEFT_GUI));
+    CHECK(keyboard_mod_managed_only_mask_count == 1);
+    CHECK(last_managed_only_mask_request == MOD_BIT(KC_LEFT_GUI));
+
+    CHECK(pd_mode_buffered_tap_masked_real_mods(VOLUME_MODE) == 0);
+    CHECK(keyboard_mod_managed_only_mask_count == 1);
+}
+
 static void test_lock_owned_auto_mouse_toggle_tracks_mode_ownership(void) {
     test_reset_stubs();
 
@@ -580,6 +605,7 @@ int main(void) {
     test_locked_mode_release_keeps_mode_active();
     test_apply_active_dpi_respects_pointer_state();
     test_pinch_mode_registers_gui_and_dragscroll_side_effects();
+    test_pinch_buffered_tap_mask_uses_managed_only_gui_policy();
     test_lock_owned_auto_mouse_toggle_tracks_mode_ownership();
     test_active_key_handler_only_runs_for_active_modes();
 

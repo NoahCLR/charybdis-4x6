@@ -31,9 +31,9 @@ If you hand this task to an agent, give it this exact job:
 Do not rewrite the generic runtime unless the new mode truly needs runtime
 behavior that existing modes do not cover.
 
-If a mode needs unusual activation, deactivation, lock, or unlock side effects
-that are not shared policy, keep the normal manifest path intact and add an
-optional lifecycle hook object in a mode-owned file under
+If a mode needs unusual activation, deactivation, lock, unlock, or buffered-tap
+replay policy that is not shared policy, keep the normal manifest path intact
+and add an optional lifecycle hook object in a mode-owned file under
 [`users/noah/lib/pointing/modes/`](../users/noah/lib/pointing/modes/), then
 reference that object from the manifest row instead of introducing another
 one-off manifest trait or registry switch edit. Only reach into
@@ -145,7 +145,7 @@ Field meaning:
 - `reset_example_mode`: optional cleanup hook
 - `0`: DPI override (`0` = use normal pointer DPI)
 - `PD_MODE_TRAIT_NONE`: manifest traits consumed by shared policy; combine `PD_MODE_TRAIT_*` flags when the mode needs them
-- `NULL`: optional lifecycle hook pointer (`NULL` = no custom activate / deactivate / lock / unlock side effects)
+- `NULL`: optional lifecycle hook pointer (`NULL` = no custom activate / deactivate / lock / unlock side effects or buffered tap replay policy)
 
 ### 2. Verify The Generated Outputs
 
@@ -254,7 +254,7 @@ Field meaning:
 - `reset`: cleanup callback, or `NULL`
 - `dpi`: pointer CPI override while the mode is active (`0` = keep normal pointer DPI)
 - `traits`: manifest-defined `PD_MODE_TRAIT_*` flags consumed by shared pointer policy and registry behavior
-- `lifecycle`: optional activate / deactivate / lock / unlock side-effect hooks owned by this mode definition row
+- `lifecycle`: optional activate / deactivate / lock / unlock side-effect hooks and buffered tap replay policy owned by this mode definition row
 
 If the mode needs a custom DPI, thread that through from the keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
@@ -333,13 +333,14 @@ If the new mode is meant to be used, not just prototyped, also update:
 Most new modes only need the fast path above. Use the sections below only if
 the behavior matches.
 
-### Mode Needs Side Effects On Activate / Deactivate
+### Mode Needs Side Effects On Activate / Deactivate Or Buffered Tap Replay
 
 Examples:
 
 - enable a firmware feature while the mode is active
 - hold a modifier while the mode is active
 - keep auto-mouse alive while the mode is locked
+- hide a mode-owned real modifier from delayed single-tap replay so transparent taps resolve like the underlying key
 
 Edit [`users/noah/lib/pointing/defs/pd_mode_manifest.h`](../users/noah/lib/pointing/defs/pd_mode_manifest.h)
 and, if needed, [`users/noah/lib/pointing/runtime/pd_mode_registry.c`](../users/noah/lib/pointing/runtime/pd_mode_registry.c)
@@ -358,8 +359,13 @@ the registry.
 Current examples to copy:
 
 - `DRAGSCROLL` uses the shared local dragscroll handler plus the locked auto-mouse helpers
-- `PINCH_MODE` uses the same dragscroll handler and keeps its owned real `GUI` modifier lifecycle in [`pd_mode_pinch.c`](../users/noah/lib/pointing/modes/pd_mode_pinch.c)
+- `PINCH_MODE` uses the same dragscroll handler and keeps both its owned real `GUI` modifier lifecycle and its buffered tap replay masking policy in [`pd_mode_pinch.c`](../users/noah/lib/pointing/modes/pd_mode_pinch.c)
 - locked scroll-like modes use the auto-mouse ownership helpers
+
+If a mode owns real modifiers while active and also supports buffered single
+taps, prefer masking only the managed-only subset of those modifiers during the
+buffered replay snapshot. That keeps transparent taps intuitive without
+dropping a modifier the user is physically holding outside the mode itself.
 
 If your mode behaves like `VOLUME_MODE`, `BRIGHTNESS_MODE`, or `ZOOM_MODE`, you
 probably do not need extra branches here.
@@ -425,7 +431,7 @@ This is the actual control path for pd modes:
 4. [`users/noah/lib/pointing/runtime/pd_mode_registry.c`](../users/noah/lib/pointing/runtime/pd_mode_registry.c) materializes the mode table
    from the manifest, including handlers, reset hooks, traits, row-owned
    lifecycle hook selection from [`users/noah/lib/pointing/modes/`](../users/noah/lib/pointing/modes/),
-   lock actions, and DPI metadata.
+   buffered tap replay policy, lock actions, and DPI metadata.
 5. [`users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`](../users/noah/lib/pointing/runtime/pd_mode_lifecycle.c) owns activate / deactivate /
    lock / unlock transitions, exclusivity, shared auto-mouse policy, DPI
    application, and active-mode key interception.

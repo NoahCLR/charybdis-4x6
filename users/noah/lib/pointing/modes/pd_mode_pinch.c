@@ -13,6 +13,14 @@
 
 static bool pinch_command_registered = false;
 
+static uint8_t pinch_mode_buffered_tap_masked_real_mods(pd_mode_mask_t mode) {
+    (void)mode;
+
+    // Quick taps on the pinch key should replay like the underlying key unless
+    // the user is physically holding GUI outside the mode itself.
+    return keyboard_mod_ownership_managed_only_mask(MOD_BIT(KC_LEFT_GUI));
+}
+
 static void pinch_mode_register_command(pd_mode_mask_t mode) {
     (void)mode;
 
@@ -39,8 +47,9 @@ static void pinch_mode_unregister_command(pd_mode_mask_t mode) {
 }
 
 const pd_mode_lifecycle_hooks_t pd_mode_pinch_lifecycle_hooks = {
-    .on_activate   = pinch_mode_register_command,
-    .on_deactivate = pinch_mode_unregister_command,
+    .on_activate                   = pinch_mode_register_command,
+    .on_deactivate                 = pinch_mode_unregister_command,
+    .buffered_tap_masked_real_mods = pinch_mode_buffered_tap_masked_real_mods,
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
     .on_lock   = pd_mode_scroll_lock_attach_auto_mouse,
     .on_unlock = pd_mode_scroll_lock_detach_auto_mouse,

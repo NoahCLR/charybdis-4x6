@@ -2,8 +2,8 @@
 // PD Mode Registry Internals
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Shared private lifecycle surface between pd-mode definition materialization,
-// mode-owned lifecycle hook objects, and the lifecycle transition
+// Shared private lifecycle/policy surface between pd-mode definition
+// materialization, mode-owned hook objects, and the lifecycle transition
 // implementation. Keep this out of the public pd-mode headers so external
 // callers still go through the normal mode API.
 // ────────────────────────────────────────────────────────────────────────────
@@ -16,6 +16,7 @@ struct pd_mode_lifecycle_hooks {
     void (*on_deactivate)(pd_mode_mask_t mode);
     void (*on_lock)(pd_mode_mask_t mode);
     void (*on_unlock)(pd_mode_mask_t mode);
+    uint8_t (*buffered_tap_masked_real_mods)(pd_mode_mask_t mode);
 };
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)

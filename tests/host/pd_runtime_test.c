@@ -228,6 +228,10 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
     last_unregistered_keycode = keycode;
 }
 
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
+    return mods;
+}
+
 report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
     volume_handler_calls++;
     mouse_report.x += 3;

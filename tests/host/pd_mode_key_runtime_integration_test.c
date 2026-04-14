@@ -40,6 +40,16 @@ const key_behavior_t key_behaviors[] = {
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(BRIGHTNESS_MODE),
             },
     },
+    {
+        .keycode        = PINCH_MODE,
+        .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
+        .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
+        .tap_counts =
+            {
+                [0] = {.tap = TAP_SENDS(KC_C)},
+                [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
+            },
+    },
 };
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 
@@ -48,6 +58,15 @@ static uint16_t current_cpi;
 static uint16_t default_dpi;
 static uint8_t  split_sync_count;
 static uint8_t  reset_volume_count;
+static uint8_t  fake_mods;
+static uint8_t  fake_weak_mods;
+static uint8_t  fake_oneshot_mods;
+static uint8_t  fake_oneshot_locked_mods;
+static uint8_t  fake_managed_mods;
+static uint8_t  fake_physical_mods;
+static uint8_t  delayed_action_count;
+static uint16_t last_delayed_action;
+static delayed_action_mods_t last_delayed_mods;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -76,6 +95,15 @@ static void test_reset_state(void) {
     default_dpi        = 900;
     split_sync_count   = 0;
     reset_volume_count = 0;
+    fake_mods                = 0;
+    fake_weak_mods           = 0;
+    fake_oneshot_mods        = 0;
+    fake_oneshot_locked_mods = 0;
+    fake_managed_mods        = 0;
+    fake_physical_mods       = 0;
+    delayed_action_count     = 0;
+    last_delayed_action      = KC_NO;
+    last_delayed_mods        = (delayed_action_mods_t){0};
 }
 
 uint16_t timer_read(void) {
@@ -99,48 +127,56 @@ bool is_keyboard_master(void) {
 }
 
 uint8_t get_mods(void) {
-    return 0;
+    return fake_mods;
 }
 
 uint8_t get_weak_mods(void) {
-    return 0;
+    return fake_weak_mods;
 }
 
 uint8_t get_oneshot_mods(void) {
-    return 0;
+    return fake_oneshot_mods;
 }
 
 uint8_t get_oneshot_locked_mods(void) {
-    return 0;
+    return fake_oneshot_locked_mods;
 }
 
 void set_mods(uint8_t mods) {
-    (void)mods;
+    fake_mods = mods;
 }
 
 void set_weak_mods(uint8_t mods) {
-    (void)mods;
+    fake_weak_mods = mods;
 }
 
 void set_oneshot_mods(uint8_t mods) {
-    (void)mods;
+    fake_oneshot_mods = mods;
 }
 
 void set_oneshot_locked_mods(uint8_t mods) {
-    (void)mods;
+    fake_oneshot_locked_mods = mods;
 }
 
-void clear_mods(void) {}
-void clear_weak_mods(void) {}
-void clear_oneshot_mods(void) {}
-void clear_oneshot_locked_mods(void) {}
+void clear_mods(void) {
+    fake_mods = 0;
+}
+void clear_weak_mods(void) {
+    fake_weak_mods = 0;
+}
+void clear_oneshot_mods(void) {
+    fake_oneshot_mods = 0;
+}
+void clear_oneshot_locked_mods(void) {
+    fake_oneshot_locked_mods = 0;
+}
 
 void add_mods(uint8_t mods) {
-    (void)mods;
+    fake_mods |= mods;
 }
 
 void del_mods(uint8_t mods) {
-    (void)mods;
+    fake_mods &= (uint8_t)~mods;
 }
 
 void send_keyboard_report(void) {}
@@ -234,8 +270,30 @@ void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t 
 }
 
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
+    uint8_t mask = 0;
+
+    if (!record) {
+        return;
+    }
+
+    switch (keycode) {
+        case KC_LEFT_GUI:
+            mask = MOD_BIT(KC_LEFT_GUI);
+            break;
+        default:
+            return;
+    }
+
+    if (record->event.pressed) {
+        fake_physical_mods |= mask;
+    } else {
+        fake_physical_mods &= (uint8_t)~mask;
+    }
+
+    fake_mods = (uint8_t)(fake_mods | fake_physical_mods);
+    if ((fake_physical_mods & mask) == 0 && (fake_managed_mods & mask) == 0) {
+        fake_mods &= (uint8_t)~mask;
+    }
 }
 
 bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
@@ -245,19 +303,29 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
 }
 
 void keyboard_mod_ownership_register_mods(uint8_t mods) {
-    (void)mods;
+    fake_managed_mods |= mods;
+    fake_mods |= mods;
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
-    (void)mods;
+    fake_managed_mods &= (uint8_t)~mods;
+    fake_mods = (uint8_t)((fake_mods & (uint8_t)~mods) | fake_physical_mods | fake_managed_mods);
 }
 
 void keyboard_mod_ownership_register(uint16_t keycode) {
-    (void)keycode;
+    if (keycode == KC_LEFT_GUI) {
+        keyboard_mod_ownership_register_mods(MOD_BIT(KC_LEFT_GUI));
+    }
 }
 
 void keyboard_mod_ownership_unregister(uint16_t keycode) {
-    (void)keycode;
+    if (keycode == KC_LEFT_GUI) {
+        keyboard_mod_ownership_unregister_mods(MOD_BIT(KC_LEFT_GUI));
+    }
+}
+
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
+    return (uint8_t)(mods & fake_managed_mods & (uint8_t)~fake_physical_mods);
 }
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
@@ -293,7 +361,9 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 }
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
-    (void)mods;
+    delayed_action_count++;
+    last_delayed_action = action;
+    last_delayed_mods   = mods;
     action_dispatch(action);
 }
 
@@ -470,11 +540,96 @@ static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
     CHECK(current_cpi == default_dpi);
 }
 
+static void test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay(void) {
+    keypos_t                             key_pos         = test_keypos(2, 4);
+    const key_runtime_integration_step_t press_steps[]   = {
+        KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PINCH_MODE, 2, 4),
+    };
+    const key_runtime_integration_step_t flush_steps[] = {
+        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_MULTI_TAP_TERM + 1),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+
+    test_reset_state();
+    fake_mods = MOD_BIT(KC_LEFT_SHIFT);
+
+    CHECK(key_behavior_lookup(PINCH_MODE).config != NULL);
+    CHECK(pd_mode_for_keycode(PINCH_MODE) == PD_MODE_PINCH);
+
+    key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
+    CHECK(pd_mode_local_active(PD_MODE_PINCH));
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PINCH_MODE);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PINCH_MODE);
+
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    CHECK(!pd_mode_local_active(PD_MODE_PINCH));
+    CHECK(fake_mods == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+
+    key_runtime_integration_run(&fake_time, flush_steps, ARRAY_SIZE(flush_steps));
+    CHECK(delayed_action_count == 1);
+    CHECK(last_delayed_action == KC_C);
+    CHECK(last_delayed_mods.real == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(last_delayed_mods.weak == 0);
+    CHECK(last_delayed_mods.oneshot == 0);
+    CHECK(last_delayed_mods.oneshot_locked == 0);
+}
+
+static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_replay(void) {
+    keypos_t                             key_pos         = test_keypos(2, 4);
+    const key_runtime_integration_step_t press_steps[]   = {
+        KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PINCH_MODE, 2, 4),
+    };
+    const key_runtime_integration_step_t flush_steps[] = {
+        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_MULTI_TAP_TERM + 1),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    keyrecord_t gui_press = {
+         .event =
+             {
+                 .key     = {.row = 0, .col = 0},
+                 .pressed = true,
+             },
+    };
+
+    test_reset_state();
+    fake_mods = MOD_BIT(KC_LEFT_SHIFT);
+    keyboard_mod_ownership_track_physical_keycode_event(KC_LEFT_GUI, &gui_press);
+
+    key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
+    CHECK(pd_mode_local_active(PD_MODE_PINCH));
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PINCH_MODE);
+
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    CHECK(!pd_mode_local_active(PD_MODE_PINCH));
+    CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+
+    key_runtime_integration_run(&fake_time, flush_steps, ARRAY_SIZE(flush_steps));
+    CHECK(delayed_action_count == 1);
+    CHECK(last_delayed_action == KC_C);
+    CHECK(last_delayed_mods.real == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+    CHECK(last_delayed_mods.weak == 0);
+    CHECK(last_delayed_mods.oneshot == 0);
+    CHECK(last_delayed_mods.oneshot_locked == 0);
+}
+
 int main(void) {
     test_authored_single_press_preserves_default_pd_mode_hold();
     test_authored_hold_action_activates_pd_mode_while_held();
     test_authored_double_tap_lock_locks_pd_mode();
     test_authored_second_press_hold_branches_into_other_pd_mode();
+    test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay();
+    test_pinch_single_tap_preserves_physically_held_gui_on_delayed_replay();
 
     puts("pd_mode_key_runtime_integration host tests passed");
     return 0;

@@ -84,9 +84,19 @@ void send_keyboard_report(void) {}
 void register_mods(uint8_t mods);
 void unregister_mods(uint8_t mods);
 
+static void test_reset_state(void) {
+    fake_mods                = 0;
+    fake_weak_mods           = 0;
+    fake_oneshot_mods        = 0;
+    fake_oneshot_locked_mods = 0;
+    keyboard_mod_ownership_reset_for_test();
+}
+
 static void test_suspend_allows_nested_same_mod_registration(void) {
     uint8_t              gui_mask = MOD_BIT(KC_LEFT_GUI);
     keyboard_mod_state_t saved;
+
+    test_reset_state();
 
     keyboard_mod_ownership_register(KC_LEFT_GUI);
     CHECK(get_mods() == gui_mask);
@@ -108,8 +118,50 @@ static void test_suspend_allows_nested_same_mod_registration(void) {
     CHECK(get_mods() == 0);
 }
 
+static void test_managed_only_mask_reports_managed_gui_without_physical_owner(void) {
+    uint8_t gui_mask = MOD_BIT(KC_LEFT_GUI);
+
+    test_reset_state();
+
+    keyboard_mod_ownership_register(KC_LEFT_GUI);
+
+    CHECK(keyboard_mod_ownership_managed_only_mask(gui_mask) == gui_mask);
+    CHECK(keyboard_mod_ownership_managed_only_mask(MOD_BIT(KC_LEFT_SHIFT)) == 0);
+}
+
+static void test_managed_only_mask_keeps_physically_held_gui_visible(void) {
+    uint8_t   gui_mask = MOD_BIT(KC_LEFT_GUI);
+    keyrecord_t press  = {
+         .event =
+             {
+                 .key     = {.row = 0, .col = 0},
+                 .pressed = true,
+             },
+    };
+    keyrecord_t release = {
+         .event =
+             {
+                 .key     = {.row = 0, .col = 0},
+                 .pressed = false,
+             },
+    };
+
+    test_reset_state();
+
+    keyboard_mod_ownership_track_physical_keycode_event(KC_LEFT_GUI, &press);
+    keyboard_mod_ownership_register(KC_LEFT_GUI);
+
+    CHECK(keyboard_mod_ownership_managed_only_mask(gui_mask) == 0);
+
+    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
+    keyboard_mod_ownership_track_physical_keycode_event(KC_LEFT_GUI, &release);
+    CHECK(keyboard_mod_ownership_managed_only_mask(gui_mask) == 0);
+}
+
 int main(void) {
     test_suspend_allows_nested_same_mod_registration();
+    test_managed_only_mask_reports_managed_gui_without_physical_owner();
+    test_managed_only_mask_keeps_physically_held_gui_visible();
     puts("keyboard_mod_ownership host tests passed");
     return 0;
 }
