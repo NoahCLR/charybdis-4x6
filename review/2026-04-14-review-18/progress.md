@@ -36,12 +36,16 @@
 - Confirmed that the buffered-tap seam work is genuinely resolved and mechanically enforced, but the thread is still not ready to close because the original `should-fix` findings on the registry DSLs and `key_runtime_internal.h` remain open.
 - Confirmed the active review folder, `docs/ADDING_PD_MODE.md`, and the landed pd-mode/runtime code all describe the same ownership model.
 - This assessment-only pass did not run new verification commands; it relies on the already-green buffered-tap seam-narrowing baseline recorded below.
+- Landed the optional buffered-tap coverage cleanup:
+  - `tests/host/pd_mode_key_runtime_integration_test.c` now authors `PINCH_MODE` as `TAP_SENDS(KC_TRNS)` like the shipped profile,
+  - the integration harness now provides a local pointer-layer-to-base-layer transparent source path with a lower raw `LT(..., KC_J)` key,
+  - the pinch replay assertions now verify the delayed action resolves to `KC_J` through transparent lookup instead of using a synthetic `KC_C` stand-in.
 
 ## Findings Snapshot
 
 - `must-fix`: none in the current tree.
 - `should-fix`: the positional registry DSLs are still the main maintainability risk; `key_runtime_internal.h` is still too broad for an internal seam.
-- `optional cleanup`: the keymap materialization macros and mixed-responsibility pointing bridge are acceptable now but are the next likely growth hotspots, and the pinch regression coverage should be extended to hit the real transparent-tap path.
+- `optional cleanup`: the keymap materialization macros and mixed-responsibility pointing bridge are acceptable now but are the next likely growth hotspots.
 - `closure verdict`: keep this thread open until the remaining `should-fix` items are either resolved or explicitly downgraded out of the closure bar.
 
 ## Verification
@@ -75,6 +79,10 @@
   - `sh tests/host/run_feature_gate_compile_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during transparent-path coverage cleanup:
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
 
 ## Next Steps
@@ -82,4 +90,3 @@
 1. Re-audit whether any other pd mode will need mode-owned buffered tap masking before adding more special policy to the private pd-mode hook surface.
 2. Resume the original architecture thread by narrowing `key_runtime_internal.h` or making the registry rows more explicit; those `should-fix` items are still open.
 3. Keep this review folder as the active thread history for both reliability follow-ups and future architecture cleanup on the same userspace seam.
-4. Add one authored-profile runtime scenario for `PINCH_MODE`'s transparent tap so the exact user-facing path is mechanically covered.

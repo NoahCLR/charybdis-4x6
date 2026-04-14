@@ -14,12 +14,21 @@
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_reset.h"
 
+#ifndef KC_J
+#    define KC_J 0x000Du
+#endif
+
 enum {
     TEST_PD_HOLD_KEY       = NOAH_KEYMAP_SAFE_RANGE + 0x10,
     TEST_PD_TAP_HOLD_TERM  = 120,
     TEST_PD_MULTI_TAP_TERM = 150,
+    TEST_LAYER_BASE        = 0,
+    TEST_LAYER_POINTER     = 1,
+    TEST_LAYER_SYM         = 2,
 };
 
+layer_state_t    layer_state = 0;
+static uint16_t  test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 const key_behavior_t key_behaviors[] = {
     {
         .keycode        = TEST_PD_HOLD_KEY,
@@ -46,7 +55,7 @@ const key_behavior_t key_behaviors[] = {
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts =
             {
-                [0] = {.tap = TAP_SENDS(KC_C)},
+                [0] = {.tap = TAP_SENDS(KC_TRNS)},
                 [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
             },
     },
@@ -87,14 +96,40 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
     };
 }
 
+static layer_state_t test_layer_mask(uint8_t layer) {
+    return (layer_state_t)1u << layer;
+}
+
+static void test_reset_keymap(void) {
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+        for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+            for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+                test_keymap[layer][row][col] = KC_TRNS;
+            }
+        }
+    }
+}
+
+static void test_set_keymap_key(uint8_t layer, keypos_t key_pos, uint16_t keycode) {
+    test_keymap[layer][key_pos.row][key_pos.col] = keycode;
+}
+
+static void test_configure_pinch_transparent_profile_path(keypos_t key_pos) {
+    test_set_keymap_key(TEST_LAYER_POINTER, key_pos, PINCH_MODE);
+    test_set_keymap_key(TEST_LAYER_BASE, key_pos, LT(TEST_LAYER_SYM, KC_J));
+    layer_state = test_layer_mask(TEST_LAYER_BASE) | test_layer_mask(TEST_LAYER_POINTER);
+}
+
 static void test_reset_state(void) {
     noah_runtime_reset_for_test();
+    test_reset_keymap();
 
-    fake_time          = 1000;
-    current_cpi        = 0;
-    default_dpi        = 900;
-    split_sync_count   = 0;
-    reset_volume_count = 0;
+    fake_time               = 1000;
+    current_cpi             = 0;
+    default_dpi             = 900;
+    split_sync_count        = 0;
+    reset_volume_count      = 0;
+    layer_state             = test_layer_mask(TEST_LAYER_BASE);
     fake_mods                = 0;
     fake_weak_mods           = 0;
     fake_oneshot_mods        = 0;
@@ -124,6 +159,10 @@ uint32_t timer_elapsed32(uint32_t last) {
 
 bool is_keyboard_master(void) {
     return true;
+}
+
+uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+    return test_keymap[layer_num][row][column];
 }
 
 uint8_t get_mods(void) {
@@ -555,6 +594,7 @@ static void test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay(void)
     };
 
     test_reset_state();
+    test_configure_pinch_transparent_profile_path(key_pos);
     fake_mods = MOD_BIT(KC_LEFT_SHIFT);
 
     CHECK(key_behavior_lookup(PINCH_MODE).config != NULL);
@@ -573,7 +613,7 @@ static void test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay(void)
 
     key_runtime_integration_run(&fake_time, flush_steps, ARRAY_SIZE(flush_steps));
     CHECK(delayed_action_count == 1);
-    CHECK(last_delayed_action == KC_C);
+    CHECK(last_delayed_action == KC_J);
     CHECK(last_delayed_mods.real == MOD_BIT(KC_LEFT_SHIFT));
     CHECK(last_delayed_mods.weak == 0);
     CHECK(last_delayed_mods.oneshot == 0);
@@ -602,6 +642,7 @@ static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_repla
     };
 
     test_reset_state();
+    test_configure_pinch_transparent_profile_path(key_pos);
     fake_mods = MOD_BIT(KC_LEFT_SHIFT);
     keyboard_mod_ownership_track_physical_keycode_event(KC_LEFT_GUI, &gui_press);
 
@@ -616,7 +657,7 @@ static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_repla
 
     key_runtime_integration_run(&fake_time, flush_steps, ARRAY_SIZE(flush_steps));
     CHECK(delayed_action_count == 1);
-    CHECK(last_delayed_action == KC_C);
+    CHECK(last_delayed_action == KC_J);
     CHECK(last_delayed_mods.real == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
     CHECK(last_delayed_mods.weak == 0);
     CHECK(last_delayed_mods.oneshot == 0);
