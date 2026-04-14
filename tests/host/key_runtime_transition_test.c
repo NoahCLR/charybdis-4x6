@@ -178,6 +178,10 @@ static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_actio
     return host_key_runtime_slot_interaction_from_authored_resolution(test_cached_resolution(TEST_NEW_KEY, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, 0, HANDLED_KEY_FLAG_HANDLED), handled_key_resolution_ctx_make(test_default_slot_key_pos, layer_state));
 }
 
+static key_runtime_slot_interaction_t test_authored_interaction(handled_key_resolution_t resolution, keypos_t key_pos) {
+    return host_key_runtime_slot_interaction_from_authored_resolution(resolution, handled_key_resolution_ctx_make(key_pos, layer_state));
+}
+
 static void test_set_cached_interaction_view(active_key_state_t *slot, key_runtime_slot_interaction_t interaction) {
     if (!slot) {
         return;
@@ -263,12 +267,11 @@ static void active_key_reset(void) {
 }
 
 static void active_key_track(uint16_t keycode, keypos_t key_pos, uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term, key_runtime_slot_phase_t phase, key_runtime_slot_hold_strategy_t hold_strategy) {
-    handled_key_resolution_t  resolution = test_cached_resolution(keycode, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, 0, HANDLED_KEY_FLAG_HANDLED);
-    handled_key_materialized_t materialized = host_handled_key_materialize_from_authored_resolution(resolution, handled_key_resolution_ctx_make(key_pos, layer_state));
+    handled_key_resolution_t      resolution = test_cached_resolution(keycode, tap_action, hold, long_hold, tap_hold_term, longer_hold_term, multi_tap_term, 0, HANDLED_KEY_FLAG_HANDLED);
     key_runtime_slot_interaction_t interaction;
 
-    materialized.hold_strategy = hold_strategy;
-    interaction                = host_key_runtime_slot_interaction_from_overridden_materialized(materialized);
+    CHECK(hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
+    interaction = test_authored_interaction(resolution, key_pos);
 
     test_set_default_slot_key_pos(key_pos);
     key_runtime_slot_track(test_default_slot(), keycode, key_pos, interaction, phase);
@@ -842,7 +845,7 @@ static void test_non_modifier_single_tap_override_activates_fallback_hold_at_thr
 
 static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
     key_runtime_transition_plan_t plan;
-    handled_key_materialized_t    fallback_materialized;
+    handled_key_resolution_t      fallback_resolution;
 
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(2, 2));
@@ -852,11 +855,8 @@ static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
         .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
         .interaction     = test_cached_interaction(KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     });
-    fallback_materialized = host_handled_key_materialize_from_authored_resolution(
-        test_cached_resolution(TEST_PLAIN_KEY, KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED),
-        handled_key_resolution_ctx_make(test_default_slot_key_pos, layer_state));
-    fallback_materialized.hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
-    test_set_cached_interaction_view(test_default_slot(), host_key_runtime_slot_interaction_from_overridden_materialized(fallback_materialized));
+    fallback_resolution = test_cached_resolution(TEST_PLAIN_KEY, TEST_PLAIN_KEY, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED);
+    test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(fallback_resolution, test_default_slot_key_pos));
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_interrupt_active_key_on_other_press(&plan);
@@ -934,7 +934,7 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
     keyrecord_t                   record            = test_record(test_keypos(1, 5), false);
     handled_key_resolution_t      key               = test_handled_key(LT(2, TEST_FALLBACK_TAP_ACTION));
     uint16_t                      layer_tap_keycode = LT(2, TEST_FALLBACK_TAP_ACTION);
-    handled_key_materialized_t    interrupted_layer_materialized;
+    handled_key_resolution_t      interrupted_layer_resolution;
 
     test_reset_stubs();
     test_handled_key_set_layer_contract(&key, 2, true, TEST_FALLBACK_TAP_ACTION);
@@ -947,12 +947,8 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
         .interaction                 = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
         .lifecycle.layer_interrupted = true,
     });
-    interrupted_layer_materialized = host_handled_key_materialize_from_authored_resolution(
-        test_cached_resolution(layer_tap_keycode, TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED),
-        handled_key_resolution_ctx_make(record.event.key, layer_state));
-    interrupted_layer_materialized.layer = 2;
-    interrupted_layer_materialized.flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
-    test_set_cached_interaction_view(test_default_slot(), host_key_runtime_slot_interaction_from_overridden_materialized(interrupted_layer_materialized));
+    interrupted_layer_resolution = test_cached_resolution(layer_tap_keycode, TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
+    test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(interrupted_layer_resolution, record.event.key));
 
     key_runtime_transition_plan_init(&plan);
     CHECK(key_runtime_transition_handled_key_release(layer_tap_keycode, &record, key, &plan));
@@ -1323,7 +1319,7 @@ static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_laye
     key_runtime_transition_plan_t scan_plan;
     keyrecord_t                   record = test_record(test_keypos(6, 2), false);
     handled_key_resolution_t      key    = test_handled_key(MO(2));
-    handled_key_materialized_t    layered_multi_tap_materialized;
+    handled_key_resolution_t      layered_multi_tap_resolution;
 
     test_reset_stubs();
     test_handled_key_enable_multi_tap(&key);
@@ -1363,13 +1359,10 @@ static void test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_laye
                 .long_hold        = TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION),
             },
     });
-    layered_multi_tap_materialized = host_handled_key_materialize_from_authored_resolution(
-        test_cached_resolution(MO(2), KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED),
-        handled_key_resolution_ctx_make(record.event.key, layer_state));
-    layered_multi_tap_materialized.layer             = 2;
-    layered_multi_tap_materialized.tap_has_more_taps = true;
-    layered_multi_tap_materialized.flags |= HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER;
-    test_set_cached_interaction_view(test_default_slot(), host_key_runtime_slot_interaction_from_overridden_materialized(layered_multi_tap_materialized));
+    layered_multi_tap_resolution = test_cached_resolution(MO(2), KC_NO, hold_behavior_none(), HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_LAYER_LOCK_ACTION)), 120, 240, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MULTI_TAP | HANDLED_KEY_FLAG_MOMENTARY_LAYER);
+    layered_multi_tap_resolution.layer         = 2;
+    layered_multi_tap_resolution.has_more_taps = true;
+    test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(layered_multi_tap_resolution, record.event.key));
 
     key_runtime_transition_plan_init(&release_plan);
     CHECK(key_runtime_transition_handled_key_release(MO(2), &record, key, &release_plan));
@@ -1604,7 +1597,7 @@ static void test_scan_commits_immediate_hold_threshold_with_feedback(void) {
 
 static void test_scan_commits_implicit_hold_without_feedback(void) {
     key_runtime_transition_plan_t plan;
-    handled_key_materialized_t    implicit_hold_materialized;
+    handled_key_resolution_t      implicit_hold_resolution;
 
     test_reset_stubs();
     test_set_default_slot_key_pos(test_keypos(5, 1));
@@ -1622,17 +1615,14 @@ static void test_scan_commits_implicit_hold_without_feedback(void) {
                                                                  },
                                                                  hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
     });
-    implicit_hold_materialized = host_handled_key_materialize_from_authored_resolution(
-        test_cached_resolution(TEST_PD_MODE_KEY, KC_NO,
-                               (hold_behavior_t){
-                                   .present = true,
-                                   .action  = TEST_PD_MODE_KEY,
-                                   .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
-                               },
-                               hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, PD_MODE_VOLUME, HANDLED_KEY_FLAG_HANDLED),
-        handled_key_resolution_ctx_make(test_keypos(5, 1), layer_state));
-    implicit_hold_materialized.hold_strategy = KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
-    test_set_cached_interaction_view(test_default_slot(), host_key_runtime_slot_interaction_from_overridden_materialized(implicit_hold_materialized));
+    implicit_hold_resolution = test_cached_resolution(TEST_PD_MODE_KEY, KC_NO,
+                                                      (hold_behavior_t){
+                                                          .present = true,
+                                                          .action  = TEST_PD_MODE_KEY,
+                                                          .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                                      },
+                                                      hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, PD_MODE_VOLUME, HANDLED_KEY_FLAG_HANDLED);
+    test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(implicit_hold_resolution, test_keypos(5, 1)));
 
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_scan(&plan);

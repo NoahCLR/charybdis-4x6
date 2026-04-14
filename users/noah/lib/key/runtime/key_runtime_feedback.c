@@ -173,9 +173,7 @@ uint8_t key_feedback_pack(void) {
 
     // Multi-tap pending: at least one slot still has an open tap window that
     // has not crossed into a pending hold.
-    const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
-
-    for (uint8_t index = 0; index < index_state->pending_multi_tap_count; index++) {
+    for (uint8_t index = 0; index < key_runtime_pending_multi_tap_slot_count(); index++) {
         active_key_state_t *slot = key_runtime_pending_multi_tap_slot_by_order(index);
         if (key_runtime_slot_has_pending_multi_tap(slot) && !key_runtime_slot_pending_multi_tap_pending_hold(slot)) {
             flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
@@ -183,7 +181,7 @@ uint8_t key_feedback_pack(void) {
         }
     }
 
-    for (uint8_t index = 0; index < index_state->active_slot_count; index++) {
+    for (uint8_t index = 0; index < key_runtime_active_slot_count(); index++) {
         uint8_t slot_flags = key_feedback_pack_for_slot(key_runtime_active_slot_by_order(index));
         if (slot_flags != 0) {
             return flags | slot_flags;

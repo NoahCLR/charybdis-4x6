@@ -129,9 +129,19 @@ void key_runtime_index_sync_slot(active_key_state_t *slot) {
     key_runtime_index_refresh_single_owner_answers(state);
 }
 
-const key_runtime_index_state_t *key_runtime_index_state_snapshot(void) {
+static const key_runtime_index_state_t *key_runtime_index_state_snapshot(void) {
     key_runtime_shared_state_t *state = key_runtime_shared_state();
     return state ? &state->index : NULL;
+}
+
+uint8_t key_runtime_active_slot_count(void) {
+    const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
+    return index ? index->active_slot_count : 0;
+}
+
+uint8_t key_runtime_pending_multi_tap_slot_count(void) {
+    const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
+    return index ? index->pending_multi_tap_count : 0;
 }
 
 active_key_state_t *key_runtime_active_slot_by_order(uint8_t order) {
@@ -162,4 +172,34 @@ active_key_state_t *key_runtime_preview_owner_slot(void) {
 active_key_state_t *key_runtime_pending_fallback_slot(void) {
     const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
     return (!index || index->pending_fallback_slot == UINT8_MAX) ? NULL : key_runtime_slot_at(index->pending_fallback_slot);
+}
+
+uint8_t key_runtime_index_snapshot_active_slots(active_key_state_t **out_slots, uint8_t capacity) {
+    const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
+    uint8_t                         count = index ? index->active_slot_count : 0;
+
+    if (count > capacity) {
+        count = capacity;
+    }
+
+    for (uint8_t order = 0; order < count; order++) {
+        out_slots[order] = key_runtime_slot_at(index->active_slots[order]);
+    }
+
+    return count;
+}
+
+uint8_t key_runtime_index_snapshot_pending_multi_tap_slots(active_key_state_t **out_slots, uint8_t capacity) {
+    const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
+    uint8_t                         count = index ? index->pending_multi_tap_count : 0;
+
+    if (count > capacity) {
+        count = capacity;
+    }
+
+    for (uint8_t order = 0; order < count; order++) {
+        out_slots[order] = key_runtime_slot_at(index->pending_multi_tap_slots[order]);
+    }
+
+    return count;
 }

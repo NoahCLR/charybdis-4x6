@@ -27,6 +27,10 @@ static uint8_t  send_keyboard_report_count;
 
 layer_state_t layer_state;
 
+static bool test_keypos_equal(keypos_t lhs, keypos_t rhs) {
+    return lhs.row == rhs.row && lhs.col == rhs.col;
+}
+
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
     exit(1);
@@ -359,6 +363,7 @@ static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
 
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_debug_snapshot_t snapshot;
+    keypos_t                      key_pos;
     keypos_t                      active_key = test_keypos(0, 0);
     keypos_t                      pending_key = test_keypos(0, 1);
     keypos_t                      layer_key  = test_keypos(1, 2);
@@ -397,12 +402,14 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(snapshot.core.pd.remote_display_active_mode == PD_MODE_ARROW);
     CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_C);
     CHECK(snapshot.core.key.slots_by_position[0].interaction.binding.tap_action == KC_C);
-    CHECK(snapshot.core.key.index.active_slot_count == 1);
-    CHECK(snapshot.core.key.index.active_slots[0] == 0);
-    CHECK(snapshot.core.key.index.pending_multi_tap_count == 1);
-    CHECK(snapshot.core.key.index.pending_multi_tap_slots[0] == 1);
-    CHECK(snapshot.core.key.index.preview_owner_slot == UINT8_MAX);
-    CHECK(snapshot.core.key.index.pending_fallback_slot == UINT8_MAX);
+    CHECK(noah_runtime_debug_active_slot_count(&snapshot) == 1);
+    CHECK(noah_runtime_debug_active_slot_key_pos(&snapshot, 0, &key_pos));
+    CHECK(test_keypos_equal(key_pos, active_key));
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count(&snapshot) == 1);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_key_pos(&snapshot, 0, &key_pos));
+    CHECK(test_keypos_equal(key_pos, pending_key));
+    CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&snapshot, &key_pos));
+    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&snapshot, &key_pos));
 
     CHECK(snapshot.layer_ownership.applied_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
     CHECK(snapshot.layer_ownership.locked_mask == ((layer_state_t)1u << 3));

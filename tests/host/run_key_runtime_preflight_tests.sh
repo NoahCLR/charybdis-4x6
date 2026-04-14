@@ -18,7 +18,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_preflight_test.c" \
-    "$ROOT/tests/host/action_kind_host_stubs.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_transparency.c" \

@@ -75,3 +75,87 @@ Next steps:
 - finally, reduce the shared host handled-key fixture back to the public
   authored/materialized seam and keep internal override-refresh helpers local
   to constructor-level tests
+
+### Implementation follow-up for the review-06 audit
+
+Completed in this pass:
+
+- started from the existing in-flight refactor state with `git status --short`
+- split action-kind metadata from side-effectful dispatch execution:
+  - `users/noah/lib/action/action_kind.c` now owns classification and metadata
+  - `users/noah/lib/action/action_kind_dispatch.c` now owns tap/press/release
+    dispatch hooks
+  - metadata-only host runners no longer link the shared dispatch stub layer
+- corrected the shared dispatch host stubs to type-check against the real
+  headers and limited their use to runners that actually execute dispatch hooks
+- narrowed the key-runtime index public seam:
+  - removed the public raw index snapshot accessor from
+    `users/noah/lib/key/runtime/key_runtime_index.h`
+  - moved slot-pointer snapshot helpers behind
+    `users/noah/lib/key/runtime/key_runtime_index_internal.h`
+  - updated runtime consumers to use semantic accessors or internal snapshot
+    helpers instead of copying raw slot-index arrays directly
+- trimmed the shared handled-key host fixture back to the public authored ->
+  materialized -> interaction seam
+- localized the internal materialized-contract refresh path to the
+  constructor-level slot test and removed it from the higher-level transition
+  suite
+- removed the stale handled-key fixture include from
+  `tests/host/key_runtime_admission_test.c`
+- added semantic runtime-debug index helpers so runtime-debug assertions no
+  longer need to read raw slot-index arrays directly
+
+Key architectural outcomes:
+
+- the action-kind metadata seam is now independent from dispatch-time runtime
+  side effects
+- the mutation-maintained key-runtime registry is consumed through semantic
+  accessors in production code
+- higher-level runtime suites now use authored resolutions and the production
+  `handled_key_materialize(...)` seam instead of a shared internal override
+  helper
+- the runtime-debug surface now owns slot-index decoding for tests that need
+  index ordering visibility
+
+Verification run in this implementation pass:
+
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_keymap_validation_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_key_runtime_index_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Verification results:
+
+- all targeted host suites above passed
+- the full host suite passed
+- the firmware build passed and produced
+  `.build/bastardkb_charybdis_4x6_noah.uf2`
+
+Workspace scope:
+
+- no sibling workspace folders were edited
+- implementation changes are confined to `users/noah/`, `tests/host/`, and
+  `review/2026-04-14-review-06/`
+
+Next steps:
+
+- no immediate follow-up is required to close the review-06 should-fix items
+- if we want to tighten the runtime-debug/public-state boundary further later,
+  the next optional step would be to separate semantic debug snapshots from the
+  raw `runtime_shared_state_t` aggregate entirely

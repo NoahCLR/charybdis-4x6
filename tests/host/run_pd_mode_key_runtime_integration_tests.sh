@@ -24,6 +24,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/tests/host/action_kind_host_stubs.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
+    "$ROOT/users/noah/lib/action/action_kind_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
     "$ROOT/users/noah/lib/key/interaction/handled_key_resolution_accessors.c" \

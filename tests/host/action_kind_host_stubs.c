@@ -1,8 +1,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/owned_keycode.h"
+#include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
+#include "users/noah/lib/state/ownership/layer_ownership.h"
 
 #if defined(__GNUC__) || defined(__clang__)
 #    define HOST_WEAK __attribute__((weak))
@@ -29,9 +32,10 @@ HOST_WEAK void noah_dispatch_synthetic_tap(uint16_t keycode) {
     (void)keycode;
 }
 
-HOST_WEAK void noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
+HOST_WEAK bool noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
     (void)keycode;
     (void)pressed;
+    return false;
 }
 
 HOST_WEAK void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
@@ -54,8 +58,9 @@ HOST_WEAK bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     return false;
 }
 
-HOST_WEAK void layer_ownership_toggle_lock_state(uint8_t layer) {
+HOST_WEAK bool layer_ownership_toggle_lock_state(uint8_t layer) {
     (void)layer;
+    return false;
 }
 
 HOST_WEAK void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
@@ -63,8 +68,9 @@ HOST_WEAK void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) 
     (void)layer;
 }
 
-HOST_WEAK void layer_ownership_momentary_release(keypos_t key_pos) {
+HOST_WEAK bool layer_ownership_momentary_release(keypos_t key_pos) {
     (void)key_pos;
+    return false;
 }
 
 HOST_WEAK void tap_code16(uint16_t keycode) {

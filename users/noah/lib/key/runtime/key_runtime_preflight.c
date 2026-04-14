@@ -39,9 +39,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.pressed) {
-        const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
-
-        for (uint8_t index = 0; index < index_state->active_slot_count; index++) {
+        for (uint8_t index = 0; index < key_runtime_active_slot_count(); index++) {
             active_key_state_t *candidate = key_runtime_active_slot_by_order(index);
 
             if (!candidate || key_runtime_keypos_equal(candidate->owner.key_pos, record->event.key)) {
@@ -62,9 +60,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.pressed && !handled_key_resolution_is_handled(handled_key)) {
-        const key_runtime_index_state_t *index_state = key_runtime_index_state_snapshot();
-
-        for (uint8_t index = 0; index < index_state->pending_multi_tap_count; index++) {
+        for (uint8_t index = 0; index < key_runtime_pending_multi_tap_slot_count(); index++) {
             active_key_state_t *candidate = key_runtime_pending_multi_tap_slot_by_order(index);
 
             if (candidate && !key_runtime_slot_pending_multi_tap_matches(candidate, keycode, record->event.key)) {

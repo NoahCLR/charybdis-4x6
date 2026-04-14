@@ -153,3 +153,15 @@ Next steps:
 
 - run the final full host suite and firmware build
 - if those stay green, this audit follow-up is complete
+
+### Correction after the review-06 cleanup
+
+The note above reflected the state before the next audit/cleanup pass closed
+out the remaining follow-up. The final verification did run later and passed:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+That later pass also resolved the remaining review-06 should-fix items around
+the action-kind dispatch seam, the key-runtime index public read surface, and
+the shared handled-key host fixture.

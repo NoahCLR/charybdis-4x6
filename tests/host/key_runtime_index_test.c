@@ -61,10 +61,7 @@ static void test_reset_state(void) {
 }
 
 static void test_expect_active_order(const keypos_t *positions, uint8_t count) {
-    const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
-
-    CHECK(index != NULL);
-    CHECK(index->active_slot_count == count);
+    CHECK(key_runtime_active_slot_count() == count);
     for (uint8_t order = 0; order < count; order++) {
         CHECK(key_runtime_active_slot_by_order(order) == test_slot(positions[order]));
     }
@@ -72,10 +69,7 @@ static void test_expect_active_order(const keypos_t *positions, uint8_t count) {
 }
 
 static void test_expect_pending_order(const keypos_t *positions, uint8_t count) {
-    const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
-
-    CHECK(index != NULL);
-    CHECK(index->pending_multi_tap_count == count);
+    CHECK(key_runtime_pending_multi_tap_slot_count() == count);
     for (uint8_t order = 0; order < count; order++) {
         CHECK(key_runtime_pending_multi_tap_slot_by_order(order) == test_slot(positions[order]));
     }

@@ -10,7 +10,8 @@
 
 #include "key_runtime_state.h"
 
-const key_runtime_index_state_t *key_runtime_index_state_snapshot(void);
+uint8_t                          key_runtime_active_slot_count(void);
+uint8_t                          key_runtime_pending_multi_tap_slot_count(void);
 active_key_state_t              *key_runtime_active_slot_by_order(uint8_t order);
 active_key_state_t              *key_runtime_pending_multi_tap_slot_by_order(uint8_t order);
 active_key_state_t              *key_runtime_preview_owner_slot(void);

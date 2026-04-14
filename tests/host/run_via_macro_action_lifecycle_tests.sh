@@ -21,8 +21,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/via_macro_action_lifecycle_test.c" \
     "$ROOT/users/noah/lib/macro/macro_slot_provider.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
-    "$ROOT/tests/host/action_kind_host_stubs.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
+    "$ROOT/users/noah/lib/action/action_kind_dispatch.c" \
     "$ROOT/users/noah/lib/macro/macro_payload.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_decode_qmk.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \

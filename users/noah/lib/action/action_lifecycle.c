@@ -4,6 +4,7 @@
 
 #include "action_lifecycle.h"
 
+#include "action_kind_dispatch_internal.h"
 #include "action_kind_internal.h"
 #include "../compat/qmk_via_playback_contract.h"
 #include "../macro/macro_dispatch.h"

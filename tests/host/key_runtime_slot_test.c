@@ -6,6 +6,7 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/noah_keymap_ids.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/key/interaction/handled_key_internal.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_effect.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_result_internal.h"
 #include "users/noah/lib/key/runtime/slot/key_runtime_slot_result.h"
@@ -76,6 +77,10 @@ static handled_key_resolution_t test_cached_resolution(uint16_t keycode, uint16_
         .has_more_taps    = false,
         .flags            = flags,
     };
+}
+
+static key_runtime_slot_interaction_t test_interaction_from_overridden_materialized(handled_key_materialized_t materialized) {
+    return key_runtime_slot_interaction_from_materialized(handled_key_materialized_refresh_contract(materialized));
 }
 
 static key_runtime_slot_interaction_t test_cached_interaction(uint16_t tap_action, hold_behavior_t hold, hold_behavior_t long_hold, uint16_t tap_hold_term, uint16_t longer_hold_term, uint16_t multi_tap_term) {
@@ -166,7 +171,7 @@ static void test_slot_materialize_applies_binding_and_strategy_overrides(void) {
     authored.authored.multi_tap_term  = 175;
     authored.hold_strategy            = KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK;
 
-    interaction = host_key_runtime_slot_interaction_from_overridden_materialized(authored);
+    interaction = test_interaction_from_overridden_materialized(authored);
 
     CHECK(interaction.binding.tap_action == TEST_SINGLE_ACTION);
     CHECK(interaction.binding.tap_repeat_count == 3);

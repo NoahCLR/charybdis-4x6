@@ -30,3 +30,9 @@ typedef struct {
 
 void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out);
 void noah_runtime_reset_for_test(void);
+uint8_t noah_runtime_debug_active_slot_count(const noah_runtime_debug_snapshot_t *snapshot);
+bool    noah_runtime_debug_active_slot_key_pos(const noah_runtime_debug_snapshot_t *snapshot, uint8_t order, keypos_t *out);
+uint8_t noah_runtime_debug_pending_multi_tap_slot_count(const noah_runtime_debug_snapshot_t *snapshot);
+bool    noah_runtime_debug_pending_multi_tap_slot_key_pos(const noah_runtime_debug_snapshot_t *snapshot, uint8_t order, keypos_t *out);
+bool    noah_runtime_debug_preview_owner_slot_key_pos(const noah_runtime_debug_snapshot_t *snapshot, keypos_t *out);
+bool    noah_runtime_debug_pending_fallback_slot_key_pos(const noah_runtime_debug_snapshot_t *snapshot, keypos_t *out);
