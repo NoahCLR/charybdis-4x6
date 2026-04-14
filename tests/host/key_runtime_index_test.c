@@ -5,7 +5,7 @@
 
 #include "users/noah/lib/key/runtime/key_runtime_index.h"
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
-#include "host_runtime_fixture.h"
+#include "host_runtime_reset_fixture.h"
 
 static uint16_t fake_time;
 layer_state_t   layer_state;

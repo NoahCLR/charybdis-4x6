@@ -51,13 +51,11 @@ static layer_state_t test_layer_mask(uint8_t layer) {
     return (layer_state_t)1u << layer;
 }
 
-static bool test_snapshot_layer_active(const noah_runtime_debug_snapshot_t *snapshot, uint8_t layer) {
-    (void)snapshot;
+static bool test_layer_active(uint8_t layer) {
     return layer < LAYER_COUNT && (layer_state & test_layer_mask(layer)) != 0;
 }
 
-static bool test_snapshot_layer_locked(const noah_runtime_debug_snapshot_t *snapshot, uint8_t layer) {
-    (void)snapshot;
+static bool test_layer_locked(uint8_t layer) {
     return layer < LAYER_COUNT && layer_ownership_is_locked(layer);
 }
 
@@ -371,63 +369,54 @@ void key_feedback_pulse_arm(bool long_hold_level) {
 }
 
 static void test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle(void) {
-    keypos_t                      key_pos  = test_keypos(4, 2);
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keypos_t key_pos = test_keypos(4, 2);
 
     test_reset_state();
 
     test_run_thumb_like_double_tap_hold_cycle(key_pos);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(test_snapshot_layer_locked(&snapshot, TEST_NUM_LAYER));
-    CHECK(test_snapshot_layer_active(&snapshot, TEST_NUM_LAYER));
-    CHECK(!test_snapshot_layer_locked(&snapshot, TEST_OTHER_LAYER));
-    CHECK(!test_snapshot_layer_active(&snapshot, TEST_OTHER_LAYER));
+    CHECK(test_layer_locked(TEST_NUM_LAYER));
+    CHECK(test_layer_active(TEST_NUM_LAYER));
+    CHECK(!test_layer_locked(TEST_OTHER_LAYER));
+    CHECK(!test_layer_active(TEST_OTHER_LAYER));
 
     fake_time = (uint16_t)(fake_time + 40);
     test_run_thumb_like_double_tap_hold_cycle(key_pos);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(!test_snapshot_layer_locked(&snapshot, TEST_NUM_LAYER));
-    CHECK(!test_snapshot_layer_active(&snapshot, TEST_NUM_LAYER));
-    CHECK(!test_snapshot_layer_locked(&snapshot, TEST_OTHER_LAYER));
-    CHECK(!test_snapshot_layer_active(&snapshot, TEST_OTHER_LAYER));
+    CHECK(!test_layer_locked(TEST_NUM_LAYER));
+    CHECK(!test_layer_active(TEST_NUM_LAYER));
+    CHECK(!test_layer_locked(TEST_OTHER_LAYER));
+    CHECK(!test_layer_active(TEST_OTHER_LAYER));
 }
 
 static void test_thumb_cycle_release_still_clears_slot_when_layer_change_resolves_to_other_keycode(void) {
-    keypos_t                      key_pos  = test_keypos(4, 2);
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keypos_t key_pos = test_keypos(4, 2);
 
     test_reset_state();
 
     test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(key_pos, TEST_FOREIGN_RELEASE_KEY);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(test_snapshot_layer_locked(&snapshot, TEST_NUM_LAYER));
-    CHECK(test_snapshot_layer_active(&snapshot, TEST_NUM_LAYER));
-    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == KC_NO);
+    CHECK(test_layer_locked(TEST_NUM_LAYER));
+    CHECK(test_layer_active(TEST_NUM_LAYER));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
 
     fake_time = (uint16_t)(fake_time + 40);
     test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(key_pos, TEST_FOREIGN_RELEASE_KEY);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(!test_snapshot_layer_locked(&snapshot, TEST_NUM_LAYER));
-    CHECK(!test_snapshot_layer_active(&snapshot, TEST_NUM_LAYER));
-    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == KC_NO);
+    CHECK(!test_layer_locked(TEST_NUM_LAYER));
+    CHECK(!test_layer_active(TEST_NUM_LAYER));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
 }
 
 static void test_double_tap_hold_with_prethreshold_scan_toggles_num_layer_only_once(void) {
-    keypos_t                      key_pos  = test_keypos(4, 2);
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keypos_t key_pos = test_keypos(4, 2);
 
     test_reset_state();
 
     test_run_thumb_like_double_tap_hold_cycle_with_intermediate_scan(key_pos, TEST_MULTI_TAP_KEY, 120, 240);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(test_snapshot_layer_locked(&snapshot, TEST_NUM_LAYER));
-    CHECK(test_snapshot_layer_active(&snapshot, TEST_NUM_LAYER));
+    CHECK(test_layer_locked(TEST_NUM_LAYER));
+    CHECK(test_layer_active(TEST_NUM_LAYER));
 
     fake_time = (uint16_t)(fake_time + 40);
     test_run_thumb_like_double_tap_hold_cycle_with_intermediate_scan(key_pos, TEST_MULTI_TAP_KEY, 120, 240);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(!test_snapshot_layer_locked(&snapshot, TEST_NUM_LAYER));
-    CHECK(!test_snapshot_layer_active(&snapshot, TEST_NUM_LAYER));
+    CHECK(!test_layer_locked(TEST_NUM_LAYER));
+    CHECK(!test_layer_active(TEST_NUM_LAYER));
 }
 
 int main(void) {

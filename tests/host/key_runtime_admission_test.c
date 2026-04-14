@@ -7,7 +7,7 @@
 #include "users/noah/lib/key/interaction/handled_key.h"
 #include "users/noah/lib/key/runtime/key_runtime_admission.h"
 #include "users/noah/lib/key/runtime/key_runtime_index.h"
-#include "host_runtime_fixture.h"
+#include "host_runtime_reset_fixture.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x60,

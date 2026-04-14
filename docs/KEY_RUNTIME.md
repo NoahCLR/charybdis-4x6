@@ -336,7 +336,7 @@ deserve updates to this doc and to the active review log in `review/`.
 
 ## Debugging And Tests
 
-For higher-level debugging, use
+For higher-level debugging, use the live query helpers in
 [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h) for
 key-runtime state inspection and
 [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h) for
@@ -364,6 +364,9 @@ and
 now records the shared [`key_runtime_effect_t`](../users/noah/lib/key/runtime/effects/key_runtime_effect.h)
 payloads directly and resets runtime state through
 [`noah_runtime_reset_for_test()`](../users/noah/lib/state/runtime/runtime_reset.h).
+Scenario and integration helpers that need slot state should call the live
+`runtime_debug.h` query helpers directly instead of rebuilding aggregate
+snapshots inside test harness code.
 Keep new scripted scenarios on that shared surface instead of adding a
 test-only effect or reset dialect.
 

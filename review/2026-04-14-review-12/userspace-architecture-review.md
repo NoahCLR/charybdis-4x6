@@ -2,145 +2,141 @@
 
 Date: 2026-04-14
 
-Status: follow-up audit of the runtime-sealing remediation that landed in
-review-11.
+Status: follow-up audit plus remediation of the `review-12` should-fix items.
 
 Scope:
 
-- public runtime reset/debug seams after strict sealing
-- host-test seam quality after the remediation pass
-- review/doc integrity after the remediation notes were updated
+- public runtime debug surface after the sealing/remediation passes
+- host-test fixture boundaries after the hard-cut cleanup
+- review/doc integrity after the cleanup landed
 
 ## Findings
 
-### No must-fix correctness regressions found in the reviewed areas
+### No must-fix correctness regressions found in the current tree
 
-The runtime-sealing remediation materially improved the code. I did not find a
-concrete firmware behavior regression in the reviewed runtime, pd, or host-test
-paths.
+The runtime-sealing and follow-up cleanup work now land cleanly. I did not find
+a concrete firmware behavior regression in the reviewed runtime, pd, or host
+test seams.
 
-### Should-fix: `runtime_debug.h` still exports a storage-shaped, matrix-sized contract
-
-References:
-
-- `users/noah/lib/state/runtime/runtime_debug.h:14-37`
-- `users/noah/lib/state/runtime/runtime_debug.c:64-88`
-- `tests/host/key_runtime_scenario_harness.c:232-253`
-
-Why this still matters:
-
-- The public snapshot is narrower than the old aggregate dump, but it still
-  mirrors runtime storage shape closely: a full `slots_by_position[]` table plus
-  ordering arrays sized by `MATRIX_ROWS * MATRIX_COLS`.
-- `noah_runtime_debug_snapshot()` still copies every slot in the matrix on every
-  call, even when callers only need one slot or one boolean.
-- The scenario harness now has to materialize a full snapshot repeatedly just to
-  answer single-slot questions such as owner keycode or hold completion.
-
-Why this is a design-quality gap rather than just an implementation detail:
-
-- The refactor goal was a semantic key-runtime observation seam. This API is
-  better than the previous whole-runtime aggregate, but it is still partly a
-  public mirror of runtime storage layout.
-- Matrix size is now part of the public debug contract, which makes the API
-  heavier than the actual observations most callers need.
-
-Recommended direction:
-
-- Keep the current helpers, but continue shrinking the public snapshot toward
-  small semantic queries or narrower iterator-style reads.
-- If the full snapshot remains useful for one integration test, keep that
-  heavier shape local to the test harness instead of making it the primary
-  public observation type.
-
-### Should-fix: `host_runtime_fixture.h` is still a catch-all integration fixture
+### Resolved: `runtime_debug.h` is now a live semantic query surface
 
 References:
 
-- `tests/host/include/host_runtime_fixture.h:11-14`
-- `tests/host/include/host_runtime_fixture.h:44-49`
-- `tests/host/include/host_runtime_fixture.h:52-125`
+- `users/noah/lib/state/runtime/runtime_debug.h:1`
+- `users/noah/lib/state/runtime/runtime_debug.c:1`
+- `tests/host/key_runtime_scenario_harness.c:228`
 
-Why this still matters:
+What changed:
 
-- The new fixture does fix the reset contract, but it also centralizes runtime
-  reset, runtime-debug capture, split-sync packet helpers, and pd snapshot
-  synthesis in one default header.
-- That makes lightweight host suites depend on more runtime/public APIs than
-  they necessarily need.
-- It also makes the intended boundary less obvious: the fixture looks like one
-  blessed way to reach several unrelated subsystems at once.
+- the public snapshot struct and `noah_runtime_debug_snapshot(...)` entry point
+  are gone
+- `runtime_debug.h` now exposes only live key-runtime queries for slot state,
+  active-slot ordering, pending multi-tap ordering, and preview/fallback owner
+  lookup
+- the runtime-debug implementation now answers directly from key-runtime slot
+  and index helpers instead of copying the whole matrix into a transient public
+  aggregate
 
-Why this is a maintainability problem:
+Why this is materially better:
 
-- The runtime storage leak is closed, but test coupling is still concentrated in
-  a single broad helper surface.
-- Future tests can easily pick up snapshot or pd helpers “because they are
-  there,” which recreates some of the same cross-subsystem coupling on the test
-  side.
+- matrix-sized storage layout is no longer part of the public debug contract
+- higher-level tests can read the semantics they need without carrying a
+  heavyweight snapshot object through helper layers
+- the scenario/integration harnesses no longer allocate internal debug snapshots
+  just to answer single-slot questions
 
-Recommended direction:
+Residual note:
 
-- Split the fixture into smaller seams, at least `host_runtime_reset_fixture.h`
-  and a separate pd/split helper header, or keep this header but stop treating
-  it as the default include for unrelated suites.
+- if a future integration test genuinely needs a bulk runtime dump, keep that
+  heavier shape local to the harness instead of reintroducing it as the primary
+  public runtime-debug API
 
-### Optional cleanup: review-11 progress still records stale next steps
+### Resolved: the catch-all host runtime fixture has been split
 
 References:
 
-- `review/2026-04-14-review-11/progress.md:63-66`
-- `review/2026-04-14-review-11/userspace-architecture-review.md:117-143`
+- `tests/host/include/host_runtime_reset_fixture.h:1`
+- `tests/host/include/host_pd_fixture.h:1`
+- `tests/host/run_feature_gate_compile_tests.sh:30`
 
-Why this is worth cleaning up:
+What changed:
 
-- The review-11 architecture note says the remediation pass is resolved, but the
-  paired progress log still ends with “run the full host suite” and “run the
-  firmware compile after the full host suite is green.”
-- That leaves the active review history internally inconsistent about whether
-  the remediation was fully verified.
+- the old `host_runtime_fixture.h` umbrella header is removed
+- common reset/time/mod/layer stubs now live in
+  `host_runtime_reset_fixture.h`
+- pd-mode display/snapshot and split-remote helpers now live in
+  `host_pd_fixture.h`
+- the compile gate now fails on any include of the removed umbrella header
 
-Why this is lower severity:
+Why this is materially better:
 
-- It does not affect firmware behavior.
-- It is still a review-integrity problem, because this repo uses review folders
-  as the architecture record.
+- lightweight key-runtime suites no longer import pd/split helpers by default
+- pd/rgb suites can depend on their own helper header explicitly
+- the intended host-test boundaries are now enforced mechanically instead of by
+  convention
+
+### Resolved: review-11 no longer advertises stale verification steps
+
+References:
+
+- `review/2026-04-14-review-11/progress.md:63`
+- `review/2026-04-14-review-12/progress.md:1`
+
+What changed:
+
+- the old review-11 “next steps” now record the completed verification state
+  instead of claiming the remediation still needed full-suite/build checks
+- review-12 carries the actual follow-up cleanup history for the debug/test seam
+  hard cut
+
+Why this matters:
+
+- the review folders remain the architecture record for this repo
+- stale “next steps” create confusion about what was truly landed and verified
 
 ## Solid Areas
 
-- The strict runtime reset seam looks sound now. `noah_runtime_reset_for_test()`
-  is public through `runtime_reset.h`, and the production runtime no longer
-  carries weak host-only fallbacks.
-- Pd-mode raw storage sealing looks real. The public `pd_mode_runtime_shared_state.h`
-  leak is gone, and only pd/runtime owner code now includes
-  `pd_mode_runtime_shared_state_internal.h`.
-- The compile gate meaningfully enforces the new boundary. It blocks the removed
-  public runtime headers, internal runtime headers from host tests, and the
-  removed public pd runtime header.
-- The host tests now use module-owned debug seams for non-key-runtime state
-  instead of rebuilding the old aggregate runtime snapshot.
+- the strict runtime reset seam remains sound
+- pd raw storage sealing remains intact
+- the compile gate now enforces both runtime storage boundaries and the removed
+  umbrella fixture boundary
+- key-runtime integration tests now use live runtime-debug queries or
+  module-owned seams instead of a public aggregate snapshot
 
-## Conclusion
+## Remaining Architecture Debt
 
-The landed refactor is in a good state overall. The important runtime-sealing
-goals were achieved, and I did not find a new correctness regression in the
-reviewed areas.
-
-The main remaining quality gap is not a broken storage boundary anymore. It is
-that the new debug/test seams are still somewhat overbuilt: cleaner than before,
-but still wider and more layout-shaped than the review narrative suggests.
+- the main remaining structural debt is still hook/stage orchestration in
+  `key_runtime_process.c`, `runtime_init.c`, and `rgb_runtime.c`
+- authored keymap structure in `keymap.c` remains a secondary maintainability
+  issue, but it is lower priority than hook/stage registration
 
 ## Verification
 
-Commands run for this review:
+Commands run for this cleanup pass:
 
 - `git status --short`
-- `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_index_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
 
 Current conclusion:
 
-- no must-fix correctness issues found in the reviewed areas
-- runtime sealing remains landed
-- review-12 should focus any follow-up work on debug/test seam narrowing, not on
-  reopening the storage seal itself
+- the `review-12` should-fix items are resolved in the current tree
+- runtime sealing and observation/test seam cleanup should stop being treated as
+  active debt
+- the next architecture target is hook/stage orchestration

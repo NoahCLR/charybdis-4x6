@@ -6,7 +6,7 @@
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
-#include "host_runtime_fixture.h"
+#include "host_runtime_reset_fixture.h"
 
 static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
 HOST_RUNTIME_FIXTURE_DEFINE_RESET_QMK_STUBS(runtime_fixture)

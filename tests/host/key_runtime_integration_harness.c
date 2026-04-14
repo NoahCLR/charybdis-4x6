@@ -93,35 +93,3 @@ bool key_runtime_integration_process_handled_release(uint16_t keycode, keypos_t 
     keyrecord_t record = key_runtime_integration_record(key_pos, false);
     return key_runtime_process_handled_key_release(keycode, &record, resolution);
 }
-
-void key_runtime_integration_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
-    if (!out) {
-        return;
-    }
-
-    noah_runtime_debug_snapshot(out);
-}
-
-uint16_t key_runtime_integration_snapshot_slot_owner_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
-    return noah_runtime_debug_slot_owner_keycode(snapshot, key_pos);
-}
-
-uint16_t key_runtime_integration_snapshot_slot_held_action_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
-    return noah_runtime_debug_slot_held_action_keycode(snapshot, key_pos);
-}
-
-uint8_t key_runtime_integration_snapshot_slot_pending_multi_tap_count(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
-    return noah_runtime_debug_slot_pending_multi_tap_count(snapshot, key_pos);
-}
-
-bool key_runtime_integration_snapshot_slot_pending_multi_tap_holding(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
-    return noah_runtime_debug_slot_pending_multi_tap_holding(snapshot, key_pos);
-}
-
-bool key_runtime_integration_snapshot_slot_has_pending_multi_tap(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
-    return noah_runtime_debug_slot_has_pending_multi_tap(snapshot, key_pos);
-}
-
-bool key_runtime_integration_snapshot_slot_hold_is_complete(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
-    return noah_runtime_debug_slot_hold_is_complete(snapshot, key_pos);
-}

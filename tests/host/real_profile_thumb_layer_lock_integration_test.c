@@ -52,13 +52,11 @@ static uint16_t test_layer_mask(uint8_t layer) {
     return (uint16_t)((layer_state_t)1u << layer);
 }
 
-static bool test_snapshot_layer_active(const noah_runtime_debug_snapshot_t *snapshot, uint8_t layer) {
-    (void)snapshot;
+static bool test_layer_active(uint8_t layer) {
     return layer < LAYER_COUNT && (layer_state & ((layer_state_t)1u << layer)) != 0;
 }
 
-static bool test_snapshot_layer_locked(const noah_runtime_debug_snapshot_t *snapshot, uint8_t layer) {
-    (void)snapshot;
+static bool test_layer_locked(uint8_t layer) {
     return layer < LAYER_COUNT && layer_ownership_is_locked(layer);
 }
 
@@ -518,63 +516,54 @@ uint8_t key_feedback_preview_layer(void) {
 void split_runtime_sync(void) {}
 
 static void test_left_thumb_double_tap_hold_toggles_num_layer(void) {
-    keypos_t                      key_pos      = test_left_thumb_pos();
-    uint16_t                      base_keycode = test_keycode_at(LAYER_BASE, key_pos);
-    noah_runtime_debug_snapshot_t snapshot     = {0};
+    keypos_t key_pos      = test_left_thumb_pos();
+    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();
 
     CHECK(test_resolve_keycode(key_pos) == base_keycode);
     test_run_double_tap_hold_cycle(key_pos, 401);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(test_snapshot_layer_locked(&snapshot, LAYER_NUM));
-    CHECK(test_snapshot_layer_active(&snapshot, LAYER_NUM));
+    CHECK(test_layer_locked(LAYER_NUM));
+    CHECK(test_layer_active(LAYER_NUM));
     CHECK(test_resolve_keycode(key_pos) == base_keycode);
 
     key_runtime_integration_advance(&fake_time, 40);
     test_run_double_tap_hold_cycle(key_pos, 401);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(!test_snapshot_layer_locked(&snapshot, LAYER_NUM));
-    CHECK(!test_snapshot_layer_active(&snapshot, LAYER_NUM));
+    CHECK(!test_layer_locked(LAYER_NUM));
+    CHECK(!test_layer_active(LAYER_NUM));
 }
 
 static void test_right_thumb_double_tap_hold_toggles_num_layer(void) {
-    keypos_t                      key_pos      = test_right_thumb_pos();
-    uint16_t                      base_keycode = test_keycode_at(LAYER_BASE, key_pos);
-    noah_runtime_debug_snapshot_t snapshot     = {0};
+    keypos_t key_pos      = test_right_thumb_pos();
+    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();
 
     CHECK(test_resolve_keycode(key_pos) == base_keycode);
     test_run_double_tap_hold_cycle(key_pos, 401);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(test_snapshot_layer_locked(&snapshot, LAYER_NUM));
-    CHECK(test_snapshot_layer_active(&snapshot, LAYER_NUM));
+    CHECK(test_layer_locked(LAYER_NUM));
+    CHECK(test_layer_active(LAYER_NUM));
     CHECK(test_resolve_keycode(key_pos) == base_keycode);
 
     key_runtime_integration_advance(&fake_time, 40);
     test_run_double_tap_hold_cycle(key_pos, 401);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(!test_snapshot_layer_locked(&snapshot, LAYER_NUM));
-    CHECK(!test_snapshot_layer_active(&snapshot, LAYER_NUM));
+    CHECK(!test_layer_locked(LAYER_NUM));
+    CHECK(!test_layer_active(LAYER_NUM));
 }
 
 static void test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle(void) {
-    keypos_t                      key_pos  = test_right_thumb_pos();
-    noah_runtime_debug_snapshot_t snapshot = {0};
+    keypos_t key_pos = test_right_thumb_pos();
 
     test_reset_state();
 
     test_run_double_tap_hold_cycle_with_intermediate_scan(key_pos, 120, 281);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(test_snapshot_layer_locked(&snapshot, LAYER_NUM));
-    CHECK(test_snapshot_layer_active(&snapshot, LAYER_NUM));
+    CHECK(test_layer_locked(LAYER_NUM));
+    CHECK(test_layer_active(LAYER_NUM));
 
     key_runtime_integration_advance(&fake_time, 40);
     test_run_double_tap_hold_cycle_with_intermediate_scan(key_pos, 120, 281);
-    key_runtime_integration_debug_snapshot(&snapshot);
-    CHECK(!test_snapshot_layer_locked(&snapshot, LAYER_NUM));
-    CHECK(!test_snapshot_layer_active(&snapshot, LAYER_NUM));
+    CHECK(!test_layer_locked(LAYER_NUM));
+    CHECK(!test_layer_active(LAYER_NUM));
 }
 
 int main(void) {

@@ -1,55 +1,82 @@
 # Implementation Progress
 
-This file tracks the follow-up audit recorded in
+This file tracks the review-12 audit and cleanup work recorded in
 [userspace-architecture-review.md](./userspace-architecture-review.md).
 
 ## 2026-04-14
 
-### Refactor quality review
+### Refactor quality audit
 
 Completed in this pass:
 
 - started with `git status --short`
 - read the newest prior review folder in `review/2026-04-14-review-11/`
-- re-audited the narrowed runtime debug surface in
-  `users/noah/lib/state/runtime/runtime_debug.h` and
-  `users/noah/lib/state/runtime/runtime_debug.c`
-- checked the strict reset seam in
-  `users/noah/lib/state/runtime/runtime_reset.h` and
-  `users/noah/lib/state/runtime/runtime_shared_state.c`
-- checked the internal pd storage seam in
-  `users/noah/lib/pointing/runtime/pd_mode_runtime_shared_state_internal.h`
-- checked the common host fixture and compile gate in
-  `tests/host/include/host_runtime_fixture.h` and
-  `tests/host/run_feature_gate_compile_tests.sh`
-- wrote a new review-12 audit focused on correctness risk, abstraction quality,
-  API cleanliness, test quality, and review integrity
+- re-audited the runtime debug surface, host fixture shape, compile gate, and
+  review/doc integrity
+- recorded the follow-up findings in `review-12`
 
-Findings recorded in the audit:
-
-- no must-fix correctness regressions found in the reviewed runtime-sealing work
-- `runtime_debug.h` is improved but still exports a matrix-sized,
-  storage-shaped public snapshot contract
-- `host_runtime_fixture.h` is still broader than necessary and keeps unrelated
-  test seams bundled together
-- review-11 progress still has stale “next steps” after the remediation was
-  already completed
-
-Verification run in this pass:
+Verification run in this audit pass:
 
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_runtime_debug_tests.sh`
 
-Results so far:
+Results:
 
 - both targeted checks above passed
+
+### Live runtime-debug and host-fixture cleanup
+
+Completed in this pass:
+
+- removed the public `noah_runtime_debug_snapshot_t` contract and
+  `noah_runtime_debug_snapshot(...)`
+- changed `users/noah/lib/state/runtime/runtime_debug.h` into a live semantic
+  query surface with direct key-runtime readers only
+- rewrote `users/noah/lib/state/runtime/runtime_debug.c` to answer directly from
+  key-runtime slot/index helpers instead of copying a matrix-sized aggregate
+- removed snapshot-shaped runtime-debug wrappers from the key-runtime
+  integration and scenario harnesses
+- migrated runtime-debug and integration tests onto the live query helpers
+- split `tests/host/include/host_runtime_fixture.h` into:
+  - `tests/host/include/host_runtime_reset_fixture.h`
+  - `tests/host/include/host_pd_fixture.h`
+- deleted the old umbrella fixture header
+- migrated host tests onto the narrower reset vs pd helper headers
+- tightened `tests/host/run_feature_gate_compile_tests.sh` to fail on includes
+  of the removed `host_runtime_fixture.h`
+- updated `docs/KEY_RUNTIME.md`
+- corrected the stale next-step note in
+  `review/2026-04-14-review-11/progress.md`
+- updated the active review-12 notes to reflect the landed cleanup
+
+Verification run in this cleanup pass:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_index_tests.sh`
+- `sh tests/host/run_key_runtime_slot_tests.sh`
+- `sh tests/host/run_key_runtime_preflight_tests.sh`
+- `sh tests/host/run_key_runtime_transition_tests.sh`
+- `sh tests/host/run_key_runtime_feedback_tests.sh`
+- `sh tests/host/run_key_runtime_admission_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+
+Results so far:
+
+- all targeted host checks above passed
 - no sibling workspace folders were edited
 
 Next steps:
 
-- decide whether to narrow the public runtime debug surface further or accept
-  the current snapshot shape as the stable test API
-- if that surface stays public, split the common host fixture so unrelated tests
-  stop importing pd/debug helpers by default
-- clean up the stale review-11 progress “next steps” so the review history stays
-  internally consistent
+- run the full host suite
+- run the firmware compile after the full host suite is green
+- treat hook/stage orchestration as the next architecture target

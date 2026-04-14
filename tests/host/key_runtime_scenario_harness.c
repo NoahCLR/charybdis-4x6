@@ -225,32 +225,20 @@ bool key_runtime_scenario_layer_locked(uint8_t layer) {
     return layer < LAYER_COUNT && (key_runtime_scenario_locked_layers & ((layer_state_t)1u << layer)) != 0;
 }
 
-void key_runtime_scenario_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
-    noah_runtime_debug_snapshot(out);
-}
-
 uint16_t key_runtime_scenario_slot_owner_keycode(keypos_t key_pos) {
-    noah_runtime_debug_snapshot_t snapshot;
-    noah_runtime_debug_snapshot(&snapshot);
-    return noah_runtime_debug_slot_owner_keycode(&snapshot, key_pos);
+    return noah_runtime_debug_slot_owner_keycode(key_pos);
 }
 
 uint16_t key_runtime_scenario_slot_held_action_keycode(keypos_t key_pos) {
-    noah_runtime_debug_snapshot_t snapshot;
-    noah_runtime_debug_snapshot(&snapshot);
-    return noah_runtime_debug_slot_held_action_keycode(&snapshot, key_pos);
+    return noah_runtime_debug_slot_held_action_keycode(key_pos);
 }
 
 bool key_runtime_scenario_slot_has_pending_multi_tap(keypos_t key_pos) {
-    noah_runtime_debug_snapshot_t snapshot;
-    noah_runtime_debug_snapshot(&snapshot);
-    return noah_runtime_debug_slot_has_pending_multi_tap(&snapshot, key_pos);
+    return noah_runtime_debug_slot_has_pending_multi_tap(key_pos);
 }
 
 bool key_runtime_scenario_slot_hold_is_complete(keypos_t key_pos) {
-    noah_runtime_debug_snapshot_t snapshot;
-    noah_runtime_debug_snapshot(&snapshot);
-    return noah_runtime_debug_slot_hold_is_complete(&snapshot, key_pos);
+    return noah_runtime_debug_slot_hold_is_complete(key_pos);
 }
 
 uint8_t key_runtime_scenario_effect_count(void) {

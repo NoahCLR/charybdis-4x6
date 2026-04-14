@@ -60,9 +60,10 @@ Results so far:
 - all targeted host checks above passed
 - no sibling workspace folders were edited
 
-Next steps:
+Status after this pass:
 
-- run the full host suite
-- run the firmware compile after the full host suite is green
-- treat hook/stage orchestration as the next architecture target instead of
+- the remediation pass completed its full host-suite and firmware-build
+  verification after the targeted checks above
+- hook/stage orchestration remained the next architecture target instead of
   reopening runtime sealing
+- later debug/test seam cleanup moved into `review/2026-04-14-review-12/`

@@ -11,7 +11,7 @@
 #include "users/noah/lib/key/runtime/key_runtime_state.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"
 #include "host_handled_key_fixture.h"
-#include "host_runtime_fixture.h"
+#include "host_runtime_reset_fixture.h"
 
 enum {
     TEST_PLAIN_KEY           = 0x0004,

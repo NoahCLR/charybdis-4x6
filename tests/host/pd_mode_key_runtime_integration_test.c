@@ -368,7 +368,6 @@ void reset_arrow_mode(void) {}
 
 static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
     keypos_t                             key_pos       = test_keypos(1, 2);
-    noah_runtime_debug_snapshot_t        snapshot      = {0};
     const key_runtime_integration_step_t press_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
     };
@@ -384,28 +383,25 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
     CHECK(pd_mode_local_active_snapshot() == 0);
 
     key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
-    key_runtime_integration_debug_snapshot(&snapshot);
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);
-    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == VOLUME_MODE);
-    CHECK(key_runtime_integration_snapshot_slot_held_action_keycode(&snapshot, key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
     CHECK(split_sync_count >= 1);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
-    key_runtime_integration_debug_snapshot(&snapshot);
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(!pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);
-    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == KC_NO);
-    CHECK(key_runtime_integration_snapshot_slot_held_action_keycode(&snapshot, key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
     CHECK(reset_volume_count == 1);
     CHECK(current_cpi == default_dpi);
 }
 
 static void test_authored_hold_action_activates_pd_mode_while_held(void) {
     keypos_t                             key_pos    = test_keypos(1, 3);
-    noah_runtime_debug_snapshot_t        snapshot   = {0};
     const key_runtime_integration_step_t scenario[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(TEST_PD_HOLD_KEY, 1, 3),
         KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
@@ -419,25 +415,22 @@ static void test_authored_hold_action_activates_pd_mode_while_held(void) {
     CHECK(pd_mode_local_active_snapshot() == 0);
 
     key_runtime_integration_run(&fake_time, scenario, 3);
-    key_runtime_integration_debug_snapshot(&snapshot);
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);
-    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == TEST_PD_HOLD_KEY);
-    CHECK(key_runtime_integration_snapshot_slot_held_action_keycode(&snapshot, key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == TEST_PD_HOLD_KEY);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
 
     key_runtime_integration_run(&fake_time, &scenario[3], 1);
-    key_runtime_integration_debug_snapshot(&snapshot);
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(pd_mode_local_locked_snapshot() == 0);
-    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == KC_NO);
-    CHECK(key_runtime_integration_snapshot_slot_held_action_keycode(&snapshot, key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
     CHECK(reset_volume_count == 1);
     CHECK(current_cpi == default_dpi);
 }
 
 static void test_authored_double_tap_lock_locks_pd_mode(void) {
-    noah_runtime_debug_snapshot_t        snapshot   = {0};
     const key_runtime_integration_step_t scenario[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
     };
@@ -445,18 +438,16 @@ static void test_authored_double_tap_lock_locks_pd_mode(void) {
     test_reset_state();
 
     key_runtime_integration_run(&fake_time, scenario, ARRAY_SIZE(scenario));
-    key_runtime_integration_debug_snapshot(&snapshot);
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked(PD_MODE_VOLUME));
-    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, test_keypos(1, 2)) == KC_NO);
+    CHECK(noah_runtime_debug_slot_owner_keycode(test_keypos(1, 2)) == KC_NO);
     CHECK(reset_volume_count == 1);
 }
 
 static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
     keypos_t                             key_pos    = test_keypos(1, 2);
-    noah_runtime_debug_snapshot_t        snapshot   = {0};
     const key_runtime_integration_step_t scenario[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
     };
@@ -464,21 +455,19 @@ static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
     test_reset_state();
 
     key_runtime_integration_run(&fake_time, scenario, 6);
-    key_runtime_integration_debug_snapshot(&snapshot);
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_BRIGHTNESS);
     CHECK(pd_mode_local_active(PD_MODE_BRIGHTNESS));
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(!pd_mode_local_active(PD_MODE_VOLUME));
-    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == VOLUME_MODE);
-    CHECK(key_runtime_integration_snapshot_slot_held_action_keycode(&snapshot, key_pos) == BRIGHTNESS_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == BRIGHTNESS_MODE);
     CHECK(reset_volume_count == 1);
 
     key_runtime_integration_run(&fake_time, &scenario[6], 1);
-    key_runtime_integration_debug_snapshot(&snapshot);
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(pd_mode_local_locked_snapshot() == 0);
-    CHECK(key_runtime_integration_snapshot_slot_owner_keycode(&snapshot, key_pos) == KC_NO);
-    CHECK(key_runtime_integration_snapshot_slot_held_action_keycode(&snapshot, key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
     CHECK(current_cpi == default_dpi);
 }
 

@@ -12,7 +12,7 @@
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_trace.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
-#include "host_runtime_fixture.h"
+#include "host_runtime_reset_fixture.h"
 
 static uint32_t fake_time32;
 static bool     fake_is_master;

@@ -28,6 +28,12 @@ check_header_boundaries() {
 }
 
 check_runtime_sealing_boundaries() {
+    if rg -n '#include ".*host_runtime_fixture\.h"' "$ROOT/tests/host" >/dev/null; then
+        echo "host tests must not include removed umbrella runtime fixture header" >&2
+        rg -n '#include ".*host_runtime_fixture\.h"' "$ROOT/tests/host" >&2
+        exit 1
+    fi
+
     if rg -n '#include "((users/noah/lib/state/runtime/)?(.*/)?runtime_(context|shared_state)\.h)"' "$ROOT/users/noah" "$ROOT/tests/host" >/dev/null; then
         echo "repo-owned code must not include removed public runtime aggregate/context headers" >&2
         rg -n '#include "((users/noah/lib/state/runtime/)?(.*/)?runtime_(context|shared_state)\.h)"' "$ROOT/users/noah" "$ROOT/tests/host" >&2

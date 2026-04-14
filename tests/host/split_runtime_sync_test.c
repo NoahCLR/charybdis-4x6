@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "host_runtime_fixture.h"
+#include "host_runtime_reset_fixture.h"
 #include "transactions.h"
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"

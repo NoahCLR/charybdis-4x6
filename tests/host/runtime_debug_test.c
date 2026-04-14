@@ -411,7 +411,6 @@ static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
 }
 
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
-    noah_runtime_debug_snapshot_t             snapshot;
     pd_mode_snapshot_t                        pd_snapshot;
     layer_ownership_debug_snapshot_t          layer_snapshot;
     held_action_debug_snapshot_t              held_action_snapshot;
@@ -453,7 +452,6 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     fake_oneshot_mods        = MOD_BIT(KC_LEFT_GUI);
     fake_oneshot_locked_mods = MOD_BIT(KC_RIGHT_GUI);
 
-    noah_runtime_debug_snapshot(&snapshot);
     pd_snapshot = pd_mode_snapshot();
     layer_ownership_debug_snapshot(&layer_snapshot);
     held_action_debug_snapshot(&held_action_snapshot);
@@ -464,20 +462,20 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     held_action_binding = test_find_held_action_binding(&held_action_snapshot, action_key, TEST_ACTION);
     held_repeat_binding = test_find_held_repeat_binding(&held_repeat_snapshot, repeat_key, TEST_ACTION);
 
-    CHECK(noah_runtime_debug_feedback_active(&snapshot));
+    CHECK(noah_runtime_debug_feedback_active());
     CHECK(pd_snapshot.local.active_mode == PD_MODE_VOLUME);
     CHECK(pd_snapshot.local.locked_mode == 0);
     CHECK(pd_snapshot.display.active_mode == PD_MODE_VOLUME);
-    CHECK(noah_runtime_debug_slot_owner_keycode(&snapshot, active_key) == KC_C);
-    CHECK(noah_runtime_debug_slot_tap_action(&snapshot, active_key) == KC_C);
-    CHECK(noah_runtime_debug_active_slot_count(&snapshot) == 1);
-    CHECK(noah_runtime_debug_active_slot_key_pos(&snapshot, 0, &key_pos));
+    CHECK(noah_runtime_debug_slot_owner_keycode(active_key) == KC_C);
+    CHECK(noah_runtime_debug_slot_tap_action(active_key) == KC_C);
+    CHECK(noah_runtime_debug_active_slot_count() == 1);
+    CHECK(noah_runtime_debug_active_slot_key_pos(0, &key_pos));
     CHECK(test_keypos_equal(key_pos, active_key));
-    CHECK(noah_runtime_debug_pending_multi_tap_slot_count(&snapshot) == 1);
-    CHECK(noah_runtime_debug_pending_multi_tap_slot_key_pos(&snapshot, 0, &key_pos));
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_key_pos(0, &key_pos));
     CHECK(test_keypos_equal(key_pos, pending_key));
-    CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&snapshot, &key_pos));
-    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&snapshot, &key_pos));
+    CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&key_pos));
+    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&key_pos));
 
     CHECK(layer_snapshot.applied_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
     CHECK(layer_snapshot.locked_mask == ((layer_state_t)1u << 3));
@@ -507,7 +505,6 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
 }
 
 static void test_reset_clears_all_runtime_surfaces(void) {
-    noah_runtime_debug_snapshot_t           snapshot;
     pd_mode_snapshot_t                      pd_snapshot;
     layer_ownership_debug_snapshot_t        layer_snapshot;
     held_action_debug_snapshot_t            held_action_snapshot;
@@ -535,7 +532,6 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     fake_oneshot_locked_mods = MOD_BIT(KC_RIGHT_GUI);
 
     noah_runtime_reset_for_test();
-    noah_runtime_debug_snapshot(&snapshot);
     pd_snapshot = pd_mode_snapshot();
     layer_ownership_debug_snapshot(&layer_snapshot);
     held_action_debug_snapshot(&held_action_snapshot);
@@ -543,17 +539,17 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     keyboard_mod_ownership_debug_snapshot(&keyboard_mod_snapshot);
     noah_runtime_trace_snapshot(&trace_snapshot);
 
-    CHECK(!noah_runtime_debug_feedback_active(&snapshot));
+    CHECK(!noah_runtime_debug_feedback_active());
     CHECK(pd_snapshot.local.active_mode == 0);
     CHECK(pd_snapshot.local.locked_mode == 0);
     CHECK(pd_snapshot.display.active_mode == 0);
     CHECK(pd_snapshot.display.locked_mode == 0);
-    CHECK(noah_runtime_debug_slot_owner_keycode(&snapshot, active_key) == KC_NO);
-    CHECK(noah_runtime_debug_slot_tap_action(&snapshot, active_key) == KC_NO);
-    CHECK(noah_runtime_debug_active_slot_count(&snapshot) == 0);
-    CHECK(noah_runtime_debug_pending_multi_tap_slot_count(&snapshot) == 0);
-    CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&snapshot, &active_key));
-    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&snapshot, &active_key));
+    CHECK(noah_runtime_debug_slot_owner_keycode(active_key) == KC_NO);
+    CHECK(noah_runtime_debug_slot_tap_action(active_key) == KC_NO);
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&active_key));
+    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&active_key));
 
     CHECK(layer_snapshot.applied_layer_state == 0);
     CHECK(layer_snapshot.locked_mask == 0);

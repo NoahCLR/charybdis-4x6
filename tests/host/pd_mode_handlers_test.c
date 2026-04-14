@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "host_runtime_fixture.h"
+#include "host_runtime_reset_fixture.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/pointing/modes/pd_mode_handlers.h"
 #include "users/noah/lib/state/runtime/keyboard_mod_state.h"
