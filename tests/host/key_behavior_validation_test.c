@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/interaction/key_behavior_lookup.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
@@ -83,9 +84,10 @@ void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
     (void)keycode;
 }
 
-void noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
+bool noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
     (void)keycode;
     (void)pressed;
+    return false;
 }
 
 void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t tap_count) {

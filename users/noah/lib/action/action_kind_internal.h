@@ -16,6 +16,7 @@ typedef enum {
 } noah_action_dispatch_flag_t;
 
 typedef struct {
+    bool                        defined;
     uint16_t                    caps;
     bool                        keeps_registered_feedback;
     bool                        preview_layer_uses_desc_layer;
@@ -23,6 +24,7 @@ typedef struct {
 } noah_action_kind_def_t;
 
 const noah_action_kind_def_t *noah_action_kind_def(noah_action_kind_t kind);
+bool                         noah_action_kind_metadata_defined(noah_action_kind_t kind);
 bool noah_action_desc_dispatches_macro_preflight(noah_action_desc_t desc);
 bool noah_action_desc_intercepts_pd_mode_press(noah_action_desc_t desc);
 bool noah_action_desc_intercepts_pd_mode_release(noah_action_desc_t desc);

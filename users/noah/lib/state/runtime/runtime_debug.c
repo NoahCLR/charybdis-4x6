@@ -4,11 +4,21 @@
 
 #include "runtime_debug.h"
 
+#include "../../key/runtime/key_runtime_state.h"
+
 static keypos_t noah_runtime_debug_slot_index_key_pos(uint8_t slot_index) {
     return (keypos_t){
         .row = (uint8_t)(slot_index / MATRIX_COLS),
         .col = (uint8_t)(slot_index % MATRIX_COLS),
     };
+}
+
+static bool noah_runtime_debug_key_pos_valid(keypos_t key_pos) {
+    return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
+}
+
+static uint16_t noah_runtime_debug_slot_table_index(keypos_t key_pos) {
+    return (uint16_t)((uint16_t)key_pos.row * (uint16_t)MATRIX_COLS + (uint16_t)key_pos.col);
 }
 
 void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
@@ -22,6 +32,45 @@ void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
     held_repeat_debug_snapshot(&out->held_repeats);
     keyboard_mod_ownership_debug_snapshot(&out->keyboard_mod_ownership);
     noah_runtime_trace_snapshot(&out->trace);
+}
+
+bool noah_runtime_debug_slot_copy(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos, active_key_state_t *out) {
+    if (!(snapshot && out) || !noah_runtime_debug_key_pos_valid(key_pos)) {
+        return false;
+    }
+
+    *out = snapshot->core.key.slots_by_position[noah_runtime_debug_slot_table_index(key_pos)];
+    return true;
+}
+
+uint16_t noah_runtime_debug_slot_owner_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+    return noah_runtime_debug_slot_copy(snapshot, key_pos, &slot) ? slot.owner.keycode : KC_NO;
+}
+
+uint16_t noah_runtime_debug_slot_held_action_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+    return noah_runtime_debug_slot_copy(snapshot, key_pos, &slot) ? slot.lifecycle.held_action_keycode : KC_NO;
+}
+
+uint8_t noah_runtime_debug_slot_pending_multi_tap_count(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+    return noah_runtime_debug_slot_copy(snapshot, key_pos, &slot) ? slot.pending_multi_tap.count : 0;
+}
+
+bool noah_runtime_debug_slot_pending_multi_tap_holding(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+    return noah_runtime_debug_slot_copy(snapshot, key_pos, &slot) && key_runtime_slot_pending_multi_tap_pending_hold(&slot);
+}
+
+bool noah_runtime_debug_slot_has_pending_multi_tap(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+    return noah_runtime_debug_slot_copy(snapshot, key_pos, &slot) && key_runtime_slot_has_pending_multi_tap(&slot);
+}
+
+bool noah_runtime_debug_slot_hold_is_complete(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos) {
+    active_key_state_t slot = ACTIVE_KEY_STATE_INIT;
+    return noah_runtime_debug_slot_copy(snapshot, key_pos, &slot) && key_runtime_slot_hold_is_complete(&slot);
 }
 
 uint8_t noah_runtime_debug_active_slot_count(const noah_runtime_debug_snapshot_t *snapshot) {

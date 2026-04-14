@@ -79,14 +79,6 @@ static keyrecord_t key_runtime_scenario_record(keypos_t key_pos, bool pressed) {
     };
 }
 
-static bool key_runtime_scenario_slot_position_is_valid(keypos_t key_pos) {
-    return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
-}
-
-static uint16_t key_runtime_scenario_slot_table_index(keypos_t key_pos) {
-    return (uint16_t)((uint16_t)key_pos.row * (uint16_t)MATRIX_COLS + (uint16_t)key_pos.col);
-}
-
 static key_behavior_view_t key_runtime_scenario_default_behavior(uint16_t keycode) {
     return (key_behavior_view_t){
         .keycode            = keycode,
@@ -239,13 +231,12 @@ void key_runtime_scenario_debug_snapshot(noah_runtime_debug_snapshot_t *out) {
 static bool key_runtime_scenario_snapshot_slot_copy(keypos_t key_pos, active_key_state_t *out) {
     noah_runtime_debug_snapshot_t snapshot;
 
-    if (!out || !key_runtime_scenario_slot_position_is_valid(key_pos)) {
+    if (!out) {
         return false;
     }
 
     noah_runtime_debug_snapshot(&snapshot);
-    *out = snapshot.core.key.slots_by_position[key_runtime_scenario_slot_table_index(key_pos)];
-    return true;
+    return noah_runtime_debug_slot_copy(&snapshot, key_pos, out);
 }
 
 uint16_t key_runtime_scenario_slot_owner_keycode(keypos_t key_pos) {

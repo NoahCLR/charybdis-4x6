@@ -22,7 +22,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/pd_mode_key_runtime_integration_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
-    "$ROOT/tests/host/action_kind_host_stubs.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/action/action_kind_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
@@ -59,6 +58,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
+    "$ROOT/users/noah/lib/state/runtime/runtime_debug.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
     -o "$BIN"
 

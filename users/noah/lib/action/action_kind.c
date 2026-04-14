@@ -16,6 +16,7 @@
 static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT] = {
     [NOAH_ACTION_KIND_LITERAL] =
         {
+            .defined = true,
             .caps =
                 NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED |
                 NOAH_ACTION_CAP_AUTHORED_TAP_SUPPORTED |
@@ -26,6 +27,7 @@ static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT
         },
     [NOAH_ACTION_KIND_LAYER_LOCK] =
         {
+            .defined = true,
             .caps =
                 NOAH_ACTION_CAP_PRESS_ONLY |
                 NOAH_ACTION_CAP_LAYER_AFFECTING |
@@ -37,6 +39,7 @@ static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT
         },
     [NOAH_ACTION_KIND_LAYER_HOLD] =
         {
+            .defined = true,
             .caps =
                 NOAH_ACTION_CAP_REQUIRES_KEY_OWNER |
                 NOAH_ACTION_CAP_LAYER_AFFECTING |
@@ -47,6 +50,7 @@ static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT
         },
     [NOAH_ACTION_KIND_LAYER_TAP] =
         {
+            .defined = true,
             .caps =
                 NOAH_ACTION_CAP_LAYER_AFFECTING |
                 NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED,
@@ -54,11 +58,13 @@ static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT
         },
     [NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION] =
         {
+            .defined = true,
             .caps           = NOAH_ACTION_CAP_LAYER_AFFECTING,
             .dispatch_flags = NOAH_ACTION_DISPATCH_STANDARD,
         },
     [NOAH_ACTION_KIND_MACRO] =
         {
+            .defined = true,
             .caps =
                 NOAH_ACTION_CAP_PRESS_ONLY |
                 NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED |
@@ -70,6 +76,7 @@ static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT
         },
     [NOAH_ACTION_KIND_QMK_BEHAVIOR] =
         {
+            .defined = true,
             .caps =
                 NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED |
                 NOAH_ACTION_CAP_AUTHORED_TAP_SUPPORTED |
@@ -80,6 +87,7 @@ static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT
         },
     [NOAH_ACTION_KIND_KEYMAP_CUSTOM] =
         {
+            .defined = true,
             .caps =
                 NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED |
                 NOAH_ACTION_CAP_AUTHORED_TAP_SUPPORTED |
@@ -90,6 +98,7 @@ static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT
         },
     [NOAH_ACTION_KIND_PD_MODE_HOLD] =
         {
+            .defined = true,
             .caps =
                 NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED |
                 NOAH_ACTION_CAP_PD_MODE_AFFECTING |
@@ -100,6 +109,7 @@ static const noah_action_kind_def_t noah_action_kind_defs[NOAH_ACTION_KIND_COUNT
         },
     [NOAH_ACTION_KIND_PD_MODE_LOCK] =
         {
+            .defined = true,
             .caps =
                 NOAH_ACTION_CAP_PRESS_ONLY |
                 NOAH_ACTION_CAP_PD_MODE_AFFECTING |
@@ -120,8 +130,12 @@ static bool noah_action_desc_has_dispatch_flag(noah_action_desc_t desc, noah_act
     return def && (def->dispatch_flags & (uint8_t)flag) != 0;
 }
 
+bool noah_action_kind_metadata_defined(noah_action_kind_t kind) {
+    return kind < NOAH_ACTION_KIND_COUNT && noah_action_kind_defs[kind].defined;
+}
+
 const noah_action_kind_def_t *noah_action_kind_def(noah_action_kind_t kind) {
-    if (kind >= NOAH_ACTION_KIND_COUNT) {
+    if (!noah_action_kind_metadata_defined(kind)) {
         kind = NOAH_ACTION_KIND_LITERAL;
     }
 

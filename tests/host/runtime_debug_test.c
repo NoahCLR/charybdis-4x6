@@ -363,6 +363,7 @@ static void test_stage_active_slot(uint16_t keycode, keypos_t key_pos) {
 
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_debug_snapshot_t snapshot;
+    active_key_state_t            active_slot;
     keypos_t                      key_pos;
     keypos_t                      active_key = test_keypos(0, 0);
     keypos_t                      pending_key = test_keypos(0, 1);
@@ -400,8 +401,9 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(snapshot.core.key.feedback.active);
     CHECK(snapshot.core.pd.local_active_mode == PD_MODE_VOLUME);
     CHECK(snapshot.core.pd.remote_display_active_mode == PD_MODE_ARROW);
-    CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_C);
-    CHECK(snapshot.core.key.slots_by_position[0].interaction.binding.tap_action == KC_C);
+    CHECK(noah_runtime_debug_slot_copy(&snapshot, active_key, &active_slot));
+    CHECK(active_slot.owner.keycode == KC_C);
+    CHECK(active_slot.interaction.binding.tap_action == KC_C);
     CHECK(noah_runtime_debug_active_slot_count(&snapshot) == 1);
     CHECK(noah_runtime_debug_active_slot_key_pos(&snapshot, 0, &key_pos));
     CHECK(test_keypos_equal(key_pos, active_key));
@@ -448,6 +450,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
 
 static void test_reset_clears_all_runtime_surfaces(void) {
     noah_runtime_debug_snapshot_t snapshot;
+    active_key_state_t            active_slot;
     keypos_t                      active_key = test_keypos(0, 0);
 
     test_reset_stubs();
@@ -476,12 +479,13 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(snapshot.core.pd.local_locked_mode == 0);
     CHECK(snapshot.core.pd.remote_display_active_mode == 0);
     CHECK(snapshot.core.pd.remote_display_locked_mode == 0);
-    CHECK(snapshot.core.key.slots_by_position[0].owner.keycode == KC_NO);
-    CHECK(snapshot.core.key.slots_by_position[0].interaction.binding.tap_action == KC_NO);
-    CHECK(snapshot.core.key.index.active_slot_count == 0);
-    CHECK(snapshot.core.key.index.pending_multi_tap_count == 0);
-    CHECK(snapshot.core.key.index.preview_owner_slot == UINT8_MAX);
-    CHECK(snapshot.core.key.index.pending_fallback_slot == UINT8_MAX);
+    CHECK(noah_runtime_debug_slot_copy(&snapshot, active_key, &active_slot));
+    CHECK(active_slot.owner.keycode == KC_NO);
+    CHECK(active_slot.interaction.binding.tap_action == KC_NO);
+    CHECK(noah_runtime_debug_active_slot_count(&snapshot) == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count(&snapshot) == 0);
+    CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&snapshot, &active_key));
+    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&snapshot, &active_key));
 
     CHECK(snapshot.layer_ownership.applied_layer_state == 0);
     CHECK(snapshot.layer_ownership.locked_mask == 0);

@@ -33,7 +33,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/real_profile_thumb_layer_lock_integration_test.c" \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c" \
-    "$ROOT/tests/host/action_kind_host_stubs.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/action/action_kind_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
@@ -64,6 +63,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_transition.c" \
     "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \
+    "$ROOT/users/noah/lib/state/runtime/runtime_debug.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
     -o "$BIN"

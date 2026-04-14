@@ -5,6 +5,7 @@
 #include "action_kind_dispatch_internal.h"
 
 #include "noah_keymap_ids.h"
+#include "action_kind_internal.h"
 
 #ifdef CONSOLE_ENABLE
 #    include "print.h"
@@ -25,14 +26,6 @@ typedef struct {
     noah_action_release_impl_t release;
 } noah_action_kind_dispatch_ops_t;
 
-static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
-#ifdef CONSOLE_ENABLE
-    uprintf("Unsupported raw QMK layer action 0x%04X; use LOCK_LAYER(...) for persistent changes or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned momentary holds\n", (unsigned int)desc.action);
-#else
-    (void)desc;
-#endif
-}
-
 static void noah_action_tap_noop(noah_action_desc_t desc) {
     (void)desc;
 }
@@ -45,6 +38,20 @@ static void noah_action_press_noop(noah_action_desc_t desc, keypos_t key_pos) {
 static void noah_action_release_noop(noah_action_desc_t desc, keypos_t key_pos) {
     (void)desc;
     (void)key_pos;
+}
+
+static const noah_action_kind_dispatch_ops_t noah_action_kind_dispatch_noop_ops = {
+    .tap     = noah_action_tap_noop,
+    .press   = noah_action_press_noop,
+    .release = noah_action_release_noop,
+};
+
+static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
+#ifdef CONSOLE_ENABLE
+    uprintf("Unsupported raw QMK layer action 0x%04X; use LOCK_LAYER(...) for persistent changes or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned momentary holds\n", (unsigned int)desc.action);
+#else
+    (void)desc;
+#endif
 }
 
 static void noah_action_tap_literal(noah_action_desc_t desc) {
@@ -216,9 +223,36 @@ static const noah_action_kind_dispatch_ops_t noah_action_kind_dispatch_ops[NOAH_
         },
 };
 
+static bool noah_action_kind_dispatch_ops_complete(const noah_action_kind_dispatch_ops_t *ops) {
+    return ops && ops->tap && ops->press && ops->release;
+}
+
+bool noah_action_kind_dispatch_has_complete_ops(noah_action_kind_t kind) {
+    return kind < NOAH_ACTION_KIND_COUNT && noah_action_kind_dispatch_ops_complete(&noah_action_kind_dispatch_ops[kind]);
+}
+
+static void noah_action_log_missing_dispatch_ops(noah_action_kind_t kind) {
+#ifdef CONSOLE_ENABLE
+    uprintf("Missing action dispatch ops for kind %u\n", (unsigned int)kind);
+#else
+    (void)kind;
+#endif
+}
+
+static void noah_action_fail_host_missing_dispatch_ops(noah_action_kind_t kind) {
+#ifdef NOAH_HOST_TEST_ENV
+    fprintf(stderr, "host test failed: missing action dispatch ops for kind %u\n", (unsigned int)kind);
+    exit(1);
+#else
+    (void)kind;
+#endif
+}
+
 static const noah_action_kind_dispatch_ops_t *noah_action_desc_dispatch_ops(noah_action_desc_t desc) {
-    if (desc.kind >= NOAH_ACTION_KIND_COUNT) {
-        desc.kind = NOAH_ACTION_KIND_LITERAL;
+    if (!noah_action_kind_metadata_defined(desc.kind) || !noah_action_kind_dispatch_has_complete_ops(desc.kind)) {
+        noah_action_log_missing_dispatch_ops(desc.kind);
+        noah_action_fail_host_missing_dispatch_ops(desc.kind);
+        return &noah_action_kind_dispatch_noop_ops;
     }
 
     return &noah_action_kind_dispatch_ops[desc.kind];

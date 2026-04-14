@@ -4,7 +4,10 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/action_kind_dispatch_internal.h"
+#include "users/noah/lib/action/action_kind_internal.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap_ids.h"
 
@@ -175,9 +178,10 @@ void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
     synthetic_qmk_tap_call.keycode = keycode;
 }
 
-void noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
+bool noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
     synthetic_record_call.keycode = keycode;
     synthetic_record_call.pressed = pressed;
+    return false;
 }
 
 void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t tap_count) {
@@ -223,6 +227,13 @@ static void test_descriptor_classifies_dispatch_shapes(void) {
     CHECK(noah_action_desc_is_press_only(noah_action_describe(MACRO_0)));
     CHECK(noah_action_desc_requires_per_key_hold(noah_action_describe(MO(2))));
     CHECK(noah_action_desc_uses_shared_hold(noah_action_describe(KC_C)));
+}
+
+static void test_every_action_kind_has_metadata_and_dispatch_coverage(void) {
+    for (uint8_t kind = 0; kind < NOAH_ACTION_KIND_COUNT; kind++) {
+        CHECK(noah_action_kind_metadata_defined((noah_action_kind_t)kind));
+        CHECK(noah_action_kind_dispatch_has_complete_ops((noah_action_kind_t)kind));
+    }
 }
 
 static void test_tap_handles_layer_lock_and_pd_lock(void) {
@@ -438,6 +449,7 @@ static void test_release_ignores_raw_layer_actions(void) {
 
 int main(void) {
     test_descriptor_classifies_dispatch_shapes();
+    test_every_action_kind_has_metadata_and_dispatch_coverage();
     test_tap_handles_layer_lock_and_pd_lock();
     test_tap_routes_macro_custom_qmk_and_plain_actions();
     test_tap_ignores_raw_layer_actions();

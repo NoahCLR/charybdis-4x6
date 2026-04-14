@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/synthetic_record.h"
 
 typedef struct {
     uint16_t keycode;
@@ -177,9 +178,10 @@ void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
     synthetic_qmk_tap_call_count++;
 }
 
-void noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
+bool noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
     (void)keycode;
     (void)pressed;
+    return false;
 }
 
 void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t tap_count) {

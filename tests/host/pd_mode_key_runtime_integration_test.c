@@ -6,6 +6,7 @@
 #include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/interaction/key_behavior.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/key_runtime_process.h"
@@ -220,9 +221,10 @@ void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
     (void)keycode;
 }
 
-void noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
+bool noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
     (void)keycode;
     (void)pressed;
+    return false;
 }
 
 void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t tap_count) {

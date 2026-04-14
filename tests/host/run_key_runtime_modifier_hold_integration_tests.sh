@@ -47,6 +47,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/ownership/held_action.c" \
     "$ROOT/users/noah/lib/key/ownership/held_repeat.c" \
     "$ROOT/users/noah/lib/state/ownership/keyboard_mod_ownership.c" \
+    "$ROOT/users/noah/lib/state/runtime/runtime_debug.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
     -o "$BIN"
 

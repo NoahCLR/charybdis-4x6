@@ -155,7 +155,11 @@ Workspace scope:
 
 Next steps:
 
-- no immediate follow-up is required to close the review-06 should-fix items
-- if we want to tighten the runtime-debug/public-state boundary further later,
-  the next optional step would be to separate semantic debug snapshots from the
-  raw `runtime_shared_state_t` aggregate entirely
+- follow-up review work in `review/2026-04-14-review-07/` tightened the
+  remaining host/test seam drift after this pass
+- the next cleanup after review-06 was:
+  - making host suites compile against the real synthetic-record dispatch
+    signature
+  - moving the higher-level integration/scenario harnesses onto semantic
+    runtime-debug helpers backed by the real `runtime_debug.c` seam
+  - adding an explicit action-kind metadata/dispatch coverage guard

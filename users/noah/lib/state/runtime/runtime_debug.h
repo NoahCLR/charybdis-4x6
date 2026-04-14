@@ -30,6 +30,13 @@ typedef struct {
 
 void noah_runtime_debug_snapshot(noah_runtime_debug_snapshot_t *out);
 void noah_runtime_reset_for_test(void);
+bool     noah_runtime_debug_slot_copy(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos, active_key_state_t *out);
+uint16_t noah_runtime_debug_slot_owner_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
+uint16_t noah_runtime_debug_slot_held_action_keycode(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
+uint8_t  noah_runtime_debug_slot_pending_multi_tap_count(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
+bool     noah_runtime_debug_slot_pending_multi_tap_holding(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
+bool     noah_runtime_debug_slot_has_pending_multi_tap(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
+bool     noah_runtime_debug_slot_hold_is_complete(const noah_runtime_debug_snapshot_t *snapshot, keypos_t key_pos);
 uint8_t noah_runtime_debug_active_slot_count(const noah_runtime_debug_snapshot_t *snapshot);
 bool    noah_runtime_debug_active_slot_key_pos(const noah_runtime_debug_snapshot_t *snapshot, uint8_t order, keypos_t *out);
 uint8_t noah_runtime_debug_pending_multi_tap_slot_count(const noah_runtime_debug_snapshot_t *snapshot);
