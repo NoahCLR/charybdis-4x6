@@ -16,6 +16,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "keycodes.h"
+#include "lib/key/interaction/key_behavior.h"
 #include "noah_keymap.h"
 
 // ─── Keymap-Local Custom Keycodes ──────────────────────────────────────────
@@ -355,7 +356,7 @@ const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_SYM)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))},
-                        [1] = {.tap = TAP_SENDS(KC_MPLY), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
                     },
@@ -366,8 +367,8 @@ const key_behavior_t
                 .tap_hold_term = 100,
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV)), .hold = KC_ESCAPE, .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))},
-                        [1] = {.tap = TAP_SENDS(KC_MPLY), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
+                        [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV)), .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))},
+                        [1] = {.tap = TAP_SENDS(KC_MPLY), .hold = TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(KC_MNXT), .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)},
                         [3] = {.tap = TAP_SENDS(KC_MPRV), .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)},
                     },
