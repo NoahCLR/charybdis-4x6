@@ -15,9 +15,10 @@ This report is generated from the authored profile files [keymap.c](../../keyboa
 | `hardcoded_macro_count` | `16` |
 | `hardcoded_macro_non_empty_count` | `0` |
 | `keymap_custom_keycode_count` | `3` |
+| `pd_mode_count` | `6` |
 | `pd_mode_color_count` | `6` |
 
-### Keymap Config
+### Config Defines
 
 | Macro | Value |
 | --- | --- |
@@ -36,7 +37,9 @@ This report is generated from the authored profile files [keymap.c](../../keyboa
 | `CHARYBDIS_DEFAULT_DPI_CONFIG_STEP` | `200` |
 | `CHARYBDIS_MINIMUM_SNIPING_DPI` | `200` |
 | `CHARYBDIS_SNIPING_DPI_CONFIG_STEP` | `100` |
+| `CHARYBDIS_AUTO_SNIPING_ENABLE` | `defined` |
 | `CHARYBDIS_AUTO_SNIPING_LAYER` | `LAYER_NAV` |
+| `POINTING_DEVICE_AUTO_MOUSE_ENABLE` | `defined` |
 | `AUTO_MOUSE_DEFAULT_LAYER` | `LAYER_POINTER` |
 | `AUTO_MOUSE_TIME` | `1200` |
 | `RGB_MATRIX_DEFAULT_MODE` | `RGB_MATRIX_SOLID_COLOR` |
@@ -46,7 +49,9 @@ This report is generated from the authored profile files [keymap.c](../../keyboa
 | `RGB_MATRIX_DEFAULT_VAL` | `RGB_MATRIX_MAXIMUM_BRIGHTNESS` |
 | `RGB_MATRIX_LED_FLUSH_LIMIT` | `32` |
 | `RGB_MATRIX_TIMEOUT` | `900000` |
+| `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` | `defined` |
 | `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` | `200` |
+| `RGB_AUTOMOUSE_GRADIENT_ENABLE` | `defined` |
 | `AUTOMOUSE_RGB_DEAD_TIME` | `(AUTO_MOUSE_TIME/3)` |
 
 ### Authored Sources
@@ -73,6 +78,16 @@ This report is generated from the authored profile files [keymap.c](../../keyboa
 - Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 
+## Key-Behavior Feedback LEDs
+
+These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer and any pd-mode overlay.
+
+| State | Meaning | Authored HSV | Preview Color |
+| --- | --- | --- | --- |
+| `Multi Tap Pending` | Neutral white while the engine is still resolving the active tap index. | `HSV(0, 0, 150)` | <img alt="Multi Tap Pending color" src="./profile-introspection-assets/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+| `Hold Active` | Orange for authored hold-tier pending / active states and hold-tier commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="./profile-introspection-assets/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `Long Hold Active` | Icy cyan for authored long-hold-tier active states and long-hold-tier commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="./profile-introspection-assets/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+
 ## Layer Images
 
 These previews are generated as SVG image assets under [profile-introspection-assets/](profile-introspection-assets). The renderer uses the authored `layer_colors[]` config from [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and the current `LAYOUT()` slot order from [keymap.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c):
@@ -81,6 +96,7 @@ These previews are generated as SVG image assets under [profile-introspection-as
 - `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys
 - `LAYER_BASE` falls back to the default RGB color from [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) when its authored layer color is `HSV(0, 0, 0)`
 - Keys with authored `key_behaviors[]` rows in [keymap.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers
+- Each layer section below also pulls in the authored key behaviors, pd-mode keys, and combos that are actually present on that layer
 
 ### `LAYER_BASE`
 
@@ -90,6 +106,55 @@ These previews are generated as SVG image assets under [profile-introspection-as
 
 ![LAYER_BASE](./profile-introspection-assets/profile-layer-LAYER_BASE.svg)
 
+#### Key Behaviors On This Layer
+
+| Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ESC @ left[0,0]` | `ESC` (`KC_ESC`) | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `defaults` |
+|  |  | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` |  |
+| `1 @ left[0,1]` | `1` (`KC_1`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)` | `-` | `defaults` |
+| `2 @ left[0,2]` | `2` (`KC_2`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_AT)` | `-` | `defaults` |
+| `3 @ left[0,3]` | `3` (`KC_3`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_HASH)` | `-` | `defaults` |
+| `4 @ left[0,4]` | `4` (`KC_4`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DLR)` | `-` | `defaults` |
+| `5 @ left[0,5]` | `5` (`KC_5`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_PERC)` | `-` | `defaults` |
+| `6 @ right[0,0]` | `6` (`KC_6`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_CIRC)` | `-` | `defaults` |
+|  |  | `double` | `TAP_SENDS(KC_MPLY)` | `-` | `-` |  |
+| `7 @ right[0,1]` | `7` (`KC_7`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_AMPR)` | `-` | `defaults` |
+|  |  | `double` | `TAP_SENDS(KC_MNXT)` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `-` |  |
+| `8 @ right[0,2]` | `8` (`KC_8`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR)` | `-` | `defaults` |
+|  |  | `double` | `TAP_SENDS(KC_MPRV)` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `-` |  |
+| `9 @ right[0,3]` | `9` (`KC_9`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LPRN)` | `-` | `defaults` |
+| `0 @ right[0,4]` | `0` (`KC_0`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RPRN)` | `-` | `defaults` |
+| `- @ right[0,5]` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `defaults` |
+| `\ @ right[1,5]` | `\` (`KC_BSLS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_PIPE)` | `-` | `defaults` |
+| `LSFT @ left[2,0]` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `defaults` |
+| `; @ right[2,4]` | `;` (`KC_SCLN`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_COLN)` | `-` | `defaults` |
+| `' @ right[2,5]` | `'` (`KC_QUOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)` | `-` | `defaults` |
+| `, @ right[3,2]` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `defaults` |
+| `. @ right[3,3]` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `defaults` |
+| `LT[NAV]/SLSH @ right[3,4]` | `LT[NAV]/SLSH` (`LT(LAYER_NAV,KC_SLSH)`) | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))` | `-` | `tap_hold=100` |
+| `RALT @ right[3,5]` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `defaults` |
+| `LGUI @ thumb[0]` | `LGUI` (`KC_LEFT_GUI`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)` | `-` | `defaults` |
+| `LTHUMB @ thumb[2]` | `LTHUMB` (`LEFT_THUMB`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `defaults` |
+|  |  | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` |  |
+|  |  | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` |  |
+|  |  | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` |  |
+| `RTHUMB @ thumb[3]` | `RTHUMB` (`RIGHT_THUMB`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_NAV))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))` | `-` | `tap_hold=100` |
+|  |  | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` |  |
+|  |  | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` |  |
+|  |  | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` |  |
+| `ENT @ thumb[4]` | `ENT` (`KC_ENT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))` | `-` | `defaults` |
+
+#### PD Mode Keys On This Layer
+
+No pd-mode keys are placed directly on this layer.
+
+#### Combos Available On This Layer
+
+| Inputs On This Layer | Output |
+| --- | --- |
+| `D @ left[2,3]` + `LT[NAV]/F @ left[2,4]` | `TAB` (`KC_TAB`) |
+
 ### `LAYER_NUM`
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
@@ -97,6 +162,26 @@ These previews are generated as SVG image assets under [profile-introspection-as
 - Preview color: <img alt="LAYER_NUM preview color" src="./profile-introspection-assets/profile-color-swatch-00ff00.svg" width="96" height="28" />
 
 ![LAYER_NUM](./profile-introspection-assets/profile-layer-LAYER_NUM.svg)
+
+#### Key Behaviors On This Layer
+
+| Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ESC @ left[0,0]` | `ESC` (`KC_ESC`) | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `defaults` |
+|  |  | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` |  |
+| `- @ right[0,5]` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `defaults` |
+| `LSFT @ left[2,0]` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `defaults` |
+| `RALT @ left[3,0]` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `defaults` |
+| `, @ right[3,4]` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `defaults` |
+| `. @ right[3,5]` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `defaults` |
+
+#### PD Mode Keys On This Layer
+
+No pd-mode keys are placed directly on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
 
 ### `LAYER_SYM`
 
@@ -106,6 +191,27 @@ These previews are generated as SVG image assets under [profile-introspection-as
 
 ![LAYER_SYM](./profile-introspection-assets/profile-layer-LAYER_SYM.svg)
 
+#### Key Behaviors On This Layer
+
+| Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ESC @ left[0,0]`, `ESC @ left[2,4]` | `ESC` (`KC_ESC`) | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `defaults` |
+|  |  | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` |  |
+| `- @ right[0,5]` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `defaults` |
+| `' @ right[1,4]` | `'` (`KC_QUOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)` | `-` | `defaults` |
+| `LSFT @ left[2,0]` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `defaults` |
+| `[ @ right[2,2]` | `[` (`KC_LBRC`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)` | `-` | `defaults` |
+| `] @ right[2,3]` | `]` (`KC_RBRC`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)` | `-` | `defaults` |
+| `RALT @ right[3,5]` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `defaults` |
+
+#### PD Mode Keys On This Layer
+
+No pd-mode keys are placed directly on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
 ### `LAYER_NAV`
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
@@ -113,6 +219,31 @@ These previews are generated as SVG image assets under [profile-introspection-as
 - Preview color: <img alt="LAYER_NAV preview color" src="./profile-introspection-assets/profile-color-swatch-3c00ff.svg" width="96" height="28" />
 
 ![LAYER_NAV](./profile-introspection-assets/profile-layer-LAYER_NAV.svg)
+
+#### Key Behaviors On This Layer
+
+| Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
+| --- | --- | --- | --- | --- | --- | --- |
+| `LSFT @ left[2,0]` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `defaults` |
+| `LEFT @ right[2,1]` | `LEFT` (`KC_LEFT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `defaults` |
+| `RIGHT @ right[2,3]` | `RIGHT` (`KC_RIGHT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `defaults` |
+| `ESC @ right[2,4]` | `ESC` (`KC_ESC`) | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `defaults` |
+|  |  | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` |  |
+| `DRAGSCROLL @ right[3,3]` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `defaults` |
+|  |  | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))` | `-` |  |
+| `RALT @ right[3,5]` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `defaults` |
+
+#### PD Mode Keys On This Layer
+
+| Key On Layer | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |
+| --- | --- | --- | --- | --- |
+| `DRAGSCROLL @ right[3,3]` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="./profile-introspection-assets/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+
+#### Combos Available On This Layer
+
+| Inputs On This Layer | Output |
+| --- | --- |
+| `MS_BTN1 @ right[3,1]` + `MS_BTN2 @ right[3,2]` | `CLICK_SPAM` |
 
 ### `LAYER_POINTER`
 
@@ -122,106 +253,32 @@ These previews are generated as SVG image assets under [profile-introspection-as
 
 ![LAYER_POINTER](./profile-introspection-assets/profile-layer-LAYER_POINTER.svg)
 
-## PD Mode Colors
+#### Key Behaviors On This Layer
 
-These overlays come from `pd_mode_colors[]` in [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and paint the right half while the matching pointing mode is active.
+| Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
+| --- | --- | --- | --- | --- | --- | --- |
+| `BRIGHTNESS @ right[2,0]` | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `defaults` |
+| `PINCH @ right[2,1]` | `PINCH` (`PINCH_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `defaults` |
+|  |  | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)` | `-` |  |
+| `VOLUME @ right[3,0]` | `VOLUME` (`VOLUME_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `defaults` |
+|  |  | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` |  |
+| `DRAGSCROLL @ right[3,3]` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `defaults` |
+|  |  | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))` | `-` |  |
 
-| Pointing Mode | Authored HSV | Preview Color |
-| --- | --- | --- |
-| `PD_MODE_DRAGSCROLL` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="./profile-introspection-assets/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `PD_MODE_VOLUME` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="./profile-introspection-assets/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
-| `PD_MODE_BRIGHTNESS` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="./profile-introspection-assets/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
-| `PD_MODE_ARROW` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="./profile-introspection-assets/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
-| `PD_MODE_PINCH` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="./profile-introspection-assets/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
-| `PD_MODE_ZOOM` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="./profile-introspection-assets/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
+#### PD Mode Keys On This Layer
 
-## Key-Behavior Feedback LEDs
+| Key On Layer | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |
+| --- | --- | --- | --- | --- |
+| `DRAGSCROLL @ right[3,3]` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="./profile-introspection-assets/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `VOLUME @ right[3,0]` | `VOLUME` (`VOLUME_MODE`) | `PD_MODE_VOLUME` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="./profile-introspection-assets/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `BRIGHTNESS @ right[2,0]` | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `PD_MODE_BRIGHTNESS` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="./profile-introspection-assets/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `PINCH @ right[2,1]` | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="./profile-introspection-assets/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
 
-These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer and any pd-mode overlay.
+#### Combos Available On This Layer
 
-| State | Meaning | Authored HSV | Preview Color |
-| --- | --- | --- | --- |
-| `Multi-tap pending` | Sequence still resolving the winning tap count. | `HSV(0, 0, 150)` | <img alt="Multi-tap pending color" src="./profile-introspection-assets/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
-| `Hold tier active` | Hold-tier pending, active, and commit-pulse feedback. | `HSV(18, 255, 200)` | <img alt="Hold tier active color" src="./profile-introspection-assets/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `Long-hold tier active` | Long-hold-tier active and commit-pulse feedback. | `HSV(148, 255, 200)` | <img alt="Long-hold tier active color" src="./profile-introspection-assets/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
-
-## Key Behavior Inventory
-
-| Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
-| --- | --- | --- | --- | --- | --- |
-| `KC_1` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)` | `-` | `defaults` |
-| `KC_2` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_AT)` | `-` | `defaults` |
-| `KC_3` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_HASH)` | `-` | `defaults` |
-| `KC_4` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DLR)` | `-` | `defaults` |
-| `KC_5` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_PERC)` | `-` | `defaults` |
-| `KC_6` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_CIRC)` | `-` | `defaults` |
-| `KC_6` | `double` | `TAP_SENDS(KC_MPLY)` | `-` | `-` | `defaults` |
-| `KC_7` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_AMPR)` | `-` | `defaults` |
-| `KC_7` | `double` | `TAP_SENDS(KC_MNXT)` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `-` | `defaults` |
-| `KC_8` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR)` | `-` | `defaults` |
-| `KC_8` | `double` | `TAP_SENDS(KC_MPRV)` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `-` | `defaults` |
-| `KC_9` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LPRN)` | `-` | `defaults` |
-| `KC_0` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RPRN)` | `-` | `defaults` |
-| `KC_MINS` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `defaults` |
-| `KC_BSLS` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_PIPE)` | `-` | `defaults` |
-| `KC_SCLN` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_COLN)` | `-` | `defaults` |
-| `KC_QUOT` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)` | `-` | `defaults` |
-| `KC_COMM` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `defaults` |
-| `KC_DOT` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `defaults` |
-| `KC_LBRC` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)` | `-` | `defaults` |
-| `KC_RBRC` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)` | `-` | `defaults` |
-| `KC_ESC` | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `defaults` |
-| `KC_ESC` | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` | `defaults` |
-| `KC_LEFT_SHIFT` | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `defaults` |
-| `KC_RIGHT_ALT` | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `defaults` |
-| `KC_ENT` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))` | `-` | `defaults` |
-| `KC_LEFT_GUI` | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)` | `-` | `defaults` |
-| `LT(LAYER_NAV,KC_SLSH)` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))` | `-` | `tap_hold=100` |
-| `KC_LEFT` | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `defaults` |
-| `KC_RIGHT` | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `defaults` |
-| `BRIGHTNESS_MODE` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `defaults` |
-| `PINCH_MODE` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `defaults` |
-| `PINCH_MODE` | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)` | `-` | `defaults` |
-| `VOLUME_MODE` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `defaults` |
-| `VOLUME_MODE` | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `defaults` |
-| `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `defaults` |
-| `DRAGSCROLL` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))` | `-` | `defaults` |
-| `LEFT_THUMB` | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `defaults` |
-| `LEFT_THUMB` | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `defaults` |
-| `LEFT_THUMB` | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `defaults` |
-| `LEFT_THUMB` | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `defaults` |
-| `RIGHT_THUMB` | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_NAV))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))` | `-` | `tap_hold=100` |
-| `RIGHT_THUMB` | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold=100` |
-| `RIGHT_THUMB` | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `tap_hold=100` |
-| `RIGHT_THUMB` | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `tap_hold=100` |
-| `CLICK_SPAM` | `single` | `-` | `REPEAT_WHILE_HELD(MS_BTN1, 100Hz)` | `-` | `tap_hold=1` |
-
-## Combos
-
-| Inputs | Output |
+| Inputs On This Layer | Output |
 | --- | --- |
-| `KC_D`, `LT(LAYER_NAV,KC_F)` | `KC_TAB` |
-| `MS_BTN1`, `MS_BTN2` | `CLICK_SPAM` |
-
-### Combo Graph
-
-```mermaid
-flowchart LR
-    combo_0["Combo 1"]
-    combo_0_out["KC_TAB"]
-    combo_0 --> combo_0_out
-    combo_0_in_0["KC_D"]
-    combo_0_in_0 --> combo_0
-    combo_0_in_1["LT(LAYER_NAV,KC_F)"]
-    combo_0_in_1 --> combo_0
-    combo_1["Combo 2"]
-    combo_1_out["CLICK_SPAM"]
-    combo_1 --> combo_1_out
-    combo_1_in_0["MS_BTN1"]
-    combo_1_in_0 --> combo_1
-    combo_1_in_1["MS_BTN2"]
-    combo_1_in_1 --> combo_1
-```
+| `MS_BTN1 @ right[3,1]` + `MS_BTN2 @ right[3,2]` | `CLICK_SPAM` |
 
 ## Macro Inventory
 

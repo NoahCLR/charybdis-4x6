@@ -20,6 +20,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 KEYMAP_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "keymap.c"
 CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "config.h"
 RGB_CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "rgb_config.c"
+PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "defs" / "pd_mode_manifest.h"
 
 OUTPUT_DIR = REPO_ROOT / "docs" / "generated"
 MARKDOWN_OUTPUT = OUTPUT_DIR / "profile-introspection.md"
@@ -32,36 +33,6 @@ LEGACY_JSON_OUTPUTS = [
 ]
 
 MARKDOWN_HEADER = "<!-- Generated file. Do not edit by hand. -->\n"
-
-CONFIG_MACROS = [
-    "TAPPING_TERM",
-    "COMBO_TERM",
-    "KEY_BEHAVIOR_MAX_TAP_COUNT",
-    "CUSTOM_TAP_HOLD_TERM",
-    "CUSTOM_LONGER_HOLD_TERM",
-    "CUSTOM_MULTI_TAP_TERM",
-    "CHARYBDIS_DRAGSCROLL_DPI",
-    "PD_MODE_VOLUME_DPI",
-    "PD_MODE_BRIGHTNESS_DPI",
-    "PD_MODE_ZOOM_DPI",
-    "PD_MODE_ARROW_DPI",
-    "CHARYBDIS_MINIMUM_DEFAULT_DPI",
-    "CHARYBDIS_DEFAULT_DPI_CONFIG_STEP",
-    "CHARYBDIS_MINIMUM_SNIPING_DPI",
-    "CHARYBDIS_SNIPING_DPI_CONFIG_STEP",
-    "CHARYBDIS_AUTO_SNIPING_LAYER",
-    "AUTO_MOUSE_DEFAULT_LAYER",
-    "AUTO_MOUSE_TIME",
-    "RGB_MATRIX_DEFAULT_MODE",
-    "RGB_MATRIX_DEFAULT_HUE",
-    "RGB_MATRIX_DEFAULT_SAT",
-    "RGB_MATRIX_MAXIMUM_BRIGHTNESS",
-    "RGB_MATRIX_DEFAULT_VAL",
-    "RGB_MATRIX_LED_FLUSH_LIMIT",
-    "RGB_MATRIX_TIMEOUT",
-    "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS",
-    "AUTOMOUSE_RGB_DEAD_TIME",
-]
 
 DISPLAY_ALIASES = {
     "KC_ESCAPE": "ESC",
@@ -131,21 +102,6 @@ TAP_COUNT_NAMES = {
     2: "triple",
     3: "quadruple",
     4: "quintuple",
-}
-
-FEEDBACK_COLOR_FIELDS = {
-    "multi_tap_pending_color": {
-        "label": "Multi-tap pending",
-        "meaning": "Sequence still resolving the winning tap count.",
-    },
-    "hold_active_color": {
-        "label": "Hold tier active",
-        "meaning": "Hold-tier pending, active, and commit-pulse feedback.",
-    },
-    "long_hold_active_color": {
-        "label": "Long-hold tier active",
-        "meaning": "Long-hold-tier active and commit-pulse feedback.",
-    },
 }
 
 SVG_BACKGROUND = "#2f2f2f"
@@ -487,12 +443,18 @@ def parse_config_layers(text: str) -> list[str]:
     return layers
 
 
-def parse_config_macros(text: str, names: list[str]) -> dict[str, str]:
+def parse_config_macros(text: str) -> dict[str, str]:
     values: dict[str, str] = {}
-    for name in names:
-        match = re.search(rf"^\s*#\s*define\s+{re.escape(name)}\s+(.+?)\s*$", text, re.MULTILINE)
-        if match:
-            values[name] = normalize_expr(match.group(1))
+    pattern = re.compile(
+        r"^\s*#\s*define\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?P<params>\([^)\n]*\))?(?:[ \t]+(?P<value>[^\n]+?))?[ \t]*$",
+        re.MULTILINE,
+    )
+    for match in pattern.finditer(text):
+        if match.group("params") is not None:
+            continue
+        name = match.group("name")
+        value = match.group("value")
+        values[name] = normalize_expr(value) if value is not None else "defined"
     return values
 
 
@@ -568,6 +530,13 @@ def comment_lines_to_text(comment_block: str) -> str:
     return " ".join(lines).strip()
 
 
+def humanize_identifier(identifier: str) -> str:
+    parts = [part for part in identifier.strip("_").split("_") if part]
+    if not parts:
+        return identifier
+    return " ".join(part.capitalize() for part in parts)
+
+
 def extract_color_name_from_comment(comment_text: str, known_names: set[str] | None = None) -> str | None:
     normalized = normalize_color_name(comment_text)
     if not normalized:
@@ -641,6 +610,26 @@ def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[di
     return rows
 
 
+def parse_pd_mode_manifest(text: str) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for row in parse_macro_table(text, "NOAH_PD_MODE_LIST", "PDM"):
+        if len(row) != 8:
+            die(f"unexpected pd mode manifest row: {row!r}")
+        name, mode_keycode, _pointer_handler, _key_handler, _reset_fn, dpi_override, traits, lifecycle = row
+        rows.append(
+            {
+                "name": name,
+                "pointing_mode": f"PD_MODE_{name}",
+                "mode_keycode": mode_keycode,
+                "lock_keycode": f"{mode_keycode}_LOCK",
+                "dpi_override": dpi_override,
+                "traits": traits,
+                "lifecycle": lifecycle,
+            }
+        )
+    return rows
+
+
 def resolve_preview_color(
     authored_color: dict[str, object],
     semantic_name: str | None,
@@ -700,17 +689,17 @@ def parse_key_behavior_feedback_colors(
     known_anchor_names = set(color_anchors)
     for match in field_pattern.finditer(body):
         field_name = match.group("field")
-        if field_name not in FEEDBACK_COLOR_FIELDS:
+        if not field_name.endswith("_color"):
             continue
-        row = FEEDBACK_COLOR_FIELDS[field_name]
         authored_color = parse_hsv_expr(match.group("expr"), known_values)
-        semantic_name = extract_color_name_from_comment(comment_lines_to_text(match.group("comments")), known_anchor_names)
+        comment_text = comment_lines_to_text(match.group("comments"))
+        semantic_name = extract_color_name_from_comment(comment_text, known_anchor_names)
         preview_color = resolve_preview_color(authored_color, semantic_name, color_anchors)
         colors.append(
             {
                 "field": field_name,
-                "label": row["label"],
-                "meaning": row["meaning"],
+                "label": humanize_identifier(field_name.removesuffix("_color")),
+                "meaning": comment_text or "Authored key-behavior feedback color.",
                 "color": authored_color,
                 "preview_color": preview_color,
             }
@@ -1044,9 +1033,10 @@ def build_profile_model() -> dict[str, object]:
     rgb_config_raw_text = read_text(RGB_CONFIG_FILE)
     rgb_config_text = strip_comments(rgb_config_raw_text)
     keymap_text = strip_comments(read_text(KEYMAP_FILE))
+    pd_mode_manifest_text = read_text(PD_MODE_MANIFEST_FILE)
 
     layers = parse_config_layers(config_text)
-    config_macros = parse_config_macros(config_text, CONFIG_MACROS)
+    config_macros = parse_config_macros(config_text)
     layer_colors = finalize_layer_colors(parse_layer_colors(rgb_config_text, config_macros), resolve_rgb_default_color(config_macros))
     keymap_custom_keycodes = parse_keymap_custom_keycodes(keymap_text)
     via_macros = parse_macro_slots(parse_macro_table(keymap_text, "VIA_MACROS", "MACRO"), kind="via")
@@ -1054,6 +1044,7 @@ def build_profile_model() -> dict[str, object]:
     behaviors = parse_key_behaviors(keymap_text)
     combos = parse_combos(keymap_text)
     parsed_layers = parse_layers(keymap_text, known_behaviors={behavior_lookup_key(behavior.keycode) for behavior in behaviors})
+    pd_modes = parse_pd_mode_manifest(pd_mode_manifest_text)
     pd_mode_colors = parse_pd_mode_colors(rgb_config_raw_text, config_macros)
     pd_mode_color_anchors = {
         row["comment_color_name"]: row["preview_color"]
@@ -1077,7 +1068,7 @@ def build_profile_model() -> dict[str, object]:
 
     summary = {
         "layer_count": len(parsed_layers),
-        "layout_key_count": LAYOUT_SLOT_COUNT,
+        "layout_key_count": len(parsed_layers[0]["positions"]),
         "key_behavior_count": len(behaviors),
         "key_behavior_step_count": sum(len(behavior.steps) for behavior in behaviors),
         "combo_count": len(combos),
@@ -1086,12 +1077,14 @@ def build_profile_model() -> dict[str, object]:
         "hardcoded_macro_count": len(hardcoded_macros),
         "hardcoded_macro_non_empty_count": sum(not slot.empty for slot in hardcoded_macros),
         "keymap_custom_keycode_count": len(keymap_custom_keycodes),
+        "pd_mode_count": len(pd_modes),
         "pd_mode_color_count": len(pd_mode_colors),
     }
 
     return {
         "summary": summary,
         "config": {"layers": layers, "macros": config_macros},
+        "pd_modes": pd_modes,
         "rgb": {
             "layer_colors": layer_colors,
             "pd_mode_colors": pd_mode_colors,
@@ -1117,11 +1110,8 @@ def render_markdown(profile: dict[str, object]) -> str:
         f"This report is generated from the authored profile files {keymap_link}, {config_link}, and {rgb_link}. The renderer is board-specific to the Charybdis 4x6 and derives the current `LAYOUT()` slot order directly from {keymap_link}.",
         "",
         render_summary_section(profile),
-        render_layer_maps_section(profile),
-        render_pd_mode_color_section(profile),
         render_key_behavior_feedback_section(profile),
-        render_key_behavior_section(profile),
-        render_combo_section(profile),
+        render_layer_maps_section(profile),
         render_macro_section(profile),
         render_generated_assets_section(),
     ]
@@ -1147,7 +1137,7 @@ def render_summary_section(profile: dict[str, object]) -> str:
     lines.extend(
         [
             "",
-            "### Keymap Config",
+            "### Config Defines",
             "",
             "| Macro | Value |",
             "| --- | --- |",
@@ -1209,6 +1199,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "- `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys",
         f"- `LAYER_BASE` falls back to the default RGB color from {config_link} when its authored layer color is `HSV(0, 0, 0)`",
         f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers",
+        "- Each layer section below also pulls in the authored key behaviors, pd-mode keys, and combos that are actually present on that layer",
         "",
     ]
     for layer in profile["layers"]:
@@ -1223,6 +1214,9 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         lines.append("")
         lines.append(f"![{layer['name']}](./{ASSET_OUTPUT_DIR.name}/{image_name})")
         lines.append("")
+        lines.extend(render_layer_local_key_behaviors(layer, profile))
+        lines.extend(render_layer_local_pd_modes(layer, profile))
+        lines.extend(render_layer_local_combos(layer, profile))
     return "\n".join(lines)
 
 
@@ -1286,13 +1280,151 @@ def markdown_path_link(path: Path, label: str | None = None) -> str:
     return f"[{label or path.name}]({target})"
 
 
+def layer_positions_by_raw_keycode(layer: dict[str, object]) -> dict[str, list[dict[str, object]]]:
+    positions_by_keycode: dict[str, list[dict[str, object]]] = {}
+    for position in layer["positions"]:
+        positions_by_keycode.setdefault(position["keycode"], []).append(position)
+    return positions_by_keycode
+
+
+def layer_positions_by_lookup_key(layer: dict[str, object]) -> dict[str, list[dict[str, object]]]:
+    positions_by_keycode: dict[str, list[dict[str, object]]] = {}
+    for position in layer["positions"]:
+        positions_by_keycode.setdefault(behavior_lookup_key(position["keycode"]), []).append(position)
+    return positions_by_keycode
+
+
+def format_layer_key_instances(positions: list[dict[str, object]]) -> str:
+    return ", ".join(f"`{position['display']} @ {format_layout_position(position)}`" for position in positions)
+
+
+def format_token_with_raw(token: str) -> str:
+    normalized = normalize_expr(token)
+    display = display_token(normalized)
+    if display == normalized:
+        return f"`{normalized}`"
+    return f"`{display}` (`{normalized}`)"
+
+
+def render_layer_local_key_behaviors(layer: dict[str, object], profile: dict[str, object]) -> list[str]:
+    behavior_map = {behavior_lookup_key(row["keycode"]): row for row in profile["key_behaviors"]}
+    positions_by_keycode = layer_positions_by_lookup_key(layer)
+    seen: set[str] = set()
+    rows: list[tuple[list[dict[str, object]], dict[str, object]]] = []
+
+    for position in layer["positions"]:
+        key = behavior_lookup_key(position["keycode"])
+        if key in seen or key not in behavior_map:
+            continue
+        seen.add(key)
+        rows.append((positions_by_keycode[key], behavior_map[key]))
+
+    lines = ["#### Key Behaviors On This Layer", ""]
+    if not rows:
+        lines.extend(["No authored key-behavior rows are present on this layer.", ""])
+        return lines
+
+    lines.extend(
+        [
+            "| Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    for positions, behavior in rows:
+        for index, step in enumerate(behavior["steps"]):
+            key_instances = format_layer_key_instances(positions) if index == 0 else ""
+            keycode = format_token_with_raw(behavior["keycode"]) if index == 0 else ""
+            timing = f"`{format_timing(behavior)}`" if index == 0 else ""
+            tap_count = TAP_COUNT_NAMES.get(step["tap_count"], str(step["tap_count"]))
+            lines.append(
+                f"| {key_instances} | {keycode} | `{tap_count}` | `{format_behavior_action(step['tap'])}` | `{format_behavior_action(step['hold'])}` | `{format_behavior_action(step['long_hold'])}` | {timing} |"
+            )
+    lines.append("")
+    return lines
+
+
+def render_layer_local_pd_modes(layer: dict[str, object], profile: dict[str, object]) -> list[str]:
+    positions_by_keycode = layer_positions_by_raw_keycode(layer)
+    color_by_mode = {row["pointing_mode"]: row for row in profile["rgb"]["pd_mode_colors"]}
+    rows: list[tuple[list[dict[str, object]], dict[str, object], dict[str, object] | None]] = []
+
+    for pd_mode in profile["pd_modes"]:
+        positions = positions_by_keycode.get(pd_mode["mode_keycode"])
+        if not positions:
+            continue
+        rows.append((positions, pd_mode, color_by_mode.get(pd_mode["pointing_mode"])))
+
+    lines = ["#### PD Mode Keys On This Layer", ""]
+    if not rows:
+        lines.extend(["No pd-mode keys are placed directly on this layer.", ""])
+        return lines
+
+    lines.extend(
+        [
+            "| Key On Layer | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for positions, pd_mode, color_row in rows:
+        if color_row is None:
+            authored_hsv = "`none`"
+            preview_swatch = "no override"
+        else:
+            color = color_row["color"]
+            authored_hsv = f"`HSV({color['h']}, {color['s']}, {color['v']})`"
+            preview_swatch = markdown_color_swatch(color_row["preview_color"], f"{pd_mode['pointing_mode']} color")
+        lines.append(
+            f"| {format_layer_key_instances(positions)} | {format_token_with_raw(pd_mode['mode_keycode'])} | `{pd_mode['pointing_mode']}` | {authored_hsv} | {preview_swatch} |"
+        )
+    lines.append("")
+    return lines
+
+
+def render_layer_local_combos(layer: dict[str, object], profile: dict[str, object]) -> list[str]:
+    positions_by_keycode = layer_positions_by_raw_keycode(layer)
+    rows: list[dict[str, object]] = []
+
+    for combo in profile["combos"]:
+        if all(input_key in positions_by_keycode for input_key in combo["inputs"]):
+            rows.append(combo)
+
+    lines = ["#### Combos Available On This Layer", ""]
+    if not rows:
+        lines.extend(["No authored combos resolve entirely from keys on this layer.", ""])
+        return lines
+
+    lines.extend(
+        [
+            "| Inputs On This Layer | Output |",
+            "| --- | --- |",
+        ]
+    )
+    for combo in rows:
+        input_instances = " + ".join(format_layer_key_instances(positions_by_keycode[input_key]) for input_key in combo["inputs"])
+        lines.append(f"| {input_instances} | {format_token_with_raw(combo['output'])} |")
+    lines.append("")
+    return lines
+
+
 def build_behavior_indicator_map(profile: dict[str, object]) -> dict[str, list[str]]:
-    feedback_colors = {
-        row["field"]: row["preview_color"]["hex"]
+    feedback_rows = [
+        row
         for row in profile["rgb"]["key_behavior_feedback_colors"]
         if row["preview_color"] is not None
-    }
+    ]
     indicator_map: dict[str, list[str]] = {}
+
+    def feedback_preview_color(required_tokens: set[str], forbidden_tokens: set[str] | None = None) -> str | None:
+        blocked = forbidden_tokens or set()
+        for row in feedback_rows:
+            field_tokens = set(row["field"].removesuffix("_color").split("_"))
+            if required_tokens.issubset(field_tokens) and field_tokens.isdisjoint(blocked):
+                return row["preview_color"]["hex"]
+        return None
+
+    tap_color = feedback_preview_color({"multi", "tap"})
+    hold_color = feedback_preview_color({"hold"}, {"long"})
+    long_hold_color = feedback_preview_color({"long", "hold"})
 
     for behavior in profile["key_behaviors"]:
         has_tap = any(step["tap"] is not None for step in behavior["steps"]) or len(behavior["steps"]) > 1
@@ -1300,12 +1432,12 @@ def build_behavior_indicator_map(profile: dict[str, object]) -> dict[str, list[s
         has_hold = any(step["hold"] is not None for step in behavior["steps"])
         dots: list[str] = []
 
-        if has_tap and feedback_colors.get("multi_tap_pending_color") is not None:
-            dots.append(feedback_colors["multi_tap_pending_color"])
-        if has_hold and feedback_colors.get("hold_active_color") is not None:
-            dots.append(feedback_colors["hold_active_color"])
-        if has_long_hold and feedback_colors.get("long_hold_active_color") is not None:
-            dots.append(feedback_colors["long_hold_active_color"])
+        if has_tap and tap_color is not None:
+            dots.append(tap_color)
+        if has_hold and hold_color is not None:
+            dots.append(hold_color)
+        if has_long_hold and long_hold_color is not None:
+            dots.append(long_hold_color)
 
         if dots:
             indicator_map[behavior_lookup_key(behavior["keycode"])] = dots
