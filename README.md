@@ -108,7 +108,7 @@ generates:
   using the authored `layer_colors[]` config from
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - a rendered layer-map and inventory report in
-  [`docs/profile-introspection.md`](./docs/profile-introspection.md)
+  [`docs/KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md)
   including authored layer colors, pd-mode colors, and key-behavior feedback LED colors from
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
   visible color swatches, transparent `TRNS` passthrough keys, key-behavior activity dots on layer images, a short timing legend for the layer-local behavior tables, and only filled macro slots
@@ -123,7 +123,7 @@ Practical usage:
 - `python3 'via layouts/via_to_qmk_layout.py' --via-json path/to/export.json`
   uses a specific VIA export instead of choosing one from `via layouts/`
 - `python3 tools/profile_introspect.py --write` regenerates the authored
-  profile report at [`docs/profile-introspection.md`](./docs/profile-introspection.md) and the SVG
+  profile report at [`docs/KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md) and the SVG
   assets under
   [`docs/media/profile-introspection/`](./docs/media/profile-introspection/)
 - `python3 tools/profile_introspect.py --check` verifies those generated
@@ -479,7 +479,7 @@ These docs are the next place to look:
   behavior
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
-- [`docs/profile-introspection.md`](./docs/profile-introspection.md): visual
+- [`docs/KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md): visual
   profile report with per-layer images, key behaviors, pd modes, combos, and
   macro inventory
 

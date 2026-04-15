@@ -2073,7 +2073,7 @@ def check_outputs(assets: dict[Path, str]) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--write", action="store_true", help="write docs/profile-introspection.md and docs/media/profile-introspection/*")
+    parser.add_argument("--write", action="store_true", help="write docs/KEYMAP-OVERVIEW.md and docs/media/profile-introspection/*")
     parser.add_argument("--check", action="store_true", help="fail if the generated artifacts are not current")
     parser.add_argument("--print-markdown", action="store_true", help="print the Markdown report to stdout")
     args = parser.parse_args()
