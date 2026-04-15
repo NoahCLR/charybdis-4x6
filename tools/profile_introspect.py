@@ -25,7 +25,7 @@ PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "def
 DOCS_DIR = REPO_ROOT / "docs"
 MEDIA_DIR = DOCS_DIR / "media"
 LEGACY_OUTPUT_DIR = DOCS_DIR / "generated"
-MARKDOWN_OUTPUT = DOCS_DIR / "KEYMAP-OVERVIEW.md"
+MARKDOWN_OUTPUT = DOCS_DIR / "profile-introspection.md"
 ASSET_OUTPUT_DIR = MEDIA_DIR / "profile-introspection"
 LEGACY_MARKDOWN_OUTPUT = LEGACY_OUTPUT_DIR / "KEYMAP-OVERVIEW.md"
 LEGACY_ASSET_OUTPUT_DIR = LEGACY_OUTPUT_DIR / "profile-introspection-assets"
@@ -1695,7 +1695,7 @@ def layer_key_style(position: dict[str, object], color_config: dict[str, object]
         return {"fill": fill, "text": text, "stroke": adjust_hex(fill, -28), "label_opacity": 1.0, "variant": "mapped"}
 
     if is_transparent:
-        return {"fill": "#d7d8d3", "text": "#5f645f", "stroke": "#b8bab5", "label_opacity": 0.72, "variant": "transparent"}
+        return {"fill": "#777777", "text": "#ffffff", "stroke": "#b8bab5", "label_opacity": 0.72, "variant": "transparent"}
 
     if is_none:
         return {"fill": "#c9cac5", "text": "#6d716d", "stroke": "#a8aaa5", "label_opacity": 0.45, "variant": "none"}
