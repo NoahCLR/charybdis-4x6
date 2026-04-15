@@ -93,15 +93,17 @@ For the full round-trip workflow, see
 
 There is also an authored-profile introspector in
 [`tools/profile_introspect.py`](./tools/profile_introspect.py). It reads the
-authored keymap surfaces directly from source and generates:
+authored keymap surfaces directly from source, derives the physical `LAYOUT()`
+order from the live Charybdis `keyboard.json`, and generates:
 
-- per-layer visual SVG previews in [`docs/generated/`](./docs/generated/)
+- per-layer visual SVG previews in
+  [`docs/generated/profile-introspection-assets/`](./docs/generated/profile-introspection-assets/)
   using the authored `layer_colors[]` config from
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - a rendered layer-map and inventory report in
   [`docs/generated/profile-introspection.md`](./docs/generated/profile-introspection.md)
 - a diffable machine-readable summary in
-  [`docs/generated/profile-summary.json`](./docs/generated/profile-summary.json)
+  [`docs/generated/profile-introspection-assets/profile-summary.json`](./docs/generated/profile-introspection-assets/profile-summary.json)
 
 Practical usage:
 
@@ -113,7 +115,9 @@ Practical usage:
 - `python3 'via layouts/via_to_qmk_layout.py' --via-json path/to/export.json`
   uses a specific VIA export instead of choosing one from `via layouts/`
 - `python3 tools/profile_introspect.py --write` regenerates the authored
-  profile report and diffable JSON summary under [`docs/generated/`](./docs/generated/)
+  profile report under [`docs/generated/`](./docs/generated/) and the SVG/JSON
+  assets under
+  [`docs/generated/profile-introspection-assets/`](./docs/generated/profile-introspection-assets/)
 - `python3 tools/profile_introspect.py --check` verifies those generated
   artifacts are current
 - `python3 tools/profile_introspect.py --print-markdown` previews the rendered
