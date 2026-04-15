@@ -94,7 +94,8 @@ For the full round-trip workflow, see
 There is also an authored-profile introspector in
 [`tools/profile_introspect.py`](./tools/profile_introspect.py). It reads the
 authored keymap surfaces directly from source, derives the physical `LAYOUT()`
-order from the live Charybdis `keyboard.json`, and generates:
+order from the live Charybdis `keyboard.json`, uses the repo's HSV hue wheel
+for preview swatches, and generates:
 
 - per-layer visual SVG previews in
   [`docs/generated/profile-introspection-assets/`](./docs/generated/profile-introspection-assets/)
@@ -102,8 +103,9 @@ order from the live Charybdis `keyboard.json`, and generates:
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - a rendered layer-map and inventory report in
   [`docs/generated/profile-introspection.md`](./docs/generated/profile-introspection.md)
-- a diffable machine-readable summary in
-  [`docs/generated/profile-introspection-assets/profile-summary.json`](./docs/generated/profile-introspection-assets/profile-summary.json)
+  including the authored key-behavior feedback LED colors from
+  [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
+  visible color swatches, and only filled macro slots
 
 Practical usage:
 
@@ -115,15 +117,13 @@ Practical usage:
 - `python3 'via layouts/via_to_qmk_layout.py' --via-json path/to/export.json`
   uses a specific VIA export instead of choosing one from `via layouts/`
 - `python3 tools/profile_introspect.py --write` regenerates the authored
-  profile report under [`docs/generated/`](./docs/generated/) and the SVG/JSON
+  profile report under [`docs/generated/`](./docs/generated/) and the SVG
   assets under
   [`docs/generated/profile-introspection-assets/`](./docs/generated/profile-introspection-assets/)
 - `python3 tools/profile_introspect.py --check` verifies those generated
   artifacts are current
 - `python3 tools/profile_introspect.py --print-markdown` previews the rendered
   report without rewriting files
-- `python3 tools/profile_introspect.py --print-json` prints the diffable JSON
-  summary to stdout
 
 ## Where To Change Things
 
