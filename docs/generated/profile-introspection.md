@@ -51,13 +51,13 @@ This report is generated from the authored profile data in `keymap.c`, `config.h
 
 ### Layer RGB Config
 
-| Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |
+| Layer | RGB Matrix Render Mode | Authored HSV | Preview Hue |
 | --- | --- | --- | --- |
-| `LAYER_BASE` | `ALL_KEYS` | `HSV(0, 0, 0)` | ![LAYER_BASE preview color](./profile-introspection-assets/profile-color-swatch-ff0000.svg) |
-| `LAYER_NUM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(85, 255, 200)` | ![LAYER_NUM preview color](./profile-introspection-assets/profile-color-swatch-00ff00.svg) |
-| `LAYER_SYM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(169, 255, 200)` | ![LAYER_SYM preview color](./profile-introspection-assets/profile-color-swatch-0006ff.svg) |
-| `LAYER_NAV` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(180, 255, 200)` | ![LAYER_NAV preview color](./profile-introspection-assets/profile-color-swatch-3c00ff.svg) |
-| `LAYER_POINTER` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 150)` | ![LAYER_POINTER preview color](./profile-introspection-assets/profile-color-swatch-ffffff.svg) |
+| `LAYER_BASE` | `ALL_KEYS` | `HSV(0, 0, 0)` | `red` |
+| `LAYER_NUM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(85, 255, 200)` | `green` |
+| `LAYER_SYM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(169, 255, 200)` | `blue` |
+| `LAYER_NAV` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(180, 255, 200)` | `violet` |
+| `LAYER_POINTER` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 150)` | `white` |
 
 ### Shared Keycode Surfaces
 
@@ -77,7 +77,8 @@ These previews are generated as SVG image assets under `./profile-introspection-
 
 - RGB matrix render mode: `ALL_KEYS`
 - Authored layer color: `HSV(0, 0, 0)`
-- Preview color: ![LAYER_BASE preview color](./profile-introspection-assets/profile-color-swatch-ff0000.svg)
+- Preview hue: `red`
+- Preview color: <img alt="LAYER_BASE preview color" src="./profile-introspection-assets/profile-color-swatch-ff0000.svg" width="96" height="28" />
 
 ![LAYER_BASE](./profile-introspection-assets/profile-layer-LAYER_BASE.svg)
 
@@ -85,7 +86,8 @@ These previews are generated as SVG image assets under `./profile-introspection-
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(85, 255, 200)`
-- Preview color: ![LAYER_NUM preview color](./profile-introspection-assets/profile-color-swatch-00ff00.svg)
+- Preview hue: `green`
+- Preview color: <img alt="LAYER_NUM preview color" src="./profile-introspection-assets/profile-color-swatch-00ff00.svg" width="96" height="28" />
 
 ![LAYER_NUM](./profile-introspection-assets/profile-layer-LAYER_NUM.svg)
 
@@ -93,7 +95,8 @@ These previews are generated as SVG image assets under `./profile-introspection-
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(169, 255, 200)`
-- Preview color: ![LAYER_SYM preview color](./profile-introspection-assets/profile-color-swatch-0006ff.svg)
+- Preview hue: `blue`
+- Preview color: <img alt="LAYER_SYM preview color" src="./profile-introspection-assets/profile-color-swatch-0006ff.svg" width="96" height="28" />
 
 ![LAYER_SYM](./profile-introspection-assets/profile-layer-LAYER_SYM.svg)
 
@@ -101,7 +104,8 @@ These previews are generated as SVG image assets under `./profile-introspection-
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(180, 255, 200)`
-- Preview color: ![LAYER_NAV preview color](./profile-introspection-assets/profile-color-swatch-3c00ff.svg)
+- Preview hue: `violet`
+- Preview color: <img alt="LAYER_NAV preview color" src="./profile-introspection-assets/profile-color-swatch-3c00ff.svg" width="96" height="28" />
 
 ![LAYER_NAV](./profile-introspection-assets/profile-layer-LAYER_NAV.svg)
 
@@ -109,19 +113,33 @@ These previews are generated as SVG image assets under `./profile-introspection-
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(0, 0, 150)`
-- Preview color: ![LAYER_POINTER preview color](./profile-introspection-assets/profile-color-swatch-ffffff.svg)
+- Preview hue: `white`
+- Preview color: <img alt="LAYER_POINTER preview color" src="./profile-introspection-assets/profile-color-swatch-ffffff.svg" width="96" height="28" />
 
 ![LAYER_POINTER](./profile-introspection-assets/profile-layer-LAYER_POINTER.svg)
+
+## PD Mode Colors
+
+These overlays come from `pd_mode_colors[]` in `rgb_config.c` and paint the right half while the matching pointing mode is active.
+
+| Pointing Mode | Mode Keycode | Authored HSV | Preview Hue | Preview Color |
+| --- | --- | --- | --- | --- |
+| `PD_MODE_DRAGSCROLL` | `DRAGSCROLL` | `HSV(21, 255, 200)` | `orange` | <img alt="PD_MODE_DRAGSCROLL color" src="./profile-introspection-assets/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `PD_MODE_VOLUME` | `VOLUME_MODE` | `HSV(43, 255, 200)` | `yellow` | <img alt="PD_MODE_VOLUME color" src="./profile-introspection-assets/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `PD_MODE_BRIGHTNESS` | `BRIGHTNESS_MODE` | `HSV(213, 255, 200)` | `magenta` | <img alt="PD_MODE_BRIGHTNESS color" src="./profile-introspection-assets/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `PD_MODE_ARROW` | `ARROW_MODE` | `HSV(127, 255, 200)` | `cyan` | <img alt="PD_MODE_ARROW color" src="./profile-introspection-assets/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `PD_MODE_PINCH` | `PINCH_MODE` | `HSV(55, 255, 200)` | `chartreuse green` | <img alt="PD_MODE_PINCH color" src="./profile-introspection-assets/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
+| `PD_MODE_ZOOM` | `ZOOM_MODE` | `HSV(70, 255, 200)` | `green` | <img alt="PD_MODE_ZOOM color" src="./profile-introspection-assets/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
 
 ## Key-Behavior Feedback LEDs
 
 These colors come from `key_behavior_feedback_colors` in `rgb_config.c` and render last on top of the current layer and any pd-mode overlay.
 
-| State | Meaning | Authored HSV | Preview Color |
-| --- | --- | --- | --- |
-| `Multi-tap pending` | Sequence still resolving the winning tap count. | `HSV(0, 0, 150)` | ![Multi-tap pending color](./profile-introspection-assets/profile-color-swatch-ffffff.svg) |
-| `Hold tier active` | Hold-tier pending, active, and commit-pulse feedback. | `HSV(18, 255, 200)` | ![Hold tier active color](./profile-introspection-assets/profile-color-swatch-ff6c00.svg) |
-| `Long-hold tier active` | Long-hold-tier active and commit-pulse feedback. | `HSV(148, 255, 200)` | ![Long-hold tier active color](./profile-introspection-assets/profile-color-swatch-0084ff.svg) |
+| State | Meaning | Authored HSV | Preview Hue | Preview Color |
+| --- | --- | --- | --- | --- |
+| `Multi-tap pending` | Sequence still resolving the winning tap count. | `HSV(0, 0, 150)` | `white` | <img alt="Multi-tap pending color" src="./profile-introspection-assets/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+| `Hold tier active` | Hold-tier pending, active, and commit-pulse feedback. | `HSV(18, 255, 200)` | `orange` | <img alt="Hold tier active color" src="./profile-introspection-assets/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `Long-hold tier active` | Long-hold-tier active and commit-pulse feedback. | `HSV(148, 255, 200)` | `cyan` | <img alt="Long-hold tier active color" src="./profile-introspection-assets/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 
 ## Key Behavior Inventory
 

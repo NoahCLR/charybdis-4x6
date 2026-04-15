@@ -94,8 +94,8 @@ For the full round-trip workflow, see
 There is also an authored-profile introspector in
 [`tools/profile_introspect.py`](./tools/profile_introspect.py). It reads the
 authored keymap surfaces directly from source, derives the physical `LAYOUT()`
-order from the live Charybdis `keyboard.json`, uses the repo's HSV hue wheel
-for preview swatches, and generates:
+order from the live Charybdis `keyboard.json`, uses full-bright preview
+swatches, and generates:
 
 - per-layer visual SVG previews in
   [`docs/generated/profile-introspection-assets/`](./docs/generated/profile-introspection-assets/)
@@ -103,9 +103,9 @@ for preview swatches, and generates:
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - a rendered layer-map and inventory report in
   [`docs/generated/profile-introspection.md`](./docs/generated/profile-introspection.md)
-  including the authored key-behavior feedback LED colors from
+  including authored layer colors, pd-mode colors, and key-behavior feedback LED colors from
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
-  visible color swatches, and only filled macro slots
+  visible color swatches, transparent `TRNS` passthrough keys, and only filled macro slots
 
 Practical usage:
 

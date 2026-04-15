@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import ast
 import difflib
+import html
 import json
 import os
 import re
@@ -136,6 +137,36 @@ TAP_COUNT_NAMES = {
     2: "triple",
     3: "quadruple",
     4: "quintuple",
+}
+
+HUE_FAMILY_NAMES = [
+    (0, "red"),
+    (21, "orange"),
+    (43, "yellow"),
+    (64, "chartreuse green"),
+    (85, "green"),
+    (106, "spring green"),
+    (127, "cyan"),
+    (148, "azure"),
+    (169, "blue"),
+    (180, "violet"),
+    (201, "magenta"),
+    (222, "rose"),
+]
+
+FEEDBACK_COLOR_FIELDS = {
+    "multi_tap_pending_color": {
+        "label": "Multi-tap pending",
+        "meaning": "Sequence still resolving the winning tap count.",
+    },
+    "hold_active_color": {
+        "label": "Hold tier active",
+        "meaning": "Hold-tier pending, active, and commit-pulse feedback.",
+    },
+    "long_hold_active_color": {
+        "label": "Long-hold tier active",
+        "meaning": "Long-hold-tier active and commit-pulse feedback.",
+    },
 }
 
 SVG_BACKGROUND = "#2f2f2f"
@@ -602,6 +633,38 @@ def parse_hsv_expr(expr: str, known_values: dict[str, str]) -> dict[str, object]
     return {"h": h, "s": s, "v": v, "hex": hsv_to_hex(h, s, v), "enabled": not (h == 0 and s == 0 and v == 0)}
 
 
+def normalize_color_name(label: str) -> str:
+    lowered = label.strip().lower().replace("-", " ")
+    lowered = re.sub(r"[^a-z\s]", " ", lowered)
+    return " ".join(lowered.split())
+
+
+def comment_lines_to_text(comment_block: str) -> str:
+    lines: list[str] = []
+    for line in comment_block.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("//"):
+            lines.append(stripped[2:].strip())
+    return " ".join(lines).strip()
+
+
+def extract_color_name_from_comment(comment_text: str, known_names: set[str] | None = None) -> str | None:
+    normalized = normalize_color_name(comment_text)
+    if not normalized:
+        return None
+
+    if known_names:
+        for name in sorted(known_names, key=len, reverse=True):
+            if re.search(rf"\b{re.escape(name)}\b", normalized):
+                return name
+
+    for fallback in ("white", "orange", "yellow", "green", "cyan", "blue", "violet", "purple", "magenta", "red"):
+        if re.search(rf"\b{re.escape(fallback)}\b", normalized):
+            return fallback
+
+    return None
+
+
 def hsv_to_hex(h: int, s: int, v: int) -> str:
     red, green, blue = qmk_preview_hsv_to_rgb(h, s, v)
     return "#{:02x}{:02x}{:02x}".format(red, green, blue)
@@ -639,6 +702,46 @@ def qmk_preview_hsv_to_rgb(h: int, s: int, v: int) -> tuple[int, int, int]:
     return preview_v, p, q
 
 
+def parse_pd_mode_colors(
+    raw_text: str,
+    known_values: dict[str, str],
+    pd_modes: list[dict[str, str]],
+) -> list[dict[str, object]]:
+    body = extract_initializer_body(raw_text, r"pd_mode_colors\[\]\s*=")
+    entry_pattern = re.compile(r"\{(?P<body>.*?)\}\s*,\s*//\s*(?P<label>[^\n]+)", re.DOTALL)
+    keycode_lookup = {f"PD_MODE_{row['name']}": row["keycode"] for row in pd_modes}
+    rows: list[dict[str, object]] = []
+
+    for match in entry_pattern.finditer(body):
+        fields = parse_designated_fields(strip_comments(match.group("body")))
+        if ".pointing_mode" not in fields or ".color" not in fields:
+            continue
+        pointing_mode = normalize_expr(fields[".pointing_mode"])
+        color = parse_hsv_expr(fields[".color"], known_values)
+        color_name = extract_color_name_from_comment(match.group("label"))
+        rows.append(
+            {
+                "pointing_mode": pointing_mode,
+                "keycode": keycode_lookup.get(pointing_mode, ""),
+                "color": color,
+                "preview_color": dict(color),
+                "preview_name": color_name or hue_family_label(color),
+            }
+        )
+
+    return rows
+
+
+def resolve_preview_color(
+    authored_color: dict[str, object],
+    semantic_name: str | None,
+    color_anchors: dict[str, dict[str, object]],
+) -> dict[str, object]:
+    if semantic_name is not None and semantic_name in color_anchors:
+        return dict(color_anchors[semantic_name])
+    return dict(authored_color)
+
+
 def parse_layer_colors(text: str, known_values: dict[str, str]) -> list[dict[str, object]]:
     body = extract_initializer_body(text, r"layer_colors\[LAYER_COUNT\]\s*=")
     colors: list[dict[str, object]] = []
@@ -669,42 +772,39 @@ def parse_layer_colors(text: str, known_values: dict[str, str]) -> list[dict[str
     return colors
 
 
-def parse_key_behavior_feedback_colors(text: str, known_values: dict[str, str]) -> list[dict[str, object]]:
+def parse_key_behavior_feedback_colors(
+    raw_text: str,
+    known_values: dict[str, str],
+    color_anchors: dict[str, dict[str, object]],
+) -> list[dict[str, object]]:
     try:
-        body = extract_initializer_body(text, r"key_behavior_feedback_colors\s*=")
+        body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
     except SystemExit:
         return []
 
-    fields = parse_designated_fields(body)
-    feedback_rows = [
-        {
-            "field": "multi_tap_pending_color",
-            "label": "Multi-tap pending",
-            "meaning": "Sequence still resolving the winning tap count.",
-        },
-        {
-            "field": "hold_active_color",
-            "label": "Hold tier active",
-            "meaning": "Hold-tier pending, active, and commit-pulse feedback.",
-        },
-        {
-            "field": "long_hold_active_color",
-            "label": "Long-hold tier active",
-            "meaning": "Long-hold-tier active and commit-pulse feedback.",
-        },
-    ]
+    field_pattern = re.compile(
+        r"(?P<comments>(?:\s*//[^\n]*\n)*)\s*\.(?P<field>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?P<expr>HSV\([^)]*\))\s*,",
+        re.MULTILINE,
+    )
 
     colors: list[dict[str, object]] = []
-    for row in feedback_rows:
-        key = f".{row['field']}"
-        if key not in fields:
+    known_anchor_names = set(color_anchors)
+    for match in field_pattern.finditer(body):
+        field_name = match.group("field")
+        if field_name not in FEEDBACK_COLOR_FIELDS:
             continue
+        row = FEEDBACK_COLOR_FIELDS[field_name]
+        authored_color = parse_hsv_expr(match.group("expr"), known_values)
+        semantic_name = extract_color_name_from_comment(comment_lines_to_text(match.group("comments")), known_anchor_names)
+        preview_color = resolve_preview_color(authored_color, semantic_name, color_anchors)
         colors.append(
             {
-                "field": row["field"],
+                "field": field_name,
                 "label": row["label"],
                 "meaning": row["meaning"],
-                "color": parse_hsv_expr(fields[key], known_values),
+                "color": authored_color,
+                "preview_color": preview_color,
+                "preview_name": semantic_name or hue_family_label(preview_color),
             }
         )
 
@@ -1024,7 +1124,8 @@ def collect_macro_usages(
 
 def build_profile_model(keyboard_json_override: Path | None = None) -> dict[str, object]:
     config_text = strip_comments(read_text(CONFIG_FILE))
-    rgb_config_text = strip_comments(read_text(RGB_CONFIG_FILE))
+    rgb_config_raw_text = read_text(RGB_CONFIG_FILE)
+    rgb_config_text = strip_comments(rgb_config_raw_text)
     keymap_text = strip_comments(read_text(KEYMAP_FILE))
     noah_ids_text = strip_comments(read_text(NOAH_KEYMAP_IDS_FILE))
     pd_mode_text = strip_comments(read_text(PD_MODE_MANIFEST_FILE))
@@ -1034,7 +1135,6 @@ def build_profile_model(keyboard_json_override: Path | None = None) -> dict[str,
     layers = parse_config_layers(config_text)
     config_macros = parse_config_macros(config_text, CONFIG_MACROS)
     layer_colors = finalize_layer_colors(parse_layer_colors(rgb_config_text, config_macros), resolve_rgb_default_color(config_macros))
-    key_behavior_feedback_colors = parse_key_behavior_feedback_colors(rgb_config_text, config_macros)
     keymap_custom_keycodes = parse_keymap_custom_keycodes(keymap_text)
     via_macros = parse_macro_slots(parse_macro_table(keymap_text, "VIA_MACROS", "MACRO"), kind="via")
     hardcoded_macros = parse_macro_slots(parse_macro_table(keymap_text, "HARDCODED_MACROS", "MACRO"), kind="hardcoded")
@@ -1042,6 +1142,9 @@ def build_profile_model(keyboard_json_override: Path | None = None) -> dict[str,
     combos = parse_combos(keymap_text)
     parsed_layers = parse_layers(keymap_text, known_behaviors={behavior.keycode for behavior in behaviors}, layout_template=layout_template)
     pd_modes = parse_pd_modes(pd_mode_text)
+    pd_mode_colors = parse_pd_mode_colors(rgb_config_raw_text, config_macros, pd_modes)
+    pd_mode_color_anchors = {row["preview_name"]: row["preview_color"] for row in pd_mode_colors}
+    key_behavior_feedback_colors = parse_key_behavior_feedback_colors(rgb_config_raw_text, config_macros, pd_mode_color_anchors)
 
     macro_usages = collect_macro_usages(parsed_layers, behaviors, combos, via_macros + hardcoded_macros)
 
@@ -1080,6 +1183,7 @@ def build_profile_model(keyboard_json_override: Path | None = None) -> dict[str,
         "config": {"layers": layers, "macros": config_macros},
         "rgb": {
             "layer_colors": layer_colors,
+            "pd_mode_colors": pd_mode_colors,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
         },
         "derived_keycode_rules": {
@@ -1105,6 +1209,7 @@ def render_markdown(profile: dict[str, object]) -> str:
         "",
         render_summary_section(profile),
         render_layer_maps_section(profile),
+        render_pd_mode_color_section(profile),
         render_key_behavior_feedback_section(profile),
         render_key_behavior_section(profile),
         render_combo_section(profile),
@@ -1144,16 +1249,15 @@ def render_summary_section(profile: dict[str, object]) -> str:
             "",
             "### Layer RGB Config",
             "",
-            "| Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |",
+            "| Layer | RGB Matrix Render Mode | Authored HSV | Preview Hue |",
             "| --- | --- | --- | --- |",
         ]
     )
     for row in rgb["layer_colors"]:
         color = row["color"]
-        preview_color = row["preview_color"]
-        preview_swatch = markdown_color_swatch(preview_color, f"{row['layer']} preview color")
+        preview_hue = hue_family_label(row["preview_color"])
         lines.append(
-            f"| `{row['layer']}` | `{row['mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
+            f"| `{row['layer']}` | `{row['mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | `{preview_hue}` |"
         )
 
     lines.extend(
@@ -1186,14 +1290,52 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         color_config = layer_color_map[layer["name"]]
         image_name = layer_image_name(layer["name"])
         preview_swatch = markdown_color_swatch(color_config["preview_color"], f"{layer['name']} preview color")
+        preview_hue = hue_family_label(color_config["preview_color"])
         lines.append(f"### `{layer['name']}`")
         lines.append("")
         lines.append(f"- RGB matrix render mode: `{color_config['mode']}`")
         lines.append(f"- Authored layer color: `HSV({color_config['color']['h']}, {color_config['color']['s']}, {color_config['color']['v']})`")
+        lines.append(f"- Preview hue: `{preview_hue}`")
         lines.append(f"- Preview color: {preview_swatch}")
         lines.append("")
         lines.append(f"![{layer['name']}](./{ASSET_OUTPUT_DIR.name}/{image_name})")
         lines.append("")
+    return "\n".join(lines)
+
+
+def render_pd_mode_color_section(profile: dict[str, object]) -> str:
+    pd_mode_colors = profile["rgb"]["pd_mode_colors"]
+    lines = [
+        "## PD Mode Colors",
+        "",
+    ]
+
+    if not pd_mode_colors:
+        lines.extend(
+            [
+                "No authored `pd_mode_colors[]` entries were found in `rgb_config.c`.",
+                "",
+            ]
+        )
+        return "\n".join(lines)
+
+    lines.extend(
+        [
+            "These overlays come from `pd_mode_colors[]` in `rgb_config.c` and paint the right half while the matching pointing mode is active.",
+            "",
+            "| Pointing Mode | Mode Keycode | Authored HSV | Preview Hue | Preview Color |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+
+    for row in pd_mode_colors:
+        color = row["color"]
+        preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['pointing_mode']} color")
+        lines.append(
+            f"| `{row['pointing_mode']}` | `{row['keycode'] or '-'}` | `HSV({color['h']}, {color['s']}, {color['v']})` | `{row['preview_name']}` | {preview_swatch} |"
+        )
+
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -1208,7 +1350,29 @@ def color_swatch_image_name(fill_hex: str) -> str:
 def markdown_color_swatch(color: dict[str, object] | None, alt_text: str) -> str:
     if color is None:
         return "no override"
-    return f"![{alt_text}](./{ASSET_OUTPUT_DIR.name}/{color_swatch_image_name(color['hex'])})"
+    return (
+        f'<img alt="{html.escape(alt_text, quote=True)}" '
+        f'src="./{ASSET_OUTPUT_DIR.name}/{color_swatch_image_name(color["hex"])}" '
+        f'width="{SWATCH_WIDTH}" height="{SWATCH_HEIGHT}" />'
+    )
+
+
+def hue_family_label(color: dict[str, object] | None) -> str:
+    if color is None:
+        return "no override"
+    if color["v"] == 0:
+        return "off"
+    if color["s"] == 0:
+        return "white"
+
+    hue = color["h"] % 256
+    nearest = min(HUE_FAMILY_NAMES, key=lambda entry: circular_hue_distance(hue, entry[0]))
+    return nearest[1]
+
+
+def circular_hue_distance(left: int, right: int) -> int:
+    delta = abs(left - right)
+    return min(delta, 256 - delta)
 
 
 def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
@@ -1228,8 +1392,11 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
         if preview_color is not None:
             swatch_colors.add(preview_color["hex"])
 
+    for row in profile["rgb"]["pd_mode_colors"]:
+        swatch_colors.add(row["preview_color"]["hex"])
+
     for row in profile["rgb"]["key_behavior_feedback_colors"]:
-        swatch_colors.add(row["color"]["hex"])
+        swatch_colors.add(row["preview_color"]["hex"])
 
     for fill_hex in sorted(swatch_colors):
         assets[ASSET_OUTPUT_DIR / color_swatch_image_name(fill_hex)] = render_color_swatch_svg(fill_hex)
@@ -1420,16 +1587,18 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
         [
             "These colors come from `key_behavior_feedback_colors` in `rgb_config.c` and render last on top of the current layer and any pd-mode overlay.",
             "",
-            "| State | Meaning | Authored HSV | Preview Color |",
-            "| --- | --- | --- | --- |",
+            "| State | Meaning | Authored HSV | Preview Hue | Preview Color |",
+            "| --- | --- | --- | --- | --- |",
         ]
     )
 
     for row in feedback_colors:
         color = row["color"]
-        preview_swatch = markdown_color_swatch(color, f"{row['label']} color")
+        preview_color = row["preview_color"]
+        preview_swatch = markdown_color_swatch(preview_color, f"{row['label']} color")
+        preview_hue = row["preview_name"]
         lines.append(
-            f"| `{row['label']}` | {row['meaning']} | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
+            f"| `{row['label']}` | {row['meaning']} | `HSV({color['h']}, {color['s']}, {color['v']})` | `{preview_hue}` | {preview_swatch} |"
         )
 
     lines.append("")
