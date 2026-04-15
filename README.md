@@ -98,8 +98,8 @@ authored profile surfaces directly from
 [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), and
 [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
 uses the current `LAYOUT()` slot order from `keymap.c`, uses full-bright
-preview swatches, resolves pd-mode identity and mode-key mapping in the
-background from
+preview swatches, keeps pd-mode names and bindings in sync with the shared
+definitions in
 [`pd_mode_manifest.h`](./users/noah/lib/pointing/defs/pd_mode_manifest.h), and
 generates:
 
@@ -111,7 +111,7 @@ generates:
   [`docs/generated/profile-introspection.md`](./docs/generated/profile-introspection.md)
   including authored layer colors, pd-mode colors, and key-behavior feedback LED colors from
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
-  visible color swatches, transparent `TRNS` passthrough keys, key-behavior activity dots on layer images, a timing legend for the layer-local behavior tables, and only filled macro slots
+  visible color swatches, transparent `TRNS` passthrough keys, key-behavior activity dots on layer images, a short timing legend for the layer-local behavior tables, and only filled macro slots
 
 Practical usage:
 

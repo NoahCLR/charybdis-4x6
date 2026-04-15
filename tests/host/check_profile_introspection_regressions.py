@@ -12,11 +12,11 @@ REPORT = ROOT / "docs" / "generated" / "profile-introspection.md"
 
 EXPECTED_SNIPPETS = {
     "timing legend": "Timing legend for the layer-local behavior tables:",
-    "pd manifest note": "PD mode identities and mode-key mapping are resolved in the background from the shared manifest",
+    "pd manifest note": "PD mode names and bindings in this report stay in sync with the shared definitions in",
     "esc long-hold timing": "| `ESC` | `ESC` (`KC_ESC`) | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `tap_hold(150), long_hold(400), multi_tap(150)` |",
     "minus hold timing": "| `-` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `tap_hold(150)` |",
-    "left shift fallback timing": "| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `tap < tap_hold(150); else normal hold` |",
-    "right alt fallback timing": "| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `tap < tap_hold(150); else normal hold` |",
+    "left shift fallback timing": "| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |",
+    "right alt fallback timing": "| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |",
     "lt nav timing override": "| `LT[NAV]/SLSH` | `LT[NAV]/SLSH` (`LT(LAYER_NAV,KC_SLSH)`) | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))` | `-` | `tap_hold=100, multi_tap(150)` |",
 }
 

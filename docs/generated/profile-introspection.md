@@ -1,7 +1,7 @@
 <!-- Generated file. Do not edit by hand. -->
 # Profile Introspection
 This report is generated from the authored profile files [keymap.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), and [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). The renderer is board-specific to the Charybdis 4x6 and derives the current `LAYOUT()` slot order directly from [keymap.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
-PD mode identities and mode-key mapping are resolved in the background from the shared manifest [pd_mode_manifest.h](../../users/noah/lib/pointing/defs/pd_mode_manifest.h).
+PD mode names and bindings in this report stay in sync with the shared definitions in [pd_mode_manifest.h](../../users/noah/lib/pointing/defs/pd_mode_manifest.h).
 ## Summary
 
 | Field | Value |
@@ -63,7 +63,7 @@ PD mode identities and mode-key mapping are resolved in the background from the 
 | [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
 | [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pd-mode colors, and key-behavior feedback colors |
 
-PD mode identity and mode-key mapping are resolved in the background from [pd_mode_manifest.h](../../users/noah/lib/pointing/defs/pd_mode_manifest.h).
+PD mode names and bindings in this report stay in sync with the shared definitions in [pd_mode_manifest.h](../../users/noah/lib/pointing/defs/pd_mode_manifest.h).
 
 ### Layer RGB Config
 
@@ -103,10 +103,10 @@ These previews are generated as SVG image assets under [profile-introspection-as
 
 Timing legend for the layer-local behavior tables:
 
-- `tap_hold(...)`, `long_hold(...)`, and `multi_tap(...)` are inherited defaults from [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
-- `tap_hold=...`, `long_hold=...`, and `multi_tap=...` are per-row overrides authored in `key_behaviors[]`
-- `tap < tap_hold(...); else normal hold` means the authored tap wins on a quick release, otherwise the key falls back to its normal held path
-- Timing is tap-index sensitive: a row lists only the thresholds that matter for that specific tap count
+- `tap_hold(...)`, `long_hold(...)`, and `multi_tap(...)` use the default timings from [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+- `tap_hold=...`, `long_hold=...`, and `multi_tap=...` are custom timings authored on that key
+- `release before tap_hold(...); otherwise normal hold` means the tap fires on a quick release; if you keep holding, the key keeps its normal hold behavior
+- Timing is shown per tap count, so each row lists only the timings that matter for that behavior
 
 ### `LAYER_BASE`
 
@@ -137,13 +137,13 @@ Timing legend for the layer-local behavior tables:
 | `0` | `0` (`KC_0`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RPRN)` | `-` | `tap_hold(150)` |
 | `-` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `tap_hold(150)` |
 | `\` | `\` (`KC_BSLS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_PIPE)` | `-` | `tap_hold(150)` |
-| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `tap < tap_hold(150); else normal hold` |
+| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `;` | `;` (`KC_SCLN`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_COLN)` | `-` | `tap_hold(150)` |
 | `'` | `'` (`KC_QUOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)` | `-` | `tap_hold(150)` |
 | `,` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `tap_hold(150)` |
 | `.` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `tap_hold(150)` |
 | `LT[NAV]/SLSH` | `LT[NAV]/SLSH` (`LT(LAYER_NAV,KC_SLSH)`) | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))` | `-` | `tap_hold=100, multi_tap(150)` |
-| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `tap < tap_hold(150); else normal hold` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `tap_hold(150), multi_tap(150)` |
 | `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold(150), long_hold(400), multi_tap(150)` |
@@ -180,8 +180,8 @@ No pd-mode keys are placed directly on this layer.
 | `ESC` | `ESC` (`KC_ESC`) | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `tap_hold(150), long_hold(400), multi_tap(150)` |
 | `ESC` | `ESC` (`KC_ESC`) | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` | `multi_tap(150)` |
 | `-` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `tap_hold(150)` |
-| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `tap < tap_hold(150); else normal hold` |
-| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `tap < tap_hold(150); else normal hold` |
+| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `,` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `tap_hold(150)` |
 | `.` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `tap_hold(150)` |
 
@@ -209,10 +209,10 @@ No authored combos resolve entirely from keys on this layer.
 | `ESC x2` | `ESC` (`KC_ESC`) | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` | `multi_tap(150)` |
 | `-` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `tap_hold(150)` |
 | `'` | `'` (`KC_QUOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)` | `-` | `tap_hold(150)` |
-| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `tap < tap_hold(150); else normal hold` |
+| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `[` | `[` (`KC_LBRC`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)` | `-` | `tap_hold(150)` |
 | `]` | `]` (`KC_RBRC`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)` | `-` | `tap_hold(150)` |
-| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `tap < tap_hold(150); else normal hold` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 
 #### PD Mode Keys On This Layer
 
@@ -234,14 +234,14 @@ No authored combos resolve entirely from keys on this layer.
 
 | Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
 | --- | --- | --- | --- | --- | --- | --- |
-| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `tap < tap_hold(150); else normal hold` |
+| `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LEFT` | `LEFT` (`KC_LEFT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `tap_hold(150), long_hold(400)` |
 | `RIGHT` | `RIGHT` (`KC_RIGHT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `tap_hold(150), long_hold(400)` |
 | `ESC` | `ESC` (`KC_ESC`) | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `tap_hold(150), long_hold(400), multi_tap(150)` |
 | `ESC` | `ESC` (`KC_ESC`) | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` | `multi_tap(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))` | `-` | `tap_hold(150), multi_tap(150)` |
-| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `tap < tap_hold(150); else normal hold` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 
 #### PD Mode Keys On This Layer
 
@@ -267,7 +267,7 @@ No authored combos resolve entirely from keys on this layer.
 
 | Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
 | --- | --- | --- | --- | --- | --- | --- |
-| `BRIGHTNESS` | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `tap < tap_hold(150); else normal hold` |
+| `BRIGHTNESS` | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
