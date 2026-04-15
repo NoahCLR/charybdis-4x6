@@ -152,10 +152,8 @@
     <circle cx="944.0" cy="270.0" r="5.5" fill="#00fffc" stroke="#f7f7f4" stroke-width="1.5"/>
   </g>
   <g transform="rotate(0 991.0 329.0)">
-    <rect x="962.0" y="300.0" width="58" height="58" rx="7" fill="#3c00ff" stroke="#2000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="991.0" y="333.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">ESC</text>
-    <circle cx="998.0" cy="310.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
-    <circle cx="1010.0" cy="310.0" r="5.5" fill="#00fffc" stroke="#f7f7f4" stroke-width="1.5"/>
+    <rect x="962.0" y="300.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="991.0" y="333.0" fill="#ffffff" fill-opacity="0.72" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(0 1057.0 329.0)">
     <rect x="1028.0" y="300.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -208,9 +206,8 @@
     <text x="991.0" y="397.0" fill="#ffffff" fill-opacity="0.72" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(0 1057.0 393.0)">
-    <rect x="1028.0" y="364.0" width="58" height="58" rx="7" fill="#3c00ff" stroke="#2000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="397.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">RALT</text>
-    <circle cx="1076.0" cy="374.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
+    <rect x="1028.0" y="364.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="1057.0" y="397.0" fill="#ffffff" fill-opacity="0.72" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(0 357.0 437.0)">
     <rect x="328.0" y="408.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
