@@ -95,11 +95,11 @@
   </g>
   <g transform="rotate(0 859.0 201.0)">
     <rect x="830.0" y="172.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="859.0" y="205.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LPRN</text>
+    <text x="859.0" y="205.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">(</text>
   </g>
   <g transform="rotate(0 925.0 225.0)">
     <rect x="896.0" y="196.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="229.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">RPRN</text>
+    <text x="925.0" y="229.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">)</text>
   </g>
   <g transform="rotate(0 991.0 265.0)">
     <rect x="962.0" y="236.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>

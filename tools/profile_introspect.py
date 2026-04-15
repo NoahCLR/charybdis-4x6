@@ -22,78 +22,141 @@ CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "key
 RGB_CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "rgb_config.c"
 PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "defs" / "pd_mode_manifest.h"
 
-OUTPUT_DIR = REPO_ROOT / "docs" / "generated"
-MARKDOWN_OUTPUT = OUTPUT_DIR / "profile-introspection.md"
-ASSET_OUTPUT_DIR = OUTPUT_DIR / "profile-introspection-assets"
+DOCS_DIR = REPO_ROOT / "docs"
+MEDIA_DIR = DOCS_DIR / "media"
+LEGACY_OUTPUT_DIR = DOCS_DIR / "generated"
+MARKDOWN_OUTPUT = DOCS_DIR / "profile-introspection.md"
+ASSET_OUTPUT_DIR = MEDIA_DIR / "profile-introspection"
+LEGACY_MARKDOWN_OUTPUT = LEGACY_OUTPUT_DIR / "profile-introspection.md"
+LEGACY_ASSET_OUTPUT_DIR = LEGACY_OUTPUT_DIR / "profile-introspection-assets"
 LAYER_IMAGE_PREFIX = "profile-layer-"
 COLOR_SWATCH_PREFIX = "profile-color-swatch-"
 LEGACY_JSON_OUTPUTS = [
-    OUTPUT_DIR / "profile-summary.json",
-    ASSET_OUTPUT_DIR / "profile-summary.json",
+    LEGACY_OUTPUT_DIR / "profile-summary.json",
+    LEGACY_ASSET_OUTPUT_DIR / "profile-summary.json",
 ]
 
 MARKDOWN_HEADER = "<!-- Generated file. Do not edit by hand. -->\n"
 
 DISPLAY_ALIASES = {
-    "KC_ESCAPE": "ESC",
-    "KC_ESC": "ESC",
-    "KC_ENTER": "ENT",
-    "KC_ENT": "ENT",
-    "KC_SPACE": "SPC",
-    "KC_SPC": "SPC",
-    "KC_BACKSPACE": "BSPC",
-    "KC_BSPC": "BSPC",
-    "KC_DELETE": "DEL",
-    "KC_DEL": "DEL",
-    "KC_TAB": "TAB",
-    "KC_LEFT_SHIFT": "LSFT",
-    "KC_RIGHT_SHIFT": "RSFT",
-    "KC_LEFT_CTRL": "LCTL",
-    "KC_RIGHT_CTRL": "RCTL",
-    "KC_LEFT_ALT": "LALT",
-    "KC_RIGHT_ALT": "RALT",
-    "KC_LEFT_GUI": "LGUI",
-    "KC_RIGHT_GUI": "RGUI",
-    "KC_LEFT": "LEFT",
-    "KC_RIGHT": "RIGHT",
-    "KC_UP": "UP",
-    "KC_DOWN": "DOWN",
-    "KC_MPLY": "PLAY",
-    "KC_MNXT": "NEXT",
-    "KC_MPRV": "PREV",
-    "KC_MUTE": "MUTE",
-    "KC_VOLD": "VOL-",
-    "KC_VOLU": "VOL+",
-    "KC_BRID": "BRI-",
-    "KC_BRIU": "BRI+",
-    "KC_COMM": ",",
-    "KC_DOT": ".",
-    "KC_SLSH": "/",
-    "KC_BSLS": "\\",
-    "KC_SCLN": ";",
-    "KC_QUOT": "'",
-    "KC_MINS": "-",
-    "KC_UNDS": "_",
-    "KC_LBRC": "[",
-    "KC_RBRC": "]",
-    "KC_LCBR": "{",
-    "KC_RCBR": "}",
-    "KC_LABK": "<",
-    "KC_RABK": ">",
-    "KC_COLN": ":",
-    "KC_PIPE": "|",
-    "KC_DQUO": '"',
-    "KC_PEQL": "=",
-    "KC_PPLS": "P+",
-    "KC_PMNS": "P-",
-    "KC_PAST": "P*",
-    "KC_PSLS": "P/",
-    "KC_PDOT": "P.",
     "_______": "TRNS",
     "XXXXXXX": "NO",
     "LEFT_THUMB": "LTHUMB",
     "RIGHT_THUMB": "RTHUMB",
-    "KC_RGHT": "RIGHT",
+}
+
+KC_DISPLAY_ALIASES = {
+    "ESCAPE": "ESC",
+    "ESC": "ESC",
+    "ENTER": "ENT",
+    "ENT": "ENT",
+    "INSERT": "INS",
+    "INS": "INS",
+    "HOME": "HOME",
+    "END": "END",
+    "PGUP": "PGUP",
+    "PGDN": "PGDN",
+    "SPACE": "SPC",
+    "SPC": "SPC",
+    "BACKSPACE": "BSPC",
+    "BSPC": "BSPC",
+    "DELETE": "DEL",
+    "DEL": "DEL",
+    "CAPS": "CAPS",
+    "TAB": "TAB",
+    "APP": "APP",
+    "MENU": "MENU",
+    "PSCR": "PSCR",
+    "PRINT_SCREEN": "PSCR",
+    "SCRL": "SCRL",
+    "SCROLL_LOCK": "SCRL",
+    "PAUS": "PAUSE",
+    "PAUSE": "PAUSE",
+    "NLCK": "NUM",
+    "NUMLOCK": "NUM",
+    "LEFT": "LEFT",
+    "RIGHT": "RIGHT",
+    "RGHT": "RIGHT",
+    "UP": "UP",
+    "DOWN": "DOWN",
+    "MPLY": "PLAY",
+    "MNXT": "NEXT",
+    "MPRV": "PREV",
+    "MUTE": "MUTE",
+    "MSTP": "STOP",
+    "MFFD": "FFWD",
+    "MRWD": "RWD",
+    "MSEL": "MEDIA",
+    "EJCT": "EJECT",
+    "VOLD": "VOL-",
+    "VOLU": "VOL+",
+    "BRID": "BRI-",
+    "BRIU": "BRI+",
+    "MS_UP": "MS UP",
+    "MS_DOWN": "MS DOWN",
+    "MS_LEFT": "MS LEFT",
+    "MS_RIGHT": "MS RIGHT",
+    "WH_U": "WH UP",
+    "WH_D": "WH DOWN",
+    "WH_L": "WH LEFT",
+    "WH_R": "WH RIGHT",
+    "BTN1": "BTN1",
+    "BTN2": "BTN2",
+    "BTN3": "BTN3",
+    "BTN4": "BTN4",
+    "BTN5": "BTN5",
+    "BTN6": "BTN6",
+    "BTN7": "BTN7",
+    "BTN8": "BTN8",
+    "ACL0": "ACC0",
+    "ACL1": "ACC1",
+    "ACL2": "ACC2",
+    "COMM": ",",
+    "DOT": ".",
+    "SLSH": "/",
+    "BSLS": "\\",
+    "SCLN": ";",
+    "QUOT": "'",
+    "MINS": "-",
+    "UNDS": "_",
+    "LBRC": "[",
+    "RBRC": "]",
+    "LCBR": "{",
+    "RCBR": "}",
+    "LABK": "<",
+    "RABK": ">",
+    "COLN": ":",
+    "PIPE": "|",
+    "DQUO": '"',
+    "GRV": "`",
+    "TILD": "~",
+    "EXLM": "!",
+    "AT": "@",
+    "HASH": "#",
+    "DLR": "$",
+    "PERC": "%",
+    "CIRC": "^",
+    "AMPR": "&",
+    "ASTR": "*",
+    "LPRN": "(",
+    "RPRN": ")",
+    "EQL": "=",
+    "PEQL": "=",
+    "PPLS": "P+",
+    "PMNS": "P-",
+    "PAST": "P*",
+    "PSLS": "P/",
+    "PDOT": "P.",
+    "TRNS": "TRNS",
+    "TRANSPARENT": "TRNS",
+    "NO": "NO",
+}
+
+KC_SIDE_MODIFIERS = {
+    "SHIFT": "SFT",
+    "CTRL": "CTL",
+    "ALT": "ALT",
+    "GUI": "GUI",
 }
 
 TAP_COUNT_NAMES = {
@@ -944,6 +1007,28 @@ def short_mode_name(name: str) -> str:
     return name.removesuffix("_MODE")
 
 
+def display_kc_suffix(suffix: str) -> str:
+    if suffix in KC_DISPLAY_ALIASES:
+        return KC_DISPLAY_ALIASES[suffix]
+
+    modifier_match = re.fullmatch(r"(LEFT|RIGHT)_(SHIFT|CTRL|ALT|GUI)", suffix)
+    if modifier_match:
+        side, modifier = modifier_match.groups()
+        return side[0] + KC_SIDE_MODIFIERS[modifier]
+
+    shorthand_modifier_match = re.fullmatch(r"(L|R)(SFT|CTL|ALT|GUI)", suffix)
+    if shorthand_modifier_match:
+        return suffix
+
+    if re.fullmatch(r"[A-Z0-9]", suffix):
+        return suffix
+
+    if re.fullmatch(r"P[0-9]", suffix):
+        return suffix
+
+    return suffix
+
+
 def display_token(token: str) -> str:
     normalized = normalize_expr(token)
     if normalized in DISPLAY_ALIASES:
@@ -953,7 +1038,7 @@ def display_token(token: str) -> str:
     if normalized.startswith("MACRO_"):
         return "MACRO" + normalized.rsplit("_", 1)[1]
     if normalized.startswith("KC_"):
-        return normalized[3:]
+        return display_kc_suffix(normalized[3:])
     if normalized.startswith("LT(") and normalized.endswith(")"):
         inner = split_top_level(normalized[3:-1])
         if len(inner) == 2:
@@ -1206,7 +1291,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
-    asset_dir_link = markdown_path_link(ASSET_OUTPUT_DIR, "profile-introspection-assets/")
+    asset_dir_link = markdown_path_link(ASSET_OUTPUT_DIR, "docs/media/profile-introspection/")
     lines = [
         "## Layer Images",
         "",
@@ -1236,7 +1321,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         lines.append(f"- Authored layer color: `HSV({color_config['color']['h']}, {color_config['color']['s']}, {color_config['color']['v']})`")
         lines.append(f"- Preview color: {preview_swatch}")
         lines.append("")
-        lines.append(f"![{layer['name']}](./{ASSET_OUTPUT_DIR.name}/{image_name})")
+        lines.append(f"![{layer['name']}]({markdown_relative_path(ASSET_OUTPUT_DIR / image_name)})")
         lines.append("")
         lines.extend(render_layer_local_key_behaviors(layer, profile))
         lines.extend(render_layer_local_pd_modes(layer, profile))
@@ -1289,19 +1374,22 @@ def color_swatch_image_name(fill_hex: str) -> str:
     return f"{COLOR_SWATCH_PREFIX}{fill_hex.removeprefix('#').lower()}.svg"
 
 
+def markdown_relative_path(path: Path) -> str:
+    return Path(os.path.relpath(path, MARKDOWN_OUTPUT.parent)).as_posix()
+
+
 def markdown_color_swatch(color: dict[str, object] | None, alt_text: str) -> str:
     if color is None:
         return "no override"
     return (
         f'<img alt="{html.escape(alt_text, quote=True)}" '
-        f'src="./{ASSET_OUTPUT_DIR.name}/{color_swatch_image_name(color["hex"])}" '
+        f'src="{markdown_relative_path(ASSET_OUTPUT_DIR / color_swatch_image_name(color["hex"]))}" '
         f'width="{SWATCH_WIDTH}" height="{SWATCH_HEIGHT}" />'
     )
 
 
 def markdown_path_link(path: Path, label: str | None = None) -> str:
-    target = Path(os.path.relpath(path, MARKDOWN_OUTPUT.parent)).as_posix()
-    return f"[{label or path.name}]({target})"
+    return f"[{label or path.name}]({markdown_relative_path(path)})"
 
 
 def layer_positions_by_raw_keycode(layer: dict[str, object]) -> dict[str, list[dict[str, object]]]:
@@ -1898,7 +1986,7 @@ def format_layout_position(position: dict[str, object]) -> str:
 
 
 def render_generated_assets_section() -> str:
-    asset_dir_link = markdown_path_link(ASSET_OUTPUT_DIR, "profile-introspection-assets/")
+    asset_dir_link = markdown_path_link(ASSET_OUTPUT_DIR, "docs/media/profile-introspection/")
     tool_link = markdown_path_link(SCRIPT_DIR / "profile_introspect.py", "tools/profile_introspect.py")
     return "\n".join(
         [
@@ -1916,14 +2004,21 @@ def render_generated_assets_section() -> str:
 def managed_generated_artifact_paths(assets: dict[Path, str]) -> set[Path]:
     managed_paths = set(assets)
     managed_paths.update(LEGACY_JSON_OUTPUTS)
+    managed_paths.add(LEGACY_MARKDOWN_OUTPUT)
 
-    for path in OUTPUT_DIR.glob(f"{LAYER_IMAGE_PREFIX}*.svg"):
+    for path in LEGACY_OUTPUT_DIR.glob(f"{LAYER_IMAGE_PREFIX}*.svg"):
         managed_paths.add(path)
 
     for path in ASSET_OUTPUT_DIR.glob(f"{LAYER_IMAGE_PREFIX}*.svg"):
         managed_paths.add(path)
 
     for path in ASSET_OUTPUT_DIR.glob(f"{COLOR_SWATCH_PREFIX}*.svg"):
+        managed_paths.add(path)
+
+    for path in LEGACY_ASSET_OUTPUT_DIR.glob(f"{LAYER_IMAGE_PREFIX}*.svg"):
+        managed_paths.add(path)
+
+    for path in LEGACY_ASSET_OUTPUT_DIR.glob(f"{COLOR_SWATCH_PREFIX}*.svg"):
         managed_paths.add(path)
 
     return managed_paths
@@ -1978,7 +2073,7 @@ def check_outputs(assets: dict[Path, str]) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--write", action="store_true", help="write docs/generated/profile-introspection.md and docs/generated/profile-introspection-assets/*")
+    parser.add_argument("--write", action="store_true", help="write docs/profile-introspection.md and docs/media/profile-introspection/*")
     parser.add_argument("--check", action="store_true", help="fail if the generated artifacts are not current")
     parser.add_argument("--print-markdown", action="store_true", help="print the Markdown report to stdout")
     args = parser.parse_args()

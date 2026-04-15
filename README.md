@@ -97,18 +97,18 @@ authored profile surfaces directly from
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
 [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), and
 [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
-uses the current `LAYOUT()` slot order from `keymap.c`, uses full-bright
+uses the current `LAYOUT()` slot order from `keymap.c`, uses
 preview swatches, keeps pd-mode names and bindings in sync with the shared
 definitions in
 [`pd_mode_manifest.h`](./users/noah/lib/pointing/defs/pd_mode_manifest.h), and
 generates:
 
 - per-layer visual SVG previews in
-  [`docs/generated/profile-introspection-assets/`](./docs/generated/profile-introspection-assets/)
+  [`docs/media/profile-introspection/`](./docs/media/profile-introspection/)
   using the authored `layer_colors[]` config from
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - a rendered layer-map and inventory report in
-  [`docs/generated/profile-introspection.md`](./docs/generated/profile-introspection.md)
+  [`docs/profile-introspection.md`](./docs/profile-introspection.md)
   including authored layer colors, pd-mode colors, and key-behavior feedback LED colors from
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
   visible color swatches, transparent `TRNS` passthrough keys, key-behavior activity dots on layer images, a short timing legend for the layer-local behavior tables, and only filled macro slots
@@ -123,9 +123,9 @@ Practical usage:
 - `python3 'via layouts/via_to_qmk_layout.py' --via-json path/to/export.json`
   uses a specific VIA export instead of choosing one from `via layouts/`
 - `python3 tools/profile_introspect.py --write` regenerates the authored
-  profile report under [`docs/generated/`](./docs/generated/) and the SVG
+  profile report at [`docs/profile-introspection.md`](./docs/profile-introspection.md) and the SVG
   assets under
-  [`docs/generated/profile-introspection-assets/`](./docs/generated/profile-introspection-assets/)
+  [`docs/media/profile-introspection/`](./docs/media/profile-introspection/)
 - `python3 tools/profile_introspect.py --check` verifies those generated
   artifacts are current
 - `python3 tools/profile_introspect.py --print-markdown` previews the rendered
@@ -479,6 +479,9 @@ These docs are the next place to look:
   behavior
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
+- [`docs/profile-introspection.md`](./docs/profile-introspection.md): visual
+  profile report with per-layer images, key behaviors, pd modes, combos, and
+  macro inventory
 
 ## A Little Show-Off Of My Build
 
