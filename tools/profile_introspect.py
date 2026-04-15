@@ -7,8 +7,6 @@ import argparse
 import ast
 import difflib
 import html
-import json
-import os
 import re
 import sys
 from dataclasses import asdict, dataclass
@@ -21,9 +19,6 @@ REPO_ROOT = SCRIPT_DIR.parent
 KEYMAP_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "keymap.c"
 CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "config.h"
 RGB_CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "rgb_config.c"
-NOAH_KEYMAP_IDS_FILE = REPO_ROOT / "users" / "noah" / "noah_keymap_ids.h"
-PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "defs" / "pd_mode_manifest.h"
-KEYBOARD_JSON_RELATIVE_PATH = Path("keyboards") / "bastardkb" / "charybdis" / "4x6" / "keyboard.json"
 
 OUTPUT_DIR = REPO_ROOT / "docs" / "generated"
 MARKDOWN_OUTPUT = OUTPUT_DIR / "profile-introspection.md"
@@ -66,8 +61,6 @@ CONFIG_MACROS = [
     "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS",
     "AUTOMOUSE_RGB_DEAD_TIME",
 ]
-
-_PD_MODE_MANIFEST_ENTRY_PATTERN = re.compile(r"^\s*PDM\(\s*([A-Z_][A-Z0-9_]*)\s*,\s*([A-Z_][A-Z0-9_]*)\s*,")
 
 DISPLAY_ALIASES = {
     "KC_ESCAPE": "ESC",
@@ -139,21 +132,6 @@ TAP_COUNT_NAMES = {
     4: "quintuple",
 }
 
-HUE_FAMILY_NAMES = [
-    (0, "red"),
-    (21, "orange"),
-    (43, "yellow"),
-    (64, "chartreuse green"),
-    (85, "green"),
-    (106, "spring green"),
-    (127, "cyan"),
-    (148, "azure"),
-    (169, "blue"),
-    (180, "violet"),
-    (201, "magenta"),
-    (222, "rose"),
-]
-
 FEEDBACK_COLOR_FIELDS = {
     "multi_tap_pending_color": {
         "label": "Multi-tap pending",
@@ -196,6 +174,10 @@ THUMB_VISUALS = {
     54: {"x": 468, "y": 446, "angle": 15},
     55: {"x": 578, "y": 432, "angle": -15},
 }
+LAYOUT_SLOT_COUNT = 56
+MAIN_CLUSTER_KEYS_PER_HALF = 24
+ROWS_PER_MAIN_CLUSTER = 4
+COLUMNS_PER_MAIN_CLUSTER = 6
 
 
 @dataclass
@@ -245,69 +227,6 @@ def read_text(path: Path) -> str:
     if not path.exists():
         die(f"missing required file: {path}")
     return path.read_text()
-
-
-def keyboard_json_candidates(override: Path | None = None) -> list[Path]:
-    candidates: list[Path] = []
-
-    if override is not None:
-        candidates.append(override.expanduser())
-
-    candidates.append(REPO_ROOT / KEYBOARD_JSON_RELATIVE_PATH)
-
-    for env_name in ("QMK_HOME", "QMK_FIRMWARE"):
-        env_value = os.environ.get(env_name)
-        if env_value:
-            candidates.append(Path(env_value).expanduser() / KEYBOARD_JSON_RELATIVE_PATH)
-
-    candidates.append(REPO_ROOT.parent / "bastardkb-qmk" / KEYBOARD_JSON_RELATIVE_PATH)
-
-    unique_candidates: list[Path] = []
-    seen: set[Path] = set()
-    for candidate in candidates:
-        resolved = candidate.resolve(strict=False)
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        unique_candidates.append(candidate)
-    return unique_candidates
-
-
-def locate_keyboard_json(override: Path | None = None) -> Path:
-    for candidate in keyboard_json_candidates(override):
-        if candidate.exists():
-            return candidate
-
-    searched = "\n".join(f"  - {path}" for path in keyboard_json_candidates(override))
-    die(f"could not find Charybdis keyboard.json. searched:\n{searched}")
-
-
-def load_layout_template(keyboard_json_path: Path) -> list[dict[str, object]]:
-    try:
-        keyboard_data = json.loads(read_text(keyboard_json_path))
-    except json.JSONDecodeError as exc:
-        die(f"could not parse keyboard metadata from {keyboard_json_path}: {exc}")
-
-    layout_body = keyboard_data.get("layouts", {}).get("LAYOUT", {}).get("layout")
-    if not isinstance(layout_body, list) or not layout_body:
-        die(f"keyboard metadata did not provide layouts.LAYOUT.layout in {keyboard_json_path}")
-
-    template: list[dict[str, object]] = []
-    for index, entry in enumerate(layout_body):
-        if not isinstance(entry, dict):
-            die(f"keyboard metadata layout entry {index} is not an object in {keyboard_json_path}")
-        matrix = entry.get("matrix")
-        if not isinstance(matrix, list) or len(matrix) != 2:
-            die(f"keyboard metadata layout entry {index} has invalid matrix data in {keyboard_json_path}")
-        template.append(
-            {
-                "matrix": [int(matrix[0]), int(matrix[1])],
-                "x": entry.get("x"),
-                "y": entry.get("y"),
-            }
-        )
-
-    return template
 
 
 def strip_comments(text: str) -> str:
@@ -658,10 +577,6 @@ def extract_color_name_from_comment(comment_text: str, known_names: set[str] | N
             if re.search(rf"\b{re.escape(name)}\b", normalized):
                 return name
 
-    for fallback in ("white", "orange", "yellow", "green", "cyan", "blue", "violet", "purple", "magenta", "red"):
-        if re.search(rf"\b{re.escape(fallback)}\b", normalized):
-            return fallback
-
     return None
 
 
@@ -702,14 +617,9 @@ def qmk_preview_hsv_to_rgb(h: int, s: int, v: int) -> tuple[int, int, int]:
     return preview_v, p, q
 
 
-def parse_pd_mode_colors(
-    raw_text: str,
-    known_values: dict[str, str],
-    pd_modes: list[dict[str, str]],
-) -> list[dict[str, object]]:
+def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[dict[str, object]]:
     body = extract_initializer_body(raw_text, r"pd_mode_colors\[\]\s*=")
     entry_pattern = re.compile(r"\{(?P<body>.*?)\}\s*,\s*//\s*(?P<label>[^\n]+)", re.DOTALL)
-    keycode_lookup = {f"PD_MODE_{row['name']}": row["keycode"] for row in pd_modes}
     rows: list[dict[str, object]] = []
 
     for match in entry_pattern.finditer(body):
@@ -718,14 +628,12 @@ def parse_pd_mode_colors(
             continue
         pointing_mode = normalize_expr(fields[".pointing_mode"])
         color = parse_hsv_expr(fields[".color"], known_values)
-        color_name = extract_color_name_from_comment(match.group("label"))
         rows.append(
             {
                 "pointing_mode": pointing_mode,
-                "keycode": keycode_lookup.get(pointing_mode, ""),
                 "color": color,
                 "preview_color": dict(color),
-                "preview_name": color_name or hue_family_label(color),
+                "comment_color_name": normalize_color_name(match.group("label")) or None,
             }
         )
 
@@ -804,7 +712,6 @@ def parse_key_behavior_feedback_colors(
                 "meaning": row["meaning"],
                 "color": authored_color,
                 "preview_color": preview_color,
-                "preview_name": semantic_name or hue_family_label(preview_color),
             }
         )
 
@@ -843,20 +750,6 @@ def finalize_layer_colors(layer_colors: list[dict[str, object]], rgb_default_col
         finalized.append({**row, "preview_color": preview_color, "preview_source": preview_source})
 
     return finalized
-
-
-def parse_pd_modes(text: str) -> list[dict[str, str]]:
-    modes: list[dict[str, str]] = []
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line.startswith("PDM("):
-            continue
-        match = _PD_MODE_MANIFEST_ENTRY_PATTERN.match(line)
-        if not match:
-            die(f"could not parse pd-mode manifest row: {raw_line!r}")
-        name, keycode = match.groups()
-        modes.append({"name": name, "keycode": keycode})
-    return modes
 
 
 def parse_macro_slots(rows: list[list[str]], kind: str) -> list[MacroSlot]:
@@ -990,7 +883,21 @@ def parse_combos(text: str) -> list[Combo]:
     return combos
 
 
-def parse_layers(text: str, known_behaviors: set[str], layout_template: list[dict[str, object]]) -> list[dict[str, object]]:
+def derive_layout_slot(layout_index: int) -> tuple[str, int | None, int | None]:
+    if layout_index < MAIN_CLUSTER_KEYS_PER_HALF:
+        return "left", layout_index // COLUMNS_PER_MAIN_CLUSTER, layout_index % COLUMNS_PER_MAIN_CLUSTER
+
+    right_index = layout_index - MAIN_CLUSTER_KEYS_PER_HALF
+    if right_index < MAIN_CLUSTER_KEYS_PER_HALF:
+        return "right", right_index // COLUMNS_PER_MAIN_CLUSTER, right_index % COLUMNS_PER_MAIN_CLUSTER
+
+    if layout_index < LAYOUT_SLOT_COUNT:
+        return "thumb", None, None
+
+    die(f"unexpected layout slot index: {layout_index}")
+
+
+def parse_layers(text: str, known_behaviors: set[str]) -> list[dict[str, object]]:
     array_body = extract_initializer_body(text, r"keymaps\[\]\[MATRIX_ROWS\]\[MATRIX_COLS\]\s*=")
     layers: list[dict[str, object]] = []
     search = 0
@@ -1004,16 +911,17 @@ def parse_layers(text: str, known_behaviors: set[str], layout_template: list[dic
         open_paren = array_body.find("(", absolute_start)
         close_paren = find_matching(array_body, open_paren, "(", ")")
         items = [normalize_expr(item) for item in split_top_level(array_body[open_paren + 1 : close_paren])]
-        if len(items) != len(layout_template):
-            die(f"{layer_name} expected {len(layout_template)} layout entries, got {len(items)}")
+        if len(items) != LAYOUT_SLOT_COUNT:
+            die(f"{layer_name} expected {LAYOUT_SLOT_COUNT} layout entries, got {len(items)}")
         positions: list[dict[str, object]] = []
-        for layout_index, (template, keycode) in enumerate(zip(layout_template, items, strict=True)):
+        for layout_index, keycode in enumerate(items):
+            cluster, layout_row, layout_col = derive_layout_slot(layout_index)
             positions.append(
                 {
                     "layout_index": layout_index,
-                    "matrix": template["matrix"],
-                    "x": template["x"],
-                    "y": template["y"],
+                    "cluster": cluster,
+                    "layout_row": layout_row,
+                    "layout_col": layout_col,
                     "keycode": keycode,
                     "display": display_token(keycode),
                     "has_key_behavior": keycode in known_behaviors,
@@ -1093,7 +1001,9 @@ def collect_macro_usages(
                         "kind": "layer",
                         "layer": layer_name,
                         "layout_index": position["layout_index"],
-                        "matrix": position["matrix"],
+                        "cluster": position["cluster"],
+                        "layout_row": position["layout_row"],
+                        "layout_col": position["layout_col"],
                     }
                 )
 
@@ -1122,15 +1032,11 @@ def collect_macro_usages(
     return usage_map
 
 
-def build_profile_model(keyboard_json_override: Path | None = None) -> dict[str, object]:
+def build_profile_model() -> dict[str, object]:
     config_text = strip_comments(read_text(CONFIG_FILE))
     rgb_config_raw_text = read_text(RGB_CONFIG_FILE)
     rgb_config_text = strip_comments(rgb_config_raw_text)
     keymap_text = strip_comments(read_text(KEYMAP_FILE))
-    noah_ids_text = strip_comments(read_text(NOAH_KEYMAP_IDS_FILE))
-    pd_mode_text = strip_comments(read_text(PD_MODE_MANIFEST_FILE))
-    keyboard_json_path = locate_keyboard_json(keyboard_json_override)
-    layout_template = load_layout_template(keyboard_json_path)
 
     layers = parse_config_layers(config_text)
     config_macros = parse_config_macros(config_text, CONFIG_MACROS)
@@ -1140,10 +1046,13 @@ def build_profile_model(keyboard_json_override: Path | None = None) -> dict[str,
     hardcoded_macros = parse_macro_slots(parse_macro_table(keymap_text, "HARDCODED_MACROS", "MACRO"), kind="hardcoded")
     behaviors = parse_key_behaviors(keymap_text)
     combos = parse_combos(keymap_text)
-    parsed_layers = parse_layers(keymap_text, known_behaviors={behavior.keycode for behavior in behaviors}, layout_template=layout_template)
-    pd_modes = parse_pd_modes(pd_mode_text)
-    pd_mode_colors = parse_pd_mode_colors(rgb_config_raw_text, config_macros, pd_modes)
-    pd_mode_color_anchors = {row["preview_name"]: row["preview_color"] for row in pd_mode_colors}
+    parsed_layers = parse_layers(keymap_text, known_behaviors={behavior.keycode for behavior in behaviors})
+    pd_mode_colors = parse_pd_mode_colors(rgb_config_raw_text, config_macros)
+    pd_mode_color_anchors = {
+        row["comment_color_name"]: row["preview_color"]
+        for row in pd_mode_colors
+        if row["comment_color_name"] is not None
+    }
     key_behavior_feedback_colors = parse_key_behavior_feedback_colors(rgb_config_raw_text, config_macros, pd_mode_color_anchors)
 
     macro_usages = collect_macro_usages(parsed_layers, behaviors, combos, via_macros + hardcoded_macros)
@@ -1156,17 +1065,12 @@ def build_profile_model(keyboard_json_override: Path | None = None) -> dict[str,
     for slot in hardcoded_macros:
         hardcoded_slots.append({**asdict(slot), "usages": macro_usages[slot.keycode]})
 
-    layer_lock_match = re.search(r"#\s*define\s+LOCK_LAYER\(layer_\)\s+\((.+)\)", noah_ids_text)
-    lock_layer_expr = normalize_expr(layer_lock_match.group(1)) if layer_lock_match else ""
-    pd_lock_match = re.search(r"#\s*define\s+LOCK_PD_MODE\(mode_keycode_\)\s+(.+)", noah_ids_text)
-    lock_pd_expr = normalize_expr(pd_lock_match.group(1)) if pd_lock_match else ""
-
     behavior_rows = [asdict(behavior) for behavior in behaviors]
     combos_rows = [asdict(combo) for combo in combos]
 
     summary = {
         "layer_count": len(parsed_layers),
-        "layout_key_count": len(layout_template),
+        "layout_key_count": LAYOUT_SLOT_COUNT,
         "key_behavior_count": len(behaviors),
         "key_behavior_step_count": sum(len(behavior.steps) for behavior in behaviors),
         "combo_count": len(combos),
@@ -1175,7 +1079,7 @@ def build_profile_model(keyboard_json_override: Path | None = None) -> dict[str,
         "hardcoded_macro_count": len(hardcoded_macros),
         "hardcoded_macro_non_empty_count": sum(not slot.empty for slot in hardcoded_macros),
         "keymap_custom_keycode_count": len(keymap_custom_keycodes),
-        "pd_mode_count": len(pd_modes),
+        "pd_mode_color_count": len(pd_mode_colors),
     }
 
     return {
@@ -1186,11 +1090,6 @@ def build_profile_model(keyboard_json_override: Path | None = None) -> dict[str,
             "pd_mode_colors": pd_mode_colors,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
         },
-        "derived_keycode_rules": {
-            "lock_layer": lock_layer_expr,
-            "lock_pd_mode": lock_pd_expr,
-        },
-        "pd_modes": pd_modes,
         "keymap_custom_keycodes": keymap_custom_keycodes,
         "via_macros": via_slots,
         "hardcoded_macros": hardcoded_slots,
@@ -1205,7 +1104,7 @@ def render_markdown(profile: dict[str, object]) -> str:
         MARKDOWN_HEADER.rstrip(),
         "# Profile Introspection",
         "",
-        "This report is generated from the authored profile data in `keymap.c`, `config.h`, `noah_keymap_ids.h`, the pd-mode manifest, and the live Charybdis `keyboard.json` layout metadata. Preview swatches use the repo's HSV hue wheel at full display brightness so the color intent is easy to read.",
+        "This report is generated from the authored profile files `keymap.c`, `config.h`, and `rgb_config.c`. The renderer is board-specific to the Charybdis 4x6 and derives the current `LAYOUT()` slot order directly from `keymap.c`.",
         "",
         render_summary_section(profile),
         render_layer_maps_section(profile),
@@ -1247,17 +1146,25 @@ def render_summary_section(profile: dict[str, object]) -> str:
     lines.extend(
         [
             "",
+            "### Authored Sources",
+            "",
+            "| File | Authored Surface |",
+            "| --- | --- |",
+            "| `keymap.c` | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |",
+            "| `config.h` | layer enum, timing, RGB defaults, and keymap-facing feature config |",
+            "| `rgb_config.c` | layer colors, pd-mode colors, and key-behavior feedback colors |",
+            "",
             "### Layer RGB Config",
             "",
-            "| Layer | RGB Matrix Render Mode | Authored HSV | Preview Hue |",
+            "| Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |",
             "| --- | --- | --- | --- |",
         ]
     )
     for row in rgb["layer_colors"]:
         color = row["color"]
-        preview_hue = hue_family_label(row["preview_color"])
+        preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['layer']} preview color")
         lines.append(
-            f"| `{row['layer']}` | `{row['mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | `{preview_hue}` |"
+            f"| `{row['layer']}` | `{row['mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
         )
 
     lines.extend(
@@ -1267,7 +1174,7 @@ def render_summary_section(profile: dict[str, object]) -> str:
             "",
             f"- Layers: {', '.join(f'`{layer}`' for layer in config['layers'])}",
             f"- Keymap-local custom keycodes: {', '.join(f'`{name}`' for name in profile['keymap_custom_keycodes']) or '`none`'}",
-            f"- PD modes: {', '.join(f'`{mode['keycode']}`' for mode in profile['pd_modes']) or '`none`'}",
+            f"- PD color overlays: {', '.join(f'`{row['pointing_mode']}`' for row in rgb['pd_mode_colors']) or '`none`'}",
             "",
         ]
     )
@@ -1279,7 +1186,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
     lines = [
         "## Layer Images",
         "",
-        "These previews are generated as SVG image assets under `./profile-introspection-assets/`. The renderer uses the authored `layer_colors[]` config from `rgb_config.c` and derives the physical `LAYOUT()` order from the live Charybdis `keyboard.json`:",
+        "These previews are generated as SVG image assets under `./profile-introspection-assets/`. The renderer uses the authored `layer_colors[]` config from `rgb_config.c` and the current `LAYOUT()` slot order from `keymap.c`:",
         "",
         "- `ALL_KEYS`: tint every physical key with the layer color",
         "- `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys",
@@ -1290,12 +1197,10 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         color_config = layer_color_map[layer["name"]]
         image_name = layer_image_name(layer["name"])
         preview_swatch = markdown_color_swatch(color_config["preview_color"], f"{layer['name']} preview color")
-        preview_hue = hue_family_label(color_config["preview_color"])
         lines.append(f"### `{layer['name']}`")
         lines.append("")
         lines.append(f"- RGB matrix render mode: `{color_config['mode']}`")
         lines.append(f"- Authored layer color: `HSV({color_config['color']['h']}, {color_config['color']['s']}, {color_config['color']['v']})`")
-        lines.append(f"- Preview hue: `{preview_hue}`")
         lines.append(f"- Preview color: {preview_swatch}")
         lines.append("")
         lines.append(f"![{layer['name']}](./{ASSET_OUTPUT_DIR.name}/{image_name})")
@@ -1323,8 +1228,8 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
         [
             "These overlays come from `pd_mode_colors[]` in `rgb_config.c` and paint the right half while the matching pointing mode is active.",
             "",
-            "| Pointing Mode | Mode Keycode | Authored HSV | Preview Hue | Preview Color |",
-            "| --- | --- | --- | --- | --- |",
+            "| Pointing Mode | Authored HSV | Preview Color |",
+            "| --- | --- | --- |",
         ]
     )
 
@@ -1332,7 +1237,7 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
         color = row["color"]
         preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['pointing_mode']} color")
         lines.append(
-            f"| `{row['pointing_mode']}` | `{row['keycode'] or '-'}` | `HSV({color['h']}, {color['s']}, {color['v']})` | `{row['preview_name']}` | {preview_swatch} |"
+            f"| `{row['pointing_mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
         )
 
     lines.append("")
@@ -1355,24 +1260,6 @@ def markdown_color_swatch(color: dict[str, object] | None, alt_text: str) -> str
         f'src="./{ASSET_OUTPUT_DIR.name}/{color_swatch_image_name(color["hex"])}" '
         f'width="{SWATCH_WIDTH}" height="{SWATCH_HEIGHT}" />'
     )
-
-
-def hue_family_label(color: dict[str, object] | None) -> str:
-    if color is None:
-        return "no override"
-    if color["v"] == 0:
-        return "off"
-    if color["s"] == 0:
-        return "white"
-
-    hue = color["h"] % 256
-    nearest = min(HUE_FAMILY_NAMES, key=lambda entry: circular_hue_distance(hue, entry[0]))
-    return nearest[1]
-
-
-def circular_hue_distance(left: int, right: int) -> int:
-    delta = abs(left - right)
-    return min(delta, 256 - delta)
 
 
 def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
@@ -1450,24 +1337,24 @@ def render_color_swatch_svg(fill_hex: str) -> str:
 
 def visual_geometry(position: dict[str, object]) -> dict[str, float]:
     layout_index = position["layout_index"]
-    matrix_row, matrix_col = position["matrix"]
+    cluster = position["cluster"]
+    layout_row = position["layout_row"]
+    layout_col = position["layout_col"]
 
     if layout_index in THUMB_VISUALS:
         thumb = THUMB_VISUALS[layout_index]
         return {"x": thumb["x"], "y": thumb["y"] + KEYBOARD_Y_OFFSET, "angle": thumb["angle"]}
 
-    if matrix_row <= 3:
+    if cluster == "left":
         return {
-            "x": LEFT_COLUMN_X[matrix_col],
-            "y": LEFT_COLUMN_TOP_Y[matrix_col] + (matrix_row * ROW_Y_STEP) + KEYBOARD_Y_OFFSET,
+            "x": LEFT_COLUMN_X[layout_col],
+            "y": LEFT_COLUMN_TOP_Y[layout_col] + (layout_row * ROW_Y_STEP) + KEYBOARD_Y_OFFSET,
             "angle": 0,
         }
 
-    physical_row = matrix_row - 5
-    physical_col = 5 - matrix_col
     return {
-        "x": RIGHT_COLUMN_X[physical_col],
-        "y": RIGHT_COLUMN_TOP_Y[physical_col] + (physical_row * ROW_Y_STEP) + KEYBOARD_Y_OFFSET,
+        "x": RIGHT_COLUMN_X[layout_col],
+        "y": RIGHT_COLUMN_TOP_Y[layout_col] + (layout_row * ROW_Y_STEP) + KEYBOARD_Y_OFFSET,
         "angle": 0,
     }
 
@@ -1587,8 +1474,8 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
         [
             "These colors come from `key_behavior_feedback_colors` in `rgb_config.c` and render last on top of the current layer and any pd-mode overlay.",
             "",
-            "| State | Meaning | Authored HSV | Preview Hue | Preview Color |",
-            "| --- | --- | --- | --- | --- |",
+            "| State | Meaning | Authored HSV | Preview Color |",
+            "| --- | --- | --- | --- |",
         ]
     )
 
@@ -1596,9 +1483,8 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
         color = row["color"]
         preview_color = row["preview_color"]
         preview_swatch = markdown_color_swatch(preview_color, f"{row['label']} color")
-        preview_hue = row["preview_name"]
         lines.append(
-            f"| `{row['label']}` | {row['meaning']} | `HSV({color['h']}, {color['s']}, {color['v']})` | `{preview_hue}` | {preview_swatch} |"
+            f"| `{row['label']}` | {row['meaning']} | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
         )
 
     lines.append("")
@@ -1698,8 +1584,7 @@ def format_usages(usages: list[dict[str, object]]) -> str:
     for usage in usages:
         kind = usage["kind"]
         if kind == "layer":
-            matrix = usage["matrix"]
-            labels.append(f"`{usage['layer']} @ matrix[{matrix[0]},{matrix[1]}]`")
+            labels.append(f"`{usage['layer']} @ {format_layout_position(usage)}`")
         elif kind == "behavior":
             tap_count = TAP_COUNT_NAMES.get(usage["tap_count"], str(usage["tap_count"]))
             labels.append(f"`{usage['owner']} {tap_count} {usage['field']}`")
@@ -1708,6 +1593,12 @@ def format_usages(usages: list[dict[str, object]]) -> str:
         elif kind == "combo_input":
             labels.append(f"`combo {usage['combo_index'] + 1} input`")
     return ", ".join(labels)
+
+
+def format_layout_position(position: dict[str, object]) -> str:
+    if position["cluster"] == "thumb":
+        return f"thumb[{position['layout_index'] - (LAYOUT_SLOT_COUNT - len(THUMB_VISUALS))}]"
+    return f"{position['cluster']}[{position['layout_row']},{position['layout_col']}]"
 
 
 def render_generated_assets_section() -> str:
@@ -1789,7 +1680,6 @@ def check_outputs(assets: dict[Path, str]) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--keyboard-json", type=Path, help="override the Charybdis keyboard.json path used to derive the live LAYOUT() metadata")
     parser.add_argument("--write", action="store_true", help="write docs/generated/profile-introspection.md and docs/generated/profile-introspection-assets/*")
     parser.add_argument("--check", action="store_true", help="fail if the generated artifacts are not current")
     parser.add_argument("--print-markdown", action="store_true", help="print the Markdown report to stdout")
@@ -1798,7 +1688,7 @@ def main() -> int:
     if not any((args.write, args.check, args.print_markdown)):
         args.write = True
 
-    profile = build_profile_model(args.keyboard_json)
+    profile = build_profile_model()
     assets = build_generated_assets(profile)
     markdown = assets[MARKDOWN_OUTPUT]
 

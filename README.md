@@ -93,9 +93,12 @@ For the full round-trip workflow, see
 
 There is also an authored-profile introspector in
 [`tools/profile_introspect.py`](./tools/profile_introspect.py). It reads the
-authored keymap surfaces directly from source, derives the physical `LAYOUT()`
-order from the live Charybdis `keyboard.json`, uses full-bright preview
-swatches, and generates:
+authored profile surfaces directly from
+[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
+[`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), and
+[`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
+uses the current `LAYOUT()` slot order from `keymap.c`, uses full-bright
+preview swatches, and generates:
 
 - per-layer visual SVG previews in
   [`docs/generated/profile-introspection-assets/`](./docs/generated/profile-introspection-assets/)
