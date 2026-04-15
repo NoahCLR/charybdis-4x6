@@ -722,6 +722,15 @@ def resolve_rgb_default_color(known_values: dict[str, str]) -> dict[str, object]
     }
 
 
+def resolve_behavior_timing_defaults(known_values: dict[str, str]) -> dict[str, int]:
+    return {
+        "tap_hold": eval_numeric_expr(known_values["CUSTOM_TAP_HOLD_TERM"], known_values),
+        "tap_hold_lt": eval_numeric_expr(known_values["TAPPING_TERM"], known_values),
+        "long_hold": eval_numeric_expr(known_values["CUSTOM_LONGER_HOLD_TERM"], known_values),
+        "multi_tap": eval_numeric_expr(known_values["CUSTOM_MULTI_TAP_TERM"], known_values),
+    }
+
+
 def finalize_layer_colors(layer_colors: list[dict[str, object]], rgb_default_color: dict[str, object]) -> list[dict[str, object]]:
     finalized: list[dict[str, object]] = []
 
@@ -1038,6 +1047,7 @@ def build_profile_model() -> dict[str, object]:
 
     layers = parse_config_layers(config_text)
     config_macros = parse_config_macros(config_text)
+    timing_defaults = resolve_behavior_timing_defaults(config_macros)
     layer_colors = finalize_layer_colors(parse_layer_colors(rgb_config_text, config_macros), resolve_rgb_default_color(config_macros))
     keymap_custom_keycodes = parse_keymap_custom_keycodes(keymap_text)
     via_macros = parse_macro_slots(parse_macro_table(keymap_text, "VIA_MACROS", "MACRO"), kind="via")
@@ -1084,7 +1094,7 @@ def build_profile_model() -> dict[str, object]:
 
     return {
         "summary": summary,
-        "config": {"layers": layers, "macros": config_macros},
+        "config": {"layers": layers, "macros": config_macros, "timing_defaults": timing_defaults},
         "pd_modes": pd_modes,
         "rgb": {
             "layer_colors": layer_colors,
@@ -1324,6 +1334,7 @@ def format_token_with_raw(token: str) -> str:
 
 
 def render_layer_local_key_behaviors(layer: dict[str, object], profile: dict[str, object]) -> list[str]:
+    timing_defaults = profile["config"]["timing_defaults"]
     behavior_map = {behavior_lookup_key(row["keycode"]): row for row in profile["key_behaviors"]}
     positions_by_keycode = layer_positions_by_lookup_key(layer)
     seen: set[str] = set()
@@ -1354,9 +1365,9 @@ def render_layer_local_key_behaviors(layer: dict[str, object], profile: dict[str
             if step["tap"] is not None or step["hold"] is not None or step["long_hold"] is not None
         ]
         for index, step in enumerate(visible_steps):
-            key_instances = format_layer_key_instances(positions) if index == 0 else ""
-            keycode = format_token_with_raw(behavior["keycode"]) if index == 0 else ""
-            timing = f"`{format_timing(behavior)}`" if index == 0 else ""
+            key_instances = format_layer_key_instances(positions)
+            keycode = format_token_with_raw(behavior["keycode"])
+            timing = f"`{format_timing_for_step(behavior, step, visible_steps, timing_defaults)}`"
             tap_count = TAP_COUNT_NAMES.get(step["tap_count"], str(step["tap_count"]))
             lines.append(
                 f"| {key_instances} | {keycode} | `{tap_count}` | `{format_behavior_action(step['tap'])}` | `{format_behavior_action(step['hold'])}` | `{format_behavior_action(step['long_hold'])}` | {timing} |"
@@ -1645,6 +1656,7 @@ def adjust_hex(fill_hex: str, delta: int) -> str:
 
 
 def render_key_behavior_section(profile: dict[str, object]) -> str:
+    timing_defaults = profile["config"]["timing_defaults"]
     lines = [
         "## Key Behavior Inventory",
         "",
@@ -1652,7 +1664,7 @@ def render_key_behavior_section(profile: dict[str, object]) -> str:
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for behavior in profile["key_behaviors"]:
-        timing = format_timing(behavior)
+        timing = format_timing(behavior, timing_defaults)
         for step in behavior["steps"]:
             lines.append(
                 "| `{keycode}` | `{tap_count}` | `{tap}` | `{hold}` | `{long_hold}` | `{timing}` |".format(
@@ -1706,15 +1718,71 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def format_timing(behavior: dict[str, object]) -> str:
+def default_tap_hold_value(behavior: dict[str, object], timing_defaults: dict[str, int]) -> int:
+    return timing_defaults["tap_hold_lt"] if normalize_expr(behavior["keycode"]).startswith("LT(") else timing_defaults["tap_hold"]
+
+
+def step_has_higher_tap_index(step: dict[str, object], visible_steps: list[dict[str, object]]) -> bool:
+    return any(other_step["tap_count"] > step["tap_count"] for other_step in visible_steps)
+
+
+def step_needs_tap_hold_display(step: dict[str, object]) -> bool:
+    return step["hold"] is not None or step["long_hold"] is not None
+
+
+def format_timing_for_step(
+    behavior: dict[str, object],
+    step: dict[str, object],
+    visible_steps: list[dict[str, object]],
+    timing_defaults: dict[str, int],
+) -> str:
     parts = []
-    if behavior["tap_hold_term"] is not None:
-        parts.append(f"tap_hold={behavior['tap_hold_term']}")
-    if behavior["longer_hold_term"] is not None:
-        parts.append(f"long_hold={behavior['longer_hold_term']}")
-    if behavior["multi_tap_term"] is not None:
-        parts.append(f"multi_tap={behavior['multi_tap_term']}")
-    return ", ".join(parts) if parts else "defaults"
+    needs_tap_hold = step_needs_tap_hold_display(step)
+    needs_long_hold = step["long_hold"] is not None
+    needs_multi_tap = step["tap_count"] > 0 or step_has_higher_tap_index(step, visible_steps)
+
+    if needs_tap_hold:
+        if behavior["tap_hold_term"] is not None:
+            parts.append(f"tap_hold={behavior['tap_hold_term']}")
+        else:
+            parts.append(f"tap_hold({default_tap_hold_value(behavior, timing_defaults)})")
+    if needs_long_hold:
+        if behavior["longer_hold_term"] is not None:
+            parts.append(f"long_hold={behavior['longer_hold_term']}")
+        else:
+            parts.append(f"long_hold({timing_defaults['long_hold']})")
+    if needs_multi_tap:
+        if behavior["multi_tap_term"] is not None:
+            parts.append(f"multi_tap={behavior['multi_tap_term']}")
+        else:
+            parts.append(f"multi_tap({timing_defaults['multi_tap']})")
+
+    if parts:
+        return ", ".join(parts)
+
+    if step["tap"] is not None and step["tap_count"] == 0 and not step_has_higher_tap_index(step, visible_steps):
+        if behavior["tap_hold_term"] is not None:
+            return f"tap < tap_hold={behavior['tap_hold_term']}; else normal hold"
+        return f"tap < tap_hold({default_tap_hold_value(behavior, timing_defaults)}); else normal hold"
+
+    return "no threshold"
+
+
+def format_timing(behavior: dict[str, object], timing_defaults: dict[str, int]) -> str:
+    visible_steps = [
+        step
+        for step in behavior["steps"]
+        if step["tap"] is not None or step["hold"] is not None or step["long_hold"] is not None
+    ]
+    if not visible_steps:
+        return "-"
+    rendered = {
+        format_timing_for_step(behavior, step, visible_steps, timing_defaults)
+        for step in visible_steps
+    }
+    if len(rendered) == 1:
+        return next(iter(rendered))
+    return "; ".join(sorted(rendered))
 
 
 def format_behavior_action(action: dict[str, object] | None) -> str:
