@@ -108,7 +108,7 @@ preview swatches, and generates:
   [`docs/generated/profile-introspection.md`](./docs/generated/profile-introspection.md)
   including authored layer colors, pd-mode colors, and key-behavior feedback LED colors from
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
-  visible color swatches, transparent `TRNS` passthrough keys, and only filled macro slots
+  visible color swatches, transparent `TRNS` passthrough keys, key-behavior activity dots on layer images, and only filled macro slots
 
 Practical usage:
 

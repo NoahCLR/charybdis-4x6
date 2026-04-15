@@ -80,6 +80,7 @@ These previews are generated as SVG image assets under [profile-introspection-as
 - `ALL_KEYS`: tint every physical key with the layer color
 - `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys
 - `LAYER_BASE` falls back to the default RGB color from [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) when its authored layer color is `HSV(0, 0, 0)`
+- Keys with authored `key_behaviors[]` rows in [keymap.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers
 
 ### `LAYER_BASE`
 
@@ -174,7 +175,7 @@ These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../../ke
 | `KC_LEFT_SHIFT` | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `defaults` |
 | `KC_RIGHT_ALT` | `single` | `TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))` | `-` | `-` | `defaults` |
 | `KC_ENT` | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))` | `-` | `defaults` |
-| `KC_LEFT_GUI` | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LALT)` | `-` | `defaults` |
+| `KC_LEFT_GUI` | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)` | `-` | `defaults` |
 | `LT(LAYER_NAV,KC_SLSH)` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))` | `-` | `tap_hold=100` |
 | `KC_LEFT` | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `defaults` |
 | `KC_RIGHT` | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `defaults` |
@@ -229,15 +230,15 @@ flowchart LR
 | Slot | Payload | Usage |
 | --- | --- | --- |
 | `VIA_MACRO_0` | `{KC_LGUI,KC_SPC}` | `LAYER_NAV @ right[3,0]` |
-| `VIA_MACRO_1` | `{KC_LALT,KC_SPC}` | `LAYER_NAV @ right[1,0]` |
-| `VIA_MACRO_2` | `{KC_LALT,KC_LGUI,KC_SPC}` | `LAYER_NAV @ left[3,0]` |
-| `VIA_MACRO_3` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` | `LAYER_SYM @ right[2,3]` |
-| `VIA_MACRO_4` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | `LAYER_SYM @ right[2,2]` |
-| `VIA_MACRO_5` | `{KC_LCTL,KC_LGUI,KC_SPC}` | `LAYER_SYM @ right[2,0]` |
+| `VIA_MACRO_1` | `{KC_LALT,KC_SPC}` | `LAYER_NAV @ right[2,0]` |
+| `VIA_MACRO_2` | `{KC_LALT,KC_LGUI,KC_SPC}` | `LAYER_NAV @ right[1,0]` |
+| `VIA_MACRO_3` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` | `LAYER_SYM @ left[3,3]` |
+| `VIA_MACRO_4` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | `LAYER_SYM @ left[3,2]` |
+| `VIA_MACRO_5` | `{KC_LCTL,KC_LGUI,KC_SPC}` | `LAYER_SYM @ left[3,0]` |
 | `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` | `PINCH_MODE double tap` |
 | `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | `LAYER_NAV @ left[0,3]` |
-| `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ right[2,4]` |
-| `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ right[2,5]` |
+| `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ left[3,4]` |
+| `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ left[3,5]` |
 
 ### Hardcoded Macros
 

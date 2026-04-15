@@ -885,12 +885,14 @@ def parse_combos(text: str) -> list[Combo]:
 
 
 def derive_layout_slot(layout_index: int) -> tuple[str, int | None, int | None]:
-    if layout_index < MAIN_CLUSTER_KEYS_PER_HALF:
-        return "left", layout_index // COLUMNS_PER_MAIN_CLUSTER, layout_index % COLUMNS_PER_MAIN_CLUSTER
-
-    right_index = layout_index - MAIN_CLUSTER_KEYS_PER_HALF
-    if right_index < MAIN_CLUSTER_KEYS_PER_HALF:
-        return "right", right_index // COLUMNS_PER_MAIN_CLUSTER, right_index % COLUMNS_PER_MAIN_CLUSTER
+    main_cluster_key_count = MAIN_CLUSTER_KEYS_PER_HALF * 2
+    keys_per_main_row = COLUMNS_PER_MAIN_CLUSTER * 2
+    if layout_index < main_cluster_key_count:
+        layout_row = layout_index // keys_per_main_row
+        row_index = layout_index % keys_per_main_row
+        if row_index < COLUMNS_PER_MAIN_CLUSTER:
+            return "left", layout_row, row_index
+        return "right", layout_row, row_index - COLUMNS_PER_MAIN_CLUSTER
 
     if layout_index < LAYOUT_SLOT_COUNT:
         return "thumb", None, None
@@ -925,7 +927,7 @@ def parse_layers(text: str, known_behaviors: set[str]) -> list[dict[str, object]
                     "layout_col": layout_col,
                     "keycode": keycode,
                     "display": display_token(keycode),
-                    "has_key_behavior": keycode in known_behaviors,
+                    "has_key_behavior": behavior_lookup_key(keycode) in known_behaviors,
                 }
             )
         layers.append({"name": layer_name, "positions": positions})
@@ -982,6 +984,10 @@ def display_token(token: str) -> str:
     if normalized.endswith("_MODE"):
         return short_mode_name(normalized)
     return normalized
+
+
+def behavior_lookup_key(token: str) -> str:
+    return display_token(token)
 
 
 def collect_macro_usages(
@@ -1047,7 +1053,7 @@ def build_profile_model() -> dict[str, object]:
     hardcoded_macros = parse_macro_slots(parse_macro_table(keymap_text, "HARDCODED_MACROS", "MACRO"), kind="hardcoded")
     behaviors = parse_key_behaviors(keymap_text)
     combos = parse_combos(keymap_text)
-    parsed_layers = parse_layers(keymap_text, known_behaviors={behavior.keycode for behavior in behaviors})
+    parsed_layers = parse_layers(keymap_text, known_behaviors={behavior_lookup_key(behavior.keycode) for behavior in behaviors})
     pd_mode_colors = parse_pd_mode_colors(rgb_config_raw_text, config_macros)
     pd_mode_color_anchors = {
         row["comment_color_name"]: row["preview_color"]
@@ -1202,6 +1208,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "- `ALL_KEYS`: tint every physical key with the layer color",
         "- `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys",
         f"- `LAYER_BASE` falls back to the default RGB color from {config_link} when its authored layer color is `HSV(0, 0, 0)`",
+        f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers",
         "",
     ]
     for layer in profile["layers"]:
@@ -1279,6 +1286,33 @@ def markdown_path_link(path: Path, label: str | None = None) -> str:
     return f"[{label or path.name}]({target})"
 
 
+def build_behavior_indicator_map(profile: dict[str, object]) -> dict[str, list[str]]:
+    feedback_colors = {
+        row["field"]: row["preview_color"]["hex"]
+        for row in profile["rgb"]["key_behavior_feedback_colors"]
+        if row["preview_color"] is not None
+    }
+    indicator_map: dict[str, list[str]] = {}
+
+    for behavior in profile["key_behaviors"]:
+        has_tap = any(step["tap"] is not None for step in behavior["steps"]) or len(behavior["steps"]) > 1
+        has_long_hold = any(step["long_hold"] is not None for step in behavior["steps"])
+        has_hold = any(step["hold"] is not None for step in behavior["steps"])
+        dots: list[str] = []
+
+        if has_tap and feedback_colors.get("multi_tap_pending_color") is not None:
+            dots.append(feedback_colors["multi_tap_pending_color"])
+        if has_hold and feedback_colors.get("hold_active_color") is not None:
+            dots.append(feedback_colors["hold_active_color"])
+        if has_long_hold and feedback_colors.get("long_hold_active_color") is not None:
+            dots.append(feedback_colors["long_hold_active_color"])
+
+        if dots:
+            indicator_map[behavior_lookup_key(behavior["keycode"])] = dots
+
+    return indicator_map
+
+
 def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     markdown = render_markdown(profile)
     assets: dict[Path, str] = {
@@ -1286,9 +1320,10 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     }
 
     layer_color_map = {row["layer"]: row for row in profile["rgb"]["layer_colors"]}
+    behavior_indicator_map = build_behavior_indicator_map(profile)
     for layer in profile["layers"]:
         image_path = ASSET_OUTPUT_DIR / layer_image_name(layer["name"])
-        assets[image_path] = render_layer_svg(layer, layer_color_map[layer["name"]])
+        assets[image_path] = render_layer_svg(layer, layer_color_map[layer["name"]], behavior_indicator_map)
 
     swatch_colors: set[str] = set()
     for row in profile["rgb"]["layer_colors"]:
@@ -1308,12 +1343,12 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     return assets
 
 
-def render_layer_svg(layer: dict[str, object], color_config: dict[str, object]) -> str:
+def render_layer_svg(layer: dict[str, object], color_config: dict[str, object], behavior_indicator_map: dict[str, list[str]]) -> str:
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{SVG_CANVAS_WIDTH}" height="{SVG_CANVAS_HEIGHT}" viewBox="0 0 {SVG_CANVAS_WIDTH} {SVG_CANVAS_HEIGHT}" role="img" aria-labelledby="title desc">',
         f"  <title id=\"title\">{layer['name']} layout preview</title>",
-        f"  <desc id=\"desc\">Generated layer preview for {layer['name']} using authored RGB layer color and mapped-key render mode.</desc>",
+        f"  <desc id=\"desc\">Generated layer preview for {layer['name']} using authored RGB layer color, mapped-key render mode, and activity dots for keys with key_behaviors[] rows.</desc>",
         "  <defs>",
         "    <filter id=\"shadow\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\">",
         "      <feDropShadow dx=\"0\" dy=\"5\" stdDeviation=\"4\" flood-color=\"#000000\" flood-opacity=\"0.22\"/>",
@@ -1328,7 +1363,8 @@ def render_layer_svg(layer: dict[str, object], color_config: dict[str, object]) 
         geometry = visual_geometry(position)
         style = layer_key_style(position, color_config)
         label = visual_label_for_position(position, style["variant"])
-        parts.extend(render_svg_key(geometry, label, style))
+        behavior_dot_colors = behavior_indicator_map.get(behavior_lookup_key(position["keycode"])) if position["has_key_behavior"] else None
+        parts.extend(render_svg_key(geometry, label, style, behavior_dot_colors))
 
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
@@ -1409,7 +1445,7 @@ def visual_label_for_position(position: dict[str, object], variant: str) -> str:
     return position["display"]
 
 
-def render_svg_key(geometry: dict[str, float], label: str, style: dict[str, object]) -> list[str]:
+def render_svg_key(geometry: dict[str, float], label: str, style: dict[str, object], behavior_dot_colors: list[str] | None = None) -> list[str]:
     x = geometry["x"]
     y = geometry["y"]
     angle = geometry["angle"]
@@ -1424,6 +1460,13 @@ def render_svg_key(geometry: dict[str, float], label: str, style: dict[str, obje
         parts.append(
             f'    <text x="{cx:.1f}" y="{cy + 4:.1f}" fill="{style["text"]}" fill-opacity="{style["label_opacity"]}" font-size="{font_size}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">{escape_xml(label)}</text>'
         )
+    if behavior_dot_colors:
+        count = len(behavior_dot_colors)
+        start_x = x + KEY_WIDTH - 10 - ((count - 1) * 12)
+        for index, behavior_dot_color in enumerate(behavior_dot_colors):
+            parts.append(
+                f'    <circle cx="{start_x + (index * 12):.1f}" cy="{y + 10:.1f}" r="5.5" fill="{behavior_dot_color}" stroke="{style["text"]}" stroke-width="1.5"/>'
+            )
     parts.append("  </g>")
     return parts
 
