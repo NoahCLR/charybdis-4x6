@@ -1114,11 +1114,14 @@ def render_markdown(profile: dict[str, object]) -> str:
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
+    pd_manifest_link = markdown_path_link(PD_MODE_MANIFEST_FILE, "pd_mode_manifest.h")
     sections = [
         MARKDOWN_HEADER.rstrip(),
         "# Profile Introspection",
         "",
         f"This report is generated from the authored profile files {keymap_link}, {config_link}, and {rgb_link}. The renderer is board-specific to the Charybdis 4x6 and derives the current `LAYOUT()` slot order directly from {keymap_link}.",
+        "",
+        f"PD mode identities and mode-key mapping are resolved in the background from the shared manifest {pd_manifest_link}.",
         "",
         render_summary_section(profile),
         render_key_behavior_feedback_section(profile),
@@ -1136,6 +1139,7 @@ def render_summary_section(profile: dict[str, object]) -> str:
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
+    pd_manifest_link = markdown_path_link(PD_MODE_MANIFEST_FILE, "pd_mode_manifest.h")
     lines = [
         "## Summary",
         "",
@@ -1167,6 +1171,8 @@ def render_summary_section(profile: dict[str, object]) -> str:
             f"| {keymap_link} | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |",
             f"| {config_link} | layer enum, timing, RGB defaults, and keymap-facing feature config |",
             f"| {rgb_link} | layer colors, pd-mode colors, and key-behavior feedback colors |",
+            "",
+            f"PD mode identity and mode-key mapping are resolved in the background from {pd_manifest_link}.",
             "",
             "### Layer RGB Config",
             "",
@@ -1211,6 +1217,13 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         f"- `LAYER_BASE` falls back to the default RGB color from {config_link} when its authored layer color is `HSV(0, 0, 0)`",
         f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers",
         "- Each layer section below also pulls in the authored key behaviors, pd-mode keys, and combos that are actually present on that layer",
+        "",
+        "Timing legend for the layer-local behavior tables:",
+        "",
+        f"- `tap_hold(...)`, `long_hold(...)`, and `multi_tap(...)` are inherited defaults from {config_link}",
+        "- `tap_hold=...`, `long_hold=...`, and `multi_tap=...` are per-row overrides authored in `key_behaviors[]`",
+        "- `tap < tap_hold(...); else normal hold` means the authored tap wins on a quick release, otherwise the key falls back to its normal held path",
+        "- Timing is tap-index sensitive: a row lists only the thresholds that matter for that specific tap count",
         "",
     ]
     for layer in profile["layers"]:

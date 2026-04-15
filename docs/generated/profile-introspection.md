@@ -1,6 +1,7 @@
 <!-- Generated file. Do not edit by hand. -->
 # Profile Introspection
 This report is generated from the authored profile files [keymap.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), and [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). The renderer is board-specific to the Charybdis 4x6 and derives the current `LAYOUT()` slot order directly from [keymap.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+PD mode identities and mode-key mapping are resolved in the background from the shared manifest [pd_mode_manifest.h](../../users/noah/lib/pointing/defs/pd_mode_manifest.h).
 ## Summary
 
 | Field | Value |
@@ -62,6 +63,8 @@ This report is generated from the authored profile files [keymap.c](../../keyboa
 | [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
 | [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pd-mode colors, and key-behavior feedback colors |
 
+PD mode identity and mode-key mapping are resolved in the background from [pd_mode_manifest.h](../../users/noah/lib/pointing/defs/pd_mode_manifest.h).
+
 ### Layer RGB Config
 
 | Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |
@@ -97,6 +100,13 @@ These previews are generated as SVG image assets under [profile-introspection-as
 - `LAYER_BASE` falls back to the default RGB color from [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) when its authored layer color is `HSV(0, 0, 0)`
 - Keys with authored `key_behaviors[]` rows in [keymap.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers
 - Each layer section below also pulls in the authored key behaviors, pd-mode keys, and combos that are actually present on that layer
+
+Timing legend for the layer-local behavior tables:
+
+- `tap_hold(...)`, `long_hold(...)`, and `multi_tap(...)` are inherited defaults from [config.h](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+- `tap_hold=...`, `long_hold=...`, and `multi_tap=...` are per-row overrides authored in `key_behaviors[]`
+- `tap < tap_hold(...); else normal hold` means the authored tap wins on a quick release, otherwise the key falls back to its normal held path
+- Timing is tap-index sensitive: a row lists only the thresholds that matter for that specific tap count
 
 ### `LAYER_BASE`
 
