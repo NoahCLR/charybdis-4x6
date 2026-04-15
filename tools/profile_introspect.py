@@ -996,6 +996,7 @@ def collect_macro_usages(
                     {
                         "kind": "layer",
                         "layer": layer_name,
+                        "display": position["display"],
                         "layout_index": position["layout_index"],
                         "cluster": position["cluster"],
                         "layout_row": position["layout_row"],
@@ -1295,7 +1296,23 @@ def layer_positions_by_lookup_key(layer: dict[str, object]) -> dict[str, list[di
 
 
 def format_layer_key_instances(positions: list[dict[str, object]]) -> str:
-    return ", ".join(f"`{position['display']} @ {format_layout_position(position)}`" for position in positions)
+    counts: dict[str, int] = {}
+    ordered_labels: list[str] = []
+    for position in positions:
+        label = position["display"]
+        if label not in counts:
+            ordered_labels.append(label)
+            counts[label] = 0
+        counts[label] += 1
+
+    rendered: list[str] = []
+    for label in ordered_labels:
+        count = counts[label]
+        if count == 1:
+            rendered.append(f"`{label}`")
+        else:
+            rendered.append(f"`{label} x{count}`")
+    return ", ".join(rendered)
 
 
 def format_token_with_raw(token: str) -> str:
@@ -1331,7 +1348,12 @@ def render_layer_local_key_behaviors(layer: dict[str, object], profile: dict[str
         ]
     )
     for positions, behavior in rows:
-        for index, step in enumerate(behavior["steps"]):
+        visible_steps = [
+            step
+            for step in behavior["steps"]
+            if step["tap"] is not None or step["hold"] is not None or step["long_hold"] is not None
+        ]
+        for index, step in enumerate(visible_steps):
             key_instances = format_layer_key_instances(positions) if index == 0 else ""
             keycode = format_token_with_raw(behavior["keycode"]) if index == 0 else ""
             timing = f"`{format_timing(behavior)}`" if index == 0 else ""
@@ -1777,7 +1799,7 @@ def format_usages(usages: list[dict[str, object]]) -> str:
     for usage in usages:
         kind = usage["kind"]
         if kind == "layer":
-            labels.append(f"`{usage['layer']} @ {format_layout_position(usage)}`")
+            labels.append(f"`{usage['layer']} @ {usage['display']}`")
         elif kind == "behavior":
             tap_count = TAP_COUNT_NAMES.get(usage["tap_count"], str(usage["tap_count"]))
             labels.append(f"`{usage['owner']} {tap_count} {usage['field']}`")
