@@ -58,11 +58,6 @@ static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
 }
 
 static void noah_action_tap_literal(noah_action_desc_t desc) {
-#if defined(NOAH_DIAGNOSTIC_USE_OWNED_LITERAL_TAP)
-    if (owned_keycode_tap(desc.action)) {
-        return;
-    }
-#endif
     pointer_layer_policy_note_action(desc.action, true);
     tap_code16(desc.action);
     pointer_layer_policy_note_action(desc.action, false);
@@ -71,31 +66,21 @@ static void noah_action_tap_literal(noah_action_desc_t desc) {
 static void noah_action_press_literal(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
 
-#if defined(NOAH_DIAGNOSTIC_DISABLE_OWNED_LITERAL_DISPATCH)
-    register_code16(desc.action);
-    return;
-#else
     if (owned_keycode_register(desc.action)) {
         return;
     }
 
     register_code16(desc.action);
-#endif
 }
 
 static void noah_action_release_literal(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
 
-#if defined(NOAH_DIAGNOSTIC_DISABLE_OWNED_LITERAL_DISPATCH)
-    unregister_code16(desc.action);
-    return;
-#else
     if (owned_keycode_unregister(desc.action)) {
         return;
     }
 
     unregister_code16(desc.action);
-#endif
 }
 
 static void noah_action_tap_unsupported_layer(noah_action_desc_t desc) {

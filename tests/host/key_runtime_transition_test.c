@@ -575,14 +575,10 @@ static void test_flush_multi_tap_replays_single_action(void) {
     CHECK(multi_tap.count == 0);
 
     key_runtime_transition_execute_plan(&plan);
-#ifdef NOAH_DIAGNOSTIC_DISABLE_DELAYED_ACTION_EXECUTION
-    CHECK(test_call_count == 0);
-#else
     CHECK(test_call_count == 3);
     CHECK(test_calls[0].kind == TEST_CALL_DELAYED_ACTION);
     CHECK(test_calls[1].kind == TEST_CALL_DELAYED_ACTION);
     CHECK(test_calls[2].kind == TEST_CALL_DELAYED_ACTION);
-#endif
 }
 
 static void test_flush_multi_tap_prefers_exact_step_tap(void) {

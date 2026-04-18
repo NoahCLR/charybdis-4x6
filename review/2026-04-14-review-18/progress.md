@@ -207,6 +207,10 @@
   - `sh tests/host/run_feature_gate_compile_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Cleanup follow-up on `codex/fix-authored-key-freeze`:
+  - removed the leftover `NOAH_DIAGNOSTIC_*` compile gates from the normal action and key-runtime code paths
+  - deleted the one-off host runners that only existed to exercise those diagnostic branches
+  - collapsed the affected host suites back to permanent normal-path expectations without changing the landed overlap fix
 - Sibling workspace folders touched: none
 
 ## Next Steps

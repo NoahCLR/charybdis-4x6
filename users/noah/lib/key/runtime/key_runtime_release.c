@@ -50,11 +50,6 @@ bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *reco
     key_runtime_transition_plan_t plan;
 
     key_runtime_transition_plan_init(&plan);
-#if defined(NOAH_DIAGNOSTIC_FLUSH_FOREIGN_ACTIVE_ON_RELEASE)
-    key_runtime_transition_flush_active_keys_except(record->event.key, &plan);
-#elif defined(NOAH_DIAGNOSTIC_FLUSH_FOREIGN_TAP_RELEASE_ON_RELEASE)
-    key_runtime_transition_flush_foreign_tap_release_slots_except(record->event.key, &plan);
-#endif
     bool handled = key_runtime_transition_handled_key_release(keycode, record, resolution, &plan);
     if (handled && key_runtime_transition_has_foreign_tap_release_slot_except(record->event.key)) {
         key_runtime_release_plan_defer_dispatch_actions(&plan, key_runtime_release_keyboard_mod_state_current());
@@ -62,13 +57,7 @@ bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *reco
     key_runtime_trace_plan("release", &plan);
     key_runtime_transition_execute_plan(&plan);
     if (handled) {
-#if defined(NOAH_DIAGNOSTIC_SKIP_RELEASE_SPLIT_SYNC_WITH_ACTIVE_SIBLING)
-        if (key_runtime_active_slot_count() == 0) {
-            split_runtime_sync();
-        }
-#else
         split_runtime_sync();
-#endif
     }
     return handled;
 }

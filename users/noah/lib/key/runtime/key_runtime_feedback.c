@@ -17,18 +17,12 @@
 #endif
 
 void key_feedback_pulse_arm(bool long_hold_level) {
-#if defined(NOAH_DIAGNOSTIC_DISABLE_KEY_FEEDBACK)
-    (void)long_hold_level;
-#else
     key_feedback_pulse = (key_runtime_feedback_state_t){
         .timer           = timer_read(),
         .active          = true,
         .long_hold_level = long_hold_level,
     };
-#endif
 }
-
-#if !defined(NOAH_DIAGNOSTIC_DISABLE_KEY_FEEDBACK)
 
 static bool key_feedback_pulse_active(void) {
     if (!key_feedback_pulse.active) {
@@ -80,17 +74,10 @@ static bool key_feedback_hold_contract_uses_preview_layer(handled_key_hold_seman
     return semantics.preview_layer != UINT8_MAX;
 }
 
-#endif
-
 uint8_t key_feedback_preview_layer(void) {
-#if defined(NOAH_DIAGNOSTIC_DISABLE_KEY_FEEDBACK)
-    return UINT8_MAX;
-#else
     return key_feedback_preview_layer_for_slot(key_runtime_preview_owner_slot());
-#endif
 }
 
-#if !defined(NOAH_DIAGNOSTIC_DISABLE_KEY_FEEDBACK)
 static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
     uint8_t                        flags = 0;
     key_runtime_slot_interaction_t interaction;
@@ -172,12 +159,8 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
 
     return flags;
 }
-#endif
 
 uint8_t key_feedback_pack(void) {
-#if defined(NOAH_DIAGNOSTIC_DISABLE_KEY_FEEDBACK)
-    return 0;
-#else
     uint8_t flags = 0;
 
     if (key_feedback_pulse_active()) {
@@ -206,7 +189,6 @@ uint8_t key_feedback_pack(void) {
     }
 
     return flags;
-#endif
 }
 
 #undef key_feedback_pulse

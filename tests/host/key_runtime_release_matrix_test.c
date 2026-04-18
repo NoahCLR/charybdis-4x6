@@ -536,33 +536,11 @@ static void test_release_with_live_tap_release_sibling_defers_dispatch(void) {
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
 
-#ifdef NOAH_DIAGNOSTIC_FLUSH_FOREIGN_ACTIVE_ON_RELEASE
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.action == TEST_RELEASE_PRIMARY);
-    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
-    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == KC_NO);
-#elif defined(NOAH_DIAGNOSTIC_FLUSH_FOREIGN_TAP_RELEASE_ON_RELEASE)
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.action == TEST_RELEASE_PRIMARY);
-    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
-    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == KC_NO);
-#else
     CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 0);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
-#endif
 
-#ifdef NOAH_DIAGNOSTIC_SKIP_RELEASE_SPLIT_SYNC_WITH_ACTIVE_SIBLING
-    CHECK_CASE(case_name, key_runtime_scenario_split_sync_count() == 0);
-#else
     CHECK_CASE(case_name, key_runtime_scenario_split_sync_count() == 1);
-#endif
 }
 
 static void test_release_with_live_held_sibling_dispatches_immediately(void) {
