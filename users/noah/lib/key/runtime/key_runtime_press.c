@@ -20,6 +20,9 @@ bool key_runtime_process_handled_key_press(uint16_t keycode, keyrecord_t *record
     bool                          active_held_action_survives_flush = slot->lifecycle.held_action_keycode == KC_NO || held_action_survives_flush(slot->owner.key_pos, slot->lifecycle.held_action_keycode);
 
     key_runtime_transition_plan_init(&plan);
+#if defined(NOAH_DIAGNOSTIC_SINGLE_ACTIVE_HANDLED_SLOT)
+    key_runtime_transition_flush_active_keys_except(record->event.key, &plan);
+#endif
     bool handled = key_runtime_transition_handled_key_press(slot, keycode, record->event.key, resolution, active_held_action_survives_flush, &plan);
     key_runtime_trace_plan("press", &plan);
     key_runtime_transition_execute_plan(&plan);

@@ -65,6 +65,10 @@
 - The rerun found no new remediation-specific findings. The contract wording, strong-override coverage, default harness behavior, host-suite enforcement, and active review notes now agree on the landed structure.
 - Re-ran the closure review using `prompts/closure-verification-review.md`.
 - Closure verdict is unchanged: this thread is still not ready to close because the original `should-fix` findings on the registry DSLs and `key_runtime_internal.h` remain open, even though the remediation-specific hook/harness findings are now resolved.
+- Landed handled-key overlap remediation on the `15-04` restart branch:
+  - `key_runtime_preflight.c` now settles foreign pending multi-tap chains before a press on another physical key proceeds, including authored handled presses,
+  - same-key pending-chain reuse is still preserved by routing the selective flush through `key_runtime_transition_flush_foreign_multi_tap(...)`,
+  - host coverage now locks that contract in at both the preflight seam and the higher-level handled-key scenario harness.
 
 ## Findings Snapshot
 
@@ -134,10 +138,17 @@
   - `sh tests/host/run_feature_gate_compile_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during handled-key overlap remediation on the `15-04` restart branch:
+  - `sh tests/host/run_key_runtime_preflight_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_key_runtime_transition_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
-1. Re-audit whether any other pd mode will need mode-owned modifier masking for buffered replay or concurrent keyboard events before adding more special policy to the private pd-mode hook surfaces.
-2. Resume the original architecture thread by narrowing `key_runtime_internal.h` or making the registry rows more explicit; those `should-fix` items are still open.
-3. Keep this review folder as the active thread history for both reliability follow-ups and future architecture cleanup on the same userspace seam.
+1. Hardware-verify the handled-key overlap fix on the short fast-alternation repros that previously froze the board.
+2. Re-audit whether any other pd mode will need mode-owned modifier masking for buffered replay or concurrent keyboard events before adding more special policy to the private pd-mode hook surfaces.
+3. Resume the original architecture thread by narrowing `key_runtime_internal.h` or making the registry rows more explicit; those `should-fix` items are still open.

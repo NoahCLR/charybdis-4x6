@@ -902,6 +902,73 @@ static void test_interrupt_other_press_marks_layer_interrupted(void) {
     CHECK(active_key.lifecycle.layer_interrupted);
 }
 
+static void test_flush_active_keys_except_dispatches_foreign_tap_and_preserves_target_slot(void) {
+    key_runtime_transition_plan_t plan;
+    keypos_t                      preserved_key_pos = test_keypos(2, 2);
+    keypos_t                      flushed_key_pos   = test_keypos(2, 3);
+    active_key_state_t           *preserved_slot    = test_slot_for_position(preserved_key_pos);
+    active_key_state_t           *flushed_slot      = test_slot_for_position(flushed_key_pos);
+
+    test_reset_stubs();
+
+    test_stage_slot_state(preserved_slot, (active_key_state_t){
+                                              .owner.keycode   = TEST_NEW_KEY,
+                                              .owner.key_pos   = preserved_key_pos,
+                                              .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+                                              .interaction     = test_cached_interaction(KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                          });
+    test_stage_slot_state(flushed_slot, (active_key_state_t){
+                                            .owner.keycode   = TEST_PREVIOUS_KEY,
+                                            .owner.key_pos   = flushed_key_pos,
+                                            .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+                                            .interaction     = test_cached_interaction(TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                        });
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_flush_active_keys_except(preserved_key_pos, &plan);
+
+    CHECK(plan.count == 1);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK(plan.items[0].data.action == TEST_PREVIOUS_TAP_ACTION);
+    CHECK(preserved_slot->owner.keycode == TEST_NEW_KEY);
+    CHECK(flushed_slot->owner.keycode == KC_NO);
+}
+
+static void test_flush_active_keys_except_unregisters_foreign_held_action(void) {
+    key_runtime_transition_plan_t plan;
+    keypos_t                      preserved_key_pos = test_keypos(3, 2);
+    keypos_t                      flushed_key_pos   = test_keypos(3, 3);
+    active_key_state_t           *preserved_slot    = test_slot_for_position(preserved_key_pos);
+    active_key_state_t           *flushed_slot      = test_slot_for_position(flushed_key_pos);
+
+    test_reset_stubs();
+
+    test_stage_slot_state(preserved_slot, (active_key_state_t){
+                                              .owner.keycode   = TEST_NEW_KEY,
+                                              .owner.key_pos   = preserved_key_pos,
+                                              .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+                                              .interaction     = test_cached_interaction(KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                          });
+    test_stage_slot_state(flushed_slot, (active_key_state_t){
+                                            .owner.keycode                 = TEST_PREVIOUS_KEY,
+                                            .owner.key_pos                 = flushed_key_pos,
+                                            .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
+                                            .lifecycle.held_action_keycode = TEST_PREVIOUS_KEY,
+                                            .interaction                   = test_cached_interaction(KC_NO, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                        });
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_flush_active_keys_except(preserved_key_pos, &plan);
+
+    CHECK(plan.count == 1);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER);
+    CHECK(plan.items[0].data.held_action.key_pos.row == flushed_key_pos.row);
+    CHECK(plan.items[0].data.held_action.key_pos.col == flushed_key_pos.col);
+    CHECK(plan.items[0].data.held_action.action == TEST_PREVIOUS_KEY);
+    CHECK(preserved_slot->owner.keycode == TEST_NEW_KEY);
+    CHECK(flushed_slot->owner.keycode == KC_NO);
+}
+
 static void test_modifier_multi_tap_second_tap_dispatches_action(void) {
     key_runtime_transition_plan_t plan;
     keyrecord_t                   press_record_1   = test_record(test_keypos(4, 4), true);
@@ -1809,6 +1876,8 @@ int main(void) {
     test_non_modifier_single_tap_override_activates_fallback_hold_at_threshold();
     test_interrupt_other_press_queues_pending_fallback_hold();
     test_interrupt_other_press_marks_layer_interrupted();
+    test_flush_active_keys_except_dispatches_foreign_tap_and_preserves_target_slot();
+    test_flush_active_keys_except_unregisters_foreign_held_action();
     test_modifier_multi_tap_second_tap_dispatches_action();
     test_interrupted_momentary_layer_release_only_releases_layer();
     test_release_hold_prefers_long_hold_after_longer_term();

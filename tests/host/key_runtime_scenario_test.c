@@ -221,30 +221,26 @@ static void test_threshold_hold_registers_and_releases_owned_state(void) {
     CHECK(key_runtime_scenario_effect_at(1)->data.key_pos.col == 3);
 }
 
-static void test_press_on_other_position_preserves_pending_multi_tap_before_new_layer_press(void) {
+static void test_press_on_other_handled_position_flushes_foreign_pending_multi_tap(void) {
     static const key_runtime_scenario_step_t setup[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 1, 1),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 1, 3),
     };
-    static const key_runtime_scenario_step_t reclaim[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(MO(2), 1, 2),
+    static const key_runtime_scenario_step_t overlap_press[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 1, 3),
     };
 
     key_runtime_scenario_reset();
     test_configure_multi_tap_key();
-    test_configure_immediate_hold_key(TEST_HOLD_KEY_TWO, TEST_HOLD_ACTION_TWO, hold_behavior_none());
+    test_configure_fallback_tap_key(TEST_HOLD_KEY_TWO, TEST_HOLD_ACTION_TWO);
     key_runtime_scenario_run(setup, ARRAY_SIZE(setup));
     key_runtime_scenario_clear_effects();
-    key_runtime_scenario_run(reclaim, ARRAY_SIZE(reclaim));
+    key_runtime_scenario_run(overlap_press, ARRAY_SIZE(overlap_press));
 
     CHECK(key_runtime_scenario_effect_count() == 1);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_LAYER_PRESS);
-    CHECK(key_runtime_scenario_effect_at(0)->data.layer_press.layer == 2);
-    CHECK(key_runtime_scenario_effect_at(0)->data.layer_press.key_pos.row == 1);
-    CHECK(key_runtime_scenario_effect_at(0)->data.layer_press.key_pos.col == 2);
-    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
-    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == MO(2));
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_TAP_ACTION);
+    CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 3)) == TEST_HOLD_KEY_TWO);
 }
 
@@ -469,7 +465,7 @@ int main(void) {
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();
-    test_press_on_other_position_preserves_pending_multi_tap_before_new_layer_press();
+    test_press_on_other_handled_position_flushes_foreign_pending_multi_tap();
     test_interrupt_other_press_activates_fallback_hold();
     test_interrupted_layer_tap_with_intermediate_scan_releases_without_tap();
     test_immediate_hold_promotes_long_hold_after_registration();

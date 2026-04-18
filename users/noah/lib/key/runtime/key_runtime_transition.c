@@ -14,6 +14,8 @@
 #include "key_runtime_admission.h"
 #include "key_runtime_index_internal.h"
 #include "slot/key_runtime_slot_step.h"
+#include "slot/key_runtime_slot_policy.h"
+#include "slot/key_runtime_slot_result_internal.h"
 #include "key_runtime_internal.h"
 #include "key_runtime_trace.h"
 #include "../../action/action_dispatch.h"
@@ -148,6 +150,48 @@ void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan)
 
     for (uint8_t index = 0; index < pending_count; index++) {
         key_runtime_transition_apply_slot_step(slots[index], (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH}, plan);
+    }
+}
+
+void key_runtime_transition_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan) {
+    active_key_state_t *slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t             pending_count = key_runtime_index_snapshot_pending_multi_tap_slots(slots, ARRAY_SIZE(slots));
+
+    for (uint8_t index = 0; index < pending_count; index++) {
+        active_key_state_t *slot = slots[index];
+
+        if (!slot || key_runtime_slot_pending_multi_tap_matches(slot, keycode, key_pos)) {
+            continue;
+        }
+
+        key_runtime_transition_apply_slot_step(slot, (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH}, plan);
+    }
+}
+
+void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
+    active_key_state_t *slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t             active_count = key_runtime_index_snapshot_active_slots(slots, ARRAY_SIZE(slots));
+
+    for (uint8_t index = 0; index < active_count; index++) {
+        active_key_state_t         *slot = slots[index];
+        key_runtime_slot_result_t   result;
+        key_runtime_effect_builder_t builder;
+        bool                        active_held_action_survives_flush;
+        keypos_t                    owner_key_pos;
+
+        if (!slot || key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) {
+            continue;
+        }
+
+        owner_key_pos                     = slot->owner.key_pos;
+        active_held_action_survives_flush = slot->lifecycle.held_action_keycode == KC_NO || held_action_survives_flush(slot->owner.key_pos, slot->lifecycle.held_action_keycode);
+        builder                           = key_runtime_slot_policy_take_flush(slot, active_held_action_survives_flush);
+        result                            = (key_runtime_slot_result_t){0};
+        if (key_runtime_slot_result_builder_has_effect(builder)) {
+            result.handled = true;
+            key_runtime_slot_result_push_builder_if_present(&result, owner_key_pos, builder);
+        }
+        key_runtime_transition_apply_slot_result(&result, plan);
     }
 }
 

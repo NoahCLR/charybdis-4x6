@@ -81,7 +81,8 @@ does the cross-cutting work that must happen before the current key is reduced:
 - track physical modifier ownership
 - suppress the raw QMK path for managed modifier transitions when appropriate
 - interrupt other active handled keys on a new press
-- flush unrelated pending multi-tap chains before a non-handled press proceeds
+- flush unrelated pending multi-tap chains before a press on another physical
+  key proceeds
 
 This is why a new physical press can affect another key's slot before the new
 key itself resolves.
@@ -104,6 +105,7 @@ The press path can:
 
 - begin a new slot
 - reuse a pending multi-tap chain for the same physical key
+- settle foreign pending multi-tap chains before a different physical key starts
 - reclaim an already-active slot at that position
 - start immediate held ownership for press-registering holds
 - start momentary layer ownership
