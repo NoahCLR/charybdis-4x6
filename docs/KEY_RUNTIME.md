@@ -216,8 +216,13 @@ Release-time overlap safety now follows a narrow rule:
   tap-release-eligible handled sibling is still live, only that authored
   dispatch defers into `deferred_release_dispatch`
 - ownership cleanup (`RELEASE_OWNED_STATE_BY_KEY`) still executes immediately
+- pending multi-tap synthetic held lifecycle (`HELD_ACTION_REGISTER` /
+  `HELD_ACTION_UNREGISTER`) still executes immediately
 - momentary layer release still executes immediately
 - pd-mode lock-tap effects still execute immediately
+- when scan later drains the deferred queue, it does so after executing the
+  normal scan plan, so any sibling delayed-action replay for that loop runs
+  before the deferred release dispatch
 
 The phase enum is small but important:
 

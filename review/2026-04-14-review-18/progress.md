@@ -84,8 +84,12 @@
 - Extended the handled-key overlap audit around that new release-dispatch rule:
   - the release matrix suite now classifies the immediate-safe release-time effects that can still run inside the sibling-overlap window,
   - owned-state cleanup remains immediate even when a foreign tap-release sibling is still live,
+  - pending multi-tap synthetic held register/unregister still remain immediate even when a foreign tap-release sibling is still live,
   - mixed `release_owned_state + dispatch_action` releases now prove the cleanup stays immediate while only the authored action defers,
   - momentary layer release and pd-mode lock-tap releases are now mechanically covered as immediate-safe sibling-overlap effects.
+- Extended the audit to the post-overlap drain seam:
+  - the release matrix suite now asserts that a sibling delayed-action replay from the normal scan plan executes before the deferred release queue drains in the same scan,
+  - a new dedicated delayed-action host suite now proves replay still settles pending fallback holds inside the delayed-action window while restoring the caller's saved keyboard mod state afterward.
 
 ## Findings Snapshot
 
@@ -197,10 +201,16 @@
   - `sh tests/host/run_feature_gate_compile_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during post-overlap drain audit on `codex/fix-authored-key-freeze`:
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_delayed_action_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
-1. Keep auditing the same overlap family by classifying any remaining release-time effect kinds that can coexist with a live tap-release sibling, especially if new authored behaviors introduce more non-dispatch release effects.
-2. If new hardware issues appear in this family, inspect the post-overlap drain seam next: deferred release dispatch replay versus any other delayed-action or fallback-hold work that scan may also execute in the same loop.
+1. Keep auditing the same overlap family by classifying any new release-time or scan-time effect kinds against the current safe/immediate versus deferred contract whenever authored behavior grows.
+2. If new hardware issues appear in this family, inspect whether any non-action drain work now needs the same kind of deferred queue separation that release dispatch needed.
 3. When the overlap family feels stable, return to the older thread-level `should-fix` items on the registry DSLs and the breadth of `key_runtime_internal.h`.
