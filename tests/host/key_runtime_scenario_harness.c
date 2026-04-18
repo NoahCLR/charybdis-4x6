@@ -47,6 +47,7 @@ static layer_state_t                         key_runtime_scenario_locked_layers;
 static pd_mode_mask_t                        key_runtime_scenario_pd_locked_modes;
 static key_runtime_scenario_effect_t         key_runtime_scenario_effects[KEY_RUNTIME_SCENARIO_MAX_EFFECTS];
 static uint8_t                               key_runtime_scenario_effect_count_value;
+static uint8_t                               key_runtime_scenario_split_sync_count_value;
 
 layer_state_t layer_state;
 
@@ -125,6 +126,7 @@ void key_runtime_scenario_reset(void) {
     key_runtime_scenario_locked_layers       = 0;
     key_runtime_scenario_pd_locked_modes     = 0;
     key_runtime_scenario_effect_count_value  = 0;
+    key_runtime_scenario_split_sync_count_value = 0;
 
     memset(key_runtime_scenario_behaviors, 0, sizeof(key_runtime_scenario_behaviors));
     memset(key_runtime_scenario_steps, 0, sizeof(key_runtime_scenario_steps));
@@ -136,6 +138,7 @@ void key_runtime_scenario_reset(void) {
 
 void key_runtime_scenario_clear_effects(void) {
     key_runtime_scenario_effect_count_value = 0;
+    key_runtime_scenario_split_sync_count_value = 0;
     memset(key_runtime_scenario_effects, 0, sizeof(key_runtime_scenario_effects));
 }
 
@@ -271,6 +274,10 @@ const key_runtime_scenario_effect_t *key_runtime_scenario_effect_at(uint8_t inde
 
 uint16_t key_runtime_scenario_now(void) {
     return key_runtime_scenario_time;
+}
+
+uint8_t key_runtime_scenario_split_sync_count(void) {
+    return key_runtime_scenario_split_sync_count_value;
 }
 
 uint16_t timer_read(void) {
@@ -552,4 +559,6 @@ void key_feedback_pulse_arm(bool long_hold_level) {
     });
 }
 
-void split_runtime_sync(void) {}
+void split_runtime_sync(void) {
+    key_runtime_scenario_split_sync_count_value++;
+}

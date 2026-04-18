@@ -77,6 +77,10 @@
   - `key_runtime.c` now drains all pending fallback-hold candidates before an emitted action proceeds instead of settling only the first indexed fallback slot,
   - this keeps overlapping handled keys and shared pd-mode ownership from depending on emit order when more than one active slot is still eligible for fallback-hold activation,
   - host coverage now stages two concurrent fallback-hold candidates directly in the transition suite and asserts both are promoted before dispatch continues.
+- Landed the next handled-key overlap fix on `codex/fix-authored-key-freeze`:
+  - handled release now defers its tap/action emission while another tap-release-eligible handled sibling is still live instead of emitting immediately into the overlap window,
+  - the deferred release emission is now key-runtime-owned shared state with the release-time keyboard mod snapshot preserved, and scan drains it once no tap-release-eligible sibling remains active,
+  - host coverage now asserts three contracts directly in the release matrix suite: a live tap-release sibling defers the release dispatch, a held sibling does not, and the deferred release action drains after the sibling retires.
 
 ## Findings Snapshot
 
@@ -175,10 +179,16 @@
   - `sh tests/host/run_feature_gate_compile_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during release-dispatch deferral landing on `codex/fix-authored-key-freeze`:
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_transition_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
-1. Hardware-verify the handled-key overlap fix on the short fast-alternation handled-only repros that previously froze the board, with special attention to overlapping fallback-hold behavior rather than same-key spam.
-2. Re-test the momentary pd-mode keys on this branch; they share the handled ownership path and should now benefit from both the active-vs-pending index hardening and the all-candidates fallback settlement change.
-3. If handled-only fast alternation still wedges, focus the next pass on true two-active-slot release ordering and held/repeat cleanup while a sibling handled slot remains active.
+1. Hardware-verify the release-dispatch deferral fix on the short fast-alternation handled-only repros that previously froze the board, with special attention to tap-on-release keys alternating against other tap-release-eligible handled keys.
+2. Re-test the momentary pd-mode keys on this branch; they share the handled ownership path and should still stay stable under the overlap hardening plus release-dispatch deferral.
+3. If handled-only fast alternation still wedges, focus the next pass on the remaining overlap-sensitive emitted-action classes, especially synthetic QMK taps and non-literal action kinds that still run after the deferred release queue drains.

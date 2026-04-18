@@ -29,6 +29,9 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan);
 void key_runtime_transition_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runtime_transition_plan_t *plan);
+void key_runtime_transition_flush_foreign_tap_release_slots_except(keypos_t key_pos, key_runtime_transition_plan_t *plan);
+bool key_runtime_transition_has_foreign_tap_release_slot_except(keypos_t key_pos);
+bool key_runtime_transition_has_any_tap_release_slot(void);
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_transition_plan_t *plan);
 bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan);

@@ -197,6 +197,85 @@ void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runti
     }
 }
 
+static bool key_runtime_transition_is_foreign_tap_release_candidate(const active_key_state_t *slot, keypos_t key_pos) {
+    if (!slot || key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) {
+        return false;
+    }
+
+    if (!key_runtime_slot_allows_tap_release(slot)) {
+        return false;
+    }
+
+    if (slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
+        return false;
+    }
+
+    return true;
+}
+
+void key_runtime_transition_flush_foreign_tap_release_slots_except(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
+    active_key_state_t *slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t             active_count = key_runtime_index_snapshot_active_slots(slots, ARRAY_SIZE(slots));
+
+    for (uint8_t index = 0; index < active_count; index++) {
+        active_key_state_t         *slot = slots[index];
+        key_runtime_slot_result_t   result;
+        key_runtime_effect_builder_t builder;
+        keypos_t                    owner_key_pos;
+
+        if (!key_runtime_transition_is_foreign_tap_release_candidate(slot, key_pos)) {
+            continue;
+        }
+
+        owner_key_pos = slot->owner.key_pos;
+        builder       = key_runtime_slot_policy_take_flush(slot, false);
+        result        = (key_runtime_slot_result_t){0};
+        if (key_runtime_slot_result_builder_has_effect(builder)) {
+            result.handled = true;
+            key_runtime_slot_result_push_builder_if_present(&result, owner_key_pos, builder);
+        }
+        key_runtime_transition_apply_slot_result(&result, plan);
+    }
+}
+
+bool key_runtime_transition_has_foreign_tap_release_slot_except(keypos_t key_pos) {
+    active_key_state_t *slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t             active_count = key_runtime_index_snapshot_active_slots(slots, ARRAY_SIZE(slots));
+
+    for (uint8_t index = 0; index < active_count; index++) {
+        if (key_runtime_transition_is_foreign_tap_release_candidate(slots[index], key_pos)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool key_runtime_transition_has_any_tap_release_slot(void) {
+    active_key_state_t *slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t             active_count = key_runtime_index_snapshot_active_slots(slots, ARRAY_SIZE(slots));
+
+    for (uint8_t index = 0; index < active_count; index++) {
+        active_key_state_t *slot = slots[index];
+
+        if (!slot) {
+            continue;
+        }
+
+        if (!key_runtime_slot_allows_tap_release(slot)) {
+            continue;
+        }
+
+        if (slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
+            continue;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
     active_key_state_t *slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
     uint8_t             active_count = key_runtime_index_snapshot_active_slots(slots, ARRAY_SIZE(slots));

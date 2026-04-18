@@ -10,6 +10,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "../../state/runtime/keyboard_mod_state.h"
 #include "../interaction/multi_tap_engine.h"
 #include "key_runtime_interaction.h"
 #include "key_runtime_types.h"
@@ -70,6 +71,16 @@ typedef struct {
     uint8_t masked_real_mods;
 } key_runtime_keyboard_event_mask_state_t;
 
+typedef struct {
+    uint16_t             action;
+    keyboard_mod_state_t mods;
+} key_runtime_deferred_release_dispatch_t;
+
+typedef struct {
+    key_runtime_deferred_release_dispatch_t items[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t                                 count;
+} key_runtime_deferred_release_dispatch_queue_t;
+
 #define ACTIVE_KEY_STATE_INIT                                                    \
     {                                                                            \
         .owner.keycode                 = KC_NO,                                  \
@@ -84,6 +95,7 @@ typedef struct {
     key_runtime_index_state_t    index;
     key_runtime_feedback_state_t feedback;
     key_runtime_keyboard_event_mask_state_t keyboard_event_mask;
+    key_runtime_deferred_release_dispatch_queue_t deferred_release_dispatch;
 } key_runtime_shared_state_t;
 
 key_runtime_shared_state_t *key_runtime_shared_state(void);

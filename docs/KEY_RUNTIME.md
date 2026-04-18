@@ -171,6 +171,13 @@ keys can leave more than one active fallback-hold candidate live at the same
 time, and settling only one of them reintroduces overlap-sensitive ownership
 ordering bugs.
 
+Handled release dispatch now follows the same overlap discipline. If a handled
+release resolves to a tap/action while another handled slot is still
+tap-release-eligible, the release tap is deferred into key-runtime-owned state
+and drained from scan only after no such sibling remains live. That keeps
+release cleanup local while avoiding re-entrant emitted-action timing during
+two-key overlap.
+
 Time-based repeat bindings now advance from the userspace housekeeping hook in
 [`runtime_init.c`](../users/noah/runtime_init.c), after QMK has already
 processed matrix changes for the loop. [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c)
@@ -200,6 +207,8 @@ The main fields are:
   materialization and shared release-hold selection used by feedback, scan,
   and release reducers
 - `pending_multi_tap`: deferred tap-chain state that remains after release
+- `deferred_release_dispatch`: queued release-time authored taps/actions whose
+  emission was postponed until overlapping tap-release siblings retired
 
 The phase enum is small but important:
 
