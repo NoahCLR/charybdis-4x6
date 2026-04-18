@@ -36,6 +36,7 @@ static test_call_t register_code16_call;
 static test_call_t unregister_code16_call;
 static test_call_t owned_register_call;
 static test_call_t owned_unregister_call;
+static test_call_t owned_tap_call;
 static test_call_t pointer_action_call_1;
 static test_call_t pointer_action_call_2;
 static uint8_t     pointer_action_call_count;
@@ -52,6 +53,7 @@ static bool pd_press_result;
 static bool pd_release_result;
 static bool owned_register_result;
 static bool owned_unregister_result;
+static bool owned_tap_result;
 
 static const pd_mode_def_t test_pd_mode_def = {
     .mode_flag   = PD_MODE_ARROW,
@@ -93,6 +95,7 @@ static void test_reset_stubs(void) {
     unregister_code16_call    = (test_call_t){0};
     owned_register_call       = (test_call_t){0};
     owned_unregister_call     = (test_call_t){0};
+    owned_tap_call            = (test_call_t){0};
     pointer_action_call_1     = (test_call_t){0};
     pointer_action_call_2     = (test_call_t){0};
     pointer_action_call_count = 0;
@@ -107,6 +110,7 @@ static void test_reset_stubs(void) {
     pd_release_result         = false;
     owned_register_result     = false;
     owned_unregister_result   = false;
+    owned_tap_result          = false;
 }
 
 bool macro_dispatch(uint16_t action) {
@@ -198,6 +202,11 @@ bool owned_keycode_register(uint16_t keycode) {
 bool owned_keycode_unregister(uint16_t keycode) {
     owned_unregister_call.keycode = keycode;
     return owned_unregister_result;
+}
+
+bool owned_keycode_tap(uint16_t keycode) {
+    owned_tap_call.keycode = keycode;
+    return owned_tap_result;
 }
 
 void tap_code16(uint16_t keycode) {
@@ -318,13 +327,30 @@ static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
 
     test_reset_stubs();
 
+#if defined(NOAH_DIAGNOSTIC_USE_OWNED_LITERAL_TAP)
+    owned_tap_result = true;
+#endif
     noah_action_tap(KC_C);
+#if defined(NOAH_DIAGNOSTIC_USE_OWNED_LITERAL_TAP)
+    CHECK(owned_tap_call.keycode == KC_C);
+    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(pointer_action_call_count == 0);
+#else
     CHECK(macro_dispatch_calls == 1);
     CHECK(tap_code16_call.keycode == KC_C);
+#endif
 
     test_reset_stubs();
 
+#if defined(NOAH_DIAGNOSTIC_USE_OWNED_LITERAL_TAP)
+    owned_tap_result = true;
+#endif
     noah_action_tap(MS_BTN1);
+#if defined(NOAH_DIAGNOSTIC_USE_OWNED_LITERAL_TAP)
+    CHECK(owned_tap_call.keycode == MS_BTN1);
+    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(pointer_action_call_count == 0);
+#else
     CHECK(macro_dispatch_calls == 1);
     CHECK(tap_code16_call.keycode == MS_BTN1);
     CHECK(pointer_action_call_count == 2);
@@ -332,6 +358,7 @@ static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
     CHECK(pointer_action_call_1.pressed);
     CHECK(pointer_action_call_2.keycode == MS_BTN1);
     CHECK(!pointer_action_call_2.pressed);
+#endif
 }
 
 static void test_tap_ignores_raw_layer_actions(void) {
@@ -384,14 +411,24 @@ static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
     owned_register_result = true;
 
     noah_action_press(key_pos, KC_RIGHT_ALT);
+#if defined(NOAH_DIAGNOSTIC_DISABLE_OWNED_LITERAL_DISPATCH)
+    CHECK(owned_register_call.keycode == KC_NO);
+    CHECK(register_code16_call.keycode == KC_RIGHT_ALT);
+#else
     CHECK(owned_register_call.keycode == KC_RIGHT_ALT);
     CHECK(register_code16_call.keycode == KC_NO);
+#endif
 
     test_reset_stubs();
 
     noah_action_press(key_pos, KC_RIGHT_ALT);
+#if defined(NOAH_DIAGNOSTIC_DISABLE_OWNED_LITERAL_DISPATCH)
+    CHECK(owned_register_call.keycode == KC_NO);
+    CHECK(register_code16_call.keycode == KC_RIGHT_ALT);
+#else
     CHECK(owned_register_call.keycode == KC_RIGHT_ALT);
     CHECK(register_code16_call.keycode == KC_RIGHT_ALT);
+#endif
 }
 
 static void test_press_ignores_raw_layer_actions_and_one_shot_actions(void) {
@@ -457,14 +494,24 @@ static void test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plai
     owned_unregister_result = true;
 
     noah_action_release(key_pos, KC_RIGHT_ALT);
+#if defined(NOAH_DIAGNOSTIC_DISABLE_OWNED_LITERAL_DISPATCH)
+    CHECK(owned_unregister_call.keycode == KC_NO);
+    CHECK(unregister_code16_call.keycode == KC_RIGHT_ALT);
+#else
     CHECK(owned_unregister_call.keycode == KC_RIGHT_ALT);
     CHECK(unregister_code16_call.keycode == KC_NO);
+#endif
 
     test_reset_stubs();
 
     noah_action_release(key_pos, KC_RIGHT_ALT);
+#if defined(NOAH_DIAGNOSTIC_DISABLE_OWNED_LITERAL_DISPATCH)
+    CHECK(owned_unregister_call.keycode == KC_NO);
+    CHECK(unregister_code16_call.keycode == KC_RIGHT_ALT);
+#else
     CHECK(owned_unregister_call.keycode == KC_RIGHT_ALT);
     CHECK(unregister_code16_call.keycode == KC_RIGHT_ALT);
+#endif
 }
 
 static void test_release_ignores_raw_layer_actions(void) {

@@ -119,7 +119,7 @@ void key_runtime_index_sync_slot(active_key_state_t *slot) {
         key_runtime_index_remove(state->index.active_slots, &state->index.active_slot_count, (uint8_t)slot_index);
     }
 
-    if (key_runtime_slot_has_pending_multi_tap(slot)) {
+    if (!key_runtime_slot_active(slot) && key_runtime_slot_has_pending_multi_tap(slot)) {
         key_runtime_index_insert_sorted(state->index.pending_multi_tap_slots, &state->index.pending_multi_tap_count, (uint8_t)slot_index);
     } else {
         key_runtime_index_remove(state->index.pending_multi_tap_slots, &state->index.pending_multi_tap_count, (uint8_t)slot_index);

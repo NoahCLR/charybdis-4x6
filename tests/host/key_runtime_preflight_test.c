@@ -428,6 +428,21 @@ static void test_matching_press_keeps_pending_multi_tap_chain(void) {
     CHECK(executed_transition_plan_count == 0);
 }
 
+static void test_foreign_press_does_not_flush_pending_chain_for_active_slot(void) {
+    keyrecord_t          record = test_record(test_keypos(3, 4), true);
+    active_key_state_t  *slot   = key_runtime_slot_for_position(test_keypos(3, 3));
+
+    test_reset_state();
+    handled_key_stub_is_handled = true;
+    key_runtime_slot_begin_pending_multi_tap(slot, KC_RIGHT_ALT, test_keypos(3, 3), KC_NO, 0, CUSTOM_TAP_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, false);
+    key_runtime_slot_track(slot, KC_RIGHT_ALT, test_keypos(3, 3), key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+
+    CHECK(test_preflight_record(KC_LEFT_CTRL, &record));
+    CHECK(interrupted_active_key);
+    CHECK(!flushed_multi_tap);
+    CHECK(executed_transition_plan_count == 1);
+}
+
 static void test_non_handled_press_flushes_foreign_multi_tap(void) {
     keyrecord_t record = test_record(test_keypos(3, 4), true);
 
@@ -446,6 +461,7 @@ int main(void) {
     test_other_press_interrupts_active_key_through_transition_plan();
     test_handled_press_flushes_foreign_multi_tap();
     test_matching_press_keeps_pending_multi_tap_chain();
+    test_foreign_press_does_not_flush_pending_chain_for_active_slot();
     test_non_handled_press_flushes_foreign_multi_tap();
 
     puts("key_runtime_preflight host tests passed");

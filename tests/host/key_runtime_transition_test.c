@@ -7,6 +7,7 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/key/runtime/key_runtime_admission.h"
+#include "users/noah/lib/key/runtime/key_runtime_api.h"
 #include "users/noah/lib/key/runtime/key_runtime_index_internal.h"
 #include "users/noah/lib/key/runtime/key_runtime_internal.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"
@@ -574,10 +575,14 @@ static void test_flush_multi_tap_replays_single_action(void) {
     CHECK(multi_tap.count == 0);
 
     key_runtime_transition_execute_plan(&plan);
+#ifdef NOAH_DIAGNOSTIC_DISABLE_DELAYED_ACTION_EXECUTION
+    CHECK(test_call_count == 0);
+#else
     CHECK(test_call_count == 3);
     CHECK(test_calls[0].kind == TEST_CALL_DELAYED_ACTION);
     CHECK(test_calls[1].kind == TEST_CALL_DELAYED_ACTION);
     CHECK(test_calls[2].kind == TEST_CALL_DELAYED_ACTION);
+#endif
 }
 
 static void test_flush_multi_tap_prefers_exact_step_tap(void) {
@@ -883,6 +888,45 @@ static void test_interrupt_other_press_queues_pending_fallback_hold(void) {
     CHECK(test_call_count == 1);
     CHECK(test_calls[0].kind == TEST_CALL_HELD_REGISTER);
     CHECK(test_calls[0].action == TEST_PLAIN_KEY);
+}
+
+static void test_settle_pending_fallback_holds_activates_all_candidates(void) {
+    keypos_t            first_key_pos  = test_keypos(2, 2);
+    keypos_t            second_key_pos = test_keypos(2, 3);
+    active_key_state_t *first_slot     = test_slot_for_position(first_key_pos);
+    active_key_state_t *second_slot    = test_slot_for_position(second_key_pos);
+
+    test_reset_stubs();
+
+    test_stage_slot_state(first_slot, (active_key_state_t){
+                                          .owner.keycode   = TEST_PLAIN_KEY,
+                                          .owner.key_pos   = first_key_pos,
+                                          .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+                                          .interaction     = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                      });
+    test_stage_slot_state(second_slot, (active_key_state_t){
+                                           .owner.keycode   = TEST_PREVIOUS_KEY,
+                                           .owner.key_pos   = second_key_pos,
+                                           .lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
+                                           .interaction     = test_cached_interaction(TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                       });
+
+    CHECK(noah_key_runtime_settle_pending_fallback_hold());
+    CHECK(first_slot->lifecycle.held_action_keycode == TEST_PLAIN_KEY);
+    CHECK(second_slot->lifecycle.held_action_keycode == TEST_PREVIOUS_KEY);
+    CHECK(key_runtime_slot_hold_is_complete(first_slot));
+    CHECK(key_runtime_slot_hold_is_complete(second_slot));
+    CHECK(key_runtime_pending_fallback_slot() == NULL);
+
+    CHECK(test_call_count == 2);
+    CHECK(test_calls[0].kind == TEST_CALL_HELD_REGISTER);
+    CHECK(test_calls[0].action == TEST_PLAIN_KEY);
+    CHECK(test_calls[0].key_pos.row == first_key_pos.row);
+    CHECK(test_calls[0].key_pos.col == first_key_pos.col);
+    CHECK(test_calls[1].kind == TEST_CALL_HELD_REGISTER);
+    CHECK(test_calls[1].action == TEST_PREVIOUS_KEY);
+    CHECK(test_calls[1].key_pos.row == second_key_pos.row);
+    CHECK(test_calls[1].key_pos.col == second_key_pos.col);
 }
 
 static void test_interrupt_other_press_marks_layer_interrupted(void) {
@@ -1875,6 +1919,7 @@ int main(void) {
     test_single_tap_override_long_release_does_not_dispatch_tap();
     test_non_modifier_single_tap_override_activates_fallback_hold_at_threshold();
     test_interrupt_other_press_queues_pending_fallback_hold();
+    test_settle_pending_fallback_holds_activates_all_candidates();
     test_interrupt_other_press_marks_layer_interrupted();
     test_flush_active_keys_except_dispatches_foreign_tap_and_preserves_target_slot();
     test_flush_active_keys_except_unregisters_foreign_held_action();

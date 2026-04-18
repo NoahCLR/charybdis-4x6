@@ -15,6 +15,9 @@ bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *reco
     key_runtime_transition_plan_t plan;
 
     key_runtime_transition_plan_init(&plan);
+#if defined(NOAH_DIAGNOSTIC_FLUSH_FOREIGN_ACTIVE_ON_RELEASE)
+    key_runtime_transition_flush_active_keys_except(record->event.key, &plan);
+#endif
     bool handled = key_runtime_transition_handled_key_release(keycode, record, resolution, &plan);
     key_runtime_trace_plan("release", &plan);
     key_runtime_transition_execute_plan(&plan);

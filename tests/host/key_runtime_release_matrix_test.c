@@ -15,6 +15,8 @@ enum {
     TEST_THRESHOLD_ACTION      = SAFE_RANGE + 0x95,
     TEST_SECOND_TAP_ACTION     = SAFE_RANGE + 0x96,
     TEST_CHAIN_CONTINUE_TAP    = SAFE_RANGE + 0x97,
+    TEST_SIBLING_KEY           = SAFE_RANGE + 0x98,
+    TEST_SIBLING_TAP_ACTION    = SAFE_RANGE + 0x99,
     TEST_TAP_HOLD_TERM_MS      = 120,
     TEST_LONGER_HOLD_TERM_MS   = 240,
     TEST_MULTI_TAP_TERM_MS     = 150,
@@ -125,6 +127,13 @@ static void test_configure_active_release_key(hold_behavior_t hold, hold_behavio
     behavior.single.tap       = tap_behavior_none();
     behavior.single.hold      = hold;
     behavior.single.long_hold = long_hold;
+    key_runtime_scenario_add_behavior_view(behavior);
+}
+
+static void test_configure_tap_release_key(uint16_t keycode, uint16_t tap_action) {
+    key_behavior_view_t behavior = test_pressable_handled_key(keycode);
+
+    behavior.single.tap = (tap_behavior_t)TAP_SENDS(tap_action);
     key_runtime_scenario_add_behavior_view(behavior);
 }
 
@@ -489,8 +498,44 @@ static void test_pending_release_edge_cases(void) {
     }
 }
 
+static void test_release_with_live_sibling_flushes_foreign_slot_only_in_diagnostic_build(void) {
+    static const char *case_name = "release with live sibling flushes foreign slot only in diagnostic build";
+    static const key_runtime_scenario_step_t setup_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_ACTIVE_KEY, 1, 1),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_tap_release_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
+    test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
+
+    key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+
+#ifdef NOAH_DIAGNOSTIC_FLUSH_FOREIGN_ACTIVE_ON_RELEASE
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.action == TEST_RELEASE_PRIMARY);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == KC_NO);
+#else
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_RELEASE_PRIMARY);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
+#endif
+}
+
 int main(void) {
     test_active_and_pending_release_semantics_stay_equivalent();
     test_pending_release_edge_cases();
+    test_release_with_live_sibling_flushes_foreign_slot_only_in_diagnostic_build();
     return 0;
 }

@@ -148,6 +148,30 @@ static void test_pending_multi_tap_order_updates_after_begin_reset_and_flush(voi
     test_expect_pending_order(NULL, 0);
 }
 
+static void test_active_slot_excludes_pending_multi_tap_until_owner_clears(void) {
+    active_key_state_t *slot    = test_slot(test_keypos(1, 1));
+    keypos_t            key_pos = test_keypos(1, 1);
+
+    test_reset_state();
+
+    key_runtime_slot_begin_pending_multi_tap(slot, TEST_KEY_D, key_pos, TEST_TAP_1, 1, 120, 180, true);
+    CHECK(key_runtime_active_slot_count() == 0);
+    test_expect_pending_order(&key_pos, 1);
+
+    key_runtime_slot_track(slot, TEST_KEY_D, key_pos, test_interaction(UINT8_MAX, 0), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    test_expect_active_order(&key_pos, 1);
+    test_expect_pending_order(NULL, 0);
+    CHECK(key_runtime_slot_has_pending_multi_tap(slot));
+
+    slot->owner = (key_runtime_slot_owner_state_t){0};
+    slot->lifecycle.phase = KEY_RUNTIME_SLOT_PHASE_IDLE;
+    key_runtime_index_sync_slot(slot);
+
+    test_expect_active_order(NULL, 0);
+    test_expect_pending_order(&key_pos, 1);
+    CHECK(key_runtime_slot_has_pending_multi_tap(slot));
+}
+
 static void test_preview_owner_updates_immediately_after_mutations(void) {
     keypos_t later_preview   = test_keypos(2, 4);
     keypos_t earlier_preview = test_keypos(2, 1);
@@ -249,6 +273,7 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 int main(void) {
     test_active_slot_order_updates_after_track_and_reset();
     test_pending_multi_tap_order_updates_after_begin_reset_and_flush();
+    test_active_slot_excludes_pending_multi_tap_until_owner_clears();
     test_preview_owner_updates_immediately_after_mutations();
     test_pending_fallback_updates_immediately_after_mutations();
     puts("key_runtime_index host tests passed");

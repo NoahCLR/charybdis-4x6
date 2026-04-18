@@ -25,7 +25,9 @@ static void noah_emit_run(uint16_t keycode, noah_emit_tap_fn_t emit, noah_emit_p
     keyboard_mod_state_t saved_mod_state = {0};
 
     if (policy.settle_pending_fallback_holds) {
+#ifndef NOAH_DIAGNOSTIC_DISABLE_EMIT_FALLBACK_SETTLEMENT
         noah_key_runtime_settle_pending_fallback_hold();
+#endif
     }
 
     if (policy.preserve_keyboard_mod_state) {
@@ -53,7 +55,9 @@ void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
 
 void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds) {
     if (settle_pending_fallback_holds) {
+#ifndef NOAH_DIAGNOSTIC_DISABLE_EMIT_FALLBACK_SETTLEMENT
         noah_key_runtime_settle_pending_fallback_hold();
+#endif
     }
 
     keyboard_mod_state_t saved_mod_state = {

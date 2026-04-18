@@ -255,6 +255,21 @@ static void test_non_passthrough_held_action_flashes(void) {
     CHECK(key_feedback_flags_level_flash(flags));
 }
 
+static void test_diagnostic_disable_returns_neutral_feedback(void) {
+    keypos_t pos = {.row = 0, .col = 0};
+
+    test_reset_state();
+    test_track_slot(test_default_slot(), KC_RIGHT_ALT, pos, key_runtime_slot_interaction_default(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_set_held_action_keycode(test_default_slot(), SAFE_RANGE + 1);
+
+#if defined(NOAH_DIAGNOSTIC_DISABLE_KEY_FEEDBACK)
+    CHECK(test_feedback_pack() == 0);
+    CHECK(test_feedback_preview_layer() == UINT8_MAX);
+#else
+    CHECK(test_feedback_pack() != 0);
+#endif
+}
+
 static void test_repeat_hold_flashes_while_active(void) {
     keypos_t pos = {.row = 0, .col = 0};
 
@@ -488,7 +503,11 @@ static void test_secondary_hold_pending_survives_primary_layer_hold(void) {
 }
 
 int main(void) {
+#if defined(NOAH_DIAGNOSTIC_DISABLE_KEY_FEEDBACK)
+    test_diagnostic_disable_returns_neutral_feedback();
+#else
     test_non_passthrough_held_action_flashes();
+    test_diagnostic_disable_returns_neutral_feedback();
     test_repeat_hold_flashes_while_active();
     test_fallback_hold_has_no_hold_feedback();
     test_momentary_hold_preview_layer_is_exposed_before_threshold();
@@ -500,6 +519,7 @@ int main(void) {
     test_multi_tap_pending_flag_uses_secondary_slot();
     test_multi_tap_pending_flag_survives_quick_release_for_higher_taps();
     test_secondary_hold_pending_survives_primary_layer_hold();
+#endif
 
     puts("key_runtime_feedback host tests passed");
     return 0;

@@ -69,6 +69,14 @@
   - `key_runtime_preflight.c` now settles foreign pending multi-tap chains before a press on another physical key proceeds, including authored handled presses,
   - same-key pending-chain reuse is still preserved by routing the selective flush through `key_runtime_transition_flush_foreign_multi_tap(...)`,
   - host coverage now locks that contract in at both the preflight seam and the higher-level handled-key scenario harness.
+- Hardened the overlap contract further on `codex/fix-authored-key-freeze`:
+  - `key_runtime_index.c` now keeps active slots out of the global pending-multi-tap index, so a foreign press can no longer flush a live active slot just because that slot is still carrying same-key multi-tap state internally,
+  - `key_runtime_transition.c` now services active slots that still carry an in-slot multi-tap chain explicitly from the active scan loop, preserving hold/expiry behavior without reintroducing them to the foreign-flush index,
+  - host coverage now locks the invariant in at the index seam, the preflight seam, the handled-key scenario harness, and the pd-mode key-runtime integration path.
+- Closed another overlap-owned state leak on `codex/fix-authored-key-freeze`:
+  - `key_runtime.c` now drains all pending fallback-hold candidates before an emitted action proceeds instead of settling only the first indexed fallback slot,
+  - this keeps overlapping handled keys and shared pd-mode ownership from depending on emit order when more than one active slot is still eligible for fallback-hold activation,
+  - host coverage now stages two concurrent fallback-hold candidates directly in the transition suite and asserts both are promoted before dispatch continues.
 
 ## Findings Snapshot
 
@@ -145,10 +153,32 @@
   - `sh tests/host/run_feature_gate_compile_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during active-vs-pending overlap hardening on `codex/fix-authored-key-freeze`:
+  - `sh tests/host/run_key_runtime_slot_tests.sh`
+  - `sh tests/host/run_key_runtime_index_tests.sh`
+  - `sh tests/host/run_key_runtime_preflight_tests.sh`
+  - `sh tests/host/run_key_runtime_transition_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during pending fallback-hold settling hardening on `codex/fix-authored-key-freeze`:
+  - `sh tests/host/run_key_runtime_slot_tests.sh`
+  - `sh tests/host/run_key_runtime_index_tests.sh`
+  - `sh tests/host/run_key_runtime_preflight_tests.sh`
+  - `sh tests/host/run_key_runtime_transition_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
-1. Hardware-verify the handled-key overlap fix on the short fast-alternation repros that previously froze the board.
-2. Re-audit whether any other pd mode will need mode-owned modifier masking for buffered replay or concurrent keyboard events before adding more special policy to the private pd-mode hook surfaces.
-3. Resume the original architecture thread by narrowing `key_runtime_internal.h` or making the registry rows more explicit; those `should-fix` items are still open.
+1. Hardware-verify the handled-key overlap fix on the short fast-alternation handled-only repros that previously froze the board, with special attention to overlapping fallback-hold behavior rather than same-key spam.
+2. Re-test the momentary pd-mode keys on this branch; they share the handled ownership path and should now benefit from both the active-vs-pending index hardening and the all-candidates fallback settlement change.
+3. If handled-only fast alternation still wedges, focus the next pass on true two-active-slot release ordering and held/repeat cleanup while a sibling handled slot remains active.

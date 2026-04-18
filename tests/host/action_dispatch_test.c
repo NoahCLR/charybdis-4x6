@@ -434,10 +434,15 @@ static void test_action_dispatch_keeps_runtime_default_policy(void) {
 
     action_dispatch(KC_C);
 
+#ifdef NOAH_DIAGNOSTIC_DISABLE_EMIT_FALLBACK_SETTLEMENT
+    CHECK(fallback_hold_activation_count == 0);
+    CHECK(!action_tap_call.fallback_hold_active);
+#else
     CHECK(fallback_hold_activation_count == 1);
+    CHECK(action_tap_call.fallback_hold_active);
+#endif
     CHECK(action_tap_call_count == 1);
     CHECK(action_tap_call.keycode == KC_C);
-    CHECK(action_tap_call.fallback_hold_active);
 }
 
 static void test_explicit_action_emit_can_skip_fallback_hold_settlement(void) {
@@ -460,10 +465,15 @@ static void test_synthetic_qmk_emit_settles_fallback_hold_without_touching_mod_s
 
     noah_emit_synthetic_qmk_tap(KC_RIGHT, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
 
+#ifdef NOAH_DIAGNOSTIC_DISABLE_EMIT_FALLBACK_SETTLEMENT
+    CHECK(fallback_hold_activation_count == 0);
+    CHECK(!synthetic_qmk_tap_call.fallback_hold_active);
+#else
     CHECK(fallback_hold_activation_count == 1);
+    CHECK(synthetic_qmk_tap_call.fallback_hold_active);
+#endif
     CHECK(synthetic_qmk_tap_call_count == 1);
     CHECK(synthetic_qmk_tap_call.keycode == KC_RIGHT);
-    CHECK(synthetic_qmk_tap_call.fallback_hold_active);
     CHECK(synthetic_qmk_tap_call.real == MOD_BIT(KC_LEFT_SHIFT));
     CHECK(synthetic_qmk_tap_call.weak == MOD_BIT(KC_RIGHT_ALT));
     CHECK(synthetic_qmk_tap_call.oneshot == MOD_BIT(KC_LEFT_GUI));
@@ -481,18 +491,27 @@ static void test_masked_synthetic_qmk_emit_settles_fallback_hold_and_restores_po
 
     noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(KC_DOWN, (MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_RIGHT_ALT)), true);
 
-    CHECK(fallback_hold_activation_count == 1);
-    CHECK(synthetic_qmk_tap_call_count == 1);
-    CHECK(synthetic_qmk_tap_call.keycode == KC_DOWN);
-    CHECK(synthetic_qmk_tap_call.fallback_hold_active);
-    CHECK(synthetic_qmk_tap_call.real == MOD_BIT(KC_LEFT_SHIFT));
+#ifdef NOAH_DIAGNOSTIC_DISABLE_EMIT_FALLBACK_SETTLEMENT
+    CHECK(fallback_hold_activation_count == 0);
+    CHECK(!synthetic_qmk_tap_call.fallback_hold_active);
     CHECK(synthetic_qmk_tap_call.weak == 0);
-    CHECK(synthetic_qmk_tap_call.oneshot == MOD_BIT(KC_LEFT_GUI));
     CHECK(synthetic_qmk_tap_call.oneshot_locked == 0);
+    CHECK(fake_mods == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(fake_weak_mods == MOD_BIT(KC_RIGHT_ALT));
+    CHECK(fake_oneshot_mods == MOD_BIT(KC_LEFT_GUI));
+    CHECK(fake_oneshot_locked_mods == 0);
+#else
+    CHECK(fallback_hold_activation_count == 1);
+    CHECK(synthetic_qmk_tap_call.fallback_hold_active);
     CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_ALT)));
     CHECK(fake_weak_mods == MOD_BIT(KC_RIGHT_ALT));
     CHECK(fake_oneshot_mods == MOD_BIT(KC_LEFT_GUI));
     CHECK(fake_oneshot_locked_mods == MOD_BIT(KC_RIGHT_ALT));
+#endif
+    CHECK(synthetic_qmk_tap_call_count == 1);
+    CHECK(synthetic_qmk_tap_call.keycode == KC_DOWN);
+    CHECK(synthetic_qmk_tap_call.real == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(synthetic_qmk_tap_call.oneshot == MOD_BIT(KC_LEFT_GUI));
     CHECK(send_keyboard_report_count == 2);
 }
 
@@ -505,10 +524,15 @@ static void test_literal_emit_can_suspend_and_restore_mods(void) {
 
     noah_emit_literal_tap(G(KC_C), NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
 
+#ifdef NOAH_DIAGNOSTIC_DISABLE_EMIT_FALLBACK_SETTLEMENT
+    CHECK(fallback_hold_activation_count == 0);
+    CHECK(!literal_tap_call.fallback_hold_active);
+#else
     CHECK(fallback_hold_activation_count == 1);
+    CHECK(literal_tap_call.fallback_hold_active);
+#endif
     CHECK(literal_tap_call_count == 1);
     CHECK(literal_tap_call.keycode == G(KC_C));
-    CHECK(literal_tap_call.fallback_hold_active);
     CHECK(literal_tap_call.real == 0);
     CHECK(literal_tap_call.weak == 0);
     CHECK(literal_tap_call.oneshot == 0);

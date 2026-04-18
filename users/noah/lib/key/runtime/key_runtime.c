@@ -27,5 +27,11 @@ static bool key_runtime_activate_pending_fallback_hold(void) {
 }
 
 bool noah_key_runtime_settle_pending_fallback_hold(void) {
-    return key_runtime_activate_pending_fallback_hold();
+    bool settled_any = false;
+
+    while (key_runtime_activate_pending_fallback_hold()) {
+        settled_any = true;
+    }
+
+    return settled_any;
 }

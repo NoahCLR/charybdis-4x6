@@ -118,9 +118,11 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
                 }
                 break;
             case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
+#ifndef NOAH_DIAGNOSTIC_DISABLE_DELAYED_ACTION_EXECUTION
                 for (uint8_t repeat = 0; repeat < effect->data.delayed_action.repeat_count; repeat++) {
                     dispatch_delayed_action(effect->data.delayed_action.action, effect->data.delayed_action.mods);
                 }
+#endif
                 break;
             case KEY_RUNTIME_EFFECT_NONE:
             default:
@@ -251,7 +253,12 @@ void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
     uint8_t             pending_count = key_runtime_index_snapshot_pending_multi_tap_slots(pending_slots, ARRAY_SIZE(pending_slots));
 
     for (uint8_t index = 0; index < active_count; index++) {
-        key_runtime_transition_apply_slot_step(active_slots[index], (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN}, plan);
+        active_key_state_t *slot = active_slots[index];
+
+        key_runtime_transition_apply_slot_step(slot, (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN}, plan);
+        if (key_runtime_slot_has_pending_multi_tap(slot)) {
+            key_runtime_transition_apply_slot_step(slot, (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN}, plan);
+        }
     }
 
     for (uint8_t index = 0; index < pending_count; index++) {

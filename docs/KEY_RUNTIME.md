@@ -51,7 +51,7 @@ These files are the core map of the runtime:
 | [`key_runtime_slot_scan_reduce.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_scan_reduce.c) | Scan-time threshold logic |
 | [`key_runtime_slot_pending_multi_tap.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c) | Deferred multi-tap ownership after release |
 | [`key_runtime_effect.h`](../users/noah/lib/key/runtime/effects/key_runtime_effect.h), [`key_runtime_effect_queue.h`](../users/noah/lib/key/runtime/effects/key_runtime_effect_queue.h), [`key_runtime_slot_result.c`](../users/noah/lib/key/runtime/slot/key_runtime_slot_result.c), and [`key_runtime_transition.c`](../users/noah/lib/key/runtime/key_runtime_transition.c) | Shared runtime effect vocabulary, shared queue field layout, request expansion, plan batching, and effect execution |
-| [`action_dispatch.h`](../users/noah/lib/action/action_dispatch.h), [`action_dispatch.c`](../users/noah/lib/action/action_dispatch.c), [`action_lifecycle.c`](../users/noah/lib/action/action_lifecycle.c), [`owned_keycode.c`](../users/noah/lib/action/owned_keycode.c), and [`keyboard_mod_state.c`](../users/noah/lib/state/runtime/keyboard_mod_state.c) | Action classification, lifecycle dispatch, overlap-safe literal key ownership, and explicit output-intent helpers for authored taps, synthetic QMK taps, and temporary modifier suspension |
+| [`action_dispatch.h`](../users/noah/lib/action/action_dispatch.h), [`action_dispatch.c`](../users/noah/lib/action/action_dispatch.c), [`action_lifecycle.c`](../users/noah/lib/action/action_lifecycle.c), [`owned_keycode.c`](../users/noah/lib/action/owned_keycode.c), and [`keyboard_mod_state.c`](../users/noah/lib/state/runtime/keyboard_mod_state.c) | Action classification, lifecycle dispatch, overlap-safe literal key ownership, and explicit output-intent helpers for authored taps, synthetic QMK taps, temporary modifier suspension, and fallback-hold settling before emitted actions |
 | [`held_action.c`](../users/noah/lib/key/ownership/held_action.c), [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c), [`layer_ownership.c`](../users/noah/lib/state/ownership/layer_ownership.c), and [`keyboard_mod_ownership.c`](../users/noah/lib/state/ownership/keyboard_mod_ownership.c) | Long-lived ownership registries touched by runtime effects |
 | [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h), [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h), and [`runtime_trace.c`](../users/noah/lib/state/runtime/runtime_trace.c) | Public key-runtime observation surface, public runtime reset seam, and the optional shared trace ring buffer used for cross-subsystem debugging |
 
@@ -83,6 +83,12 @@ does the cross-cutting work that must happen before the current key is reduced:
 - interrupt other active handled keys on a new press
 - flush unrelated pending multi-tap chains before a press on another physical
   key proceeds
+
+That pending-chain flush is intentionally narrower than "any slot that still has
+multi-tap state". A slot can keep a same-key multi-tap chain internally while
+it is actively processing the next press in that chain; preflight must not
+treat that live active slot as a foreign pending chain and flush it on another
+key's press.
 
 This is why a new physical press can affect another key's slot before the new
 key itself resolves.
@@ -152,6 +158,18 @@ event passes every matrix scan:
 Those scan reducers handle threshold firing, long-hold promotion, and
 pending-multi-tap expiry through the same transition-plan mechanism as press
 and release.
+
+The pending-multi-tap index only tracks inactive deferred chains. If an active
+slot is still carrying the same-key multi-tap chain internally, the scan pass
+services that chain explicitly from the active-slot scan loop instead of
+relying on the global pending index.
+
+Fallback-hold settlement follows a similar overlap rule: action emission must
+drain every currently pending fallback-hold candidate before emitting a tap or
+synthetic keycode, not just the first indexed slot. Fast alternating handled
+keys can leave more than one active fallback-hold candidate live at the same
+time, and settling only one of them reintroduces overlap-sensitive ownership
+ordering bugs.
 
 Time-based repeat bindings now advance from the userspace housekeeping hook in
 [`runtime_init.c`](../users/noah/runtime_init.c), after QMK has already
@@ -252,6 +270,10 @@ These are the easiest runtime rules to break by accident:
 
 - Release is routed by physical key position, not by the current layer's live
   keycode mapping.
+- A slot may temporarily carry both an active press owner and an in-slot
+  same-key multi-tap chain, but the global `pending_multi_tap` index must only
+  contain inactive deferred chains. Foreign-press flushing is allowed to target
+  only those inactive chains.
 - `handled_key_resolution_t` is the authored handled-key resolution contract,
   while `key_runtime_slot_interaction_t` is the slot-owned cached interaction
   contract. Keep that boundary explicit and prefer
