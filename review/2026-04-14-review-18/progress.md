@@ -81,6 +81,11 @@
   - handled release now defers its tap/action emission while another tap-release-eligible handled sibling is still live instead of emitting immediately into the overlap window,
   - the deferred release emission is now key-runtime-owned shared state with the release-time keyboard mod snapshot preserved, and scan drains it once no tap-release-eligible sibling remains active,
   - host coverage now asserts three contracts directly in the release matrix suite: a live tap-release sibling defers the release dispatch, a held sibling does not, and the deferred release action drains after the sibling retires.
+- Extended the handled-key overlap audit around that new release-dispatch rule:
+  - the release matrix suite now classifies the immediate-safe release-time effects that can still run inside the sibling-overlap window,
+  - owned-state cleanup remains immediate even when a foreign tap-release sibling is still live,
+  - mixed `release_owned_state + dispatch_action` releases now prove the cleanup stays immediate while only the authored action defers,
+  - momentary layer release and pd-mode lock-tap releases are now mechanically covered as immediate-safe sibling-overlap effects.
 
 ## Findings Snapshot
 
@@ -185,10 +190,17 @@
   - `sh tests/host/run_feature_gate_compile_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during same-family sibling-overlap effect audit on `codex/fix-authored-key-freeze`:
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
-1. Hardware-verify the release-dispatch deferral fix on the short fast-alternation handled-only repros that previously froze the board, with special attention to tap-on-release keys alternating against other tap-release-eligible handled keys.
-2. Re-test the momentary pd-mode keys on this branch; they share the handled ownership path and should still stay stable under the overlap hardening plus release-dispatch deferral.
-3. If handled-only fast alternation still wedges, focus the next pass on the remaining overlap-sensitive emitted-action classes, especially synthetic QMK taps and non-literal action kinds that still run after the deferred release queue drains.
+1. Keep auditing the same overlap family by classifying any remaining release-time effect kinds that can coexist with a live tap-release sibling, especially if new authored behaviors introduce more non-dispatch release effects.
+2. If new hardware issues appear in this family, inspect the post-overlap drain seam next: deferred release dispatch replay versus any other delayed-action or fallback-hold work that scan may also execute in the same loop.
+3. When the overlap family feels stable, return to the older thread-level `should-fix` items on the registry DSLs and the breadth of `key_runtime_internal.h`.

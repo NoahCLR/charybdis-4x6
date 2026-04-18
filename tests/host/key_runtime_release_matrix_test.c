@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "key_runtime_scenario_harness.h"
+#include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap_ids.h"
 
 enum {
@@ -17,6 +18,8 @@ enum {
     TEST_CHAIN_CONTINUE_TAP    = SAFE_RANGE + 0x97,
     TEST_SIBLING_KEY           = SAFE_RANGE + 0x98,
     TEST_SIBLING_TAP_ACTION    = SAFE_RANGE + 0x99,
+    TEST_PD_MODE_KEY           = SAFE_RANGE + 0x9A,
+    TEST_OTHER_LAYER           = 3,
     TEST_TAP_HOLD_TERM_MS      = 120,
     TEST_LONGER_HOLD_TERM_MS   = 240,
     TEST_MULTI_TAP_TERM_MS     = 150,
@@ -134,6 +137,15 @@ static void test_configure_tap_release_key(uint16_t keycode, uint16_t tap_action
     key_behavior_view_t behavior = test_pressable_handled_key(keycode);
 
     behavior.single.tap = (tap_behavior_t)TAP_SENDS(tap_action);
+    key_runtime_scenario_add_behavior_view(behavior);
+}
+
+static void test_configure_layer_hold_key(uint16_t keycode, uint8_t layer) {
+    key_behavior_view_t behavior = test_pressable_handled_key(keycode);
+
+    behavior.is_momentary_layer = true;
+    behavior.single.tap         = tap_behavior_none();
+    behavior.single.hold        = (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer));
     key_runtime_scenario_add_behavior_view(behavior);
 }
 
@@ -617,11 +629,175 @@ static void test_release_dispatch_is_deferred_until_tap_release_sibling_clears(v
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.delayed_action.action == TEST_RELEASE_PRIMARY);
 }
 
+static void test_release_with_live_tap_release_sibling_keeps_owned_cleanup_immediate(void) {
+    static const char *case_name = "release with live tap-release sibling keeps owned cleanup immediate";
+    static const key_runtime_scenario_step_t setup_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_ACTIVE_KEY, 1, 1),
+    };
+    static const key_runtime_scenario_step_t clear_sibling_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_SIBLING_KEY, 1, 2),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_active_release_key(HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)), HOLD_NONE_LIT);
+    test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
+
+    key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.row == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.col == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(clear_sibling_steps, ARRAY_SIZE(clear_sibling_steps));
+
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
+}
+
+static void test_release_with_live_tap_release_sibling_splits_owned_cleanup_and_deferred_action(void) {
+    static const char *case_name = "release with live tap-release sibling splits owned cleanup and deferred action";
+    static const key_runtime_scenario_step_t setup_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_ADVANCE((uint16_t)(TEST_LONG_SETUP_ELAPSED_MS - TEST_TAP_SETUP_ELAPSED_MS)),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_ACTIVE_KEY, 1, 1),
+    };
+    static const key_runtime_scenario_step_t clear_sibling_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_SIBLING_KEY, 1, 2),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_active_release_key(HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
+                                      HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)));
+    test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
+
+    key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.row == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.col == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(clear_sibling_steps, ARRAY_SIZE(clear_sibling_steps));
+
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.delayed_action.action == TEST_RELEASE_LONG);
+}
+
+static void test_release_with_live_tap_release_sibling_keeps_layer_release_immediate(void) {
+    static const char *case_name = "release with live tap-release sibling keeps layer release immediate";
+    static const key_runtime_scenario_step_t setup_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_ACTIVE_KEY, 1, 1),
+    };
+    static const key_runtime_scenario_step_t clear_sibling_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_SIBLING_KEY, 1, 2),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_layer_hold_key(TEST_ACTIVE_KEY, TEST_OTHER_LAYER);
+    test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
+
+    key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.row == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.col == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(clear_sibling_steps, ARRAY_SIZE(clear_sibling_steps));
+
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
+}
+
+static void test_release_with_live_tap_release_sibling_keeps_pd_mode_lock_immediate(void) {
+    static const char *case_name = "release with live tap-release sibling keeps pd mode lock immediate";
+    static const key_runtime_scenario_step_t setup_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 1, 1),
+    };
+    static const key_runtime_scenario_step_t clear_sibling_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_SIBLING_KEY, 1, 2),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    key_runtime_scenario_reset();
+    key_runtime_scenario_define_pd_mode_key(TEST_PD_MODE_KEY, PD_MODE_VOLUME, true);
+    test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
+
+    key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.row == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.col == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.pd_mode == PD_MODE_VOLUME);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
+    CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(clear_sibling_steps, ARRAY_SIZE(clear_sibling_steps));
+
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
+}
+
 int main(void) {
     test_active_and_pending_release_semantics_stay_equivalent();
     test_pending_release_edge_cases();
     test_release_with_live_tap_release_sibling_defers_dispatch();
     test_release_with_live_held_sibling_dispatches_immediately();
     test_release_dispatch_is_deferred_until_tap_release_sibling_clears();
+    test_release_with_live_tap_release_sibling_keeps_owned_cleanup_immediate();
+    test_release_with_live_tap_release_sibling_splits_owned_cleanup_and_deferred_action();
+    test_release_with_live_tap_release_sibling_keeps_layer_release_immediate();
+    test_release_with_live_tap_release_sibling_keeps_pd_mode_lock_immediate();
     return 0;
 }

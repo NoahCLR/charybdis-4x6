@@ -210,6 +210,15 @@ The main fields are:
 - `deferred_release_dispatch`: queued release-time authored taps/actions whose
   emission was postponed until overlapping tap-release siblings retired
 
+Release-time overlap safety now follows a narrow rule:
+
+- if a handled release resolves to an authored tap/action while a foreign
+  tap-release-eligible handled sibling is still live, only that authored
+  dispatch defers into `deferred_release_dispatch`
+- ownership cleanup (`RELEASE_OWNED_STATE_BY_KEY`) still executes immediately
+- momentary layer release still executes immediately
+- pd-mode lock-tap effects still execute immediately
+
 The phase enum is small but important:
 
 - `IDLE`: no active press
