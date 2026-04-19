@@ -633,6 +633,43 @@ The remaining split is now outside authoritative handled release:
 
 That is a real architecture milestone. The remaining work is now mostly mechanical transport/orchestration cleanup rather than “which subsystem decides what this release means.”
 
+## 2026-04-20 Runtime V2 Flush And Interrupt Transport Note
+
+The next non-release transport seams have now moved off the old slot-result wrapper too:
+
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now translates pending-chain flush directly into delayed-action effects for:
+  - `key_runtime_transition_flush_multi_tap(...)`, and
+  - `key_runtime_transition_flush_foreign_multi_tap(...)`.
+- The same file now translates slot-policy builders directly into transition-plan effects for:
+  - `key_runtime_transition_flush_active_keys_except(...)`, and
+  - `key_runtime_transition_interrupt_active_keys_on_other_press(...)`.
+- Those paths no longer route through:
+  - `key_runtime_slot_step(...)`,
+  - `KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH`,
+  - `KEY_RUNTIME_SLOT_EVENT_INTERRUPT`, or
+  - temporary `key_runtime_slot_result_t` wrapping
+  on the normal transition path.
+- The underlying state mutation is intentionally unchanged:
+  - pending-chain flush still comes from `key_runtime_slot_take_pending_multi_tap_flush(...)`, and
+  - active-slot interrupt/flush still comes from slot-policy helpers.
+- `tests/host/key_runtime_transition_test.c` now adds dedicated coverage for `key_runtime_transition_flush_foreign_multi_tap(...)`, while the transition, release matrix, scenario, runtime-debug, real-profile overlap, modifier-hold integration, pd-mode key-runtime integration, key-runtime harness, and feature-gate compile suites all stayed green after the move.
+
+Inference from the current tree: the old slot-result transport is no longer on the hot path for:
+
+- authoritative handled release,
+- pending multi-tap flush,
+- foreign pending multi-tap flush,
+- active-key flush, and
+- active-key interrupt.
+
+The remaining mixed transport is now narrower:
+
+- handled press still uses slot-step/result transport,
+- active scan and pending multi-tap scan still use slot-step/result transport, and
+- deferred-release queue assembly/drain orchestration still lives in the legacy release/transition layer.
+
+That is the right shape for the next passes. The remaining work is now concentrated in press/scan/orchestration seams rather than spread across every event type.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

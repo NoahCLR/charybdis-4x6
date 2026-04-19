@@ -149,6 +149,85 @@ static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan
     }
 }
 
+static void key_runtime_transition_plan_push_builder_if_present(key_runtime_transition_plan_t *plan, keypos_t key_pos, key_runtime_effect_builder_t builder) {
+    if (!key_runtime_slot_result_builder_has_effect(builder)) {
+        return;
+    }
+
+    if (builder.release_owned_state) {
+        key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
+                                                   .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+                                                   .data.key_pos = key_pos,
+                                               });
+    }
+
+    switch (builder.kind) {
+        case KEY_RUNTIME_EFFECT_BUILDER_DISPATCH_ACTION:
+            key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
+                                                       .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+                                                       .data.action = builder.action,
+                                                   });
+            break;
+        case KEY_RUNTIME_EFFECT_BUILDER_HELD_REGISTER:
+            key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
+                                                       .kind = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
+                                                       .data.held_action =
+                                                           {
+                                                               .key_pos = key_pos,
+                                                               .action  = builder.action,
+                                                           },
+                                                   });
+            break;
+        case KEY_RUNTIME_EFFECT_BUILDER_HELD_UNREGISTER:
+            key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
+                                                       .kind = KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER,
+                                                       .data.held_action =
+                                                           {
+                                                               .key_pos = key_pos,
+                                                               .action  = builder.action,
+                                                           },
+                                                   });
+            break;
+        case KEY_RUNTIME_EFFECT_BUILDER_REPEAT_START:
+            key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
+                                                       .kind = KEY_RUNTIME_EFFECT_REPEAT_START,
+                                                       .data.repeat =
+                                                           {
+                                                               .key_pos   = key_pos,
+                                                               .action    = builder.action,
+                                                               .repeat_hz = builder.repeat_hz,
+                                                           },
+                                                   });
+            break;
+        case KEY_RUNTIME_EFFECT_BUILDER_NONE:
+        default:
+            break;
+    }
+
+    if (builder.feedback_pulse) {
+        key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
+                                                   .kind                 = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
+                                                   .data.long_hold_level = builder.feedback_long_hold_level,
+                                               });
+    }
+}
+
+static void key_runtime_transition_plan_push_delayed_action(key_runtime_transition_plan_t *plan, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
+    if (!(plan && action != KC_NO && repeat_count != 0u)) {
+        return;
+    }
+
+    key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
+                                               .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
+                                               .data.delayed_action =
+                                                   {
+                                                       .action       = action,
+                                                       .mods         = mods,
+                                                       .repeat_count = repeat_count,
+                                                   },
+                                           });
+}
+
 static void key_runtime_transition_apply_slot_result(const key_runtime_slot_result_t *result, key_runtime_transition_plan_t *plan) {
     if (!result || !result->handled) {
         return;
@@ -228,7 +307,14 @@ void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan)
     uint8_t             pending_count = key_runtime_index_snapshot_pending_multi_tap_slots(slots, ARRAY_SIZE(slots));
 
     for (uint8_t index = 0; index < pending_count; index++) {
-        key_runtime_transition_apply_slot_step(slots[index], (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH}, plan);
+        key_runtime_slot_pending_multi_tap_flush_t flush = key_runtime_slot_take_pending_multi_tap_flush(slots[index]);
+
+        if (!flush.handled) {
+            continue;
+        }
+
+        key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_FLUSH_PENDING_CHAIN, flush.repeat_count, flush.action);
+        key_runtime_transition_plan_push_delayed_action(plan, flush.action, flush.mods, flush.repeat_count);
     }
 }
 
@@ -243,7 +329,14 @@ void key_runtime_transition_flush_foreign_multi_tap(uint16_t keycode, keypos_t k
             continue;
         }
 
-        key_runtime_transition_apply_slot_step(slot, (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH}, plan);
+        key_runtime_slot_pending_multi_tap_flush_t flush = key_runtime_slot_take_pending_multi_tap_flush(slot);
+
+        if (!flush.handled) {
+            continue;
+        }
+
+        key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_FLUSH_PENDING_CHAIN, flush.repeat_count, flush.action);
+        key_runtime_transition_plan_push_delayed_action(plan, flush.action, flush.mods, flush.repeat_count);
     }
 }
 
@@ -253,7 +346,6 @@ void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runti
 
     for (uint8_t index = 0; index < active_count; index++) {
         active_key_state_t         *slot = slots[index];
-        key_runtime_slot_result_t   result;
         key_runtime_effect_builder_t builder;
         bool                        active_held_action_survives_flush;
         keypos_t                    owner_key_pos;
@@ -265,12 +357,9 @@ void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runti
         owner_key_pos                     = slot->owner.key_pos;
         active_held_action_survives_flush = slot->lifecycle.held_action_keycode == KC_NO || held_action_survives_flush(slot->owner.key_pos, slot->lifecycle.held_action_keycode);
         builder                           = key_runtime_slot_policy_take_flush(slot, active_held_action_survives_flush);
-        result                            = (key_runtime_slot_result_t){0};
         if (key_runtime_slot_result_builder_has_effect(builder)) {
-            result.handled = true;
-            key_runtime_slot_result_push_builder_if_present(&result, owner_key_pos, builder);
+            key_runtime_transition_plan_push_builder_if_present(plan, owner_key_pos, builder);
         }
-        key_runtime_transition_apply_slot_result(&result, plan);
     }
 }
 
@@ -295,15 +384,15 @@ void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_po
     uint8_t             active_count = key_runtime_index_snapshot_active_slots(slots, ARRAY_SIZE(slots));
 
     for (uint8_t index = 0; index < active_count; index++) {
-        key_runtime_transition_apply_slot_step(slots[index],
-                                               (key_runtime_slot_event_t){
-                                                   .kind = KEY_RUNTIME_SLOT_EVENT_INTERRUPT,
-                                                   .data.interrupt =
-                                                       {
-                                                           .other_key_pos = key_pos,
-                                                       },
-                                               },
-                                               plan);
+        active_key_state_t         *slot = slots[index];
+        key_runtime_effect_builder_t builder;
+
+        if (!slot) {
+            continue;
+        }
+
+        builder = key_runtime_slot_policy_interrupt_on_other_press(slot, key_pos);
+        key_runtime_transition_plan_push_builder_if_present(plan, slot->owner.key_pos, builder);
     }
 }
 

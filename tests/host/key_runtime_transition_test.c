@@ -659,6 +659,43 @@ static void test_flush_multi_tap_flushes_each_active_slot_in_order(void) {
     CHECK(second_multi_tap->keycode == KC_NO);
 }
 
+static void test_flush_foreign_multi_tap_preserves_matching_chain(void) {
+    key_runtime_transition_plan_t plan;
+    multi_tap_t                  *preserved_multi_tap = test_multi_tap_for_position(test_keypos(0, 0));
+    multi_tap_t                  *foreign_multi_tap   = test_multi_tap_for_position(test_keypos(0, 1));
+
+    test_reset_stubs();
+    test_stage_slot_state(key_runtime_slot_for_position(test_keypos(0, 0)), (active_key_state_t){
+                                                                                .pending_multi_tap =
+                                                                                    {
+                                                                                        .keycode       = TEST_MULTI_TAP_KEY,
+                                                                                        .key_pos       = test_keypos(0, 0),
+                                                                                        .count         = 1,
+                                                                                        .single_action = TEST_PREVIOUS_TAP_ACTION,
+                                                                                    },
+                                                                            });
+    test_stage_slot_state(key_runtime_slot_for_position(test_keypos(0, 1)), (active_key_state_t){
+                                                                                .pending_multi_tap =
+                                                                                    {
+                                                                                        .keycode       = KC_RIGHT_ALT,
+                                                                                        .key_pos       = test_keypos(0, 1),
+                                                                                        .count         = 2,
+                                                                                        .single_action = TEST_FALLBACK_TAP_ACTION,
+                                                                                    },
+                                                                            });
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_flush_foreign_multi_tap(TEST_MULTI_TAP_KEY, test_keypos(0, 0), &plan);
+
+    CHECK(plan.count == 1);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(plan.items[0].data.delayed_action.action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(plan.items[0].data.delayed_action.repeat_count == 2);
+    CHECK(preserved_multi_tap->keycode == TEST_MULTI_TAP_KEY);
+    CHECK(preserved_multi_tap->count == 1);
+    CHECK(foreign_multi_tap->keycode == KC_NO);
+}
+
 static void test_quick_release_locked_pd_mode_queues_lock_tap(void) {
     key_runtime_transition_plan_t plan;
     keyrecord_t                   record = test_record(test_keypos(2, 3), false);
@@ -2110,6 +2147,7 @@ int main(void) {
     test_flush_multi_tap_replays_single_action();
     test_flush_multi_tap_prefers_exact_step_tap();
     test_flush_multi_tap_flushes_each_active_slot_in_order();
+    test_flush_foreign_multi_tap_preserves_matching_chain();
     test_quick_release_locked_pd_mode_queues_lock_tap();
     test_quick_release_immediate_hold_unregisters_then_taps();
     test_modifier_multi_tap_first_tap_is_buffered();

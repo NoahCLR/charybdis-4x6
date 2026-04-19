@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-04-20 Runtime V2 Flush And Interrupt Transport Pass
+
+- Moved the next non-release transport seams off `key_runtime_slot_result_t`: pending-chain flush and active-key interrupt/flush no longer round-trip through slot-step result wrappers before effects reach the transition plan.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now:
+  - translates `key_runtime_slot_pending_multi_tap_flush_t` directly into delayed-action effects for:
+    - `key_runtime_transition_flush_multi_tap(...)`, and
+    - `key_runtime_transition_flush_foreign_multi_tap(...)`,
+  - translates `key_runtime_effect_builder_t` directly into transition-plan effects for:
+    - `key_runtime_transition_flush_active_keys_except(...)`, and
+    - `key_runtime_transition_interrupt_active_keys_on_other_press(...)`.
+- That means these seams no longer depend on:
+  - `KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_FLUSH`,
+  - `KEY_RUNTIME_SLOT_EVENT_INTERRUPT`, or
+  - temporary `key_runtime_slot_result_t` wrapping
+  on the default transition path.
+- This keeps the cut narrow:
+  - slot policy and pending-chain mutation are unchanged,
+  - press and scan still use the old slot-step/result transport,
+  - but flush/interrupt transport is now direct plan assembly in the transition layer.
+- `tests/host/key_runtime_transition_test.c` now includes a dedicated `key_runtime_transition_flush_foreign_multi_tap(...)` regression case proving the matching chain survives while the foreign chain is flushed, which specifically covers the new transport path.
+
 ## 2026-04-20 Runtime V2 Authoritative Release Transport Pass
 
 - Removed the old `key_runtime_slot_result_t` transport from the authoritative handled-release path: active release and pending-multi-tap release now mutate slot state and append their reducer-owned effect plan directly into the transition plan.
@@ -762,5 +783,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Move the remaining non-release transport/orchestration seams onto the reducer path so v2 owns not just release decision, effect selection, effect projection, and authoritative release transport, but also scan/flush transport and deferred-release queue assembly end-to-end.
+3. Move the remaining non-release transport/orchestration seams onto the reducer path so v2 owns not just release decision, effect selection, effect projection, authoritative release transport, and flush/interrupt transport, but also press/scan transport and deferred-release queue assembly end-to-end.
 4. Capture and replay on-device traces for the original wedge repros now that blocker gating, pending multi-tap lifecycle, explicit flush/reset, and handled-release effect planning all have reducer-owned visibility.
