@@ -785,6 +785,24 @@ The remaining mixed architecture is now compatibility-shaped rather than product
 
 That is a materially different state than when this thread started. The default firmware path now runs through reducer-owned meaning, planning, projection, transport, and deferred-release ownership. The remaining legacy code is now mostly fallback and deletion work, not live authority on the default runtime path.
 
+## 2026-04-20 Runtime V2 Transition Shim Reduction Note
+
+The remaining legacy transition shim is narrower again:
+
+- `users/noah/lib/key/runtime/key_runtime_transition.c` no longer routes non-authoritative handled-release fallback through `key_runtime_slot_step(...)`.
+- That fallback now calls `key_runtime_slot_reduce_handled_release(...)` directly, which means the production transition layer no longer constructs synthetic slot-step events for any event kind.
+- The same file now uses `key_runtime_slot_direct_plan_builder_has_effect(...)` for transition-layer builder checks, so the production transition path no longer depends on `key_runtime_slot_result_internal.h` merely to test whether a builder emits anything.
+- Slot-step still exists as a compatibility adapter for focused slot/unit callers and tests, but it is no longer a production transition dependency.
+- The transition, release-matrix, runtime-debug, scenario, modifier-hold integration, pd-mode key-runtime integration, real-profile overlap, key-runtime harness, feature-gate compile, and full host suites stayed green after this reduction.
+
+Inference from the current tree: the default firmware path is now cleaner not only in authority but also in shape:
+
+- the default transition layer no longer feeds events through slot-step/result transport,
+- direct-plan and reducer-owned paths are the production default, and
+- slot-step/result code is now compatibility-shaped infrastructure rather than a hidden production dependency.
+
+That makes the remaining work more explicit. What is left is not “find another live transition seam,” but decide how aggressively to delete or quarantine compatibility code while preserving the targeted slot/unit test surfaces and then finish hardware validation against the original wedge repros.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

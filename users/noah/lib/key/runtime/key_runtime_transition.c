@@ -16,10 +16,9 @@
 #include "slot/key_runtime_slot_pending_multi_tap.h"
 #include "slot/key_runtime_slot_press_reduce.h"
 #include "slot/key_runtime_slot_release_active.h"
+#include "slot/key_runtime_slot_release_reduce.h"
 #include "slot/key_runtime_slot_scan_reduce.h"
-#include "slot/key_runtime_slot_step.h"
 #include "slot/key_runtime_slot_policy.h"
-#include "slot/key_runtime_slot_result_internal.h"
 #include "key_runtime_internal.h"
 #include "key_runtime_trace.h"
 #include "../../action/action_dispatch.h"
@@ -152,7 +151,7 @@ static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan
 }
 
 static void key_runtime_transition_plan_push_builder_if_present(key_runtime_transition_plan_t *plan, keypos_t key_pos, key_runtime_effect_builder_t builder) {
-    if (!key_runtime_slot_result_builder_has_effect(builder)) {
+    if (!key_runtime_slot_direct_plan_builder_has_effect(builder)) {
         return;
     }
 
@@ -280,8 +279,8 @@ static void key_runtime_transition_append_unmatched_release_effects(keypos_t key
                                            });
 }
 
-static bool key_runtime_transition_apply_slot_step(active_key_state_t *slot, key_runtime_slot_event_t event, key_runtime_transition_plan_t *plan) {
-    key_runtime_slot_result_t result = key_runtime_slot_step(slot, event);
+static bool key_runtime_transition_apply_release_reduce(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+    key_runtime_slot_result_t result = key_runtime_slot_reduce_handled_release(slot, keycode, key_pos, resolution);
 
     if (!result.handled) {
         return false;
@@ -365,7 +364,7 @@ void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runti
         owner_key_pos                     = slot->owner.key_pos;
         active_held_action_survives_flush = slot->lifecycle.held_action_keycode == KC_NO || held_action_survives_flush(slot->owner.key_pos, slot->lifecycle.held_action_keycode);
         builder                           = key_runtime_slot_policy_take_flush(slot, active_held_action_survives_flush);
-        if (key_runtime_slot_result_builder_has_effect(builder)) {
+        if (key_runtime_slot_direct_plan_builder_has_effect(builder)) {
             key_runtime_transition_plan_push_builder_if_present(plan, owner_key_pos, builder);
         }
     }
@@ -434,18 +433,7 @@ static bool key_runtime_transition_process_active_key_release(uint16_t keycode, 
         return true;
     }
 
-    key_runtime_transition_apply_slot_step(slot,
-                                           (key_runtime_slot_event_t){
-                                               .kind = KEY_RUNTIME_SLOT_EVENT_HANDLED_RELEASE,
-                                               .data.handled_release =
-                                                   {
-                                                       .keycode = release_keycode,
-                                                       .key_pos = record->event.key,
-                                                       .key     = release_key,
-                                                   },
-                                           },
-                                           plan);
-    return true;
+    return key_runtime_transition_apply_release_reduce(slot, release_keycode, record->event.key, release_key, plan);
 }
 
 bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {

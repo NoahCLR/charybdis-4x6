@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-04-20 Runtime V2 Release Fallback Shim Reduction Pass
+
+- Removed the last production transition-layer dependency on `key_runtime_slot_step(...)`:
+  - non-authoritative handled-release fallback in `users/noah/lib/key/runtime/key_runtime_transition.c` now calls `key_runtime_slot_reduce_handled_release(...)` directly instead of routing through a synthetic slot-step event.
+- The same file also now uses `key_runtime_slot_direct_plan_builder_has_effect(...)` for transition-layer builder checks, so the production transition path no longer depends on `key_runtime_slot_result_internal.h` just to answer “does this builder emit anything?”
+- This keeps the cut narrow:
+  - slot-step itself still exists as a compatibility wrapper for focused slot/unit callers and tests,
+  - release fallback semantics are unchanged,
+  - but the production transition layer no longer routes any event kind through `key_runtime_slot_step(...)`.
+
 ## 2026-04-20 Runtime V2 Deferred Release Queue Ownership Pass
 
 - Moved the remaining production deferred-release orchestration seam onto the authoritative reducer path:
