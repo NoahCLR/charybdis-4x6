@@ -38,6 +38,12 @@ __attribute__((weak)) void noah_post_process_record_user(uint16_t keycode, keyre
     noah_process_record_user_finalize(keycode, record, true);
 }
 
+__attribute__((weak)) bool key_runtime_integration_pre_userspace_record(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return true;
+}
+
 static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed) {
     return (keyrecord_t){
         .event =
@@ -63,6 +69,10 @@ void key_runtime_integration_scan(void) {
 bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed) {
     keyrecord_t record = key_runtime_integration_record(key_pos, pressed);
     bool        keep_processing;
+
+    if (!key_runtime_integration_pre_userspace_record(keycode, &record)) {
+        return false;
+    }
 
     if (!noah_pre_process_record_user(keycode, &record)) {
         return false;

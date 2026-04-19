@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-04-19 Pd-Mode Auto-Mouse Ownership Remediation
+
+- Investigated the reopened wedge against the current real repro families and the upstream QMK auto-mouse/release ordering in `../bastardkb-qmk`.
+- Found a concrete userspace ownership bug in `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`: anchored pd modes could double-own auto-mouse state by combining a synthetic lifecycle anchor with either the real held-key auto-mouse path or a lock-owned `auto_mouse_toggle()` path.
+- Narrowed the synthetic lifecycle anchor to locked modes that keep auto-mouse alive but do not own the lock-time toggle path, and moved the synthetic-anchor latch into shared pd-mode runtime state so resets/tests do not depend on a translation-unit static.
+- Tightened the real-profile host harness so releases use the press-time keycode identity across layer changes and so the harness now models the pre-userspace auto-mouse side effects that QMK applies before userspace record processing.
+- Added focused host coverage that now proves:
+  - active `DRAGSCROLL` does not add a second synthetic auto-mouse anchor,
+  - locked non-toggle modes still keep auto-mouse alive,
+  - lock-owned toggle modes do not double-anchor auto-mouse, and
+  - the real-profile nav/dragscroll overlap path keeps `auto_mouse_key_tracker` at `1` instead of double-counting ownership.
+- This narrows the most likely hardware wedge family substantially, but the regression stays open until on-device validation confirms the board no longer wedges under the original repros.
+
+## 2026-04-19 Hardware Regression Reopened
+
+- Captured the currently open hardware-visible wedge regression in `authored-key-overlap-wedge-regression.md`.
+- This follow-up supersedes the earlier audit-time assumption that the overlap remediation was fully closed on hardware. The active review folder now treats the authored-key wedge as an open regression again until the runtime and host-harness mismatch is reconciled.
+- The current leading hypothesis is a deterministic cleanup leak across authored key-runtime ownership and pre-userspace QMK side effects after layer, pointer-layer, pd-mode, or modifier transitions.
+- The documented regression window is `fdc2d77` -> `29156345db90973cfc4422de1384c1a684aa94e2`, with the interruption/release-semantics widening in that later commit as the primary suspect.
+- This documentation-only pass did not run new host tests or firmware builds.
+
 ## 2026-04-14 Initial Review Start
 
 - Started a fresh active review thread in `review/2026-04-14-review-18/`.
@@ -112,10 +133,10 @@
 
 ## Findings Snapshot
 
-- `must-fix`: none in the current tree.
+- `must-fix`: the authored-key overlap wedge described in `authored-key-overlap-wedge-regression.md` remains open until on-device validation closes it. The current branch now models the press-identity and auto-mouse ownership seams more faithfully, but host green alone is still not sufficient evidence that the hardware wedge is gone.
 - `should-fix`: the positional registry DSLs are still the main maintainability risk; `key_runtime_internal.h` is still too broad for an internal seam.
 - `optional cleanup`: the keymap materialization macros and mixed-responsibility pointing bridge are acceptable now but are the next likely growth hotspots.
-- `closure verdict`: keep this thread open until the remaining `should-fix` items are either resolved or explicitly downgraded out of the closure bar.
+- `closure verdict`: keep this thread open until the hardware regression is closed on-device, and until the remaining `should-fix` items are either resolved or explicitly downgraded out of the closure bar.
 
 ## Verification
 
@@ -128,6 +149,17 @@
   - `sh tests/host/run_key_runtime_scenario_tests.sh`
   - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
   - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during pd-mode auto-mouse ownership remediation on `codex/authored-key-wedge-debug`:
+  - `sh tests/host/run_key_runtime_transition_tests.sh`
+  - `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_tests.sh`
+  - `sh tests/host/run_pd_runtime_tests.sh`
+  - `sh tests/host/run_pointer_layer_policy_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Current full-suite status:
   - At that audit snapshot, `sh tests/host/run_all_host_tests.sh` was still blocked by right-alt introspection drift in `docs/KEYMAP-OVERVIEW.md`; the later cleanup on `review-after-arrowmode` resolved that mismatch and restored the clean baseline recorded below.
@@ -277,5 +309,6 @@
 
 ## Next Steps
 
-1. Confirm on-device that single-tap `KC_RIGHT_ALT` now enters arrow mode without freezing and that a second tap still unlocks cleanly.
-2. When this tap-path regression is fully closed, return to the older thread-level `should-fix` items on the registry DSLs and the breadth of `key_runtime_internal.h`.
+1. Re-run the original on-device repro families: raw/authored `LAYER_NAV` into `DRAGSCROLL`, and `KC_LEFT_GUI` double-tap-hold to `KC_LEFT_ALT` with repeated nav-arrow use.
+2. If hardware still wedges, capture whether the new host-modeled seams stay quiescent so the next pass can focus on the remaining release/ownership paths instead of auto-mouse double ownership.
+3. Once the hardware regression is actually closed, return to the older thread-level `should-fix` items on the registry DSLs and the breadth of `key_runtime_internal.h`.

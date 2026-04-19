@@ -256,3 +256,17 @@ I reran the closure verification after the later hook/harness cleanup. The verdi
 - Split `users/noah/lib/key/runtime/key_runtime_internal.h` into narrower internal slice headers.
 - Revisit the authored keymap materialization macros if more authored surfaces are added.
 - Split `users/noah/lib/pointing/runtime/pd_runtime.c` when the next pointing feature lands instead of letting it accumulate more responsibilities.
+
+## 2026-04-19 Hardware Regression Reconciliation Note
+
+The earlier audit and closure-verification snapshots above should now be read as audit-time baselines, not the current truth of the hardware. A new hardware-visible regression is open again: authored-key overlaps can wedge the runtime after layer, pd-mode, or modifier transitions. The detailed capture lives in `review/2026-04-14-review-18/authored-key-overlap-wedge-regression.md`.
+
+This new evidence changes the current correctness assessment:
+
+- `must-fix`: open again. The tree has a real hardware regression even though the present host matrix can still pass.
+- The most likely failure class is a deterministic cleanup leak between pre-userspace QMK side effects and userspace key-runtime ownership cleanup after the live layer/pointer/pd/modifier context diverges from the original press identity.
+- The host harness was initially missing at least one real hardware seam. The current follow-up work now models press-time release identity across layer changes and the pre-userspace auto-mouse ownership path more faithfully, but host green should still not be treated as sufficient evidence that the overlap/release path is closed until the board is revalidated.
+
+One concrete remediation landed during that follow-up: `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c` had been double-owning auto-mouse state for some anchored pd modes by combining a synthetic lifecycle anchor with either the normal held-key auto-mouse path or a lock-owned `auto_mouse_toggle()` path. The lifecycle code now limits the synthetic anchor to locked non-toggle modes, and the host matrix locks that contract in `tests/host/pd_mode_test.c` plus the real-profile overlap harness.
+
+This note reconciles the older "no correctness blocker found" audit wording with the current hardware state so the active review folder stays internally coherent.

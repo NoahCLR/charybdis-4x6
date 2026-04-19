@@ -25,6 +25,7 @@ static uint16_t test_tap_code16_count;
 static uint16_t test_last_tap_code16;
 static uint16_t test_delayed_action_count;
 static uint16_t test_last_delayed_action;
+static uint16_t test_pressed_keycodes[MATRIX_ROWS][MATRIX_COLS];
 static uint16_t current_cpi;
 static uint8_t  fake_mods;
 static uint8_t  fake_weak_mods;
@@ -171,24 +172,46 @@ static uint16_t test_resolve_keycode(keypos_t key_pos) {
     return KC_NO;
 }
 
+static uint16_t test_cached_press_keycode(keypos_t key_pos) {
+    if (!test_keypos_valid(key_pos)) {
+        return KC_NO;
+    }
+
+    return test_pressed_keycodes[key_pos.row][key_pos.col];
+}
+
+static void test_cache_press_keycode(keypos_t key_pos, uint16_t keycode) {
+    if (!test_keypos_valid(key_pos)) {
+        return;
+    }
+
+    test_pressed_keycodes[key_pos.row][key_pos.col] = keycode;
+}
+
+static void test_clear_press_keycode(keypos_t key_pos) {
+    if (!test_keypos_valid(key_pos)) {
+        return;
+    }
+
+    test_pressed_keycodes[key_pos.row][key_pos.col] = KC_NO;
+}
+
 static void test_press_resolved(keypos_t key_pos) {
     uint16_t keycode = test_resolve_keycode(key_pos);
 
+    test_cache_press_keycode(key_pos, keycode);
     CHECK(!key_runtime_integration_process_record(keycode, key_pos, true));
 }
 
 static void test_release_resolved(keypos_t key_pos) {
-    uint16_t keycode = test_resolve_keycode(key_pos);
+    uint16_t keycode = test_cached_press_keycode(key_pos);
+
+    if (keycode == KC_NO) {
+        keycode = test_resolve_keycode(key_pos);
+    }
 
     CHECK(!key_runtime_integration_process_record(keycode, key_pos, false));
-}
-
-static void test_press_explicit(uint16_t keycode, keypos_t key_pos) {
-    CHECK(!key_runtime_integration_process_record(keycode, key_pos, true));
-}
-
-static void test_release_explicit(uint16_t keycode, keypos_t key_pos) {
-    CHECK(!key_runtime_integration_process_record(keycode, key_pos, false));
+    test_clear_press_keycode(key_pos);
 }
 
 static void test_run_double_tap_hold_cycle(keypos_t key_pos, uint16_t hold_ms) {
@@ -261,9 +284,10 @@ static void test_reset_state(void) {
     auto_mouse_layer_target  = LAYER_POINTER;
     auto_mouse_layer_off_count = 0;
     reset_dragscroll_count   = 0;
+    memset(test_pressed_keycodes, 0, sizeof(test_pressed_keycodes));
     memset(test_held_actions, 0, sizeof(test_held_actions));
     noah_runtime_reset_for_test();
-    layer_state = test_layer_mask(LAYER_BASE);
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE));
 }
 
 int uprintf(const char *fmt, ...) {
@@ -299,12 +323,16 @@ bool layer_state_cmp(layer_state_t state, uint8_t layer) {
     return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
 }
 
+static void test_apply_layer_state(layer_state_t next_state) {
+    layer_state = noah_layer_state_set_user(next_state);
+}
+
 void layer_on(uint8_t layer) {
-    layer_state |= (layer_state_t)1u << layer;
+    test_apply_layer_state(layer_state | ((layer_state_t)1u << layer));
 }
 
 void layer_off(uint8_t layer) {
-    layer_state &= ~((layer_state_t)1u << layer);
+    test_apply_layer_state(layer_state & (layer_state_t)~((layer_state_t)1u << layer));
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
@@ -652,11 +680,14 @@ uint16_t auto_mouse_get_time_elapsed(void) {
 }
 
 bool is_auto_mouse_active(void) {
-    return false;
+    return auto_mouse_toggled || auto_mouse_key_tracker != 0;
 }
 
 void auto_mouse_keyevent(bool pressed) {
     auto_mouse_key_tracker += pressed ? 1 : -1;
+    if (auto_mouse_key_tracker < 0) {
+        auto_mouse_key_tracker = 0;
+    }
 }
 
 void auto_mouse_layer_off(void) {
@@ -665,6 +696,95 @@ void auto_mouse_layer_off(void) {
     if (layer_state_cmp(layer_state, auto_mouse_layer_target) && auto_mouse_enabled && !auto_mouse_toggled && auto_mouse_key_tracker == 0) {
         layer_off(auto_mouse_layer_target);
     }
+}
+
+static void test_auto_mouse_reset_trigger(bool pressed) {
+    if (!pressed) {
+        return;
+    }
+
+    if (layer_state_cmp(layer_state, auto_mouse_layer_target)) {
+        layer_off(auto_mouse_layer_target);
+    }
+
+    auto_mouse_toggled     = false;
+    auto_mouse_key_tracker = 0;
+}
+
+static bool test_is_plain_modifier_or_qk_mod(uint16_t keycode) {
+    return (keycode >= KC_LEFT_CTRL && keycode <= KC_RIGHT_GUI) || (keycode >= QK_MODS && keycode <= QK_MODS_MAX);
+}
+
+bool key_runtime_integration_pre_userspace_record(uint16_t keycode, keyrecord_t *record) {
+    if (!auto_mouse_enabled) {
+        return true;
+    }
+
+    if (test_is_plain_modifier_or_qk_mod(keycode)) {
+        return true;
+    }
+
+    if (keycode >= QK_TO && keycode <= QK_TO_MAX) {
+        if (QK_TO_GET_LAYER(keycode) == auto_mouse_layer_target && !record->event.pressed) {
+            auto_mouse_toggled ^= 1;
+        }
+        return true;
+    }
+
+    if (keycode >= QK_TOGGLE_LAYER && keycode <= QK_TOGGLE_LAYER_MAX) {
+        if (QK_TOGGLE_LAYER_GET_LAYER(keycode) == auto_mouse_layer_target && !record->event.pressed) {
+            auto_mouse_toggled ^= 1;
+        }
+        return true;
+    }
+
+    if (keycode >= QK_MOMENTARY && keycode <= QK_MOMENTARY_MAX) {
+        if (QK_MOMENTARY_GET_LAYER(keycode) == auto_mouse_layer_target) {
+            auto_mouse_keyevent(record->event.pressed);
+        }
+        return true;
+    }
+
+    if ((keycode >= QK_DEF_LAYER && keycode <= QK_DEF_LAYER_MAX) || (keycode >= QK_ONE_SHOT_LAYER && keycode <= QK_ONE_SHOT_LAYER_MAX) || (keycode >= QK_ONE_SHOT_MOD && keycode <= QK_ONE_SHOT_MOD_MAX)) {
+        return true;
+    }
+
+    if (keycode >= QK_LAYER_MOD && keycode <= QK_LAYER_MOD_MAX) {
+        if (QK_LAYER_MOD_GET_LAYER(keycode) == auto_mouse_layer_target) {
+            auto_mouse_keyevent(record->event.pressed);
+        }
+        return true;
+    }
+
+    if (keycode >= QK_LAYER_TAP_TOGGLE && keycode <= QK_LAYER_TAP_TOGGLE_MAX) {
+        if (QK_LAYER_TAP_TOGGLE_GET_LAYER(keycode) == auto_mouse_layer_target) {
+            auto_mouse_keyevent(record->event.pressed);
+        }
+        return true;
+    }
+
+    if (keycode >= QK_LAYER_TAP && keycode <= QK_LAYER_TAP_MAX) {
+        if (!record->tap.count) {
+            if (QK_LAYER_TAP_GET_LAYER(keycode) == auto_mouse_layer_target) {
+                auto_mouse_keyevent(record->event.pressed);
+            }
+            return true;
+        }
+    }
+
+    if (keycode >= QK_MOD_TAP && keycode <= QK_MOD_TAP_MAX && !record->tap.count) {
+        return true;
+    }
+
+    if (!IS_NOEVENT(record->event)) {
+        if (IS_MOUSEKEY_BUTTON(keycode) || noah_is_mouse_record_user(keycode, record)) {
+            auto_mouse_keyevent(record->event.pressed);
+        } else if (!is_auto_mouse_active()) {
+            test_auto_mouse_reset_trigger(record->event.pressed);
+        }
+    }
+
+    return true;
 }
 
 bool transaction_rpc_send(int8_t transaction_id, uint8_t initiator2target_buffer_size, const void *initiator2target_buffer) {
@@ -946,6 +1066,7 @@ static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool re
         CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == DRAGSCROLL);
         CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == DRAGSCROLL);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
+        CHECK(auto_mouse_key_tracker == 1);
         CHECK(reset_dragscroll_count == 0);
 
         key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
@@ -954,6 +1075,7 @@ static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool re
         CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == DRAGSCROLL);
         CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == DRAGSCROLL);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
+        CHECK(auto_mouse_key_tracker == 1);
 
         if (release_parent_first) {
             test_release_resolved(parent_pos);
@@ -961,7 +1083,7 @@ static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool re
             CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
         }
 
-        test_release_explicit(DRAGSCROLL, dragscroll_pos);
+        test_release_resolved(dragscroll_pos);
 
         if (!release_parent_first) {
             test_release_resolved(parent_pos);
@@ -990,11 +1112,11 @@ static void test_activate_gui_double_tap_alt_hold(keypos_t gui_pos) {
     CHECK(test_keypos_valid(gui_pos));
     CHECK(test_resolve_keycode(gui_pos) == KC_LEFT_GUI);
 
-    test_press_explicit(KC_LEFT_GUI, gui_pos);
-    test_release_explicit(KC_LEFT_GUI, gui_pos);
+    test_press_resolved(gui_pos);
+    test_release_resolved(gui_pos);
 
     key_runtime_integration_advance(&fake_time, 40);
-    test_press_explicit(KC_LEFT_GUI, gui_pos);
+    test_press_resolved(gui_pos);
 
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
@@ -1008,11 +1130,11 @@ static void test_activate_gui_double_tap_alt_hold_pending(keypos_t gui_pos) {
     CHECK(test_keypos_valid(gui_pos));
     CHECK(test_resolve_keycode(gui_pos) == KC_LEFT_GUI);
 
-    test_press_explicit(KC_LEFT_GUI, gui_pos);
-    test_release_explicit(KC_LEFT_GUI, gui_pos);
+    test_press_resolved(gui_pos);
+    test_release_resolved(gui_pos);
 
     key_runtime_integration_advance(&fake_time, 40);
-    test_press_explicit(KC_LEFT_GUI, gui_pos);
+    test_press_resolved(gui_pos);
 
     CHECK(noah_runtime_debug_slot_owner_keycode(gui_pos) == KC_LEFT_GUI);
     CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_NO);
@@ -1032,7 +1154,8 @@ static void test_commit_pending_gui_double_tap_alt_hold(keypos_t gui_pos) {
 }
 
 static void test_activate_nav_parent_hold(keypos_t parent_pos, uint16_t parent_keycode, bool requires_threshold_scan) {
-    test_press_explicit(parent_keycode, parent_pos);
+    CHECK(test_resolve_keycode(parent_pos) == parent_keycode);
+    test_press_resolved(parent_pos);
     if (requires_threshold_scan) {
         key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
@@ -1063,7 +1186,7 @@ static void test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
         if (release_gui_first) {
-            test_release_explicit(KC_LEFT_GUI, gui_pos);
+            test_release_resolved(gui_pos);
             CHECK(noah_runtime_debug_slot_owner_keycode(gui_pos) == KC_NO);
             CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_RIGHT_ALT);
         }
@@ -1076,7 +1199,7 @@ static void test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
         if (!release_gui_first) {
-            test_release_explicit(KC_LEFT_GUI, gui_pos);
+            test_release_resolved(gui_pos);
         }
 
         key_runtime_integration_scan();
@@ -1155,15 +1278,15 @@ static void test_run_follow_on_nav_tap(keypos_t parent_pos, uint16_t parent_keyc
     test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
     CHECK(test_resolve_keycode(child_pos) == KC_LEFT);
 
-    test_press_explicit(KC_LEFT, child_pos);
-    test_release_explicit(KC_LEFT, child_pos);
+    test_press_resolved(child_pos);
+    test_release_resolved(child_pos);
 
     CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
     CHECK(test_last_tap_code16 == KC_LEFT);
     CHECK(test_delayed_action_count == 0);
     CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
-    test_release_explicit(parent_keycode, parent_pos);
+    test_release_resolved(parent_pos);
     key_runtime_integration_scan();
 }
 
@@ -1173,16 +1296,16 @@ static void test_run_follow_on_nav_hold_release(keypos_t parent_pos, uint16_t pa
     test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
     CHECK(test_resolve_keycode(child_pos) == KC_LEFT);
 
-    test_press_explicit(KC_LEFT, child_pos);
+    test_press_resolved(child_pos);
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
-    test_release_explicit(KC_LEFT, child_pos);
+    test_release_resolved(child_pos);
 
     CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
     CHECK(test_last_tap_code16 == A(KC_LEFT));
     CHECK(test_delayed_action_count == 0);
     CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
-    test_release_explicit(parent_keycode, parent_pos);
+    test_release_resolved(parent_pos);
     key_runtime_integration_scan();
 }
 
@@ -1203,7 +1326,7 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_taps_immediate_across_relea
         test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
         CHECK(test_resolve_keycode(child_pos) == KC_LEFT);
 
-        test_press_explicit(KC_LEFT, child_pos);
+        test_press_resolved(child_pos);
 
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
             switch (release_order->order[release_index]) {
@@ -1211,17 +1334,17 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_taps_immediate_across_relea
                     uint16_t previous_tap_count     = test_tap_code16_count;
                     uint16_t previous_delayed_count = test_delayed_action_count;
 
-                    test_release_explicit(KC_LEFT, child_pos);
+                    test_release_resolved(child_pos);
                     CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
                     CHECK(test_last_tap_code16 == KC_LEFT);
                     CHECK(test_delayed_action_count == previous_delayed_count);
                     break;
                 }
                 case TEST_RELEASE_TARGET_PARENT:
-                    test_release_explicit(parent_keycode, parent_pos);
+                    test_release_resolved(parent_pos);
                     break;
                 case TEST_RELEASE_TARGET_GUI:
-                    test_release_explicit(KC_LEFT_GUI, gui_pos);
+                    test_release_resolved(gui_pos);
                     break;
             }
         }
@@ -1252,7 +1375,7 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_hold_release_immediate_acro
         test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
         CHECK(test_resolve_keycode(child_pos) == KC_LEFT);
 
-        test_press_explicit(KC_LEFT, child_pos);
+        test_press_resolved(child_pos);
         key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
 
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
@@ -1261,17 +1384,17 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_hold_release_immediate_acro
                     uint16_t previous_tap_count     = test_tap_code16_count;
                     uint16_t previous_delayed_count = test_delayed_action_count;
 
-                    test_release_explicit(KC_LEFT, child_pos);
+                    test_release_resolved(child_pos);
                     CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
                     CHECK(test_last_tap_code16 == A(KC_LEFT));
                     CHECK(test_delayed_action_count == previous_delayed_count);
                     break;
                 }
                 case TEST_RELEASE_TARGET_PARENT:
-                    test_release_explicit(parent_keycode, parent_pos);
+                    test_release_resolved(parent_pos);
                     break;
                 case TEST_RELEASE_TARGET_GUI:
-                    test_release_explicit(KC_LEFT_GUI, gui_pos);
+                    test_release_resolved(gui_pos);
                     break;
             }
         }
@@ -1302,7 +1425,7 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_long_hold_immediate_across_
         test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
         CHECK(test_resolve_keycode(child_pos) == KC_LEFT);
 
-        test_press_explicit(KC_LEFT, child_pos);
+        test_press_resolved(child_pos);
         key_runtime_integration_advance(&fake_time, CUSTOM_LONGER_HOLD_TERM + 1);
         key_runtime_integration_scan();
 
@@ -1313,13 +1436,13 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_long_hold_immediate_across_
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
             switch (release_order->order[release_index]) {
                 case TEST_RELEASE_TARGET_CHILD:
-                    test_release_explicit(KC_LEFT, child_pos);
+                    test_release_resolved(child_pos);
                     break;
                 case TEST_RELEASE_TARGET_PARENT:
-                    test_release_explicit(parent_keycode, parent_pos);
+                    test_release_resolved(parent_pos);
                     break;
                 case TEST_RELEASE_TARGET_GUI:
-                    test_release_explicit(KC_LEFT_GUI, gui_pos);
+                    test_release_resolved(gui_pos);
                     break;
             }
         }
@@ -1351,7 +1474,7 @@ static void test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immedi
         test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
         CHECK(test_resolve_keycode(child_pos) == KC_LEFT);
 
-        test_press_explicit(KC_LEFT, child_pos);
+        test_press_resolved(child_pos);
         test_commit_pending_gui_double_tap_alt_hold(gui_pos);
 
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
@@ -1359,17 +1482,17 @@ static void test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immedi
                 case TEST_RELEASE_TARGET_CHILD: {
                     uint16_t previous_tap_count = test_tap_code16_count;
 
-                    test_release_explicit(KC_LEFT, child_pos);
+                    test_release_resolved(child_pos);
                     CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
                     CHECK(test_last_tap_code16 == A(KC_LEFT));
                     CHECK(test_delayed_action_count == 0);
                     break;
                 }
                 case TEST_RELEASE_TARGET_PARENT:
-                    test_release_explicit(parent_keycode, parent_pos);
+                    test_release_resolved(parent_pos);
                     break;
                 case TEST_RELEASE_TARGET_GUI:
-                    test_release_explicit(KC_LEFT_GUI, gui_pos);
+                    test_release_resolved(gui_pos);
                     break;
             }
         }
@@ -1403,7 +1526,7 @@ static void test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_q
         test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
         CHECK(test_resolve_keycode(dragscroll_pos) == DRAGSCROLL);
 
-        test_press_explicit(DRAGSCROLL, dragscroll_pos);
+        test_press_resolved(dragscroll_pos);
         CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
         CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == DRAGSCROLL);
         CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == DRAGSCROLL);
@@ -1415,13 +1538,13 @@ static void test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_q
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
             switch (release_order->order[release_index]) {
                 case TEST_RELEASE_TARGET_CHILD:
-                    test_release_explicit(DRAGSCROLL, dragscroll_pos);
+                    test_release_resolved(dragscroll_pos);
                     break;
                 case TEST_RELEASE_TARGET_PARENT:
-                    test_release_explicit(parent_keycode, parent_pos);
+                    test_release_resolved(parent_pos);
                     break;
                 case TEST_RELEASE_TARGET_GUI:
-                    test_release_explicit(KC_LEFT_GUI, gui_pos);
+                    test_release_resolved(gui_pos);
                     break;
             }
         }
@@ -1455,6 +1578,57 @@ static void test_gui_double_tap_hold_with_right_thumb_nav_hold_keeps_arrow_taps_
     test_gui_double_tap_hold_keeps_nav_arrow_long_hold_immediate_across_release_orders(right_thumb_pos, right_thumb_keycode, true);
 }
 
+static void test_gui_double_tap_hold_with_repeated_nav_arrow_taps_stays_quiescent(keypos_t parent_pos, uint16_t parent_keycode, bool requires_threshold_scan) {
+    keypos_t gui_pos   = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
+    keypos_t child_pos = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
+
+    CHECK(test_keypos_valid(gui_pos));
+    CHECK(test_keypos_valid(parent_pos));
+    CHECK(test_keypos_valid(child_pos));
+
+    test_reset_state();
+    test_activate_gui_double_tap_alt_hold(gui_pos);
+    test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
+
+    for (uint8_t iteration = 0; iteration < 16; iteration++) {
+        uint16_t previous_tap_count = test_tap_code16_count;
+
+        CHECK(test_resolve_keycode(child_pos) == KC_LEFT);
+        test_press_resolved(child_pos);
+        test_release_resolved(child_pos);
+        CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
+        CHECK(test_last_tap_code16 == KC_LEFT);
+        CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == KC_NO);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == KC_NO);
+        CHECK(noah_runtime_debug_deferred_release_count() == 0);
+
+        key_runtime_integration_advance(&fake_time, 10);
+        key_runtime_integration_scan();
+        CHECK(noah_runtime_debug_deferred_release_count() == 0);
+    }
+
+    test_release_resolved(parent_pos);
+    test_release_resolved(gui_pos);
+    key_runtime_integration_scan();
+    test_assert_nav_overlap_quiescent(gui_pos, parent_pos);
+}
+
+static void test_gui_double_tap_hold_with_raw_nav_lt_repeated_arrow_taps_stays_quiescent(void) {
+    const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
+    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+
+    CHECK(test_keypos_valid(nav_hold_pos));
+    test_gui_double_tap_hold_with_repeated_nav_arrow_taps_stays_quiescent(nav_hold_pos, nav_hold_keycode, false);
+}
+
+static void test_gui_double_tap_hold_with_right_thumb_repeated_arrow_taps_stays_quiescent(void) {
+    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
+
+    CHECK(right_thumb_keycode != KC_TRNS);
+    test_gui_double_tap_hold_with_repeated_nav_arrow_taps_stays_quiescent(right_thumb_pos, right_thumb_keycode, true);
+}
+
 static void test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_arrow_hold_release_immediate(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
     keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
@@ -1484,8 +1658,8 @@ static void test_gui_pending_double_tap_hold_keeps_arrow_tap_immediate(keypos_t 
         CHECK(test_resolve_keycode(child_pos) == KC_LEFT);
 
         previous_tap_count = test_tap_code16_count;
-        test_press_explicit(KC_LEFT, child_pos);
-        test_release_explicit(KC_LEFT, child_pos);
+        test_press_resolved(child_pos);
+        test_release_resolved(child_pos);
         CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
         CHECK(test_last_tap_code16 == KC_LEFT);
         CHECK(test_delayed_action_count == 0);
@@ -1494,11 +1668,11 @@ static void test_gui_pending_double_tap_hold_keeps_arrow_tap_immediate(keypos_t 
         test_commit_pending_gui_double_tap_alt_hold(gui_pos);
 
         if (release_parent_first) {
-            test_release_explicit(parent_keycode, parent_pos);
-            test_release_explicit(KC_LEFT_GUI, gui_pos);
+            test_release_resolved(parent_pos);
+            test_release_resolved(gui_pos);
         } else {
-            test_release_explicit(KC_LEFT_GUI, gui_pos);
-            test_release_explicit(parent_keycode, parent_pos);
+            test_release_resolved(gui_pos);
+            test_release_resolved(parent_pos);
         }
 
         key_runtime_integration_scan();
@@ -1546,7 +1720,7 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent
         test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
         CHECK(test_resolve_keycode(dragscroll_pos) == DRAGSCROLL);
 
-        test_press_explicit(DRAGSCROLL, dragscroll_pos);
+        test_press_resolved(dragscroll_pos);
         CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
         CHECK(pd_mode_local_locked_snapshot() == 0);
         CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == DRAGSCROLL);
@@ -1564,13 +1738,13 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
             switch (release_order->order[release_index]) {
                 case TEST_RELEASE_TARGET_CHILD:
-                    test_release_explicit(DRAGSCROLL, dragscroll_pos);
+                    test_release_resolved(dragscroll_pos);
                     break;
                 case TEST_RELEASE_TARGET_PARENT:
-                    test_release_explicit(parent_keycode, parent_pos);
+                    test_release_resolved(parent_pos);
                     break;
                 case TEST_RELEASE_TARGET_GUI:
-                    test_release_explicit(KC_LEFT_GUI, gui_pos);
+                    test_release_resolved(gui_pos);
                     break;
             }
         }
@@ -1628,21 +1802,21 @@ static void test_nav_dragscroll_hold_keeps_arrow_taps_immediate(keypos_t parent_
     test_reset_state();
     test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
 
-    test_press_explicit(DRAGSCROLL, dragscroll_pos);
+    test_press_resolved(dragscroll_pos);
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
     CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == DRAGSCROLL);
     CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == DRAGSCROLL);
 
     previous_tap_count = test_tap_code16_count;
-    test_press_explicit(KC_LEFT, child_pos);
-    test_release_explicit(KC_LEFT, child_pos);
+    test_press_resolved(child_pos);
+    test_release_resolved(child_pos);
     CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
     CHECK(test_last_tap_code16 == KC_LEFT);
     CHECK(test_delayed_action_count == 0);
     CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
-    test_release_explicit(DRAGSCROLL, dragscroll_pos);
-    test_release_explicit(parent_keycode, parent_pos);
+    test_release_resolved(dragscroll_pos);
+    test_release_resolved(parent_pos);
     key_runtime_integration_scan();
     test_assert_dragscroll_overlap_quiescent(parent_pos, dragscroll_pos);
 }
@@ -1678,22 +1852,22 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_active_keeps_arrow_taps
     test_activate_gui_double_tap_alt_hold(gui_pos);
     test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
 
-    test_press_explicit(DRAGSCROLL, dragscroll_pos);
+    test_press_resolved(dragscroll_pos);
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
     CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == DRAGSCROLL);
     CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == DRAGSCROLL);
 
     previous_tap_count = test_tap_code16_count;
-    test_press_explicit(KC_LEFT, child_pos);
-    test_release_explicit(KC_LEFT, child_pos);
+    test_press_resolved(child_pos);
+    test_release_resolved(child_pos);
     CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
     CHECK(test_last_tap_code16 == KC_LEFT);
     CHECK(test_delayed_action_count == 0);
     CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
-    test_release_explicit(DRAGSCROLL, dragscroll_pos);
-    test_release_explicit(parent_keycode, parent_pos);
-    test_release_explicit(KC_LEFT_GUI, gui_pos);
+    test_release_resolved(dragscroll_pos);
+    test_release_resolved(parent_pos);
+    test_release_resolved(gui_pos);
     key_runtime_integration_scan();
     test_assert_gui_dragscroll_overlap_quiescent(gui_pos, parent_pos, dragscroll_pos);
 }
@@ -1735,6 +1909,8 @@ int main(void) {
     test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable();
     test_gui_double_tap_hold_with_raw_nav_lt_keeps_arrow_taps_immediate();
     test_gui_double_tap_hold_with_right_thumb_nav_hold_keeps_arrow_taps_immediate();
+    test_gui_double_tap_hold_with_raw_nav_lt_repeated_arrow_taps_stays_quiescent();
+    test_gui_double_tap_hold_with_right_thumb_repeated_arrow_taps_stays_quiescent();
     test_gui_double_tap_hold_with_raw_nav_dragscroll_active_keeps_arrow_taps_immediate();
     test_gui_double_tap_hold_with_right_thumb_dragscroll_active_keeps_arrow_taps_immediate();
     test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_arrow_tap_immediate();

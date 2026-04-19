@@ -34,6 +34,7 @@ static int8_t  auto_mouse_key_tracker;
 static uint8_t auto_mouse_layer;
 static uint8_t auto_mouse_toggle_count;
 static uint8_t auto_mouse_layer_off_count;
+static uint8_t auto_mouse_keyevent_calls;
 
 static uint8_t split_sync_count;
 
@@ -87,6 +88,7 @@ static void test_reset_stubs(void) {
     auto_mouse_layer              = 4;
     auto_mouse_toggle_count       = 0;
     auto_mouse_layer_off_count    = 0;
+    auto_mouse_keyevent_calls     = 0;
     split_sync_count              = 0;
     keyboard_mod_register_count   = 0;
     keyboard_mod_unregister_count = 0;
@@ -180,7 +182,11 @@ void auto_mouse_toggle(void) {
 }
 
 void auto_mouse_keyevent(bool pressed) {
-    (void)pressed;
+    auto_mouse_keyevent_calls++;
+    auto_mouse_key_tracker += pressed ? 1 : -1;
+    if (auto_mouse_key_tracker < 0) {
+        auto_mouse_key_tracker = 0;
+    }
 }
 
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
@@ -590,6 +596,50 @@ static void test_lock_owned_auto_mouse_toggle_tracks_mode_ownership(void) {
     CHECK(auto_mouse_toggle_count == 0);
 }
 
+static void test_active_dragscroll_mode_does_not_add_synthetic_auto_mouse_anchor(void) {
+    test_reset_stubs();
+
+    pd_mode_activate(PD_MODE_DRAGSCROLL);
+    CHECK(auto_mouse_keyevent_calls == 0);
+    CHECK(auto_mouse_key_tracker == 0);
+    CHECK(auto_mouse_toggle_count == 0);
+
+    pd_mode_deactivate(PD_MODE_DRAGSCROLL);
+    CHECK(auto_mouse_keyevent_calls == 0);
+    CHECK(auto_mouse_key_tracker == 0);
+    CHECK(auto_mouse_toggle_count == 0);
+}
+
+static void test_locked_non_toggle_mode_uses_synthetic_auto_mouse_anchor(void) {
+    test_reset_stubs();
+
+    pd_mode_lock(PD_MODE_VOLUME);
+    CHECK(auto_mouse_toggle_count == 0);
+    CHECK(auto_mouse_keyevent_calls == 1);
+    CHECK(auto_mouse_key_tracker == 1);
+
+    pd_mode_unlock(PD_MODE_VOLUME);
+    CHECK(auto_mouse_toggle_count == 0);
+    CHECK(auto_mouse_keyevent_calls == 2);
+    CHECK(auto_mouse_key_tracker == 0);
+}
+
+static void test_locked_toggle_owned_dragscroll_mode_does_not_double_anchor_auto_mouse(void) {
+    test_reset_stubs();
+
+    pd_mode_lock(PD_MODE_DRAGSCROLL);
+    CHECK(auto_mouse_toggle_enabled);
+    CHECK(auto_mouse_toggle_count == 1);
+    CHECK(auto_mouse_keyevent_calls == 0);
+    CHECK(auto_mouse_key_tracker == 0);
+
+    pd_mode_unlock(PD_MODE_DRAGSCROLL);
+    CHECK(!auto_mouse_toggle_enabled);
+    CHECK(auto_mouse_toggle_count == 2);
+    CHECK(auto_mouse_keyevent_calls == 0);
+    CHECK(auto_mouse_key_tracker == 0);
+}
+
 static void test_active_key_handler_only_runs_for_active_modes(void) {
     keyrecord_t record = {
         .event =
@@ -626,6 +676,9 @@ int main(void) {
     test_pinch_buffered_tap_mask_uses_managed_only_gui_policy();
     test_pinch_keyboard_event_mask_uses_managed_only_gui_policy();
     test_lock_owned_auto_mouse_toggle_tracks_mode_ownership();
+    test_active_dragscroll_mode_does_not_add_synthetic_auto_mouse_anchor();
+    test_locked_non_toggle_mode_uses_synthetic_auto_mouse_anchor();
+    test_locked_toggle_owned_dragscroll_mode_does_not_double_anchor_auto_mouse();
     test_active_key_handler_only_runs_for_active_modes();
 
     puts("pd_mode host tests passed");

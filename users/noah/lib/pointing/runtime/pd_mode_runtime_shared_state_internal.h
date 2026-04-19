@@ -16,6 +16,7 @@ typedef struct {
     pd_mode_mask_t local_locked_mode;
     pd_mode_mask_t remote_display_active_mode;
     pd_mode_mask_t remote_display_locked_mode;
+    bool           synthetic_auto_mouse_anchor_active;
 } pd_mode_runtime_shared_state_t;
 
 pd_mode_runtime_shared_state_t *pd_mode_runtime_shared_state(void);

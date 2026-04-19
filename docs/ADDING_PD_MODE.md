@@ -360,9 +360,10 @@ the registry.
 
 Current examples to copy:
 
-- `DRAGSCROLL` uses the shared local dragscroll handler plus the locked auto-mouse helpers
+- `DRAGSCROLL` uses the shared local dragscroll handler plus the lock-owned auto-mouse toggle helper; its ordinary held-key path relies on the normal QMK auto-mouse key tracking instead of a synthetic lifecycle anchor
 - `PINCH_MODE` uses the same dragscroll handler and keeps its owned real `GUI` modifier lifecycle, buffered tap replay masking policy, and concurrent keyboard-event masking policy in [`pd_mode_pinch.c`](../users/noah/lib/pointing/modes/pd_mode_pinch.c)
-- locked scroll-like modes use the auto-mouse ownership helpers
+- locked non-toggle modes that set `PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED` use the shared synthetic lifecycle anchor in [`pd_mode_lifecycle.c`](../users/noah/lib/pointing/runtime/pd_mode_lifecycle.c)
+- locked scroll-like modes that set `PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE` should not also add a synthetic tracker-style anchor
 
 If a mode owns real modifiers while active and also supports buffered single
 taps, prefer masking only the managed-only subset of those modifiers during the
