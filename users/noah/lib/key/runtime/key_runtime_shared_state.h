@@ -15,15 +15,6 @@
 #include "key_runtime_interaction.h"
 #include "key_runtime_types.h"
 
-typedef enum {
-    KEY_RUNTIME_SLOT_PHASE_IDLE = 0,
-    KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW,
-    KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
-    KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING,
-    KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE,
-    KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE,
-} key_runtime_slot_phase_t;
-
 typedef struct {
     uint16_t keycode;
     keypos_t key_pos;
@@ -34,7 +25,8 @@ typedef struct {
     uint16_t                 held_action_keycode;
     bool                     repeat_binding_active;
     bool                     pd_mode_was_locked_on_press;
-    bool                     layer_interrupted;
+    bool                     other_press_interrupted;
+    bool                     momentary_layer_tap_interrupted;
 } key_runtime_slot_lifecycle_state_t;
 
 // One handled-key runtime slot: active press/hold state plus any deferred

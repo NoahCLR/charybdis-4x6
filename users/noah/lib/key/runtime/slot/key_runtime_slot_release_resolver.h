@@ -40,7 +40,8 @@ typedef struct {
     uint16_t                             elapsed;
     bool                                 held_action_active;
     bool                                 repeat_active;
-    bool                                 layer_interrupted;
+    bool                                 other_press_interrupted;
+    bool                                 momentary_layer_tap_interrupted;
     bool                                 pd_mode_was_locked_on_press;
 } key_runtime_slot_release_query_t;
 
@@ -51,13 +52,63 @@ typedef struct {
     pd_mode_mask_t                              pd_mode_lock_tap;
 } key_runtime_slot_release_decision_t;
 
-static inline bool key_runtime_slot_release_query_interrupt_suppresses_tap(const key_runtime_slot_release_query_t *query) {
+static inline key_runtime_slot_release_semantics_t key_runtime_slot_release_semantics_for_phase(key_runtime_slot_phase_t phase) {
+    switch (phase) {
+        case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
+            return (key_runtime_slot_release_semantics_t){
+                .buffered_base_tap_dispatches_tap = true,
+                .quick_tap_dispatches_tap         = true,
+                .pd_mode_lock_tap_allowed         = true,
+                .checks_fallback_hold_suppression = true,
+                .hold_action_mode                 = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY,
+                .long_hold_dispatches_action      = true,
+                .nonquick_release_dispatches_tap  = true,
+            };
+        case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
+            return (key_runtime_slot_release_semantics_t){
+                .pd_mode_lock_tap_allowed            = true,
+                .quick_immediate_hold_dispatches_tap = true,
+                .long_hold_dispatches_action         = true,
+            };
+        case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
+            return (key_runtime_slot_release_semantics_t){
+                .hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION,
+            };
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE:
+            return (key_runtime_slot_release_semantics_t){
+                .long_hold_dispatches_action = true,
+            };
+        case KEY_RUNTIME_SLOT_PHASE_IDLE:
+        default:
+            return (key_runtime_slot_release_semantics_t){0};
+    }
+}
+
+static inline key_runtime_slot_release_query_t key_runtime_slot_release_query_from_slot(const active_key_state_t *slot, key_runtime_slot_release_semantics_t semantics, uint16_t elapsed) {
+    if (!slot) {
+        return (key_runtime_slot_release_query_t){0};
+    }
+
+    return (key_runtime_slot_release_query_t){
+        .interaction                       = key_runtime_slot_cached_interaction(slot),
+        .semantics                         = semantics,
+        .elapsed                           = elapsed,
+        .held_action_active                = slot->lifecycle.held_action_keycode != KC_NO,
+        .repeat_active                     = slot->lifecycle.repeat_binding_active,
+        .other_press_interrupted           = slot->lifecycle.other_press_interrupted,
+        .momentary_layer_tap_interrupted   = slot->lifecycle.momentary_layer_tap_interrupted,
+        .pd_mode_was_locked_on_press       = slot->lifecycle.pd_mode_was_locked_on_press,
+    };
+}
+
+static inline bool key_runtime_slot_release_query_momentary_layer_tap_suppresses_quick_tap(const key_runtime_slot_release_query_t *query) {
     key_runtime_slot_release_contract_t contract = query ? key_runtime_slot_release_contract(query->interaction) : (key_runtime_slot_release_contract_t){0};
-    return query && query->layer_interrupted && (contract.suppress_tap_on_layer_interrupt || contract.quick_release_of_immediate_hold_dispatches_tap || contract.quick_tap_pd_mode_lock != 0);
+    return query && contract.suppress_tap_on_layer_interrupt && query->momentary_layer_tap_interrupted;
 }
 
 static inline bool key_runtime_slot_release_query_quick_tap(const key_runtime_slot_release_query_t *query) {
-    return query && query->elapsed < query->interaction.binding.tap_hold_term && !key_runtime_slot_release_query_interrupt_suppresses_tap(query);
+    return query && query->elapsed < query->interaction.binding.tap_hold_term && !key_runtime_slot_release_query_momentary_layer_tap_suppresses_quick_tap(query);
 }
 
 static inline bool key_runtime_slot_release_query_buffered_base_tap(const key_runtime_slot_release_query_t *query) {
@@ -67,7 +118,7 @@ static inline bool key_runtime_slot_release_query_buffered_base_tap(const key_ru
 
 static inline bool key_runtime_slot_release_query_quick_immediate_hold(const key_runtime_slot_release_query_t *query) {
     key_runtime_slot_release_contract_t contract = query ? key_runtime_slot_release_contract(query->interaction) : (key_runtime_slot_release_contract_t){0};
-    return query && contract.quick_release_of_immediate_hold_dispatches_tap && key_runtime_slot_release_query_quick_tap(query);
+    return query && contract.quick_release_of_immediate_hold_dispatches_tap && !query->other_press_interrupted && key_runtime_slot_release_query_quick_tap(query);
 }
 
 static inline pd_mode_mask_t key_runtime_slot_release_query_lock_tap_mode(const key_runtime_slot_release_query_t *query) {
@@ -85,7 +136,7 @@ static inline pd_mode_mask_t key_runtime_slot_release_query_lock_tap_mode(const 
         return 0;
     }
 
-    if (key_runtime_slot_release_query_interrupt_suppresses_tap(query)) {
+    if (key_runtime_slot_release_query_momentary_layer_tap_suppresses_quick_tap(query)) {
         return 0;
     }
 

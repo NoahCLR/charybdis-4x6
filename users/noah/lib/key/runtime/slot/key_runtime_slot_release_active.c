@@ -29,58 +29,8 @@ typedef struct {
     pd_mode_mask_t                      lock_tap_mode;
 } key_runtime_slot_release_context_t;
 
-typedef struct {
-    bool                                        buffered_base_tap_dispatches_tap;
-    bool                                        quick_tap_dispatches_tap;
-    bool                                        pd_mode_lock_tap_allowed;
-    bool                                        quick_immediate_hold_dispatches_tap;
-    bool                                        checks_fallback_hold_suppression;
-    key_runtime_slot_release_hold_action_mode_t hold_action_mode;
-    bool                                        long_hold_dispatches_action;
-    bool                                        nonquick_release_dispatches_tap;
-} key_runtime_slot_release_phase_contract_t;
-
-typedef struct {
-    key_runtime_slot_release_phase_contract_t tap_window;
-    key_runtime_slot_release_phase_contract_t press_held_window;
-    key_runtime_slot_release_phase_contract_t release_hold_pending;
-    key_runtime_slot_release_phase_contract_t hold_tier_active;
-    key_runtime_slot_release_phase_contract_t hold_complete;
-} key_runtime_slot_release_phase_contracts_t;
-
-static const key_runtime_slot_release_phase_contracts_t key_runtime_slot_release_phase_contracts = {
-    .tap_window =
-        {
-            .buffered_base_tap_dispatches_tap = true,
-            .quick_tap_dispatches_tap         = true,
-            .pd_mode_lock_tap_allowed         = true,
-            .checks_fallback_hold_suppression = true,
-            .hold_action_mode                 = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY,
-            .long_hold_dispatches_action      = true,
-            .nonquick_release_dispatches_tap  = true,
-        },
-    .press_held_window =
-        {
-            .pd_mode_lock_tap_allowed            = true,
-            .quick_immediate_hold_dispatches_tap = true,
-            .long_hold_dispatches_action         = true,
-        },
-    .release_hold_pending =
-        {
-            .hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION,
-        },
-    .hold_tier_active =
-        {
-            .long_hold_dispatches_action = true,
-        },
-    .hold_complete =
-        {
-            .long_hold_dispatches_action = true,
-        },
-};
-
-static bool key_runtime_slot_release_interrupt_suppresses_tap(const key_runtime_slot_release_context_t *context) {
-    return context && context->released_key.lifecycle.layer_interrupted && (context->contract.suppress_tap_on_layer_interrupt || context->contract.quick_release_of_immediate_hold_dispatches_tap || context->contract.quick_tap_pd_mode_lock != 0);
+static bool key_runtime_slot_release_momentary_layer_tap_suppresses_quick_tap(const key_runtime_slot_release_context_t *context) {
+    return context && context->contract.suppress_tap_on_layer_interrupt && context->released_key.lifecycle.momentary_layer_tap_interrupted;
 }
 
 static bool key_runtime_slot_release_is_buffered_base_tap(const key_runtime_slot_release_context_t *context) {
@@ -88,7 +38,7 @@ static bool key_runtime_slot_release_is_buffered_base_tap(const key_runtime_slot
 }
 
 static bool key_runtime_slot_release_is_quick_tap(const key_runtime_slot_release_context_t *context) {
-    return context && context->elapsed < context->interaction.binding.tap_hold_term && !key_runtime_slot_release_interrupt_suppresses_tap(context);
+    return context && context->elapsed < context->interaction.binding.tap_hold_term && !key_runtime_slot_release_momentary_layer_tap_suppresses_quick_tap(context);
 }
 
 static pd_mode_mask_t key_runtime_slot_locked_pd_mode_tap_mode(const key_runtime_slot_release_context_t *context) {
@@ -105,7 +55,7 @@ static pd_mode_mask_t key_runtime_slot_locked_pd_mode_tap_mode(const key_runtime
         return 0;
     }
 
-    if (key_runtime_slot_release_interrupt_suppresses_tap(context)) {
+    if (key_runtime_slot_release_momentary_layer_tap_suppresses_quick_tap(context)) {
         return 0;
     }
 
@@ -126,14 +76,14 @@ static key_runtime_trace_release_outcome_t key_runtime_slot_release_trace_outcom
     }
 }
 
-static uint16_t key_runtime_slot_release_trace_flags(const key_runtime_slot_release_context_t *context, key_runtime_slot_release_phase_contract_t phase_contract, key_runtime_slot_release_decision_t decision) {
+static uint16_t key_runtime_slot_release_trace_flags(const key_runtime_slot_release_context_t *context, key_runtime_slot_release_semantics_t semantics, key_runtime_slot_release_decision_t decision) {
     uint16_t flags = 0;
 
     if (!context) {
         return flags;
     }
 
-    if (context && context->contract.suppress_tap_on_layer_interrupt && context->released_key.lifecycle.layer_interrupted) {
+    if (context && context->contract.suppress_tap_on_layer_interrupt && context->released_key.lifecycle.momentary_layer_tap_interrupted) {
         flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_INTERRUPTED_LAYER_TAP;
     }
     if (context->quick_tap) {
@@ -151,7 +101,7 @@ static uint16_t key_runtime_slot_release_trace_flags(const key_runtime_slot_rele
     if (decision.release_owned_state) {
         flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_RELEASE_OWNED_STATE;
     }
-    if (phase_contract.checks_fallback_hold_suppression && context->contract.fallback_hold_suppresses_nonquick_release && !context->quick_tap && decision.outcome == KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE) {
+    if (semantics.checks_fallback_hold_suppression && context->contract.fallback_hold_suppresses_nonquick_release && !context->quick_tap && decision.outcome == KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE) {
         flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_FALLBACK_SUPPRESSED;
     }
 
@@ -176,48 +126,12 @@ static uint16_t key_runtime_slot_release_trace_detail(const key_runtime_slot_rel
     }
 }
 
-static key_runtime_slot_release_phase_contract_t key_runtime_slot_release_phase_contract(key_runtime_slot_phase_t phase) {
-    switch (phase) {
-        case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
-            return key_runtime_slot_release_phase_contracts.tap_window;
-        case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
-            return key_runtime_slot_release_phase_contracts.press_held_window;
-        case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
-            return key_runtime_slot_release_phase_contracts.release_hold_pending;
-        case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
-            return key_runtime_slot_release_phase_contracts.hold_tier_active;
-        case KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE:
-            return key_runtime_slot_release_phase_contracts.hold_complete;
-        case KEY_RUNTIME_SLOT_PHASE_IDLE:
-        default:
-            return (key_runtime_slot_release_phase_contract_t){0};
-    }
-}
-
-static key_runtime_slot_release_query_t key_runtime_slot_release_query(const key_runtime_slot_release_context_t *context, key_runtime_slot_release_phase_contract_t phase_contract) {
+static key_runtime_slot_release_query_t key_runtime_slot_release_query(const key_runtime_slot_release_context_t *context, key_runtime_slot_release_semantics_t semantics) {
     if (!context) {
         return (key_runtime_slot_release_query_t){0};
     }
 
-    return (key_runtime_slot_release_query_t){
-        .interaction = context->interaction,
-        .semantics =
-            {
-                .buffered_base_tap_dispatches_tap    = phase_contract.buffered_base_tap_dispatches_tap,
-                .quick_tap_dispatches_tap            = phase_contract.quick_tap_dispatches_tap,
-                .pd_mode_lock_tap_allowed            = phase_contract.pd_mode_lock_tap_allowed,
-                .quick_immediate_hold_dispatches_tap = phase_contract.quick_immediate_hold_dispatches_tap,
-                .checks_fallback_hold_suppression    = phase_contract.checks_fallback_hold_suppression,
-                .hold_action_mode                    = phase_contract.hold_action_mode,
-                .long_hold_dispatches_action         = phase_contract.long_hold_dispatches_action,
-                .nonquick_release_dispatches_tap     = phase_contract.nonquick_release_dispatches_tap,
-            },
-        .elapsed                     = context->elapsed,
-        .held_action_active          = context->released_key.lifecycle.held_action_keycode != KC_NO,
-        .repeat_active               = context->released_key.lifecycle.repeat_binding_active,
-        .layer_interrupted           = context->released_key.lifecycle.layer_interrupted,
-        .pd_mode_was_locked_on_press = context->released_key.lifecycle.pd_mode_was_locked_on_press,
-    };
+    return key_runtime_slot_release_query_from_slot(&context->released_key, semantics, context->elapsed);
 }
 
 static key_runtime_slot_release_decision_t key_runtime_slot_resolve_release(active_key_state_t released_key, uint16_t elapsed) {
@@ -228,19 +142,19 @@ static key_runtime_slot_release_decision_t key_runtime_slot_resolve_release(acti
         .contract     = key_runtime_slot_release_contract(interaction),
         .elapsed      = elapsed,
     };
-    key_runtime_slot_phase_t                  phase          = key_runtime_slot_phase(&released_key);
-    key_runtime_slot_release_phase_contract_t phase_contract = key_runtime_slot_release_phase_contract(phase);
-    key_runtime_slot_release_query_t          query;
+    key_runtime_slot_phase_t            phase     = key_runtime_slot_phase(&released_key);
+    key_runtime_slot_release_semantics_t semantics = key_runtime_slot_release_semantics_for_phase(phase);
+    key_runtime_slot_release_query_t    query;
 
     context.quick_tap            = key_runtime_slot_release_is_quick_tap(&context);
     context.quick_immediate_hold = context.contract.quick_release_of_immediate_hold_dispatches_tap && key_runtime_slot_allows_tap_release(&released_key) && context.quick_tap;
     context.buffered_base_tap    = key_runtime_slot_release_is_buffered_base_tap(&context);
     context.lock_tap_mode        = key_runtime_slot_locked_pd_mode_tap_mode(&context);
-    query                        = key_runtime_slot_release_query(&context, phase_contract);
+    query                        = key_runtime_slot_release_query(&context, semantics);
 
     key_runtime_slot_release_decision_t decision = key_runtime_slot_release_decide(&query);
 
-    key_runtime_trace_release_resolution(phase, key_runtime_slot_release_trace_outcome(decision.outcome), key_runtime_slot_release_trace_flags(&context, phase_contract, decision), key_runtime_slot_release_trace_detail(&context, decision));
+    key_runtime_trace_release_resolution(phase, key_runtime_slot_release_trace_outcome(decision.outcome), key_runtime_slot_release_trace_flags(&context, semantics, decision), key_runtime_slot_release_trace_detail(&context, decision));
 
     return decision;
 }

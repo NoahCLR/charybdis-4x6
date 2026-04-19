@@ -65,6 +65,16 @@ In plain terms:
 - repeated taps must stay within the multi-tap term to remain part of the same
   sequence
 
+Foreign-key interruption only cancels the quick tap for true momentary-layer
+taps. Other authored hold families, such as press-registering modifier holds
+and pd-mode quick-lock taps, keep their own release contract instead of
+borrowing the momentary-layer interrupt rule.
+
+Immediate-hold keys still remember that another physical key overlapped them,
+but that overlap fact is separate from momentary-layer cancellation. Its job is
+narrower: once an immediate-hold key was actually used in an overlap, release
+must not reopen the key's quick-release tap or first-tap multi-tap path.
+
 One practical consequence is that a single tap on a multi-tap key is delayed by
 one multi-tap window so the firmware can tell whether you meant one tap or
 more.

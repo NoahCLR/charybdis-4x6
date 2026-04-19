@@ -99,6 +99,16 @@
   - this keeps ordinary authored tap actions on the shared emit path while giving release-time pd-mode locks the same native runtime effect that already covered quick-tap lock toggles on real pd-mode keys,
   - `tests/host/key_runtime_transition_test.c` now asserts that a `KC_RIGHT_ALT` fallback tap to `ARROW_MODE_LOCK` produces the native pd-mode-lock effect and split-sync outcome instead of a generic dispatched action,
   - `tests/host/pd_mode_key_runtime_integration_test.c` and `run_pd_mode_key_runtime_integration_tests.sh` now model the real `auto_mouse_layer_off() -> layer_off() -> noah_layer_state_set_user()` stack by linking `pd_runtime.c` and `pointer_layer_policy.c` instead of using a direct layer-bit clear stub.
+- Landed the authored-hold interrupt/release split after the broader `layer_interrupted` model proved unstable on hardware:
+  - the slot lifecycle latch in `key_runtime_shared_state.h` now only records momentary-layer tap cancellation on foreign press instead of serving as a generic authored-hold interrupt bit,
+  - `key_runtime_slot_policy.c` now sets that latch only for true momentary-layer tap paths, while immediate-hold quick-release taps and pd-mode quick-lock taps keep their own release contracts,
+  - `key_runtime_transition.c` no longer infers deferred-release blockers by running the generic release resolver over live slots; blocker classification is now a separate phase/ownership helper that ignores slots once they have committed held or repeat ownership,
+  - `key_runtime_transition.c` now also excludes active slots that are still carrying a pending multi-tap hold from deferred-release blocker classification, so a pending modifier-hold does not queue unrelated authored child taps behind a phantom sibling release window,
+  - `key_runtime_shared_state.h`, `key_runtime_slot_policy.c`, and `key_runtime_slot_release_resolver.h` now also track foreign-key overlap for immediate-hold paths explicitly, separate from momentary-layer tap cancellation, so a used immediate hold cannot reopen its quick-release tap or preserve a first-tap multi-tap chain on release,
+  - the public runtime-debug surface now exposes slot phase and momentary-layer interrupt state so host tests can assert runtime invariants directly instead of inferring them only from output effects,
+  - the overlap integration coverage now exercises `KC_LEFT_GUI` double-tap-hold against raw `LT(...)`, authored nav holds, and an authored pd-mode hold while asserting quiescent runtime state after every release-order permutation,
+  - host coverage now also locks the pending-multi-tap blocker contract in two places: `tests/host/key_runtime_modifier_hold_integration_test.c` proves a pending multi-tap modifier hold does not defer a processed child, and `tests/host/real_profile_thumb_layer_lock_integration_test.c` proves the raw right-side `LT(LAYER_NAV, KC_SLSH)` path keeps nav-arrow and dragscroll children immediate even while `KC_LEFT_GUI` is still in its second-tap pending-hold window,
+  - that same real-profile suite now also proves a held `DRAGSCROLL` slot does not leave a stale first-tap chain behind after overlapping authored nav-arrow use, both with and without the authored right-thumb nav parent and `KC_LEFT_GUI` overlap.
 
 ## Findings Snapshot
 
@@ -218,6 +228,15 @@
 - Passed during same-family sibling-overlap effect audit on `codex/fix-authored-key-freeze`:
   - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
   - `sh tests/host/run_key_runtime_scenario_tests.sh`
+- Passed during authored-hold interrupt/release split:
+  - `sh tests/host/run_key_runtime_transition_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
   - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
   - `sh tests/host/run_feature_gate_compile_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`

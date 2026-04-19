@@ -44,7 +44,7 @@ static bool key_runtime_slot_policy_hold_activation_needs_pulse(hold_behavior_t 
     return false;
 }
 
-static bool key_runtime_slot_policy_other_press_suppresses_quick_release_tap(const active_key_state_t *slot) {
+static bool key_runtime_slot_policy_other_press_interrupts_momentary_layer_tap(const active_key_state_t *slot) {
     key_runtime_slot_release_contract_t release_contract;
 
     if (!slot) {
@@ -52,7 +52,7 @@ static bool key_runtime_slot_policy_other_press_suppresses_quick_release_tap(con
     }
 
     release_contract = key_runtime_slot_release_contract(key_runtime_slot_cached_interaction(slot));
-    return release_contract.suppress_tap_on_layer_interrupt || release_contract.quick_release_of_immediate_hold_dispatches_tap || release_contract.quick_tap_pd_mode_lock != 0;
+    return release_contract.suppress_tap_on_layer_interrupt;
 }
 
 static void key_runtime_slot_policy_clear_owned_hold(active_key_state_t *slot, key_runtime_effect_builder_t *builder) {
@@ -128,8 +128,10 @@ key_runtime_effect_builder_t key_runtime_slot_policy_interrupt_on_other_press(ac
 
     key_runtime_effect_builder_t builder = key_runtime_slot_policy_activate_pending_fallback_hold(slot);
 
-    if (key_runtime_slot_policy_other_press_suppresses_quick_release_tap(slot)) {
-        slot->lifecycle.layer_interrupted = true;
+    slot->lifecycle.other_press_interrupted = true;
+
+    if (key_runtime_slot_policy_other_press_interrupts_momentary_layer_tap(slot)) {
+        slot->lifecycle.momentary_layer_tap_interrupted = true;
     }
 
     return builder;

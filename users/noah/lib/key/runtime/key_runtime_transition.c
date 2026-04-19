@@ -195,14 +195,28 @@ void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runti
     }
 }
 
-static bool key_runtime_transition_is_foreign_tap_release_candidate(const active_key_state_t *slot, keypos_t key_pos) {
-    key_runtime_slot_release_contract_t release_contract;
+static bool key_runtime_transition_slot_momentary_layer_tap_suppresses_quick_tap(const active_key_state_t *slot, key_runtime_slot_release_contract_t contract) {
+    return slot && contract.suppress_tap_on_layer_interrupt && slot->lifecycle.momentary_layer_tap_interrupted;
+}
 
-    if (!slot || key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) {
+static bool key_runtime_transition_slot_has_pd_mode_quick_lock_candidate(const active_key_state_t *slot, key_runtime_slot_release_contract_t contract, key_runtime_slot_interaction_t interaction, uint16_t elapsed) {
+    return slot && contract.quick_tap_pd_mode_lock != 0 && slot->lifecycle.pd_mode_was_locked_on_press && elapsed < interaction.binding.tap_hold_term && !key_runtime_transition_slot_momentary_layer_tap_suppresses_quick_tap(slot, contract);
+}
+
+static bool key_runtime_transition_slot_blocks_deferred_dispatch(const active_key_state_t *slot, keypos_t key_pos) {
+    key_runtime_slot_interaction_t      interaction;
+    key_runtime_slot_release_contract_t contract;
+    key_runtime_slot_phase_t            phase;
+    uint16_t                            elapsed;
+
+    if (!slot || !key_runtime_slot_active(slot) || key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) {
         return false;
     }
 
-    if (!key_runtime_slot_allows_tap_release(slot)) {
+    // Active slots that are still carrying a pending multi-tap hold resolve
+    // through the dedicated pending-multi-tap reducer with saved mods. They
+    // should not act as phantom tap-release blockers for unrelated child keys.
+    if (key_runtime_slot_pending_multi_tap_pending_hold(slot)) {
         return false;
     }
 
@@ -210,12 +224,35 @@ static bool key_runtime_transition_is_foreign_tap_release_candidate(const active
         return false;
     }
 
-    release_contract = key_runtime_slot_release_contract(key_runtime_slot_cached_interaction(slot));
-    if (slot->lifecycle.layer_interrupted && (release_contract.suppress_tap_on_layer_interrupt || release_contract.quick_release_of_immediate_hold_dispatches_tap || release_contract.quick_tap_pd_mode_lock != 0)) {
-        return false;
-    }
+    interaction = key_runtime_slot_cached_interaction(slot);
+    contract    = key_runtime_slot_release_contract(interaction);
+    phase       = key_runtime_slot_phase(slot);
+    elapsed     = timer_elapsed(slot->timer);
 
-    return true;
+    switch (phase) {
+        case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
+            if (contract.buffered_base_tap_dispatches_tap) {
+                return true;
+            }
+
+            if (elapsed < interaction.binding.tap_hold_term) {
+                if (key_runtime_transition_slot_momentary_layer_tap_suppresses_quick_tap(slot, contract)) {
+                    return false;
+                }
+
+                return contract.tap.outcome != KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE || key_runtime_transition_slot_has_pd_mode_quick_lock_candidate(slot, contract, interaction, elapsed);
+            }
+
+            return contract.nonquick_release_dispatches_tap;
+        case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
+            return (elapsed < interaction.binding.tap_hold_term && contract.quick_release_of_immediate_hold_dispatches_tap) || key_runtime_transition_slot_has_pd_mode_quick_lock_candidate(slot, contract, interaction, elapsed);
+        case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE:
+        case KEY_RUNTIME_SLOT_PHASE_IDLE:
+        default:
+            return false;
+    }
 }
 
 bool key_runtime_transition_has_foreign_tap_release_slot_except(keypos_t key_pos) {
@@ -223,7 +260,7 @@ bool key_runtime_transition_has_foreign_tap_release_slot_except(keypos_t key_pos
     uint8_t             active_count = key_runtime_index_snapshot_active_slots(slots, ARRAY_SIZE(slots));
 
     for (uint8_t index = 0; index < active_count; index++) {
-        if (key_runtime_transition_is_foreign_tap_release_candidate(slots[index], key_pos)) {
+        if (key_runtime_transition_slot_blocks_deferred_dispatch(slots[index], key_pos)) {
             return true;
         }
     }
@@ -236,7 +273,7 @@ bool key_runtime_transition_has_any_tap_release_slot(void) {
     uint8_t             active_count = key_runtime_index_snapshot_active_slots(slots, ARRAY_SIZE(slots));
 
     for (uint8_t index = 0; index < active_count; index++) {
-        if (key_runtime_transition_is_foreign_tap_release_candidate(slots[index], (keypos_t){0xFF, 0xFF})) {
+        if (key_runtime_transition_slot_blocks_deferred_dispatch(slots[index], (keypos_t){0xFF, 0xFF})) {
             return true;
         }
     }

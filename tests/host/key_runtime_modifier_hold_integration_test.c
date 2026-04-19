@@ -15,7 +15,6 @@
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,
-    TEST_CHORD_KEY     = KC_C,
 };
 
 static uint16_t fake_time;
@@ -28,12 +27,12 @@ static uint16_t integration_hold_modifier;
 static uint8_t  integration_expected_mask;
 
 static uint8_t send_keyboard_report_count;
-static uint8_t register_code_count;
-static uint8_t unregister_code_count;
-static uint8_t last_registered_keycode;
-static uint8_t last_registered_mods;
-static uint8_t last_unregistered_keycode;
-static uint8_t last_unregistered_mods;
+static uint8_t emitted_action_count;
+static uint16_t last_emitted_action;
+static uint8_t last_emitted_mods;
+static uint8_t delayed_action_count;
+static uint16_t last_delayed_action;
+static delayed_action_mods_t last_delayed_mods;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -68,12 +67,12 @@ static void test_reset_state(void) {
     fake_oneshot_mods          = 0;
     fake_oneshot_locked_mods   = 0;
     send_keyboard_report_count = 0;
-    register_code_count        = 0;
-    unregister_code_count      = 0;
-    last_registered_keycode    = KC_NO;
-    last_registered_mods       = 0;
-    last_unregistered_keycode  = KC_NO;
-    last_unregistered_mods     = 0;
+    emitted_action_count       = 0;
+    last_emitted_action        = KC_NO;
+    last_emitted_mods          = 0;
+    delayed_action_count       = 0;
+    last_delayed_action        = KC_NO;
+    last_delayed_mods          = (delayed_action_mods_t){0};
     noah_runtime_reset_for_test();
     send_keyboard_report_count = 0;
 }
@@ -147,15 +146,11 @@ void send_keyboard_report(void) {
 }
 
 void register_code(uint8_t keycode) {
-    register_code_count++;
-    last_registered_keycode = keycode;
-    last_registered_mods    = fake_mods;
+    (void)keycode;
 }
 
 void unregister_code(uint8_t keycode) {
-    unregister_code_count++;
-    last_unregistered_keycode = keycode;
-    last_unregistered_mods    = fake_mods;
+    (void)keycode;
 }
 
 void register_code16(uint16_t keycode) {
@@ -210,6 +205,9 @@ bool is_pd_mode_lock_action(uint16_t action) {
 }
 
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
+    emitted_action_count++;
+    last_emitted_action = action;
+    last_emitted_mods   = fake_mods;
     (void)action;
     (void)policy;
 }
@@ -224,8 +222,9 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 }
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
-    (void)action;
-    (void)mods;
+    delayed_action_count++;
+    last_delayed_action = action;
+    last_delayed_mods   = mods;
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
@@ -284,9 +283,15 @@ bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     return false;
 }
 
-static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifier, uint8_t expected_mask) {
-    keypos_t source_pos = test_keypos(1, 1);
+static void test_assert_runtime_quiescent(keypos_t source_pos) {
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(source_pos) == KC_NO);
+    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
+}
 
+static void test_begin_third_tap_hold_modifier_pending(keypos_t source_pos, uint16_t modifier, uint8_t expected_mask) {
     integration_hold_modifier = modifier;
     integration_expected_mask = expected_mask;
     test_reset_state();
@@ -307,6 +312,10 @@ static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifie
     CHECK(noah_runtime_debug_slot_pending_multi_tap_holding(source_pos));
     CHECK(noah_runtime_debug_slot_owner_keycode(source_pos) == TEST_MULTI_TAP_KEY);
     CHECK(get_mods() == 0);
+}
+
+static void test_activate_third_tap_hold_modifier(keypos_t source_pos, uint16_t modifier, uint8_t expected_mask) {
+    test_begin_third_tap_hold_modifier_pending(source_pos, modifier, expected_mask);
 
     key_runtime_integration_advance(&fake_time, 130);
     key_runtime_integration_scan();
@@ -316,30 +325,68 @@ static void test_third_tap_hold_modifier_applies_to_chorded_key(uint16_t modifie
     CHECK((test_snapshot_real_mods() & integration_expected_mask) != 0);
     CHECK((get_mods() & integration_expected_mask) != 0);
     CHECK(send_keyboard_report_count == 1);
+}
 
-    CHECK(owned_keycode_register(TEST_CHORD_KEY));
-    CHECK(last_registered_keycode == TEST_CHORD_KEY);
-    CHECK((last_registered_mods & integration_expected_mask) != 0);
+static void test_pending_third_tap_hold_modifier_keeps_processed_child_immediate(uint16_t modifier, uint8_t expected_mask) {
+    keypos_t source_pos = test_keypos(1, 1);
+    keypos_t child_pos  = test_keypos(1, 2);
 
-    CHECK(owned_keycode_unregister(TEST_CHORD_KEY));
-    CHECK(last_unregistered_keycode == TEST_CHORD_KEY);
-    CHECK((last_unregistered_mods & integration_expected_mask) != 0);
+    test_begin_third_tap_hold_modifier_pending(source_pos, modifier, expected_mask);
+
+    CHECK(!key_runtime_integration_process_record(KC_C, child_pos, true));
+    CHECK(!key_runtime_integration_process_record(KC_C, child_pos, false));
+    CHECK(emitted_action_count == 1);
+    CHECK(last_emitted_action == KC_C);
+    CHECK(delayed_action_count == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0);
+
+    key_runtime_integration_advance(&fake_time, 130);
+    key_runtime_integration_scan();
+    CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(source_pos));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(source_pos) == modifier);
+    CHECK((test_snapshot_real_mods() & expected_mask) != 0);
+    CHECK((get_mods() & expected_mask) != 0);
 
     CHECK(!key_runtime_integration_process_record(TEST_MULTI_TAP_KEY, source_pos, false));
-    CHECK((test_snapshot_real_mods() & integration_expected_mask) == 0);
-    CHECK((get_mods() & integration_expected_mask) == 0);
+    CHECK((test_snapshot_real_mods() & expected_mask) == 0);
+    CHECK((get_mods() & expected_mask) == 0);
+    test_assert_runtime_quiescent(source_pos);
+}
+
+static void test_third_tap_hold_modifier_keeps_processed_child_immediate(uint16_t modifier, uint8_t expected_mask) {
+    keypos_t source_pos = test_keypos(1, 1);
+    keypos_t child_pos  = test_keypos(1, 2);
+
+    test_activate_third_tap_hold_modifier(source_pos, modifier, expected_mask);
+
+    CHECK(!key_runtime_integration_process_record(KC_C, child_pos, true));
+    CHECK(!key_runtime_integration_process_record(KC_C, child_pos, false));
+    CHECK(emitted_action_count == 1);
+    CHECK(last_emitted_action == KC_C);
+    CHECK((last_emitted_mods & expected_mask) != 0);
+    CHECK(delayed_action_count == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0);
+
+    CHECK(!key_runtime_integration_process_record(TEST_MULTI_TAP_KEY, source_pos, false));
+    CHECK((test_snapshot_real_mods() & expected_mask) == 0);
+    CHECK((get_mods() & expected_mask) == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(source_pos) == KC_NO);
     CHECK(send_keyboard_report_count == 2);
+    test_assert_runtime_quiescent(source_pos);
 
-    CHECK(owned_keycode_register(TEST_CHORD_KEY));
-    CHECK(last_registered_keycode == TEST_CHORD_KEY);
-    CHECK((last_registered_mods & integration_expected_mask) == 0);
-    CHECK(owned_keycode_unregister(TEST_CHORD_KEY));
+    CHECK(!key_runtime_integration_process_record(KC_V, child_pos, true));
+    CHECK(!key_runtime_integration_process_record(KC_V, child_pos, false));
+    CHECK(emitted_action_count == 2);
+    CHECK(last_emitted_action == KC_V);
+    CHECK((last_emitted_mods & expected_mask) == 0);
+    CHECK(delayed_action_count == 0);
 }
 
 int main(void) {
-    test_third_tap_hold_modifier_applies_to_chorded_key(KC_LEFT_SHIFT, MOD_BIT(KC_LEFT_SHIFT));
-    test_third_tap_hold_modifier_applies_to_chorded_key(KC_LEFT_GUI, MOD_BIT(KC_LEFT_GUI));
+    test_pending_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_SHIFT, MOD_BIT(KC_LEFT_SHIFT));
+    test_pending_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_GUI, MOD_BIT(KC_LEFT_GUI));
+    test_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_SHIFT, MOD_BIT(KC_LEFT_SHIFT));
+    test_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_GUI, MOD_BIT(KC_LEFT_GUI));
 
     puts("key_runtime modifier-hold integration tests passed");
     return 0;

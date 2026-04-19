@@ -56,6 +56,16 @@ uint16_t noah_runtime_debug_slot_held_action_keycode(keypos_t key_pos) {
     return slot ? slot->lifecycle.held_action_keycode : KC_NO;
 }
 
+key_runtime_slot_phase_t noah_runtime_debug_slot_phase(keypos_t key_pos) {
+    const active_key_state_t *slot = noah_runtime_debug_slot(key_pos);
+    return key_runtime_slot_phase(slot);
+}
+
+bool noah_runtime_debug_slot_momentary_tap_interrupted(keypos_t key_pos) {
+    const active_key_state_t *slot = noah_runtime_debug_slot(key_pos);
+    return slot ? slot->lifecycle.momentary_layer_tap_interrupted : false;
+}
+
 uint8_t noah_runtime_debug_slot_pending_multi_tap_count(keypos_t key_pos) {
     const active_key_state_t *slot = noah_runtime_debug_slot(key_pos);
     return slot ? slot->pending_multi_tap.count : 0;
@@ -90,6 +100,10 @@ uint8_t noah_runtime_debug_pending_multi_tap_slot_count(void) {
 
 bool noah_runtime_debug_pending_multi_tap_slot_key_pos(uint8_t order, keypos_t *out) {
     return noah_runtime_debug_pending_multi_tap_key_pos(key_runtime_pending_multi_tap_slot_by_order(order), out);
+}
+
+uint8_t noah_runtime_debug_deferred_release_count(void) {
+    return key_runtime_shared_state()->deferred_release_dispatch.count;
 }
 
 bool noah_runtime_debug_preview_owner_slot_key_pos(keypos_t *out) {

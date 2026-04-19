@@ -235,9 +235,9 @@ static void test_stage_slot_state(active_key_state_t *slot, active_key_state_t s
         key_runtime_slot_track(slot, state.owner.keycode, state.owner.key_pos, test_stage_slot_interaction(state.interaction), state.lifecycle.phase);
     }
 
-    slot->timer                                 = state.timer;
-    slot->lifecycle.layer_interrupted           = state.lifecycle.layer_interrupted;
-    slot->lifecycle.pd_mode_was_locked_on_press = state.lifecycle.pd_mode_was_locked_on_press;
+    slot->timer                                         = state.timer;
+    slot->lifecycle.momentary_layer_tap_interrupted     = state.lifecycle.momentary_layer_tap_interrupted;
+    slot->lifecycle.pd_mode_was_locked_on_press         = state.lifecycle.pd_mode_was_locked_on_press;
 
     if (state.lifecycle.phase == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING) {
         key_runtime_slot_set_release_hold_pending(slot);
@@ -966,7 +966,7 @@ static void test_settle_pending_fallback_holds_activates_all_candidates(void) {
     CHECK(test_calls[1].key_pos.col == second_key_pos.col);
 }
 
-static void test_interrupt_other_press_marks_layer_interrupted(void) {
+static void test_interrupt_other_press_marks_momentary_layer_tap_interrupted(void) {
     key_runtime_transition_plan_t plan;
     keypos_t                      key_pos            = test_keypos(2, 5);
     uint16_t                      layer_tap_keycode = LT(2, TEST_FALLBACK_TAP_ACTION);
@@ -975,6 +975,7 @@ static void test_interrupt_other_press_marks_layer_interrupted(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(key_pos);
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .timer         = fake_time,
                                                    .owner.keycode = layer_tap_keycode,
                                                    .owner.key_pos = key_pos,
                                                    .interaction   = test_authored_interaction(layer_resolution, key_pos),
@@ -984,7 +985,65 @@ static void test_interrupt_other_press_marks_layer_interrupted(void) {
     key_runtime_transition_interrupt_active_key_on_other_press(&plan);
 
     CHECK(plan.count == 0);
-    CHECK(active_key.lifecycle.layer_interrupted);
+    CHECK(active_key.lifecycle.momentary_layer_tap_interrupted);
+}
+
+static void test_interrupt_other_press_does_not_mark_immediate_hold_tap_interrupted(void) {
+    key_runtime_transition_plan_t plan;
+    keypos_t                      key_pos = test_keypos(2, 6);
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(key_pos);
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .timer                         = fake_time,
+                                                   .owner.keycode                 = TEST_NEW_KEY,
+                                                   .owner.key_pos                 = key_pos,
+                                                   .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+                                                   .lifecycle.held_action_keycode = TEST_IMMEDIATE_HOLD,
+                                                   .interaction                   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION,
+                                                                                                            (hold_behavior_t){
+                                                                                                                .present = true,
+                                                                                                                .action  = TEST_IMMEDIATE_HOLD,
+                                                                                                                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                                                                                            },
+                                                                                                            hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_interrupt_active_key_on_other_press(&plan);
+
+    CHECK(plan.count == 0);
+    CHECK(!active_key.lifecycle.momentary_layer_tap_interrupted);
+}
+
+static void test_interrupt_other_press_does_not_mark_pd_mode_lock_tap_interrupted(void) {
+    key_runtime_transition_plan_t plan;
+    keypos_t                      key_pos = test_keypos(2, 7);
+    handled_key_resolution_t      pd_resolution;
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(key_pos);
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .timer                         = fake_time,
+                                                   .owner.keycode                 = TEST_PD_MODE_KEY,
+                                                   .owner.key_pos                 = key_pos,
+                                                   .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+                                                   .lifecycle.held_action_keycode = TEST_PD_MODE_KEY,
+                                               });
+    pd_resolution = test_cached_resolution(TEST_PD_MODE_KEY, KC_NO,
+                                           (hold_behavior_t){
+                                               .present = true,
+                                               .action  = TEST_PD_MODE_KEY,
+                                               .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                           },
+                                           hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, PD_MODE_VOLUME, HANDLED_KEY_FLAG_HANDLED);
+    test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(pd_resolution, key_pos));
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_interrupt_active_key_on_other_press(&plan);
+
+    CHECK(plan.count == 0);
+    CHECK(!active_key.lifecycle.momentary_layer_tap_interrupted);
 }
 
 static void test_has_any_tap_release_slot_ignores_interrupted_layer_tap(void) {
@@ -995,16 +1054,16 @@ static void test_has_any_tap_release_slot_ignores_interrupted_layer_tap(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(key_pos);
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-                                                   .owner.keycode               = layer_tap_keycode,
-                                                   .owner.key_pos               = key_pos,
-                                                   .interaction                 = test_authored_interaction(layer_resolution, key_pos),
-                                                   .lifecycle.layer_interrupted = true,
+                                                   .owner.keycode                             = layer_tap_keycode,
+                                                   .owner.key_pos                             = key_pos,
+                                                   .interaction                               = test_authored_interaction(layer_resolution, key_pos),
+                                                   .lifecycle.momentary_layer_tap_interrupted = true,
                                                });
 
     CHECK(!key_runtime_transition_has_any_tap_release_slot());
 }
 
-static void test_has_any_tap_release_slot_reports_live_layer_tap(void) {
+static void test_has_any_tap_release_slot_ignores_nonquick_layer_tap(void) {
     keypos_t                 key_pos            = test_keypos(2, 5);
     uint16_t                 layer_tap_keycode = LT(2, TEST_FALLBACK_TAP_ACTION);
     handled_key_resolution_t layer_resolution  = test_cached_resolution(layer_tap_keycode, TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
@@ -1012,12 +1071,77 @@ static void test_has_any_tap_release_slot_reports_live_layer_tap(void) {
     test_reset_stubs();
     test_set_default_slot_key_pos(key_pos);
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .timer         = (uint16_t)(fake_time - (CUSTOM_TAP_HOLD_TERM + 1)),
                                                    .owner.keycode = layer_tap_keycode,
                                                    .owner.key_pos = key_pos,
                                                    .interaction   = test_authored_interaction(layer_resolution, key_pos),
                                                });
 
+    CHECK(!key_runtime_transition_has_any_tap_release_slot());
+}
+
+static void test_has_any_tap_release_slot_reports_live_tap_release_key(void) {
+    keypos_t key_pos = test_keypos(2, 5);
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(key_pos);
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .timer         = fake_time,
+                                                   .owner.keycode = TEST_NEW_KEY,
+                                                   .owner.key_pos = key_pos,
+                                                   .interaction   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
+
     CHECK(key_runtime_transition_has_any_tap_release_slot());
+}
+
+static void test_has_any_tap_release_slot_ignores_live_press_held_immediate_hold_owner(void) {
+    keypos_t key_pos = test_keypos(2, 6);
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(key_pos);
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .timer                         = fake_time,
+                                                   .owner.keycode                 = TEST_NEW_KEY,
+                                                   .owner.key_pos                 = key_pos,
+                                                   .lifecycle.phase               = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+                                                   .lifecycle.held_action_keycode = TEST_IMMEDIATE_HOLD,
+                                                   .interaction                   = test_cached_interaction(TEST_FALLBACK_TAP_ACTION,
+                                                                                                            (hold_behavior_t){
+                                                                                                                .present = true,
+                                                                                                                .action  = TEST_IMMEDIATE_HOLD,
+                                                                                                                .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                                                                                            },
+                                                                                                            hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
+
+    CHECK(!key_runtime_transition_has_any_tap_release_slot());
+}
+
+static void test_has_any_tap_release_slot_ignores_live_press_held_pd_mode_owner(void) {
+    keypos_t                 key_pos = test_keypos(2, 7);
+    handled_key_resolution_t pd_resolution;
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(key_pos);
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .timer                               = fake_time,
+                                                   .owner.keycode                       = TEST_PD_MODE_KEY,
+                                                   .owner.key_pos                       = key_pos,
+                                                   .lifecycle.phase                     = KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW,
+                                                   .lifecycle.held_action_keycode       = TEST_PD_MODE_KEY,
+                                                   .lifecycle.pd_mode_was_locked_on_press = true,
+                                               });
+    pd_resolution = test_cached_resolution(TEST_PD_MODE_KEY, KC_NO,
+                                           (hold_behavior_t){
+                                               .present = true,
+                                               .action  = TEST_PD_MODE_KEY,
+                                               .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+                                           },
+                                           hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, PD_MODE_VOLUME, HANDLED_KEY_FLAG_HANDLED);
+    test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(pd_resolution, key_pos));
+
+    CHECK(!key_runtime_transition_has_any_tap_release_slot());
 }
 
 static void test_flush_active_keys_except_dispatches_foreign_tap_and_preserves_target_slot(void) {
@@ -1136,11 +1260,11 @@ static void test_interrupted_momentary_layer_release_only_releases_layer(void) {
     test_set_default_slot_key_pos(record.event.key);
 
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-                                                   .timer                       = (uint16_t)(fake_time - 30),
-                                                   .owner.keycode               = layer_tap_keycode,
-                                                   .owner.key_pos               = record.event.key,
-                                                   .interaction                 = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
-                                                   .lifecycle.layer_interrupted = true,
+                                                   .timer                                     = (uint16_t)(fake_time - 30),
+                                                   .owner.keycode                             = layer_tap_keycode,
+                                                   .owner.key_pos                             = record.event.key,
+                                                   .interaction                               = test_cached_interaction(TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                                   .lifecycle.momentary_layer_tap_interrupted = true,
                                                });
     interrupted_layer_resolution = test_cached_resolution(layer_tap_keycode, TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), 150, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
     test_set_cached_interaction_view(test_default_slot(), test_authored_interaction(interrupted_layer_resolution, record.event.key));
@@ -1995,9 +2119,14 @@ int main(void) {
     test_non_modifier_single_tap_override_activates_fallback_hold_at_threshold();
     test_interrupt_other_press_queues_pending_fallback_hold();
     test_settle_pending_fallback_holds_activates_all_candidates();
-    test_interrupt_other_press_marks_layer_interrupted();
+    test_interrupt_other_press_marks_momentary_layer_tap_interrupted();
+    test_interrupt_other_press_does_not_mark_immediate_hold_tap_interrupted();
+    test_interrupt_other_press_does_not_mark_pd_mode_lock_tap_interrupted();
     test_has_any_tap_release_slot_ignores_interrupted_layer_tap();
-    test_has_any_tap_release_slot_reports_live_layer_tap();
+    test_has_any_tap_release_slot_ignores_nonquick_layer_tap();
+    test_has_any_tap_release_slot_reports_live_tap_release_key();
+    test_has_any_tap_release_slot_ignores_live_press_held_immediate_hold_owner();
+    test_has_any_tap_release_slot_ignores_live_press_held_pd_mode_owner();
     test_flush_active_keys_except_dispatches_foreign_tap_and_preserves_target_slot();
     test_flush_active_keys_except_unregisters_foreign_held_action();
     test_modifier_multi_tap_second_tap_dispatches_action();

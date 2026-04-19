@@ -22,6 +22,7 @@
 enum {
     TEST_ACTION                = SAFE_RANGE + 0x10,
     TEST_PENDING_MULTI_TAP_KEY = SAFE_RANGE + 0x11,
+    TEST_INTERRUPTED_LAYER_KEY = SAFE_RANGE + 0x12,
 };
 
 static uint16_t fake_time;
@@ -106,16 +107,23 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
 
     if (keycode == TEST_PENDING_MULTI_TAP_KEY) {
         flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+    } else if (keycode == TEST_INTERRUPTED_LAYER_KEY) {
+        flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
     }
 
     return (handled_key_resolution_t){
         .keycode          = keycode,
         .tap_count        = tap_count,
-        .step             = {.tap = TAP_SENDS(keycode)},
+        .step             = keycode == TEST_INTERRUPTED_LAYER_KEY ? (key_behavior_step_t){
+            .tap  = TAP_SENDS(KC_V),
+            .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(2)),
+        } : (key_behavior_step_t){
+            .tap = TAP_SENDS(keycode),
+        },
         .tap_hold_term    = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
         .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term   = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
-        .layer            = UINT8_MAX,
+        .layer            = keycode == TEST_INTERRUPTED_LAYER_KEY ? 2 : UINT8_MAX,
         .pd_mode          = 0,
         .has_more_taps    = false,
         .flags            = flags,
@@ -398,6 +406,22 @@ static void test_stage_pending_multi_tap(keypos_t key_pos) {
     CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, false));
 }
 
+static void test_debug_reports_slot_phase_and_momentary_layer_interrupt_state(void) {
+    keypos_t layer_key = test_keypos(0, 0);
+    keypos_t other_key = test_keypos(0, 1);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, layer_key, true));
+    CHECK(noah_runtime_debug_slot_phase(layer_key) == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    CHECK(!noah_runtime_debug_slot_momentary_tap_interrupted(layer_key));
+
+    CHECK(!test_process_record(KC_V, other_key, true));
+    CHECK(noah_runtime_debug_slot_phase(layer_key) == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    CHECK(noah_runtime_debug_slot_momentary_tap_interrupted(layer_key));
+}
+
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     pd_mode_snapshot_t                        pd_snapshot;
     layer_ownership_debug_snapshot_t          layer_snapshot;
@@ -456,6 +480,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(pd_snapshot.display.active_mode == PD_MODE_VOLUME);
     CHECK(noah_runtime_debug_slot_owner_keycode(active_key) == KC_C);
     CHECK(noah_runtime_debug_slot_tap_action(active_key) == KC_C);
+    CHECK(!noah_runtime_debug_slot_momentary_tap_interrupted(active_key));
     CHECK(noah_runtime_debug_active_slot_count() == 1);
     CHECK(noah_runtime_debug_active_slot_key_pos(0, &key_pos));
     CHECK(test_keypos_equal(key_pos, active_key));
@@ -534,6 +559,8 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(pd_snapshot.display.locked_mode == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(active_key) == KC_NO);
     CHECK(noah_runtime_debug_slot_tap_action(active_key) == KC_NO);
+    CHECK(noah_runtime_debug_slot_phase(active_key) == KEY_RUNTIME_SLOT_PHASE_IDLE);
+    CHECK(!noah_runtime_debug_slot_momentary_tap_interrupted(active_key));
     CHECK(noah_runtime_debug_active_slot_count() == 0);
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
     CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&active_key));
@@ -559,6 +586,7 @@ static void test_reset_clears_all_runtime_surfaces(void) {
 }
 
 int main(void) {
+    test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
     test_reset_clears_all_runtime_surfaces();
 

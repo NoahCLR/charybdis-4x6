@@ -79,6 +79,16 @@ Another narrow handled-key runtime adjustment landed later on `arrowmodefix2` wi
 
 Inference from the current code and tests: the relevant distinction was not split sync and not the generic pd-mode core, but the fact that authored release taps to lock actions were taking a different runtime effect path than native pd-mode quick-lock releases. The current mapping removes that divergence while preserving the overlap-remediation behavior for ordinary tap actions.
 
+Another handled-key follow-up landed after that right-alt work when the broader `layer_interrupted` model introduced during overlap remediation proved unstable on hardware. The current tree now does the narrower thing instead:
+
+- `users/noah/lib/key/runtime/key_runtime_shared_state.h`, `users/noah/lib/key/runtime/slot/key_runtime_slot_policy.c`, and `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c` now treat interruption as a momentary-layer-tap-only concern rather than a generic authored-hold quick-release suppression bit;
+- the current tree also keeps a separate foreign-overlap lifecycle fact for immediate-hold keys, so overlap-aware quick-release suppression on those paths no longer borrows the momentary-layer latch and instead only blocks reopening a quick tap or first-tap chain after the key was actually used as a hold;
+- `users/noah/lib/key/runtime/key_runtime_transition.c` no longer classifies deferred-release blockers by feeding live slots through the generic release resolver; it uses a separate phase/ownership helper so held or repeating owners stop blocking once they have committed their owned state;
+- `users/noah/lib/key/runtime/key_runtime_transition.c` also now treats active slots that are still carrying a pending multi-tap hold as non-blockers, because those slots resolve through the dedicated pending-multi-tap reducer with saved mods rather than through the ordinary tap-release overlap path;
+- `users/noah/lib/state/runtime/runtime_debug.h`, `users/noah/lib/key/runtime/key_runtime_debug.c`, and the updated host suites now expose and assert slot phase plus momentary-layer interrupt state directly, which closes the earlier blind spot where output-only assertions could miss poisoned slot state.
+
+Inference from the current code and tests: the failed theory was not “all authored quick-release taps should share one interrupt latch,” but the opposite. Momentary-layer tap cancellation is a specific rule, immediate-hold overlap is a separate rule, and pd-mode quick-lock taps plus deferred-release blocking each need their own narrower contract.
+
 ## Follow-Up Audit
 
 Date: 2026-04-14  

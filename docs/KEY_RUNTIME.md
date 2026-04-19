@@ -147,6 +147,17 @@ Shared tap-vs-hold-vs-pd-lock semantics now live in
 The active-slot and pending-multi-tap release paths are adapters around that
 one decision surface rather than parallel release engines.
 
+Overlap blocking is intentionally a separate decision. The release resolver
+answers "what would this slot emit on release," while
+[`key_runtime_transition.c`](../users/noah/lib/key/runtime/key_runtime_transition.c)
+uses a narrower phase/ownership blocker helper to decide whether a foreign
+release dispatch must wait for a live sibling.
+
+One important exclusion in that blocker helper is active slots that are still
+carrying a pending multi-tap hold. Those slots resolve through the dedicated
+pending-multi-tap reducer with saved mods, so they are not allowed to act as
+phantom tap-release blockers for unrelated child keys.
+
 ### 5. Scan
 
 [`key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c) runs two slot
@@ -199,8 +210,9 @@ The main fields are:
 - `timer`: press timestamp used for threshold and release-time evaluation
 - `owner`: original keycode and physical key position
 - `lifecycle`: slot phase, current held-action ownership, repeat ownership,
-  hold strategy, pd-mode lock state on press, and whether a layer hold was
-  interrupted by another key
+  hold strategy, pd-mode lock state on press, whether another physical key
+  overlapped the slot, and whether a momentary-layer tap was canceled by that
+  overlap
 - `interaction`: cached `key_runtime_slot_interaction_t`, which owns the
   active press's authored branch selection plus slot-owned binding,
   cached hold policy, and cached release semantics including typed tap
@@ -215,6 +227,13 @@ Release-time overlap safety now follows a narrow rule:
 - if a handled release resolves to an authored tap/action while a foreign
   tap-release-eligible handled sibling is still live, only that authored
   dispatch defers into `deferred_release_dispatch`
+- a sibling only counts as tap-release-eligible while it is still in a
+  tap-capable phase and has not already committed held or repeat ownership
+- foreign press cancellation is specific to true momentary-layer taps; it does
+  not reuse the momentary-layer rule for immediate-hold or pd-mode lock paths
+- immediate-hold quick-release taps still remember foreign-key overlap through
+  their own lifecycle bit, so a key that was actually used as a hold cannot
+  reopen a quick tap or leave a first-tap multi-tap chain behind on release
 - ownership cleanup (`RELEASE_OWNED_STATE_BY_KEY`) still executes immediately
 - pending multi-tap synthetic held lifecycle (`HELD_ACTION_REGISTER` /
   `HELD_ACTION_UNREGISTER`) still executes immediately
