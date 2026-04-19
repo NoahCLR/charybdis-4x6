@@ -21,6 +21,7 @@
 #define RUNTIME_V2_PRESS_TOKEN_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 #define RUNTIME_V2_TAP_SERIES_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 #define RUNTIME_V2_LEASE_CAPACITY ((uint16_t)(RUNTIME_V2_PRESS_TOKEN_CAPACITY * 4u))
+#define RUNTIME_V2_PENDING_RELEASE_CAPACITY ((uint16_t)(RUNTIME_V2_PRESS_TOKEN_CAPACITY * 2u))
 #define RUNTIME_V2_PERSISTENT_INTENT_CAPACITY 16u
 
 typedef enum {
@@ -96,6 +97,14 @@ typedef struct {
     uint16_t last_tap_at;
     uint16_t tap_term_ms;
 } tap_series_t;
+
+typedef struct {
+    bool                active;
+    uint16_t            owner_token_id;
+    keypos_t            key_pos;
+    uint16_t            action;
+    keyboard_mod_state_t mods;
+} pending_release_t;
 
 typedef enum {
     LEASE_KIND_NONE = 0,
@@ -199,6 +208,7 @@ typedef struct {
     uint8_t              v2_press_token_count;
     uint8_t              v2_tap_series_count;
     uint8_t              v2_lease_count;
+    uint8_t              v2_pending_release_count;
     uint8_t              v2_persistent_intent_count;
     uint8_t              v2_release_keycode_mismatch_count;
     uint8_t              v2_orphan_release_count;
@@ -209,6 +219,7 @@ typedef struct {
     press_token_t       press_tokens[RUNTIME_V2_PRESS_TOKEN_CAPACITY];
     tap_series_t        tap_series[RUNTIME_V2_TAP_SERIES_CAPACITY];
     lease_t             leases[RUNTIME_V2_LEASE_CAPACITY];
+    pending_release_t   pending_releases[RUNTIME_V2_PENDING_RELEASE_CAPACITY];
     persistent_intent_t persistent_intents[RUNTIME_V2_PERSISTENT_INTENT_CAPACITY];
     runtime_v2_shadow_projection_t shadow_projection;
     projection_snapshot_t last_projection;
@@ -217,6 +228,7 @@ typedef struct {
     uint8_t             press_token_count;
     uint8_t             tap_series_count;
     uint8_t             lease_count;
+    uint8_t             pending_release_count;
     uint8_t             persistent_intent_count;
     uint8_t             release_keycode_mismatch_count;
     uint8_t             orphan_release_count;
@@ -228,8 +240,11 @@ void                 runtime_v2_apply_event(const runtime_event_t *event, uint16
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos);
 const tap_series_t  *runtime_v2_tap_series_at(keypos_t key_pos);
 const runtime_v2_shadow_projection_t *runtime_v2_shadow_projection(void);
+uint8_t              runtime_v2_pending_release_count_for_keypos(keypos_t key_pos);
 void                 runtime_v2_layer_lock_set(uint8_t layer, bool active);
 void                 runtime_v2_pd_mode_lock_set(pd_mode_mask_t mode, bool active);
+void                 runtime_v2_observe_release_dispatch_deferred(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
+void                 runtime_v2_observe_release_dispatch_drained(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void);
 bool                 runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, const projection_snapshot_t *rhs);
 

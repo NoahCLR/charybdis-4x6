@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Pending Release Ownership Pass
+
+- Moved the next release-path seam away from anonymous shared state by adding explicit owner identity to deferred release dispatches and shadowing them as owned v2 pending-release records.
+- `users/noah/lib/key/runtime/key_runtime_shared_state.h` now stores `key_pos` alongside each deferred release action/mod snapshot, so the legacy queue no longer drops the physical-key owner identity.
+- `users/noah/lib/key/runtime/key_runtime_release.c` now records that owner key position when deferring release actions and notifies runtime-v2 on both enqueue and drain, so the shadow reducer sees real production deferral/drain events instead of synthetic test-only calls.
+- `users/noah/lib/runtime_v2/runtime_v2.c` and `.h` now track `pending_release_t` records separately from active press tokens, including a dedicated `v2_pending_release_count` snapshot field and a `runtime_v2_pending_release_count_for_keypos(...)` debug query.
+- This keeps a deferred release bound to the releasing physical key even if that key position is pressed again before the deferred action drains, which is the exact ownership property the old anonymous queue could not represent.
+- `users/noah/lib/state/runtime/runtime_debug.h` and `users/noah/lib/key/runtime/key_runtime_debug.c` now expose deferred-release owner key position and action for host assertions.
+- `tests/host/key_runtime_release_matrix_test.c` now proves the legacy deferred release queue retains the releasing key position, and `tests/host/runtime_debug_test.c` now proves the v2 pending-release record survives same-key slot reuse until it is explicitly drained.
+
 ## 2026-04-19 Runtime V2 Live Lock Mutation Observation Pass
 
 - Closed the next shadow-runtime gap for persistent lock mutations by wiring the production lock-state setters into the v2 observer APIs instead of relying on direct test-only lock calls.
@@ -215,6 +225,17 @@
 - `closure verdict`: keep this thread open until the hardware regression is closed on-device, and until the remaining `should-fix` items are either resolved or explicitly downgraded out of the closure bar.
 
 ## Verification
+
+- Passed during the runtime-v2 pending release ownership pass:
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - `git diff --check`
 
 - Passed during the runtime-v2 live lock mutation observation pass:
   - `sh tests/host/run_runtime_debug_tests.sh`
@@ -442,5 +463,6 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Replace imperative pd-mode and pointer-layer cleanup branches with reducer-owned leases and projection recompute before any production hook cutover.
+3. Replace the legacy live-slot blocker scan for deferred release dispatch with reducer-owned blocker state, so release deferral stops being re-derived from the current world on every drain attempt.
+4. Fold the remaining release/deferred-emission paths into the lease/reducer model before any production hook cutover.
 4. Extend the cutover from persistent lock mutations into the remaining release/deferred-emission paths, where the legacy runtime still re-derives behavior from live state.

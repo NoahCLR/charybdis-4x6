@@ -25,6 +25,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_scenario_harness.c" \
     "$ROOT/tests/host/key_runtime_scenario_test.c" \
+    "$ROOT/tests/host/runtime_v2_observer_stub.c" \
     $SCENARIO_SUPPORT_SOURCES \
     -o "$BIN"
 

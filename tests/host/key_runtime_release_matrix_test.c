@@ -5,6 +5,7 @@
 
 #include "key_runtime_scenario_harness.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/noah_keymap_ids.h"
 
 enum {
@@ -591,6 +592,7 @@ static void test_release_with_live_held_sibling_dispatches_immediately(void) {
 
 static void test_release_dispatch_is_deferred_until_tap_release_sibling_clears(void) {
     static const char *case_name = "release dispatch is deferred until tap-release sibling clears";
+    keypos_t            deferred_key_pos;
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
@@ -614,6 +616,11 @@ static void test_release_dispatch_is_deferred_until_tap_release_sibling_clears(v
     CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 0);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
+    CHECK_CASE(case_name, noah_runtime_debug_deferred_release_count() == 1u);
+    CHECK_CASE(case_name, noah_runtime_debug_deferred_release_key_pos(0u, &deferred_key_pos));
+    CHECK_CASE(case_name, deferred_key_pos.row == 1u);
+    CHECK_CASE(case_name, deferred_key_pos.col == 1u);
+    CHECK_CASE(case_name, noah_runtime_debug_deferred_release_action(0u) == TEST_RELEASE_PRIMARY);
 
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_sibling_and_scan, ARRAY_SIZE(release_sibling_and_scan));
@@ -623,6 +630,7 @@ static void test_release_dispatch_is_deferred_until_tap_release_sibling_clears(v
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.delayed_action.action == TEST_RELEASE_PRIMARY);
+    CHECK_CASE(case_name, noah_runtime_debug_deferred_release_count() == 0u);
 }
 
 static void test_release_dispatch_drains_when_last_blocker_clears_on_release(void) {

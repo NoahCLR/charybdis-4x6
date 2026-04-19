@@ -64,6 +64,7 @@ typedef struct {
 } key_runtime_keyboard_event_mask_state_t;
 
 typedef struct {
+    keypos_t             key_pos;
     uint16_t             action;
     keyboard_mod_state_t mods;
 } key_runtime_deferred_release_dispatch_t;

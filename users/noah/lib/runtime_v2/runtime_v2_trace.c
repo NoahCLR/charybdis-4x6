@@ -96,7 +96,10 @@ void runtime_v2_trace_record_projection_snapshot(const projection_snapshot_t *sn
     noah_runtime_trace_emit(NOAH_TRACE_RUNTIME_V2, NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_PD_MODE_DISPLAY, snapshot->pd_mode_display_active, snapshot->pd_mode_display_locked);
     noah_runtime_trace_emit(NOAH_TRACE_RUNTIME_V2, NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_POINTER_LAYER, pointer_flags, (uint16_t)(((uint16_t)(uint8_t)snapshot->pointer_key_tracker << 8) | snapshot->pointer_layer));
     noah_runtime_trace_emit(NOAH_TRACE_RUNTIME_V2, NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_RUNTIME_COUNTS, (uint16_t)(((uint16_t)snapshot->active_slot_count) | ((uint16_t)snapshot->pending_multi_tap_slot_count << 8)), (uint16_t)(((uint16_t)snapshot->deferred_release_count) | ((uint16_t)snapshot->v2_press_token_count << 8)));
-    noah_runtime_trace_emit(NOAH_TRACE_RUNTIME_V2, NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_V2_COUNTS, (uint16_t)(((uint16_t)snapshot->v2_tap_series_count) | ((uint16_t)snapshot->v2_lease_count << 8)), snapshot->v2_persistent_intent_count);
+    noah_runtime_trace_emit(NOAH_TRACE_RUNTIME_V2,
+                            NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_V2_COUNTS,
+                            (uint16_t)(((uint16_t)snapshot->v2_tap_series_count) | ((uint16_t)snapshot->v2_lease_count << 8)),
+                            (uint16_t)(((uint16_t)snapshot->v2_persistent_intent_count) | ((uint16_t)snapshot->v2_pending_release_count << 8)));
 }
 
 uint16_t runtime_v2_trace_decode_input_events(const noah_runtime_trace_snapshot_t *snapshot, runtime_event_t *out, uint16_t capacity) {

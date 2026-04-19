@@ -106,6 +106,27 @@ uint8_t noah_runtime_debug_deferred_release_count(void) {
     return key_runtime_shared_state()->deferred_release_dispatch.count;
 }
 
+bool noah_runtime_debug_deferred_release_key_pos(uint8_t order, keypos_t *out) {
+    key_runtime_deferred_release_dispatch_queue_t *queue = &key_runtime_shared_state()->deferred_release_dispatch;
+
+    if (!(out && order < queue->count)) {
+        return false;
+    }
+
+    *out = queue->items[order].key_pos;
+    return true;
+}
+
+uint16_t noah_runtime_debug_deferred_release_action(uint8_t order) {
+    key_runtime_deferred_release_dispatch_queue_t *queue = &key_runtime_shared_state()->deferred_release_dispatch;
+
+    if (order >= queue->count) {
+        return KC_NO;
+    }
+
+    return queue->items[order].action;
+}
+
 bool noah_runtime_debug_preview_owner_slot_key_pos(keypos_t *out) {
     return noah_runtime_debug_slot_key_pos(key_runtime_preview_owner_slot(), out);
 }

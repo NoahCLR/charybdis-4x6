@@ -331,3 +331,14 @@ The next shadow-runtime seam is now landed too:
 - Focused host runners that intentionally keep the full reducer out of process now share one central `tests/host/runtime_v2_observer_stub.c` instead of each growing their own local runtime-v2 stubs.
 
 Inference from the current tree: the earlier review note about authored `*_LOCK` actions sitting completely outside the shadow model is no longer true for persistent layer/pd lock mutations. The remaining gap is further downstream: production still runs the legacy runtime for the actual release/deferred-emission logic, so the cleanup decisions that can wedge the board are still being made outside the reducer-owned lease model.
+
+## 2026-04-19 Runtime V2 Pending Release Ownership Note
+
+The next release-path seam is now landed as well:
+
+- `users/noah/lib/key/runtime/key_runtime_shared_state.h` now stores deferred release entries with `key_pos`, `action`, and saved mod snapshot instead of only `action + mods`.
+- `users/noah/lib/key/runtime/key_runtime_release.c` now passes that real owner key position into the deferred queue and into runtime-v2 observer hooks on both enqueue and drain.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now keeps a separate `pending_release_t` record family plus a dedicated `v2_pending_release_count`, instead of pretending deferred release work can always stay attached to the single active/released token slot for a key position.
+- `tests/host/key_runtime_release_matrix_test.c` now mechanically proves the production deferred queue retains the releasing key position, and `tests/host/runtime_debug_test.c` now proves a v2 pending-release record survives a same-key re-press until the deferred action actually drains.
+
+Inference from the current tree: deferred release is no longer an anonymous action FIFO in either the legacy debug surface or the v2 shadow model. That is a real architectural step forward. The deeper problem still remains open, though: the decision about whether a deferred release is blocked still comes from `key_runtime_transition_has_foreign_tap_release_slot_except(...)` and `key_runtime_transition_has_any_tap_release_slot(...)`, which re-derive blocker state by scanning the live slot world instead of consulting reducer-owned blocker records.

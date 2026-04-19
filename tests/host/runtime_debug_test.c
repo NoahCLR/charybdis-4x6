@@ -1076,6 +1076,59 @@ static void test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases(vo
     CHECK(shadow->pointer_prefers_typing_layer);
 }
 
+static void test_runtime_v2_pending_release_state_survives_same_key_reuse(void) {
+    projection_snapshot_t   snapshot;
+    const press_token_t    *token;
+    keypos_t                key_pos = test_keypos(4, 1);
+    keyboard_mod_state_t    mods = {
+           .real = MOD_LALT,
+           .weak = MOD_BIT(KC_LEFT_SHIFT),
+       };
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, key_pos, fake_time);
+
+    token = runtime_v2_press_token_at(key_pos);
+    CHECK(token != NULL);
+    CHECK(!token->active);
+    CHECK(token->phase == PRESS_TOKEN_PHASE_RELEASED);
+
+    runtime_v2_observe_release_dispatch_deferred(key_pos, TEST_ACTION, mods);
+
+    token = runtime_v2_press_token_at(key_pos);
+    CHECK(token != NULL);
+    CHECK(!token->active);
+    CHECK(token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING);
+    CHECK(token->pending_release_emission);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_pending_release_count == 1u);
+    CHECK(runtime_v2_pending_release_count_for_keypos(key_pos) == 1u);
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, MO(2), key_pos, fake_time);
+    token = runtime_v2_press_token_at(key_pos);
+    CHECK(token != NULL);
+    CHECK(token->active);
+    CHECK(token->resolved_keycode == MO(2));
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_pending_release_count == 1u);
+    CHECK(runtime_v2_pending_release_count_for_keypos(key_pos) == 1u);
+
+    runtime_v2_observe_release_dispatch_drained(key_pos, TEST_ACTION, mods);
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_pending_release_count == 0u);
+    CHECK(runtime_v2_pending_release_count_for_keypos(key_pos) == 0u);
+    token = runtime_v2_press_token_at(key_pos);
+    CHECK(token != NULL);
+    CHECK(token->active);
+    CHECK(token->resolved_keycode == MO(2));
+}
+
 int main(void) {
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
@@ -1091,6 +1144,7 @@ int main(void) {
     test_runtime_v2_arrow_mode_prefers_typing_without_pointer_anchor();
     test_runtime_v2_pd_mode_lock_observes_live_pd_mode_state();
     test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases();
+    test_runtime_v2_pending_release_state_survives_same_key_reuse();
 
     puts("runtime_debug host tests passed");
     return 0;

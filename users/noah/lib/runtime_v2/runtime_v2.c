@@ -37,6 +37,10 @@ static uint16_t runtime_v2_keypos_index(keypos_t key_pos) {
     return (uint16_t)((uint16_t)key_pos.row * MATRIX_COLS + key_pos.col);
 }
 
+static bool runtime_v2_keypos_equal(keypos_t lhs, keypos_t rhs) {
+    return lhs.row == rhs.row && lhs.col == rhs.col;
+}
+
 static uint16_t runtime_v2_default_hold_term(uint16_t keycode) {
     return (IS_QK_LAYER_TAP(keycode) || IS_QK_MOD_TAP(keycode)) ? TAPPING_TERM : CUSTOM_TAP_HOLD_TERM;
 }
@@ -59,6 +63,43 @@ static tap_series_t *runtime_v2_tap_series_state(runtime_v2_state_t *state, keyp
     }
 
     return &state->tap_series[runtime_v2_keypos_index(key_pos)];
+}
+
+static pending_release_t *runtime_v2_allocate_pending_release(runtime_v2_state_t *state) {
+    if (!state) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PENDING_RELEASE_CAPACITY; index++) {
+        pending_release_t *pending = &state->pending_releases[index];
+
+        if (!pending->active) {
+            *pending = (pending_release_t){0};
+            pending->active = true;
+            state->pending_release_count++;
+            return pending;
+        }
+    }
+
+    return NULL;
+}
+
+static uint8_t runtime_v2_pending_release_count_for_owner_token(const runtime_v2_state_t *state, uint16_t owner_token_id) {
+    uint8_t count = 0;
+
+    if (!(state && owner_token_id != 0u)) {
+        return 0u;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PENDING_RELEASE_CAPACITY; index++) {
+        const pending_release_t *pending = &state->pending_releases[index];
+
+        if (pending->active && pending->owner_token_id == owner_token_id) {
+            count++;
+        }
+    }
+
+    return count;
 }
 
 static uint16_t runtime_v2_elapsed(uint16_t start, uint16_t end) {
@@ -837,6 +878,45 @@ static void runtime_v2_tap_series_note_hold_release(runtime_v2_state_t *state, c
     series->pending_hold = false;
 }
 
+static bool runtime_v2_pending_release_matches(const pending_release_t *pending, keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
+    return pending && pending->active && runtime_v2_keypos_equal(pending->key_pos, key_pos) && pending->action == action && pending->mods.real == mods.real &&
+           pending->mods.weak == mods.weak && pending->mods.oneshot == mods.oneshot && pending->mods.oneshot_locked == mods.oneshot_locked;
+}
+
+static void runtime_v2_pending_release_mark_token(runtime_v2_state_t *state, uint16_t owner_token_id) {
+    if (!(state && owner_token_id != 0u)) {
+        return;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+        press_token_t *token = &state->press_tokens[index];
+
+        if (token->token_id == owner_token_id && !token->active) {
+            token->pending_release_emission = true;
+            token->phase                    = PRESS_TOKEN_PHASE_RELEASE_PENDING;
+            return;
+        }
+    }
+}
+
+static void runtime_v2_pending_release_clear_token(runtime_v2_state_t *state, uint16_t owner_token_id) {
+    if (!(state && owner_token_id != 0u) || runtime_v2_pending_release_count_for_owner_token(state, owner_token_id) != 0u) {
+        return;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+        press_token_t *token = &state->press_tokens[index];
+
+        if (token->token_id == owner_token_id && !token->active) {
+            token->pending_release_emission = false;
+            if (token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING) {
+                token->phase = PRESS_TOKEN_PHASE_RELEASED;
+            }
+            return;
+        }
+    }
+}
+
 static void runtime_v2_press_token_end(runtime_v2_state_t *state, const runtime_key_event_t *event, uint16_t now) {
     press_token_t released_token;
     press_token_t *token;
@@ -917,6 +997,25 @@ const runtime_v2_shadow_projection_t *runtime_v2_shadow_projection(void) {
     return state ? &state->shadow_projection : NULL;
 }
 
+uint8_t runtime_v2_pending_release_count_for_keypos(keypos_t key_pos) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    uint8_t             count = 0;
+
+    if (!(state && runtime_v2_keypos_valid(key_pos))) {
+        return 0u;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PENDING_RELEASE_CAPACITY; index++) {
+        const pending_release_t *pending = &state->pending_releases[index];
+
+        if (pending->active && runtime_v2_keypos_equal(pending->key_pos, key_pos)) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
 void runtime_v2_layer_lock_set(uint8_t layer, bool active) {
     runtime_v2_state_t *state = runtime_v2_state();
 
@@ -951,6 +1050,54 @@ void runtime_v2_pd_mode_lock_set(pd_mode_mask_t mode, bool active) {
 
     if (changed) {
         runtime_v2_shadow_projection_recompute(state);
+    }
+}
+
+void runtime_v2_observe_release_dispatch_deferred(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    press_token_t      *token;
+    pending_release_t  *pending;
+
+    if (!(state && action != KC_NO && runtime_v2_keypos_valid(key_pos))) {
+        return;
+    }
+
+    pending = runtime_v2_allocate_pending_release(state);
+    if (!pending) {
+        return;
+    }
+
+    token = runtime_v2_press_token_state(state, key_pos);
+    *pending = (pending_release_t){
+        .active         = true,
+        .owner_token_id = token ? token->token_id : 0u,
+        .key_pos        = key_pos,
+        .action         = action,
+        .mods           = mods,
+    };
+    runtime_v2_pending_release_mark_token(state, pending->owner_token_id);
+}
+
+void runtime_v2_observe_release_dispatch_drained(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    if (!(state && action != KC_NO && runtime_v2_keypos_valid(key_pos))) {
+        return;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PENDING_RELEASE_CAPACITY; index++) {
+        pending_release_t pending = state->pending_releases[index];
+
+        if (!runtime_v2_pending_release_matches(&pending, key_pos, action, mods)) {
+            continue;
+        }
+
+        state->pending_releases[index] = (pending_release_t){0};
+        if (state->pending_release_count != 0u) {
+            state->pending_release_count--;
+        }
+        runtime_v2_pending_release_clear_token(state, pending.owner_token_id);
+        return;
     }
 }
 
@@ -1004,6 +1151,7 @@ projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
         snapshot.v2_press_token_count     = state->press_token_count;
         snapshot.v2_tap_series_count      = state->tap_series_count;
         snapshot.v2_lease_count           = state->lease_count;
+        snapshot.v2_pending_release_count = state->pending_release_count;
         snapshot.v2_persistent_intent_count = state->persistent_intent_count;
         snapshot.v2_release_keycode_mismatch_count = state->release_keycode_mismatch_count;
         snapshot.v2_orphan_release_count = state->orphan_release_count;
@@ -1058,6 +1206,7 @@ bool runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, cons
            lhs->v2_press_token_count == rhs->v2_press_token_count &&
            lhs->v2_tap_series_count == rhs->v2_tap_series_count &&
            lhs->v2_lease_count == rhs->v2_lease_count &&
+           lhs->v2_pending_release_count == rhs->v2_pending_release_count &&
            lhs->v2_persistent_intent_count == rhs->v2_persistent_intent_count &&
            lhs->v2_release_keycode_mismatch_count == rhs->v2_release_keycode_mismatch_count &&
            lhs->v2_orphan_release_count == rhs->v2_orphan_release_count &&
