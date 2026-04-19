@@ -65,6 +65,14 @@ static tap_series_t *runtime_v2_tap_series_state(runtime_v2_state_t *state, keyp
     return &state->tap_series[runtime_v2_keypos_index(key_pos)];
 }
 
+static deferred_release_blocker_t *runtime_v2_deferred_release_blocker_state(runtime_v2_state_t *state, keypos_t key_pos) {
+    if (!(state && runtime_v2_keypos_valid(key_pos))) {
+        return NULL;
+    }
+
+    return &state->deferred_release_blockers[runtime_v2_keypos_index(key_pos)];
+}
+
 static pending_release_t *runtime_v2_allocate_pending_release(runtime_v2_state_t *state) {
     if (!state) {
         return NULL;
@@ -104,6 +112,60 @@ static uint8_t runtime_v2_pending_release_count_for_owner_token(const runtime_v2
 
 static uint16_t runtime_v2_elapsed(uint16_t start, uint16_t end) {
     return (uint16_t)(end - start);
+}
+
+static bool runtime_v2_deferred_release_blocker_tracks_tap_term(const deferred_release_blocker_t *blocker) {
+    return blocker && blocker->active && blocker->blocks_before_tap_term != blocker->blocks_after_tap_term;
+}
+
+static const press_token_t *runtime_v2_active_press_token_for_blocker(const runtime_v2_state_t *state, const deferred_release_blocker_t *blocker) {
+    const press_token_t *token;
+
+    if (!(state && blocker && blocker->active && blocker->owner_token_id != 0u)) {
+        return NULL;
+    }
+
+    token = runtime_v2_press_token_state((runtime_v2_state_t *)state, blocker->key_pos);
+    if (!(token && token->active && token->token_id == blocker->owner_token_id)) {
+        return NULL;
+    }
+
+    return token;
+}
+
+static bool runtime_v2_deferred_release_blocker_is_effective(const runtime_v2_state_t *state, const deferred_release_blocker_t *blocker) {
+    const press_token_t *token;
+
+    if (!(state && blocker && blocker->active)) {
+        return false;
+    }
+
+    if (!runtime_v2_deferred_release_blocker_tracks_tap_term(blocker)) {
+        return blocker->blocks_before_tap_term;
+    }
+
+    token = runtime_v2_active_press_token_for_blocker(state, blocker);
+    if (!token) {
+        return false;
+    }
+
+    return runtime_v2_elapsed(token->pressed_at, state->current_time) < token->hold_term_ms ? blocker->blocks_before_tap_term : blocker->blocks_after_tap_term;
+}
+
+static uint8_t runtime_v2_effective_deferred_release_blocker_count(const runtime_v2_state_t *state) {
+    uint8_t count = 0;
+
+    if (!state) {
+        return 0u;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_DEFERRED_RELEASE_BLOCKER_CAPACITY; index++) {
+        if (runtime_v2_deferred_release_blocker_is_effective(state, &state->deferred_release_blockers[index])) {
+            count++;
+        }
+    }
+
+    return count;
 }
 
 static uint8_t runtime_v2_modifier_mask_for_keycode(uint16_t keycode) {
@@ -1016,6 +1078,13 @@ uint8_t runtime_v2_pending_release_count_for_keypos(keypos_t key_pos) {
     return count;
 }
 
+uint8_t runtime_v2_deferred_release_blocker_count_for_keypos(keypos_t key_pos) {
+    runtime_v2_state_t           *state   = runtime_v2_state();
+    deferred_release_blocker_t   *blocker = runtime_v2_deferred_release_blocker_state(state, key_pos);
+
+    return runtime_v2_deferred_release_blocker_is_effective(state, blocker) ? 1u : 0u;
+}
+
 void runtime_v2_layer_lock_set(uint8_t layer, bool active) {
     runtime_v2_state_t *state = runtime_v2_state();
 
@@ -1101,6 +1170,55 @@ void runtime_v2_observe_release_dispatch_drained(keypos_t key_pos, uint16_t acti
     }
 }
 
+void runtime_v2_observe_deferred_release_blocker_profile(keypos_t key_pos, bool active, bool blocks_before_tap_term, bool blocks_after_tap_term) {
+    runtime_v2_state_t         *state   = runtime_v2_state();
+    deferred_release_blocker_t *blocker;
+    press_token_t              *token;
+    bool                        was_active;
+    bool                        was_timed;
+    bool                        now_active;
+    bool                        now_timed;
+
+    if (!(state && runtime_v2_keypos_valid(key_pos))) {
+        return;
+    }
+
+    blocker    = runtime_v2_deferred_release_blocker_state(state, key_pos);
+    token      = runtime_v2_press_token_state(state, key_pos);
+    was_active = blocker && blocker->active;
+    was_timed  = runtime_v2_deferred_release_blocker_tracks_tap_term(blocker);
+    now_active = active && (blocks_before_tap_term || blocks_after_tap_term);
+    now_timed  = now_active && blocks_before_tap_term != blocks_after_tap_term;
+
+    if (was_active && state->deferred_release_blocker_count != 0u) {
+        state->deferred_release_blocker_count--;
+    }
+    if (was_timed && state->deferred_release_timed_blocker_count != 0u) {
+        state->deferred_release_timed_blocker_count--;
+    }
+
+    if (!blocker) {
+        return;
+    }
+
+    if (!now_active) {
+        *blocker = (deferred_release_blocker_t){0};
+        return;
+    }
+
+    *blocker = (deferred_release_blocker_t){
+        .active                 = true,
+        .owner_token_id         = (token && token->active) ? token->token_id : 0u,
+        .key_pos                = key_pos,
+        .blocks_before_tap_term = blocks_before_tap_term,
+        .blocks_after_tap_term  = blocks_after_tap_term,
+    };
+    state->deferred_release_blocker_count++;
+    if (now_timed) {
+        state->deferred_release_timed_blocker_count++;
+    }
+}
+
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
     projection_snapshot_t                  snapshot = {0};
     layer_ownership_debug_snapshot_t       layer_snapshot;
@@ -1135,6 +1253,8 @@ projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
     snapshot.active_slot_count            = noah_runtime_debug_active_slot_count();
     snapshot.pending_multi_tap_slot_count = noah_runtime_debug_pending_multi_tap_slot_count();
     snapshot.deferred_release_count       = noah_runtime_debug_deferred_release_count();
+    snapshot.deferred_release_blocker_count = noah_runtime_debug_deferred_release_blocker_count();
+    snapshot.deferred_release_timed_blocker_count = noah_runtime_debug_deferred_release_timed_blocker_count();
 
     if (state) {
         snapshot.v2_shadow_layer_state     = state->shadow_projection.layer_state;
@@ -1152,6 +1272,8 @@ projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
         snapshot.v2_tap_series_count      = state->tap_series_count;
         snapshot.v2_lease_count           = state->lease_count;
         snapshot.v2_pending_release_count = state->pending_release_count;
+        snapshot.v2_deferred_release_blocker_count = runtime_v2_effective_deferred_release_blocker_count(state);
+        snapshot.v2_deferred_release_timed_blocker_count = state->deferred_release_timed_blocker_count;
         snapshot.v2_persistent_intent_count = state->persistent_intent_count;
         snapshot.v2_release_keycode_mismatch_count = state->release_keycode_mismatch_count;
         snapshot.v2_orphan_release_count = state->orphan_release_count;
@@ -1189,6 +1311,8 @@ bool runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, cons
            lhs->active_slot_count == rhs->active_slot_count &&
            lhs->pending_multi_tap_slot_count == rhs->pending_multi_tap_slot_count &&
            lhs->deferred_release_count == rhs->deferred_release_count &&
+           lhs->deferred_release_blocker_count == rhs->deferred_release_blocker_count &&
+           lhs->deferred_release_timed_blocker_count == rhs->deferred_release_timed_blocker_count &&
            lhs->v2_shadow_layer_state == rhs->v2_shadow_layer_state &&
            lhs->v2_shadow_locked_layer_mask == rhs->v2_shadow_locked_layer_mask &&
            lhs->v2_shadow_keyboard_mod_state.real == rhs->v2_shadow_keyboard_mod_state.real &&
@@ -1207,6 +1331,8 @@ bool runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, cons
            lhs->v2_tap_series_count == rhs->v2_tap_series_count &&
            lhs->v2_lease_count == rhs->v2_lease_count &&
            lhs->v2_pending_release_count == rhs->v2_pending_release_count &&
+           lhs->v2_deferred_release_blocker_count == rhs->v2_deferred_release_blocker_count &&
+           lhs->v2_deferred_release_timed_blocker_count == rhs->v2_deferred_release_timed_blocker_count &&
            lhs->v2_persistent_intent_count == rhs->v2_persistent_intent_count &&
            lhs->v2_release_keycode_mismatch_count == rhs->v2_release_keycode_mismatch_count &&
            lhs->v2_orphan_release_count == rhs->v2_orphan_release_count &&

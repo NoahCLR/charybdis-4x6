@@ -6,6 +6,8 @@
 
 #include <stddef.h>
 
+#include "../../runtime_v2/runtime_v2.h"
+
 static bool key_runtime_index_slot_preview_owner_candidate(const active_key_state_t *slot) {
     return key_runtime_slot_active(slot) && !key_runtime_slot_uses_implicit_hold(slot) && !key_runtime_slot_uses_fallback_hold(slot) && slot->lifecycle.held_action_keycode == KC_NO && key_runtime_slot_allows_tap_release(slot) && key_runtime_slot_preview_layer_hint(slot) != UINT8_MAX;
 }
@@ -81,6 +83,13 @@ static int16_t key_runtime_index_slot_index(const active_key_state_t *slot) {
     return (int16_t)(slot - base);
 }
 
+static keypos_t key_runtime_index_slot_key_pos(uint8_t slot_index) {
+    return (keypos_t){
+        .row = (uint8_t)(slot_index / MATRIX_COLS),
+        .col = (uint8_t)(slot_index % MATRIX_COLS),
+    };
+}
+
 static void key_runtime_index_refresh_single_owner_answers(key_runtime_shared_state_t *state) {
     state->index.preview_owner_slot    = UINT8_MAX;
     state->index.pending_fallback_slot = UINT8_MAX;
@@ -104,14 +113,22 @@ static void key_runtime_index_refresh_single_owner_answers(key_runtime_shared_st
 }
 
 static void key_runtime_index_sync_deferred_release_blocker(active_key_state_t *slot, uint8_t slot_index, key_runtime_shared_state_t *state) {
+    bool    profile_active;
+    keypos_t key_pos;
+
     if (!(state && slot)) {
         return;
     }
 
+    key_pos = key_runtime_index_slot_key_pos(slot_index);
+
     key_runtime_index_remove(state->index.deferred_release_blocker_slots, &state->index.deferred_release_blocker_count, slot_index);
     key_runtime_index_remove(state->index.deferred_release_blocker_timed_slots, &state->index.deferred_release_blocker_timed_count, slot_index);
 
-    if (!key_runtime_slot_active(slot)) {
+    profile_active = key_runtime_slot_active(slot) && (slot->lifecycle.deferred_release_blocker_before_tap_term || slot->lifecycle.deferred_release_blocker_after_tap_term);
+    runtime_v2_observe_deferred_release_blocker_profile(key_pos, profile_active, slot->lifecycle.deferred_release_blocker_before_tap_term, slot->lifecycle.deferred_release_blocker_after_tap_term);
+
+    if (!profile_active) {
         return;
     }
 

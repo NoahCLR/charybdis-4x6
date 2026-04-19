@@ -343,6 +343,21 @@ The next release-path seam is now landed as well:
 
 Inference from the current tree: deferred release is no longer an anonymous action FIFO in either the legacy debug surface or the v2 shadow model. That is a real architectural step forward. The deeper problem still remains open, though: the decision about whether a deferred release is blocked still comes from `key_runtime_transition_has_foreign_tap_release_slot_except(...)` and `key_runtime_transition_has_any_tap_release_slot(...)`, which re-derive blocker state by scanning the live slot world instead of consulting reducer-owned blocker records.
 
+## 2026-04-19 Runtime V2 Blocker Observation Note
+
+The blocker seam moved one step further toward the intended shadow-reducer model:
+
+- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now keep blocker records per physical key position, keyed to the current press token id for that key position.
+- The v2 blocker record stores the same timed blocker profile as the legacy owner:
+  - blocks before `tap_hold_term`
+  - blocks after `tap_hold_term`
+- `runtime_v2` now evaluates the threshold locally from the owning press token's `pressed_at` and `hold_term_ms`, so time-boundary blocker activation is no longer borrowed from legacy scan-time blocker refresh.
+- `users/noah/lib/key/runtime/key_runtime_index.c` now feeds the blocker profile into `runtime_v2_observe_deferred_release_blocker_profile(...)` from the real blocker owner seam.
+- `runtime_v2_projection_snapshot_capture()` now records both legacy blocker counts and v2 blocker counts, so the parity surface can compare blocker ownership explicitly instead of leaving it invisible.
+- `tests/host/runtime_debug_test.c` now proves the v2 shadow blocker record changes state correctly across `tap_hold_term` in both directions.
+
+Inference from the current tree: blocker timing is now modeled inside `runtime_v2`, but blocker semantics are still observer-fed from the legacy owner. That is a meaningful reduction in architecture risk, but it is not yet the final clean state. The remaining step is to derive blocker ownership natively from authored press-token semantics inside the reducer instead of mirroring the legacy blocker profile.
+
 ## 2026-04-19 Deferred Release Timed Blocker Ownership Note
 
 The next blocker-path refinement is now landed too:
@@ -357,7 +372,7 @@ The next blocker-path refinement is now landed too:
   - a quick-tap blocker expires after `tap_hold_term` without an active-slot resync, and
   - an interrupted layer-tap blocker with nonquick tap behavior becomes active after `tap_hold_term` without rescanning the active set.
 
-Inference from the current tree: blocker ownership is materially cleaner now. The remaining architectural gap is no longer “rescan every active slot and rediscover blocker semantics.” It is that the timed blocker profile still lives in legacy slot/index state instead of the v2 reducer.
+Inference from the current tree at that stage: blocker ownership was materially cleaner, but the timed blocker profile still lived entirely in legacy slot/index state. The later runtime-v2 blocker observation pass above moved that profile into the shadow reducer and localised threshold timing there, but the blocker semantics are still mirrored from the legacy owner rather than derived natively from authored token state.
 
 ## 2026-04-19 Deferred Release Blocker Index Note
 

@@ -21,3 +21,10 @@ void runtime_v2_observe_release_dispatch_drained(keypos_t key_pos, uint16_t acti
     (void)action;
     (void)mods;
 }
+
+void runtime_v2_observe_deferred_release_blocker_profile(keypos_t key_pos, bool active, bool blocks_before_tap_term, bool blocks_after_tap_term) {
+    (void)key_pos;
+    (void)active;
+    (void)blocks_before_tap_term;
+    (void)blocks_after_tap_term;
+}

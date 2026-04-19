@@ -30,5 +30,7 @@ bool     noah_runtime_debug_pending_multi_tap_slot_key_pos(uint8_t order, keypos
 uint8_t  noah_runtime_debug_deferred_release_count(void);
 bool     noah_runtime_debug_deferred_release_key_pos(uint8_t order, keypos_t *out);
 uint16_t noah_runtime_debug_deferred_release_action(uint8_t order);
+uint8_t  noah_runtime_debug_deferred_release_blocker_count(void);
+uint8_t  noah_runtime_debug_deferred_release_timed_blocker_count(void);
 bool     noah_runtime_debug_preview_owner_slot_key_pos(keypos_t *out);
 bool     noah_runtime_debug_pending_fallback_slot_key_pos(keypos_t *out);

@@ -1076,6 +1076,73 @@ static void test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases(vo
     CHECK(shadow->pointer_prefers_typing_layer);
 }
 
+static void test_runtime_v2_deferred_release_blocker_expires_after_tap_term(void) {
+    projection_snapshot_t snapshot;
+    keypos_t              key_pos = test_keypos(4, 0);
+    runtime_event_t       advance = {
+                  .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
+                  .data.timer_advance =
+                      {
+                          .advance_ms = (uint16_t)(CUSTOM_TAP_HOLD_TERM + 1u),
+                      },
+              };
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, key_pos, fake_time);
+    runtime_v2_observe_deferred_release_blocker_profile(key_pos, true, true, false);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_deferred_release_blocker_count == 1u);
+    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 1u);
+    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 1u);
+
+    runtime_v2_apply_event(&advance, fake_time);
+    fake_time = (uint16_t)(fake_time + advance.data.timer_advance.advance_ms);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_deferred_release_blocker_count == 0u);
+    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 1u);
+    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 0u);
+
+    runtime_v2_observe_deferred_release_blocker_profile(key_pos, false, false, false);
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_deferred_release_blocker_count == 0u);
+    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 0u);
+}
+
+static void test_runtime_v2_deferred_release_blocker_activates_after_tap_term(void) {
+    projection_snapshot_t snapshot;
+    keypos_t              key_pos = test_keypos(4, 2);
+    runtime_event_t       advance = {
+                  .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
+                  .data.timer_advance =
+                      {
+                          .advance_ms = (uint16_t)(CUSTOM_TAP_HOLD_TERM + 1u),
+                      },
+              };
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_V, key_pos, fake_time);
+    runtime_v2_observe_deferred_release_blocker_profile(key_pos, true, false, true);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_deferred_release_blocker_count == 0u);
+    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 1u);
+    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 0u);
+
+    runtime_v2_apply_event(&advance, fake_time);
+    fake_time = (uint16_t)(fake_time + advance.data.timer_advance.advance_ms);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_deferred_release_blocker_count == 1u);
+    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 1u);
+    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 1u);
+}
+
 static void test_runtime_v2_pending_release_state_survives_same_key_reuse(void) {
     projection_snapshot_t   snapshot;
     const press_token_t    *token;
@@ -1144,6 +1211,8 @@ int main(void) {
     test_runtime_v2_arrow_mode_prefers_typing_without_pointer_anchor();
     test_runtime_v2_pd_mode_lock_observes_live_pd_mode_state();
     test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases();
+    test_runtime_v2_deferred_release_blocker_expires_after_tap_term();
+    test_runtime_v2_deferred_release_blocker_activates_after_tap_term();
     test_runtime_v2_pending_release_state_survives_same_key_reuse();
 
     puts("runtime_debug host tests passed");

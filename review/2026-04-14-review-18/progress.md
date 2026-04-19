@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Blocker Observation Pass
+
+- Extended the shadow reducer into deferred-release blocker ownership so blocker state is now visible in `runtime_v2` and the parity snapshot surface instead of staying entirely trapped in legacy slot/index storage.
+- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now keep one blocker record per physical key position, owned by the current press token id for that key position.
+- The v2 blocker record stores the same timed profile shape as the legacy blocker owner:
+  - blocks before `tap_hold_term`
+  - blocks after `tap_hold_term`
+- `runtime_v2` now evaluates the time-boundary locally from the owning press token's `pressed_at` and `hold_term_ms`, so the shadow path no longer depends on legacy scan-time blocker refresh to know whether a timed blocker is currently active.
+- `users/noah/lib/key/runtime/key_runtime_index.c` now feeds that profile into `runtime_v2_observe_deferred_release_blocker_profile(...)` from the real blocker owner seam, and the v2 observer binds the blocker record to the currently active press token on the same physical key.
+- `users/noah/lib/state/runtime/runtime_debug.h` and `users/noah/lib/key/runtime/key_runtime_debug.c` now expose legacy blocker counts for projection capture, and `runtime_v2_projection_snapshot_capture()` now records both:
+  - legacy blocker counts
+  - v2 shadow blocker counts
+- `tests/host/runtime_debug_test.c` now proves both timed blocker directions in the shadow reducer:
+  - a blocker that only exists before `tap_hold_term` expires in v2 after the threshold, and
+  - a blocker that only exists after `tap_hold_term` activates in v2 after the threshold.
+- Focused host runners that compile `key_runtime_index.c` without the full reducer now link `tests/host/runtime_v2_observer_stub.c`, so the new observer hook does not broaden those runner surfaces accidentally.
+
 ## 2026-04-19 Deferred Release Timed Blocker Ownership Pass
 
 - Tightened deferred-release blocker ownership so blocker queries no longer rebuild blocker membership by rescanning every active slot and rerunning the blocker predicate over the whole live set.
@@ -247,6 +264,21 @@
 - `closure verdict`: keep this thread open until the hardware regression is closed on-device, and until the remaining `should-fix` items are either resolved or explicitly downgraded out of the closure bar.
 
 ## Verification
+
+- Passed during the runtime-v2 blocker observation pass:
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_key_runtime_index_tests.sh`
+  - `sh tests/host/run_key_runtime_slot_tests.sh`
+  - `sh tests/host/run_key_runtime_transition_tests.sh`
+  - `sh tests/host/run_key_runtime_admission_tests.sh`
+  - `sh tests/host/run_key_runtime_feedback_tests.sh`
+  - `sh tests/host/run_key_runtime_preflight_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
 
 - Passed during the deferred-release timed blocker ownership pass:
   - `sh tests/host/run_key_runtime_index_tests.sh`
@@ -507,5 +539,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Move the new timed blocker profile and blocker subset fully into runtime-v2, so blocker ownership stops living in legacy slot/index storage.
+3. Replace the observer-fed v2 blocker profile with native authored-token blocker derivation, so runtime-v2 no longer depends on the legacy blocker owner for this seam.
 4. Fold the remaining release/deferred-emission paths into the lease/reducer model before any production hook cutover.

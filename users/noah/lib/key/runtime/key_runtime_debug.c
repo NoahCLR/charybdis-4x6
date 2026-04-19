@@ -127,6 +127,14 @@ uint16_t noah_runtime_debug_deferred_release_action(uint8_t order) {
     return queue->items[order].action;
 }
 
+uint8_t noah_runtime_debug_deferred_release_blocker_count(void) {
+    return key_runtime_deferred_release_blocker_count();
+}
+
+uint8_t noah_runtime_debug_deferred_release_timed_blocker_count(void) {
+    return key_runtime_shared_state()->index.deferred_release_blocker_timed_count;
+}
+
 bool noah_runtime_debug_preview_owner_slot_key_pos(keypos_t *out) {
     return noah_runtime_debug_slot_key_pos(key_runtime_preview_owner_slot(), out);
 }

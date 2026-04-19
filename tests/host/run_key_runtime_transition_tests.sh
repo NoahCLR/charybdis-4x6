@@ -42,6 +42,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/key_runtime.c" \
     "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
+    "$ROOT/tests/host/runtime_v2_observer_stub.c" \
     -o "$BIN"
 
 "$BIN"
