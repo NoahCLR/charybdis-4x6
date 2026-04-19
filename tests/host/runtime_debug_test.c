@@ -10,6 +10,7 @@
 #include "users/noah/lib/key/ownership/held_repeat.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
+#include "users/noah/lib/key/runtime/key_runtime_transition.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
 #include "users/noah/lib/runtime_v2/runtime_v2.h"
@@ -1288,6 +1289,81 @@ static void test_runtime_v2_take_pending_releases_preserves_order_and_clears_tok
     CHECK(snapshot.v2_pending_release_count == 0u);
 }
 
+static void test_runtime_v2_runtime_owned_state_leases_track_and_clear(void) {
+    projection_snapshot_t snapshot;
+    keypos_t              key_pos = test_keypos(5, 0);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, key_pos, fake_time);
+    runtime_v2_observe_held_action_register(key_pos, TEST_ACTION);
+    runtime_v2_observe_repeat_start(key_pos, TEST_SECOND_ACTION, 25u);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_lease_count == 2u);
+
+    runtime_v2_observe_held_action_unregister(key_pos, TEST_ACTION);
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_lease_count == 1u);
+
+    CHECK(runtime_v2_release_owned_state_by_key(key_pos));
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_lease_count == 0u);
+    CHECK(!runtime_v2_release_owned_state_by_key(key_pos));
+}
+
+static void test_runtime_v2_transition_execute_plan_updates_owned_state_leases(void) {
+    projection_snapshot_t         snapshot;
+    key_runtime_transition_plan_t plan = {
+        .count = 2u,
+        .items =
+            {
+                [0] =
+                    {
+                        .kind = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
+                        .data.held_action =
+                            {
+                                .key_pos = test_keypos(5, 1),
+                                .action  = TEST_ACTION,
+                            },
+                    },
+                [1] =
+                    {
+                        .kind = KEY_RUNTIME_EFFECT_REPEAT_START,
+                        .data.repeat =
+                            {
+                                .key_pos    = test_keypos(5, 1),
+                                .action     = TEST_SECOND_ACTION,
+                                .repeat_hz  = 25u,
+                            },
+                    },
+            },
+    };
+    key_runtime_transition_plan_t release_plan = {
+        .count = 1u,
+        .items =
+            {
+                [0] =
+                    {
+                        .kind     = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+                        .data.key_pos = test_keypos(5, 1),
+                    },
+            },
+    };
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    key_runtime_transition_execute_plan(&plan);
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_lease_count == 2u);
+
+    key_runtime_transition_execute_plan(&release_plan);
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_lease_count == 0u);
+}
+
 int main(void) {
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
@@ -1309,6 +1385,8 @@ int main(void) {
     test_runtime_v2_other_press_interrupt_clears_momentary_layer_quick_tap_blocker();
     test_runtime_v2_pending_release_state_survives_same_key_reuse();
     test_runtime_v2_take_pending_releases_preserves_order_and_clears_tokens();
+    test_runtime_v2_runtime_owned_state_leases_track_and_clear();
+    test_runtime_v2_transition_execute_plan_updates_owned_state_leases();
 
     puts("runtime_debug host tests passed");
     return 0;

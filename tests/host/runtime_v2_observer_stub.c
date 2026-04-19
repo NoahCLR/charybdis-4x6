@@ -51,3 +51,24 @@ uint8_t runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8
     (void)capacity;
     return 0u;
 }
+
+void runtime_v2_observe_held_action_register(keypos_t key_pos, uint16_t action) {
+    (void)key_pos;
+    (void)action;
+}
+
+void runtime_v2_observe_held_action_unregister(keypos_t key_pos, uint16_t action) {
+    (void)key_pos;
+    (void)action;
+}
+
+void runtime_v2_observe_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
+    (void)key_pos;
+    (void)action;
+    (void)repeat_hz;
+}
+
+bool runtime_v2_release_owned_state_by_key(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}

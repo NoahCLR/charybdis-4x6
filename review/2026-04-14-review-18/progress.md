@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Owned-State Lease Observation Pass
+
+- Moved held-action and held-repeat ownership into reducer-observed lease state so the remaining release/unwind path is no longer guessing about owned runtime state.
+- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now:
+  - track `LEASE_KIND_HELD_ACTION` and `LEASE_KIND_REPEAT` by physical key position,
+  - expose observer hooks for held-action register/unregister and repeat start, and
+  - expose `runtime_v2_release_owned_state_by_key(...)` so reducer-owned held/repeat leases can be cleared by the production release/unwind seam.
+- `runtime_v2_press_token_owned_state_active(...)` now consults reducer-observed held/repeat leases before falling back to threshold-based inference, tightening blocker semantics around real owned state.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now feeds the production effect executor through those reducer observers:
+  - `KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER`
+  - `KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER`
+  - `KEY_RUNTIME_EFFECT_REPEAT_START`
+  - `KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY`
+- That means the production execute-plan path now updates reducer-owned held/repeat lease state and uses the reducer-owned release-owned-state cleanup helper before the legacy held-action/repeat owner runs.
+- `tests/host/runtime_debug_test.c` now proves both:
+  - direct held/repeat lease observation and reducer-owned clear, and
+  - the production `key_runtime_transition_execute_plan(...)` path updating and clearing those leases.
+- `tests/host/runtime_v2_observer_stub.c` now covers the new held/repeat observer hooks so focused runners that omit the full reducer still link cleanly.
+
 ## 2026-04-19 Runtime V2 Pending Release Drain Ownership Pass
 
 - Moved the next release-cleanup seam out of pure observer mode and into reducer-owned state management.
@@ -585,5 +604,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Replace the observer-fed v2 blocker profile with native authored-token blocker derivation, so runtime-v2 no longer depends on the legacy blocker owner for this seam.
-4. Fold the remaining release/deferred-emission paths into the lease/reducer model before any production hook cutover.
+3. Move release settlement planning itself onto runtime-v2 press-token state so tap vs hold vs long-hold vs pd-lock outcome selection no longer depends on the legacy slot release resolver.
+4. Fold the remaining release/deferred-emission effect planning and slot retirement paths into the lease/reducer model before any production hook cutover.

@@ -160,9 +160,15 @@ static bool runtime_v2_press_token_has_pd_mode_quick_lock_candidate(const press_
            !runtime_v2_press_token_quick_tap_suppressed(token);
 }
 
+static bool runtime_v2_owner_has_runtime_owned_state_lease(const runtime_v2_state_t *state, uint16_t owner_token_id);
+
 static bool runtime_v2_press_token_owned_state_active(const runtime_v2_state_t *state, const press_token_t *token) {
     if (!(state && token && token->active)) {
         return false;
+    }
+
+    if (runtime_v2_owner_has_runtime_owned_state_lease(state, token->token_id)) {
+        return true;
     }
 
     if (token->behavior_contract.quick_release_of_immediate_hold_dispatches_tap && !handled_key_hold_semantics_fires_at_threshold(token->behavior_contract.hold)) {
@@ -415,6 +421,38 @@ static lease_t *runtime_v2_find_layer_lease(runtime_v2_state_t *state, uint16_t 
     return NULL;
 }
 
+static lease_t *runtime_v2_find_held_action_lease(runtime_v2_state_t *state, keypos_t key_pos, uint16_t action) {
+    if (!state) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (lease->active && lease->kind == LEASE_KIND_HELD_ACTION && runtime_v2_keypos_equal(lease->owner_key_pos, key_pos) && lease->data.action == action) {
+            return lease;
+        }
+    }
+
+    return NULL;
+}
+
+static lease_t *runtime_v2_find_repeat_lease(runtime_v2_state_t *state, keypos_t key_pos, uint16_t action) {
+    if (!state) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (lease->active && lease->kind == LEASE_KIND_REPEAT && runtime_v2_keypos_equal(lease->owner_key_pos, key_pos) && lease->data.repeat.action == action) {
+            return lease;
+        }
+    }
+
+    return NULL;
+}
+
 static lease_t *runtime_v2_allocate_lease(runtime_v2_state_t *state) {
     if (!state) {
         return NULL;
@@ -434,7 +472,7 @@ static lease_t *runtime_v2_allocate_lease(runtime_v2_state_t *state) {
     return NULL;
 }
 
-static bool runtime_v2_layer_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, uint8_t layer) {
+static bool runtime_v2_layer_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, uint8_t layer) {
     lease_t *lease;
 
     if (!(state && layer < 32u)) {
@@ -454,12 +492,13 @@ static bool runtime_v2_layer_lease_activate(runtime_v2_state_t *state, uint16_t 
         .active         = true,
         .kind           = LEASE_KIND_LAYER,
         .owner_token_id = owner_token_id,
+        .owner_key_pos  = owner_key_pos,
         .data.layer     = layer,
     };
     return true;
 }
 
-static bool runtime_v2_modifier_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, uint8_t modifiers, bool physical) {
+static bool runtime_v2_modifier_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, uint8_t modifiers, bool physical) {
     lease_t *lease;
 
     if (!(state && modifiers != 0u)) {
@@ -479,6 +518,7 @@ static bool runtime_v2_modifier_lease_activate(runtime_v2_state_t *state, uint16
         .active         = true,
         .kind           = LEASE_KIND_MODIFIER,
         .owner_token_id = owner_token_id,
+        .owner_key_pos  = owner_key_pos,
         .data.modifier =
             {
                 .modifiers = modifiers,
@@ -488,7 +528,7 @@ static bool runtime_v2_modifier_lease_activate(runtime_v2_state_t *state, uint16
     return true;
 }
 
-static bool runtime_v2_pd_mode_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, pd_mode_mask_t mode) {
+static bool runtime_v2_pd_mode_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, pd_mode_mask_t mode) {
     lease_t *lease;
 
     if (!(state && mode != 0)) {
@@ -508,12 +548,13 @@ static bool runtime_v2_pd_mode_lease_activate(runtime_v2_state_t *state, uint16_
         .active         = true,
         .kind           = LEASE_KIND_PD_MODE,
         .owner_token_id = owner_token_id,
+        .owner_key_pos  = owner_key_pos,
         .data.pd_mode   = mode,
     };
     return true;
 }
 
-static bool runtime_v2_pointer_anchor_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, bool keep_typing_surface) {
+static bool runtime_v2_pointer_anchor_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, bool keep_typing_surface) {
     lease_t *lease;
 
     if (!state) {
@@ -533,10 +574,67 @@ static bool runtime_v2_pointer_anchor_lease_activate(runtime_v2_state_t *state, 
         .active         = true,
         .kind           = LEASE_KIND_POINTER_ANCHOR,
         .owner_token_id = owner_token_id,
+        .owner_key_pos  = owner_key_pos,
         .data.pointer_anchor =
             {
                 .layer               = runtime_v2_default_pointer_layer(),
                 .keep_typing_surface = keep_typing_surface,
+            },
+    };
+    return true;
+}
+
+static bool runtime_v2_held_action_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, uint16_t action) {
+    lease_t *lease;
+
+    if (!(state && action != KC_NO)) {
+        return false;
+    }
+
+    if (runtime_v2_find_held_action_lease(state, owner_key_pos, action)) {
+        return false;
+    }
+
+    lease = runtime_v2_allocate_lease(state);
+    if (!lease) {
+        return false;
+    }
+
+    *lease = (lease_t){
+        .active         = true,
+        .kind           = LEASE_KIND_HELD_ACTION,
+        .owner_token_id = owner_token_id,
+        .owner_key_pos  = owner_key_pos,
+        .data.action    = action,
+    };
+    return true;
+}
+
+static bool runtime_v2_repeat_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, uint16_t action, uint16_t repeat_hz) {
+    lease_t *lease;
+
+    if (!(state && action != KC_NO)) {
+        return false;
+    }
+
+    if (runtime_v2_find_repeat_lease(state, owner_key_pos, action)) {
+        return false;
+    }
+
+    lease = runtime_v2_allocate_lease(state);
+    if (!lease) {
+        return false;
+    }
+
+    *lease = (lease_t){
+        .active         = true,
+        .kind           = LEASE_KIND_REPEAT,
+        .owner_token_id = owner_token_id,
+        .owner_key_pos  = owner_key_pos,
+        .data.repeat =
+            {
+                .action    = action,
+                .repeat_hz = (uint8_t)repeat_hz,
             },
     };
     return true;
@@ -742,6 +840,52 @@ static void runtime_v2_release_leases_for_token(runtime_v2_state_t *state, uint1
     }
 }
 
+static bool runtime_v2_owner_has_runtime_owned_state_lease(const runtime_v2_state_t *state, uint16_t owner_token_id) {
+    if (!(state && owner_token_id != 0u)) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        const lease_t *lease = &state->leases[index];
+
+        if (!lease->active || lease->owner_token_id != owner_token_id) {
+            continue;
+        }
+
+        if (lease->kind == LEASE_KIND_HELD_ACTION || lease->kind == LEASE_KIND_REPEAT) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool runtime_v2_release_runtime_owned_state_leases_for_key(runtime_v2_state_t *state, keypos_t key_pos) {
+    bool changed = false;
+
+    if (!state) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (!lease->active || !runtime_v2_keypos_equal(lease->owner_key_pos, key_pos)) {
+            continue;
+        }
+
+        if (lease->kind == LEASE_KIND_HELD_ACTION || lease->kind == LEASE_KIND_REPEAT) {
+            *lease = (lease_t){0};
+            if (state->lease_count != 0u) {
+                state->lease_count--;
+            }
+            changed = true;
+        }
+    }
+
+    return changed;
+}
+
 static void runtime_v2_release_pd_related_leases_for_token(runtime_v2_state_t *state, uint16_t owner_token_id) {
     if (!state) {
         return;
@@ -844,12 +988,12 @@ static void runtime_v2_press_token_attach_press_leases(runtime_v2_state_t *state
         uint8_t layer = runtime_v2_layer_for_keycode(token->resolved_keycode);
 
         if (layer != UINT8_MAX) {
-            changed |= runtime_v2_layer_lease_activate(state, token->token_id, layer);
+            changed |= runtime_v2_layer_lease_activate(state, token->token_id, token->key_pos, layer);
         }
     }
 
     if (runtime_v2_keycode_owns_modifier_on_press(token->resolved_keycode)) {
-        changed |= runtime_v2_modifier_lease_activate(state, token->token_id, runtime_v2_modifier_mask_for_keycode(token->resolved_keycode), true);
+        changed |= runtime_v2_modifier_lease_activate(state, token->token_id, token->key_pos, runtime_v2_modifier_mask_for_keycode(token->resolved_keycode), true);
     }
 
     mode = runtime_v2_pd_mode_for_keycode(token->resolved_keycode);
@@ -864,9 +1008,9 @@ static void runtime_v2_press_token_attach_press_leases(runtime_v2_state_t *state
         }
 
         changed |= runtime_v2_clear_other_pd_mode_intents(state, mode);
-        changed |= runtime_v2_pd_mode_lease_activate(state, token->token_id, mode);
+        changed |= runtime_v2_pd_mode_lease_activate(state, token->token_id, token->key_pos, mode);
         if (runtime_v2_pd_mode_keeps_auto_mouse_anchored(mode)) {
-            changed |= runtime_v2_pointer_anchor_lease_activate(state, token->token_id, runtime_v2_pd_mode_prefers_typing_layer(mode));
+            changed |= runtime_v2_pointer_anchor_lease_activate(state, token->token_id, token->key_pos, runtime_v2_pd_mode_prefers_typing_layer(mode));
         }
     }
 
@@ -886,12 +1030,12 @@ static void runtime_v2_press_token_attach_hold_leases(runtime_v2_state_t *state,
         uint8_t layer = runtime_v2_layer_for_keycode(token->resolved_keycode);
 
         if (layer != UINT8_MAX) {
-            changed |= runtime_v2_layer_lease_activate(state, token->token_id, layer);
+            changed |= runtime_v2_layer_lease_activate(state, token->token_id, token->key_pos, layer);
         }
     }
 
     if (runtime_v2_keycode_owns_modifier_on_hold(token->resolved_keycode)) {
-        changed |= runtime_v2_modifier_lease_activate(state, token->token_id, runtime_v2_modifier_mask_for_keycode(token->resolved_keycode), false);
+        changed |= runtime_v2_modifier_lease_activate(state, token->token_id, token->key_pos, runtime_v2_modifier_mask_for_keycode(token->resolved_keycode), false);
     }
 
     if (changed) {
@@ -1279,6 +1423,59 @@ uint8_t runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8
     }
 
     return count;
+}
+
+void runtime_v2_observe_held_action_register(keypos_t key_pos, uint16_t action) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    press_token_t      *token;
+
+    if (!(state && action != KC_NO && runtime_v2_keypos_valid(key_pos))) {
+        return;
+    }
+
+    token = runtime_v2_press_token_state(state, key_pos);
+    (void)runtime_v2_held_action_lease_activate(state, token ? token->token_id : 0u, key_pos, action);
+}
+
+void runtime_v2_observe_held_action_unregister(keypos_t key_pos, uint16_t action) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    lease_t            *lease;
+
+    if (!(state && action != KC_NO && runtime_v2_keypos_valid(key_pos))) {
+        return;
+    }
+
+    lease = runtime_v2_find_held_action_lease(state, key_pos, action);
+    if (!lease) {
+        return;
+    }
+
+    *lease = (lease_t){0};
+    if (state->lease_count != 0u) {
+        state->lease_count--;
+    }
+}
+
+void runtime_v2_observe_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    press_token_t      *token;
+
+    if (!(state && action != KC_NO && runtime_v2_keypos_valid(key_pos))) {
+        return;
+    }
+
+    token = runtime_v2_press_token_state(state, key_pos);
+    (void)runtime_v2_repeat_lease_activate(state, token ? token->token_id : 0u, key_pos, action, repeat_hz);
+}
+
+bool runtime_v2_release_owned_state_by_key(keypos_t key_pos) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    if (!(state && runtime_v2_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    return runtime_v2_release_runtime_owned_state_leases_for_key(state, key_pos);
 }
 
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos) {

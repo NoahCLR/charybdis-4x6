@@ -138,6 +138,7 @@ typedef struct {
     bool        active;
     lease_kind_t kind;
     uint16_t    owner_token_id;
+    keypos_t    owner_key_pos;
     union {
         uint8_t       layer;
         struct {
@@ -271,6 +272,10 @@ bool                 runtime_v2_has_any_deferred_release_blocker(void);
 bool                 runtime_v2_has_foreign_deferred_release_blocker_except(keypos_t key_pos);
 uint8_t              runtime_v2_pending_release_count(void);
 uint8_t              runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity);
+void                 runtime_v2_observe_held_action_register(keypos_t key_pos, uint16_t action);
+void                 runtime_v2_observe_held_action_unregister(keypos_t key_pos, uint16_t action);
+void                 runtime_v2_observe_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz);
+bool                 runtime_v2_release_owned_state_by_key(keypos_t key_pos);
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos);
 const tap_series_t  *runtime_v2_tap_series_at(keypos_t key_pos);
 const runtime_v2_shadow_projection_t *runtime_v2_shadow_projection(void);

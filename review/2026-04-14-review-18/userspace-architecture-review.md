@@ -407,6 +407,24 @@ The deferred-release cleanup seam has now moved one step further into reducer ow
 
 Inference from the current tree: production blocker gating and pending-release cleanup are now partially on the same reducer-owned path. That is a real architectural reduction in split-brain state. The remaining gap is still the legacy release/action execution path itself: slot release resolution, effect planning, and owned-state unwind are not yet generated directly from reducer state, so the old slot/release machinery can still poison the board before or around that final dispatch layer.
 
+## 2026-04-19 Runtime V2 Owned-State Lease Observation Note
+
+The reducer now observes one more critical piece of the live production world: held-action and repeat ownership.
+
+- `users/noah/lib/runtime_v2/runtime_v2.c` now tracks reducer-owned held-action and repeat leases by physical key position.
+- Those lease records now also keep `owner_key_pos`, so runtime-owned state is no longer tied only to token id. The reducer can clear held/repeat ownership by the same physical key identity that production release cleanup uses, even if token reuse has already happened on that position.
+- New runtime-v2 observer hooks now mirror the production execute-plan seams for:
+  - held-action register,
+  - held-action unregister,
+  - repeat start, and
+  - release-owned-state cleanup by key.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now calls those hooks from the real `key_runtime_transition_execute_plan(...)` path, so the reducer sees actual held/repeat ownership changes instead of inferring them only from timing/contract state.
+- `runtime_v2_press_token_owned_state_active(...)` now consults those reducer-observed held/repeat leases before falling back to threshold-based inference, which tightens blocker semantics around the real owned-state path.
+- `runtime_v2_release_owned_state_by_key(...)` is now used from the production release-owned-state effect branch before the legacy held-action/repeat owner runs, so reducer-side unwind of held/repeat lease state is no longer purely synthetic and no longer depends on the legacy owner being the only source of truth for that cleanup.
+- `tests/host/runtime_debug_test.c` now proves both the direct lease observation path and the production `key_runtime_transition_execute_plan(...)` path updating and clearing reducer-owned held/repeat lease state.
+
+Inference from the current tree: blocker gating, pending-release drain, and runtime-owned held/repeat cleanup are now all partially on the reducer side. That is the strongest reduction so far in “split brain about owned state after release.” The remaining gap is the actual release settlement plan: tap vs hold vs long-hold vs pd-lock outcome selection is still being decided by the legacy slot release resolver, and the legacy effect planner still decides which owned-state cleanup effects to enqueue in the first place. Final closure still requires moving that settlement decision onto the reducer side too.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:
