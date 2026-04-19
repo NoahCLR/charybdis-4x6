@@ -196,6 +196,8 @@ void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runti
 }
 
 static bool key_runtime_transition_is_foreign_tap_release_candidate(const active_key_state_t *slot, keypos_t key_pos) {
+    key_runtime_slot_release_contract_t release_contract;
+
     if (!slot || key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) {
         return false;
     }
@@ -205,6 +207,11 @@ static bool key_runtime_transition_is_foreign_tap_release_candidate(const active
     }
 
     if (slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
+        return false;
+    }
+
+    release_contract = key_runtime_slot_release_contract(key_runtime_slot_cached_interaction(slot));
+    if (slot->lifecycle.layer_interrupted && (release_contract.suppress_tap_on_layer_interrupt || release_contract.quick_release_of_immediate_hold_dispatches_tap || release_contract.quick_tap_pd_mode_lock != 0)) {
         return false;
     }
 
@@ -229,21 +236,9 @@ bool key_runtime_transition_has_any_tap_release_slot(void) {
     uint8_t             active_count = key_runtime_index_snapshot_active_slots(slots, ARRAY_SIZE(slots));
 
     for (uint8_t index = 0; index < active_count; index++) {
-        active_key_state_t *slot = slots[index];
-
-        if (!slot) {
-            continue;
+        if (key_runtime_transition_is_foreign_tap_release_candidate(slots[index], (keypos_t){0xFF, 0xFF})) {
+            return true;
         }
-
-        if (!key_runtime_slot_allows_tap_release(slot)) {
-            continue;
-        }
-
-        if (slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
-            continue;
-        }
-
-        return true;
     }
 
     return false;

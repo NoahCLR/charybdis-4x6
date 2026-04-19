@@ -51,13 +51,13 @@ typedef struct {
     pd_mode_mask_t                              pd_mode_lock_tap;
 } key_runtime_slot_release_decision_t;
 
-static inline bool key_runtime_slot_release_query_interrupted_layer_tap(const key_runtime_slot_release_query_t *query) {
+static inline bool key_runtime_slot_release_query_interrupt_suppresses_tap(const key_runtime_slot_release_query_t *query) {
     key_runtime_slot_release_contract_t contract = query ? key_runtime_slot_release_contract(query->interaction) : (key_runtime_slot_release_contract_t){0};
-    return query && contract.suppress_tap_on_layer_interrupt && query->layer_interrupted;
+    return query && query->layer_interrupted && (contract.suppress_tap_on_layer_interrupt || contract.quick_release_of_immediate_hold_dispatches_tap || contract.quick_tap_pd_mode_lock != 0);
 }
 
 static inline bool key_runtime_slot_release_query_quick_tap(const key_runtime_slot_release_query_t *query) {
-    return query && query->elapsed < query->interaction.binding.tap_hold_term && !key_runtime_slot_release_query_interrupted_layer_tap(query);
+    return query && query->elapsed < query->interaction.binding.tap_hold_term && !key_runtime_slot_release_query_interrupt_suppresses_tap(query);
 }
 
 static inline bool key_runtime_slot_release_query_buffered_base_tap(const key_runtime_slot_release_query_t *query) {
@@ -85,7 +85,7 @@ static inline pd_mode_mask_t key_runtime_slot_release_query_lock_tap_mode(const 
         return 0;
     }
 
-    if (key_runtime_slot_release_query_interrupted_layer_tap(query)) {
+    if (key_runtime_slot_release_query_interrupt_suppresses_tap(query)) {
         return 0;
     }
 

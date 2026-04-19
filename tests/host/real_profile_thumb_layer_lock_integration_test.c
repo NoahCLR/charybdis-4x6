@@ -2,7 +2,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "users/noah/lib/action/action_lifecycle.h"
 #include "key_runtime_integration_harness.h"
 #include "print.h"
 #include "transactions.h"
@@ -19,6 +21,18 @@
 layer_state_t layer_state = 0;
 
 static uint16_t fake_time;
+static uint16_t test_tap_code16_count;
+static uint16_t test_last_tap_code16;
+static uint16_t test_delayed_action_count;
+static uint16_t test_last_delayed_action;
+
+typedef struct {
+    bool     active;
+    keypos_t key_pos;
+    uint16_t action;
+} test_held_action_binding_t;
+
+static test_held_action_binding_t test_held_actions[MATRIX_ROWS * MATRIX_COLS];
 
 extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];
 
@@ -46,6 +60,10 @@ static keypos_t test_right_thumb_pos(void) {
     return (keypos_t){.row = 6, .col = 3};
 }
 
+static bool test_keypos_equal(keypos_t lhs, keypos_t rhs) {
+    return lhs.row == rhs.row && lhs.col == rhs.col;
+}
+
 static uint16_t test_layer_mask(uint8_t layer) {
     return (uint16_t)((layer_state_t)1u << layer);
 }
@@ -70,6 +88,50 @@ static uint8_t test_highest_active_layer(void) {
 
 static uint16_t test_keycode_at(uint8_t layer_num, keypos_t key_pos) {
     return keymaps[layer_num][key_pos.row][key_pos.col];
+}
+
+static bool test_keypos_valid(keypos_t key_pos) {
+    return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
+}
+
+static keypos_t test_find_keypos_on_layer(uint8_t layer_num, uint16_t keycode) {
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            keypos_t key_pos = {
+                .row = row,
+                .col = col,
+            };
+
+            if (test_keycode_at(layer_num, key_pos) == keycode) {
+                return key_pos;
+            }
+        }
+    }
+
+    return (keypos_t){
+        .row = UINT8_MAX,
+        .col = UINT8_MAX,
+    };
+}
+
+static int16_t test_find_held_action_slot(keypos_t key_pos) {
+    for (uint16_t index = 0; index < ARRAY_SIZE(test_held_actions); index++) {
+        if (test_held_actions[index].active && test_keypos_equal(test_held_actions[index].key_pos, key_pos)) {
+            return (int16_t)index;
+        }
+    }
+
+    return -1;
+}
+
+static int16_t test_find_free_held_action_slot(void) {
+    for (uint16_t index = 0; index < ARRAY_SIZE(test_held_actions); index++) {
+        if (!test_held_actions[index].active) {
+            return (int16_t)index;
+        }
+    }
+
+    return -1;
 }
 
 static uint16_t test_resolve_keycode(keypos_t key_pos) {
@@ -127,7 +189,12 @@ static void test_run_double_tap_hold_cycle_with_intermediate_scan(keypos_t key_p
 }
 
 static void test_reset_state(void) {
-    fake_time = 1000;
+    fake_time                 = 1000;
+    test_tap_code16_count     = 0;
+    test_last_tap_code16      = KC_NO;
+    test_delayed_action_count = 0;
+    test_last_delayed_action  = KC_NO;
+    memset(test_held_actions, 0, sizeof(test_held_actions));
     noah_runtime_reset_for_test();
     layer_state = test_layer_mask(LAYER_BASE);
 }
@@ -217,7 +284,8 @@ void del_mods(uint8_t mods) {
 void send_keyboard_report(void) {}
 
 void tap_code16(uint16_t keycode) {
-    (void)keycode;
+    test_tap_code16_count++;
+    test_last_tap_code16 = keycode;
 }
 
 void register_code16(uint16_t keycode) {
@@ -466,23 +534,57 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 }
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
-    (void)action;
+    test_delayed_action_count++;
+    test_last_delayed_action = action;
     (void)mods;
 }
 
 void held_action_register(keypos_t key_pos, uint16_t action) {
-    (void)key_pos;
-    (void)action;
+    int16_t slot = test_find_held_action_slot(key_pos);
+
+    if (slot >= 0) {
+        if (test_held_actions[slot].action == action) {
+            return;
+        }
+
+        noah_action_release(key_pos, test_held_actions[slot].action);
+    } else {
+        slot = test_find_free_held_action_slot();
+        CHECK(slot >= 0);
+    }
+
+    test_held_actions[slot] = (test_held_action_binding_t){
+        .active  = true,
+        .key_pos = key_pos,
+        .action  = action,
+    };
+    noah_action_press(key_pos, action);
 }
 
 void held_action_unregister(keypos_t key_pos, uint16_t action) {
-    (void)key_pos;
-    (void)action;
+    int16_t slot = test_find_held_action_slot(key_pos);
+
+    if (slot >= 0) {
+        action = test_held_actions[slot].action;
+        test_held_actions[slot].active = false;
+        test_held_actions[slot].action = KC_NO;
+    }
+
+    noah_action_release(key_pos, action);
 }
 
 bool held_action_release_owned_by_key(keypos_t key_pos) {
-    (void)key_pos;
-    return false;
+    int16_t slot = test_find_held_action_slot(key_pos);
+
+    if (slot < 0) {
+        return false;
+    }
+
+    uint16_t action = test_held_actions[slot].action;
+    test_held_actions[slot].active = false;
+    test_held_actions[slot].action = KC_NO;
+    noah_action_release(key_pos, action);
+    return true;
 }
 
 bool held_modifier_release_owned_by_key(keypos_t key_pos) {
@@ -499,9 +601,9 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
 void held_repeat_tick(void) {}
 
 bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
-    (void)key_pos;
-    (void)action;
-    return false;
+    int16_t slot = test_find_held_action_slot(key_pos);
+
+    return slot >= 0 && test_held_actions[slot].action == action;
 }
 
 void key_feedback_pulse_arm(bool long_hold_level) {
@@ -569,10 +671,80 @@ static void test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_
     CHECK(!test_layer_active(LAYER_NUM));
 }
 
+static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
+    const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
+    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t        nav_left_pos    = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
+
+    test_reset_state();
+
+    CHECK(test_keypos_valid(nav_hold_pos));
+    CHECK(test_keypos_valid(nav_left_pos));
+    CHECK(test_resolve_keycode(nav_hold_pos) == nav_hold_keycode);
+
+    test_press_resolved(nav_hold_pos);
+    CHECK(test_layer_active(LAYER_NAV));
+
+    key_runtime_integration_advance(&fake_time, 20);
+    CHECK(test_resolve_keycode(nav_left_pos) == KC_LEFT);
+
+    test_press_resolved(nav_left_pos);
+    test_release_resolved(nav_left_pos);
+
+    CHECK(test_tap_code16_count == 1);
+    CHECK(test_last_tap_code16 == KC_LEFT);
+    CHECK(test_delayed_action_count == 0);
+    CHECK(test_layer_active(LAYER_NAV));
+
+    test_release_resolved(nav_hold_pos);
+    key_runtime_integration_scan();
+
+    CHECK(test_tap_code16_count == 1);
+    CHECK(test_delayed_action_count == 0);
+    CHECK(test_last_delayed_action == KC_NO);
+}
+
+static void test_right_thumb_hold_dispatches_nav_taps_immediately(void) {
+    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    keypos_t  nav_left_pos        = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
+    uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
+
+    test_reset_state();
+
+    CHECK(test_keypos_valid(nav_left_pos));
+    CHECK(right_thumb_keycode != KC_TRNS);
+    CHECK(test_resolve_keycode(right_thumb_pos) == right_thumb_keycode);
+
+    test_press_resolved(right_thumb_pos);
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
+    key_runtime_integration_scan();
+
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(noah_runtime_debug_slot_owner_keycode(right_thumb_pos) == right_thumb_keycode);
+
+    test_press_resolved(nav_left_pos);
+    test_release_resolved(nav_left_pos);
+
+    CHECK(test_tap_code16_count == 1);
+    CHECK(test_last_tap_code16 == KC_LEFT);
+    CHECK(test_delayed_action_count == 0);
+    CHECK(test_layer_active(LAYER_NAV));
+
+    test_release_resolved(right_thumb_pos);
+    key_runtime_integration_scan();
+
+    CHECK(test_tap_code16_count == 1);
+    CHECK(test_delayed_action_count == 0);
+    CHECK(test_last_delayed_action == KC_NO);
+    CHECK(!test_layer_active(LAYER_NAV));
+}
+
 int main(void) {
     test_left_thumb_double_tap_hold_toggles_num_layer();
     test_right_thumb_double_tap_hold_toggles_num_layer();
     test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle();
+    test_right_nav_layer_hold_dispatches_nav_taps_immediately();
+    test_right_thumb_hold_dispatches_nav_taps_immediately();
 
     puts("real_profile_thumb_layer_lock integration tests passed");
     return 0;

@@ -18,9 +18,14 @@
 #ifndef KC_J
 #    define KC_J 0x000Du
 #endif
+#ifndef KC_SLSH
+#    define KC_SLSH 0x0038u
+#endif
 
 enum {
     TEST_PD_HOLD_KEY       = NOAH_KEYMAP_SAFE_RANGE + 0x10,
+    TEST_HANDLED_TAP_KEY   = NOAH_KEYMAP_SAFE_RANGE + 0x11,
+    TEST_LAYER_HOLD_KEY    = NOAH_KEYMAP_SAFE_RANGE + 0x12,
     TEST_PD_TAP_HOLD_TERM  = 120,
     TEST_PD_MULTI_TAP_TERM = 150,
     TEST_LAYER_BASE        = 0,
@@ -65,6 +70,25 @@ const key_behavior_t key_behaviors[] = {
         .tap_counts[0] =
             {
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(VOLUME_MODE),
+            },
+    },
+    {
+        .keycode        = TEST_HANDLED_TAP_KEY,
+        .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
+        .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
+        .tap_counts[0] =
+            {
+                .tap = TAP_SENDS(KC_J),
+            },
+    },
+    {
+        .keycode        = TEST_LAYER_HOLD_KEY,
+        .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
+        .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
+        .tap_counts =
+            {
+                [0] = {.tap = TAP_SENDS(LOCK_LAYER(TEST_LAYER_NAV)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_LAYER_NAV))},
+                [1] = {.tap = TAP_SENDS(KC_C)},
             },
     },
     {
@@ -114,6 +138,8 @@ static bool     auto_mouse_layer_off_pending_fallback;
 static uint8_t  auto_mouse_layer_off_real_mods;
 static uint8_t  auto_mouse_layer_off_managed_mods;
 static uint8_t  auto_mouse_layer_off_physical_mods;
+static uint16_t tap_code16_count;
+static uint16_t last_tap_code16;
 static uint16_t last_delayed_action;
 static delayed_action_mods_t last_delayed_mods;
 
@@ -189,6 +215,8 @@ static void test_reset_state(void) {
     auto_mouse_layer_off_real_mods         = 0;
     auto_mouse_layer_off_managed_mods      = 0;
     auto_mouse_layer_off_physical_mods     = 0;
+    tap_code16_count         = 0;
+    last_tap_code16          = KC_NO;
     last_delayed_action      = KC_NO;
     last_delayed_mods        = (delayed_action_mods_t){0};
 }
@@ -301,7 +329,8 @@ void del_mods(uint8_t mods) {
 void send_keyboard_report(void) {}
 
 void tap_code16(uint16_t keycode) {
-    (void)keycode;
+    tap_code16_count++;
+    last_tap_code16 = keycode;
 }
 
 void register_code(uint8_t keycode) {
@@ -650,6 +679,284 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
     CHECK(current_cpi == default_dpi);
 }
 
+static void test_authored_single_press_pd_mode_hold_dispatches_plain_taps_immediately(void) {
+    keypos_t key_pos = test_keypos(1, 2);
+    const key_runtime_integration_step_t hold_and_tap_steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_HANDLED_TAP_KEY, 1, 3),
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_HANDLED_TAP_KEY, 1, 3),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+    };
+
+    test_reset_state();
+
+    key_runtime_integration_run(&fake_time, hold_and_tap_steps, ARRAY_SIZE(hold_and_tap_steps));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_active(PD_MODE_VOLUME));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
+    CHECK(tap_code16_count == 1);
+    CHECK(last_tap_code16 == KC_J);
+    CHECK(delayed_action_count == 0);
+
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    CHECK(tap_code16_count == 1);
+    CHECK(last_tap_code16 == KC_J);
+    CHECK(delayed_action_count == 0);
+}
+
+static void test_raw_lt_hold_dispatches_authored_tap_key_immediately(void) {
+    keypos_t                             hold_pos   = test_keypos(1, 4);
+    keypos_t                             child_pos  = test_keypos(3, 5);
+    const uint16_t                       hold_key   = LT(TEST_LAYER_NAV, KC_SLSH);
+    const key_runtime_integration_step_t hold_steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(hold_key, 1, 4),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_PRESS(KC_RIGHT_ALT, 3, 5),
+        KEY_RUNTIME_INTEGRATION_RELEASE(KC_RIGHT_ALT, 3, 5),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(hold_key, 1, 4),
+    };
+
+    test_reset_state();
+
+    CHECK(key_behavior_lookup(KC_RIGHT_ALT).config != NULL);
+
+    key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+    CHECK(delayed_action_count == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == KC_NO);
+
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    CHECK(pd_mode_local_active(PD_MODE_ARROW));
+    CHECK(pd_mode_local_locked(PD_MODE_ARROW));
+}
+
+static void test_raw_lt_hold_dispatches_authored_plain_tap_immediately(void) {
+    const uint16_t                       hold_key   = LT(TEST_LAYER_NAV, KC_SLSH);
+    const key_runtime_integration_step_t hold_steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(hold_key, 1, 4),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_HANDLED_TAP_KEY, 3, 5),
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_HANDLED_TAP_KEY, 3, 5),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(hold_key, 1, 4),
+    };
+
+    test_reset_state();
+
+    CHECK(key_behavior_lookup(TEST_HANDLED_TAP_KEY).config != NULL);
+
+    key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
+    CHECK(tap_code16_count == 1);
+    CHECK(last_tap_code16 == KC_J);
+    CHECK(delayed_action_count == 0);
+
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    CHECK(tap_code16_count == 1);
+    CHECK(delayed_action_count == 0);
+}
+
+static void test_authored_layer_hold_dispatches_authored_tap_key_immediately(void) {
+    keypos_t                             hold_pos   = test_keypos(1, 4);
+    keypos_t                             child_pos  = test_keypos(3, 5);
+    const key_runtime_integration_step_t hold_steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(KC_RIGHT_ALT, 3, 5),
+        KEY_RUNTIME_INTEGRATION_RELEASE(KC_RIGHT_ALT, 3, 5),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_LAYER_HOLD_KEY, 1, 4),
+    };
+
+    test_reset_state();
+
+    CHECK(key_behavior_lookup(TEST_LAYER_HOLD_KEY).config != NULL);
+    CHECK(key_behavior_lookup(KC_RIGHT_ALT).config != NULL);
+
+    key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+    CHECK(delayed_action_count == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == KC_NO);
+
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    CHECK(pd_mode_local_active(PD_MODE_ARROW));
+    CHECK(pd_mode_local_locked(PD_MODE_ARROW));
+}
+
+static void test_authored_layer_hold_dispatches_authored_plain_tap_immediately(void) {
+    const key_runtime_integration_step_t hold_steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_HANDLED_TAP_KEY, 3, 5),
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_HANDLED_TAP_KEY, 3, 5),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_LAYER_HOLD_KEY, 1, 4),
+    };
+
+    test_reset_state();
+
+    CHECK(key_behavior_lookup(TEST_LAYER_HOLD_KEY).config != NULL);
+    CHECK(key_behavior_lookup(TEST_HANDLED_TAP_KEY).config != NULL);
+
+    key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
+    CHECK(tap_code16_count == 1);
+    CHECK(last_tap_code16 == KC_J);
+    CHECK(delayed_action_count == 0);
+
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    CHECK(tap_code16_count == 1);
+    CHECK(delayed_action_count == 0);
+}
+
+static void test_interrupted_locked_pd_mode_press_does_not_toggle_lock_on_release(void) {
+    keypos_t key_pos = test_keypos(1, 2);
+    const key_runtime_integration_step_t press_and_interrupt[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_PRESS(KC_J, 1, 3),
+        KEY_RUNTIME_INTEGRATION_RELEASE(KC_J, 1, 3),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+    };
+
+    test_reset_state();
+
+    CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, true));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    CHECK(reset_volume_count == 0);
+
+    key_runtime_integration_run(&fake_time, press_and_interrupt, ARRAY_SIZE(press_and_interrupt));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
+
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_active(PD_MODE_VOLUME));
+    CHECK(pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+}
+
+static void test_authored_pd_mode_hold_dispatches_authored_tap_key_immediately(void) {
+    keypos_t                             hold_pos   = test_keypos(1, 2);
+    keypos_t                             child_pos  = test_keypos(3, 5);
+    const key_runtime_integration_step_t hold_steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_PRESS(KC_RIGHT_ALT, 3, 5),
+        KEY_RUNTIME_INTEGRATION_RELEASE(KC_RIGHT_ALT, 3, 5),
+    };
+    const key_runtime_integration_step_t release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+    };
+
+    test_reset_state();
+
+    CHECK(key_behavior_lookup(VOLUME_MODE).config != NULL);
+    CHECK(key_behavior_lookup(KC_RIGHT_ALT).config != NULL);
+
+    key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+    CHECK(delayed_action_count == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == KC_NO);
+
+    key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    CHECK(pd_mode_local_active(PD_MODE_ARROW));
+    CHECK(pd_mode_local_locked(PD_MODE_ARROW));
+}
+
+static void test_authored_layer_hold_releases_authored_pd_mode_child_cleanly(void) {
+    keypos_t                             hold_pos  = test_keypos(1, 4);
+    keypos_t                             child_pos = test_keypos(1, 2);
+    const key_runtime_integration_step_t hold_steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+    };
+    const key_runtime_integration_step_t child_release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+    };
+    const key_runtime_integration_step_t parent_release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_LAYER_HOLD_KEY, 1, 4),
+    };
+
+    test_reset_state();
+
+    CHECK(key_behavior_lookup(TEST_LAYER_HOLD_KEY).config != NULL);
+    CHECK(key_behavior_lookup(VOLUME_MODE).config != NULL);
+
+    key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
+    CHECK(noah_runtime_debug_active_slot_count() == 2);
+    CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == TEST_LAYER_HOLD_KEY);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == VOLUME_MODE);
+
+    key_runtime_integration_run(&fake_time, child_release_steps, ARRAY_SIZE(child_release_steps));
+    CHECK(noah_runtime_debug_active_slot_count() == 1);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == KC_NO);
+
+    key_runtime_integration_run(&fake_time, parent_release_steps, ARRAY_SIZE(parent_release_steps));
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == KC_NO);
+}
+
+static void test_authored_pd_mode_hold_releases_authored_pd_mode_child_cleanly(void) {
+    keypos_t                             hold_pos  = test_keypos(1, 2);
+    keypos_t                             child_pos = test_keypos(2, 4);
+    const key_runtime_integration_step_t hold_steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4),
+    };
+    const key_runtime_integration_step_t child_release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(PINCH_MODE, 2, 4),
+    };
+    const key_runtime_integration_step_t parent_release_steps[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+    };
+
+    test_reset_state();
+    test_configure_pinch_transparent_profile_path(child_pos);
+
+    CHECK(key_behavior_lookup(VOLUME_MODE).config != NULL);
+    CHECK(key_behavior_lookup(PINCH_MODE).config != NULL);
+
+    key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
+    CHECK(noah_runtime_debug_active_slot_count() == 2);
+    CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PINCH_MODE);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PINCH_MODE);
+
+    key_runtime_integration_run(&fake_time, child_release_steps, ARRAY_SIZE(child_release_steps));
+    CHECK(noah_runtime_debug_active_slot_count() == 1);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == KC_NO);
+
+    key_runtime_integration_run(&fake_time, parent_release_steps, ARRAY_SIZE(parent_release_steps));
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == KC_NO);
+}
+
 static void test_authored_hold_action_activates_pd_mode_while_held(void) {
     keypos_t                             key_pos    = test_keypos(1, 3);
     const key_runtime_integration_step_t scenario[] = {
@@ -897,6 +1204,15 @@ static void test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain
 
 int main(void) {
     test_authored_single_press_preserves_default_pd_mode_hold();
+    test_authored_single_press_pd_mode_hold_dispatches_plain_taps_immediately();
+    test_raw_lt_hold_dispatches_authored_tap_key_immediately();
+    test_raw_lt_hold_dispatches_authored_plain_tap_immediately();
+    test_authored_layer_hold_dispatches_authored_tap_key_immediately();
+    test_authored_layer_hold_dispatches_authored_plain_tap_immediately();
+    test_interrupted_locked_pd_mode_press_does_not_toggle_lock_on_release();
+    test_authored_pd_mode_hold_dispatches_authored_tap_key_immediately();
+    test_authored_layer_hold_releases_authored_pd_mode_child_cleanly();
+    test_authored_pd_mode_hold_releases_authored_pd_mode_child_cleanly();
     test_authored_hold_action_activates_pd_mode_while_held();
     test_authored_double_tap_lock_locks_pd_mode();
     test_authored_second_press_hold_branches_into_other_pd_mode();

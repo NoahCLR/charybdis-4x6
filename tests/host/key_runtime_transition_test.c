@@ -968,12 +968,16 @@ static void test_settle_pending_fallback_holds_activates_all_candidates(void) {
 
 static void test_interrupt_other_press_marks_layer_interrupted(void) {
     key_runtime_transition_plan_t plan;
+    keypos_t                      key_pos            = test_keypos(2, 5);
+    uint16_t                      layer_tap_keycode = LT(2, TEST_FALLBACK_TAP_ACTION);
+    handled_key_resolution_t      layer_resolution  = test_cached_resolution(layer_tap_keycode, TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
 
     test_reset_stubs();
-    test_set_default_slot_key_pos(test_keypos(2, 5));
+    test_set_default_slot_key_pos(key_pos);
     test_stage_slot_state(test_default_slot(), (active_key_state_t){
-                                                   .owner.keycode = LT(2, TEST_FALLBACK_TAP_ACTION),
-                                                   .owner.key_pos = test_keypos(2, 5),
+                                                   .owner.keycode = layer_tap_keycode,
+                                                   .owner.key_pos = key_pos,
+                                                   .interaction   = test_authored_interaction(layer_resolution, key_pos),
                                                });
 
     key_runtime_transition_plan_init(&plan);
@@ -981,6 +985,39 @@ static void test_interrupt_other_press_marks_layer_interrupted(void) {
 
     CHECK(plan.count == 0);
     CHECK(active_key.lifecycle.layer_interrupted);
+}
+
+static void test_has_any_tap_release_slot_ignores_interrupted_layer_tap(void) {
+    keypos_t                 key_pos            = test_keypos(2, 5);
+    uint16_t                 layer_tap_keycode = LT(2, TEST_FALLBACK_TAP_ACTION);
+    handled_key_resolution_t layer_resolution  = test_cached_resolution(layer_tap_keycode, TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(key_pos);
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .owner.keycode               = layer_tap_keycode,
+                                                   .owner.key_pos               = key_pos,
+                                                   .interaction                 = test_authored_interaction(layer_resolution, key_pos),
+                                                   .lifecycle.layer_interrupted = true,
+                                               });
+
+    CHECK(!key_runtime_transition_has_any_tap_release_slot());
+}
+
+static void test_has_any_tap_release_slot_reports_live_layer_tap(void) {
+    keypos_t                 key_pos            = test_keypos(2, 5);
+    uint16_t                 layer_tap_keycode = LT(2, TEST_FALLBACK_TAP_ACTION);
+    handled_key_resolution_t layer_resolution  = test_cached_resolution(layer_tap_keycode, TEST_FALLBACK_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM, 0, HANDLED_KEY_FLAG_HANDLED | HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(key_pos);
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .owner.keycode = layer_tap_keycode,
+                                                   .owner.key_pos = key_pos,
+                                                   .interaction   = test_authored_interaction(layer_resolution, key_pos),
+                                               });
+
+    CHECK(key_runtime_transition_has_any_tap_release_slot());
 }
 
 static void test_flush_active_keys_except_dispatches_foreign_tap_and_preserves_target_slot(void) {
@@ -1959,6 +1996,8 @@ int main(void) {
     test_interrupt_other_press_queues_pending_fallback_hold();
     test_settle_pending_fallback_holds_activates_all_candidates();
     test_interrupt_other_press_marks_layer_interrupted();
+    test_has_any_tap_release_slot_ignores_interrupted_layer_tap();
+    test_has_any_tap_release_slot_reports_live_layer_tap();
     test_flush_active_keys_except_dispatches_foreign_tap_and_preserves_target_slot();
     test_flush_active_keys_except_unregisters_foreign_held_action();
     test_modifier_multi_tap_second_tap_dispatches_action();

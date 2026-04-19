@@ -79,8 +79,8 @@ static const key_runtime_slot_release_phase_contracts_t key_runtime_slot_release
         },
 };
 
-static bool key_runtime_slot_release_is_interrupted_layer_tap(const key_runtime_slot_release_context_t *context) {
-    return context && context->contract.suppress_tap_on_layer_interrupt && context->released_key.lifecycle.layer_interrupted;
+static bool key_runtime_slot_release_interrupt_suppresses_tap(const key_runtime_slot_release_context_t *context) {
+    return context && context->released_key.lifecycle.layer_interrupted && (context->contract.suppress_tap_on_layer_interrupt || context->contract.quick_release_of_immediate_hold_dispatches_tap || context->contract.quick_tap_pd_mode_lock != 0);
 }
 
 static bool key_runtime_slot_release_is_buffered_base_tap(const key_runtime_slot_release_context_t *context) {
@@ -88,7 +88,7 @@ static bool key_runtime_slot_release_is_buffered_base_tap(const key_runtime_slot
 }
 
 static bool key_runtime_slot_release_is_quick_tap(const key_runtime_slot_release_context_t *context) {
-    return context && context->elapsed < context->interaction.binding.tap_hold_term && !key_runtime_slot_release_is_interrupted_layer_tap(context);
+    return context && context->elapsed < context->interaction.binding.tap_hold_term && !key_runtime_slot_release_interrupt_suppresses_tap(context);
 }
 
 static pd_mode_mask_t key_runtime_slot_locked_pd_mode_tap_mode(const key_runtime_slot_release_context_t *context) {
@@ -105,7 +105,7 @@ static pd_mode_mask_t key_runtime_slot_locked_pd_mode_tap_mode(const key_runtime
         return 0;
     }
 
-    if (key_runtime_slot_release_is_interrupted_layer_tap(context)) {
+    if (key_runtime_slot_release_interrupt_suppresses_tap(context)) {
         return 0;
     }
 
@@ -133,7 +133,7 @@ static uint16_t key_runtime_slot_release_trace_flags(const key_runtime_slot_rele
         return flags;
     }
 
-    if (key_runtime_slot_release_is_interrupted_layer_tap(context)) {
+    if (context && context->contract.suppress_tap_on_layer_interrupt && context->released_key.lifecycle.layer_interrupted) {
         flags |= KEY_RUNTIME_TRACE_RELEASE_FLAG_INTERRUPTED_LAYER_TAP;
     }
     if (context->quick_tap) {
