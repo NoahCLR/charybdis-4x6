@@ -99,7 +99,7 @@ These previews are generated as SVG image assets under [docs/media/profile-intro
 - `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys
 - `LAYER_BASE` falls back to the default RGB color from [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) when its authored layer color is `HSV(0, 0, 0)`
 - Keys with authored `key_behaviors[]` rows in [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers
-- Each layer section below also pulls in the authored key behaviors, pd-mode keys, and combos that are actually present on that layer
+- Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer
 
 Timing legend for the layer-local behavior tables:
 
@@ -155,9 +155,11 @@ Timing legend for the layer-local behavior tables:
 | `RTHUMB` | `RTHUMB` (`RIGHT_THUMB`) | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
 | `ENT` | `ENT` (`KC_ENT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))` | `-` | `tap_hold(150)` |
 
-#### PD Mode Keys On This Layer
+#### PD Modes Reachable On This Layer
 
-No pd-mode keys are placed directly on this layer.
+| Reachable Via | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |
+| --- | --- | --- | --- | --- |
+| `RALT` via `single tap` -> `LOCK[ARROW]` (`LOCK_PD_MODE(ARROW_MODE)`) | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -185,9 +187,11 @@ No pd-mode keys are placed directly on this layer.
 | `,` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `tap_hold(150)` |
 | `.` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `tap_hold(150)` |
 
-#### PD Mode Keys On This Layer
+#### PD Modes Reachable On This Layer
 
-No pd-mode keys are placed directly on this layer.
+| Reachable Via | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |
+| --- | --- | --- | --- | --- |
+| `RALT` via `single tap` -> `LOCK[ARROW]` (`LOCK_PD_MODE(ARROW_MODE)`) | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -213,9 +217,9 @@ No authored combos resolve entirely from keys on this layer.
 | `[` | `[` (`KC_LBRC`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)` | `-` | `tap_hold(150)` |
 | `]` | `]` (`KC_RBRC`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)` | `-` | `tap_hold(150)` |
 
-#### PD Mode Keys On This Layer
+#### PD Modes Reachable On This Layer
 
-No pd-mode keys are placed directly on this layer.
+No pd modes are directly placed or reachable through key behaviors on this layer.
 
 #### Combos Available On This Layer
 
@@ -239,11 +243,11 @@ No authored combos resolve entirely from keys on this layer.
 | `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))` | `-` | `tap_hold(150), multi_tap(150)` |
 
-#### PD Mode Keys On This Layer
+#### PD Modes Reachable On This Layer
 
-| Key On Layer | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |
+| Reachable Via | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- |
-| `DRAGSCROLL` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `LOCK[DRAGSCROLL]` (`LOCK_PD_MODE(DRAGSCROLL)`) | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -271,14 +275,15 @@ No authored combos resolve entirely from keys on this layer.
 | `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))` | `-` | `tap_hold(150), multi_tap(150)` |
 
-#### PD Mode Keys On This Layer
+#### PD Modes Reachable On This Layer
 
-| Key On Layer | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |
+| Reachable Via | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- |
-| `DRAGSCROLL` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `PD_MODE_VOLUME` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
-| `BRIGHTNESS` | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `PD_MODE_BRIGHTNESS` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
-| `PINCH` | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
+| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `LOCK[DRAGSCROLL]` (`LOCK_PD_MODE(DRAGSCROLL)`) | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `VOLUME` directly on layer | `VOLUME` (`VOLUME_MODE`) | `PD_MODE_VOLUME` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `BRIGHTNESS` directly on layer | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `PD_MODE_BRIGHTNESS` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `PINCH` via `double hold` -> `ZOOM` (`ZOOM_MODE`) | `ZOOM` (`ZOOM_MODE`) | `PD_MODE_ZOOM` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
+| `PINCH` directly on layer | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 

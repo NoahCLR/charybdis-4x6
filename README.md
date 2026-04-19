@@ -111,7 +111,7 @@ generates:
   [`docs/KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md)
   including authored layer colors, pd-mode colors, and key-behavior feedback LED colors from
   [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
-  visible color swatches, transparent `TRNS` passthrough keys, key-behavior activity dots on layer images, a short timing legend for the layer-local behavior tables, and only filled macro slots
+  visible color swatches, transparent `TRNS` passthrough keys, key-behavior activity dots on layer images, per-layer pd-mode reachability including behavior-triggered modes, a short timing legend for the layer-local behavior tables, and only filled macro slots
 
 Practical usage:
 

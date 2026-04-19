@@ -1301,7 +1301,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "- `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys",
         f"- `LAYER_BASE` falls back to the default RGB color from {config_link} when its authored layer color is `HSV(0, 0, 0)`",
         f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers",
-        "- Each layer section below also pulls in the authored key behaviors, pd-mode keys, and combos that are actually present on that layer",
+        "- Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer",
         "",
         "Timing legend for the layer-local behavior tables:",
         "",
@@ -1434,6 +1434,91 @@ def format_token_with_raw(token: str) -> str:
     return f"`{display}` (`{normalized}`)"
 
 
+def resolve_pd_mode_from_action_expr(
+    action_expr: str,
+    pd_mode_by_mode_keycode: dict[str, dict[str, object]],
+    pd_mode_by_lock_keycode: dict[str, dict[str, object]],
+) -> dict[str, object] | None:
+    normalized = normalize_expr(action_expr)
+    if normalized in pd_mode_by_mode_keycode:
+        return pd_mode_by_mode_keycode[normalized]
+    if normalized in pd_mode_by_lock_keycode:
+        return pd_mode_by_lock_keycode[normalized]
+    if normalized.startswith("LOCK_PD_MODE(") and normalized.endswith(")"):
+        inner = normalize_expr(normalized[13:-1])
+        if inner in pd_mode_by_mode_keycode:
+            return pd_mode_by_mode_keycode[inner]
+        if inner in pd_mode_by_lock_keycode:
+            return pd_mode_by_lock_keycode[inner]
+    return None
+
+
+def format_pd_mode_behavior_source(
+    positions: list[dict[str, object]],
+    step: dict[str, object],
+    field_name: str,
+    action_expr: str,
+) -> str:
+    tap_count = TAP_COUNT_NAMES.get(step["tap_count"], str(step["tap_count"]))
+    field_label = field_name.replace("_", " ")
+    return f"{format_layer_key_instances(positions)} via `{tap_count} {field_label}` -> {format_token_with_raw(action_expr)}"
+
+
+def collect_layer_reachable_pd_mode_rows(
+    layer: dict[str, object],
+    profile: dict[str, object],
+) -> list[tuple[dict[str, object], list[str], dict[str, object] | None]]:
+    positions_by_raw_keycode = layer_positions_by_raw_keycode(layer)
+    positions_by_lookup_key = layer_positions_by_lookup_key(layer)
+    behavior_map = {behavior_lookup_key(row["keycode"]): row for row in profile["key_behaviors"]}
+    pd_mode_by_mode_keycode = {row["mode_keycode"]: row for row in profile["pd_modes"]}
+    pd_mode_by_lock_keycode = {row["lock_keycode"]: row for row in profile["pd_modes"]}
+    color_by_mode = {row["pointing_mode"]: row for row in profile["rgb"]["pd_mode_colors"]}
+    sources_by_mode: dict[str, list[str]] = {}
+    seen_sources_by_mode: dict[str, set[str]] = {}
+
+    def add_source(pd_mode: dict[str, object], source: str) -> None:
+        mode_name = pd_mode["pointing_mode"]
+        if mode_name not in sources_by_mode:
+            sources_by_mode[mode_name] = []
+            seen_sources_by_mode[mode_name] = set()
+        if source in seen_sources_by_mode[mode_name]:
+            return
+        seen_sources_by_mode[mode_name].add(source)
+        sources_by_mode[mode_name].append(source)
+
+    for pd_mode in profile["pd_modes"]:
+        positions = positions_by_raw_keycode.get(pd_mode["mode_keycode"])
+        if positions:
+            add_source(pd_mode, f"{format_layer_key_instances(positions)} directly on layer")
+
+    seen_behavior_keys: set[str] = set()
+    for position in layer["positions"]:
+        key = behavior_lookup_key(position["keycode"])
+        if key in seen_behavior_keys or key not in behavior_map:
+            continue
+        seen_behavior_keys.add(key)
+        behavior = behavior_map[key]
+        positions = positions_by_lookup_key[key]
+        for step in behavior["steps"]:
+            for field_name in ("tap", "hold", "long_hold"):
+                action = step[field_name]
+                if action is None:
+                    continue
+                pd_mode = resolve_pd_mode_from_action_expr(action["action"], pd_mode_by_mode_keycode, pd_mode_by_lock_keycode)
+                if pd_mode is None:
+                    continue
+                add_source(pd_mode, format_pd_mode_behavior_source(positions, step, field_name, action["action"]))
+
+    rows: list[tuple[dict[str, object], list[str], dict[str, object] | None]] = []
+    for pd_mode in profile["pd_modes"]:
+        sources = sources_by_mode.get(pd_mode["pointing_mode"])
+        if not sources:
+            continue
+        rows.append((pd_mode, sources, color_by_mode.get(pd_mode["pointing_mode"])))
+    return rows
+
+
 def render_layer_local_key_behaviors(layer: dict[str, object], profile: dict[str, object]) -> list[str]:
     timing_defaults = profile["config"]["timing_defaults"]
     behavior_map = {behavior_lookup_key(row["keycode"]): row for row in profile["key_behaviors"]}
@@ -1478,28 +1563,20 @@ def render_layer_local_key_behaviors(layer: dict[str, object], profile: dict[str
 
 
 def render_layer_local_pd_modes(layer: dict[str, object], profile: dict[str, object]) -> list[str]:
-    positions_by_keycode = layer_positions_by_raw_keycode(layer)
-    color_by_mode = {row["pointing_mode"]: row for row in profile["rgb"]["pd_mode_colors"]}
-    rows: list[tuple[list[dict[str, object]], dict[str, object], dict[str, object] | None]] = []
+    rows = collect_layer_reachable_pd_mode_rows(layer, profile)
 
-    for pd_mode in profile["pd_modes"]:
-        positions = positions_by_keycode.get(pd_mode["mode_keycode"])
-        if not positions:
-            continue
-        rows.append((positions, pd_mode, color_by_mode.get(pd_mode["pointing_mode"])))
-
-    lines = ["#### PD Mode Keys On This Layer", ""]
+    lines = ["#### PD Modes Reachable On This Layer", ""]
     if not rows:
-        lines.extend(["No pd-mode keys are placed directly on this layer.", ""])
+        lines.extend(["No pd modes are directly placed or reachable through key behaviors on this layer.", ""])
         return lines
 
     lines.extend(
         [
-            "| Key On Layer | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |",
+            "| Reachable Via | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |",
             "| --- | --- | --- | --- | --- |",
         ]
     )
-    for positions, pd_mode, color_row in rows:
+    for pd_mode, sources, color_row in rows:
         if color_row is None:
             authored_hsv = "`none`"
             preview_swatch = "no override"
@@ -1508,7 +1585,7 @@ def render_layer_local_pd_modes(layer: dict[str, object], profile: dict[str, obj
             authored_hsv = f"`HSV({color['h']}, {color['s']}, {color['v']})`"
             preview_swatch = markdown_color_swatch(color_row["preview_color"], f"{pd_mode['pointing_mode']} color")
         lines.append(
-            f"| {format_layer_key_instances(positions)} | {format_token_with_raw(pd_mode['mode_keycode'])} | `{pd_mode['pointing_mode']}` | {authored_hsv} | {preview_swatch} |"
+            f"| {'; '.join(sources)} | {format_token_with_raw(pd_mode['mode_keycode'])} | `{pd_mode['pointing_mode']}` | {authored_hsv} | {preview_swatch} |"
         )
     lines.append("")
     return lines
