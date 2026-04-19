@@ -423,7 +423,31 @@ The reducer now observes one more critical piece of the live production world: h
 - `runtime_v2_release_owned_state_by_key(...)` is now used from the production release-owned-state effect branch before the legacy held-action/repeat owner runs, so reducer-side unwind of held/repeat lease state is no longer purely synthetic and no longer depends on the legacy owner being the only source of truth for that cleanup.
 - `tests/host/runtime_debug_test.c` now proves both the direct lease observation path and the production `key_runtime_transition_execute_plan(...)` path updating and clearing reducer-owned held/repeat lease state.
 
-Inference from the current tree: blocker gating, pending-release drain, and runtime-owned held/repeat cleanup are now all partially on the reducer side. That is the strongest reduction so far in “split brain about owned state after release.” The remaining gap is the actual release settlement plan: tap vs hold vs long-hold vs pd-lock outcome selection is still being decided by the legacy slot release resolver, and the legacy effect planner still decides which owned-state cleanup effects to enqueue in the first place. Final closure still requires moving that settlement decision onto the reducer side too.
+Inference from the current tree at that stage: blocker gating, pending-release drain, and runtime-owned held/repeat cleanup were now all partially on the reducer side. That was the strongest reduction so far in “split brain about owned state after release,” but active release settlement still lived in the legacy slot release resolver.
+
+## 2026-04-19 Runtime V2 Active Release Settlement Note
+
+The active-slot release decision has now crossed into the reducer-owned path as well:
+
+- `users/noah/lib/runtime_v2/runtime_v2.h` now stores the immutable press-resolved `key_runtime_slot_interaction_t` on each press token, plus a reducer-owned `slot_phase` that tracks release semantics separately from the coarse token lifecycle phase.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now advances that reducer-owned release phase only from scan/effect progression:
+  - scan events can promote a token from tap window into release-hold-pending or committed hold phases,
+  - held-action/repeat observer hooks can commit hold phase when production effect execution does so outside the scan loop, and
+  - key-up itself no longer reinterprets release semantics just because time elapsed.
+- Held-action and repeat leases now survive physical key-up until `RELEASE_OWNED_STATE_BY_KEY`, which is required for reducer-owned release settlement to see the same live owned-state picture as the production cleanup seam.
+- `users/noah/lib/runtime_v2/runtime_v2_release_internal.h` now exposes `runtime_v2_resolve_active_release(...)`, which resolves active release outcome from:
+  - the immutable token interaction snapshot,
+  - reducer-owned release phase,
+  - reducer-owned held/repeat leases,
+  - reducer-owned interruption latches, and
+  - the release-time elapsed interval captured on the token.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c` now uses that reducer-owned release planner when runtime-v2 has observed the real normalized input stream, while retaining the legacy slot-owned resolver as fallback for non-authoritative or narrowed surfaces.
+- `tests/host/runtime_debug_test.c` now proves two crucial invariants of this seam:
+  - key-up after `tap_hold_term` does not advance the release phase by itself, preserving current scan-sensitive behavior, and
+  - scan-time threshold promotion changes reducer-owned release outcome the same way the production slot scan path does.
+- The release matrix, scenario suite, modifier-hold integration suite, pd-mode key-runtime integration suite, feature-gate compile suite, and the real-profile thumb/nav suite all stayed green after the cutover, which is the enforcement bar that the migrated active-release planner preserved intended runtime behavior.
+
+Inference from the current tree: the default active-slot release caller no longer decides tap vs hold vs long-hold vs pd-lock by re-reading mutable live slot state at release time. That decision now comes from the reducer-owned press-token snapshot. The remaining release-settlement gap is the second caller: pending multi-tap release still uses the shared legacy resolver, and the effect-planning / slot-retirement layer is still legacy-owned after the decision is made.
 
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 

@@ -14,6 +14,7 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
 #include "users/noah/lib/runtime_v2/runtime_v2.h"
+#include "users/noah/lib/runtime_v2/runtime_v2_release_internal.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
@@ -26,6 +27,8 @@ enum {
     TEST_SECOND_ACTION         = SAFE_RANGE + 0x11,
     TEST_PENDING_MULTI_TAP_KEY = SAFE_RANGE + 0x12,
     TEST_INTERRUPTED_LAYER_KEY = SAFE_RANGE + 0x13,
+    TEST_RELEASE_PRIMARY_KEY   = SAFE_RANGE + 0x14,
+    TEST_THRESHOLD_LONG_KEY    = SAFE_RANGE + 0x15,
 };
 
 static uint16_t fake_time;
@@ -124,26 +127,39 @@ static const held_repeat_binding_snapshot_t *test_find_held_repeat_binding(const
 
 static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, uint8_t tap_count) {
     uint16_t flags = HANDLED_KEY_FLAG_HANDLED;
+    key_behavior_step_t step  = {
+         .tap = TAP_SENDS(keycode),
+     };
+    uint8_t            layer = UINT8_MAX;
 
     if (keycode == TEST_PENDING_MULTI_TAP_KEY) {
         flags |= HANDLED_KEY_FLAG_MULTI_TAP;
     } else if (keycode == TEST_INTERRUPTED_LAYER_KEY) {
         flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
+        step = (key_behavior_step_t){
+            .tap  = TAP_SENDS(KC_V),
+            .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(2)),
+        };
+        layer = 2;
+    } else if (keycode == TEST_RELEASE_PRIMARY_KEY) {
+        step = (key_behavior_step_t){
+            .hold = TAP_ON_RELEASE_AFTER_HOLD(TEST_ACTION),
+        };
+    } else if (keycode == TEST_THRESHOLD_LONG_KEY) {
+        step = (key_behavior_step_t){
+            .hold      = TAP_AT_HOLD_THRESHOLD(TEST_ACTION),
+            .long_hold = TAP_ON_RELEASE_AFTER_HOLD(TEST_SECOND_ACTION),
+        };
     }
 
     return (handled_key_resolution_t){
         .keycode          = keycode,
         .tap_count        = tap_count,
-        .step             = keycode == TEST_INTERRUPTED_LAYER_KEY ? (key_behavior_step_t){
-            .tap  = TAP_SENDS(KC_V),
-            .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(2)),
-        } : (key_behavior_step_t){
-            .tap = TAP_SENDS(keycode),
-        },
+        .step             = step,
         .tap_hold_term    = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
         .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term   = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
-        .layer            = keycode == TEST_INTERRUPTED_LAYER_KEY ? 2 : UINT8_MAX,
+        .layer            = layer,
         .pd_mode          = 0,
         .has_more_taps    = false,
         .flags            = flags,
@@ -690,6 +706,55 @@ static void test_runtime_v2_timer_and_scan_do_not_rewrite_press_identity(void) {
     CHECK(token->resolved_keycode == layer_tap_keycode);
     CHECK(token->hold_term_ms == original.hold_term_ms);
     CHECK(token->phase == PRESS_TOKEN_PHASE_HELD);
+}
+
+static void test_runtime_v2_active_release_resolution_preserves_tap_window_without_scan(void) {
+    runtime_v2_active_release_resolution_t resolution;
+    keypos_t                              key_pos = test_keypos(4, 2);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_RELEASE_PRIMARY_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_RELEASE_PRIMARY_KEY, key_pos, fake_time);
+
+    CHECK(runtime_v2_resolve_active_release(key_pos, &resolution));
+    CHECK(resolution.phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    CHECK(resolution.decision.outcome == KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION);
+    CHECK(resolution.decision.action == TEST_ACTION);
+    CHECK(!resolution.decision.release_owned_state);
+}
+
+static void test_runtime_v2_active_release_resolution_tracks_threshold_hold_after_scan(void) {
+    runtime_v2_active_release_resolution_t resolution;
+    keypos_t                              key_pos = test_keypos(4, 3);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_THRESHOLD_LONG_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM);
+    runtime_v2_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, fake_time);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_THRESHOLD_LONG_KEY, key_pos, fake_time);
+
+    CHECK(runtime_v2_resolve_active_release(key_pos, &resolution));
+    CHECK(resolution.phase == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE);
+    CHECK(resolution.decision.outcome == KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE);
+    CHECK(!resolution.decision.release_owned_state);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_THRESHOLD_LONG_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + CUSTOM_LONGER_HOLD_TERM);
+    runtime_v2_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, fake_time);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_THRESHOLD_LONG_KEY, key_pos, fake_time);
+
+    CHECK(runtime_v2_resolve_active_release(key_pos, &resolution));
+    CHECK(resolution.phase == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE);
+    CHECK(resolution.decision.outcome == KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION);
+    CHECK(resolution.decision.action == TEST_SECOND_ACTION);
 }
 
 static void test_runtime_v2_tap_series_state_stays_independent_from_active_token_storage(void) {
@@ -1370,6 +1435,8 @@ int main(void) {
     test_reset_clears_all_runtime_surfaces();
     test_runtime_v2_release_tracks_press_by_position_despite_keycode_mismatch();
     test_runtime_v2_timer_and_scan_do_not_rewrite_press_identity();
+    test_runtime_v2_active_release_resolution_preserves_tap_window_without_scan();
+    test_runtime_v2_active_release_resolution_tracks_threshold_hold_after_scan();
     test_runtime_v2_tap_series_state_stays_independent_from_active_token_storage();
     test_runtime_v2_layer_lock_observes_live_layer_ownership_state();
     test_runtime_v2_layer_tap_hold_creates_and_retires_layer_lease();

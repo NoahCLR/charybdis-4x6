@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "runtime_v2.h"
+#include "runtime_v2_release_internal.h"
 
 #include <string.h>
 
@@ -160,6 +161,7 @@ static bool runtime_v2_press_token_has_pd_mode_quick_lock_candidate(const press_
            !runtime_v2_press_token_quick_tap_suppressed(token);
 }
 
+static bool runtime_v2_owner_has_lease_kind(const runtime_v2_state_t *state, uint16_t owner_token_id, lease_kind_t kind);
 static bool runtime_v2_owner_has_runtime_owned_state_lease(const runtime_v2_state_t *state, uint16_t owner_token_id);
 
 static bool runtime_v2_press_token_owned_state_active(const runtime_v2_state_t *state, const press_token_t *token) {
@@ -180,6 +182,74 @@ static bool runtime_v2_press_token_owned_state_active(const runtime_v2_state_t *
     }
 
     return runtime_v2_hold_semantics_owns_state_at_threshold(token->behavior_contract.hold);
+}
+
+static void runtime_v2_press_token_commit_hold_phase(press_token_t *token, bool completes_hold) {
+    if (!token) {
+        return;
+    }
+
+    token->slot_phase = completes_hold ? KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE : KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE;
+}
+
+static bool runtime_v2_press_token_active_scan_should_mark_release_hold_pending(const press_token_t *token, uint16_t elapsed) {
+    if (!(token && token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW)) {
+        return false;
+    }
+
+    if (token->interaction.contract.hold.release_action != KC_NO && elapsed >= token->interaction.binding.tap_hold_term) {
+        return true;
+    }
+
+    return !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term;
+}
+
+static void runtime_v2_press_token_refresh_slot_phase_for_scan(const runtime_v2_state_t *state, press_token_t *token, uint16_t now) {
+    uint16_t elapsed;
+
+    if (!(state && token && token->active && token->handled_key)) {
+        return;
+    }
+
+    elapsed = runtime_v2_elapsed(token->pressed_at, now);
+
+    switch (token->slot_phase) {
+        case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+                runtime_v2_press_token_commit_hold_phase(token, true);
+                return;
+            }
+
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.hold) && elapsed >= token->interaction.binding.tap_hold_term) {
+                runtime_v2_press_token_commit_hold_phase(token, !token->interaction.binding.long_hold.present);
+                return;
+            }
+
+            if (runtime_v2_press_token_active_scan_should_mark_release_hold_pending(token, elapsed)) {
+                token->slot_phase = KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
+            }
+            return;
+        case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+                runtime_v2_press_token_commit_hold_phase(token, true);
+                return;
+            }
+
+            if (elapsed >= token->interaction.binding.tap_hold_term) {
+                runtime_v2_press_token_commit_hold_phase(token, !token->interaction.binding.long_hold.present);
+            }
+            return;
+        case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+                runtime_v2_press_token_commit_hold_phase(token, true);
+            }
+            return;
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE:
+        case KEY_RUNTIME_SLOT_PHASE_IDLE:
+        default:
+            return;
+    }
 }
 
 static void runtime_v2_press_token_deferred_release_profile(const runtime_v2_state_t *state, const press_token_t *token, bool *before_tap_term, bool *after_tap_term) {
@@ -831,7 +901,7 @@ static void runtime_v2_release_leases_for_token(runtime_v2_state_t *state, uint1
     for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->owner_token_id == owner_token_id) {
+        if (lease->active && lease->owner_token_id == owner_token_id && lease->kind != LEASE_KIND_HELD_ACTION && lease->kind != LEASE_KIND_REPEAT) {
             *lease = (lease_t){0};
             if (state->lease_count != 0u) {
                 state->lease_count--;
@@ -840,7 +910,7 @@ static void runtime_v2_release_leases_for_token(runtime_v2_state_t *state, uint1
     }
 }
 
-static bool runtime_v2_owner_has_runtime_owned_state_lease(const runtime_v2_state_t *state, uint16_t owner_token_id) {
+static bool runtime_v2_owner_has_lease_kind(const runtime_v2_state_t *state, uint16_t owner_token_id, lease_kind_t kind) {
     if (!(state && owner_token_id != 0u)) {
         return false;
     }
@@ -848,16 +918,16 @@ static bool runtime_v2_owner_has_runtime_owned_state_lease(const runtime_v2_stat
     for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
         const lease_t *lease = &state->leases[index];
 
-        if (!lease->active || lease->owner_token_id != owner_token_id) {
-            continue;
-        }
-
-        if (lease->kind == LEASE_KIND_HELD_ACTION || lease->kind == LEASE_KIND_REPEAT) {
+        if (lease->active && lease->owner_token_id == owner_token_id && lease->kind == kind) {
             return true;
         }
     }
 
     return false;
+}
+
+static bool runtime_v2_owner_has_runtime_owned_state_lease(const runtime_v2_state_t *state, uint16_t owner_token_id) {
+    return runtime_v2_owner_has_lease_kind(state, owner_token_id, LEASE_KIND_HELD_ACTION) || runtime_v2_owner_has_lease_kind(state, owner_token_id, LEASE_KIND_REPEAT);
 }
 
 static bool runtime_v2_release_runtime_owned_state_leases_for_key(runtime_v2_state_t *state, keypos_t key_pos) {
@@ -1114,11 +1184,22 @@ static void runtime_v2_refresh_for_time(runtime_v2_state_t *state, uint16_t now)
     }
 }
 
+static void runtime_v2_refresh_slot_phases_for_scan(runtime_v2_state_t *state, uint16_t now) {
+    if (!state) {
+        return;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+        runtime_v2_press_token_refresh_slot_phase_for_scan(state, &state->press_tokens[index], now);
+    }
+}
+
 static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtime_key_event_t *event, uint16_t now) {
     press_token_t             *token;
     tap_series_t              *series;
     handled_key_resolution_t   resolution;
     handled_key_materialized_t materialized;
+    key_runtime_slot_interaction_t interaction = key_runtime_slot_interaction_default();
     handled_key_resolution_ctx_t ctx;
     uint16_t                   hold_term_ms;
     uint16_t                   longer_hold_term_ms;
@@ -1126,6 +1207,7 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
     bool                       handled   = false;
     bool                       tap_outcome_available = false;
     bool                       pd_mode_was_locked_on_press = false;
+    key_runtime_slot_phase_t   slot_phase = KEY_RUNTIME_SLOT_PHASE_IDLE;
 
     if (!(state && event)) {
         return;
@@ -1155,10 +1237,12 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
     if (handled) {
         ctx                      = handled_key_resolution_ctx_make(event->key_pos, runtime_v2_resolution_layers(state));
         materialized             = handled_key_materialize(resolution, ctx);
+        interaction              = key_runtime_slot_interaction_from_materialized(materialized);
         hold_term_ms             = handled_key_resolution_tap_hold_term(resolution);
         longer_hold_term_ms      = handled_key_resolution_longer_hold_term(resolution);
         tap_outcome_available    = handled_key_resolution_has_multi_tap(resolution) || materialized.tap_action != KC_NO;
         pd_mode_was_locked_on_press = materialized.pd_mode != 0 && state->shadow_projection.pd_mode_local_locked == materialized.pd_mode;
+        slot_phase               = hold_registers_on_press(materialized.hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
     }
 
     for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
@@ -1189,6 +1273,8 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
         .handled_key              = handled,
         .tap_outcome_available    = tap_outcome_available,
         .pd_mode_was_locked_on_press = pd_mode_was_locked_on_press,
+        .interaction               = interaction,
+        .slot_phase                = slot_phase,
     };
     state->press_token_count++;
     runtime_v2_press_token_attach_press_leases(state, token);
@@ -1344,6 +1430,9 @@ void runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time) {
             runtime_v2_refresh_for_time(state, (uint16_t)(event_time + event->data.timer_advance.advance_ms));
             return;
         case RUNTIME_EVENT_KIND_SCAN:
+            runtime_v2_refresh_for_time(state, event_time);
+            runtime_v2_refresh_slot_phases_for_scan(state, event_time);
+            return;
         case RUNTIME_EVENT_KIND_POINTER_REPORT:
         case RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT:
             runtime_v2_refresh_for_time(state, event_time);
@@ -1435,6 +1524,26 @@ void runtime_v2_observe_held_action_register(keypos_t key_pos, uint16_t action) 
 
     token = runtime_v2_press_token_state(state, key_pos);
     (void)runtime_v2_held_action_lease_activate(state, token ? token->token_id : 0u, key_pos, action);
+
+    if (!(token && token->handled_key)) {
+        return;
+    }
+
+    if (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW) {
+        if (key_runtime_slot_interaction_uses_fallback_hold(token->interaction)) {
+            runtime_v2_press_token_commit_hold_phase(token, true);
+            return;
+        }
+
+        if (runtime_v2_elapsed(token->pressed_at, state->current_time) >= token->interaction.binding.tap_hold_term) {
+            runtime_v2_press_token_commit_hold_phase(token, !token->interaction.binding.long_hold.present);
+            return;
+        }
+    }
+
+    if (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE) {
+        runtime_v2_press_token_commit_hold_phase(token, true);
+    }
 }
 
 void runtime_v2_observe_held_action_unregister(keypos_t key_pos, uint16_t action) {
@@ -1466,6 +1575,19 @@ void runtime_v2_observe_repeat_start(keypos_t key_pos, uint16_t action, uint16_t
 
     token = runtime_v2_press_token_state(state, key_pos);
     (void)runtime_v2_repeat_lease_activate(state, token ? token->token_id : 0u, key_pos, action, repeat_hz);
+
+    if (!(token && token->handled_key)) {
+        return;
+    }
+
+    if (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW) {
+        runtime_v2_press_token_commit_hold_phase(token, !token->interaction.binding.long_hold.present);
+        return;
+    }
+
+    if (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE) {
+        runtime_v2_press_token_commit_hold_phase(token, true);
+    }
 }
 
 bool runtime_v2_release_owned_state_by_key(keypos_t key_pos) {
@@ -1476,6 +1598,55 @@ bool runtime_v2_release_owned_state_by_key(keypos_t key_pos) {
     }
 
     return runtime_v2_release_runtime_owned_state_leases_for_key(state, key_pos);
+}
+
+bool runtime_v2_resolve_active_release(keypos_t key_pos, runtime_v2_active_release_resolution_t *out) {
+    runtime_v2_state_t                    *state = runtime_v2_state();
+    press_token_t                         *token;
+    key_runtime_slot_release_semantics_t   semantics;
+    key_runtime_slot_release_query_t       query;
+    uint16_t                               elapsed;
+
+    if (out) {
+        *out = (runtime_v2_active_release_resolution_t){0};
+    }
+
+    if (!(state && out && runtime_v2_blocker_queries_authoritative() && runtime_v2_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    token = runtime_v2_press_token_state(state, key_pos);
+    if (!(token && token->handled_key && !token->active && token->observed_release_keycode != KC_NO)) {
+        return false;
+    }
+
+    elapsed   = runtime_v2_elapsed(token->pressed_at, token->released_at);
+    semantics = key_runtime_slot_release_semantics_for_phase(token->slot_phase);
+    query     = (key_runtime_slot_release_query_t){
+        .interaction                     = token->interaction,
+        .semantics                       = semantics,
+        .elapsed                         = elapsed,
+        .held_action_active              = runtime_v2_owner_has_lease_kind(state, token->token_id, LEASE_KIND_HELD_ACTION),
+        .repeat_active                   = runtime_v2_owner_has_lease_kind(state, token->token_id, LEASE_KIND_REPEAT),
+        .other_press_interrupted         = token->other_press_interrupted,
+        .momentary_layer_tap_interrupted = token->momentary_layer_tap_interrupted,
+        .pd_mode_was_locked_on_press     = token->pd_mode_was_locked_on_press,
+    };
+
+    *out = (runtime_v2_active_release_resolution_t){
+        .interaction                     = token->interaction,
+        .phase                           = token->slot_phase,
+        .elapsed                         = elapsed,
+        .held_action_active              = query.held_action_active,
+        .repeat_active                   = query.repeat_active,
+        .momentary_layer_tap_interrupted = token->momentary_layer_tap_interrupted,
+        .quick_tap                       = key_runtime_slot_release_query_quick_tap(&query),
+        .quick_immediate_hold            = key_runtime_slot_release_query_quick_immediate_hold(&query),
+        .buffered_base_tap               = key_runtime_slot_release_query_buffered_base_tap(&query),
+        .lock_tap_mode                   = key_runtime_slot_release_query_lock_tap_mode(&query),
+        .decision                        = key_runtime_slot_release_decide(&query),
+    };
+    return true;
 }
 
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos) {

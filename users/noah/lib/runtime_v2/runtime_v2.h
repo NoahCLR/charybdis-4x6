@@ -16,6 +16,7 @@
 #include <stdint.h>
 
 #include "../key/interaction/handled_key.h"
+#include "../key/runtime/key_runtime_interaction.h"
 #include "../pointing/defs/pd_mode_flags.h"
 #include "../state/runtime/keyboard_mod_state.h"
 
@@ -94,6 +95,8 @@ typedef struct {
     bool                resolved_from_transparent;
     bool                pending_release_emission;
     bool                release_keycode_mismatched;
+    key_runtime_slot_interaction_t interaction;
+    key_runtime_slot_phase_t       slot_phase;
 } press_token_t;
 
 typedef struct {

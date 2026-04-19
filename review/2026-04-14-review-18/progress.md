@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Active Release Settlement Pass
+
+- Moved the active-slot release decision onto reducer-owned press-token state while keeping pending multi-tap release settlement on the legacy shared resolver for this pass.
+- `users/noah/lib/runtime_v2/runtime_v2.h` now stores the immutable press-resolved `key_runtime_slot_interaction_t` on each press token, plus a reducer-owned `slot_phase` that tracks release semantics separately from the generic token lifecycle phase.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now:
+  - updates reducer-owned release phase only from scan/effect progression instead of reinterpreting phase on key-up,
+  - keeps held-action/repeat leases alive across physical key-up until `RELEASE_OWNED_STATE_BY_KEY` unwinds them,
+  - exposes `runtime_v2_resolve_active_release(...)` through `runtime_v2_release_internal.h`, and
+  - resolves active release outcome from the immutable token interaction snapshot plus reducer-owned held/repeat leases.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c` now uses that v2 release-resolution path when the normalized runtime-v2 stream is authoritative, and falls back to the legacy slot-owned resolver otherwise.
+- This production cut keeps the old effect mapping and pending multi-tap reducer in place, but active release settlement for the default hook path no longer depends on mutable live slot interaction being re-derived at release time.
+- `tests/host/runtime_debug_test.c` now proves:
+  - release-time phase does not advance merely because key-up arrives after `tap_hold_term`, and
+  - scan-time threshold promotion changes active-release outcome in the reducer the same way the legacy slot scan path does.
+
 ## 2026-04-19 Runtime V2 Owned-State Lease Observation Pass
 
 - Moved held-action and held-repeat ownership into reducer-observed lease state so the remaining release/unwind path is no longer guessing about owned runtime state.
@@ -604,5 +619,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Move release settlement planning itself onto runtime-v2 press-token state so tap vs hold vs long-hold vs pd-lock outcome selection no longer depends on the legacy slot release resolver.
+3. Move pending multi-tap release settlement onto the same runtime-v2 press-token/tap-series planner so both release callers share one authority.
 4. Fold the remaining release/deferred-emission effect planning and slot retirement paths into the lease/reducer model before any production hook cutover.
