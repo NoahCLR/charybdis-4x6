@@ -750,6 +750,41 @@ The remaining mixed architecture is now concentrated in one real production seam
 
 Compatibility wrappers still exist, but they are no longer the default runtime authority. That is the first point in this thread where the default handled-key event flow is mostly reducer/direct-plan driven end to end, with deferred release orchestration standing out as the main remaining legacy owner.
 
+## 2026-04-20 Runtime V2 Deferred Release Queue Ownership Note
+
+The last remaining production deferred-release orchestration seam has now crossed into the authoritative reducer path too:
+
+- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now expose:
+  - `runtime_v2_queue_pending_release_dispatch(...)`, which appends one pending release directly into reducer-owned state, and
+  - `runtime_v2_pending_release_at_order(...)`, which exposes reducer-owned pending releases in sequence order for debug/readback without draining them.
+- `users/noah/lib/key/runtime/key_runtime_release.c` now uses that queue API in `key_runtime_release_plan_defer_dispatch_actions(...)` whenever runtime-v2 has authoritative normalized input, so handled-release tap actions that must defer are removed from the live transition plan and queued directly into reducer-owned pending-release state.
+- The same file now drains deferred releases directly from runtime-v2 whenever the authoritative path is live:
+  - `runtime_v2_take_pending_release_dispatches(...)` is now the source of truth for drain ordering and cleanup,
+  - the legacy shared deferred-release queue is fallback-only for non-authoritative or narrowed surfaces, and
+  - the old queue-count equality guard is gone because the authoritative path no longer depends on mirroring legacy queue state.
+- `users/noah/lib/key/runtime/key_runtime_debug.c` now reads deferred-release count, key position, and action from reducer-owned pending-release state whenever the authoritative path is live, preserving the public debug/readback contract while the legacy queue stops being the default source of truth.
+- `tests/host/runtime_debug_test.c` now adds dedicated coverage proving the public debug surface follows the reducer-owned pending-release queue in sequence order, while the runtime-debug, release-matrix, transition, scenario, modifier-hold integration, pd-mode key-runtime integration, real-profile overlap, key-runtime harness, feature-gate compile, and full host suites all stayed green after the cut.
+
+Inference from the current tree: the default production handled-key flow no longer depends on the legacy slot-result/deferred-queue transport for:
+
+- handled press,
+- authoritative handled release,
+- active scan,
+- pending multi-tap scan,
+- pending multi-tap flush,
+- foreign pending multi-tap flush,
+- active-key flush,
+- active-key interrupt, and
+- deferred-release queue assembly/drain.
+
+The remaining mixed architecture is now compatibility-shaped rather than production-shaped:
+
+- `key_runtime_slot_step(...)` and slot-result reducers still exist for focused slot/unit callers and compatibility fallback,
+- the legacy shared deferred-release queue still exists as fallback storage for non-authoritative surfaces, and
+- low-level fallback paths still exist where runtime-v2 is intentionally not linked or not authoritative.
+
+That is a materially different state than when this thread started. The default firmware path now runs through reducer-owned meaning, planning, projection, transport, and deferred-release ownership. The remaining legacy code is now mostly fallback and deletion work, not live authority on the default runtime path.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

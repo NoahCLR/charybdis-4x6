@@ -4,6 +4,7 @@
 
 #include "../../state/runtime/runtime_debug.h"
 
+#include "../../runtime_v2/runtime_v2.h"
 #include "key_runtime_index_internal.h"
 #include "key_runtime_internal.h"
 
@@ -103,10 +104,25 @@ bool noah_runtime_debug_pending_multi_tap_slot_key_pos(uint8_t order, keypos_t *
 }
 
 uint8_t noah_runtime_debug_deferred_release_count(void) {
+    if (runtime_v2_blocker_queries_authoritative()) {
+        return runtime_v2_pending_release_count();
+    }
+
     return key_runtime_shared_state()->deferred_release_dispatch.count;
 }
 
 bool noah_runtime_debug_deferred_release_key_pos(uint8_t order, keypos_t *out) {
+    if (runtime_v2_blocker_queries_authoritative()) {
+        pending_release_t pending;
+
+        if (!(out && runtime_v2_pending_release_at_order(order, &pending))) {
+            return false;
+        }
+
+        *out = pending.key_pos;
+        return true;
+    }
+
     key_runtime_deferred_release_dispatch_queue_t *queue = &key_runtime_shared_state()->deferred_release_dispatch;
 
     if (!(out && order < queue->count)) {
@@ -118,6 +134,12 @@ bool noah_runtime_debug_deferred_release_key_pos(uint8_t order, keypos_t *out) {
 }
 
 uint16_t noah_runtime_debug_deferred_release_action(uint8_t order) {
+    if (runtime_v2_blocker_queries_authoritative()) {
+        pending_release_t pending;
+
+        return runtime_v2_pending_release_at_order(order, &pending) ? pending.action : KC_NO;
+    }
+
     key_runtime_deferred_release_dispatch_queue_t *queue = &key_runtime_shared_state()->deferred_release_dispatch;
 
     if (order >= queue->count) {

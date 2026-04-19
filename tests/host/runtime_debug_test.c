@@ -1690,6 +1690,45 @@ static void test_runtime_v2_take_pending_releases_preserves_order_and_clears_tok
     CHECK(snapshot.v2_pending_release_count == 0u);
 }
 
+static void test_runtime_debug_deferred_release_view_follows_runtime_v2_queue(void) {
+    pending_release_t    pending;
+    keypos_t             first_key   = test_keypos(5, 2);
+    keypos_t             second_key  = test_keypos(5, 3);
+    keypos_t             debug_key_pos;
+    keyboard_mod_state_t first_mods  = {.real = MOD_LALT};
+    keyboard_mod_state_t second_mods = {.weak = MOD_BIT(KC_LEFT_SHIFT)};
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, first_key, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, first_key, fake_time);
+
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_V, second_key, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_V, second_key, fake_time);
+
+    CHECK(runtime_v2_queue_pending_release_dispatch(first_key, TEST_ACTION, first_mods));
+    CHECK(runtime_v2_queue_pending_release_dispatch(second_key, TEST_SECOND_ACTION, second_mods));
+
+    CHECK(noah_runtime_debug_deferred_release_count() == 2u);
+    CHECK(noah_runtime_debug_deferred_release_key_pos(0u, &debug_key_pos));
+    CHECK(debug_key_pos.row == first_key.row);
+    CHECK(debug_key_pos.col == first_key.col);
+    CHECK(noah_runtime_debug_deferred_release_action(0u) == TEST_ACTION);
+    CHECK(noah_runtime_debug_deferred_release_key_pos(1u, &debug_key_pos));
+    CHECK(debug_key_pos.row == second_key.row);
+    CHECK(debug_key_pos.col == second_key.col);
+    CHECK(noah_runtime_debug_deferred_release_action(1u) == TEST_SECOND_ACTION);
+
+    CHECK(runtime_v2_pending_release_at_order(0u, &pending));
+    CHECK(pending.action == TEST_ACTION);
+    CHECK(runtime_v2_pending_release_at_order(1u, &pending));
+    CHECK(pending.action == TEST_SECOND_ACTION);
+}
+
 static void test_runtime_v2_runtime_owned_state_leases_track_and_clear(void) {
     projection_snapshot_t snapshot;
     keypos_t              key_pos = test_keypos(5, 0);
@@ -1829,6 +1868,7 @@ int main(void) {
     test_runtime_v2_other_press_interrupt_clears_momentary_layer_quick_tap_blocker();
     test_runtime_v2_pending_release_state_survives_same_key_reuse();
     test_runtime_v2_take_pending_releases_preserves_order_and_clears_tokens();
+    test_runtime_debug_deferred_release_view_follows_runtime_v2_queue();
     test_runtime_v2_runtime_owned_state_leases_track_and_clear();
     test_runtime_v2_transition_execute_plan_updates_owned_state_leases();
     test_runtime_v2_projector_executes_effects_and_pending_dispatches();

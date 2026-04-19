@@ -46,6 +46,21 @@ uint8_t runtime_v2_pending_release_count(void) {
     return 0u;
 }
 
+bool runtime_v2_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
+    (void)key_pos;
+    (void)action;
+    (void)mods;
+    return false;
+}
+
+bool runtime_v2_pending_release_at_order(uint8_t order, pending_release_t *out) {
+    (void)order;
+    if (out) {
+        *out = (pending_release_t){0};
+    }
+    return false;
+}
+
 uint8_t runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity) {
     (void)out;
     (void)capacity;

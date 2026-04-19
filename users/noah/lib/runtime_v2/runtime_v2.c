@@ -291,6 +291,42 @@ static int16_t runtime_v2_oldest_pending_release_index(const runtime_v2_state_t 
     return selected;
 }
 
+static int16_t runtime_v2_pending_release_index_for_order(const runtime_v2_state_t *state, uint8_t order) {
+    uint16_t previous_sequence = 0u;
+
+    if (!state) {
+        return -1;
+    }
+
+    for (uint8_t current_order = 0u; current_order <= order; current_order++) {
+        int16_t  selected = -1;
+        uint16_t sequence = 0u;
+
+        for (uint16_t index = 0; index < RUNTIME_V2_PENDING_RELEASE_CAPACITY; index++) {
+            const pending_release_t *pending = &state->pending_releases[index];
+
+            if (!(pending->active && pending->sequence > previous_sequence) || (selected >= 0 && pending->sequence >= sequence)) {
+                continue;
+            }
+
+            selected = (int16_t)index;
+            sequence = pending->sequence;
+        }
+
+        if (selected < 0) {
+            return -1;
+        }
+
+        if (current_order == order) {
+            return selected;
+        }
+
+        previous_sequence = sequence;
+    }
+
+    return -1;
+}
+
 static uint8_t runtime_v2_pending_release_count_for_owner_token(const runtime_v2_state_t *state, uint16_t owner_token_id) {
     uint8_t count = 0;
 
@@ -1746,6 +1782,54 @@ uint8_t runtime_v2_pending_release_count(void) {
     return state ? state->pending_release_count : 0u;
 }
 
+bool runtime_v2_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    press_token_t      *token;
+    pending_release_t  *pending;
+
+    if (!(state && action != KC_NO && runtime_v2_keypos_valid(key_pos) && runtime_v2_blocker_queries_authoritative())) {
+        return false;
+    }
+
+    pending = runtime_v2_allocate_pending_release(state);
+    if (!pending) {
+        return false;
+    }
+
+    token = runtime_v2_press_token_state(state, key_pos);
+    *pending = (pending_release_t){
+        .active         = true,
+        .owner_token_id = token ? token->token_id : 0u,
+        .sequence       = state->next_pending_release_sequence++,
+        .key_pos        = key_pos,
+        .action         = action,
+        .mods           = mods,
+    };
+    runtime_v2_pending_release_mark_token(state, pending->owner_token_id);
+    return true;
+}
+
+bool runtime_v2_pending_release_at_order(uint8_t order, pending_release_t *out) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    int16_t             index;
+
+    if (out) {
+        *out = (pending_release_t){0};
+    }
+
+    if (!(state && out && order < state->pending_release_count)) {
+        return false;
+    }
+
+    index = runtime_v2_pending_release_index_for_order(state, order);
+    if (index < 0) {
+        return false;
+    }
+
+    *out = state->pending_releases[index];
+    return true;
+}
+
 bool runtime_v2_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *action, uint8_t *repeat_count) {
     runtime_v2_state_t *state = runtime_v2_state();
     tap_series_t       *series;
@@ -2310,29 +2394,7 @@ void runtime_v2_pd_mode_lock_set(pd_mode_mask_t mode, bool active) {
 }
 
 void runtime_v2_observe_release_dispatch_deferred(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
-    runtime_v2_state_t *state = runtime_v2_state();
-    press_token_t      *token;
-    pending_release_t  *pending;
-
-    if (!(state && action != KC_NO && runtime_v2_keypos_valid(key_pos))) {
-        return;
-    }
-
-    pending = runtime_v2_allocate_pending_release(state);
-    if (!pending) {
-        return;
-    }
-
-    token = runtime_v2_press_token_state(state, key_pos);
-    *pending = (pending_release_t){
-        .active         = true,
-        .owner_token_id = token ? token->token_id : 0u,
-        .sequence       = state->next_pending_release_sequence++,
-        .key_pos        = key_pos,
-        .action         = action,
-        .mods           = mods,
-    };
-    runtime_v2_pending_release_mark_token(state, pending->owner_token_id);
+    (void)runtime_v2_queue_pending_release_dispatch(key_pos, action, mods);
 }
 
 void runtime_v2_observe_release_dispatch_drained(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {

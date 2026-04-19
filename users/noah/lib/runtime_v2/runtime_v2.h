@@ -281,6 +281,8 @@ bool                 runtime_v2_blocker_queries_authoritative(void);
 bool                 runtime_v2_has_any_deferred_release_blocker(void);
 bool                 runtime_v2_has_foreign_deferred_release_blocker_except(keypos_t key_pos);
 uint8_t              runtime_v2_pending_release_count(void);
+bool                 runtime_v2_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
+bool                 runtime_v2_pending_release_at_order(uint8_t order, pending_release_t *out);
 uint8_t              runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity);
 bool                 runtime_v2_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *action, uint8_t *repeat_count);
 bool                 runtime_v2_reset_pending_multi_tap(keypos_t key_pos);

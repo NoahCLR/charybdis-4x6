@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-04-20 Runtime V2 Deferred Release Queue Ownership Pass
+
+- Moved the remaining production deferred-release orchestration seam onto the authoritative reducer path:
+  - deferred dispatch assembly on handled release now queues directly into `runtime_v2` when the normalized input stream is authoritative, and
+  - deferred dispatch drain now drains directly from `runtime_v2` instead of using the legacy shared queue as the source of truth.
+- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now expose:
+  - `runtime_v2_queue_pending_release_dispatch(...)`, which appends one pending release directly into reducer-owned state, and
+  - `runtime_v2_pending_release_at_order(...)`, which exposes reducer-owned pending releases in sequence order for debug/readback without draining them.
+- `users/noah/lib/key/runtime/key_runtime_release.c` now uses that new queue API in `key_runtime_release_plan_defer_dispatch_actions(...)` when runtime-v2 is authoritative:
+  - handled-release tap actions that must defer are removed from the live transition plan and queued directly into reducer-owned pending-release state,
+  - the legacy shared deferred-release queue is now fallback-only for non-authoritative surfaces, and
+  - `key_runtime_release_drain_deferred_dispatches()` now drains from runtime-v2 directly whenever the authoritative reducer path is live.
+- `users/noah/lib/key/runtime/key_runtime_debug.c` now reports deferred-release count, key position, and action from reducer-owned pending-release state whenever the authoritative runtime-v2 path is live, preserving the public debug contract while the legacy queue stops being the default source of truth.
+- `tests/host/runtime_debug_test.c` now includes dedicated coverage proving:
+  - reducer-owned deferred releases are visible through the public debug surface in sequence order, and
+  - the reducer-owned queue APIs expose the same pending release ordering that the drain path consumes.
+
 ## 2026-04-20 Runtime V2 Press Transport Pass
 
 - Moved handled press off `key_runtime_slot_result_t` on the default transition path: handled presses now append a direct reducer-owned effect plan into `key_runtime_transition_plan_t` instead of routing through `key_runtime_slot_step(...)` and result wrapping first.

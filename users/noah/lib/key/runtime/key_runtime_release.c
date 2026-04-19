@@ -33,7 +33,8 @@ __attribute__((weak)) void runtime_v2_project_pending_release_dispatch(const pen
 
 static void key_runtime_release_plan_defer_dispatch_actions(key_runtime_transition_plan_t *plan, keypos_t key_pos, keyboard_mod_state_t mods) {
     key_runtime_deferred_release_dispatch_queue_t *queue = &key_runtime_shared_state()->deferred_release_dispatch;
-    uint8_t write_index = 0;
+    bool                                         authoritative = runtime_v2_blocker_queries_authoritative();
+    uint8_t                                      write_index   = 0;
 
     if (!plan) {
         return;
@@ -42,14 +43,20 @@ static void key_runtime_release_plan_defer_dispatch_actions(key_runtime_transiti
     for (uint8_t read_index = 0; read_index < plan->count; read_index++) {
         const key_runtime_effect_t effect = plan->items[read_index];
 
-        if (effect.kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION && queue->count < ARRAY_SIZE(queue->items)) {
-            queue->items[queue->count++] = (key_runtime_deferred_release_dispatch_t){
-                .key_pos = key_pos,
-                .action = effect.data.action,
-                .mods   = mods,
-            };
-            runtime_v2_observe_release_dispatch_deferred(key_pos, effect.data.action, mods);
-            continue;
+        if (effect.kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION) {
+            if (authoritative) {
+                if (runtime_v2_queue_pending_release_dispatch(key_pos, effect.data.action, mods)) {
+                    continue;
+                }
+            } else if (queue->count < ARRAY_SIZE(queue->items)) {
+                queue->items[queue->count++] = (key_runtime_deferred_release_dispatch_t){
+                    .key_pos = key_pos,
+                    .action  = effect.data.action,
+                    .mods    = mods,
+                };
+                runtime_v2_observe_release_dispatch_deferred(key_pos, effect.data.action, mods);
+                continue;
+            }
         }
 
         plan->items[write_index++] = effect;
@@ -78,12 +85,9 @@ bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *reco
 void key_runtime_release_drain_deferred_dispatches(void) {
     key_runtime_deferred_release_dispatch_queue_t *queue = &key_runtime_shared_state()->deferred_release_dispatch;
     pending_release_t                              pending[RUNTIME_V2_PENDING_RELEASE_CAPACITY];
+    bool                                           authoritative = runtime_v2_blocker_queries_authoritative();
 
-    if (queue->count == 0) {
-        return;
-    }
-
-    if (runtime_v2_blocker_queries_authoritative() && runtime_v2_pending_release_count() == queue->count) {
+    if (authoritative) {
         uint8_t drained = runtime_v2_take_pending_release_dispatches(pending, ARRAY_SIZE(pending));
 
         if (drained == 0u) {
@@ -94,7 +98,10 @@ void key_runtime_release_drain_deferred_dispatches(void) {
             runtime_v2_project_pending_release_dispatch(&pending[index]);
         }
 
-        queue->count = 0;
+        return;
+    }
+
+    if (queue->count == 0) {
         return;
     }
 
