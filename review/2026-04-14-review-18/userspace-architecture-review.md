@@ -670,6 +670,43 @@ The remaining mixed transport is now narrower:
 
 That is the right shape for the next passes. The remaining work is now concentrated in press/scan/orchestration seams rather than spread across every event type.
 
+## 2026-04-20 Runtime V2 Scan Transport Note
+
+The next scan-time transport seam has now crossed into the direct-plan path too:
+
+- Added `users/noah/lib/key/runtime/slot/key_runtime_slot_direct_plan.h` as the narrow transport surface for migrated slot reducers that should:
+  - mutate live slot state, and
+  - return emitted `key_runtime_effect_t` items directly
+  without round-tripping through `key_runtime_slot_result_t`.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_scan_reduce.h` and `.c` now expose `key_runtime_slot_take_active_scan_plan(...)`, which keeps the existing active-slot scan mutation intact while returning emitted threshold/long-hold/fallback-hold effects directly.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.h` and `.c` now expose `key_runtime_slot_take_pending_multi_tap_scan_plan(...)`, which does the same for pending multi-tap scan settlement:
+  - pending-hold threshold promotion,
+  - pending long-hold promotion, and
+  - expired-chain delayed-action flush.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses those direct-plan helpers in `key_runtime_transition_scan(...)` instead of calling through slot-step/result transport on the default path.
+- The cut stays intentionally narrow:
+  - state mutation is unchanged,
+  - legacy slot-result reducers still exist as compatibility wrappers,
+  - but normal active scan and pending multi-tap scan no longer depend on `key_runtime_slot_result_t` as a transport envelope.
+- `tests/host/key_runtime_transition_test.c` now includes a dedicated mixed-scan regression proving one scan tick can merge an active-slot threshold effect plus an independent pending-chain expiry flush into one transition plan, and the transition, runtime-debug, release matrix, slot, scenario, real-profile overlap, modifier-hold integration, pd-mode key-runtime integration, key-runtime harness, feature-gate compile, and full host suites all stayed green after the move.
+
+Inference from the current tree: the old slot-result transport is no longer on the default hot path for:
+
+- authoritative handled release,
+- pending multi-tap flush,
+- foreign pending multi-tap flush,
+- active-key flush,
+- active-key interrupt,
+- active scan, and
+- pending multi-tap scan.
+
+The remaining mixed transport is narrower again:
+
+- handled press still uses slot-step/result transport, and
+- deferred-release queue assembly/drain orchestration still lives in the legacy release/transition layer.
+
+That is now a much more realistic endgame. The remaining work is no longer “most of the runtime”; it is the last press/orchestration seams plus deletion of the compatibility wrappers once the default path no longer depends on them.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

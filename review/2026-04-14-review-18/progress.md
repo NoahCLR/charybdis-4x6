@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-04-20 Runtime V2 Scan Transport Pass
+
+- Moved the next hot-path transport seam off `key_runtime_slot_result_t`: active scan and pending multi-tap scan now emit direct effect plans into `key_runtime_transition_plan_t` instead of round-tripping through slot-step/result wrappers first.
+- Added `users/noah/lib/key/runtime/slot/key_runtime_slot_direct_plan.h` as the narrow direct-plan surface for migrated slot reducers:
+  - reducers can now mutate live slot state and emit direct `key_runtime_effect_t` items without serializing through `key_runtime_slot_result_t`,
+  - the helper intentionally mirrors the small builder-to-effect translation already used in the transition layer instead of widening the old slot-result dependency further.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_scan_reduce.h` and `.c` now expose `key_runtime_slot_take_active_scan_plan(...)`, which:
+  - performs the same active-slot threshold/long-hold/fallback-hold state mutation as before, and
+  - returns the emitted scan effects directly as a `key_runtime_slot_direct_plan_t`.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.h` and `.c` now expose `key_runtime_slot_take_pending_multi_tap_scan_plan(...)`, which does the same for:
+  - reducer-owned pending-hold promotion,
+  - long-hold promotion, and
+  - expired pending-chain flush.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses those direct scan helpers in `key_runtime_transition_scan(...)`:
+  - active slots append their direct scan effects straight into the transition plan,
+  - active slots with live pending multi-tap state append that second direct scan plan immediately after the active scan plan, and
+  - independent pending-only slots append their pending multi-tap scan plan directly as well.
+- This keeps the cut narrow:
+  - scan-time state mutation is unchanged,
+  - the legacy slot-result reducers still exist as compatibility wrappers,
+  - but the normal transition scan path no longer depends on `key_runtime_slot_result_t` transport for active or pending multi-tap scan.
+- `tests/host/key_runtime_transition_test.c` now includes a dedicated mixed-scan regression proving one scan tick can merge:
+  - an active-slot threshold effect, and
+  - an independent pending multi-tap expired-chain flush
+  into one transition plan in order.
+
 ## 2026-04-20 Runtime V2 Flush And Interrupt Transport Pass
 
 - Moved the next non-release transport seams off `key_runtime_slot_result_t`: pending-chain flush and active-key interrupt/flush no longer round-trip through slot-step result wrappers before effects reach the transition plan.

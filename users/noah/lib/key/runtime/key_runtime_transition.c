@@ -15,6 +15,7 @@
 #include "key_runtime_index_internal.h"
 #include "slot/key_runtime_slot_pending_multi_tap.h"
 #include "slot/key_runtime_slot_release_active.h"
+#include "slot/key_runtime_slot_scan_reduce.h"
 #include "slot/key_runtime_slot_step.h"
 #include "slot/key_runtime_slot_policy.h"
 #include "slot/key_runtime_slot_result_internal.h"
@@ -248,6 +249,16 @@ static void key_runtime_transition_append_release_effect_plan(const runtime_v2_r
     }
 }
 
+static void key_runtime_transition_append_direct_plan(const key_runtime_slot_direct_plan_t *direct_plan, key_runtime_transition_plan_t *plan) {
+    if (!(direct_plan && plan)) {
+        return;
+    }
+
+    for (uint8_t index = 0; index < direct_plan->count; index++) {
+        key_runtime_transition_plan_push(plan, direct_plan->items[index]);
+    }
+}
+
 static void key_runtime_transition_append_unmatched_release_effects(keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
     handled_key_materialized_t materialized = handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
 
@@ -452,14 +463,18 @@ void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
 
     for (uint8_t index = 0; index < active_count; index++) {
         active_key_state_t *slot = active_slots[index];
+        key_runtime_slot_direct_plan_t direct_plan;
 
-        key_runtime_transition_apply_slot_step(slot, (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_ACTIVE_SCAN}, plan);
+        direct_plan = key_runtime_slot_take_active_scan_plan(slot);
+        key_runtime_transition_append_direct_plan(&direct_plan, plan);
         if (key_runtime_slot_has_pending_multi_tap(slot)) {
-            key_runtime_transition_apply_slot_step(slot, (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN}, plan);
+            direct_plan = key_runtime_slot_take_pending_multi_tap_scan_plan(slot);
+            key_runtime_transition_append_direct_plan(&direct_plan, plan);
         }
     }
 
     for (uint8_t index = 0; index < pending_count; index++) {
-        key_runtime_transition_apply_slot_step(pending_slots[index], (key_runtime_slot_event_t){.kind = KEY_RUNTIME_SLOT_EVENT_PENDING_MULTI_TAP_SCAN}, plan);
+        key_runtime_slot_direct_plan_t direct_plan = key_runtime_slot_take_pending_multi_tap_scan_plan(pending_slots[index]);
+        key_runtime_transition_append_direct_plan(&direct_plan, plan);
     }
 }

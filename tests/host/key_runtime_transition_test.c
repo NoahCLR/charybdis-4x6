@@ -1884,6 +1884,47 @@ static void test_scan_flushes_expired_pending_multi_tap_chain(void) {
     CHECK(multi_tap.count == 0);
 }
 
+static void test_scan_merges_active_and_pending_slot_effects(void) {
+    key_runtime_transition_plan_t plan;
+    active_key_state_t           *pending_slot = key_runtime_slot_for_position(test_keypos(6, 5));
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(test_keypos(6, 3));
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .timer         = (uint16_t)(fake_time - 170),
+                                                   .owner.keycode = TEST_NEW_KEY,
+                                                   .owner.key_pos = test_keypos(6, 3),
+                                                   .interaction   = test_cached_interaction(KC_NO, HOLD_LIT(REPEAT_WHILE_HELD(TEST_THRESHOLD_HOLD, 25)), hold_behavior_none(), 120, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
+    test_stage_slot_state(pending_slot, (active_key_state_t){
+                                            .pending_multi_tap =
+                                                {
+                                                    .keycode        = TEST_MULTI_TAP_KEY,
+                                                    .key_pos        = test_keypos(6, 5),
+                                                    .timer          = (uint16_t)(fake_time - 200),
+                                                    .count          = 2,
+                                                    .single_action  = TEST_FALLBACK_TAP_ACTION,
+                                                    .multi_tap_term = 150,
+                                                },
+                                        });
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_scan(&plan);
+
+    CHECK(plan.count == 3);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_REPEAT_START);
+    CHECK(plan.items[0].data.repeat.key_pos.row == test_keypos(6, 3).row);
+    CHECK(plan.items[0].data.repeat.key_pos.col == test_keypos(6, 3).col);
+    CHECK(plan.items[0].data.repeat.action == TEST_THRESHOLD_HOLD);
+    CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(plan.items[2].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(plan.items[2].data.delayed_action.action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(plan.items[2].data.delayed_action.repeat_count == 2);
+    CHECK(test_default_slot()->lifecycle.repeat_binding_active);
+    CHECK(key_runtime_slot_hold_is_complete(test_default_slot()));
+    CHECK(pending_slot->pending_multi_tap.keycode == KC_NO);
+}
+
 static void test_scan_starts_repeat_hold_at_threshold(void) {
     key_runtime_transition_plan_t plan;
 
@@ -2184,6 +2225,7 @@ int main(void) {
     test_scan_promotes_pending_multi_tap_momentary_hold_without_feedback_pulse();
     test_scan_promotes_pending_multi_tap_momentary_long_hold_without_feedback_pulse();
     test_scan_flushes_expired_pending_multi_tap_chain();
+    test_scan_merges_active_and_pending_slot_effects();
     test_scan_starts_repeat_hold_at_threshold();
     test_scan_commits_immediate_hold_threshold_with_feedback();
     test_scan_commits_implicit_hold_without_feedback();
