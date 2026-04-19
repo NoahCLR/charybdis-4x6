@@ -294,3 +294,17 @@ The next runtime-v2 pass is now landed as shadow behavior, still without product
 - That new white-box coverage immediately found one real shadow-runtime bug: pending-hold tap series were expiring on elapsed tap time even while the matching second press was still active. `users/noah/lib/runtime_v2/runtime_v2.c` now keeps a pending-hold series alive until the owning press resolves, which is exactly the kind of state isolation the redesign needs.
 
 Inference from the current tree: the right migration shape is still the reducer/lease model, but the validation strategy also matters. The shadow runtime is now strong enough to catch architectural leaks inside the replacement core before any production cutover. That is progress, but it still does **not** close the authored-key wedge or the broader internal-seam finding yet.
+
+## 2026-04-19 Runtime V2 Layer/Modifier Lease Note
+
+The next shadow-runtime pass is now also landed:
+
+- `users/noah/lib/runtime_v2/runtime_v2.c` now owns real token-backed leases for the first shared state domains instead of only tracking token/tap-series timing:
+  - raw `MO(layer)` presses create immediate layer leases,
+  - raw `LT(layer, key)` presses promote into layer leases only on hold,
+  - raw physical modifier keys create physical modifier leases on press, and
+  - raw `MT(mod, key)` presses promote into managed modifier leases on hold.
+- The v2 state now keeps a reducer-owned shadow projection for layer and modifier state plus a simple persistent layer-lock intent, so release and cancellation cleanup is already happening in the right shape: remove owned records, then recompute projection.
+- `tests/host/runtime_debug_test.c` now locks the first ownership-projection invariants directly, including token replacement cancelling old owned leases immediately instead of leaving stale layer state behind.
+
+Inference from the current tree: the replacement core has now crossed the line from "observes timing" to "owns real shared state" for layer/mod domains. That is the first meaningful proof that the lease model can replace the old branchy cleanup style. It still does **not** cover pd-mode or pointer-anchor ownership yet, so the wedge-prone pointer/layer overlap class remains open until those domains migrate too.

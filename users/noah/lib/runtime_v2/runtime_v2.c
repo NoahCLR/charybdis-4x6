@@ -37,7 +37,7 @@ static uint16_t runtime_v2_keypos_index(keypos_t key_pos) {
 }
 
 static uint16_t runtime_v2_default_hold_term(uint16_t keycode) {
-    return IS_QK_LAYER_TAP(keycode) ? TAPPING_TERM : CUSTOM_TAP_HOLD_TERM;
+    return (IS_QK_LAYER_TAP(keycode) || IS_QK_MOD_TAP(keycode)) ? TAPPING_TERM : CUSTOM_TAP_HOLD_TERM;
 }
 
 static uint16_t runtime_v2_default_multi_tap_term(void) {
@@ -64,10 +64,331 @@ static uint16_t runtime_v2_elapsed(uint16_t start, uint16_t end) {
     return (uint16_t)(end - start);
 }
 
-static void runtime_v2_press_token_refresh_phase(press_token_t *token, uint16_t now) {
+static uint8_t runtime_v2_modifier_mask_for_keycode(uint16_t keycode) {
+    if (IS_MODIFIER_KEYCODE(keycode)) {
+        return MOD_BIT(keycode);
+    }
+
+    if (IS_QK_MOD_TAP(keycode)) {
+        return QK_MOD_TAP_GET_MODS(keycode);
+    }
+
+    return 0u;
+}
+
+static bool runtime_v2_keycode_owns_layer_on_press(uint16_t keycode) {
+    return IS_QK_MOMENTARY(keycode);
+}
+
+static bool runtime_v2_keycode_owns_layer_on_hold(uint16_t keycode) {
+    return IS_QK_LAYER_TAP(keycode);
+}
+
+static uint8_t runtime_v2_layer_for_keycode(uint16_t keycode) {
+    if (IS_QK_MOMENTARY(keycode)) {
+        return QK_MOMENTARY_GET_LAYER(keycode);
+    }
+
+    if (IS_QK_LAYER_TAP(keycode)) {
+        return QK_LAYER_TAP_GET_LAYER(keycode);
+    }
+
+    return UINT8_MAX;
+}
+
+static bool runtime_v2_keycode_owns_modifier_on_press(uint16_t keycode) {
+    return IS_MODIFIER_KEYCODE(keycode);
+}
+
+static bool runtime_v2_keycode_owns_modifier_on_hold(uint16_t keycode) {
+    return IS_QK_MOD_TAP(keycode);
+}
+
+static lease_t *runtime_v2_find_modifier_lease(runtime_v2_state_t *state, uint16_t owner_token_id, uint8_t modifiers, bool physical) {
+    if (!state) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (lease->active && lease->kind == LEASE_KIND_MODIFIER && lease->owner_token_id == owner_token_id &&
+            lease->data.modifier.modifiers == modifiers && lease->data.modifier.physical == physical) {
+            return lease;
+        }
+    }
+
+    return NULL;
+}
+
+static lease_t *runtime_v2_find_layer_lease(runtime_v2_state_t *state, uint16_t owner_token_id, uint8_t layer) {
+    if (!state) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (lease->active && lease->kind == LEASE_KIND_LAYER && lease->owner_token_id == owner_token_id && lease->data.layer == layer) {
+            return lease;
+        }
+    }
+
+    return NULL;
+}
+
+static lease_t *runtime_v2_allocate_lease(runtime_v2_state_t *state) {
+    if (!state) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (!lease->active) {
+            *lease = (lease_t){0};
+            lease->active = true;
+            state->lease_count++;
+            return lease;
+        }
+    }
+
+    return NULL;
+}
+
+static bool runtime_v2_layer_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, uint8_t layer) {
+    lease_t *lease;
+
+    if (!(state && layer < 32u)) {
+        return false;
+    }
+
+    if (runtime_v2_find_layer_lease(state, owner_token_id, layer)) {
+        return false;
+    }
+
+    lease = runtime_v2_allocate_lease(state);
+    if (!lease) {
+        return false;
+    }
+
+    *lease = (lease_t){
+        .active         = true,
+        .kind           = LEASE_KIND_LAYER,
+        .owner_token_id = owner_token_id,
+        .data.layer     = layer,
+    };
+    return true;
+}
+
+static bool runtime_v2_modifier_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, uint8_t modifiers, bool physical) {
+    lease_t *lease;
+
+    if (!(state && modifiers != 0u)) {
+        return false;
+    }
+
+    if (runtime_v2_find_modifier_lease(state, owner_token_id, modifiers, physical)) {
+        return false;
+    }
+
+    lease = runtime_v2_allocate_lease(state);
+    if (!lease) {
+        return false;
+    }
+
+    *lease = (lease_t){
+        .active         = true,
+        .kind           = LEASE_KIND_MODIFIER,
+        .owner_token_id = owner_token_id,
+        .data.modifier =
+            {
+                .modifiers = modifiers,
+                .physical  = physical,
+            },
+    };
+    return true;
+}
+
+static bool runtime_v2_persistent_layer_lock_update(runtime_v2_state_t *state, uint8_t layer, bool active) {
+    persistent_intent_t *empty_slot = NULL;
+
+    if (!(state && layer < 32u)) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PERSISTENT_INTENT_CAPACITY; index++) {
+        persistent_intent_t *intent = &state->persistent_intents[index];
+
+        if (intent->active && intent->kind == PERSISTENT_INTENT_KIND_LAYER_LOCK && intent->data.layer == layer) {
+            if (active) {
+                return false;
+            }
+
+            *intent = (persistent_intent_t){0};
+            if (state->persistent_intent_count != 0u) {
+                state->persistent_intent_count--;
+            }
+            return true;
+        }
+
+        if (!intent->active && !empty_slot) {
+            empty_slot = intent;
+        }
+    }
+
+    if (!(active && empty_slot)) {
+        return false;
+    }
+
+    *empty_slot = (persistent_intent_t){
+        .active = true,
+        .kind   = PERSISTENT_INTENT_KIND_LAYER_LOCK,
+        .data.layer = layer,
+    };
+    state->persistent_intent_count++;
+    return true;
+}
+
+static void runtime_v2_release_leases_for_token(runtime_v2_state_t *state, uint16_t owner_token_id) {
+    if (!state) {
+        return;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (lease->active && lease->owner_token_id == owner_token_id) {
+            *lease = (lease_t){0};
+            if (state->lease_count != 0u) {
+                state->lease_count--;
+            }
+        }
+    }
+}
+
+static void runtime_v2_shadow_projection_recompute(runtime_v2_state_t *state) {
+    runtime_v2_shadow_projection_t projection = {0};
+
+    if (!state) {
+        return;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        const lease_t *lease = &state->leases[index];
+
+        if (!lease->active) {
+            continue;
+        }
+
+        switch (lease->kind) {
+            case LEASE_KIND_LAYER:
+                projection.layer_state |= (layer_state_t)1u << lease->data.layer;
+                break;
+            case LEASE_KIND_MODIFIER:
+                projection.keyboard_mod_state.real |= lease->data.modifier.modifiers;
+                if (lease->data.modifier.physical) {
+                    projection.keyboard_physical_mod_mask |= lease->data.modifier.modifiers;
+                } else {
+                    projection.keyboard_managed_mod_mask |= lease->data.modifier.modifiers;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PERSISTENT_INTENT_CAPACITY; index++) {
+        const persistent_intent_t *intent = &state->persistent_intents[index];
+
+        if (!intent->active) {
+            continue;
+        }
+
+        switch (intent->kind) {
+            case PERSISTENT_INTENT_KIND_LAYER_LOCK:
+                projection.locked_layer_mask |= (layer_state_t)1u << intent->data.layer;
+                projection.layer_state |= (layer_state_t)1u << intent->data.layer;
+                break;
+            default:
+                break;
+        }
+    }
+
+    state->shadow_projection = projection;
+}
+
+static void runtime_v2_press_token_attach_press_leases(runtime_v2_state_t *state, const press_token_t *token) {
+    bool changed = false;
+
+    if (!(state && token && token->active)) {
+        return;
+    }
+
+    if (runtime_v2_keycode_owns_layer_on_press(token->resolved_keycode)) {
+        uint8_t layer = runtime_v2_layer_for_keycode(token->resolved_keycode);
+
+        if (layer != UINT8_MAX) {
+            changed |= runtime_v2_layer_lease_activate(state, token->token_id, layer);
+        }
+    }
+
+    if (runtime_v2_keycode_owns_modifier_on_press(token->resolved_keycode)) {
+        changed |= runtime_v2_modifier_lease_activate(state, token->token_id, runtime_v2_modifier_mask_for_keycode(token->resolved_keycode), true);
+    }
+
+    if (changed) {
+        runtime_v2_shadow_projection_recompute(state);
+    }
+}
+
+static void runtime_v2_press_token_attach_hold_leases(runtime_v2_state_t *state, const press_token_t *token) {
+    bool changed = false;
+
+    if (!(state && token && token->active && token->phase == PRESS_TOKEN_PHASE_HELD)) {
+        return;
+    }
+
+    if (runtime_v2_keycode_owns_layer_on_hold(token->resolved_keycode)) {
+        uint8_t layer = runtime_v2_layer_for_keycode(token->resolved_keycode);
+
+        if (layer != UINT8_MAX) {
+            changed |= runtime_v2_layer_lease_activate(state, token->token_id, layer);
+        }
+    }
+
+    if (runtime_v2_keycode_owns_modifier_on_hold(token->resolved_keycode)) {
+        changed |= runtime_v2_modifier_lease_activate(state, token->token_id, runtime_v2_modifier_mask_for_keycode(token->resolved_keycode), false);
+    }
+
+    if (changed) {
+        runtime_v2_shadow_projection_recompute(state);
+    }
+}
+
+static void runtime_v2_press_token_cancel(runtime_v2_state_t *state, press_token_t *token, uint16_t now) {
+    if (!(state && token && token->active)) {
+        return;
+    }
+
+    runtime_v2_release_leases_for_token(state, token->token_id);
+    runtime_v2_shadow_projection_recompute(state);
+    token->active      = false;
+    token->released_at = now;
+    token->phase       = PRESS_TOKEN_PHASE_CANCELLED;
+    if (state->press_token_count != 0u) {
+        state->press_token_count--;
+    }
+}
+
+static void runtime_v2_press_token_refresh_phase(runtime_v2_state_t *state, press_token_t *token, uint16_t now) {
+    press_token_phase_t previous_phase;
+
     if (!(token && token->active)) {
         return;
     }
+
+    previous_phase = token->phase;
 
     if (token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING || token->phase == PRESS_TOKEN_PHASE_RELEASED || token->phase == PRESS_TOKEN_PHASE_CANCELLED) {
         return;
@@ -75,11 +396,12 @@ static void runtime_v2_press_token_refresh_phase(press_token_t *token, uint16_t 
 
     if (runtime_v2_elapsed(token->pressed_at, now) >= token->hold_term_ms) {
         token->phase = PRESS_TOKEN_PHASE_HELD;
-        return;
+    } else if (token->phase == PRESS_TOKEN_PHASE_PRESSED) {
+        token->phase = PRESS_TOKEN_PHASE_HOLD_PENDING;
     }
 
-    if (token->phase == PRESS_TOKEN_PHASE_PRESSED) {
-        token->phase = PRESS_TOKEN_PHASE_HOLD_PENDING;
+    if (token->phase != previous_phase && token->phase == PRESS_TOKEN_PHASE_HELD) {
+        runtime_v2_press_token_attach_hold_leases(state, token);
     }
 }
 
@@ -110,7 +432,7 @@ static void runtime_v2_refresh_for_time(runtime_v2_state_t *state, uint16_t now)
     state->current_time = now;
 
     for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
-        runtime_v2_press_token_refresh_phase(&state->press_tokens[index], now);
+        runtime_v2_press_token_refresh_phase(state, &state->press_tokens[index], now);
         runtime_v2_tap_series_release_if_expired(&state->tap_series[index], now, state);
     }
 }
@@ -132,8 +454,7 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
 
     if (token->active) {
         state->cancelled_press_count++;
-    } else {
-        state->press_token_count++;
+        runtime_v2_press_token_cancel(state, token, now);
     }
 
     hold_term_ms = runtime_v2_default_hold_term(event->keycode);
@@ -148,6 +469,8 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
         .hold_term_ms       = hold_term_ms,
         .phase              = PRESS_TOKEN_PHASE_PRESSED,
     };
+    state->press_token_count++;
+    runtime_v2_press_token_attach_press_leases(state, token);
 
     if (series && series->active && series->keycode == event->keycode && runtime_v2_elapsed(series->last_tap_at, now) <= series->tap_term_ms) {
         series->pending_hold = true;
@@ -214,7 +537,7 @@ static void runtime_v2_press_token_end(runtime_v2_state_t *state, const runtime_
         return;
     }
 
-    runtime_v2_press_token_refresh_phase(token, now);
+    runtime_v2_press_token_refresh_phase(state, token, now);
     token->observed_release_keycode = event->keycode;
     token->released_at              = now;
     if (event->keycode != token->resolved_keycode) {
@@ -229,6 +552,8 @@ static void runtime_v2_press_token_end(runtime_v2_state_t *state, const runtime_
         runtime_v2_tap_series_note_hold_release(state, token);
     }
 
+    runtime_v2_release_leases_for_token(state, token->token_id);
+    runtime_v2_shadow_projection_recompute(state);
     *token = released_token;
     token->active = false;
     token->phase  = PRESS_TOKEN_PHASE_RELEASED;
@@ -272,6 +597,20 @@ const tap_series_t *runtime_v2_tap_series_at(keypos_t key_pos) {
     return runtime_v2_tap_series_state(runtime_v2_state(), key_pos);
 }
 
+const runtime_v2_shadow_projection_t *runtime_v2_shadow_projection(void) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    return state ? &state->shadow_projection : NULL;
+}
+
+void runtime_v2_layer_lock_set(uint8_t layer, bool active) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    if (runtime_v2_persistent_layer_lock_update(state, layer, active)) {
+        runtime_v2_shadow_projection_recompute(state);
+    }
+}
+
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
     projection_snapshot_t                  snapshot = {0};
     layer_ownership_debug_snapshot_t       layer_snapshot;
@@ -308,6 +647,11 @@ projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
     snapshot.deferred_release_count       = noah_runtime_debug_deferred_release_count();
 
     if (state) {
+        snapshot.v2_shadow_layer_state     = state->shadow_projection.layer_state;
+        snapshot.v2_shadow_locked_layer_mask = state->shadow_projection.locked_layer_mask;
+        snapshot.v2_shadow_keyboard_mod_state = state->shadow_projection.keyboard_mod_state;
+        snapshot.v2_shadow_keyboard_managed_mod_mask = state->shadow_projection.keyboard_managed_mod_mask;
+        snapshot.v2_shadow_keyboard_physical_mod_mask = state->shadow_projection.keyboard_physical_mod_mask;
         snapshot.v2_press_token_count     = state->press_token_count;
         snapshot.v2_tap_series_count      = state->tap_series_count;
         snapshot.v2_lease_count           = state->lease_count;
@@ -348,6 +692,14 @@ bool runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, cons
            lhs->active_slot_count == rhs->active_slot_count &&
            lhs->pending_multi_tap_slot_count == rhs->pending_multi_tap_slot_count &&
            lhs->deferred_release_count == rhs->deferred_release_count &&
+           lhs->v2_shadow_layer_state == rhs->v2_shadow_layer_state &&
+           lhs->v2_shadow_locked_layer_mask == rhs->v2_shadow_locked_layer_mask &&
+           lhs->v2_shadow_keyboard_mod_state.real == rhs->v2_shadow_keyboard_mod_state.real &&
+           lhs->v2_shadow_keyboard_mod_state.weak == rhs->v2_shadow_keyboard_mod_state.weak &&
+           lhs->v2_shadow_keyboard_mod_state.oneshot == rhs->v2_shadow_keyboard_mod_state.oneshot &&
+           lhs->v2_shadow_keyboard_mod_state.oneshot_locked == rhs->v2_shadow_keyboard_mod_state.oneshot_locked &&
+           lhs->v2_shadow_keyboard_managed_mod_mask == rhs->v2_shadow_keyboard_managed_mod_mask &&
+           lhs->v2_shadow_keyboard_physical_mod_mask == rhs->v2_shadow_keyboard_physical_mod_mask &&
            lhs->v2_press_token_count == rhs->v2_press_token_count &&
            lhs->v2_tap_series_count == rhs->v2_tap_series_count &&
            lhs->v2_lease_count == rhs->v2_lease_count &&

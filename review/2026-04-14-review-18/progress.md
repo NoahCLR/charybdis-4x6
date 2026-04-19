@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Layer And Modifier Lease Shadow Pass
+
+- Extended the shadow reducer from identity-only state into real lease-backed ownership for the first shared domains: layers and modifiers.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now:
+  - creates token-owned layer leases for raw `MO(layer)` presses,
+  - promotes raw `LT(layer, key)` into a layer lease only after hold timing settles,
+  - creates physical modifier leases for raw modifier key presses, and
+  - promotes raw `MT(mod, key)` into a managed modifier lease on hold.
+- Added a reducer-owned shadow projection for layer/mod state plus a simple persistent layer-lock intent, so cleanup is now "drop leases by token id and recompute projection" instead of a branchy unwind path.
+- Tightened token replacement semantics in the shadow reducer so replacing a live token on the same physical key position cancels the old token and retires its owned leases immediately.
+- Extended `tests/host/runtime_debug_test.c` with direct white-box coverage for:
+  - momentary layer lease recompute plus persistent layer-lock composition,
+  - layer-tap hold promotion creating and retiring a layer lease,
+  - physical versus managed modifier ownership staying separate, and
+  - live-token replacement clearing owned leases instead of leaving stale layer state behind.
+- This pass still keeps production behavior on the legacy runtime, but it advances the replacement core from "tracks timing facts" to "owns and recomputes real shared state" for the first nontrivial domains.
+
 ## 2026-04-19 Runtime V2 Identity Shadow Pass
 
 - Advanced the single-authority runtime redesign beyond pure scaffolding and into a real shadow reducer for the first migration domain: press/release identity and tap-series lifetime.
@@ -176,6 +193,15 @@
 - Passed during the runtime-v2 identity shadow pass:
   - `sh tests/host/run_runtime_debug_tests.sh`
   - `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - `git diff --check`
+
+- Passed during the runtime-v2 layer/modifier lease shadow pass:
+  - `sh tests/host/run_runtime_debug_tests.sh`
   - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
   - `sh tests/host/run_runtime_trace_tests.sh`
   - `sh tests/host/run_feature_gate_compile_tests.sh`
@@ -366,6 +392,6 @@
 ## Next Steps
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
-2. Expand the shadow reducer from identity/tap-series timing into real lease-backed layer and modifier ownership so production cleanup can eventually stop depending on legacy slot release reinterpretation.
+2. Expand the shadow reducer from layer/mod ownership into pd-mode and pointer-anchor leases so the wedge-prone pointer/layer overlap path is modeled under the same ownership rules.
 3. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
 4. Replace imperative pd-mode and pointer-layer cleanup branches with reducer-owned leases and projection recompute before any production hook cutover.

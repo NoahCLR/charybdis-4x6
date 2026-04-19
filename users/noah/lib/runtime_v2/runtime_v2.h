@@ -113,7 +113,10 @@ typedef struct {
     uint16_t    owner_token_id;
     union {
         uint8_t       layer;
-        uint8_t       modifiers;
+        struct {
+            uint8_t modifiers;
+            bool    physical;
+        } modifier;
         uint16_t      action;
         pd_mode_mask_t pd_mode;
         struct {
@@ -150,6 +153,14 @@ typedef struct {
     keyboard_mod_state_t keyboard_mod_state;
     uint8_t              keyboard_managed_mod_mask;
     uint8_t              keyboard_physical_mod_mask;
+} runtime_v2_shadow_projection_t;
+
+typedef struct {
+    layer_state_t        layer_state;
+    layer_state_t        locked_layer_mask;
+    keyboard_mod_state_t keyboard_mod_state;
+    uint8_t              keyboard_managed_mod_mask;
+    uint8_t              keyboard_physical_mod_mask;
     pd_mode_mask_t       pd_mode_local_active;
     pd_mode_mask_t       pd_mode_local_locked;
     pd_mode_mask_t       pd_mode_display_active;
@@ -164,6 +175,11 @@ typedef struct {
     uint8_t              active_slot_count;
     uint8_t              pending_multi_tap_slot_count;
     uint8_t              deferred_release_count;
+    layer_state_t        v2_shadow_layer_state;
+    layer_state_t        v2_shadow_locked_layer_mask;
+    keyboard_mod_state_t v2_shadow_keyboard_mod_state;
+    uint8_t              v2_shadow_keyboard_managed_mod_mask;
+    uint8_t              v2_shadow_keyboard_physical_mod_mask;
     uint8_t              v2_press_token_count;
     uint8_t              v2_tap_series_count;
     uint8_t              v2_lease_count;
@@ -178,6 +194,7 @@ typedef struct {
     tap_series_t        tap_series[RUNTIME_V2_TAP_SERIES_CAPACITY];
     lease_t             leases[RUNTIME_V2_LEASE_CAPACITY];
     persistent_intent_t persistent_intents[RUNTIME_V2_PERSISTENT_INTENT_CAPACITY];
+    runtime_v2_shadow_projection_t shadow_projection;
     projection_snapshot_t last_projection;
     uint16_t            current_time;
     uint16_t            next_token_id;
@@ -194,6 +211,8 @@ runtime_v2_state_t  *runtime_v2_state(void);
 void                 runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time);
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos);
 const tap_series_t  *runtime_v2_tap_series_at(keypos_t key_pos);
+const runtime_v2_shadow_projection_t *runtime_v2_shadow_projection(void);
+void                 runtime_v2_layer_lock_set(uint8_t layer, bool active);
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void);
 bool                 runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, const projection_snapshot_t *rhs);
 
