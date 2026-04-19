@@ -776,7 +776,7 @@ static void test_runtime_v2_tap_series_state_stays_independent_from_active_token
     CHECK(snapshot.v2_tap_series_count == 0u);
 }
 
-static void test_runtime_v2_layer_leases_and_layer_lock_recompute_from_owned_state(void) {
+static void test_runtime_v2_layer_lock_observes_live_layer_ownership_state(void) {
     const runtime_v2_shadow_projection_t *shadow;
     projection_snapshot_t                 snapshot;
     keypos_t                              key_pos = test_keypos(1, 1);
@@ -784,7 +784,7 @@ static void test_runtime_v2_layer_leases_and_layer_lock_recompute_from_owned_sta
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    runtime_v2_layer_lock_set(3, true);
+    CHECK(layer_ownership_set_lock_state(3, true));
     shadow = runtime_v2_shadow_projection();
     CHECK(shadow != NULL);
     CHECK(shadow->locked_layer_mask == ((layer_state_t)1u << 3));
@@ -809,10 +809,16 @@ static void test_runtime_v2_layer_leases_and_layer_lock_recompute_from_owned_sta
     CHECK(shadow->locked_layer_mask == ((layer_state_t)1u << 3));
     CHECK(shadow->layer_state == ((layer_state_t)1u << 3));
 
-    runtime_v2_layer_lock_set(3, false);
+    CHECK(layer_ownership_set_lock_state(3, false));
     shadow = runtime_v2_shadow_projection();
     CHECK(shadow->locked_layer_mask == 0u);
     CHECK(shadow->layer_state == 0u);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_shadow_locked_layer_mask == 0u);
+    CHECK(snapshot.v2_shadow_layer_state == 0u);
+    CHECK(snapshot.locked_layer_mask == 0u);
+    CHECK(snapshot.layer_state == 0u);
 }
 
 static void test_runtime_v2_layer_tap_hold_creates_and_retires_layer_lease(void) {
@@ -996,14 +1002,14 @@ static void test_runtime_v2_arrow_mode_prefers_typing_without_pointer_anchor(voi
     CHECK(snapshot.v2_lease_count == 1u);
 }
 
-static void test_runtime_v2_pd_mode_lock_owns_pointer_toggle_intent(void) {
+static void test_runtime_v2_pd_mode_lock_observes_live_pd_mode_state(void) {
     const runtime_v2_shadow_projection_t *shadow;
     projection_snapshot_t                 snapshot;
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    runtime_v2_pd_mode_lock_set(PD_MODE_DRAGSCROLL, true);
+    CHECK(pd_mode_set_lock_state(PD_MODE_DRAGSCROLL, true));
 
     shadow = runtime_v2_shadow_projection();
     CHECK(shadow != NULL);
@@ -1018,13 +1024,24 @@ static void test_runtime_v2_pd_mode_lock_owns_pointer_toggle_intent(void) {
     CHECK(snapshot.v2_shadow_pd_mode_local_locked == PD_MODE_DRAGSCROLL);
     CHECK(snapshot.v2_shadow_pointer_toggle_enabled);
     CHECK(snapshot.v2_persistent_intent_count == 2u);
+    CHECK(snapshot.pd_mode_local_active == PD_MODE_DRAGSCROLL);
+    CHECK(snapshot.pd_mode_local_locked == PD_MODE_DRAGSCROLL);
 
-    runtime_v2_pd_mode_lock_set(PD_MODE_DRAGSCROLL, false);
+    CHECK(pd_mode_set_lock_state(PD_MODE_DRAGSCROLL, false));
     shadow = runtime_v2_shadow_projection();
     CHECK(shadow->pd_mode_local_active == 0);
     CHECK(shadow->pd_mode_local_locked == 0);
     CHECK(!shadow->pointer_anchor_active);
     CHECK(!shadow->pointer_toggle_enabled);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_shadow_pd_mode_local_active == 0);
+    CHECK(snapshot.v2_shadow_pd_mode_local_locked == 0);
+    CHECK(!snapshot.v2_shadow_pointer_anchor_active);
+    CHECK(!snapshot.v2_shadow_pointer_toggle_enabled);
+    CHECK(snapshot.pd_mode_local_active == 0);
+    CHECK(snapshot.pd_mode_local_locked == 0);
+    CHECK(!snapshot.pointer_toggle_enabled);
 }
 
 static void test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases(void) {
@@ -1066,13 +1083,13 @@ int main(void) {
     test_runtime_v2_release_tracks_press_by_position_despite_keycode_mismatch();
     test_runtime_v2_timer_and_scan_do_not_rewrite_press_identity();
     test_runtime_v2_tap_series_state_stays_independent_from_active_token_storage();
-    test_runtime_v2_layer_leases_and_layer_lock_recompute_from_owned_state();
+    test_runtime_v2_layer_lock_observes_live_layer_ownership_state();
     test_runtime_v2_layer_tap_hold_creates_and_retires_layer_lease();
     test_runtime_v2_modifier_leases_keep_physical_and_managed_masks_separate();
     test_runtime_v2_replacing_a_live_token_cleans_up_owned_leases();
     test_runtime_v2_pd_mode_press_creates_active_mode_and_pointer_anchor();
     test_runtime_v2_arrow_mode_prefers_typing_without_pointer_anchor();
-    test_runtime_v2_pd_mode_lock_owns_pointer_toggle_intent();
+    test_runtime_v2_pd_mode_lock_observes_live_pd_mode_state();
     test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases();
 
     puts("runtime_debug host tests passed");

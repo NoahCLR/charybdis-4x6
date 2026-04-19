@@ -28,6 +28,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/pd_mode_key_runtime_integration_test.c" \
+    "$ROOT/tests/host/runtime_v2_observer_stub.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \

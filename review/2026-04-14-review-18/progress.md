@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Live Lock Mutation Observation Pass
+
+- Closed the next shadow-runtime gap for persistent lock mutations by wiring the production lock-state setters into the v2 observer APIs instead of relying on direct test-only lock calls.
+- `users/noah/lib/state/ownership/layer_ownership.c` now calls `runtime_v2_layer_lock_set(...)` from `layer_ownership_set_lock_state(...)` after the authoritative layer lock mutation succeeds.
+- `users/noah/lib/pointing/runtime/pd_mode_state.c` now calls `runtime_v2_pd_mode_lock_set(...)` from `pd_mode_set_lock_state(...)` after the authoritative local pd-mode lock mutation succeeds.
+- This means authored lock actions and native key-runtime lock taps now reach the shadow reducer through the same real mutation seams that own production lock state, instead of only through raw key presses or explicit test helpers.
+- `tests/host/runtime_debug_test.c` now proves that v2 shadow lock state updates correctly when driven by the real layer and pd-mode setters, not only by direct runtime-v2 API calls.
+- Added `tests/host/runtime_v2_observer_stub.c` and wired the focused host runners that intentionally do not link the full v2 reducer to that shared stub, so minimal subsystem tests keep their narrow compile surface while the parity-aware suites continue using the real implementation.
+
 ## 2026-04-19 Runtime V2 Pd-Mode And Pointer Ownership Shadow Pass
 
 - Extended the shadow reducer into the first wedge-prone overlap domain: pd-mode ownership and pointer anchoring.
@@ -206,6 +215,20 @@
 - `closure verdict`: keep this thread open until the hardware regression is closed on-device, and until the remaining `should-fix` items are either resolved or explicitly downgraded out of the closure bar.
 
 ## Verification
+
+- Passed during the runtime-v2 live lock mutation observation pass:
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_layer_ownership_tests.sh`
+  - `sh tests/host/run_pd_mode_tests.sh`
+  - `sh tests/host/run_pd_runtime_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - `git diff --check`
 
 - Passed during the runtime-v2 identity shadow pass:
   - `sh tests/host/run_runtime_debug_tests.sh`
@@ -418,6 +441,6 @@
 ## Next Steps
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
-2. Expand the shadow reducer from raw pd-mode keys and explicit lock APIs into emitted lock-action observation so authored `*_LOCK` paths participate in the same ownership model as raw pd-mode keys.
-3. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-4. Replace imperative pd-mode and pointer-layer cleanup branches with reducer-owned leases and projection recompute before any production hook cutover.
+2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
+3. Replace imperative pd-mode and pointer-layer cleanup branches with reducer-owned leases and projection recompute before any production hook cutover.
+4. Extend the cutover from persistent lock mutations into the remaining release/deferred-emission paths, where the legacy runtime still re-derives behavior from live state.

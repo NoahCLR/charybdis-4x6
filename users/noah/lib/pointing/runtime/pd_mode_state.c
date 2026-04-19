@@ -5,6 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "pd_mode_runtime_shared_state_internal.h"
+#include "../../runtime_v2/runtime_v2.h"
 #include "../../state/runtime/split_runtime_sync.h"
 #include "../../state/runtime/runtime_trace.h"
 #include "../policy/pd_mode_policy.h"
@@ -294,6 +295,10 @@ bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
         .kind = locked ? PD_MODE_COMMAND_LOCK : PD_MODE_COMMAND_UNLOCK,
         .mode = mode,
     });
+
+    if (result.local_state_changed) {
+        runtime_v2_pd_mode_lock_set(mode, locked);
+    }
 
     if (result.split_sync_required) {
         split_runtime_sync();

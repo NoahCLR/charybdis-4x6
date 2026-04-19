@@ -9,6 +9,7 @@
 #include "layer_ownership.h"
 
 #include "noah_keymap_ids.h"
+#include "../../runtime_v2/runtime_v2.h"
 #include "../runtime/runtime_context_internal.h"
 #include "../runtime/runtime_trace.h"
 
@@ -136,6 +137,7 @@ bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
 
     bool changed = true;
     changed |= layer_ownership_apply_layer(layer);
+    runtime_v2_layer_lock_set(layer, locked);
     return changed;
 }
 

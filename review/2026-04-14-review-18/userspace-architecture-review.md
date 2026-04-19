@@ -319,3 +319,15 @@ The next shadow-runtime pass is now landed as well:
 - `tests/host/runtime_debug_test.c` now locks those rules directly, including the `DRAGSCROLL` lock-owned toggle shape and foreign-mode supersession cleanup.
 
 Inference from the current tree: the replacement core now owns the same general state family as the original `NAV -> DRAGSCROLL` wedge path, not just the safer layer/mod domains. That is the first meaningful runtime-v2 pass that can speak to the suspected pointer/pd ownership leak class directly. It still does **not** observe emitted authored `*_LOCK` actions yet, so authored lock paths are not fully inside the shadow model until that next seam lands.
+
+## 2026-04-19 Runtime V2 Live Lock Observation Note
+
+The next shadow-runtime seam is now landed too:
+
+- `users/noah/lib/state/ownership/layer_ownership.c` now feeds successful `layer_ownership_set_lock_state(...)` mutations into `runtime_v2_layer_lock_set(...)`.
+- `users/noah/lib/pointing/runtime/pd_mode_state.c` now feeds successful `pd_mode_set_lock_state(...)` mutations into `runtime_v2_pd_mode_lock_set(...)`.
+- That means the shadow reducer no longer depends on direct test-only lock APIs to see persistent lock state changes. Real authored lock actions and native key-runtime lock taps now enter the shadow model through the same production setters that own the authoritative lock state.
+- `tests/host/runtime_debug_test.c` now locks those setter-driven observation paths directly instead of only asserting the direct runtime-v2 helper calls.
+- Focused host runners that intentionally keep the full reducer out of process now share one central `tests/host/runtime_v2_observer_stub.c` instead of each growing their own local runtime-v2 stubs.
+
+Inference from the current tree: the earlier review note about authored `*_LOCK` actions sitting completely outside the shadow model is no longer true for persistent layer/pd lock mutations. The remaining gap is further downstream: production still runs the legacy runtime for the actual release/deferred-emission logic, so the cleanup decisions that can wedge the board are still being made outside the reducer-owned lease model.
