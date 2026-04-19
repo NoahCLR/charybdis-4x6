@@ -8,9 +8,12 @@
 #include "users/noah/lib/key/interaction/handled_key.h"
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/ownership/held_repeat.h"
+#include "users/noah/lib/key/runtime/key_runtime_admission.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"
+#include "users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.h"
+#include "users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
 #include "users/noah/lib/runtime_v2/runtime_v2.h"
@@ -836,6 +839,29 @@ static void test_runtime_v2_active_release_effect_plan_releases_layer_and_taps(v
     CHECK(plan.items[1].data.action == KC_V);
 }
 
+static void test_runtime_v2_direct_active_release_helper_seeds_pending_multi_tap(void) {
+    runtime_v2_release_effect_plan_t plan;
+    active_key_state_t              *slot;
+    keypos_t                         key_pos = test_keypos(6, 6);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_stage_active_slot(TEST_PENDING_MULTI_TAP_KEY, key_pos);
+    slot = key_runtime_find_slot_by_position(key_pos);
+    CHECK(slot != NULL);
+    CHECK(slot->owner.keycode == TEST_PENDING_MULTI_TAP_KEY);
+
+    fake_time = (uint16_t)(fake_time + 20u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    CHECK(key_runtime_slot_take_v2_active_release_plan(slot, TEST_PENDING_MULTI_TAP_KEY, &plan));
+    CHECK(plan.count == 0u);
+    CHECK(plan.pending_multi_tap_seed.active);
+    CHECK(slot->owner.keycode == KC_NO);
+    CHECK(slot->pending_multi_tap.keycode == TEST_PENDING_MULTI_TAP_KEY);
+    CHECK(slot->pending_multi_tap.count == 1u);
+}
+
 static void test_runtime_v2_pending_multi_tap_release_resolution_preserves_chain(void) {
     runtime_v2_pending_multi_tap_release_resolution_t resolution;
     keypos_t                                          key_pos = test_keypos(4, 4);
@@ -911,6 +937,35 @@ static void test_runtime_v2_pending_multi_tap_release_effect_plan_delays_action(
     CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
     CHECK(plan.items[0].data.delayed_action.repeat_count == 1u);
     CHECK(plan.items[0].data.delayed_action.mods.real == mods.real);
+}
+
+static void test_runtime_v2_direct_pending_multi_tap_release_helper_resets_slot(void) {
+    runtime_v2_release_effect_plan_t plan;
+    active_key_state_t              *slot;
+    keypos_t                         key_pos = test_keypos(6, 7);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, false));
+    fake_time = (uint16_t)(fake_time + 20u);
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, true));
+
+    slot = key_runtime_find_slot_by_position(key_pos);
+    CHECK(slot != NULL);
+    CHECK(slot->owner.keycode == TEST_PENDING_MULTI_TAP_KEY);
+    CHECK(slot->pending_multi_tap.pending_hold);
+
+    fake_time = (uint16_t)(fake_time + 120u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    CHECK(key_runtime_slot_take_v2_pending_multi_tap_release_plan(slot, TEST_PENDING_MULTI_TAP_KEY, timer_elapsed(slot->timer), &plan));
+    CHECK(plan.count == 1u);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
+    CHECK(slot->owner.keycode == KC_NO);
+    CHECK(slot->pending_multi_tap.keycode == KC_NO);
 }
 
 static void test_runtime_v2_pending_multi_tap_scan_resolution_promotes_hold_threshold(void) {
@@ -1748,10 +1803,12 @@ int main(void) {
     test_runtime_v2_active_release_resolution_tracks_threshold_hold_after_scan();
     test_runtime_v2_active_release_effect_plan_buffers_multi_tap();
     test_runtime_v2_active_release_effect_plan_releases_layer_and_taps();
+    test_runtime_v2_direct_active_release_helper_seeds_pending_multi_tap();
     test_runtime_v2_pending_multi_tap_release_resolution_preserves_chain();
     test_runtime_v2_pending_multi_tap_release_effect_plan_preserves_chain();
     test_runtime_v2_pending_multi_tap_release_resolution_uses_hold_action_after_term();
     test_runtime_v2_pending_multi_tap_release_effect_plan_delays_action();
+    test_runtime_v2_direct_pending_multi_tap_release_helper_resets_slot();
     test_runtime_v2_pending_multi_tap_scan_resolution_promotes_hold_threshold();
     test_runtime_v2_pending_multi_tap_scan_resolution_promotes_long_hold();
     test_runtime_v2_pending_multi_tap_scan_resolution_flushes_expired_chain();

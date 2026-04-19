@@ -248,11 +248,42 @@ static void key_runtime_slot_result_append_release_plan(key_runtime_slot_result_
     }
 }
 
-key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_state_t *slot, uint16_t keycode) {
-    key_runtime_slot_result_t              result = {0};
-    key_runtime_slot_interaction_t         interaction;
+bool key_runtime_slot_take_v2_active_release_plan(active_key_state_t *slot, uint16_t keycode, runtime_v2_release_effect_plan_t *out_plan) {
     runtime_v2_active_release_resolution_t v2_resolution;
     runtime_v2_release_effect_plan_t       v2_plan;
+
+    if (out_plan) {
+        *out_plan = (runtime_v2_release_effect_plan_t){0};
+    }
+
+    if (!(slot && slot->owner.keycode != KC_NO && out_plan)) {
+        return false;
+    }
+
+    if (!runtime_v2_resolve_active_release(slot->owner.key_pos, &v2_resolution)) {
+        return false;
+    }
+
+    key_runtime_slot_release_trace_v2_resolution(&v2_resolution);
+    if (!runtime_v2_plan_active_release_effects(slot->owner.key_pos, keycode, &v2_resolution, &v2_plan)) {
+        return false;
+    }
+
+    if (v2_plan.settlement == RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET) {
+        key_runtime_slot_reset(slot);
+    }
+    if (v2_plan.pending_multi_tap_seed.active) {
+        key_runtime_slot_begin_pending_multi_tap(slot, v2_plan.pending_multi_tap_seed.keycode, v2_plan.pending_multi_tap_seed.key_pos, v2_plan.pending_multi_tap_seed.tap_action, v2_plan.pending_multi_tap_seed.tap_repeat_count, v2_plan.pending_multi_tap_seed.tap_hold_term, v2_plan.pending_multi_tap_seed.multi_tap_term, v2_plan.pending_multi_tap_seed.has_more_taps);
+    }
+
+    *out_plan = v2_plan;
+    return true;
+}
+
+key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_state_t *slot, uint16_t keycode) {
+    key_runtime_slot_result_t        result = {0};
+    key_runtime_slot_interaction_t   interaction;
+    runtime_v2_release_effect_plan_t v2_plan;
 
     if (!slot || slot->owner.keycode == KC_NO) {
         return result;
@@ -264,20 +295,8 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_stat
 
     result.handled = true;
 
-    if (runtime_v2_resolve_active_release(released_key.owner.key_pos, &v2_resolution)) {
-        key_runtime_slot_release_trace_v2_resolution(&v2_resolution);
-        if (!runtime_v2_plan_active_release_effects(released_key.owner.key_pos, keycode, &v2_resolution, &v2_plan)) {
-            return result;
-        }
-
-        if (v2_plan.settlement == RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET) {
-            key_runtime_slot_reset(slot);
-        }
-        if (v2_plan.pending_multi_tap_seed.active) {
-            key_runtime_slot_begin_pending_multi_tap(slot, v2_plan.pending_multi_tap_seed.keycode, v2_plan.pending_multi_tap_seed.key_pos, v2_plan.pending_multi_tap_seed.tap_action, v2_plan.pending_multi_tap_seed.tap_repeat_count, v2_plan.pending_multi_tap_seed.tap_hold_term, v2_plan.pending_multi_tap_seed.multi_tap_term, v2_plan.pending_multi_tap_seed.has_more_taps);
-        }
+    if (key_runtime_slot_take_v2_active_release_plan(slot, keycode, &v2_plan)) {
         key_runtime_slot_result_append_release_plan(&result, &v2_plan);
-
         return result;
     }
 

@@ -13,6 +13,8 @@
 #include "key_runtime_feedback.h"
 #include "key_runtime_admission.h"
 #include "key_runtime_index_internal.h"
+#include "slot/key_runtime_slot_pending_multi_tap.h"
+#include "slot/key_runtime_slot_release_active.h"
 #include "slot/key_runtime_slot_step.h"
 #include "slot/key_runtime_slot_policy.h"
 #include "slot/key_runtime_slot_result_internal.h"
@@ -157,6 +159,36 @@ static void key_runtime_transition_apply_slot_result(const key_runtime_slot_resu
     }
 }
 
+static void key_runtime_transition_append_release_effect_plan(const runtime_v2_release_effect_plan_t *release_plan, key_runtime_transition_plan_t *plan) {
+    if (!(release_plan && plan)) {
+        return;
+    }
+
+    for (uint8_t index = 0; index < release_plan->count; index++) {
+        key_runtime_transition_plan_push(plan, release_plan->items[index]);
+    }
+}
+
+static void key_runtime_transition_append_unmatched_release_effects(keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+    handled_key_materialized_t materialized = handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
+
+    if (!plan) {
+        return;
+    }
+
+    if ((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0) {
+        key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
+                                                   .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
+                                                   .data.key_pos = key_pos,
+                                               });
+    }
+
+    key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
+                                               .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+                                               .data.key_pos = key_pos,
+                                           });
+}
+
 static bool key_runtime_transition_apply_slot_step(active_key_state_t *slot, key_runtime_slot_event_t event, key_runtime_transition_plan_t *plan) {
     key_runtime_slot_result_t result = key_runtime_slot_step(slot, event);
 
@@ -283,10 +315,26 @@ static bool key_runtime_transition_process_active_key_release(uint16_t keycode, 
     active_key_state_t      *slot            = key_runtime_find_slot_by_position(record->event.key);
     uint16_t                 release_keycode = keycode;
     handled_key_resolution_t release_key     = resolution;
+    runtime_v2_release_effect_plan_t release_plan = {0};
 
     if (key_runtime_slot_active(slot) && slot->owner.keycode != keycode) {
         release_keycode = slot->owner.keycode;
         release_key     = handled_key_lookup(release_keycode);
+    }
+
+    if (runtime_v2_blocker_queries_authoritative()) {
+        if (slot && key_runtime_slot_take_v2_pending_multi_tap_release_plan(slot, release_keycode, timer_elapsed(slot->timer), &release_plan)) {
+            key_runtime_transition_append_release_effect_plan(&release_plan, plan);
+            return true;
+        }
+
+        if (key_runtime_slot_matches(slot, release_keycode, record->event.key) && key_runtime_slot_take_v2_active_release_plan(slot, release_keycode, &release_plan)) {
+            key_runtime_transition_append_release_effect_plan(&release_plan, plan);
+            return true;
+        }
+
+        key_runtime_transition_append_unmatched_release_effects(record->event.key, release_key, plan);
+        return true;
     }
 
     key_runtime_transition_apply_slot_step(slot,

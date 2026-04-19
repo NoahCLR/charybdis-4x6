@@ -598,6 +598,41 @@ Inference from the current tree: handled release meaning, effect selection, and 
 
 That is the smallest split-brain surface this thread has reached so far. It is still not the clean-slate end state, but the remaining ownership gap is now much narrower and more mechanical than the earlier “multiple subsystems decide what release means” bug class.
 
+## 2026-04-20 Runtime V2 Authoritative Release Transport Note
+
+The next transport seam has now crossed into the reducer-owned path too:
+
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.h` and `.c` now expose `key_runtime_slot_take_v2_active_release_plan(...)`.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.h` and `.c` now expose `key_runtime_slot_take_v2_pending_multi_tap_release_plan(...)`.
+- Those helpers sit exactly at the intended release boundary:
+  - runtime-v2 has already observed the physical key-up,
+  - the legacy slot is still live and has not yet been settled,
+  - the helper resolves reducer-owned release semantics,
+  - mutates the live slot according to reducer-owned settlement, and
+  - returns the reducer-owned effect plan without serializing through `key_runtime_slot_result_t`.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses those helpers when runtime-v2 has authoritative normalized input:
+  - pending multi-tap release bypasses `key_runtime_slot_step(...)`,
+  - active release bypasses `key_runtime_slot_step(...)`,
+  - reducer-owned effect plans append directly into `key_runtime_transition_plan_t`, and
+  - unmatched handled releases append layer-release / owned-state cleanup effects directly into the transition plan rather than going through slot-result transport.
+- The old slot-result release reducers remain as compatibility fallback for non-authoritative or narrowed surfaces, so this is a narrow production migration rather than a big-bang delete.
+- `tests/host/runtime_debug_test.c` now directly proves the new boundary contract for both helper entrypoints, and the transition, release matrix, scenario, real-profile overlap, modifier-hold integration, pd-mode key-runtime integration, key-runtime harness, runtime-debug, and feature-gate compile suites all stayed green after this cut.
+
+Inference from the current tree: authoritative handled release no longer depends on the legacy slot-result transport at all. For release paths, runtime-v2 now owns:
+
+- release meaning,
+- release effect selection,
+- release effect projection, and
+- authoritative release transport into the transition plan.
+
+The remaining split is now outside authoritative handled release:
+
+- press, scan, interrupt, and flush still use the legacy slot-result transport,
+- deferred-release queue assembly and drain orchestration still live in the legacy release/transition layer, and
+- compatibility fallback still routes narrowed or non-authoritative release surfaces through the old slot reducers.
+
+That is a real architecture milestone. The remaining work is now mostly mechanical transport/orchestration cleanup rather than “which subsystem decides what this release means.”
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

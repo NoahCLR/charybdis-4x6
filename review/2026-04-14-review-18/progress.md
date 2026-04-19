@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-04-20 Runtime V2 Authoritative Release Transport Pass
+
+- Removed the old `key_runtime_slot_result_t` transport from the authoritative handled-release path: active release and pending-multi-tap release now mutate slot state and append their reducer-owned effect plan directly into the transition plan.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.h` and `.c` now expose `key_runtime_slot_take_v2_active_release_plan(...)`, which:
+  - resolves reducer-owned active release,
+  - traces that release decision,
+  - applies reducer-owned settlement to the live slot,
+  - seeds pending multi-tap state when needed, and
+  - returns the reducer-owned effect plan without routing through `key_runtime_slot_result_t`.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.h` and `.c` now expose `key_runtime_slot_take_v2_pending_multi_tap_release_plan(...)`, which does the same for pending multi-tap release, including preserve-chain settlement and delayed-action / held-lifecycle planning.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses those direct helpers when runtime-v2 has authoritative normalized input:
+  - active and pending-multi-tap handled releases bypass `key_runtime_slot_step(...)` and `key_runtime_slot_reduce_handled_release(...)`,
+  - reducer-owned effect plans append directly into `key_runtime_transition_plan_t`, and
+  - unmatched handled releases now append their layer-release / owned-state cleanup effects directly into the transition plan instead of round-tripping through slot-result transport.
+- This keeps the cut narrow:
+  - the legacy slot reducers still exist as compatibility fallback for non-authoritative or narrowed surfaces,
+  - authoritative handled-release transport no longer depends on `key_runtime_slot_result_t`,
+  - but press, scan, interrupt, and flush transport still run through the old slot-result/plan assembly seams.
+- `tests/host/runtime_debug_test.c` now directly proves the new bypass helpers at the exact seam they serve:
+  - shadow key-up observed by runtime-v2 while the legacy slot is still live,
+  - active release can seed pending multi-tap directly through the helper, and
+  - pending multi-tap release can reset the live slot and emit the delayed action directly through the helper.
+
 ## 2026-04-19 Runtime V2 Effect Projection Pass
 
 - Moved the world-application seam for handled-key runtime effects onto runtime-v2-owned projector helpers: transition and release orchestration no longer own the direct QMK-side effect switch for authored runtime effects.
@@ -739,5 +762,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Move the remaining release aftermath transport seams onto the reducer path so v2 owns not just release decision, effect selection, and effect projection, but also the queue/seed transport contract end-to-end.
+3. Move the remaining non-release transport/orchestration seams onto the reducer path so v2 owns not just release decision, effect selection, effect projection, and authoritative release transport, but also scan/flush transport and deferred-release queue assembly end-to-end.
 4. Capture and replay on-device traces for the original wedge repros now that blocker gating, pending multi-tap lifecycle, explicit flush/reset, and handled-release effect planning all have reducer-owned visibility.
