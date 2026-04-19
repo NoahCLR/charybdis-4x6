@@ -14,6 +14,7 @@
 #include "key_runtime_admission.h"
 #include "key_runtime_index_internal.h"
 #include "slot/key_runtime_slot_pending_multi_tap.h"
+#include "slot/key_runtime_slot_press_reduce.h"
 #include "slot/key_runtime_slot_release_active.h"
 #include "slot/key_runtime_slot_scan_reduce.h"
 #include "slot/key_runtime_slot_step.h"
@@ -299,18 +300,14 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 }
 
 bool key_runtime_transition_handled_key_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush, key_runtime_transition_plan_t *plan) {
-    return key_runtime_transition_apply_slot_step(slot,
-                                                  (key_runtime_slot_event_t){
-                                                      .kind = KEY_RUNTIME_SLOT_EVENT_HANDLED_PRESS,
-                                                      .data.handled_press =
-                                                          {
-                                                              .keycode                           = keycode,
-                                                              .key_pos                           = key_pos,
-                                                              .key                               = resolution,
-                                                              .active_held_action_survives_flush = active_held_action_survives_flush,
-                                                          },
-                                                  },
-                                                  plan);
+    key_runtime_slot_direct_plan_t direct_plan = key_runtime_slot_take_handled_press_plan(slot, keycode, key_pos, resolution, active_held_action_survives_flush);
+
+    if (!direct_plan.handled) {
+        return false;
+    }
+
+    key_runtime_transition_append_direct_plan(&direct_plan, plan);
+    return true;
 }
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {

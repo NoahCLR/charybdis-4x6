@@ -1583,6 +1583,74 @@ static void test_press_on_new_position_preserves_existing_pending_multi_tap(void
     CHECK(pending_slot_multi_tap->single_action == TEST_FALLBACK_TAP_ACTION);
 }
 
+static void test_press_reclaims_tap_before_begin_request(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   record = test_record(test_keypos(4, 4), true);
+    handled_key_resolution_t      key    = test_handled_key(TEST_NEW_KEY);
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(record.event.key);
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .timer         = fake_time,
+                                                   .owner.keycode = TEST_PREVIOUS_KEY,
+                                                   .owner.key_pos = record.event.key,
+                                                   .interaction   = test_cached_interaction(TEST_PREVIOUS_TAP_ACTION, hold_behavior_none(), hold_behavior_none(), CUSTOM_TAP_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM, CUSTOM_MULTI_TAP_TERM),
+                                               });
+
+    key.step.hold = (hold_behavior_t){
+        .present = true,
+        .action  = TEST_IMMEDIATE_HOLD,
+        .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+    };
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(record.event.key), TEST_NEW_KEY, record.event.key, key, false, &plan));
+
+    CHECK(plan.count == 2);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK(plan.items[0].data.action == TEST_PREVIOUS_TAP_ACTION);
+    CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
+    CHECK(plan.items[1].data.held_action.key_pos.row == record.event.key.row);
+    CHECK(plan.items[1].data.held_action.key_pos.col == record.event.key.col);
+    CHECK(plan.items[1].data.held_action.action == TEST_IMMEDIATE_HOLD);
+    CHECK(test_default_slot()->owner.keycode == TEST_NEW_KEY);
+    CHECK(test_default_slot()->lifecycle.held_action_keycode == TEST_IMMEDIATE_HOLD);
+}
+
+static void test_press_flushes_pending_multi_tap_before_layer_press(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   record = test_record(test_keypos(4, 5), true);
+    handled_key_resolution_t      key    = test_handled_key(TEST_NEW_KEY);
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(record.event.key);
+    test_stage_slot_state(test_default_slot(), (active_key_state_t){
+                                                   .pending_multi_tap =
+                                                       {
+                                                           .keycode       = TEST_MULTI_TAP_KEY,
+                                                           .key_pos       = test_keypos(4, 4),
+                                                           .count         = 2,
+                                                           .single_action = TEST_FALLBACK_TAP_ACTION,
+                                                       },
+                                               });
+    test_handled_key_set_layer_contract(&key, 3, false, KC_NO);
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(record.event.key), TEST_NEW_KEY, record.event.key, key, false, &plan));
+
+    CHECK(plan.count == 2);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(plan.items[0].data.delayed_action.action == TEST_FALLBACK_TAP_ACTION);
+    CHECK(plan.items[0].data.delayed_action.repeat_count == 2);
+    CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_LAYER_PRESS);
+    CHECK(plan.items[1].data.layer_press.key_pos.row == record.event.key.row);
+    CHECK(plan.items[1].data.layer_press.key_pos.col == record.event.key.col);
+    CHECK(plan.items[1].data.layer_press.layer == 3);
+    CHECK(test_default_slot()->owner.keycode == TEST_NEW_KEY);
+    CHECK(test_default_slot()->interaction.layer == 3);
+    CHECK(test_default_slot()->pending_multi_tap.keycode == KC_NO);
+}
+
 static void test_scan_fires_hold_for_independent_position_slot(void) {
     key_runtime_transition_plan_t plan;
     active_key_state_t           *other_slot = test_slot_for_position(test_keypos(6, 3));
@@ -2218,6 +2286,8 @@ int main(void) {
     test_release_on_other_position_leaves_existing_position_active();
     test_release_on_other_position_starts_independent_multi_tap_chain();
     test_press_on_new_position_preserves_existing_pending_multi_tap();
+    test_press_reclaims_tap_before_begin_request();
+    test_press_flushes_pending_multi_tap_before_layer_press();
     test_scan_fires_hold_for_independent_position_slot();
     test_release_pending_multi_tap_hold_registers_then_unregisters_held_action();
     test_quick_release_pending_multi_tap_hold_keeps_chain_alive_for_layer_key();

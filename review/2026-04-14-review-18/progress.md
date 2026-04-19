@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-04-20 Runtime V2 Press Transport Pass
+
+- Moved handled press off `key_runtime_slot_result_t` on the default transition path: handled presses now append a direct reducer-owned effect plan into `key_runtime_transition_plan_t` instead of routing through `key_runtime_slot_step(...)` and result wrapping first.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.h` and `.c` now expose `key_runtime_slot_take_handled_press_plan(...)`, which:
+  - preserves the existing handled-press state mutation,
+  - reuses the same press reducer logic for:
+    - pending multi-tap reuse,
+    - pending-chain flush before a fresh begin,
+    - reclaiming an occupied active slot, and
+    - fresh press begin,
+  - but emits a `key_runtime_slot_direct_plan_t` directly instead of serializing those effects through `key_runtime_slot_result_t`.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_direct_plan.h` now also covers the remaining press-only effect shapes needed by that reducer:
+  - direct dispatch-action emission, and
+  - direct layer-press emission.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses that direct press helper in `key_runtime_transition_handled_key_press(...)`, so the default press path no longer depends on slot-step/result transport.
+- This keeps the cut narrow:
+  - `key_runtime_slot_step(...)` still exists as the compatibility wrapper for focused slot tests and any narrowed callers,
+  - press-state mutation is unchanged,
+  - but the default handled-press transport is now direct-plan based.
+- `tests/host/key_runtime_transition_test.c` now includes dedicated press transport regressions proving:
+  - reclaiming a live tap slot emits the previous tap before the new immediate-hold registration, and
+  - flushing a foreign pending chain emits the delayed action before a new layer-press request.
+
 ## 2026-04-20 Runtime V2 Scan Transport Pass
 
 - Moved the next hot-path transport seam off `key_runtime_slot_result_t`: active scan and pending multi-tap scan now emit direct effect plans into `key_runtime_transition_plan_t` instead of round-tripping through slot-step/result wrappers first.

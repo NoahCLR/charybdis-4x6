@@ -100,6 +100,19 @@ static inline void key_runtime_slot_direct_plan_push_builder_if_present(key_runt
     }
 }
 
+static inline void key_runtime_slot_direct_plan_push_dispatch_action(key_runtime_slot_direct_plan_t *plan, keypos_t key_pos, uint16_t action) {
+    if (!(plan && action != KC_NO)) {
+        return;
+    }
+
+    (void)key_pos;
+    plan->handled = true;
+    key_runtime_slot_direct_plan_push(plan, (key_runtime_effect_t){
+                                                .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+                                                .data.action = action,
+                                            });
+}
+
 static inline void key_runtime_slot_direct_plan_push_delayed_action(key_runtime_slot_direct_plan_t *plan, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
     if (!(plan && action != KC_NO && repeat_count != 0u)) {
         return;
@@ -113,6 +126,22 @@ static inline void key_runtime_slot_direct_plan_push_delayed_action(key_runtime_
                                                         .action       = action,
                                                         .mods         = mods,
                                                         .repeat_count = repeat_count,
+                                                    },
+                                            });
+}
+
+static inline void key_runtime_slot_direct_plan_push_layer_press(key_runtime_slot_direct_plan_t *plan, keypos_t key_pos, uint8_t layer) {
+    if (!plan) {
+        return;
+    }
+
+    plan->handled = true;
+    key_runtime_slot_direct_plan_push(plan, (key_runtime_effect_t){
+                                                .kind = KEY_RUNTIME_EFFECT_LAYER_PRESS,
+                                                .data.layer_press =
+                                                    {
+                                                        .key_pos = key_pos,
+                                                        .layer   = layer,
                                                     },
                                             });
 }

@@ -7,12 +7,25 @@
 #include "key_runtime_slot_effect.h"
 #include "key_runtime_slot_pending_multi_tap.h"
 #include "key_runtime_slot_policy.h"
-#include "key_runtime_slot_result_internal.h"
 
 #include "../key_runtime_index_internal.h"
 #include "../key_runtime_trace.h"
 #include "../../interaction/handled_key_internal.h"
 #include "../../../pointing/defs/pd_modes.h"
+
+static key_runtime_slot_result_t key_runtime_slot_result_from_direct_plan(key_runtime_slot_direct_plan_t plan) {
+    key_runtime_slot_result_t result = {
+        .handled    = plan.handled,
+        .count      = plan.count,
+        .overflowed = plan.overflowed,
+    };
+
+    for (uint8_t index = 0; index < plan.count; index++) {
+        result.items[index] = plan.items[index];
+    }
+
+    return result;
+}
 
 static key_runtime_slot_phase_t key_runtime_slot_initial_press_phase(hold_behavior_t hold) {
     return hold_registers_on_press(hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
@@ -108,21 +121,21 @@ static key_runtime_slot_press_outcome_t key_runtime_slot_press_outcome_for_conte
     return KEY_RUNTIME_SLOT_PRESS_OUTCOME_BEGIN_FRESH;
 }
 
-static key_runtime_slot_result_t key_runtime_slot_reduce_press_reuse_pending_multi_tap(const key_runtime_slot_press_context_t *context) {
-    key_runtime_slot_result_t result = {0};
-    uint16_t                  action;
+static key_runtime_slot_direct_plan_t key_runtime_slot_reduce_press_reuse_pending_multi_tap(const key_runtime_slot_press_context_t *context) {
+    key_runtime_slot_direct_plan_t plan = {0};
+    uint16_t                       action;
 
     if (!(context && context->slot)) {
-        return result;
+        return plan;
     }
 
-    result.handled = true;
-    action         = key_runtime_slot_advance_pending_multi_tap(context->slot, context->keycode);
+    plan.handled = true;
+    action       = key_runtime_slot_advance_pending_multi_tap(context->slot, context->keycode);
     key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_PRESS_REUSE_CHAIN, context->slot->pending_multi_tap.count, action);
-    key_runtime_slot_result_push_dispatch_action(&result, context->key_pos, action);
+    key_runtime_slot_direct_plan_push_dispatch_action(&plan, context->key_pos, action);
 
     if (context->needs_layer_press) {
-        key_runtime_slot_result_push_layer_press(&result, context->key_pos, context->materialized.layer);
+        key_runtime_slot_direct_plan_push_layer_press(&plan, context->key_pos, context->materialized.layer);
     }
 
     if (key_runtime_slot_pending_multi_tap_pending_hold(context->slot) || context->needs_layer_press) {
@@ -133,46 +146,46 @@ static key_runtime_slot_result_t key_runtime_slot_reduce_press_reuse_pending_mul
         key_runtime_effect_builder_t begin_builder;
 
         if (pending_layer_press && !context->needs_layer_press) {
-            key_runtime_slot_result_push_layer_press(&result, context->key_pos, current_materialized.layer);
+            key_runtime_slot_direct_plan_push_layer_press(&plan, context->key_pos, current_materialized.layer);
         }
 
         begin_builder = key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, current_materialized, KC_NO, 0, pending_hold ? current_materialized.hold : hold_behavior_none(), pending_hold ? current_materialized.long_hold : hold_behavior_none(), pending_hold ? current_tap.tap_hold_term : context->tap_hold_term, pending_hold ? current_tap.longer_hold_term : context->longer_hold_term, pending_hold ? current_tap.multi_tap_term : context->multi_tap_term, pending_hold ? KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW : KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE, pending_hold ? current_materialized.hold_strategy : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT, false);
-        key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, begin_builder);
+        key_runtime_slot_direct_plan_push_builder_if_present(&plan, context->key_pos, begin_builder);
     }
 
-    return result;
+    return plan;
 }
 
-static key_runtime_slot_result_t key_runtime_slot_reduce_press_begin_fresh(const key_runtime_slot_press_context_t *context) {
-    key_runtime_slot_result_t result = {0};
+static key_runtime_slot_direct_plan_t key_runtime_slot_reduce_press_begin_fresh(const key_runtime_slot_press_context_t *context) {
+    key_runtime_slot_direct_plan_t plan = {0};
 
     if (!(context && context->slot)) {
-        return result;
+        return plan;
     }
 
-    result.handled = true;
+    plan.handled = true;
 
     if (context->flush_pending_multi_tap) {
         key_runtime_slot_pending_multi_tap_flush_t flush = key_runtime_slot_take_pending_multi_tap_flush(context->slot);
         key_runtime_trace_multi_tap_decision(KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_PRESS_FLUSH_CHAIN, flush.repeat_count, flush.action);
-        key_runtime_slot_result_push_delayed_action(&result, flush.action, flush.mods, flush.repeat_count);
+        key_runtime_slot_direct_plan_push_delayed_action(&plan, flush.action, flush.mods, flush.repeat_count);
     }
 
     if (context->needs_layer_press) {
-        key_runtime_slot_result_push_layer_press(&result, context->key_pos, context->materialized.layer);
+        key_runtime_slot_direct_plan_push_layer_press(&plan, context->key_pos, context->materialized.layer);
     }
 
     if (context->reclaim_active_slot) {
         keypos_t                     reclaim_key_pos = context->slot->owner.key_pos;
         key_runtime_effect_builder_t reclaim_builder = key_runtime_slot_policy_take_flush(context->slot, context->active_held_action_survives_flush);
-        key_runtime_slot_result_push_builder_if_present(&result, reclaim_key_pos, reclaim_builder);
+        key_runtime_slot_direct_plan_push_builder_if_present(&plan, reclaim_key_pos, reclaim_builder);
     }
 
-    key_runtime_slot_result_push_builder_if_present(&result, context->key_pos, key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, context->materialized, context->binding.tap_action, context->binding.tap_repeat_count, context->binding.hold, context->binding.long_hold, context->tap_hold_term, context->longer_hold_term, context->multi_tap_term, key_runtime_slot_initial_press_phase(context->binding.hold), context->materialized.hold_strategy, context->materialized.pd_mode && pd_mode_local_locked(context->materialized.pd_mode)));
-    return result;
+    key_runtime_slot_direct_plan_push_builder_if_present(&plan, context->key_pos, key_runtime_slot_begin_press(context->slot, context->keycode, context->key_pos, context->materialized, context->binding.tap_action, context->binding.tap_repeat_count, context->binding.hold, context->binding.long_hold, context->tap_hold_term, context->longer_hold_term, context->multi_tap_term, key_runtime_slot_initial_press_phase(context->binding.hold), context->materialized.hold_strategy, context->materialized.pd_mode && pd_mode_local_locked(context->materialized.pd_mode)));
+    return plan;
 }
 
-key_runtime_slot_result_t key_runtime_slot_reduce_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush) {
+key_runtime_slot_direct_plan_t key_runtime_slot_take_handled_press_plan(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush) {
     key_runtime_slot_press_context_t context = key_runtime_slot_press_context(slot, keycode, key_pos, resolution, active_held_action_survives_flush);
 
     switch (key_runtime_slot_press_outcome_for_context(&context)) {
@@ -182,6 +195,10 @@ key_runtime_slot_result_t key_runtime_slot_reduce_handled_press(active_key_state
             return key_runtime_slot_reduce_press_begin_fresh(&context);
         case KEY_RUNTIME_SLOT_PRESS_OUTCOME_NONE:
         default:
-            return (key_runtime_slot_result_t){0};
+            return (key_runtime_slot_direct_plan_t){0};
     }
+}
+
+key_runtime_slot_result_t key_runtime_slot_reduce_handled_press(active_key_state_t *slot, uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, bool active_held_action_survives_flush) {
+    return key_runtime_slot_result_from_direct_plan(key_runtime_slot_take_handled_press_plan(slot, keycode, key_pos, resolution, active_held_action_survives_flush));
 }

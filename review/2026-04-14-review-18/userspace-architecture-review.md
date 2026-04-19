@@ -707,6 +707,49 @@ The remaining mixed transport is narrower again:
 
 That is now a much more realistic endgame. The remaining work is no longer “most of the runtime”; it is the last press/orchestration seams plus deletion of the compatibility wrappers once the default path no longer depends on them.
 
+## 2026-04-20 Runtime V2 Press Transport Note
+
+Handled press has now crossed into the same direct-plan transport model:
+
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.h` and `.c` now expose `key_runtime_slot_take_handled_press_plan(...)`.
+- That helper keeps the existing handled-press reducer semantics intact for:
+  - pending multi-tap reuse,
+  - pending-chain flush before a fresh begin,
+  - reclaiming an occupied active slot, and
+  - fresh press begin,
+  but emits a `key_runtime_slot_direct_plan_t` directly instead of serializing through `key_runtime_slot_result_t`.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_direct_plan.h` now also covers the remaining press-only effect shapes needed by that reducer:
+  - direct dispatch-action emission, and
+  - direct layer-press emission.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses that helper in `key_runtime_transition_handled_key_press(...)`, so the default handled-press path no longer goes through:
+  - `key_runtime_slot_step(...)`, or
+  - slot-result transport.
+- The compatibility boundary remains intentionally narrow:
+  - `key_runtime_slot_reduce_handled_press(...)` still exists as a wrapper for focused slot tests and narrowed callers, and
+  - slot-step/result transport still exists where the migration has not deleted it yet,
+  - but the normal handled-press path is now direct-plan based.
+- `tests/host/key_runtime_transition_test.c` now adds dedicated press transport regressions proving:
+  - reclaiming a live tap slot emits the old tap before the new immediate-hold registration, and
+  - flushing a foreign pending chain emits the delayed action before a new layer-press request.
+- The transition, slot, runtime-debug, release matrix, scenario, modifier-hold integration, pd-mode key-runtime integration, real-profile overlap, key-runtime harness, feature-gate compile, and full host suites stayed green after this cut.
+
+Inference from the current tree: the default hot path no longer depends on old slot-result transport for:
+
+- handled press,
+- authoritative handled release,
+- active scan,
+- pending multi-tap scan,
+- pending multi-tap flush,
+- foreign pending multi-tap flush,
+- active-key flush, and
+- active-key interrupt.
+
+The remaining mixed architecture is now concentrated in one real production seam:
+
+- deferred-release queue assembly and drain orchestration still live in the legacy release/transition layer.
+
+Compatibility wrappers still exist, but they are no longer the default runtime authority. That is the first point in this thread where the default handled-key event flow is mostly reducer/direct-plan driven end to end, with deferred release orchestration standing out as the main remaining legacy owner.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:
