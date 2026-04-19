@@ -566,6 +566,38 @@ Inference from the current tree: handled-release effect *selection* is no longer
 
 That is a materially smaller split-brain surface than before, but it still means the final emitted-effect execution contract is not yet end-to-end reducer-owned.
 
+## 2026-04-19 Runtime V2 Effect Projection Note
+
+The next downstream seam has now crossed into the reducer-owned projector layer:
+
+- `users/noah/lib/runtime_v2/runtime_v2_projection.h` now defines the runtime-v2 projector surface for:
+  - `runtime_v2_project_effect(...)`, and
+  - `runtime_v2_project_pending_release_dispatch(...)`.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now owns the actual side-effect projection for handled-key runtime effects:
+  - action taps,
+  - held-action register/unregister,
+  - release-owned-state cleanup,
+  - repeat start,
+  - layer press/release,
+  - feedback pulse,
+  - pd-mode lock tap, and
+  - delayed-action repeats.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now reduces `key_runtime_transition_execute_plan(...)` to an execution shell that:
+  - emits trace records, then
+  - hands each effect to `runtime_v2_project_effect(...)`.
+- `users/noah/lib/key/runtime/key_runtime_release.c` now routes both the reducer-owned drained pending-release path and the legacy deferred-release queue fallback through `runtime_v2_project_pending_release_dispatch(...)` instead of calling delayed-action execution directly.
+- `tests/host/runtime_debug_test.c` now directly proves the projector seam by checking:
+  - direct effect projection for an authored action tap and a pd-mode lock tap, and
+  - direct deferred delayed-action projection with preserved saved-mod payload.
+- The transition suite, runtime-debug suite, modifier-hold integration suite, pd-mode key-runtime integration suite, and feature-gate compile suite stayed green after this cut, which is the enforcement bar that the new projector seam preserved intended behavior.
+
+Inference from the current tree: handled release meaning, effect selection, and effect application are now all on reducer-owned seams. The remaining split is transport:
+
+- legacy slot/result state still carries reducer-owned effect queues and pending multi-tap seed payload through the old handled-key transport, and
+- legacy transition/release orchestration still owns queue assembly and drain ordering for those transported effects.
+
+That is the smallest split-brain surface this thread has reached so far. It is still not the clean-slate end state, but the remaining ownership gap is now much narrower and more mechanical than the earlier “multiple subsystems decide what release means” bug class.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

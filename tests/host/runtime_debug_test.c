@@ -14,6 +14,7 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
 #include "users/noah/lib/runtime_v2/runtime_v2.h"
+#include "users/noah/lib/runtime_v2/runtime_v2_projection.h"
 #include "users/noah/lib/runtime_v2/runtime_v2_release_internal.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
@@ -38,6 +39,10 @@ static uint8_t  fake_weak_mods;
 static uint8_t  fake_oneshot_mods;
 static uint8_t  fake_oneshot_locked_mods;
 static uint8_t  send_keyboard_report_count;
+static uint16_t last_emitted_action;
+static uint16_t last_delayed_action;
+static delayed_action_mods_t last_delayed_mods;
+static uint8_t  split_runtime_sync_count;
 
 layer_state_t layer_state;
 
@@ -192,6 +197,10 @@ static void test_reset_stubs(void) {
     fake_oneshot_mods          = 0;
     fake_oneshot_locked_mods   = 0;
     send_keyboard_report_count = 0;
+    last_emitted_action        = KC_NO;
+    last_delayed_action        = KC_NO;
+    last_delayed_mods          = (delayed_action_mods_t){0};
+    split_runtime_sync_count   = 0;
     layer_state                = 0;
 }
 
@@ -421,13 +430,13 @@ void action_dispatch(uint16_t action) {
 }
 
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
-    (void)action;
+    last_emitted_action = action;
     (void)policy;
 }
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
-    (void)action;
-    (void)mods;
+    last_delayed_action = action;
+    last_delayed_mods   = mods;
 }
 
 bool noah_synthetic_record_active(void) {
@@ -445,7 +454,9 @@ bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     return false;
 }
 
-void split_runtime_sync(void) {}
+void split_runtime_sync(void) {
+    split_runtime_sync_count++;
+}
 
 static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
     return (keyrecord_t){
@@ -1699,6 +1710,34 @@ static void test_runtime_v2_transition_execute_plan_updates_owned_state_leases(v
     CHECK(snapshot.v2_lease_count == 0u);
 }
 
+static void test_runtime_v2_projector_executes_effects_and_pending_dispatches(void) {
+    delayed_action_mods_t mods = {
+        .real = MOD_BIT(KC_LEFT_SHIFT),
+    };
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    runtime_v2_project_effect(&(key_runtime_effect_t){
+        .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+        .data.action = TEST_ACTION,
+    });
+    CHECK(last_emitted_action == TEST_ACTION);
+
+    runtime_v2_project_effect(&(key_runtime_effect_t){
+        .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+        .data.pd_mode = PD_MODE_ARROW,
+    });
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+
+    runtime_v2_project_pending_release_dispatch(&(pending_release_t){
+        .action = TEST_SECOND_ACTION,
+        .mods   = mods,
+    });
+    CHECK(last_delayed_action == TEST_SECOND_ACTION);
+    CHECK(last_delayed_mods.real == mods.real);
+}
+
 int main(void) {
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
@@ -1735,6 +1774,7 @@ int main(void) {
     test_runtime_v2_take_pending_releases_preserves_order_and_clears_tokens();
     test_runtime_v2_runtime_owned_state_leases_track_and_clear();
     test_runtime_v2_transition_execute_plan_updates_owned_state_leases();
+    test_runtime_v2_projector_executes_effects_and_pending_dispatches();
 
     puts("runtime_debug host tests passed");
     return 0;

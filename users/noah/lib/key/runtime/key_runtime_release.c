@@ -11,6 +11,7 @@
 #include "key_runtime_trace.h"
 #include "key_runtime_transition.h"
 #include "../../runtime_v2/runtime_v2.h"
+#include "../../runtime_v2/runtime_v2_projection.h"
 #include "../../state/runtime/split_runtime_sync.h"
 
 static keyboard_mod_state_t key_runtime_release_keyboard_mod_state_current(void) {
@@ -20,6 +21,14 @@ static keyboard_mod_state_t key_runtime_release_keyboard_mod_state_current(void)
         .oneshot        = get_oneshot_mods(),
         .oneshot_locked = get_oneshot_locked_mods(),
     };
+}
+
+__attribute__((weak)) void runtime_v2_project_pending_release_dispatch(const pending_release_t *pending) {
+    if (!pending) {
+        return;
+    }
+
+    dispatch_delayed_action(pending->action, pending->mods);
 }
 
 static void key_runtime_release_plan_defer_dispatch_actions(key_runtime_transition_plan_t *plan, keypos_t key_pos, keyboard_mod_state_t mods) {
@@ -82,7 +91,7 @@ void key_runtime_release_drain_deferred_dispatches(void) {
         }
 
         for (uint8_t index = 0; index < drained; index++) {
-            dispatch_delayed_action(pending[index].action, pending[index].mods);
+            runtime_v2_project_pending_release_dispatch(&pending[index]);
         }
 
         queue->count = 0;
@@ -94,7 +103,10 @@ void key_runtime_release_drain_deferred_dispatches(void) {
     }
 
     for (uint8_t index = 0; index < queue->count; index++) {
-        dispatch_delayed_action(queue->items[index].action, queue->items[index].mods);
+        runtime_v2_project_pending_release_dispatch(&(pending_release_t){
+            .action = queue->items[index].action,
+            .mods   = queue->items[index].mods,
+        });
         runtime_v2_observe_release_dispatch_drained(queue->items[index].key_pos, queue->items[index].action, queue->items[index].mods);
     }
 

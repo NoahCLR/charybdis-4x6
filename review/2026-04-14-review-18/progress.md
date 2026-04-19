@@ -1,5 +1,35 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Effect Projection Pass
+
+- Moved the world-application seam for handled-key runtime effects onto runtime-v2-owned projector helpers: transition and release orchestration no longer own the direct QMK-side effect switch for authored runtime effects.
+- Added `users/noah/lib/runtime_v2/runtime_v2_projection.h` as the reducer-owned projector surface for:
+  - `runtime_v2_project_effect(...)`, which applies one `key_runtime_effect_t`, and
+  - `runtime_v2_project_pending_release_dispatch(...)`, which applies one drained deferred-release dispatch.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now owns the effect projector implementation for:
+  - action taps,
+  - held-action register/unregister,
+  - release-owned-state cleanup,
+  - repeat start,
+  - layer press/release,
+  - feedback pulse,
+  - pd-mode lock tap, and
+  - delayed-action repeats.
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now reduces `key_runtime_transition_execute_plan(...)` to:
+  - trace the effect, then
+  - hand it to `runtime_v2_project_effect(...)`.
+- `users/noah/lib/key/runtime/key_runtime_release.c` now routes both:
+  - reducer-owned drained pending releases, and
+  - legacy deferred-release queue fallback dispatches,
+  through `runtime_v2_project_pending_release_dispatch(...)` instead of calling delayed-action execution directly.
+- This keeps the migration cut narrow:
+  - the legacy transition and release modules still transport effect queues and deferred-release items,
+  - runtime-v2 now owns the side-effectful projection step for those runtime effects, and
+  - weak fallback projector stubs remain in the legacy executor files for focused host runners that intentionally omit the full reducer object surface.
+- `tests/host/runtime_debug_test.c` now directly proves the projector seam by checking:
+  - `runtime_v2_project_effect(...)` dispatches an authored action tap and applies a pd-mode lock tap, and
+  - `runtime_v2_project_pending_release_dispatch(...)` applies a deferred delayed action with the saved modifier payload intact.
+
 ## 2026-04-19 Runtime V2 Release Effect Planning Pass
 
 - Moved handled-release effect selection onto the reducer-owned path: once runtime-v2 decides active or pending multi-tap release outcome, the default release callers no longer re-map that decision into effects locally.
@@ -709,5 +739,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Move the remaining release aftermath transport/execution seams onto the reducer path so v2 owns not just release decision and effect selection, but the complete settlement/cleanup contract.
+3. Move the remaining release aftermath transport seams onto the reducer path so v2 owns not just release decision, effect selection, and effect projection, but also the queue/seed transport contract end-to-end.
 4. Capture and replay on-device traces for the original wedge repros now that blocker gating, pending multi-tap lifecycle, explicit flush/reset, and handled-release effect planning all have reducer-owned visibility.

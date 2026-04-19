@@ -22,6 +22,7 @@
 #include "../../action/action_lifecycle.h"
 #include "../../pointing/defs/pd_modes.h"
 #include "../../runtime_v2/runtime_v2.h"
+#include "../../runtime_v2/runtime_v2_projection.h"
 #include "../../state/ownership/layer_ownership.h"
 #include "../../state/runtime/split_runtime_sync.h"
 #include "../ownership/held_action.h"
@@ -59,6 +60,56 @@ __attribute__((weak)) void runtime_v2_observe_repeat_start(keypos_t key_pos, uin
 __attribute__((weak)) bool runtime_v2_release_owned_state_by_key(keypos_t key_pos) {
     (void)key_pos;
     return false;
+}
+
+__attribute__((weak)) void runtime_v2_project_effect(const key_runtime_effect_t *effect) {
+    if (!effect) {
+        return;
+    }
+
+    switch (effect->kind) {
+        case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
+            noah_emit_action_tap(effect->data.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+            return;
+        case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
+            runtime_v2_observe_held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
+            held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
+            return;
+        case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
+            held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
+            runtime_v2_observe_held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
+            return;
+        case KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
+            runtime_v2_release_owned_state_by_key(effect->data.key_pos);
+            held_action_release_owned_by_key(effect->data.key_pos);
+            return;
+        case KEY_RUNTIME_EFFECT_REPEAT_START:
+            runtime_v2_observe_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
+            held_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
+            return;
+        case KEY_RUNTIME_EFFECT_LAYER_PRESS:
+            layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
+            return;
+        case KEY_RUNTIME_EFFECT_LAYER_RELEASE:
+            layer_ownership_momentary_release(effect->data.key_pos);
+            return;
+        case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
+            key_feedback_pulse_arm(effect->data.long_hold_level);
+            return;
+        case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
+            if (pd_mode_toggle_lock_state(effect->data.pd_mode)) {
+                split_runtime_sync();
+            }
+            return;
+        case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
+            for (uint8_t repeat = 0; repeat < effect->data.delayed_action.repeat_count; repeat++) {
+                dispatch_delayed_action(effect->data.delayed_action.action, effect->data.delayed_action.mods);
+            }
+            return;
+        case KEY_RUNTIME_EFFECT_NONE:
+        default:
+            return;
+    }
 }
 
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
@@ -121,50 +172,7 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
     for (uint8_t i = 0; i < plan->count; i++) {
         const key_runtime_effect_t *effect = &plan->items[i];
         key_runtime_trace_effect_execute(i, effect);
-
-        switch (effect->kind) {
-            case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
-                noah_emit_action_tap(effect->data.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
-                break;
-            case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
-                runtime_v2_observe_held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
-                held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
-                break;
-            case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
-                held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
-                runtime_v2_observe_held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
-                break;
-            case KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
-                runtime_v2_release_owned_state_by_key(effect->data.key_pos);
-                held_action_release_owned_by_key(effect->data.key_pos);
-                break;
-            case KEY_RUNTIME_EFFECT_REPEAT_START:
-                runtime_v2_observe_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
-                held_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
-                break;
-            case KEY_RUNTIME_EFFECT_LAYER_PRESS:
-                layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
-                break;
-            case KEY_RUNTIME_EFFECT_LAYER_RELEASE:
-                layer_ownership_momentary_release(effect->data.key_pos);
-                break;
-            case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
-                key_feedback_pulse_arm(effect->data.long_hold_level);
-                break;
-            case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
-                if (pd_mode_toggle_lock_state(effect->data.pd_mode)) {
-                    split_runtime_sync();
-                }
-                break;
-            case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
-                for (uint8_t repeat = 0; repeat < effect->data.delayed_action.repeat_count; repeat++) {
-                    dispatch_delayed_action(effect->data.delayed_action.action, effect->data.delayed_action.mods);
-                }
-                break;
-            case KEY_RUNTIME_EFFECT_NONE:
-            default:
-                break;
-        }
+        runtime_v2_project_effect(effect);
     }
 }
 
