@@ -297,7 +297,7 @@ An action in a `key_behaviors[]` row can be:
 - a plain keycode (`KC_MPLY`, `S(KC_1)`)
 - a hardcoded or VIA macro (`MACRO_0`, `VIA_MACRO_6`)
 - a layer lock (`LOCK_LAYER(layer)`)
-- a pointer-mode lock (`LOCK_PD_MODE(mode_keycode)`)
+- a generated pointer-mode lock keycode (`ARROW_MODE_LOCK`)
 - a supported QMK behavior keycode such as `OSM()` or `MT()`
 - an owned momentary layer hold such as
   `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))`

@@ -1050,8 +1050,6 @@ def display_token(token: str) -> str:
         return f"MO[{short_layer_name(normalized[3:-1])}]"
     if normalized.startswith("LOCK_LAYER(") and normalized.endswith(")"):
         return f"LOCK[{short_layer_name(normalized[11:-1])}]"
-    if normalized.startswith("LOCK_PD_MODE(") and normalized.endswith(")"):
-        return f"LOCK[{short_mode_name(normalized[13:-1])}]"
     if normalized.startswith("S(") and normalized.endswith(")"):
         return f"S({display_token(normalized[2:-1])})"
     if normalized.startswith("A(") and normalized.endswith(")"):
@@ -1444,12 +1442,6 @@ def resolve_pd_mode_from_action_expr(
         return pd_mode_by_mode_keycode[normalized]
     if normalized in pd_mode_by_lock_keycode:
         return pd_mode_by_lock_keycode[normalized]
-    if normalized.startswith("LOCK_PD_MODE(") and normalized.endswith(")"):
-        inner = normalize_expr(normalized[13:-1])
-        if inner in pd_mode_by_mode_keycode:
-            return pd_mode_by_mode_keycode[inner]
-        if inner in pd_mode_by_lock_keycode:
-            return pd_mode_by_lock_keycode[inner]
     return None
 
 

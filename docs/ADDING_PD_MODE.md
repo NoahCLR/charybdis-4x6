@@ -58,7 +58,7 @@ A pd mode is a custom keycode that:
 - can be placed directly in the keymap for default momentary behavior
 - can optionally grow explicit tap / hold / multi-tap behavior through
   `key_behaviors[]`
-- gets a generated `LOCK_PD_MODE(...)` action whether or not the keymap uses it
+- gets a generated `<MODE>_LOCK` keycode whether or not the keymap uses it
 - can transform trackball motion in the pointing-device pipeline
 - can optionally intercept key events while active
 - participates in split sync and RGB overlays
@@ -79,8 +79,8 @@ These are the rules most likely to break the system if you miss one.
 1. Every shared pd mode must exist as exactly one row in [`users/noah/lib/pointing/defs/pd_mode_manifest.h`](../users/noah/lib/pointing/defs/pd_mode_manifest.h).
 2. Shared pd-mode keycodes and lock keycodes are generated from that manifest.
    Do not hand-edit the generated pd-mode section in [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h).
-3. `LOCK_PD_MODE(mode_keycode_)` token-pastes to the generated `<MODE>_LOCK`
-   keycode, so authored mode keycodes must use the manifest-generated symbolic names.
+3. Authored lock actions should use the generated `<MODE>_LOCK` keycode for
+   that mode, so mode keycodes must keep using the manifest-generated symbolic names.
 4. Mode flags use `pd_mode_mask_t`, and split sync mirrors the active and
    locked modes as `pd_mode_id_t` values:
    [`users/noah/lib/pointing/defs/pd_mode_flags.h`](../users/noah/lib/pointing/defs/pd_mode_flags.h) and [`users/noah/lib/state/runtime/split_runtime_sync.h`](../users/noah/lib/state/runtime/split_runtime_sync.h).
@@ -127,7 +127,7 @@ Edit [`users/noah/lib/pointing/defs/pd_mode_manifest.h`](../users/noah/lib/point
 Add the new mode as one manifest row. That single row generates:
 
 - the shared mode keycode in [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h)
-- the shared lock keycode used by `LOCK_PD_MODE(...)`
+- the shared lock keycode (`<MODE>_LOCK`)
 - the `PD_MODE_*` flag
 - the `pd_modes[]` registry row
 
@@ -242,14 +242,14 @@ You do not register the mode by hand anymore. The manifest row expands into a
 `pd_modes[]` entry in [`users/noah/lib/pointing/runtime/pd_mode_registry.c`](../users/noah/lib/pointing/runtime/pd_mode_registry.c):
 
 ```c
-{PD_MODE_EXAMPLE, EXAMPLE_MODE, LOCK_PD_MODE(EXAMPLE_MODE), handle_example_mode, NULL, reset_example_mode, 0, PD_MODE_TRAIT_NONE, NULL},
+{PD_MODE_EXAMPLE, EXAMPLE_MODE, EXAMPLE_MODE_LOCK, handle_example_mode, NULL, reset_example_mode, 0, PD_MODE_TRAIT_NONE, NULL},
 ```
 
 Field meaning:
 
 - `mode_flag`: internal bit flag
 - `keycode`: custom keycode that activates the mode
-- `lock_action`: generated `LOCK_PD_MODE(...)` action for that mode
+- `lock_action`: generated `<MODE>_LOCK` keycode for that mode
 - `handler`: trackball-motion handler, or `NULL`
 - `key_handler`: optional key-event interceptor
 - `reset`: cleanup callback, or `NULL`
@@ -280,13 +280,13 @@ Common lockable patterns are:
 
 - hold: momentary mode
 - optional first quick tap: an explicit `[0].tap`
-- quick double tap: lock the mode when `[1].tap = TAP_SENDS(LOCK_PD_MODE(...))`
-- double-tap hold: lock the mode when `[1].hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(...))`
+- quick double tap: lock the mode when `[1].tap = TAP_SENDS(EXAMPLE_MODE_LOCK)`
+- double-tap hold: lock the mode when `[1].hold = TAP_AT_HOLD_THRESHOLD(EXAMPLE_MODE_LOCK)`
 
 Example:
 
 ```c
-{.keycode = EXAMPLE_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(LOCK_PD_MODE(EXAMPLE_MODE))}}},
+{.keycode = EXAMPLE_MODE, .tap_counts = {[1] = {.tap = TAP_SENDS(EXAMPLE_MODE_LOCK)}}},
 ```
 
 That row only matters if `EXAMPLE_MODE` is reachable. You can expose it:
@@ -412,7 +412,7 @@ you are inventing a new runtime behavior that existing modes do not cover.
 
 ### Mode Should Not Expose A Lock Gesture
 
-Every shared pd mode still gets a generated `LOCK_PD_MODE(...)` action from the
+Every shared pd mode still gets a generated `<MODE>_LOCK` keycode from the
 manifest.
 
 If the intended behavior should not expose locking, do not bind that action on

@@ -61,7 +61,7 @@ enum {
 // Plain pointing-device mode keycodes work as default momentary holds.
 // Add a key_behaviors[] row when you want those keys to grow explicit tap,
 // hold, longer-hold, or multi-tap behavior on top of that default.
-// Use LOCK_PD_MODE(mode_keycode) for a persistent toggle inside tap/hold rows.
+// Use the generated *_LOCK keycode for a persistent toggle inside tap/hold rows.
 // Each pd mode gets an explicit generated lock keycode, so mode identity no
 // longer depends on contiguous enum math.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
@@ -102,7 +102,6 @@ enum custom_keycodes {
 #define PD_MODE_KEYCODE_COUNT PD_MODE_COUNT
 #define PD_MODE_LOCK_KEYCODE_COUNT PD_MODE_COUNT
 #define HARDCODED_MACRO_SLOT_COUNT ((MACRO_15 - MACRO_0) + 1)
-#define LOCK_PD_MODE(mode_keycode_) mode_keycode_##_LOCK
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 #define NOAH_KEYMAP_SAFE_RANGE CUSTOM_KEYCODES_END
 

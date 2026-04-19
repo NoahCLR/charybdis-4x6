@@ -173,7 +173,7 @@ These are small profile-specific quality-of-life keys:
 - `KC_ESC`: tap `Esc`, double tap `~`, long hold `Alt+Cmd+Esc`
 - `KC_ENT`: hold `Shift+Enter`
 - `KC_LEFT_SHIFT`: tap `Caps Lock`, hold normal left `Shift`
-- `KC_RIGHT_ALT`: tap `LOCK_PD_MODE(ARROW_MODE)`, hold normal right `Alt`
+- `KC_RIGHT_ALT`: tap `ARROW_MODE_LOCK`, hold normal right `Alt`
 
 `KC_RIGHT_ALT` is a good example of the profile using a plain key's default held
 path while still stealing its tap for something more specialized. That matters

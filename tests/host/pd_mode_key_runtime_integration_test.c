@@ -73,7 +73,7 @@ const key_behavior_t key_behaviors[] = {
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[1] =
             {
-                .tap  = TAP_SENDS(LOCK_PD_MODE(VOLUME_MODE)),
+                .tap  = TAP_SENDS(VOLUME_MODE_LOCK),
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(BRIGHTNESS_MODE),
             },
     },

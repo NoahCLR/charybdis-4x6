@@ -120,7 +120,7 @@
   - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Current full-suite status:
-  - `sh tests/host/run_all_host_tests.sh` is still blocked by the pre-existing `docs/KEYMAP-OVERVIEW.md` introspection drift against the dirty `keymap.c` right-alt row (`LOCK_PD_MODE(ARROW_MODE)` vs `ARROW_MODE_LOCK` wording), not by this runtime change.
+  - At that audit snapshot, `sh tests/host/run_all_host_tests.sh` was still blocked by right-alt introspection drift in `docs/KEYMAP-OVERVIEW.md`; the later cleanup on `review-after-arrowmode` resolved that mismatch and restored the clean baseline recorded below.
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes with the current tree.
   - Earlier notes above that marked the full host suite as passed predate this unrelated dirty-tree drift and should be read as audit-time snapshots.
   - `sh tests/host/run_action_dispatch_tests.sh`
@@ -243,10 +243,20 @@
   - removed the leftover `NOAH_DIAGNOSTIC_*` compile gates from the normal action and key-runtime code paths
   - deleted the one-off host runners that only existed to exercise those diagnostic branches
   - collapsed the affected host suites back to permanent normal-path expectations without changing the landed overlap fix
+- Lock-keycode cleanup follow-up on `review-after-arrowmode`:
+  - removed the pd-mode lock authoring alias from `users/noah/noah_keymap_ids.h` and switched the remaining repo-owned authored/test surfaces to explicit generated `*_LOCK` keycodes
+  - regenerated `docs/KEYMAP-OVERVIEW.md` with `python3 tools/profile_introspect.py --write`, so the right-alt and dragscroll rows now match the current authored keymap
+  - reconciled the stale arrow-lock note in `review/2026-04-14-review-18/userspace-architecture-review.md` so the active review folder no longer contradicts the current runtime path
+- Current full-suite status on `review-after-arrowmode`:
+  - `python3 tools/profile_introspect.py --check` passes
+  - `sh tests/host/run_real_profile_validation_tests.sh` passes
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh` passes
+  - `sh tests/host/run_feature_gate_compile_tests.sh` passes
+  - `sh tests/host/run_all_host_tests.sh` passes
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
 1. Confirm on-device that single-tap `KC_RIGHT_ALT` now enters arrow mode without freezing and that a second tap still unlocks cleanly.
-2. Reconcile the existing `docs/KEYMAP-OVERVIEW.md` introspection drift against the dirty `keymap.c` row, then rerun `sh tests/host/run_all_host_tests.sh` for a clean full-suite baseline on this branch.
-3. When this tap-path regression is fully closed, return to the older thread-level `should-fix` items on the registry DSLs and the breadth of `key_runtime_internal.h`.
+2. When this tap-path regression is fully closed, return to the older thread-level `should-fix` items on the registry DSLs and the breadth of `key_runtime_internal.h`.

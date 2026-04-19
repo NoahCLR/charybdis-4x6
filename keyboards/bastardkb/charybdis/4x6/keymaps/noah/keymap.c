@@ -123,8 +123,8 @@ enum keymap_custom_keycodes {
 // Group the key list in parentheses so 2-key and 3+-key combos read the same way.
 //
 // Valid combo outputs include plain keycodes, hardcoded macros (MACRO_n),
-// VIA macros (VIA_MACRO_n), LOCK_LAYER(...), LOCK_PD_MODE(...), and keycodes
-// that also have rows in key_behaviors[].
+// VIA macros (VIA_MACRO_n), LOCK_LAYER(...), explicit pd-mode lock keycodes
+// such as ARROW_MODE_LOCK, and keycodes that also have rows in key_behaviors[].
 //
 // If a combo emits a keycode that also has a row in key_behaviors[],
 // that emitted key can reuse the same custom behavior handling.
@@ -137,7 +137,7 @@ enum keymap_custom_keycodes {
     /* COMBO(MACRO_0, (KC_Q, KC_W)) */                     \
     /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */                 \
     /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */       \
-    /* COMBO(LOCK_PD_MODE(ARROW_MODE), (KC_M, KC_COMM)) */ \
+    /* COMBO(ARROW_MODE_LOCK, (KC_M, KC_COMM)) */          \
     /* COMBO(..., (...)) */                                \
     /* ... */
 
@@ -210,7 +210,7 @@ enum keymap_custom_keycodes {
 //   - Raw TG()/TO()/TT()/OSL()/LM()/LT() actions inside key_behaviors[] are
 //     intentionally unsupported because they bypass layer ownership. LT()
 //     remains supported as the keycode of a key_behavior row itself.
-//   - Use LOCK_PD_MODE(mode_keycode) to toggle a pointer-mode lock.
+//   - Use the generated *_LOCK keycode to toggle a pointer-mode lock.
 //     Activating the same mode again unlocks it; pressing, holding or locking
 //     any other pointer-mode key also clears the previous lock.
 //   - Add hardcoded custom macros to HARDCODED_MACROS(MACRO) above, then use
@@ -287,7 +287,7 @@ enum keymap_custom_keycodes {
 //             [0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_EXAMPLE))}, // tap index 0: normal tap, long-hold threshold action only
 //             [1] = {.tap = TAP_SENDS(S(KC_EXAMPLE))}, // tap index 1: alternate tap output
 //             [2] = {.tap = TAP_SENDS(KC_EXAMPLE), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXAMPLE)}, // tap index 2: tap once, or keep a held action active
-//             [3] = {.tap = TAP_SENDS(LOCK_PD_MODE(EXAMPLE_MODE)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_EXAMPLE))}, // tap index 3: pointer-mode lock on tap, shifted held action
+//             [3] = {.tap = TAP_SENDS(EXAMPLE_MODE_LOCK), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_EXAMPLE))}, // tap index 3: pointer-mode lock on tap, shifted held action
 //             [4] = {.tap = TAP_SENDS(MACRO_n), .hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_EXAMPLE)), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_EXAMPLE))}, // tap index 4: macro on tap, release action on hold, layer-lock threshold action on long hold
 //         },
 // }
@@ -347,7 +347,7 @@ const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(KC_TRNS)},
-                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_PD_MODE(DRAGSCROLL))},
+                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(DRAGSCROLL_LOCK)},
                     },
             },
 
