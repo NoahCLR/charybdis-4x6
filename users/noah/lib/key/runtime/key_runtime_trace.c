@@ -156,6 +156,10 @@ static const char *key_runtime_trace_multi_tap_decision_name(key_runtime_trace_m
             return "release_preserve_chain";
         case KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_FLUSH_PENDING_CHAIN:
             return "flush_pending_chain";
+        case KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_SCAN_HOLD_THRESHOLD:
+            return "scan_hold_threshold";
+        case KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_SCAN_LONG_HOLD:
+            return "scan_long_hold";
         case KEY_RUNTIME_TRACE_MULTI_TAP_DECISION_SCAN_EXPIRED_FLUSH:
             return "scan_expired_flush";
         default:

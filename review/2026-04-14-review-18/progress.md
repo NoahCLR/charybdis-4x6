@@ -1,5 +1,50 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Pending Multi-Tap Lifecycle Pass
+
+- Moved the next multi-tap lifecycle seam into the reducer-owned shadow path: scan-time pending-hold promotion and chain-expiry flush now resolve from runtime-v2 token/tap-series state instead of only from slot-local timer state.
+- `users/noah/lib/runtime_v2/runtime_v2.h` now keeps richer tap-series records:
+  - first-tap action,
+  - current tap action/repeat payload,
+  - authored hold/long-hold contract for the current tap count,
+  - per-series tap-hold term, and
+  - the per-series multi-tap term.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now:
+  - keeps authored multi-tap chains alive past generic time refresh until the dedicated pending-multi-tap scan resolver settles them,
+  - exposes `runtime_v2_resolve_pending_multi_tap_scan(...)`,
+  - resolves scan-time hold-threshold promotion, long-hold promotion, and expired-chain flush from reducer-owned token/tap-series state, and
+  - clears reducer-owned tap-series state when pending multi-tap release or scan settlement fully consumes the chain.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c` now uses that v2 scan resolver when the normalized runtime-v2 stream is authoritative, while leaving the existing slot/effect code in place to:
+  - build the actual hold/long-hold effect,
+  - carry the saved delayed-action mod snapshot, and
+  - reset legacy pending-multi-tap storage after the decision.
+- `users/noah/lib/key/runtime/key_runtime_trace.h` and `.c` now distinguish reducer-owned pending-multi-tap scan decisions for:
+  - hold-threshold promotion,
+  - long-hold promotion, and
+  - expired-chain flush.
+- `tests/host/runtime_debug_test.c` now proves the new reducer path directly for:
+  - scan-time threshold promotion of a second-tap hold,
+  - late-scan long-hold promotion of the same chain,
+  - expired-chain flush after the authored multi-tap term, and
+  - the narrower contract that only authored hold-capable chains use `pending_hold`, while plain tap-series state can still expire independently from an active later press token.
+
+## 2026-04-19 Runtime V2 Pending Multi-Tap Release Settlement Pass
+
+- Moved the second handled-release caller onto the reducer-owned release planner: pending multi-tap release no longer decides tap-vs-hold-vs-long-hold by rebuilding semantics only from the live slot world.
+- `users/noah/lib/runtime_v2/runtime_v2_release_internal.h` and `users/noah/lib/runtime_v2/runtime_v2.c` now expose `runtime_v2_resolve_pending_multi_tap_release(...)`, which resolves pending multi-tap release outcome from:
+  - the released press token's immutable interaction snapshot,
+  - the reducer-owned release timestamp / elapsed interval,
+  - the resolved tap payload returned by `multi_tap_resolve_hold(...)`, and
+  - whether the pending chain is still active and should be preserved.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c` now uses that reducer-owned pending-release planner when the normalized runtime-v2 stream is authoritative, while keeping the delayed-action mod snapshot and chain payload on the slot-owned multi-tap storage for this pass.
+- This keeps the migration cut narrow:
+  - reducer-owned state now decides pending multi-tap release outcome,
+  - slot-owned multi-tap storage still transports saved mods / repeat payload into the emitted effects,
+  - scan-time pending multi-tap hold promotion remains on the existing reducer for now.
+- `tests/host/runtime_debug_test.c` now proves the new reducer API directly for:
+  - preserve-chain quick release, and
+  - hold-action dispatch after the tap-hold term.
+
 ## 2026-04-19 Runtime V2 Active Release Settlement Pass
 
 - Moved the active-slot release decision onto reducer-owned press-token state while keeping pending multi-tap release settlement on the legacy shared resolver for this pass.
@@ -619,5 +664,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Move pending multi-tap release settlement onto the same runtime-v2 press-token/tap-series planner so both release callers share one authority.
+3. Move the remaining explicit pending-multi-tap flush/reset paths onto runtime-v2 so foreign-chain flush and slot-owned reset no longer leave lifecycle ownership split.
 4. Fold the remaining release/deferred-emission effect planning and slot retirement paths into the lease/reducer model before any production hook cutover.

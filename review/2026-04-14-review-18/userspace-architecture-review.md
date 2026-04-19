@@ -447,7 +447,65 @@ The active-slot release decision has now crossed into the reducer-owned path as 
   - scan-time threshold promotion changes reducer-owned release outcome the same way the production slot scan path does.
 - The release matrix, scenario suite, modifier-hold integration suite, pd-mode key-runtime integration suite, feature-gate compile suite, and the real-profile thumb/nav suite all stayed green after the cutover, which is the enforcement bar that the migrated active-release planner preserved intended runtime behavior.
 
-Inference from the current tree: the default active-slot release caller no longer decides tap vs hold vs long-hold vs pd-lock by re-reading mutable live slot state at release time. That decision now comes from the reducer-owned press-token snapshot. The remaining release-settlement gap is the second caller: pending multi-tap release still uses the shared legacy resolver, and the effect-planning / slot-retirement layer is still legacy-owned after the decision is made.
+Inference from the current tree at that stage: the default active-slot release caller no longer decided tap vs hold vs long-hold vs pd-lock by re-reading mutable live slot state at release time. That decision now came from the reducer-owned press-token snapshot, but pending multi-tap release still used the shared legacy resolver.
+
+## 2026-04-19 Runtime V2 Pending Multi-Tap Release Settlement Note
+
+The second handled-release caller now uses the same reducer-owned authority for release outcome:
+
+- `users/noah/lib/runtime_v2/runtime_v2_release_internal.h` and `users/noah/lib/runtime_v2/runtime_v2.c` now expose `runtime_v2_resolve_pending_multi_tap_release(...)`.
+- That API resolves pending multi-tap release from:
+  - the released press token's immutable interaction snapshot,
+  - reducer-owned release timing captured on the token,
+  - the resolved tap payload returned by `multi_tap_resolve_hold(...)`, and
+  - whether the multi-tap chain remains active and should be preserved.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c` now uses that reducer-owned planner when runtime-v2 has observed the real normalized input stream, while leaving the delayed-action mod snapshot and repeat payload on the slot-owned multi-tap storage for this pass.
+- That is an intentional narrow migration cut: the reducer now owns the pending multi-tap release *decision*, but the slot still transports the saved-mod snapshot into the final delayed-action effects.
+- `tests/host/runtime_debug_test.c` now proves the reducer API directly for both:
+  - quick release preserving the chain, and
+  - release after the tap-hold term dispatching the held release action.
+- The release matrix, transition suite, scenario suite, modifier-hold integration suite, pd-mode key-runtime integration suite, feature-gate compile suite, and the real-profile thumb/nav suite all stayed green after the cutover, which is the enforcement bar that pending multi-tap release preserved current behavior.
+
+Inference from the current tree at that stage: both handled-release callers now took their outcome from reducer-owned release planning rather than from slot-local release reinterpretation. The remaining multi-tap gap was lifecycle ownership, not release outcome: pending multi-tap scan-time hold promotion and chain expiry still lived in the legacy slot/multi-tap reducer, and the effect-planning / slot-retirement layer after the decision was still legacy-owned.
+
+## 2026-04-19 Runtime V2 Pending Multi-Tap Lifecycle Note
+
+The next multi-tap lifecycle seam has now crossed into the reducer too:
+
+- `users/noah/lib/runtime_v2/runtime_v2.h` now stores richer authored tap-series payload:
+  - first-tap action,
+  - current tap action/repeat payload,
+  - authored hold/long-hold contract for the current tap count,
+  - per-series tap-hold term, and
+  - per-series multi-tap term.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now exposes `runtime_v2_resolve_pending_multi_tap_scan(...)`, which resolves:
+  - second-tap hold-threshold promotion,
+  - late-scan long-hold promotion, and
+  - expired-chain flush,
+  from reducer-owned press-token/tap-series state instead of from slot-local timer state alone.
+- The reducer now keeps authored multi-tap chains alive past generic time refresh until that dedicated pending-multi-tap scan resolver settles them, while plain non-authored tap-series state can still expire independently.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c` now uses that reducer-owned scan resolver when runtime-v2 is authoritative, but still delegates actual effect building and delayed-action mod transport to the legacy slot/effect layer for this pass.
+- `users/noah/lib/key/runtime/key_runtime_trace.h` and `.c` now distinguish:
+  - scan hold-threshold promotion,
+  - scan long-hold promotion, and
+  - scan expired-chain flush,
+  which keeps the trace surface aligned with the new reducer-owned lifecycle decisions.
+- `tests/host/runtime_debug_test.c` now directly proves reducer-owned pending multi-tap lifecycle for:
+  - threshold promotion,
+  - long-hold promotion,
+  - expired-chain flush, and
+  - the narrower `pending_hold` contract that only authored hold-capable chains use that latch.
+
+Reconciliation Note:
+
+- The inference paragraph above is now an audit-time snapshot only.
+- Release outcome plus scan-time lifecycle decision are now both reducer-owned for pending multi-tap paths.
+- The remaining multi-tap split is narrower:
+  - explicit foreign-chain flush/reset still clears legacy slot storage directly,
+  - saved delayed-action mod payload is still transported through slot-owned multi-tap storage, and
+  - final effect planning / slot retirement after the reducer decision is still legacy-owned.
+
+Inference from the current tree: authored pending multi-tap timing is substantially less split-brained than it was. Both handled release settlement and scan-time pending-hold / expiry settlement now come from reducer-owned token/tap-series state. The remaining wedge risk is no longer "which timer owns multi-tap lifecycle," but the downstream legacy effect-planning and reset seams that still consume those decisions.
 
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 

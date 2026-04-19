@@ -105,6 +105,13 @@ typedef struct {
     uint16_t keycode;
     uint8_t  tap_count;
     bool     pending_hold;
+    uint16_t single_action;
+    uint16_t tap_action;
+    uint8_t  tap_repeat_count;
+    bool     has_more_taps;
+    hold_behavior_t hold;
+    hold_behavior_t long_hold;
+    uint16_t tap_hold_term_ms;
     uint16_t last_action;
     uint16_t last_tap_at;
     uint16_t tap_term_ms;

@@ -29,6 +29,7 @@ enum {
     TEST_INTERRUPTED_LAYER_KEY = SAFE_RANGE + 0x13,
     TEST_RELEASE_PRIMARY_KEY   = SAFE_RANGE + 0x14,
     TEST_THRESHOLD_LONG_KEY    = SAFE_RANGE + 0x15,
+    TEST_PENDING_RELEASE_KEY   = SAFE_RANGE + 0x16,
 };
 
 static uint16_t fake_time;
@@ -131,9 +132,22 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
          .tap = TAP_SENDS(keycode),
      };
     uint8_t            layer = UINT8_MAX;
+    bool               has_more_taps = false;
 
     if (keycode == TEST_PENDING_MULTI_TAP_KEY) {
         flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        if (tap_count == 1u) {
+            step = (key_behavior_step_t){
+                .tap = TAP_SENDS(TEST_ACTION),
+            };
+            has_more_taps = true;
+        } else {
+            step = (key_behavior_step_t){
+                .tap       = TAP_SENDS(TEST_SECOND_ACTION),
+                .hold      = TAP_AT_HOLD_THRESHOLD(TEST_ACTION),
+                .long_hold = TAP_AT_HOLD_THRESHOLD(TEST_SECOND_ACTION),
+            };
+        }
     } else if (keycode == TEST_INTERRUPTED_LAYER_KEY) {
         flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
         step = (key_behavior_step_t){
@@ -150,6 +164,11 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
             .hold      = TAP_AT_HOLD_THRESHOLD(TEST_ACTION),
             .long_hold = TAP_ON_RELEASE_AFTER_HOLD(TEST_SECOND_ACTION),
         };
+    } else if (keycode == TEST_PENDING_RELEASE_KEY) {
+        flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        step = (key_behavior_step_t){
+            .hold = TAP_ON_RELEASE_AFTER_HOLD(TEST_ACTION),
+        };
     }
 
     return (handled_key_resolution_t){
@@ -161,7 +180,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         .multi_tap_term   = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
         .layer            = layer,
         .pd_mode          = 0,
-        .has_more_taps    = false,
+        .has_more_taps    = has_more_taps,
         .flags            = flags,
     };
 }
@@ -757,6 +776,133 @@ static void test_runtime_v2_active_release_resolution_tracks_threshold_hold_afte
     CHECK(resolution.decision.action == TEST_SECOND_ACTION);
 }
 
+static void test_runtime_v2_pending_multi_tap_release_resolution_preserves_chain(void) {
+    runtime_v2_pending_multi_tap_release_resolution_t resolution;
+    keypos_t                                          key_pos = test_keypos(4, 4);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 60u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+
+    CHECK(runtime_v2_resolve_pending_multi_tap_release(key_pos, KC_NO, 0u, true, &resolution));
+    CHECK(resolution.outcome == RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN);
+    CHECK(resolution.action == KC_NO);
+    CHECK(resolution.repeat_count == 0u);
+}
+
+static void test_runtime_v2_pending_multi_tap_release_resolution_uses_hold_action_after_term(void) {
+    runtime_v2_pending_multi_tap_release_resolution_t resolution;
+    keypos_t                                          key_pos = test_keypos(4, 5);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+
+    CHECK(runtime_v2_resolve_pending_multi_tap_release(key_pos, KC_NO, 1u, false, &resolution));
+    CHECK(resolution.outcome == RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION);
+    CHECK(resolution.action == TEST_ACTION);
+    CHECK(resolution.repeat_count == 1u);
+}
+
+static void test_runtime_v2_pending_multi_tap_scan_resolution_promotes_hold_threshold(void) {
+    runtime_v2_pending_multi_tap_scan_resolution_t resolution;
+    const tap_series_t                            *series;
+    keypos_t                                       key_pos = test_keypos(5, 0);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 10u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 20u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+
+    series = runtime_v2_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->pending_hold);
+
+    fake_time = (uint16_t)(fake_time + 120u);
+    runtime_v2_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, fake_time);
+
+    CHECK(runtime_v2_resolve_pending_multi_tap_scan(key_pos, &resolution));
+    CHECK(resolution.outcome == RUNTIME_V2_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD);
+    CHECK(resolution.action == TEST_ACTION);
+    CHECK(resolution.hold.action == TEST_ACTION);
+    CHECK(resolution.completes_hold == false);
+
+    series = runtime_v2_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(!series->active);
+}
+
+static void test_runtime_v2_pending_multi_tap_scan_resolution_promotes_long_hold(void) {
+    runtime_v2_pending_multi_tap_scan_resolution_t resolution;
+    const tap_series_t                            *series;
+    keypos_t                                       key_pos = test_keypos(5, 1);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 10u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 20u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_LONGER_HOLD_TERM);
+    runtime_v2_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, fake_time);
+
+    CHECK(runtime_v2_resolve_pending_multi_tap_scan(key_pos, &resolution));
+    CHECK(resolution.outcome == RUNTIME_V2_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD);
+    CHECK(resolution.action == TEST_SECOND_ACTION);
+    CHECK(resolution.hold.action == TEST_SECOND_ACTION);
+    CHECK(resolution.completes_hold);
+
+    series = runtime_v2_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(!series->active);
+}
+
+static void test_runtime_v2_pending_multi_tap_scan_resolution_flushes_expired_chain(void) {
+    runtime_v2_pending_multi_tap_scan_resolution_t resolution;
+    const tap_series_t                            *series;
+    keypos_t                                       key_pos = test_keypos(5, 2);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 10u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+
+    series = runtime_v2_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->tap_count == 1u);
+    CHECK(series->single_action == TEST_ACTION);
+    CHECK(series->tap_term_ms == 180u);
+
+    fake_time = (uint16_t)(fake_time + 181u);
+    runtime_v2_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, fake_time);
+
+    CHECK(runtime_v2_resolve_pending_multi_tap_scan(key_pos, &resolution));
+    CHECK(resolution.outcome == RUNTIME_V2_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH);
+    CHECK(resolution.action == TEST_ACTION);
+    CHECK(resolution.repeat_count == 1u);
+
+    series = runtime_v2_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(!series->active);
+}
+
 static void test_runtime_v2_tap_series_state_stays_independent_from_active_token_storage(void) {
     keypos_t                key_pos = test_keypos(6, 2);
     const press_token_t    *token;
@@ -772,7 +918,6 @@ static void test_runtime_v2_tap_series_state_stays_independent_from_active_token
     runtime_event_t         scan = {
                 .kind = RUNTIME_EVENT_KIND_SCAN,
             };
-    uint16_t                tap_series_expire_ms;
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -796,7 +941,7 @@ static void test_runtime_v2_tap_series_state_stays_independent_from_active_token
     CHECK(token->active);
     CHECK(series != NULL);
     CHECK(series->active);
-    CHECK(series->pending_hold);
+    CHECK(!series->pending_hold);
 
     runtime_v2_apply_event(&advance, fake_time);
     fake_time = (uint16_t)(fake_time + advance.data.timer_advance.advance_ms);
@@ -815,31 +960,10 @@ static void test_runtime_v2_tap_series_state_stays_independent_from_active_token
     CHECK(!token->active);
     CHECK(token->phase == PRESS_TOKEN_PHASE_RELEASED);
     CHECK(series != NULL);
-    CHECK(series->active);
-    CHECK(series->keycode == KC_C);
-    CHECK(series->tap_count == 1u);
-    CHECK(!series->pending_hold);
+    CHECK(!series->active);
 
     snapshot = runtime_v2_projection_snapshot_capture();
     CHECK(snapshot.v2_press_token_count == 0u);
-    CHECK(snapshot.v2_tap_series_count == 1u);
-
-    tap_series_expire_ms = (uint16_t)(series->tap_term_ms + 1u);
-    runtime_v2_apply_event(&(runtime_event_t){
-                               .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
-                               .data.timer_advance =
-                                   {
-                                       .advance_ms = tap_series_expire_ms,
-                                   },
-                           },
-                           fake_time);
-    fake_time = (uint16_t)(fake_time + tap_series_expire_ms);
-    runtime_v2_apply_event(&scan, fake_time);
-
-    series = runtime_v2_tap_series_at(key_pos);
-    CHECK(series != NULL);
-    CHECK(!series->active);
-    snapshot = runtime_v2_projection_snapshot_capture();
     CHECK(snapshot.v2_tap_series_count == 0u);
 }
 
@@ -1437,6 +1561,11 @@ int main(void) {
     test_runtime_v2_timer_and_scan_do_not_rewrite_press_identity();
     test_runtime_v2_active_release_resolution_preserves_tap_window_without_scan();
     test_runtime_v2_active_release_resolution_tracks_threshold_hold_after_scan();
+    test_runtime_v2_pending_multi_tap_release_resolution_preserves_chain();
+    test_runtime_v2_pending_multi_tap_release_resolution_uses_hold_action_after_term();
+    test_runtime_v2_pending_multi_tap_scan_resolution_promotes_hold_threshold();
+    test_runtime_v2_pending_multi_tap_scan_resolution_promotes_long_hold();
+    test_runtime_v2_pending_multi_tap_scan_resolution_flushes_expired_chain();
     test_runtime_v2_tap_series_state_stays_independent_from_active_token_storage();
     test_runtime_v2_layer_lock_observes_live_layer_ownership_state();
     test_runtime_v2_layer_tap_hold_creates_and_retires_layer_lease();

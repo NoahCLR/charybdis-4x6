@@ -70,6 +70,17 @@ static tap_series_t *runtime_v2_tap_series_state(runtime_v2_state_t *state, keyp
     return &state->tap_series[runtime_v2_keypos_index(key_pos)];
 }
 
+static void runtime_v2_tap_series_clear(runtime_v2_state_t *state, tap_series_t *series) {
+    if (!(state && series && series->active)) {
+        return;
+    }
+
+    *series = (tap_series_t){0};
+    if (state->tap_series_count != 0u) {
+        state->tap_series_count--;
+    }
+}
+
 static pending_release_t *runtime_v2_allocate_pending_release(runtime_v2_state_t *state) {
     if (!state) {
         return NULL;
@@ -1165,10 +1176,11 @@ static void runtime_v2_tap_series_release_if_expired(tap_series_t *series, uint1
         return;
     }
 
-    *series = (tap_series_t){0};
-    if (state->tap_series_count != 0u) {
-        state->tap_series_count--;
+    if (series->has_more_taps || series->tap_count > 1u || series->hold.present || series->long_hold.present) {
+        return;
     }
+
+    runtime_v2_tap_series_clear(state, series);
 }
 
 static void runtime_v2_refresh_for_time(runtime_v2_state_t *state, uint16_t now) {
@@ -1280,13 +1292,22 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
     runtime_v2_press_token_attach_press_leases(state, token);
 
     if (series && tap_count > 1u) {
-        series->pending_hold = true;
+        series->pending_hold = materialized.hold.present || materialized.long_hold.present;
     }
 }
 
 static void runtime_v2_tap_series_note_tap(runtime_v2_state_t *state, const press_token_t *token, uint16_t now) {
     tap_series_t *series;
     bool          reuse_existing;
+    uint16_t      single_action;
+    uint16_t      tap_action;
+    uint8_t       tap_repeat_count;
+    bool          has_more_taps;
+    hold_behavior_t hold;
+    hold_behavior_t long_hold;
+    uint16_t      tap_hold_term_ms;
+    uint16_t      tap_term_ms;
+    uint8_t       tap_count;
 
     if (!(state && token && token->active)) {
         return;
@@ -1298,20 +1319,52 @@ static void runtime_v2_tap_series_note_tap(runtime_v2_state_t *state, const pres
     }
 
     reuse_existing = series->active && series->keycode == token->resolved_keycode && runtime_v2_elapsed(series->last_tap_at, now) <= series->tap_term_ms;
+    single_action   = reuse_existing ? series->single_action : token->resolved_keycode;
+    tap_action      = token->resolved_keycode;
+    tap_repeat_count = 0u;
+    has_more_taps   = false;
+    hold            = hold_behavior_none();
+    long_hold       = hold_behavior_none();
+    tap_hold_term_ms = runtime_v2_default_hold_term(token->resolved_keycode);
+    tap_term_ms     = runtime_v2_default_multi_tap_term();
+    tap_count       = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u);
+
+    if (token->handled_key) {
+        uint16_t handled_tap_action = token->interaction.binding.tap_action != KC_NO ? token->interaction.binding.tap_action : token->resolved_keycode;
+
+        single_action    = reuse_existing ? series->single_action : handled_tap_action;
+        tap_action       = handled_tap_action;
+        tap_repeat_count = token->interaction.binding.tap_repeat_count;
+        has_more_taps    = token->interaction.binding.has_more_taps;
+        hold             = token->interaction.binding.hold;
+        long_hold        = token->interaction.binding.long_hold;
+        tap_hold_term_ms = token->interaction.binding.tap_hold_term;
+        tap_term_ms      = token->interaction.binding.multi_tap_term;
+        if (token->interaction.selection.tap_count != 0u) {
+            tap_count = token->interaction.selection.tap_count;
+        }
+    }
 
     if (!series->active) {
         state->tap_series_count++;
     }
 
     *series = (tap_series_t){
-        .active       = true,
-        .key_pos      = token->key_pos,
-        .keycode      = token->resolved_keycode,
-        .tap_count    = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u),
-        .pending_hold = false,
-        .last_action  = token->resolved_keycode,
-        .last_tap_at  = now,
-        .tap_term_ms  = runtime_v2_default_multi_tap_term(),
+        .active           = true,
+        .key_pos          = token->key_pos,
+        .keycode          = token->resolved_keycode,
+        .tap_count        = tap_count,
+        .pending_hold     = false,
+        .single_action    = single_action,
+        .tap_action       = tap_action,
+        .tap_repeat_count = tap_repeat_count,
+        .has_more_taps    = has_more_taps,
+        .hold             = hold,
+        .long_hold        = long_hold,
+        .tap_hold_term_ms = tap_hold_term_ms,
+        .last_action      = tap_action,
+        .last_tap_at      = now,
+        .tap_term_ms      = tap_term_ms,
     };
 }
 
@@ -1328,6 +1381,44 @@ static void runtime_v2_tap_series_note_hold_release(runtime_v2_state_t *state, c
     }
 
     series->pending_hold = false;
+}
+
+static bool runtime_v2_pending_multi_tap_release_uses_held_lifecycle(const press_token_t *token, uint16_t action, uint8_t tap_repeat_count, uint16_t elapsed) {
+    handled_key_hold_semantics_t semantics;
+
+    if (!(token && token->handled_key)) {
+        return false;
+    }
+
+    semantics = token->interaction.contract.hold;
+    if (semantics.threshold_action == KC_NO || tap_repeat_count != 1u || elapsed < token->interaction.binding.tap_hold_term) {
+        return false;
+    }
+
+    if (semantics.threshold != HANDLED_KEY_HOLD_THRESHOLD_REGISTER_HELD || action != semantics.threshold_action) {
+        return false;
+    }
+
+    return semantics.uses_held_lifecycle;
+}
+
+static bool runtime_v2_pending_multi_tap_flush_resolution(const tap_series_t *series, uint16_t *action, uint8_t *repeat_count) {
+    uint16_t resolved_action;
+    uint8_t  resolved_repeat_count;
+
+    if (!(series && series->active && !series->pending_hold)) {
+        return false;
+    }
+
+    resolved_action       = series->tap_repeat_count > 0u ? series->tap_action : series->single_action;
+    resolved_repeat_count = series->tap_repeat_count > 0u ? series->tap_repeat_count : series->tap_count;
+    if (action) {
+        *action = resolved_action;
+    }
+    if (repeat_count) {
+        *repeat_count = resolved_repeat_count;
+    }
+    return true;
 }
 
 static bool runtime_v2_pending_release_matches(const pending_release_t *pending, keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
@@ -1646,6 +1737,183 @@ bool runtime_v2_resolve_active_release(keypos_t key_pos, runtime_v2_active_relea
         .lock_tap_mode                   = key_runtime_slot_release_query_lock_tap_mode(&query),
         .decision                        = key_runtime_slot_release_decide(&query),
     };
+    return true;
+}
+
+bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, runtime_v2_pending_multi_tap_release_resolution_t *out) {
+    runtime_v2_state_t                  *state = runtime_v2_state();
+    press_token_t                       *token;
+    tap_series_t                        *series;
+    key_runtime_slot_release_semantics_t semantics = {
+        .quick_tap_dispatches_tap        = true,
+        .nonquick_release_dispatches_tap = true,
+    };
+    key_runtime_slot_release_decision_t decision;
+    uint16_t                            elapsed;
+
+    if (out) {
+        *out = (runtime_v2_pending_multi_tap_release_resolution_t){0};
+    }
+
+    if (!(state && out && runtime_v2_blocker_queries_authoritative() && runtime_v2_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    token = runtime_v2_press_token_state(state, key_pos);
+    series = runtime_v2_tap_series_state(state, key_pos);
+    if (!(token && token->handled_key && !token->active && token->observed_release_keycode != KC_NO)) {
+        return false;
+    }
+
+    elapsed = runtime_v2_elapsed(token->pressed_at, token->released_at);
+
+    if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term
+                                                                 : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term) {
+        semantics.hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
+    }
+
+    decision = key_runtime_slot_release_decide(&(key_runtime_slot_release_query_t){
+        .interaction = token->interaction,
+        .semantics   = semantics,
+        .elapsed     = elapsed,
+    });
+
+    switch (decision.outcome) {
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION:
+            if (runtime_v2_pending_multi_tap_release_uses_held_lifecycle(token, decision.action, tap_repeat_count, elapsed)) {
+                runtime_v2_tap_series_clear(state, series);
+                *out = (runtime_v2_pending_multi_tap_release_resolution_t){
+                    .outcome = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
+                    .action  = decision.action,
+                };
+                return true;
+            }
+
+            runtime_v2_tap_series_clear(state, series);
+            *out = (runtime_v2_pending_multi_tap_release_resolution_t){
+                .outcome      = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
+                .action       = decision.action,
+                .repeat_count = decision.action == KC_NO ? 0u : 1u,
+            };
+            return true;
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_TAP:
+            if (runtime_v2_pending_multi_tap_release_uses_held_lifecycle(token, tap_action, tap_repeat_count, elapsed)) {
+                runtime_v2_tap_series_clear(state, series);
+                *out = (runtime_v2_pending_multi_tap_release_resolution_t){
+                    .outcome = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
+                    .action  = tap_action,
+                };
+                return true;
+            }
+
+            if (tap_action == KC_NO && tap_repeat_count == 0u && preserve_chain_available) {
+                *out = (runtime_v2_pending_multi_tap_release_resolution_t){
+                    .outcome = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN,
+                };
+                return true;
+            }
+
+            runtime_v2_tap_series_clear(state, series);
+            *out = (runtime_v2_pending_multi_tap_release_resolution_t){
+                .outcome      = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
+                .action       = tap_action,
+                .repeat_count = tap_repeat_count,
+            };
+            return true;
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE:
+        default:
+            if (runtime_v2_pending_multi_tap_release_uses_held_lifecycle(token, tap_action, tap_repeat_count, elapsed)) {
+                runtime_v2_tap_series_clear(state, series);
+                *out = (runtime_v2_pending_multi_tap_release_resolution_t){
+                    .outcome = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
+                    .action  = tap_action,
+                };
+                return true;
+            }
+
+            if (tap_action == KC_NO && tap_repeat_count == 0u && preserve_chain_available) {
+                *out = (runtime_v2_pending_multi_tap_release_resolution_t){
+                    .outcome = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN,
+                };
+                return true;
+            }
+
+            runtime_v2_tap_series_clear(state, series);
+            *out = (runtime_v2_pending_multi_tap_release_resolution_t){
+                .outcome      = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
+                .action       = tap_action,
+                .repeat_count = tap_repeat_count,
+            };
+            return true;
+    }
+}
+
+bool runtime_v2_resolve_pending_multi_tap_scan(keypos_t key_pos, runtime_v2_pending_multi_tap_scan_resolution_t *out) {
+    runtime_v2_state_t *state  = runtime_v2_state();
+    press_token_t      *token;
+    tap_series_t       *series;
+    uint16_t            elapsed;
+    uint16_t            flush_action;
+    uint8_t             flush_repeat_count;
+
+    if (out) {
+        *out = (runtime_v2_pending_multi_tap_scan_resolution_t){0};
+    }
+
+    if (!(state && out && runtime_v2_blocker_queries_authoritative() && runtime_v2_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    token  = runtime_v2_press_token_state(state, key_pos);
+    series = runtime_v2_tap_series_state(state, key_pos);
+    if (!(series && series->active)) {
+        return false;
+    }
+
+    if (!series->pending_hold) {
+        if (runtime_v2_elapsed(series->last_tap_at, state->current_time) > series->tap_term_ms &&
+            runtime_v2_pending_multi_tap_flush_resolution(series, &flush_action, &flush_repeat_count)) {
+            runtime_v2_tap_series_clear(state, series);
+            *out = (runtime_v2_pending_multi_tap_scan_resolution_t){
+                .outcome      = RUNTIME_V2_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH,
+                .action       = flush_action,
+                .repeat_count = flush_repeat_count,
+            };
+        }
+
+        return true;
+    }
+
+    if (!(token && token->active && token->handled_key && series->keycode == token->resolved_keycode)) {
+        return false;
+    }
+
+    elapsed = runtime_v2_elapsed(token->pressed_at, state->current_time);
+    if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+        runtime_v2_tap_series_clear(state, series);
+        *out = (runtime_v2_pending_multi_tap_scan_resolution_t){
+            .outcome        = RUNTIME_V2_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD,
+            .hold           = token->interaction.binding.long_hold,
+            .semantics      = token->interaction.contract.long_hold,
+            .completes_hold = true,
+            .action         = token->interaction.binding.long_hold.action,
+        };
+        return true;
+    }
+
+    if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.hold) && elapsed >= token->interaction.binding.tap_hold_term) {
+        runtime_v2_tap_series_clear(state, series);
+        *out = (runtime_v2_pending_multi_tap_scan_resolution_t){
+            .outcome        = RUNTIME_V2_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD,
+            .hold           = token->interaction.binding.hold,
+            .semantics      = token->interaction.contract.hold,
+            .completes_hold = !token->interaction.binding.long_hold.present,
+            .action         = token->interaction.binding.hold.action,
+        };
+        return true;
+    }
+
     return true;
 }
 
