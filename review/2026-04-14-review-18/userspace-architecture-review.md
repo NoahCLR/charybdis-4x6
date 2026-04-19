@@ -369,6 +369,29 @@ Reconciliation Note:
 
 Inference from the current tree: blocker timing and blocker semantics are now both modeled inside `runtime_v2`. That is a meaningful reduction in split-brain risk. The remaining open architecture gap is production ownership: the real release/deferred-emission path still runs through the legacy runtime, so the board can still wedge until the production blocker decision and release cleanup migrate onto the single-authority reducer path.
 
+## 2026-04-19 Runtime V2 Production Blocker Bridge Note
+
+The blocker seam is now partially cut over in the production path:
+
+- `users/noah/lib/key/runtime/key_runtime_process.c` now feeds normalized non-synthetic physical key down/up events into runtime-v2 from the real `noah_process_record_user(...)` path.
+- `users/noah/lib/key/runtime/key_runtime_scan.c` now feeds normalized scan events into runtime-v2 from the real key-runtime scan path.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now tracks whether it has observed the real normalized input stream and exposes native blocker query helpers:
+  - any blocker
+  - foreign blocker except a key position
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now consults those native v2 blocker queries when the runtime-v2 input stream is authoritative, and falls back to the legacy blocker index only in low-level slot/unit surfaces that still mutate legacy state directly without feeding v2.
+- `tests/host/key_runtime_integration_harness.c` now suppresses manual key/scan shadow injection when the linked real userspace already feeds runtime-v2 itself, which keeps the integration/parity suites on a single production-shaped input stream instead of double-driving the reducer.
+- `tests/host/runtime_debug_test.c` now proves the production process hook feeds blocker queries and that scan-time observation clears the quick-tap blocker once hold ownership settles.
+
+Reconciliation Note:
+
+- The earlier note above that said "the real release/deferred-emission path still runs through the legacy runtime" remains true for effect execution and cleanup ownership, but it is no longer fully true for blocker *decision*.
+- The blocker decision has now crossed into a hybrid state:
+  - blocker semantics are native in runtime-v2,
+  - production blocker queries use runtime-v2 when that normalized stream is authoritative,
+  - legacy blocker index ownership remains only as a fallback for low-level direct-slot surfaces that have not been migrated yet.
+
+Inference from the current tree: the production runtime is no longer merely shadow-validating blocker state. The live deferred-release gate can already consult the single-authority reducer path on the default firmware flow. The remaining architecture gap is the release/deferred-emission cleanup itself: effect queues, slot retirement, and owned-state unwind still execute in the legacy runtime, so the wedge class is not closed until that cleanup ownership moves over too.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

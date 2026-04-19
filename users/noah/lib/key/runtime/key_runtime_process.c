@@ -21,6 +21,17 @@ __attribute__((weak)) uint8_t pd_mode_active_keyboard_event_masked_real_mods(voi
     return 0;
 }
 
+__attribute__((weak)) void runtime_v2_observe_process_record_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
+#ifdef NOAH_HOST_TEST_ENV
+bool key_runtime_integration_userspace_feeds_runtime_v2_key_events(void) {
+    return true;
+}
+#endif
+
 typedef enum {
     KEY_RUNTIME_PROCESS_NEXT = 0,
     KEY_RUNTIME_PROCESS_RETURN_TRUE,
@@ -204,6 +215,10 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
         .runtime_keycode = keycode,
         .record          = record,
     };
+
+    if (!noah_synthetic_record_active()) {
+        runtime_v2_observe_process_record_event(keycode, record);
+    }
 
     key_runtime_trace_record("process:entry", keycode, record);
 

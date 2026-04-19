@@ -64,6 +64,14 @@ __attribute__((weak)) void key_runtime_integration_shadow_runtime_v2_apply_event
     (void)event_time;
 }
 
+__attribute__((weak)) bool key_runtime_integration_userspace_feeds_runtime_v2_key_events(void) {
+    return false;
+}
+
+__attribute__((weak)) bool key_runtime_integration_userspace_feeds_runtime_v2_scan_events(void) {
+    return false;
+}
+
 static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed) {
     return (keyrecord_t){
         .event =
@@ -97,7 +105,9 @@ void key_runtime_integration_scan(void) {
     };
 
     runtime_v2_trace_record_input_event(&event);
-    key_runtime_integration_shadow_runtime_v2_apply_event(&event, timer_read());
+    if (!key_runtime_integration_userspace_feeds_runtime_v2_scan_events()) {
+        key_runtime_integration_shadow_runtime_v2_apply_event(&event, timer_read());
+    }
     noah_key_runtime_scan();
     runtime_v2_trace_capture_projection();
 }
@@ -115,7 +125,9 @@ bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, 
     };
 
     runtime_v2_trace_record_input_event(&event);
-    key_runtime_integration_shadow_runtime_v2_apply_event(&event, timer_read());
+    if (!key_runtime_integration_userspace_feeds_runtime_v2_key_events()) {
+        key_runtime_integration_shadow_runtime_v2_apply_event(&event, timer_read());
+    }
 
     if (!key_runtime_integration_pre_userspace_record(keycode, &record)) {
         runtime_v2_trace_capture_projection();

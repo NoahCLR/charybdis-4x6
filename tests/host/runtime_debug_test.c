@@ -1106,6 +1106,27 @@ static void test_runtime_v2_deferred_release_blocker_expires_after_tap_term(void
     CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 0u);
 }
 
+static void test_runtime_v2_production_hooks_feed_blocker_queries(void) {
+    keypos_t key_pos = test_keypos(4, 5);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!runtime_v2_blocker_queries_authoritative());
+    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, true));
+    CHECK(runtime_v2_blocker_queries_authoritative());
+    CHECK(runtime_v2_has_any_deferred_release_blocker());
+    CHECK(runtime_v2_has_foreign_deferred_release_blocker_except(test_keypos(7, 7)));
+    CHECK(!runtime_v2_has_foreign_deferred_release_blocker_except(key_pos));
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 1u);
+    runtime_v2_observe_scan_cycle(fake_time);
+
+    CHECK(runtime_v2_blocker_queries_authoritative());
+    CHECK(!runtime_v2_has_any_deferred_release_blocker());
+    CHECK(!runtime_v2_has_foreign_deferred_release_blocker_except(test_keypos(7, 7)));
+}
+
 static void test_runtime_v2_deferred_release_blocker_persists_after_tap_term_for_plain_tap(void) {
     projection_snapshot_t snapshot;
     keypos_t              key_pos = test_keypos(4, 2);
@@ -1229,6 +1250,7 @@ int main(void) {
     test_runtime_v2_pd_mode_lock_observes_live_pd_mode_state();
     test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases();
     test_runtime_v2_deferred_release_blocker_expires_after_tap_term();
+    test_runtime_v2_production_hooks_feed_blocker_queries();
     test_runtime_v2_deferred_release_blocker_persists_after_tap_term_for_plain_tap();
     test_runtime_v2_other_press_interrupt_clears_momentary_layer_quick_tap_blocker();
     test_runtime_v2_pending_release_state_survives_same_key_reuse();

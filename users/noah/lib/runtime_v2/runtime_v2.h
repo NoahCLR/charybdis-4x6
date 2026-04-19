@@ -257,10 +257,16 @@ typedef struct {
     uint8_t             release_keycode_mismatch_count;
     uint8_t             orphan_release_count;
     uint8_t             cancelled_press_count;
+    bool                input_stream_observed;
 } runtime_v2_state_t;
 
 runtime_v2_state_t  *runtime_v2_state(void);
 void                 runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time);
+void                 runtime_v2_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
+void                 runtime_v2_observe_scan_cycle(uint16_t now);
+bool                 runtime_v2_blocker_queries_authoritative(void);
+bool                 runtime_v2_has_any_deferred_release_blocker(void);
+bool                 runtime_v2_has_foreign_deferred_release_blocker_except(keypos_t key_pos);
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos);
 const tap_series_t  *runtime_v2_tap_series_at(keypos_t key_pos);
 const runtime_v2_shadow_projection_t *runtime_v2_shadow_projection(void);

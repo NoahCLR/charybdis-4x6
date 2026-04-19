@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Production Blocker Query Bridge Pass
+
+- Moved the blocker migration one step out of pure shadow mode and into the real production path.
+- `users/noah/lib/key/runtime/key_runtime_process.c` now feeds normalized physical key down/up events into `runtime_v2` from the real `noah_process_record_user(...)` path for non-synthetic records.
+- `users/noah/lib/key/runtime/key_runtime_scan.c` now feeds normalized scan events into `runtime_v2` from the real key-runtime scan path, so shadow blocker timing advances under the same scan cadence as production hold promotion and deferred-release drain.
+- `users/noah/lib/runtime_v2/runtime_v2.c` and `.h` now expose:
+  - production-facing key/scan observer entry points,
+  - an `input_stream_observed` authority latch, and
+  - native blocker query helpers for:
+    - any blocker
+    - foreign blocker except a key position
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses the v2 blocker queries when the normalized runtime-v2 input stream is authoritative, and falls back to the legacy index blocker queries in low-level slot/unit surfaces that still mutate legacy state directly without feeding v2.
+- `tests/host/key_runtime_integration_harness.c` now avoids double-feeding key/scan events into runtime-v2 when the linked real userspace already does that itself, while still keeping manual v2 injection for standalone timer/pointer/remote replay events.
+- `tests/host/runtime_debug_test.c` now proves the production process hook feeds blocker queries and that the scan observer clears the quick-tap blocker once hold ownership settles.
+
 ## 2026-04-19 Runtime V2 Native Blocker Derivation Pass
 
 - Replaced the shadow reducer's observer-fed deferred-release blocker semantics with native blocker derivation from authored token state.

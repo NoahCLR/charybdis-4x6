@@ -26,6 +26,19 @@
 #include "../ownership/held_action.h"
 #include "../ownership/held_repeat.h"
 
+__attribute__((weak)) bool runtime_v2_blocker_queries_authoritative(void) {
+    return false;
+}
+
+__attribute__((weak)) bool runtime_v2_has_any_deferred_release_blocker(void) {
+    return false;
+}
+
+__attribute__((weak)) bool runtime_v2_has_foreign_deferred_release_blocker_except(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     *plan = (key_runtime_transition_plan_t){0};
 }
@@ -196,10 +209,18 @@ void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runti
 }
 
 bool key_runtime_transition_has_foreign_tap_release_slot_except(keypos_t key_pos) {
+    if (runtime_v2_blocker_queries_authoritative()) {
+        return runtime_v2_has_foreign_deferred_release_blocker_except(key_pos);
+    }
+
     return key_runtime_index_has_foreign_deferred_release_blocker_except(key_pos);
 }
 
 bool key_runtime_transition_has_any_tap_release_slot(void) {
+    if (runtime_v2_blocker_queries_authoritative()) {
+        return runtime_v2_has_any_deferred_release_blocker();
+    }
+
     return key_runtime_index_has_any_deferred_release_blocker();
 }
 

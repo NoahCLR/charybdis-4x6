@@ -244,6 +244,24 @@ static uint8_t runtime_v2_timed_deferred_release_blocker_count(const runtime_v2_
     return count;
 }
 
+static bool runtime_v2_has_foreign_effective_deferred_release_blocker_except(const runtime_v2_state_t *state, keypos_t key_pos) {
+    if (!state) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+        const press_token_t *token = &state->press_tokens[index];
+
+        if (!runtime_v2_press_token_blocks_deferred_release(state, token) || runtime_v2_keypos_equal(token->key_pos, key_pos)) {
+            continue;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
 static uint8_t runtime_v2_modifier_mask_for_keycode(uint16_t keycode) {
     if (IS_MODIFIER_KEYCODE(keycode)) {
         return MOD_BIT(keycode);
@@ -1145,6 +1163,8 @@ void runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time) {
         return;
     }
 
+    state->input_stream_observed = true;
+
     switch (event->kind) {
         case RUNTIME_EVENT_KIND_KEY_DOWN:
             runtime_v2_refresh_for_time(state, event_time);
@@ -1163,6 +1183,46 @@ void runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time) {
             runtime_v2_refresh_for_time(state, event_time);
             return;
     }
+}
+
+void runtime_v2_observe_process_record_event(uint16_t keycode, keyrecord_t *record) {
+    runtime_event_t event;
+
+    if (!record) {
+        return;
+    }
+
+    event = (runtime_event_t){
+        .kind = record->event.pressed ? RUNTIME_EVENT_KIND_KEY_DOWN : RUNTIME_EVENT_KIND_KEY_UP,
+        .data.key_event =
+            {
+                .keycode = keycode,
+                .key_pos = record->event.key,
+            },
+    };
+    runtime_v2_apply_event(&event, timer_read());
+}
+
+void runtime_v2_observe_scan_cycle(uint16_t now) {
+    runtime_v2_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, now);
+}
+
+bool runtime_v2_blocker_queries_authoritative(void) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    return state && state->input_stream_observed;
+}
+
+bool runtime_v2_has_any_deferred_release_blocker(void) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    return runtime_v2_blocker_queries_authoritative() && runtime_v2_effective_deferred_release_blocker_count(state) != 0u;
+}
+
+bool runtime_v2_has_foreign_deferred_release_blocker_except(keypos_t key_pos) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    return runtime_v2_blocker_queries_authoritative() && runtime_v2_has_foreign_effective_deferred_release_blocker_except(state, key_pos);
 }
 
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos) {
