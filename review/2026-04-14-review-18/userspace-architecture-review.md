@@ -270,3 +270,16 @@ This new evidence changes the current correctness assessment:
 One concrete remediation landed during that follow-up: `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c` had been double-owning auto-mouse state for some anchored pd modes by combining a synthetic lifecycle anchor with either the normal held-key auto-mouse path or a lock-owned `auto_mouse_toggle()` path. The lifecycle code now limits the synthetic anchor to locked non-toggle modes, and the host matrix locks that contract in `tests/host/pd_mode_test.c` plus the real-profile overlap harness.
 
 This note reconciles the older "no correctness blocker found" audit wording with the current hardware state so the active review folder stays internally coherent.
+
+## 2026-04-19 Runtime V2 Foundation Note
+
+The first implementation pass of the single-authority runtime redesign is now landed in parallel with the legacy runtime. This does **not** cut production behavior over yet, and it does **not** close the authored-key wedge by itself. What landed is the new internal structure and validation substrate that the redesign plan required before cutover:
+
+- `users/noah/lib/runtime_v2/runtime_v2.h`, `runtime_v2.c`, and `runtime_v2_trace.c` define the new typed v2 model: immutable normalized input events, press-token/tap-series/lease/persistent-intent records, and a projection snapshot contract.
+- `users/noah/lib/state/runtime/runtime_trace.h` and `runtime_trace.c` now carry a dedicated `NOAH_TRACE_RUNTIME_V2` kind plus a console dump path for snapshot inspection under runtime trace flags.
+- `tests/host/key_runtime_integration_harness.c` now records normalized input events from the real hook path and emits projection checkpoints after semantic events.
+- `tests/host/real_profile_thumb_layer_lock_integration_test.c` now proves trace-capture and replay parity for the two most important open repro families: raw nav into `DRAGSCROLL`, and `KC_LEFT_GUI` second-tap hold to `KC_LEFT_ALT` with repeated nav-arrow taps.
+
+This foundation changes the architecture direction in one important way: the review thread now has an explicit migration path away from "release re-derives meaning from the live world" toward "press resolves once, leases own state, projection recomputes from owned records." That is the right direction for the wedge class.
+
+It does **not** yet resolve the earlier open finding about `users/noah/lib/key/runtime/key_runtime_internal.h` being too broad, because the live production behavior still runs through the legacy runtime. The v2 subtree reduces the need to widen that seam again, but the closure bar for that finding stays open until production behavior migrates off it and the old seam can be narrowed or deleted.

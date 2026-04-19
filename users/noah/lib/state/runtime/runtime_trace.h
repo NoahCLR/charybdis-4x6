@@ -16,6 +16,7 @@ typedef enum {
     NOAH_TRACE_PD_MODE,
     NOAH_TRACE_LAYER_OWNERSHIP,
     NOAH_TRACE_SPLIT_SYNC,
+    NOAH_TRACE_RUNTIME_V2,
 } noah_trace_kind_t;
 
 typedef enum {
@@ -56,6 +57,25 @@ typedef enum {
     NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE,
 } noah_trace_split_sync_event_t;
 
+typedef enum {
+    NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_KEY_DOWN = 0,
+    NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_KEY_UP,
+    NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_TIMER_ADVANCE,
+    NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_SCAN,
+    NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_POINTER_REPORT_AXES,
+    NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_POINTER_REPORT_BUTTONS,
+    NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_REMOTE_SNAPSHOT,
+    NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_LAYER_STATE,
+    NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_LAYER_LOCKS,
+    NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_MOD_STATE,
+    NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_MOD_OWNERSHIP,
+    NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_PD_MODE_LOCAL,
+    NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_PD_MODE_DISPLAY,
+    NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_POINTER_LAYER,
+    NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_RUNTIME_COUNTS,
+    NOAH_TRACE_RUNTIME_V2_EVENT_OUTPUT_PROJECTION_V2_COUNTS,
+} noah_trace_runtime_v2_event_t;
+
 typedef struct {
     uint8_t  kind;
     uint8_t  event;
@@ -78,6 +98,9 @@ typedef struct {
 void noah_runtime_trace_emit(noah_trace_kind_t kind, uint8_t event, uint16_t a, uint16_t b);
 void noah_runtime_trace_snapshot(noah_runtime_trace_snapshot_t *out);
 void noah_runtime_trace_reset(void);
+#    if defined(CONSOLE_ENABLE)
+void noah_runtime_trace_dump_snapshot_to_console(const noah_runtime_trace_snapshot_t *snapshot);
+#    endif
 
 #else
 
@@ -97,5 +120,11 @@ static inline void noah_runtime_trace_snapshot(noah_runtime_trace_snapshot_t *ou
 }
 
 static inline void noah_runtime_trace_reset(void) {}
+
+#    if defined(CONSOLE_ENABLE)
+static inline void noah_runtime_trace_dump_snapshot_to_console(const noah_runtime_trace_snapshot_t *snapshot) {
+    (void)snapshot;
+}
+#    endif
 
 #endif // defined(NOAH_RUNTIME_TRACE_ENABLE)

@@ -1,5 +1,7 @@
 #include "key_runtime_integration_harness.h"
 
+#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/runtime_v2/runtime_v2_trace.h"
 #include "users/noah/lib/key/runtime/key_runtime_api.h"
 #include "users/noah/noah_runtime.h"
 
@@ -38,6 +40,15 @@ __attribute__((weak)) void noah_post_process_record_user(uint16_t keycode, keyre
     noah_process_record_user_finalize(keycode, record, true);
 }
 
+__attribute__((weak)) report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
+    return mouse_report;
+}
+
+__attribute__((weak)) void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
+    (void)active_flags;
+    (void)locked_flags;
+}
+
 __attribute__((weak)) bool key_runtime_integration_pre_userspace_record(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
@@ -55,6 +66,16 @@ static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed
 }
 
 void key_runtime_integration_advance(uint16_t *time, uint16_t advance_ms) {
+    runtime_event_t event = {
+        .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
+        .data.timer_advance =
+            {
+                .advance_ms = advance_ms,
+            },
+    };
+
+    runtime_v2_trace_record_input_event(&event);
+
     if (!time) {
         return;
     }
@@ -63,29 +84,80 @@ void key_runtime_integration_advance(uint16_t *time, uint16_t advance_ms) {
 }
 
 void key_runtime_integration_scan(void) {
+    runtime_event_t event = {
+        .kind = RUNTIME_EVENT_KIND_SCAN,
+    };
+
+    runtime_v2_trace_record_input_event(&event);
     noah_key_runtime_scan();
+    runtime_v2_trace_capture_projection();
 }
 
 bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed) {
     keyrecord_t record = key_runtime_integration_record(key_pos, pressed);
     bool        keep_processing;
+    runtime_event_t event = {
+        .kind = pressed ? RUNTIME_EVENT_KIND_KEY_DOWN : RUNTIME_EVENT_KIND_KEY_UP,
+        .data.key_event =
+            {
+                .keycode = keycode,
+                .key_pos = key_pos,
+            },
+    };
+
+    runtime_v2_trace_record_input_event(&event);
 
     if (!key_runtime_integration_pre_userspace_record(keycode, &record)) {
+        runtime_v2_trace_capture_projection();
         return false;
     }
 
     if (!noah_pre_process_record_user(keycode, &record)) {
+        runtime_v2_trace_capture_projection();
         return false;
     }
 
     keep_processing = noah_process_record_user(keycode, &record);
     if (!keep_processing) {
         noah_process_record_user_finalize(keycode, &record, false);
+        runtime_v2_trace_capture_projection();
         return false;
     }
 
     noah_post_process_record_user(keycode, &record);
+    runtime_v2_trace_capture_projection();
     return true;
+}
+
+bool key_runtime_integration_apply_runtime_v2_event(uint16_t *time, const runtime_event_t *event) {
+    if (!event) {
+        return false;
+    }
+
+    switch (event->kind) {
+        case RUNTIME_EVENT_KIND_KEY_DOWN:
+            return key_runtime_integration_process_record(event->data.key_event.keycode, event->data.key_event.key_pos, true);
+        case RUNTIME_EVENT_KIND_KEY_UP:
+            return key_runtime_integration_process_record(event->data.key_event.keycode, event->data.key_event.key_pos, false);
+        case RUNTIME_EVENT_KIND_TIMER_ADVANCE:
+            key_runtime_integration_advance(time, event->data.timer_advance.advance_ms);
+            return true;
+        case RUNTIME_EVENT_KIND_SCAN:
+            key_runtime_integration_scan();
+            return true;
+        case RUNTIME_EVENT_KIND_POINTER_REPORT:
+            runtime_v2_trace_record_input_event(event);
+            (void)noah_pointing_device_task_user(event->data.pointer_report.report);
+            runtime_v2_trace_capture_projection();
+            return true;
+        case RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT:
+            runtime_v2_trace_record_input_event(event);
+            pd_mode_apply_remote_snapshot(event->data.remote_snapshot.active_mode, event->data.remote_snapshot.locked_mode);
+            runtime_v2_trace_capture_projection();
+            return true;
+    }
+
+    return false;
 }
 
 void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_step_t *steps, uint8_t step_count) {

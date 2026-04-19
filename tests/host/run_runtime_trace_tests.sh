@@ -35,6 +35,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_trace.c" \
+    "$ROOT/users/noah/lib/runtime_v2/runtime_v2_trace.c" \
     "$ROOT/users/noah/lib/state/runtime/split_runtime_sync.c" \
     -o "$BIN"
 

@@ -82,9 +82,43 @@ static void test_false_path_finalizes_immediately(void) {
     CHECK(!finalize_keep_processing);
 }
 
+static void test_runtime_v2_event_adapter_routes_key_and_timer_events(void) {
+    uint16_t        time   = 100u;
+    keypos_t        key_pos = {.row = 5, .col = 6};
+    runtime_event_t down = {
+        .kind = RUNTIME_EVENT_KIND_KEY_DOWN,
+        .data.key_event =
+            {
+                .keycode = TEST_TRUE_KEYCODE,
+                .key_pos = key_pos,
+            },
+    };
+    runtime_event_t advance = {
+        .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
+        .data.timer_advance =
+            {
+                .advance_ms = 17u,
+            },
+    };
+
+    test_reset();
+
+    CHECK(key_runtime_integration_apply_runtime_v2_event(&time, &down));
+    CHECK(finalize_calls == 1);
+    CHECK(finalize_keycode == TEST_TRUE_KEYCODE);
+    CHECK(finalize_record != NULL);
+    CHECK(finalize_record->event.pressed);
+    CHECK(finalize_record->event.key.row == key_pos.row);
+    CHECK(finalize_record->event.key.col == key_pos.col);
+
+    CHECK(key_runtime_integration_apply_runtime_v2_event(&time, &advance));
+    CHECK(time == 117u);
+}
+
 int main(void) {
     test_true_path_uses_default_post_finalize();
     test_false_path_finalizes_immediately();
+    test_runtime_v2_event_adapter_routes_key_and_timer_events();
 
     puts("key runtime integration harness host tests passed");
     return 0;

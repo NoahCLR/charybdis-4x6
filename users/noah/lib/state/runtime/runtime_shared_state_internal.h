@@ -11,8 +11,10 @@
 
 #include "../../key/runtime/key_runtime_shared_state.h"
 #include "../../pointing/runtime/pd_mode_runtime_shared_state_internal.h"
+#include "../../runtime_v2/runtime_v2.h"
 
 typedef struct {
     key_runtime_shared_state_t     key;
     pd_mode_runtime_shared_state_t pd;
+    runtime_v2_state_t             v2;
 } runtime_shared_state_t;

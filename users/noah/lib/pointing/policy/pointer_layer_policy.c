@@ -94,6 +94,24 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     return state;
 }
 
+void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_policy_debug_snapshot_t *out) {
+    pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+
+    if (!out) {
+        return;
+    }
+
+    *out = (pointer_layer_policy_debug_snapshot_t){
+        .auto_mouse_anchored       = pointer_layer_policy_auto_mouse_anchored(snapshot),
+        .pd_mode_anchor_active     = pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot),
+        .prefers_typing_layer      = pd_mode_policy_snapshot_prefers_typing_layer(snapshot),
+        .auto_mouse_toggle_enabled = noah_qmk_contract_auto_mouse_toggle_enabled(),
+        .sniping_layer_active      = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER),
+        .auto_mouse_key_tracker    = noah_qmk_contract_auto_mouse_key_tracker(),
+        .auto_mouse_layer          = noah_qmk_contract_auto_mouse_layer(),
+    };
+}
+
 #else
 
 bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
@@ -113,6 +131,16 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     return state;
+}
+
+void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_policy_debug_snapshot_t *out) {
+    (void)state;
+
+    if (!out) {
+        return;
+    }
+
+    *out = (pointer_layer_policy_debug_snapshot_t){0};
 }
 
 #endif // POINTING_DEVICE_AUTO_MOUSE_ENABLE

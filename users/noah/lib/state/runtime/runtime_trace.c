@@ -55,4 +55,23 @@ void noah_runtime_trace_reset(void) {
     memset(runtime_trace_state(), 0, sizeof(*runtime_trace_state()));
 }
 
+#    if defined(CONSOLE_ENABLE)
+
+#        include "print.h"
+
+void noah_runtime_trace_dump_snapshot_to_console(const noah_runtime_trace_snapshot_t *snapshot) {
+    if (!snapshot) {
+        return;
+    }
+
+    uprintf("Runtime trace snapshot count=%u overflowed=%u\n", (unsigned int)snapshot->count, snapshot->overflowed ? 1u : 0u);
+    for (uint8_t index = 0; index < snapshot->count; index++) {
+        const noah_runtime_trace_entry_t *entry = &snapshot->entries[index];
+
+        uprintf("  [%u] kind=%u event=%u a=0x%04X b=0x%04X\n", (unsigned int)index, (unsigned int)entry->kind, (unsigned int)entry->event, (unsigned int)entry->a, (unsigned int)entry->b);
+    }
+}
+
+#    endif // defined(CONSOLE_ENABLE)
+
 #endif // defined(NOAH_RUNTIME_TRACE_ENABLE)

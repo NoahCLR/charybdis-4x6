@@ -16,6 +16,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_HOST_TESTS \
     -DCONSOLE_ENABLE \
     -DCOMBO_ENABLE \
+    -DNOAH_RUNTIME_TRACE_ENABLE \
+    -DNOAH_RUNTIME_TRACE_CAPACITY=255u \
     -DPOINTING_DEVICE_ENABLE \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
@@ -73,6 +75,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
+    "$ROOT/users/noah/lib/state/runtime/runtime_trace.c" \
+    "$ROOT/users/noah/lib/runtime_v2/runtime_v2.c" \
+    "$ROOT/users/noah/lib/runtime_v2/runtime_v2_trace.c" \
     -o "$BIN"
 
 "$BIN"

@@ -64,6 +64,8 @@ NOAH_COMMON_SOURCES := \
     lib/state/runtime/runtime_trace.c \
     lib/state/runtime/runtime_shared_state.c \
     lib/state/runtime/split_runtime_sync.c \
+    lib/runtime_v2/runtime_v2.c \
+    lib/runtime_v2/runtime_v2_trace.c \
     lib/rgb/core/rgb_runtime.c \
     lib/rgb/stages/rgb_key_feedback_stage.c \
     lib/rgb/stages/rgb_layer_stage.c \

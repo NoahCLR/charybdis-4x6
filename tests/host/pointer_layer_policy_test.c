@@ -253,6 +253,26 @@ static void test_sniping_layer_blocks_anchored_auto_mouse_restore_when_pointer_m
     CHECK((next & ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER)) != 0);
 }
 
+static void test_debug_snapshot_reports_effective_anchor_inputs(void) {
+    pointer_layer_policy_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+    fake_active_modes           = PD_MODE_ARROW;
+    fake_auto_mouse_toggle      = true;
+    fake_auto_mouse_key_tracker = 2;
+    fake_auto_mouse_layer       = 4;
+
+    pointer_layer_policy_debug_snapshot((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER, &snapshot);
+
+    CHECK(snapshot.auto_mouse_anchored);
+    CHECK(!snapshot.pd_mode_anchor_active);
+    CHECK(snapshot.prefers_typing_layer);
+    CHECK(snapshot.auto_mouse_toggle_enabled);
+    CHECK(snapshot.sniping_layer_active);
+    CHECK(snapshot.auto_mouse_key_tracker == 2);
+    CHECK(snapshot.auto_mouse_layer == 4);
+}
+
 int main(void) {
     test_non_arrow_pd_mode_marks_layer_holds_as_mouse_records();
     test_arrow_mode_does_not_anchor_layer_hold_keys();
@@ -266,6 +286,7 @@ int main(void) {
     test_sniping_layer_strips_pd_mode_anchored_auto_mouse_layer();
     test_sniping_layer_strips_key_tracker_anchored_auto_mouse_layer();
     test_sniping_layer_blocks_anchored_auto_mouse_restore_when_pointer_missing();
+    test_debug_snapshot_reports_effective_anchor_inputs();
 
     puts("pointer_layer_policy host tests passed");
     return 0;

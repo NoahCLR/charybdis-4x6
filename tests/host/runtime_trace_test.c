@@ -8,6 +8,7 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/key/runtime/key_runtime_trace.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/runtime_v2/runtime_v2_trace.h"
 #include "users/noah/lib/state/runtime/keyboard_mod_state.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_trace.h"
@@ -345,11 +346,105 @@ static void test_key_runtime_decision_events_capture_release_hold_and_multi_tap_
     CHECK(snapshot.entries[2].b == KC_V);
 }
 
+static void test_runtime_v2_input_events_round_trip_through_shared_trace_buffer(void) {
+    noah_runtime_trace_snapshot_t snapshot;
+    runtime_event_t               inputs[6] = {
+        {
+            .kind = RUNTIME_EVENT_KIND_KEY_DOWN,
+            .data.key_event =
+                {
+                    .keycode = KC_C,
+                    .key_pos = {.row = 2, .col = 3},
+                },
+        },
+        {
+            .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
+            .data.timer_advance =
+                {
+                    .advance_ms = 37u,
+                },
+        },
+        {
+            .kind = RUNTIME_EVENT_KIND_POINTER_REPORT,
+            .data.pointer_report =
+                {
+                    .report =
+                        {
+                            .x       = -5,
+                            .y       = 7,
+                            .h       = 2,
+                            .v       = -3,
+                            .buttons = 0x15u,
+                        },
+                },
+        },
+        {
+            .kind = RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT,
+            .data.remote_snapshot =
+                {
+                    .active_mode = PD_MODE_ARROW,
+                    .locked_mode = PD_MODE_ARROW,
+                },
+        },
+        {
+            .kind = RUNTIME_EVENT_KIND_KEY_UP,
+            .data.key_event =
+                {
+                    .keycode = KC_C,
+                    .key_pos = {.row = 2, .col = 3},
+                },
+        },
+        {
+            .kind = RUNTIME_EVENT_KIND_SCAN,
+        },
+    };
+    runtime_event_t decoded[ARRAY_SIZE(inputs)];
+
+    test_reset_stubs();
+
+    for (uint8_t index = 0; index < ARRAY_SIZE(inputs); index++) {
+        runtime_v2_trace_record_input_event(&inputs[index]);
+    }
+
+    snapshot = test_trace_snapshot();
+
+    CHECK(snapshot.count == 7u);
+    CHECK(snapshot.entries[0].kind == NOAH_TRACE_RUNTIME_V2);
+    CHECK(snapshot.entries[0].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_KEY_DOWN);
+    CHECK(snapshot.entries[1].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_TIMER_ADVANCE);
+    CHECK(snapshot.entries[2].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_POINTER_REPORT_AXES);
+    CHECK(snapshot.entries[3].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_POINTER_REPORT_BUTTONS);
+    CHECK(snapshot.entries[4].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_REMOTE_SNAPSHOT);
+    CHECK(snapshot.entries[5].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_KEY_UP);
+    CHECK(snapshot.entries[6].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_SCAN);
+
+    CHECK(runtime_v2_trace_decode_input_events(&snapshot, decoded, ARRAY_SIZE(decoded)) == ARRAY_SIZE(inputs));
+    CHECK(decoded[0].kind == RUNTIME_EVENT_KIND_KEY_DOWN);
+    CHECK(decoded[0].data.key_event.keycode == KC_C);
+    CHECK(decoded[0].data.key_event.key_pos.row == 2u);
+    CHECK(decoded[0].data.key_event.key_pos.col == 3u);
+    CHECK(decoded[1].kind == RUNTIME_EVENT_KIND_TIMER_ADVANCE);
+    CHECK(decoded[1].data.timer_advance.advance_ms == 37u);
+    CHECK(decoded[2].kind == RUNTIME_EVENT_KIND_POINTER_REPORT);
+    CHECK(decoded[2].data.pointer_report.report.x == -5);
+    CHECK(decoded[2].data.pointer_report.report.y == 7);
+    CHECK(decoded[2].data.pointer_report.report.h == 2);
+    CHECK(decoded[2].data.pointer_report.report.v == -3);
+    CHECK(decoded[2].data.pointer_report.report.buttons == 0x15u);
+    CHECK(decoded[3].kind == RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT);
+    CHECK(decoded[3].data.remote_snapshot.active_mode == PD_MODE_ARROW);
+    CHECK(decoded[3].data.remote_snapshot.locked_mode == PD_MODE_ARROW);
+    CHECK(decoded[4].kind == RUNTIME_EVENT_KIND_KEY_UP);
+    CHECK(decoded[4].data.key_event.keycode == KC_C);
+    CHECK(decoded[5].kind == RUNTIME_EVENT_KIND_SCAN);
+}
+
 int main(void) {
     test_ring_buffer_retains_recent_tail_when_full();
     test_key_runtime_and_layer_ownership_share_one_trace_buffer();
     test_pd_mode_and_split_sync_events_share_one_trace_buffer();
     test_key_runtime_decision_events_capture_release_hold_and_multi_tap_details();
+    test_runtime_v2_input_events_round_trip_through_shared_trace_buffer();
 
     puts("runtime_trace host tests passed");
     return 0;

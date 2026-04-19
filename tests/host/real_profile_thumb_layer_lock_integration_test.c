@@ -12,9 +12,13 @@
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/runtime_v2/runtime_v2.h"
+#include "users/noah/lib/runtime_v2/runtime_v2_trace.h"
+#include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_reset.h"
+#include "users/noah/lib/state/runtime/runtime_trace.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
 
@@ -290,6 +294,55 @@ static void test_reset_state(void) {
     layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE));
 }
 
+static void test_assert_runtime_trace_snapshot_equal(const noah_runtime_trace_snapshot_t *expected, const noah_runtime_trace_snapshot_t *actual) {
+    CHECK(expected != NULL);
+    CHECK(actual != NULL);
+    CHECK(expected->count == actual->count);
+    CHECK(expected->overflowed == actual->overflowed);
+
+    for (uint8_t index = 0; index < expected->count; index++) {
+        CHECK(expected->entries[index].kind == actual->entries[index].kind);
+        CHECK(expected->entries[index].event == actual->entries[index].event);
+        CHECK(expected->entries[index].a == actual->entries[index].a);
+        CHECK(expected->entries[index].b == actual->entries[index].b);
+    }
+}
+
+static void test_shadow_replay_scenario(void (*scenario)(void)) {
+    runtime_event_t                events[128];
+    noah_runtime_trace_snapshot_t  original_trace;
+    noah_runtime_trace_snapshot_t  replay_trace;
+    projection_snapshot_t          original_projection;
+    projection_snapshot_t          replay_projection;
+    uint16_t                       event_count;
+
+    CHECK(scenario != NULL);
+
+    test_reset_state();
+    noah_runtime_trace_reset();
+    scenario();
+    noah_runtime_trace_snapshot(&original_trace);
+    original_projection = runtime_v2_projection_snapshot_capture();
+
+    CHECK(!original_trace.overflowed);
+    event_count = runtime_v2_trace_decode_input_events(&original_trace, events, ARRAY_SIZE(events));
+    CHECK(event_count != 0u);
+
+    test_reset_state();
+    noah_runtime_trace_reset();
+
+    for (uint16_t index = 0; index < event_count; index++) {
+        (void)key_runtime_integration_apply_runtime_v2_event(&fake_time, &events[index]);
+    }
+
+    noah_runtime_trace_snapshot(&replay_trace);
+    replay_projection = runtime_v2_projection_snapshot_capture();
+
+    CHECK(!replay_trace.overflowed);
+    CHECK(runtime_v2_projection_snapshot_equal(&original_projection, &replay_projection));
+    test_assert_runtime_trace_snapshot_equal(&original_trace, &replay_trace);
+}
+
 int uprintf(const char *fmt, ...) {
     (void)fmt;
     return 0;
@@ -563,6 +616,29 @@ void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
 
 uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
     return (uint8_t)(mods & fake_managed_mods & (uint8_t)~fake_physical_mods);
+}
+
+void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (keyboard_mod_ownership_debug_snapshot_t){
+        .live_state =
+            {
+                .real           = fake_mods,
+                .weak           = fake_weak_mods,
+                .oneshot        = fake_oneshot_mods,
+                .oneshot_locked = fake_oneshot_locked_mods,
+            },
+    };
+
+    for (uint8_t index = 0; index < KEYBOARD_MOD_OWNERSHIP_MOD_COUNT; index++) {
+        uint8_t bit = (uint8_t)(1u << index);
+
+        out->physical_refcounts[index] = (fake_physical_mods & bit) != 0 ? 1u : 0u;
+        out->managed_refcounts[index] = (fake_managed_mods & bit) != 0 ? 1u : 0u;
+    }
 }
 
 void keyboard_mod_state_apply(keyboard_mod_state_t state) {
@@ -1896,6 +1972,69 @@ static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_dra
     test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(right_thumb_pos, right_thumb_keycode, true);
 }
 
+static void test_runtime_v2_raw_nav_dragscroll_shadow_scenario(void) {
+    const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
+    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t        dragscroll_pos  = test_find_keypos_on_layer(LAYER_NAV, DRAGSCROLL);
+
+    CHECK(test_keypos_valid(nav_hold_pos));
+    CHECK(test_keypos_valid(dragscroll_pos));
+
+    test_activate_nav_parent_hold(nav_hold_pos, nav_hold_keycode, false);
+    CHECK(test_resolve_keycode(dragscroll_pos) == DRAGSCROLL);
+
+    test_press_resolved(dragscroll_pos);
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
+    key_runtime_integration_scan();
+    test_release_resolved(dragscroll_pos);
+    test_release_resolved(nav_hold_pos);
+    key_runtime_integration_scan();
+
+    test_assert_dragscroll_overlap_quiescent(nav_hold_pos, dragscroll_pos);
+}
+
+static void test_runtime_v2_gui_alt_repeated_nav_shadow_scenario(void) {
+    const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
+    keypos_t        gui_pos         = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
+    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t        child_pos       = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
+
+    CHECK(test_keypos_valid(gui_pos));
+    CHECK(test_keypos_valid(nav_hold_pos));
+    CHECK(test_keypos_valid(child_pos));
+
+    test_activate_gui_double_tap_alt_hold(gui_pos);
+    test_activate_nav_parent_hold(nav_hold_pos, nav_hold_keycode, false);
+
+    for (uint8_t iteration = 0; iteration < 4u; iteration++) {
+        uint16_t previous_tap_count = test_tap_code16_count;
+
+        CHECK(test_resolve_keycode(child_pos) == KC_LEFT);
+        test_press_resolved(child_pos);
+        test_release_resolved(child_pos);
+        CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1u));
+        CHECK(test_last_tap_code16 == KC_LEFT);
+
+        key_runtime_integration_advance(&fake_time, 10u);
+        key_runtime_integration_scan();
+        CHECK(noah_runtime_debug_deferred_release_count() == 0u);
+    }
+
+    test_release_resolved(nav_hold_pos);
+    test_release_resolved(gui_pos);
+    key_runtime_integration_scan();
+
+    test_assert_nav_overlap_quiescent(gui_pos, nav_hold_pos);
+}
+
+static void test_runtime_v2_shadow_replays_raw_nav_dragscroll_overlap(void) {
+    test_shadow_replay_scenario(test_runtime_v2_raw_nav_dragscroll_shadow_scenario);
+}
+
+static void test_runtime_v2_shadow_replays_gui_alt_repeated_nav_overlap(void) {
+    test_shadow_replay_scenario(test_runtime_v2_gui_alt_repeated_nav_shadow_scenario);
+}
+
 int main(void) {
     test_left_thumb_double_tap_hold_toggles_num_layer();
     test_right_thumb_double_tap_hold_toggles_num_layer();
@@ -1921,6 +2060,8 @@ int main(void) {
     test_gui_double_tap_hold_with_right_thumb_nav_hold_keeps_dragscroll_immediate();
     test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_dragscroll_immediate();
     test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_dragscroll_immediate();
+    test_runtime_v2_shadow_replays_raw_nav_dragscroll_overlap();
+    test_runtime_v2_shadow_replays_gui_alt_repeated_nav_overlap();
 
     puts("real_profile_thumb_layer_lock integration tests passed");
     return 0;

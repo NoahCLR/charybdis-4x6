@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include "users/noah/lib/runtime_v2/runtime_v2.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 
 typedef enum {
@@ -56,5 +57,6 @@ typedef struct {
 void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_step_t *steps, uint8_t step_count);
 void key_runtime_integration_advance(uint16_t *time, uint16_t advance_ms);
 void key_runtime_integration_scan(void);
+bool key_runtime_integration_apply_runtime_v2_event(uint16_t *time, const runtime_event_t *event);
 bool key_runtime_integration_pre_userspace_record(uint16_t keycode, keyrecord_t *record);
 bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed);

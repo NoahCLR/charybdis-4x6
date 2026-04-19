@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-04-19 Single-Authority Runtime V2 Foundation
+
+- Landed the first implementation pass of the single-authority runtime redesign without cutting over production behavior yet.
+- Added the preservation contract in `runtime-v2-preservation-matrix.md`, tying the redesign acceptance bar to `docs/INTERACTION_MODEL.md`, `docs/KEYMAP.md`, and the real-profile integration scenarios instead of legacy slot-model white-box behavior.
+- Added the new internal `users/noah/lib/runtime_v2/` subtree with the typed v2 foundation:
+  - `runtime_event_t`
+  - `press_token_t`
+  - `tap_series_t`
+  - `lease_t`
+  - `persistent_intent_t`
+  - `projection_snapshot_t`
+- Extended the shared runtime trace ring with a dedicated `NOAH_TRACE_RUNTIME_V2` kind and normalized input/output event ids, plus a debug-only console dump helper for trace snapshots.
+- Wired the host integration harness to emit normalized v2 input events from the real hook path and to emit projection checkpoints after semantic events, instead of introducing a second synthetic test-only adapter.
+- Added runtime-v2 input encode/decode coverage in `tests/host/runtime_trace_test.c`.
+- Added a pointer-layer policy debug snapshot surface and coverage so projection snapshots can compare effective anchor inputs directly.
+- Added real-profile shadow replay parity coverage for the two highest-priority repro families:
+  - raw `LAYER_NAV` -> `DRAGSCROLL`
+  - `KC_LEFT_GUI` second-tap hold to `KC_LEFT_ALT` with repeated nav-arrow taps
+- The current production hooks still run the legacy runtime. This pass only lands the preservation matrix, normalized trace substrate, projection snapshot contract, and replay harness required before domain-by-domain cutover.
+
 ## 2026-04-19 Pd-Mode Auto-Mouse Ownership Remediation
 
 - Investigated the reopened wedge against the current real repro families and the upstream QMK auto-mouse/release ordering in `../bastardkb-qmk`.
@@ -139,6 +159,19 @@
 - `closure verdict`: keep this thread open until the hardware regression is closed on-device, and until the remaining `should-fix` items are either resolved or explicitly downgraded out of the closure bar.
 
 ## Verification
+
+- Passed during the runtime-v2 foundation landing:
+  - `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_pointer_layer_policy_tests.sh`
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - `git diff --check`
 
 - Passed: `sh tests/host/run_all_host_tests.sh`
 - Passed: `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
@@ -309,6 +342,7 @@
 
 ## Next Steps
 
-1. Re-run the original on-device repro families: raw/authored `LAYER_NAV` into `DRAGSCROLL`, and `KC_LEFT_GUI` double-tap-hold to `KC_LEFT_ALT` with repeated nav-arrow use.
-2. If hardware still wedges, capture whether the new host-modeled seams stay quiescent so the next pass can focus on the remaining release/ownership paths instead of auto-mouse double ownership.
-3. Once the hardware regression is actually closed, return to the older thread-level `should-fix` items on the registry DSLs and the breadth of `key_runtime_internal.h`.
+1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
+2. Migrate press/release identity into real immutable `press_token_t` ownership instead of legacy slot reinterpretation.
+3. Move tap-series state out of `active_key_state_t` and into the new `tap_series_t` store.
+4. Replace imperative layer/modifier/pd cleanup branches with lease-backed projection recompute before any production hook cutover.

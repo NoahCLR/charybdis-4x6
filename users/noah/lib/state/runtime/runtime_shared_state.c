@@ -23,6 +23,10 @@ key_runtime_shared_state_t *key_runtime_shared_state(void) {
     return &noah_runtime_context()->shared.key;
 }
 
+runtime_v2_state_t *runtime_v2_state(void) {
+    return &noah_runtime_context()->shared.v2;
+}
+
 static void runtime_shared_state_reset(runtime_shared_state_t *state) {
     if (!state) {
         return;
@@ -30,6 +34,7 @@ static void runtime_shared_state_reset(runtime_shared_state_t *state) {
 
     *state = (runtime_shared_state_t){0};
     key_runtime_shared_state_reset(&state->key);
+    runtime_v2_state_reset(&state->v2);
 }
 
 void noah_runtime_context_reset_for_test(noah_runtime_context_t *ctx) {
