@@ -9,7 +9,10 @@
 
 #include "runtime_v2.h"
 
+#include "../key/runtime/effects/key_runtime_effect_queue.h"
 #include "../key/runtime/slot/key_runtime_slot_release_resolver.h"
+
+#define RUNTIME_V2_RELEASE_EFFECT_PLAN_CAPACITY 6u
 
 typedef struct {
     key_runtime_slot_interaction_t      interaction;
@@ -54,6 +57,31 @@ typedef struct {
     uint8_t                                     repeat_count;
 } runtime_v2_pending_multi_tap_scan_resolution_t;
 
+typedef enum {
+    RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_NONE = 0,
+    RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET,
+    RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_CLEAR_ACTIVE_PRESERVE_PENDING_MULTI_TAP,
+} runtime_v2_release_slot_settlement_t;
+
+typedef struct {
+    bool     active;
+    uint16_t keycode;
+    keypos_t key_pos;
+    uint16_t tap_action;
+    uint8_t  tap_repeat_count;
+    uint16_t tap_hold_term;
+    uint16_t multi_tap_term;
+    bool     has_more_taps;
+} runtime_v2_pending_multi_tap_seed_t;
+
+typedef struct {
+    runtime_v2_release_slot_settlement_t settlement;
+    runtime_v2_pending_multi_tap_seed_t  pending_multi_tap_seed;
+    KEY_RUNTIME_EFFECT_QUEUE_FIELDS(RUNTIME_V2_RELEASE_EFFECT_PLAN_CAPACITY);
+} runtime_v2_release_effect_plan_t;
+
 bool runtime_v2_resolve_active_release(keypos_t key_pos, runtime_v2_active_release_resolution_t *out);
+bool runtime_v2_plan_active_release_effects(keypos_t key_pos, uint16_t keycode, const runtime_v2_active_release_resolution_t *resolution, runtime_v2_release_effect_plan_t *out);
 bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, runtime_v2_pending_multi_tap_release_resolution_t *out);
+bool runtime_v2_plan_pending_multi_tap_release_effects(keypos_t key_pos, bool is_momentary_layer, const runtime_v2_pending_multi_tap_release_resolution_t *resolution, delayed_action_mods_t mods, runtime_v2_release_effect_plan_t *out);
 bool runtime_v2_resolve_pending_multi_tap_scan(keypos_t key_pos, runtime_v2_pending_multi_tap_scan_resolution_t *out);

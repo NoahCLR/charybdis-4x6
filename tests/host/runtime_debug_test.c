@@ -776,6 +776,55 @@ static void test_runtime_v2_active_release_resolution_tracks_threshold_hold_afte
     CHECK(resolution.decision.action == TEST_SECOND_ACTION);
 }
 
+static void test_runtime_v2_active_release_effect_plan_buffers_multi_tap(void) {
+    runtime_v2_active_release_resolution_t resolution;
+    runtime_v2_release_effect_plan_t       plan;
+    keypos_t                               key_pos = test_keypos(4, 6);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 20u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+
+    CHECK(runtime_v2_resolve_active_release(key_pos, &resolution));
+    CHECK(runtime_v2_plan_active_release_effects(key_pos, TEST_PENDING_MULTI_TAP_KEY, &resolution, &plan));
+    CHECK(plan.settlement == RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET);
+    CHECK(plan.count == 0u);
+    CHECK(plan.pending_multi_tap_seed.active);
+    CHECK(plan.pending_multi_tap_seed.keycode == TEST_PENDING_MULTI_TAP_KEY);
+    CHECK(test_keypos_equal(plan.pending_multi_tap_seed.key_pos, key_pos));
+    CHECK(plan.pending_multi_tap_seed.tap_action == TEST_ACTION);
+    CHECK(plan.pending_multi_tap_seed.tap_repeat_count == 1u);
+    CHECK(plan.pending_multi_tap_seed.tap_hold_term == 120u);
+    CHECK(plan.pending_multi_tap_seed.multi_tap_term == 180u);
+    CHECK(plan.pending_multi_tap_seed.has_more_taps);
+}
+
+static void test_runtime_v2_active_release_effect_plan_releases_layer_and_taps(void) {
+    runtime_v2_active_release_resolution_t resolution;
+    runtime_v2_release_effect_plan_t       plan;
+    keypos_t                               key_pos = test_keypos(6, 3);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_INTERRUPTED_LAYER_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 20u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_INTERRUPTED_LAYER_KEY, key_pos, fake_time);
+
+    CHECK(runtime_v2_resolve_active_release(key_pos, &resolution));
+    CHECK(runtime_v2_plan_active_release_effects(key_pos, TEST_INTERRUPTED_LAYER_KEY, &resolution, &plan));
+    CHECK(plan.settlement == RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET);
+    CHECK(!plan.pending_multi_tap_seed.active);
+    CHECK(plan.count == 2u);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
+    CHECK(test_keypos_equal(plan.items[0].data.key_pos, key_pos));
+    CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK(plan.items[1].data.action == KC_V);
+}
+
 static void test_runtime_v2_pending_multi_tap_release_resolution_preserves_chain(void) {
     runtime_v2_pending_multi_tap_release_resolution_t resolution;
     keypos_t                                          key_pos = test_keypos(4, 4);
@@ -793,6 +842,24 @@ static void test_runtime_v2_pending_multi_tap_release_resolution_preserves_chain
     CHECK(resolution.repeat_count == 0u);
 }
 
+static void test_runtime_v2_pending_multi_tap_release_effect_plan_preserves_chain(void) {
+    runtime_v2_pending_multi_tap_release_resolution_t resolution;
+    runtime_v2_release_effect_plan_t                  plan;
+    keypos_t                                         key_pos = test_keypos(6, 0);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 60u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+
+    CHECK(runtime_v2_resolve_pending_multi_tap_release(key_pos, KC_NO, 0u, true, &resolution));
+    CHECK(runtime_v2_plan_pending_multi_tap_release_effects(key_pos, false, &resolution, (delayed_action_mods_t){0}, &plan));
+    CHECK(plan.settlement == RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_CLEAR_ACTIVE_PRESERVE_PENDING_MULTI_TAP);
+    CHECK(plan.count == 0u);
+}
+
 static void test_runtime_v2_pending_multi_tap_release_resolution_uses_hold_action_after_term(void) {
     runtime_v2_pending_multi_tap_release_resolution_t resolution;
     keypos_t                                          key_pos = test_keypos(4, 5);
@@ -808,6 +875,31 @@ static void test_runtime_v2_pending_multi_tap_release_resolution_uses_hold_actio
     CHECK(resolution.outcome == RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION);
     CHECK(resolution.action == TEST_ACTION);
     CHECK(resolution.repeat_count == 1u);
+}
+
+static void test_runtime_v2_pending_multi_tap_release_effect_plan_delays_action(void) {
+    runtime_v2_pending_multi_tap_release_resolution_t resolution;
+    runtime_v2_release_effect_plan_t                  plan;
+    delayed_action_mods_t                             mods = {
+                                    .real = MOD_BIT(KC_LEFT_SHIFT),
+                                };
+    keypos_t                                         key_pos = test_keypos(6, 1);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+
+    CHECK(runtime_v2_resolve_pending_multi_tap_release(key_pos, KC_NO, 1u, false, &resolution));
+    CHECK(runtime_v2_plan_pending_multi_tap_release_effects(key_pos, false, &resolution, mods, &plan));
+    CHECK(plan.settlement == RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET);
+    CHECK(plan.count == 1u);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
+    CHECK(plan.items[0].data.delayed_action.repeat_count == 1u);
+    CHECK(plan.items[0].data.delayed_action.mods.real == mods.real);
 }
 
 static void test_runtime_v2_pending_multi_tap_scan_resolution_promotes_hold_threshold(void) {
@@ -1615,8 +1707,12 @@ int main(void) {
     test_runtime_v2_timer_and_scan_do_not_rewrite_press_identity();
     test_runtime_v2_active_release_resolution_preserves_tap_window_without_scan();
     test_runtime_v2_active_release_resolution_tracks_threshold_hold_after_scan();
+    test_runtime_v2_active_release_effect_plan_buffers_multi_tap();
+    test_runtime_v2_active_release_effect_plan_releases_layer_and_taps();
     test_runtime_v2_pending_multi_tap_release_resolution_preserves_chain();
+    test_runtime_v2_pending_multi_tap_release_effect_plan_preserves_chain();
     test_runtime_v2_pending_multi_tap_release_resolution_uses_hold_action_after_term();
+    test_runtime_v2_pending_multi_tap_release_effect_plan_delays_action();
     test_runtime_v2_pending_multi_tap_scan_resolution_promotes_hold_threshold();
     test_runtime_v2_pending_multi_tap_scan_resolution_promotes_long_hold();
     test_runtime_v2_pending_multi_tap_scan_resolution_flushes_expired_chain();

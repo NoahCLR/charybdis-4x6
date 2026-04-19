@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Release Effect Planning Pass
+
+- Moved handled-release effect selection onto the reducer-owned path: once runtime-v2 decides active or pending multi-tap release outcome, the default release callers no longer re-map that decision into effects locally.
+- `users/noah/lib/runtime_v2/runtime_v2_release_internal.h` now defines:
+  - `runtime_v2_release_effect_plan_t`,
+  - `runtime_v2_pending_multi_tap_seed_t`,
+  - reducer-owned slot-settlement instructions, and
+  - planning APIs for active and pending multi-tap release.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now exposes:
+  - `runtime_v2_plan_active_release_effects(...)`, which maps reducer-owned active-release decisions into:
+    - concrete effect queue items,
+    - pending multi-tap seed payload, and
+    - slot-settlement instructions, and
+  - `runtime_v2_plan_pending_multi_tap_release_effects(...)`, which does the same for pending multi-tap release, including delayed-action mod transport and preserve-chain settlement.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c` now consumes that reducer-owned effect plan when runtime-v2 has authoritative normalized input, uses the returned settlement to reset legacy slot state, seeds legacy pending multi-tap storage from the reducer-owned payload, and appends the reducer-owned effect queue to the existing slot result.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c` now consumes the reducer-owned pending-multi-tap effect plan when runtime-v2 is authoritative, uses the returned settlement to either preserve the chain or reset the slot, and appends the reducer-owned held-lifecycle or delayed-action effects to the existing slot result.
+- This keeps the migration cut narrow:
+  - reducer-owned state now determines handled-release effect selection as well as handled-release outcome,
+  - legacy slot/result storage still transports the emitted effects and pending multi-tap seed, and
+  - production effect execution still lives in the legacy transition executor for this pass.
+- `tests/host/runtime_debug_test.c` now proves four direct reducer contracts:
+  - active release can buffer a pending multi-tap seed without emitting immediate effects,
+  - active interrupted layer release can emit layer-release plus tap-action effects from the reducer-owned plan,
+  - pending multi-tap quick release can preserve the chain without emitting immediate effects, and
+  - pending multi-tap delayed-action release keeps the saved delayed-mod payload on the emitted reducer-owned effect.
+
 ## 2026-04-19 Runtime V2 Slot Retirement And Explicit Multi-Tap Flush Pass
 
 - Moved the next mixed-ownership cleanup seam into the reducer-aware path: explicit pending-multi-tap flush/reset and forced active-slot retirement no longer leave `runtime_v2` state live after the legacy slot world has been cleared.
@@ -683,5 +709,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Move the remaining release/deferred-emission effect planning and slot-retirement aftermath onto the reducer path so v2 owns not just lifetime end, but the complete settlement/cleanup contract.
-4. Capture and replay on-device traces for the original wedge repros now that blocker gating, pending multi-tap lifecycle, explicit flush/reset, and active-slot retirement all have reducer-owned visibility.
+3. Move the remaining release aftermath transport/execution seams onto the reducer path so v2 owns not just release decision and effect selection, but the complete settlement/cleanup contract.
+4. Capture and replay on-device traces for the original wedge repros now that blocker gating, pending multi-tap lifecycle, explicit flush/reset, and handled-release effect planning all have reducer-owned visibility.

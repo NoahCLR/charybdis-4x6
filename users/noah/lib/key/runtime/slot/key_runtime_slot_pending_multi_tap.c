@@ -33,6 +33,17 @@ __attribute__((weak)) bool runtime_v2_resolve_pending_multi_tap_scan(keypos_t ke
     return false;
 }
 
+__attribute__((weak)) bool runtime_v2_plan_pending_multi_tap_release_effects(keypos_t key_pos, bool is_momentary_layer, const runtime_v2_pending_multi_tap_release_resolution_t *resolution, delayed_action_mods_t mods, runtime_v2_release_effect_plan_t *out) {
+    (void)key_pos;
+    (void)is_momentary_layer;
+    (void)resolution;
+    (void)mods;
+    if (out) {
+        *out = (runtime_v2_release_effect_plan_t){0};
+    }
+    return false;
+}
+
 static void key_runtime_slot_pending_multi_tap_clear_active_state(active_key_state_t *slot) {
     if (!slot) {
         return;
@@ -70,6 +81,16 @@ typedef struct {
     uint8_t                                              repeat_count;
     delayed_action_mods_t                                mods;
 } key_runtime_slot_pending_multi_tap_release_resolution_t;
+
+static void key_runtime_slot_result_append_release_plan(key_runtime_slot_result_t *result, const runtime_v2_release_effect_plan_t *plan) {
+    if (!(result && plan)) {
+        return;
+    }
+
+    for (uint8_t index = 0; index < plan->count; index++) {
+        key_runtime_slot_result_push(result, plan->items[index]);
+    }
+}
 
 static bool key_runtime_slot_pending_multi_tap_release_uses_held_lifecycle(const key_runtime_slot_pending_multi_tap_release_context_t *context, uint16_t action) {
     handled_key_hold_semantics_t semantics;
@@ -226,6 +247,8 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(acti
     key_runtime_slot_pending_multi_tap_release_context_t    context    = key_runtime_slot_pending_multi_tap_release_context(slot, keycode, elapsed);
     key_runtime_slot_pending_multi_tap_release_resolution_t resolution = key_runtime_slot_pending_multi_tap_release_resolve(&context);
     key_runtime_slot_result_t                               result     = {0};
+    runtime_v2_pending_multi_tap_release_resolution_t       v2_resolution;
+    runtime_v2_release_effect_plan_t                        v2_plan;
 
     if (!context.matched) {
         return result;
@@ -246,6 +269,28 @@ key_runtime_slot_result_t key_runtime_slot_pending_multi_tap_handle_release(acti
         case KEY_RUNTIME_SLOT_PENDING_MULTI_TAP_RELEASE_OUTCOME_NONE:
         default:
             break;
+    }
+
+    v2_resolution = (runtime_v2_pending_multi_tap_release_resolution_t){
+        .outcome      = (runtime_v2_pending_multi_tap_release_outcome_t)resolution.outcome,
+        .action       = resolution.action,
+        .repeat_count = resolution.repeat_count,
+    };
+
+    if (runtime_v2_plan_pending_multi_tap_release_effects(context.key_pos, context.is_momentary_layer, &v2_resolution, resolution.mods, &v2_plan)) {
+        switch (v2_plan.settlement) {
+            case RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_CLEAR_ACTIVE_PRESERVE_PENDING_MULTI_TAP:
+                key_runtime_slot_pending_multi_tap_clear_active_state(slot);
+                break;
+            case RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET:
+                key_runtime_slot_reset(slot);
+                break;
+            case RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_NONE:
+            default:
+                break;
+        }
+        key_runtime_slot_result_append_release_plan(&result, &v2_plan);
+        return result;
     }
 
     switch (resolution.outcome) {

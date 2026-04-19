@@ -7,12 +7,18 @@
 
 #include <string.h>
 
+#include "../pointing/defs/pd_modes.h"
 #include "../pointing/policy/pd_mode_policy.h"
 #include "../pointing/policy/pointer_layer_policy.h"
 #include "../state/ownership/keyboard_mod_ownership.h"
 #include "../state/ownership/layer_ownership.h"
 #include "../state/runtime/runtime_debug.h"
 #include "runtime_v2_trace.h"
+
+__attribute__((weak)) const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+    (void)action;
+    return NULL;
+}
 
 static uint8_t runtime_v2_refcount_mask(const uint8_t *refcounts, uint8_t count) {
     uint8_t mask = 0;
@@ -40,6 +46,105 @@ static uint16_t runtime_v2_keypos_index(keypos_t key_pos) {
 
 static bool runtime_v2_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
+}
+
+static void runtime_v2_release_effect_plan_push(runtime_v2_release_effect_plan_t *plan, key_runtime_effect_t effect) {
+    if (!plan) {
+        return;
+    }
+
+    if (plan->count < ARRAY_SIZE(plan->items)) {
+        plan->items[plan->count++] = effect;
+        return;
+    }
+
+    plan->overflowed = true;
+}
+
+static void runtime_v2_release_effect_plan_push_dispatch_action(runtime_v2_release_effect_plan_t *plan, uint16_t action) {
+    if (action == KC_NO) {
+        return;
+    }
+
+    runtime_v2_release_effect_plan_push(plan, (key_runtime_effect_t){
+                                                  .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+                                                  .data.action = action,
+                                              });
+}
+
+static void runtime_v2_release_effect_plan_push_held_action(runtime_v2_release_effect_plan_t *plan, key_runtime_effect_kind_t kind, keypos_t key_pos, uint16_t action) {
+    if (!(plan && action != KC_NO)) {
+        return;
+    }
+
+    runtime_v2_release_effect_plan_push(plan, (key_runtime_effect_t){
+                                                  .kind = kind,
+                                                  .data.held_action =
+                                                      {
+                                                          .key_pos = key_pos,
+                                                          .action  = action,
+                                                      },
+                                              });
+}
+
+static void runtime_v2_release_effect_plan_push_release_owned_state(runtime_v2_release_effect_plan_t *plan, keypos_t key_pos) {
+    if (!plan) {
+        return;
+    }
+
+    runtime_v2_release_effect_plan_push(plan, (key_runtime_effect_t){
+                                                  .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+                                                  .data.key_pos = key_pos,
+                                              });
+}
+
+static void runtime_v2_release_effect_plan_push_layer_release(runtime_v2_release_effect_plan_t *plan, keypos_t key_pos) {
+    if (!plan) {
+        return;
+    }
+
+    runtime_v2_release_effect_plan_push(plan, (key_runtime_effect_t){
+                                                  .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
+                                                  .data.key_pos = key_pos,
+                                              });
+}
+
+static void runtime_v2_release_effect_plan_push_pd_mode_lock_tap(runtime_v2_release_effect_plan_t *plan, pd_mode_mask_t mode) {
+    if (!(plan && mode != 0)) {
+        return;
+    }
+
+    runtime_v2_release_effect_plan_push(plan, (key_runtime_effect_t){
+                                                  .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+                                                  .data.pd_mode = mode,
+                                              });
+}
+
+static void runtime_v2_release_effect_plan_push_delayed_action(runtime_v2_release_effect_plan_t *plan, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
+    if (!(plan && action != KC_NO && repeat_count != 0u)) {
+        return;
+    }
+
+    runtime_v2_release_effect_plan_push(plan, (key_runtime_effect_t){
+                                                  .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
+                                                  .data.delayed_action =
+                                                      {
+                                                          .action       = action,
+                                                          .mods         = mods,
+                                                          .repeat_count = repeat_count,
+                                                      },
+                                              });
+}
+
+static void runtime_v2_release_effect_plan_push_action_or_pd_mode_lock_tap(runtime_v2_release_effect_plan_t *plan, uint16_t action) {
+    const pd_mode_def_t *def = pd_mode_lock_action_lookup(action);
+
+    if (def) {
+        runtime_v2_release_effect_plan_push_pd_mode_lock_tap(plan, def->mode_flag);
+        return;
+    }
+
+    runtime_v2_release_effect_plan_push_dispatch_action(plan, action);
 }
 
 static uint16_t runtime_v2_default_hold_term(uint16_t keycode) {
@@ -1798,6 +1903,62 @@ bool runtime_v2_resolve_active_release(keypos_t key_pos, runtime_v2_active_relea
     return true;
 }
 
+bool runtime_v2_plan_active_release_effects(keypos_t key_pos, uint16_t keycode, const runtime_v2_active_release_resolution_t *resolution, runtime_v2_release_effect_plan_t *out) {
+    key_runtime_slot_release_contract_t contract;
+
+    if (out) {
+        *out = (runtime_v2_release_effect_plan_t){
+            .settlement = RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET,
+        };
+    }
+
+    if (!(resolution && out && runtime_v2_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    contract = key_runtime_slot_release_contract(resolution->interaction);
+
+    if (key_runtime_slot_interaction_is_momentary_layer(resolution->interaction)) {
+        runtime_v2_release_effect_plan_push_layer_release(out, key_pos);
+    }
+    if (resolution->decision.release_owned_state) {
+        runtime_v2_release_effect_plan_push_release_owned_state(out, key_pos);
+    }
+
+    switch (resolution->decision.outcome) {
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_TAP:
+            switch (contract.tap.outcome) {
+                case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP:
+                    out->pending_multi_tap_seed = (runtime_v2_pending_multi_tap_seed_t){
+                        .active           = true,
+                        .keycode          = keycode,
+                        .key_pos          = key_pos,
+                        .tap_action       = contract.tap.action,
+                        .tap_repeat_count = contract.tap.repeat_count,
+                        .tap_hold_term    = resolution->interaction.binding.tap_hold_term,
+                        .multi_tap_term   = resolution->interaction.binding.multi_tap_term,
+                        .has_more_taps    = resolution->interaction.binding.has_more_taps,
+                    };
+                    return true;
+                case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
+                    runtime_v2_release_effect_plan_push_action_or_pd_mode_lock_tap(out, contract.tap.action);
+                    return true;
+                case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE:
+                default:
+                    return true;
+            }
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION:
+            runtime_v2_release_effect_plan_push_action_or_pd_mode_lock_tap(out, resolution->decision.action);
+            return true;
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
+            runtime_v2_release_effect_plan_push_pd_mode_lock_tap(out, resolution->decision.pd_mode_lock_tap);
+            return true;
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE:
+        default:
+            return true;
+    }
+}
+
 bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, runtime_v2_pending_multi_tap_release_resolution_t *out) {
     runtime_v2_state_t                  *state = runtime_v2_state();
     press_token_t                       *token;
@@ -1903,6 +2064,38 @@ bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap
                 .action       = tap_action,
                 .repeat_count = tap_repeat_count,
             };
+            return true;
+    }
+}
+
+bool runtime_v2_plan_pending_multi_tap_release_effects(keypos_t key_pos, bool is_momentary_layer, const runtime_v2_pending_multi_tap_release_resolution_t *resolution, delayed_action_mods_t mods, runtime_v2_release_effect_plan_t *out) {
+    if (out) {
+        *out = (runtime_v2_release_effect_plan_t){
+            .settlement = RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET,
+        };
+    }
+
+    if (!(resolution && out && runtime_v2_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    if (is_momentary_layer) {
+        runtime_v2_release_effect_plan_push_layer_release(out, key_pos);
+    }
+
+    switch (resolution->outcome) {
+        case RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE:
+            runtime_v2_release_effect_plan_push_held_action(out, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, key_pos, resolution->action);
+            runtime_v2_release_effect_plan_push_held_action(out, KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER, key_pos, resolution->action);
+            return true;
+        case RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION:
+            runtime_v2_release_effect_plan_push_delayed_action(out, resolution->action, mods, resolution->repeat_count);
+            return true;
+        case RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN:
+            out->settlement = RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_CLEAR_ACTIVE_PRESERVE_PENDING_MULTI_TAP;
+            return true;
+        case RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_NONE:
+        default:
             return true;
     }
 }

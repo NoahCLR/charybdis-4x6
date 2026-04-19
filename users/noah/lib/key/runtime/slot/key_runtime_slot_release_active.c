@@ -27,6 +27,16 @@ __attribute__((weak)) bool runtime_v2_resolve_active_release(keypos_t key_pos, r
     return false;
 }
 
+__attribute__((weak)) bool runtime_v2_plan_active_release_effects(keypos_t key_pos, uint16_t keycode, const runtime_v2_active_release_resolution_t *resolution, runtime_v2_release_effect_plan_t *out) {
+    (void)key_pos;
+    (void)keycode;
+    (void)resolution;
+    if (out) {
+        *out = (runtime_v2_release_effect_plan_t){0};
+    }
+    return false;
+}
+
 typedef struct {
     active_key_state_t                  released_key;
     key_runtime_slot_interaction_t      interaction;
@@ -228,10 +238,21 @@ static void key_runtime_slot_release_push_action_or_pd_mode_lock_tap(key_runtime
     key_runtime_slot_result_push_dispatch_action(result, key_pos, action);
 }
 
+static void key_runtime_slot_result_append_release_plan(key_runtime_slot_result_t *result, const runtime_v2_release_effect_plan_t *plan) {
+    if (!(result && plan)) {
+        return;
+    }
+
+    for (uint8_t index = 0; index < plan->count; index++) {
+        key_runtime_slot_result_push(result, plan->items[index]);
+    }
+}
+
 key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_state_t *slot, uint16_t keycode) {
     key_runtime_slot_result_t              result = {0};
     key_runtime_slot_interaction_t         interaction;
     runtime_v2_active_release_resolution_t v2_resolution;
+    runtime_v2_release_effect_plan_t       v2_plan;
 
     if (!slot || slot->owner.keycode == KC_NO) {
         return result;
@@ -244,35 +265,20 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_stat
     result.handled = true;
 
     if (runtime_v2_resolve_active_release(released_key.owner.key_pos, &v2_resolution)) {
-        if (key_runtime_slot_interaction_is_momentary_layer(v2_resolution.interaction)) {
-            key_runtime_slot_result_push_layer_release(&result, released_key.owner.key_pos);
-        }
-
-        key_runtime_slot_reset(slot);
-
-        if (v2_resolution.decision.release_owned_state) {
-            key_runtime_slot_result_push_builder_if_present(&result, released_key.owner.key_pos,
-                                                            (key_runtime_effect_builder_t){
-                                                                .release_owned_state = true,
-                                                            });
-        }
-
         key_runtime_slot_release_trace_v2_resolution(&v2_resolution);
-
-        switch (v2_resolution.decision.outcome) {
-            case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_TAP:
-                key_runtime_slot_release_apply_tap(&result, slot, keycode, released_key.owner.key_pos, v2_resolution.interaction);
-                return result;
-            case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION:
-                key_runtime_slot_release_push_action_or_pd_mode_lock_tap(&result, released_key.owner.key_pos, v2_resolution.decision.action);
-                return result;
-            case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
-                key_runtime_slot_result_push_pd_mode_lock_tap(&result, v2_resolution.decision.pd_mode_lock_tap);
-                return result;
-            case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE:
-            default:
-                return result;
+        if (!runtime_v2_plan_active_release_effects(released_key.owner.key_pos, keycode, &v2_resolution, &v2_plan)) {
+            return result;
         }
+
+        if (v2_plan.settlement == RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET) {
+            key_runtime_slot_reset(slot);
+        }
+        if (v2_plan.pending_multi_tap_seed.active) {
+            key_runtime_slot_begin_pending_multi_tap(slot, v2_plan.pending_multi_tap_seed.keycode, v2_plan.pending_multi_tap_seed.key_pos, v2_plan.pending_multi_tap_seed.tap_action, v2_plan.pending_multi_tap_seed.tap_repeat_count, v2_plan.pending_multi_tap_seed.tap_hold_term, v2_plan.pending_multi_tap_seed.multi_tap_term, v2_plan.pending_multi_tap_seed.has_more_taps);
+        }
+        key_runtime_slot_result_append_release_plan(&result, &v2_plan);
+
+        return result;
     }
 
     if (key_runtime_slot_interaction_is_momentary_layer(interaction)) {

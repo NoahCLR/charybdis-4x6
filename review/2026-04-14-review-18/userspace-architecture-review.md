@@ -534,6 +534,38 @@ Inference from the current tree: the reducer now sees the same lifetime end poin
 
 That is a meaningful reduction in architecture risk, because shadow state is less able to survive after the legacy slot world has already declared a key path dead. The remaining split is now mostly in the last step after the decision: production still uses the legacy plan/effect/slot-retirement machinery to emit the final actions and unwind the world, rather than having runtime-v2 own that whole aftermath end-to-end.
 
+## 2026-04-19 Runtime V2 Release Effect Planning Note
+
+The next release-aftermath seam has now crossed into reducer-owned planning too:
+
+- `users/noah/lib/runtime_v2/runtime_v2_release_internal.h` now defines:
+  - `runtime_v2_release_effect_plan_t`,
+  - `runtime_v2_pending_multi_tap_seed_t`, and
+  - explicit settlement instructions for handled release callers.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now exposes:
+  - `runtime_v2_plan_active_release_effects(...)`, and
+  - `runtime_v2_plan_pending_multi_tap_release_effects(...)`,
+  which map reducer-owned handled-release decisions into:
+  - concrete effect queue items,
+  - pending multi-tap seed payload, and
+  - slot-settlement instructions.
+- That mapping now includes reducer-owned handling for pd-mode lock taps, momentary-layer release effects, release-owned-state cleanup effects, held-lifecycle effects, and delayed-action effects with saved modifier payload.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c` now consumes the reducer-owned active-release effect plan on the authoritative path, uses the returned settlement to reset legacy slot state, seeds legacy pending multi-tap storage from reducer-owned payload, and appends the reducer-owned effect queue into the existing slot result.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c` now does the same for pending multi-tap release, using reducer-owned settlement to either preserve the chain or reset the slot before appending the emitted effects.
+- `tests/host/runtime_debug_test.c` now directly proves:
+  - active release buffering a pending multi-tap seed without immediate effects,
+  - active interrupted layer release emitting layer-release plus tap-action effects,
+  - pending multi-tap quick release preserving the chain without immediate effects, and
+  - pending multi-tap delayed-action release preserving the saved delayed-mod payload.
+- The slot suite, transition suite, release matrix, scenario suite, runtime-debug suite, and the real-profile thumb/nav overlap suite all stayed green after this bridge, which is the enforcement bar that reducer-owned effect planning preserved intended outward behavior.
+
+Inference from the current tree: handled-release effect *selection* is no longer legacy-owned. Once runtime-v2 decides what the release means, runtime-v2 now also decides which effects should exist and whether the slot resets or preserves a pending multi-tap chain. The remaining split is now downstream transport and execution:
+
+- legacy slot storage still carries the pending multi-tap seed and effect queue through the old result path, and
+- legacy transition execution still applies those side effects to the world.
+
+That is a materially smaller split-brain surface than before, but it still means the final emitted-effect execution contract is not yet end-to-end reducer-owned.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:
