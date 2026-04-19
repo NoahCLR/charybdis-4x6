@@ -68,8 +68,28 @@ bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *reco
 
 void key_runtime_release_drain_deferred_dispatches(void) {
     key_runtime_deferred_release_dispatch_queue_t *queue = &key_runtime_shared_state()->deferred_release_dispatch;
+    pending_release_t                              pending[RUNTIME_V2_PENDING_RELEASE_CAPACITY];
 
-    if (queue->count == 0 || key_runtime_transition_has_any_tap_release_slot()) {
+    if (queue->count == 0) {
+        return;
+    }
+
+    if (runtime_v2_blocker_queries_authoritative() && runtime_v2_pending_release_count() == queue->count) {
+        uint8_t drained = runtime_v2_take_pending_release_dispatches(pending, ARRAY_SIZE(pending));
+
+        if (drained == 0u) {
+            return;
+        }
+
+        for (uint8_t index = 0; index < drained; index++) {
+            dispatch_delayed_action(pending[index].action, pending[index].mods);
+        }
+
+        queue->count = 0;
+        return;
+    }
+
+    if (key_runtime_transition_has_any_tap_release_slot()) {
         return;
     }
 

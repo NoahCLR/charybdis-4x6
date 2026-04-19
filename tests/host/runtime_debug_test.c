@@ -22,8 +22,9 @@
 
 enum {
     TEST_ACTION                = SAFE_RANGE + 0x10,
-    TEST_PENDING_MULTI_TAP_KEY = SAFE_RANGE + 0x11,
-    TEST_INTERRUPTED_LAYER_KEY = SAFE_RANGE + 0x12,
+    TEST_SECOND_ACTION         = SAFE_RANGE + 0x11,
+    TEST_PENDING_MULTI_TAP_KEY = SAFE_RANGE + 0x12,
+    TEST_INTERRUPTED_LAYER_KEY = SAFE_RANGE + 0x13,
 };
 
 static uint16_t fake_time;
@@ -1234,6 +1235,59 @@ static void test_runtime_v2_pending_release_state_survives_same_key_reuse(void) 
     CHECK(token->resolved_keycode == MO(2));
 }
 
+static void test_runtime_v2_take_pending_releases_preserves_order_and_clears_tokens(void) {
+    pending_release_t      drained[2];
+    projection_snapshot_t  snapshot;
+    const press_token_t   *first_token;
+    const press_token_t   *second_token;
+    keypos_t               first_key = test_keypos(4, 6);
+    keypos_t               second_key = test_keypos(4, 7);
+    keyboard_mod_state_t   first_mods = {.real = MOD_LALT};
+    keyboard_mod_state_t   second_mods = {.weak = MOD_BIT(KC_LEFT_SHIFT)};
+    uint8_t                drained_count;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, first_key, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, first_key, fake_time);
+
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_V, second_key, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_V, second_key, fake_time);
+
+    runtime_v2_observe_release_dispatch_deferred(first_key, TEST_ACTION, first_mods);
+    runtime_v2_observe_release_dispatch_deferred(second_key, TEST_SECOND_ACTION, second_mods);
+
+    first_token = runtime_v2_press_token_at(first_key);
+    second_token = runtime_v2_press_token_at(second_key);
+    CHECK(first_token != NULL);
+    CHECK(second_token != NULL);
+    CHECK(first_token->pending_release_emission);
+    CHECK(second_token->pending_release_emission);
+
+    drained_count = runtime_v2_take_pending_release_dispatches(drained, ARRAY_SIZE(drained));
+    CHECK(drained_count == 2u);
+    CHECK(drained[0].action == TEST_ACTION);
+    CHECK(runtime_v2_pending_release_count_for_keypos(first_key) == 0u);
+    CHECK(drained[1].action == TEST_SECOND_ACTION);
+    CHECK(runtime_v2_pending_release_count_for_keypos(second_key) == 0u);
+
+    first_token = runtime_v2_press_token_at(first_key);
+    second_token = runtime_v2_press_token_at(second_key);
+    CHECK(first_token != NULL);
+    CHECK(second_token != NULL);
+    CHECK(!first_token->pending_release_emission);
+    CHECK(!second_token->pending_release_emission);
+    CHECK(first_token->phase == PRESS_TOKEN_PHASE_RELEASED);
+    CHECK(second_token->phase == PRESS_TOKEN_PHASE_RELEASED);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_pending_release_count == 0u);
+}
+
 int main(void) {
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
@@ -1254,6 +1308,7 @@ int main(void) {
     test_runtime_v2_deferred_release_blocker_persists_after_tap_term_for_plain_tap();
     test_runtime_v2_other_press_interrupt_clears_momentary_layer_quick_tap_blocker();
     test_runtime_v2_pending_release_state_survives_same_key_reuse();
+    test_runtime_v2_take_pending_releases_preserves_order_and_clears_tokens();
 
     puts("runtime_debug host tests passed");
     return 0;

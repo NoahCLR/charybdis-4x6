@@ -392,6 +392,21 @@ Reconciliation Note:
 
 Inference from the current tree: the production runtime is no longer merely shadow-validating blocker state. The live deferred-release gate can already consult the single-authority reducer path on the default firmware flow. The remaining architecture gap is the release/deferred-emission cleanup itself: effect queues, slot retirement, and owned-state unwind still execute in the legacy runtime, so the wedge class is not closed until that cleanup ownership moves over too.
 
+## 2026-04-19 Runtime V2 Pending Release Drain Ownership Note
+
+The deferred-release cleanup seam has now moved one step further into reducer ownership:
+
+- `users/noah/lib/runtime_v2/runtime_v2.c` now gives each pending release a stable sequence number and exposes a reducer-owned take path that drains pending releases in enqueue order.
+- That take path also clears the owning token's `pending_release_emission` and release-pending phase inside runtime-v2, so token cleanup no longer depends on the legacy runtime calling back into observer hooks one drained item at a time.
+- `users/noah/lib/key/runtime/key_runtime_release.c` now uses that reducer-owned take path when:
+  - runtime-v2 has observed the real normalized input stream, and
+  - the mirrored legacy deferred-release queue count matches the reducer-owned pending-release count.
+- In that authoritative branch, the legacy queue is now mirror/transport state only; ordering and reducer-side cleanup are owned by runtime-v2, while the legacy release module only dispatches the already-drained actions.
+- The old per-item observer drain path remains as compatibility fallback for low-level direct-slot surfaces and any mismatch case while the mixed architecture still exists.
+- `tests/host/runtime_debug_test.c` now proves the reducer-owned drain preserves enqueue order and clears token pending-release state after the drain.
+
+Inference from the current tree: production blocker gating and pending-release cleanup are now partially on the same reducer-owned path. That is a real architectural reduction in split-brain state. The remaining gap is still the legacy release/action execution path itself: slot release resolution, effect planning, and owned-state unwind are not yet generated directly from reducer state, so the old slot/release machinery can still poison the board before or around that final dispatch layer.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

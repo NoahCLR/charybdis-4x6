@@ -110,6 +110,7 @@ typedef struct {
 typedef struct {
     bool                active;
     uint16_t            owner_token_id;
+    uint16_t            sequence;
     keypos_t            key_pos;
     uint16_t            action;
     keyboard_mod_state_t mods;
@@ -247,6 +248,7 @@ typedef struct {
     projection_snapshot_t last_projection;
     uint16_t            current_time;
     uint16_t            next_token_id;
+    uint16_t            next_pending_release_sequence;
     uint8_t             press_token_count;
     uint8_t             tap_series_count;
     uint8_t             lease_count;
@@ -267,6 +269,8 @@ void                 runtime_v2_observe_scan_cycle(uint16_t now);
 bool                 runtime_v2_blocker_queries_authoritative(void);
 bool                 runtime_v2_has_any_deferred_release_blocker(void);
 bool                 runtime_v2_has_foreign_deferred_release_blocker_except(keypos_t key_pos);
+uint8_t              runtime_v2_pending_release_count(void);
+uint8_t              runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity);
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos);
 const tap_series_t  *runtime_v2_tap_series_at(keypos_t key_pos);
 const runtime_v2_shadow_projection_t *runtime_v2_shadow_projection(void);
@@ -287,4 +291,5 @@ static inline void runtime_v2_state_reset(runtime_v2_state_t *state) {
 
     *state              = (runtime_v2_state_t){0};
     state->next_token_id = 1u;
+    state->next_pending_release_sequence = 1u;
 }

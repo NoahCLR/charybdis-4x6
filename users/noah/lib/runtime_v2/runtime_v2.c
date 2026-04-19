@@ -88,6 +88,28 @@ static pending_release_t *runtime_v2_allocate_pending_release(runtime_v2_state_t
     return NULL;
 }
 
+static int16_t runtime_v2_oldest_pending_release_index(const runtime_v2_state_t *state) {
+    int16_t  selected = -1;
+    uint16_t sequence = 0u;
+
+    if (!state) {
+        return -1;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PENDING_RELEASE_CAPACITY; index++) {
+        const pending_release_t *pending = &state->pending_releases[index];
+
+        if (!pending->active || (selected >= 0 && pending->sequence >= sequence)) {
+            continue;
+        }
+
+        selected = (int16_t)index;
+        sequence = pending->sequence;
+    }
+
+    return selected;
+}
+
 static uint8_t runtime_v2_pending_release_count_for_owner_token(const runtime_v2_state_t *state, uint16_t owner_token_id) {
     uint8_t count = 0;
 
@@ -1225,6 +1247,40 @@ bool runtime_v2_has_foreign_deferred_release_blocker_except(keypos_t key_pos) {
     return runtime_v2_blocker_queries_authoritative() && runtime_v2_has_foreign_effective_deferred_release_blocker_except(state, key_pos);
 }
 
+uint8_t runtime_v2_pending_release_count(void) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    return state ? state->pending_release_count : 0u;
+}
+
+uint8_t runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    uint8_t             count = 0;
+
+    if (!(state && out && capacity != 0u && runtime_v2_blocker_queries_authoritative()) || runtime_v2_effective_deferred_release_blocker_count(state) != 0u) {
+        return 0u;
+    }
+
+    while (count < capacity) {
+        int16_t          index   = runtime_v2_oldest_pending_release_index(state);
+        pending_release_t pending;
+
+        if (index < 0) {
+            break;
+        }
+
+        pending                    = state->pending_releases[index];
+        out[count++]               = pending;
+        state->pending_releases[index] = (pending_release_t){0};
+        if (state->pending_release_count != 0u) {
+            state->pending_release_count--;
+        }
+        runtime_v2_pending_release_clear_token(state, pending.owner_token_id);
+    }
+
+    return count;
+}
+
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos) {
     return runtime_v2_press_token_state(runtime_v2_state(), key_pos);
 }
@@ -1320,6 +1376,7 @@ void runtime_v2_observe_release_dispatch_deferred(keypos_t key_pos, uint16_t act
     *pending = (pending_release_t){
         .active         = true,
         .owner_token_id = token ? token->token_id : 0u,
+        .sequence       = state->next_pending_release_sequence++,
         .key_pos        = key_pos,
         .action         = action,
         .mods           = mods,

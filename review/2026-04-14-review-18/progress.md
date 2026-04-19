@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Pending Release Drain Ownership Pass
+
+- Moved the next release-cleanup seam out of pure observer mode and into reducer-owned state management.
+- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now give each pending release a stable sequence number and expose:
+  - total pending-release count, and
+  - `runtime_v2_take_pending_release_dispatches(...)`, which drains pending releases in enqueue order and clears the owning token's `pending_release_emission` / release-pending phase inside the reducer.
+- `users/noah/lib/key/runtime/key_runtime_release.c` now uses that reducer-owned take path when:
+  - runtime-v2 has observed the real normalized input stream, and
+  - the mirrored legacy queue count matches the reducer-owned pending-release count.
+- In that authoritative path, the legacy deferred-release queue is now transport-only mirror state; the reducer owns pending-release ordering and cleanup, while `key_runtime_release.c` only executes the drained actions.
+- The legacy drain loop remains as compatibility fallback for low-level surfaces that still do not feed runtime-v2 or where the mirror counts do not agree yet.
+- `tests/host/runtime_debug_test.c` now proves the reducer-owned drain keeps enqueue order and clears token pending-release state after the take completes.
+- `tests/host/runtime_v2_observer_stub.c` now covers the new blocker/pending-release authority APIs so narrow subsystem runners keep their existing link surface.
+
 ## 2026-04-19 Runtime V2 Production Blocker Query Bridge Pass
 
 - Moved the blocker migration one step out of pure shadow mode and into the real production path.

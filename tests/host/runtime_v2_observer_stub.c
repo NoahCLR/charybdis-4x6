@@ -28,3 +28,26 @@ void runtime_v2_observe_deferred_release_blocker_profile(keypos_t key_pos, bool 
     (void)blocks_before_tap_term;
     (void)blocks_after_tap_term;
 }
+
+bool runtime_v2_blocker_queries_authoritative(void) {
+    return false;
+}
+
+bool runtime_v2_has_any_deferred_release_blocker(void) {
+    return false;
+}
+
+bool runtime_v2_has_foreign_deferred_release_blocker_except(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+uint8_t runtime_v2_pending_release_count(void) {
+    return 0u;
+}
+
+uint8_t runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity) {
+    (void)out;
+    (void)capacity;
+    return 0u;
+}
