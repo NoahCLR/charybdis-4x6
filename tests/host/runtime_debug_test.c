@@ -268,6 +268,8 @@ void send_keyboard_report(void) {
 
 static uint8_t test_pd_mode_index(pd_mode_mask_t mode) {
     switch (mode) {
+        case PD_MODE_DRAGSCROLL:
+            return PD_MODE_INDEX_DRAGSCROLL;
         case PD_MODE_VOLUME:
             return PD_MODE_INDEX_VOLUME;
         case PD_MODE_ARROW:
@@ -278,17 +280,26 @@ static uint8_t test_pd_mode_index(pd_mode_mask_t mode) {
 }
 
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
+    [PD_MODE_INDEX_DRAGSCROLL] =
+        {
+            .mode_flag   = PD_MODE_DRAGSCROLL,
+            .keycode     = DRAGSCROLL,
+            .lock_action = DRAGSCROLL_LOCK,
+            .traits      = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE,
+        },
     [PD_MODE_INDEX_VOLUME] =
         {
             .mode_flag   = PD_MODE_VOLUME,
             .keycode     = VOLUME_MODE,
             .lock_action = VOLUME_MODE_LOCK,
+            .traits      = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED,
         },
     [PD_MODE_INDEX_ARROW] =
         {
             .mode_flag   = PD_MODE_ARROW,
             .keycode     = ARROW_MODE,
             .lock_action = ARROW_MODE_LOCK,
+            .traits      = PD_MODE_TRAIT_PREFER_TYPING_LAYER,
         },
 };
 
@@ -325,6 +336,10 @@ bool is_keyboard_master(void) {
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+    if (keycode == DRAGSCROLL) {
+        return PD_MODE_DRAGSCROLL;
+    }
+
     if (keycode == VOLUME_MODE) {
         return PD_MODE_VOLUME;
     }
@@ -924,6 +939,126 @@ static void test_runtime_v2_replacing_a_live_token_cleans_up_owned_leases(void) 
     CHECK(snapshot.v2_press_token_count == 1u);
 }
 
+static void test_runtime_v2_pd_mode_press_creates_active_mode_and_pointer_anchor(void) {
+    const runtime_v2_shadow_projection_t *shadow;
+    projection_snapshot_t                 snapshot;
+    keypos_t                              key_pos = test_keypos(1, 6);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, VOLUME_MODE, key_pos, fake_time);
+
+    shadow = runtime_v2_shadow_projection();
+    CHECK(shadow != NULL);
+    CHECK(shadow->pd_mode_local_active == PD_MODE_VOLUME);
+    CHECK(shadow->pd_mode_local_locked == 0);
+    CHECK(shadow->pointer_anchor_active);
+    CHECK(shadow->pointer_pd_mode_anchor_active);
+    CHECK(!shadow->pointer_prefers_typing_layer);
+    CHECK(!shadow->pointer_toggle_enabled);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_shadow_pd_mode_local_active == PD_MODE_VOLUME);
+    CHECK(snapshot.v2_shadow_pointer_anchor_active);
+    CHECK(snapshot.v2_shadow_pointer_pd_mode_anchor_active);
+    CHECK(snapshot.v2_lease_count == 2u);
+
+    fake_time = (uint16_t)(fake_time + 10u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, VOLUME_MODE, key_pos, fake_time);
+    shadow = runtime_v2_shadow_projection();
+    CHECK(shadow->pd_mode_local_active == 0);
+    CHECK(!shadow->pointer_anchor_active);
+}
+
+static void test_runtime_v2_arrow_mode_prefers_typing_without_pointer_anchor(void) {
+    const runtime_v2_shadow_projection_t *shadow;
+    projection_snapshot_t                 snapshot;
+    keypos_t                              key_pos = test_keypos(1, 7);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, ARROW_MODE, key_pos, fake_time);
+
+    shadow = runtime_v2_shadow_projection();
+    CHECK(shadow != NULL);
+    CHECK(shadow->pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(!shadow->pointer_anchor_active);
+    CHECK(!shadow->pointer_pd_mode_anchor_active);
+    CHECK(shadow->pointer_prefers_typing_layer);
+    CHECK(!shadow->pointer_toggle_enabled);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_shadow_pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(snapshot.v2_shadow_pointer_prefers_typing_layer);
+    CHECK(!snapshot.v2_shadow_pointer_anchor_active);
+    CHECK(snapshot.v2_lease_count == 1u);
+}
+
+static void test_runtime_v2_pd_mode_lock_owns_pointer_toggle_intent(void) {
+    const runtime_v2_shadow_projection_t *shadow;
+    projection_snapshot_t                 snapshot;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    runtime_v2_pd_mode_lock_set(PD_MODE_DRAGSCROLL, true);
+
+    shadow = runtime_v2_shadow_projection();
+    CHECK(shadow != NULL);
+    CHECK(shadow->pd_mode_local_active == PD_MODE_DRAGSCROLL);
+    CHECK(shadow->pd_mode_local_locked == PD_MODE_DRAGSCROLL);
+    CHECK(shadow->pointer_anchor_active);
+    CHECK(shadow->pointer_pd_mode_anchor_active);
+    CHECK(shadow->pointer_toggle_enabled);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_shadow_pd_mode_local_active == PD_MODE_DRAGSCROLL);
+    CHECK(snapshot.v2_shadow_pd_mode_local_locked == PD_MODE_DRAGSCROLL);
+    CHECK(snapshot.v2_shadow_pointer_toggle_enabled);
+    CHECK(snapshot.v2_persistent_intent_count == 2u);
+
+    runtime_v2_pd_mode_lock_set(PD_MODE_DRAGSCROLL, false);
+    shadow = runtime_v2_shadow_projection();
+    CHECK(shadow->pd_mode_local_active == 0);
+    CHECK(shadow->pd_mode_local_locked == 0);
+    CHECK(!shadow->pointer_anchor_active);
+    CHECK(!shadow->pointer_toggle_enabled);
+}
+
+static void test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases(void) {
+    const runtime_v2_shadow_projection_t *shadow;
+    projection_snapshot_t                 snapshot;
+    keypos_t                              volume_pos = test_keypos(2, 6);
+    keypos_t                              arrow_pos  = test_keypos(2, 7);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, VOLUME_MODE, volume_pos, fake_time);
+    shadow = runtime_v2_shadow_projection();
+    CHECK(shadow != NULL);
+    CHECK(shadow->pd_mode_local_active == PD_MODE_VOLUME);
+    CHECK(shadow->pointer_anchor_active);
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, ARROW_MODE, arrow_pos, fake_time);
+    shadow = runtime_v2_shadow_projection();
+    CHECK(shadow->pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(!shadow->pointer_anchor_active);
+    CHECK(shadow->pointer_prefers_typing_layer);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_shadow_pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(snapshot.v2_lease_count == 1u);
+
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, VOLUME_MODE, volume_pos, fake_time);
+    shadow = runtime_v2_shadow_projection();
+    CHECK(shadow->pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(shadow->pointer_prefers_typing_layer);
+}
+
 int main(void) {
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
@@ -935,6 +1070,10 @@ int main(void) {
     test_runtime_v2_layer_tap_hold_creates_and_retires_layer_lease();
     test_runtime_v2_modifier_leases_keep_physical_and_managed_masks_separate();
     test_runtime_v2_replacing_a_live_token_cleans_up_owned_leases();
+    test_runtime_v2_pd_mode_press_creates_active_mode_and_pointer_anchor();
+    test_runtime_v2_arrow_mode_prefers_typing_without_pointer_anchor();
+    test_runtime_v2_pd_mode_lock_owns_pointer_toggle_intent();
+    test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases();
 
     puts("runtime_debug host tests passed");
     return 0;

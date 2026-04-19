@@ -308,3 +308,14 @@ The next shadow-runtime pass is now also landed:
 - `tests/host/runtime_debug_test.c` now locks the first ownership-projection invariants directly, including token replacement cancelling old owned leases immediately instead of leaving stale layer state behind.
 
 Inference from the current tree: the replacement core has now crossed the line from "observes timing" to "owns real shared state" for layer/mod domains. That is the first meaningful proof that the lease model can replace the old branchy cleanup style. It still does **not** cover pd-mode or pointer-anchor ownership yet, so the wedge-prone pointer/layer overlap class remains open until those domains migrate too.
+
+## 2026-04-19 Runtime V2 Pd-Mode/Pointer Ownership Note
+
+The next shadow-runtime pass is now landed as well:
+
+- `users/noah/lib/runtime_v2/runtime_v2.c` now owns token-backed active pd-mode leases for raw pd-mode keys, token-backed pointer-anchor leases for momentary anchored modes, persistent pd-mode lock intents, and persistent pointer-toggle intents for lock-owned auto-mouse-toggle modes.
+- The shadow projection now recomputes pd-mode active/locked state plus pointer anchor/toggle/prefer-typing policy from those owned records instead of from imperative cleanup sequencing.
+- The shadow reducer also preserves the production exclusivity rule: a newly activated raw pd-mode key clears foreign active pd-mode leases and foreign lock/toggle intents before becoming authoritative.
+- `tests/host/runtime_debug_test.c` now locks those rules directly, including the `DRAGSCROLL` lock-owned toggle shape and foreign-mode supersession cleanup.
+
+Inference from the current tree: the replacement core now owns the same general state family as the original `NAV -> DRAGSCROLL` wedge path, not just the safer layer/mod domains. That is the first meaningful runtime-v2 pass that can speak to the suspected pointer/pd ownership leak class directly. It still does **not** observe emitted authored `*_LOCK` actions yet, so authored lock paths are not fully inside the shadow model until that next seam lands.

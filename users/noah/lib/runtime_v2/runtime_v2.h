@@ -144,6 +144,10 @@ typedef struct {
         uint8_t       layer;
         pd_mode_mask_t pd_mode;
         uint8_t       pointer_layer;
+        struct {
+            uint8_t       pointer_layer;
+            pd_mode_mask_t mode;
+        } pointer_toggle;
     } data;
 } persistent_intent_t;
 
@@ -153,6 +157,12 @@ typedef struct {
     keyboard_mod_state_t keyboard_mod_state;
     uint8_t              keyboard_managed_mod_mask;
     uint8_t              keyboard_physical_mod_mask;
+    pd_mode_mask_t       pd_mode_local_active;
+    pd_mode_mask_t       pd_mode_local_locked;
+    bool                 pointer_anchor_active;
+    bool                 pointer_pd_mode_anchor_active;
+    bool                 pointer_prefers_typing_layer;
+    bool                 pointer_toggle_enabled;
 } runtime_v2_shadow_projection_t;
 
 typedef struct {
@@ -180,6 +190,12 @@ typedef struct {
     keyboard_mod_state_t v2_shadow_keyboard_mod_state;
     uint8_t              v2_shadow_keyboard_managed_mod_mask;
     uint8_t              v2_shadow_keyboard_physical_mod_mask;
+    pd_mode_mask_t       v2_shadow_pd_mode_local_active;
+    pd_mode_mask_t       v2_shadow_pd_mode_local_locked;
+    bool                 v2_shadow_pointer_anchor_active;
+    bool                 v2_shadow_pointer_pd_mode_anchor_active;
+    bool                 v2_shadow_pointer_prefers_typing_layer;
+    bool                 v2_shadow_pointer_toggle_enabled;
     uint8_t              v2_press_token_count;
     uint8_t              v2_tap_series_count;
     uint8_t              v2_lease_count;
@@ -213,6 +229,7 @@ const press_token_t *runtime_v2_press_token_at(keypos_t key_pos);
 const tap_series_t  *runtime_v2_tap_series_at(keypos_t key_pos);
 const runtime_v2_shadow_projection_t *runtime_v2_shadow_projection(void);
 void                 runtime_v2_layer_lock_set(uint8_t layer, bool active);
+void                 runtime_v2_pd_mode_lock_set(pd_mode_mask_t mode, bool active);
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void);
 bool                 runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, const projection_snapshot_t *rhs);
 

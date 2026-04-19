@@ -6,6 +6,7 @@
 
 #include <string.h>
 
+#include "../pointing/policy/pd_mode_policy.h"
 #include "../pointing/policy/pointer_layer_policy.h"
 #include "../state/ownership/keyboard_mod_ownership.h"
 #include "../state/ownership/layer_ownership.h"
@@ -102,6 +103,64 @@ static bool runtime_v2_keycode_owns_modifier_on_press(uint16_t keycode) {
 
 static bool runtime_v2_keycode_owns_modifier_on_hold(uint16_t keycode) {
     return IS_QK_MOD_TAP(keycode);
+}
+
+static pd_mode_mask_t runtime_v2_pd_mode_for_keycode(uint16_t keycode) {
+    return pd_mode_for_keycode(keycode);
+}
+
+static bool runtime_v2_pd_mode_keeps_auto_mouse_anchored(pd_mode_mask_t mode) {
+    return mode != 0 && pd_mode_policy_mode_keeps_auto_mouse_anchored(mode);
+}
+
+static bool runtime_v2_pd_mode_prefers_typing_layer(pd_mode_mask_t mode) {
+    return mode != 0 && pd_mode_policy_mode_prefers_typing_layer(mode);
+}
+
+static bool runtime_v2_pd_mode_lock_owns_pointer_toggle(pd_mode_mask_t mode) {
+    return mode != 0 && pd_mode_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE);
+}
+
+#ifdef AUTO_MOUSE_DEFAULT_LAYER
+static uint8_t runtime_v2_default_pointer_layer(void) {
+    return AUTO_MOUSE_DEFAULT_LAYER;
+}
+#else
+static uint8_t runtime_v2_default_pointer_layer(void) {
+    return 0u;
+}
+#endif
+
+static lease_t *runtime_v2_find_pd_mode_lease(runtime_v2_state_t *state, uint16_t owner_token_id, pd_mode_mask_t mode) {
+    if (!state) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (lease->active && lease->kind == LEASE_KIND_PD_MODE && lease->owner_token_id == owner_token_id && lease->data.pd_mode == mode) {
+            return lease;
+        }
+    }
+
+    return NULL;
+}
+
+static lease_t *runtime_v2_find_pointer_anchor_lease(runtime_v2_state_t *state, uint16_t owner_token_id) {
+    if (!state) {
+        return NULL;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (lease->active && lease->kind == LEASE_KIND_POINTER_ANCHOR && lease->owner_token_id == owner_token_id) {
+            return lease;
+        }
+    }
+
+    return NULL;
 }
 
 static lease_t *runtime_v2_find_modifier_lease(runtime_v2_state_t *state, uint16_t owner_token_id, uint8_t modifiers, bool physical) {
@@ -210,6 +269,60 @@ static bool runtime_v2_modifier_lease_activate(runtime_v2_state_t *state, uint16
     return true;
 }
 
+static bool runtime_v2_pd_mode_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, pd_mode_mask_t mode) {
+    lease_t *lease;
+
+    if (!(state && mode != 0)) {
+        return false;
+    }
+
+    if (runtime_v2_find_pd_mode_lease(state, owner_token_id, mode)) {
+        return false;
+    }
+
+    lease = runtime_v2_allocate_lease(state);
+    if (!lease) {
+        return false;
+    }
+
+    *lease = (lease_t){
+        .active         = true,
+        .kind           = LEASE_KIND_PD_MODE,
+        .owner_token_id = owner_token_id,
+        .data.pd_mode   = mode,
+    };
+    return true;
+}
+
+static bool runtime_v2_pointer_anchor_lease_activate(runtime_v2_state_t *state, uint16_t owner_token_id, bool keep_typing_surface) {
+    lease_t *lease;
+
+    if (!state) {
+        return false;
+    }
+
+    if (runtime_v2_find_pointer_anchor_lease(state, owner_token_id)) {
+        return false;
+    }
+
+    lease = runtime_v2_allocate_lease(state);
+    if (!lease) {
+        return false;
+    }
+
+    *lease = (lease_t){
+        .active         = true,
+        .kind           = LEASE_KIND_POINTER_ANCHOR,
+        .owner_token_id = owner_token_id,
+        .data.pointer_anchor =
+            {
+                .layer               = runtime_v2_default_pointer_layer(),
+                .keep_typing_surface = keep_typing_surface,
+            },
+    };
+    return true;
+}
+
 static bool runtime_v2_persistent_layer_lock_update(runtime_v2_state_t *state, uint8_t layer, bool active) {
     persistent_intent_t *empty_slot = NULL;
 
@@ -250,6 +363,149 @@ static bool runtime_v2_persistent_layer_lock_update(runtime_v2_state_t *state, u
     return true;
 }
 
+static bool runtime_v2_persistent_pd_mode_lock_update(runtime_v2_state_t *state, pd_mode_mask_t mode, bool active) {
+    persistent_intent_t *empty_slot = NULL;
+    bool                 changed    = false;
+
+    if (!(state && mode != 0)) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PERSISTENT_INTENT_CAPACITY; index++) {
+        persistent_intent_t *intent = &state->persistent_intents[index];
+
+        if (intent->active && intent->kind == PERSISTENT_INTENT_KIND_PD_MODE_LOCK) {
+            if (intent->data.pd_mode == mode) {
+                if (active) {
+                    return changed;
+                }
+
+                *intent = (persistent_intent_t){0};
+                if (state->persistent_intent_count != 0u) {
+                    state->persistent_intent_count--;
+                }
+                return true;
+            }
+
+            if (active) {
+                *intent = (persistent_intent_t){0};
+                if (state->persistent_intent_count != 0u) {
+                    state->persistent_intent_count--;
+                }
+                changed = true;
+                continue;
+            }
+        }
+
+        if (!intent->active && !empty_slot) {
+            empty_slot = intent;
+        }
+    }
+
+    if (!(active && empty_slot)) {
+        return changed;
+    }
+
+    *empty_slot = (persistent_intent_t){
+        .active       = true,
+        .kind         = PERSISTENT_INTENT_KIND_PD_MODE_LOCK,
+        .data.pd_mode = mode,
+    };
+    state->persistent_intent_count++;
+    return true;
+}
+
+static bool runtime_v2_persistent_pointer_toggle_update(runtime_v2_state_t *state, pd_mode_mask_t mode, bool active) {
+    persistent_intent_t *empty_slot = NULL;
+    bool                 changed    = false;
+
+    if (!(state && mode != 0)) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PERSISTENT_INTENT_CAPACITY; index++) {
+        persistent_intent_t *intent = &state->persistent_intents[index];
+
+        if (intent->active && intent->kind == PERSISTENT_INTENT_KIND_POINTER_TOGGLE) {
+            if (intent->data.pointer_toggle.mode == mode) {
+                if (active) {
+                    return changed;
+                }
+
+                *intent = (persistent_intent_t){0};
+                if (state->persistent_intent_count != 0u) {
+                    state->persistent_intent_count--;
+                }
+                return true;
+            }
+
+            if (active) {
+                *intent = (persistent_intent_t){0};
+                if (state->persistent_intent_count != 0u) {
+                    state->persistent_intent_count--;
+                }
+                changed = true;
+                continue;
+            }
+        }
+
+        if (!intent->active && !empty_slot) {
+            empty_slot = intent;
+        }
+    }
+
+    if (!(active && empty_slot)) {
+        return changed;
+    }
+
+    *empty_slot = (persistent_intent_t){
+        .active = true,
+        .kind   = PERSISTENT_INTENT_KIND_POINTER_TOGGLE,
+        .data.pointer_toggle =
+            {
+                .pointer_layer = runtime_v2_default_pointer_layer(),
+                .mode          = mode,
+            },
+    };
+    state->persistent_intent_count++;
+    return true;
+}
+
+static bool runtime_v2_clear_other_pd_mode_intents(runtime_v2_state_t *state, pd_mode_mask_t keep_mode) {
+    bool changed = false;
+
+    if (!state) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PERSISTENT_INTENT_CAPACITY; index++) {
+        persistent_intent_t *intent = &state->persistent_intents[index];
+
+        if (!intent->active) {
+            continue;
+        }
+
+        if (intent->kind == PERSISTENT_INTENT_KIND_PD_MODE_LOCK && intent->data.pd_mode != keep_mode) {
+            *intent = (persistent_intent_t){0};
+            if (state->persistent_intent_count != 0u) {
+                state->persistent_intent_count--;
+            }
+            changed = true;
+            continue;
+        }
+
+        if (intent->kind == PERSISTENT_INTENT_KIND_POINTER_TOGGLE && intent->data.pointer_toggle.mode != keep_mode) {
+            *intent = (persistent_intent_t){0};
+            if (state->persistent_intent_count != 0u) {
+                state->persistent_intent_count--;
+            }
+            changed = true;
+        }
+    }
+
+    return changed;
+}
+
 static void runtime_v2_release_leases_for_token(runtime_v2_state_t *state, uint16_t owner_token_id) {
     if (!state) {
         return;
@@ -267,8 +523,30 @@ static void runtime_v2_release_leases_for_token(runtime_v2_state_t *state, uint1
     }
 }
 
+static void runtime_v2_release_pd_related_leases_for_token(runtime_v2_state_t *state, uint16_t owner_token_id) {
+    if (!state) {
+        return;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+        lease_t *lease = &state->leases[index];
+
+        if (!lease->active || lease->owner_token_id != owner_token_id) {
+            continue;
+        }
+
+        if (lease->kind == LEASE_KIND_PD_MODE || lease->kind == LEASE_KIND_POINTER_ANCHOR) {
+            *lease = (lease_t){0};
+            if (state->lease_count != 0u) {
+                state->lease_count--;
+            }
+        }
+    }
+}
+
 static void runtime_v2_shadow_projection_recompute(runtime_v2_state_t *state) {
     runtime_v2_shadow_projection_t projection = {0};
+    bool                           pointer_anchor_lease_active = false;
 
     if (!state) {
         return;
@@ -293,6 +571,12 @@ static void runtime_v2_shadow_projection_recompute(runtime_v2_state_t *state) {
                     projection.keyboard_managed_mod_mask |= lease->data.modifier.modifiers;
                 }
                 break;
+            case LEASE_KIND_PD_MODE:
+                projection.pd_mode_local_active = lease->data.pd_mode;
+                break;
+            case LEASE_KIND_POINTER_ANCHOR:
+                pointer_anchor_lease_active = true;
+                break;
             default:
                 break;
         }
@@ -310,16 +594,28 @@ static void runtime_v2_shadow_projection_recompute(runtime_v2_state_t *state) {
                 projection.locked_layer_mask |= (layer_state_t)1u << intent->data.layer;
                 projection.layer_state |= (layer_state_t)1u << intent->data.layer;
                 break;
+            case PERSISTENT_INTENT_KIND_PD_MODE_LOCK:
+                projection.pd_mode_local_locked = intent->data.pd_mode;
+                projection.pd_mode_local_active = intent->data.pd_mode;
+                break;
+            case PERSISTENT_INTENT_KIND_POINTER_TOGGLE:
+                projection.pointer_toggle_enabled = true;
+                break;
             default:
                 break;
         }
     }
+
+    projection.pointer_pd_mode_anchor_active = runtime_v2_pd_mode_keeps_auto_mouse_anchored(projection.pd_mode_local_active);
+    projection.pointer_prefers_typing_layer  = runtime_v2_pd_mode_prefers_typing_layer(projection.pd_mode_local_active);
+    projection.pointer_anchor_active         = projection.pointer_toggle_enabled || pointer_anchor_lease_active || projection.pointer_pd_mode_anchor_active;
 
     state->shadow_projection = projection;
 }
 
 static void runtime_v2_press_token_attach_press_leases(runtime_v2_state_t *state, const press_token_t *token) {
     bool changed = false;
+    pd_mode_mask_t mode;
 
     if (!(state && token && token->active)) {
         return;
@@ -335,6 +631,24 @@ static void runtime_v2_press_token_attach_press_leases(runtime_v2_state_t *state
 
     if (runtime_v2_keycode_owns_modifier_on_press(token->resolved_keycode)) {
         changed |= runtime_v2_modifier_lease_activate(state, token->token_id, runtime_v2_modifier_mask_for_keycode(token->resolved_keycode), true);
+    }
+
+    mode = runtime_v2_pd_mode_for_keycode(token->resolved_keycode);
+    if (mode != 0) {
+        for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+            lease_t *lease = &state->leases[index];
+
+            if (lease->active && lease->kind == LEASE_KIND_PD_MODE && lease->data.pd_mode != mode) {
+                runtime_v2_release_pd_related_leases_for_token(state, lease->owner_token_id);
+                changed = true;
+            }
+        }
+
+        changed |= runtime_v2_clear_other_pd_mode_intents(state, mode);
+        changed |= runtime_v2_pd_mode_lease_activate(state, token->token_id, mode);
+        if (runtime_v2_pd_mode_keeps_auto_mouse_anchored(mode)) {
+            changed |= runtime_v2_pointer_anchor_lease_activate(state, token->token_id, runtime_v2_pd_mode_prefers_typing_layer(mode));
+        }
     }
 
     if (changed) {
@@ -611,6 +925,35 @@ void runtime_v2_layer_lock_set(uint8_t layer, bool active) {
     }
 }
 
+void runtime_v2_pd_mode_lock_set(pd_mode_mask_t mode, bool active) {
+    runtime_v2_state_t *state   = runtime_v2_state();
+    bool                changed = false;
+
+    if (!(state && mode != 0)) {
+        return;
+    }
+
+    if (active) {
+        for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
+            lease_t *lease = &state->leases[index];
+
+            if (lease->active && lease->kind == LEASE_KIND_PD_MODE && lease->data.pd_mode != mode) {
+                runtime_v2_release_pd_related_leases_for_token(state, lease->owner_token_id);
+                changed = true;
+            }
+        }
+
+        changed |= runtime_v2_clear_other_pd_mode_intents(state, mode);
+    }
+
+    changed |= runtime_v2_persistent_pd_mode_lock_update(state, mode, active);
+    changed |= runtime_v2_persistent_pointer_toggle_update(state, mode, active && runtime_v2_pd_mode_lock_owns_pointer_toggle(mode));
+
+    if (changed) {
+        runtime_v2_shadow_projection_recompute(state);
+    }
+}
+
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
     projection_snapshot_t                  snapshot = {0};
     layer_ownership_debug_snapshot_t       layer_snapshot;
@@ -652,6 +995,12 @@ projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
         snapshot.v2_shadow_keyboard_mod_state = state->shadow_projection.keyboard_mod_state;
         snapshot.v2_shadow_keyboard_managed_mod_mask = state->shadow_projection.keyboard_managed_mod_mask;
         snapshot.v2_shadow_keyboard_physical_mod_mask = state->shadow_projection.keyboard_physical_mod_mask;
+        snapshot.v2_shadow_pd_mode_local_active = state->shadow_projection.pd_mode_local_active;
+        snapshot.v2_shadow_pd_mode_local_locked = state->shadow_projection.pd_mode_local_locked;
+        snapshot.v2_shadow_pointer_anchor_active = state->shadow_projection.pointer_anchor_active;
+        snapshot.v2_shadow_pointer_pd_mode_anchor_active = state->shadow_projection.pointer_pd_mode_anchor_active;
+        snapshot.v2_shadow_pointer_prefers_typing_layer = state->shadow_projection.pointer_prefers_typing_layer;
+        snapshot.v2_shadow_pointer_toggle_enabled = state->shadow_projection.pointer_toggle_enabled;
         snapshot.v2_press_token_count     = state->press_token_count;
         snapshot.v2_tap_series_count      = state->tap_series_count;
         snapshot.v2_lease_count           = state->lease_count;
@@ -700,6 +1049,12 @@ bool runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, cons
            lhs->v2_shadow_keyboard_mod_state.oneshot_locked == rhs->v2_shadow_keyboard_mod_state.oneshot_locked &&
            lhs->v2_shadow_keyboard_managed_mod_mask == rhs->v2_shadow_keyboard_managed_mod_mask &&
            lhs->v2_shadow_keyboard_physical_mod_mask == rhs->v2_shadow_keyboard_physical_mod_mask &&
+           lhs->v2_shadow_pd_mode_local_active == rhs->v2_shadow_pd_mode_local_active &&
+           lhs->v2_shadow_pd_mode_local_locked == rhs->v2_shadow_pd_mode_local_locked &&
+           lhs->v2_shadow_pointer_anchor_active == rhs->v2_shadow_pointer_anchor_active &&
+           lhs->v2_shadow_pointer_pd_mode_anchor_active == rhs->v2_shadow_pointer_pd_mode_anchor_active &&
+           lhs->v2_shadow_pointer_prefers_typing_layer == rhs->v2_shadow_pointer_prefers_typing_layer &&
+           lhs->v2_shadow_pointer_toggle_enabled == rhs->v2_shadow_pointer_toggle_enabled &&
            lhs->v2_press_token_count == rhs->v2_press_token_count &&
            lhs->v2_tap_series_count == rhs->v2_tap_series_count &&
            lhs->v2_lease_count == rhs->v2_lease_count &&

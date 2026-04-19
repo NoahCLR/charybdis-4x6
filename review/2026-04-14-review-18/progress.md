@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Pd-Mode And Pointer Ownership Shadow Pass
+
+- Extended the shadow reducer into the first wedge-prone overlap domain: pd-mode ownership and pointer anchoring.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now:
+  - creates token-owned active pd-mode leases for raw pd-mode keys,
+  - creates token-owned pointer-anchor leases for momentary anchored pd modes,
+  - owns persistent pd-mode lock intents,
+  - owns persistent pointer-toggle intents for lock-owned auto-mouse-toggle modes, and
+  - recomputes shadow pd-mode/pointer projection from those owned records instead of from ad hoc cleanup paths.
+- Preserved the production exclusivity shape in shadow form: activating a new raw pd-mode key now clears foreign pd-mode leases and foreign pd-mode lock/toggle intents before the new mode becomes authoritative.
+- Added direct white-box coverage in `tests/host/runtime_debug_test.c` for:
+  - anchored momentary pd-mode ownership,
+  - typing-preference pd-mode ownership without pointer anchoring,
+  - lock-owned pointer-toggle intent for `DRAGSCROLL`, and
+  - foreign pd-mode supersession clearing old owned leases instead of leaving mixed anchor state behind.
+- This still does not cut production hooks over to v2, but the replacement core now owns the same general state family as the original `NAV -> DRAGSCROLL` wedge path.
+
 ## 2026-04-19 Runtime V2 Layer And Modifier Lease Shadow Pass
 
 - Extended the shadow reducer from identity-only state into real lease-backed ownership for the first shared domains: layers and modifiers.
@@ -209,6 +226,15 @@
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
   - `git diff --check`
 
+- Passed during the runtime-v2 pd-mode/pointer ownership shadow pass:
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - `git diff --check`
+
 - Passed during the runtime-v2 foundation landing:
   - `sh tests/host/run_key_runtime_integration_harness_tests.sh`
   - `sh tests/host/run_runtime_trace_tests.sh`
@@ -392,6 +418,6 @@
 ## Next Steps
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
-2. Expand the shadow reducer from layer/mod ownership into pd-mode and pointer-anchor leases so the wedge-prone pointer/layer overlap path is modeled under the same ownership rules.
+2. Expand the shadow reducer from raw pd-mode keys and explicit lock APIs into emitted lock-action observation so authored `*_LOCK` paths participate in the same ownership model as raw pd-mode keys.
 3. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
 4. Replace imperative pd-mode and pointer-layer cleanup branches with reducer-owned leases and projection recompute before any production hook cutover.
