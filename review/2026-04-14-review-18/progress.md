@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-04-20 Runtime V2 Slot-Step Build Surface Reduction Pass
+
+- Removed `users/noah/lib/key/runtime/slot/key_runtime_slot_step.c` from `users/noah/source_manifest.mk` because it is no longer a production dependency.
+- `tests/host/noah_source_manifest.sh` no longer treats `slot_step.c` as part of the public key-runtime base support set.
+- The host runners were narrowed accordingly:
+  - focused slot-level tests that still exercise the compatibility adapter continue to compile `slot_step.c` explicitly, and
+  - broader integration/transition runners that no longer use it stopped compiling it unnecessarily.
+- This is a real build-surface reduction, not just a comment cleanup:
+  - firmware compile no longer links the compatibility adapter by default, and
+  - `slot_step.c` is now host/test-only infrastructure unless a future production caller reintroduces it explicitly.
+
 ## 2026-04-20 Runtime V2 Release Fallback Shim Reduction Pass
 
 - Removed the last production transition-layer dependency on `key_runtime_slot_step(...)`:

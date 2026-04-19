@@ -41,7 +41,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot_press_reduce.c" \
     "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot_result.c" \
     "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot_scan_reduce.c" \
-    "$ROOT/users/noah/lib/key/runtime/slot/key_runtime_slot_step.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_index.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_preflight.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_press.c" \

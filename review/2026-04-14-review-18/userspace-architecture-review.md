@@ -803,6 +803,20 @@ Inference from the current tree: the default firmware path is now cleaner not on
 
 That makes the remaining work more explicit. What is left is not “find another live transition seam,” but decide how aggressively to delete or quarantine compatibility code while preserving the targeted slot/unit test surfaces and then finish hardware validation against the original wedge repros.
 
+## 2026-04-20 Runtime V2 Slot-Step Build Surface Note
+
+The compatibility adapter has now moved out of the firmware build surface as well:
+
+- `users/noah/source_manifest.mk` no longer includes `lib/key/runtime/slot/key_runtime_slot_step.c` in `NOAH_COMMON_SOURCES`.
+- `tests/host/noah_source_manifest.sh` no longer treats `slot_step.c` as part of the public key-runtime base support set used by general host runners.
+- Focused slot-level tests still compile `slot_step.c` explicitly where they intentionally exercise the compatibility adapter:
+  - `tests/host/run_key_runtime_slot_tests.sh`
+  - `tests/host/run_key_runtime_feedback_tests.sh`
+- Broader transition/integration runners that no longer depend on it stopped compiling it unnecessarily.
+- The slot, feedback, transition, release-matrix, pd-mode key-runtime integration, layer-lock integration, real-profile overlap, feature-gate compile, full host, and firmware compile checks all stayed green after the manifest reduction.
+
+Inference from the current tree: `key_runtime_slot_step.c` is no longer “production code that happens not to be called.” It is now build-surface-isolated compatibility infrastructure. That is the right shape for eventual deletion or further quarantine, because the production firmware and the default transition path no longer even link it by default.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

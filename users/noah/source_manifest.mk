@@ -31,7 +31,6 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/slot/key_runtime_slot_release_reduce.c \
     lib/key/runtime/slot/key_runtime_slot_result.c \
     lib/key/runtime/slot/key_runtime_slot_scan_reduce.c \
-    lib/key/runtime/slot/key_runtime_slot_step.c \
     lib/key/runtime/slot/key_runtime_slot.c \
     lib/key/runtime/key_runtime_preflight.c \
     lib/key/runtime/key_runtime_process.c \
