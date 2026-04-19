@@ -1090,8 +1090,7 @@ static void test_runtime_v2_deferred_release_blocker_expires_after_tap_term(void
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, key_pos, fake_time);
-    runtime_v2_observe_deferred_release_blocker_profile(key_pos, true, true, false);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_INTERRUPTED_LAYER_KEY, key_pos, fake_time);
 
     snapshot = runtime_v2_projection_snapshot_capture();
     CHECK(snapshot.v2_deferred_release_blocker_count == 1u);
@@ -1103,16 +1102,11 @@ static void test_runtime_v2_deferred_release_blocker_expires_after_tap_term(void
 
     snapshot = runtime_v2_projection_snapshot_capture();
     CHECK(snapshot.v2_deferred_release_blocker_count == 0u);
-    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 1u);
-    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 0u);
-
-    runtime_v2_observe_deferred_release_blocker_profile(key_pos, false, false, false);
-    snapshot = runtime_v2_projection_snapshot_capture();
-    CHECK(snapshot.v2_deferred_release_blocker_count == 0u);
     CHECK(snapshot.v2_deferred_release_timed_blocker_count == 0u);
+    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 0u);
 }
 
-static void test_runtime_v2_deferred_release_blocker_activates_after_tap_term(void) {
+static void test_runtime_v2_deferred_release_blocker_persists_after_tap_term_for_plain_tap(void) {
     projection_snapshot_t snapshot;
     keypos_t              key_pos = test_keypos(4, 2);
     runtime_event_t       advance = {
@@ -1127,20 +1121,43 @@ static void test_runtime_v2_deferred_release_blocker_activates_after_tap_term(vo
     noah_runtime_reset_for_test();
 
     test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_V, key_pos, fake_time);
-    runtime_v2_observe_deferred_release_blocker_profile(key_pos, true, false, true);
 
     snapshot = runtime_v2_projection_snapshot_capture();
-    CHECK(snapshot.v2_deferred_release_blocker_count == 0u);
-    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 1u);
-    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 0u);
+    CHECK(snapshot.v2_deferred_release_blocker_count == 1u);
+    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 0u);
+    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 1u);
 
     runtime_v2_apply_event(&advance, fake_time);
     fake_time = (uint16_t)(fake_time + advance.data.timer_advance.advance_ms);
 
     snapshot = runtime_v2_projection_snapshot_capture();
     CHECK(snapshot.v2_deferred_release_blocker_count == 1u);
-    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 1u);
+    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 0u);
     CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(key_pos) == 1u);
+}
+
+static void test_runtime_v2_other_press_interrupt_clears_momentary_layer_quick_tap_blocker(void) {
+    projection_snapshot_t snapshot;
+    keypos_t              layer_key = test_keypos(4, 3);
+    keypos_t              other_key = test_keypos(4, 4);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_INTERRUPTED_LAYER_KEY, layer_key, fake_time);
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_deferred_release_blocker_count == 1u);
+    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 1u);
+    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(layer_key) == 1u);
+
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, other_key, fake_time);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_deferred_release_blocker_count == 1u);
+    CHECK(snapshot.v2_deferred_release_timed_blocker_count == 0u);
+    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(layer_key) == 0u);
+    CHECK(runtime_v2_deferred_release_blocker_count_for_keypos(other_key) == 1u);
 }
 
 static void test_runtime_v2_pending_release_state_survives_same_key_reuse(void) {
@@ -1212,7 +1229,8 @@ int main(void) {
     test_runtime_v2_pd_mode_lock_observes_live_pd_mode_state();
     test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases();
     test_runtime_v2_deferred_release_blocker_expires_after_tap_term();
-    test_runtime_v2_deferred_release_blocker_activates_after_tap_term();
+    test_runtime_v2_deferred_release_blocker_persists_after_tap_term_for_plain_tap();
+    test_runtime_v2_other_press_interrupt_clears_momentary_layer_quick_tap_blocker();
     test_runtime_v2_pending_release_state_survives_same_key_reuse();
 
     puts("runtime_debug host tests passed");

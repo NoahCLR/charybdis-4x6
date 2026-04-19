@@ -343,6 +343,32 @@ The next release-path seam is now landed as well:
 
 Inference from the current tree: deferred release is no longer an anonymous action FIFO in either the legacy debug surface or the v2 shadow model. That is a real architectural step forward. The deeper problem still remains open, though: the decision about whether a deferred release is blocked still comes from `key_runtime_transition_has_foreign_tap_release_slot_except(...)` and `key_runtime_transition_has_any_tap_release_slot(...)`, which re-derive blocker state by scanning the live slot world instead of consulting reducer-owned blocker records.
 
+## 2026-04-19 Runtime V2 Native Blocker Derivation Note
+
+The blocker seam has now crossed the next architectural boundary inside the shadow reducer:
+
+- `users/noah/lib/runtime_v2/runtime_v2.c` now derives blocker semantics natively from reducer-owned state instead of mirroring blocker truth from legacy slot/index ownership.
+- `runtime_v2_press_token_begin(...)` now resolves handled-key materialization once on press against shadow layer state, stores blocker-relevant contract fields on the immutable press token, and latches foreign-key interruption on already-active tokens inside the reducer.
+- `runtime_v2_deferred_release_blocker_count_for_keypos(...)` and projection capture now compute blocker counts by asking whether live press tokens currently block deferred release based on:
+  - press-time handled-key contract,
+  - token interruption latches,
+  - token timing,
+  - pending-hold tap-series state, and
+  - whether the token has already crossed into owned hold state.
+- `runtime_v2_observe_deferred_release_blocker_profile(...)` remains present only as a compatibility hook while the mixed architecture still exists; blocker semantics inside v2 no longer depend on observer-fed blocker profiles.
+- `tests/host/runtime_debug_test.c` now proves native authored blocker shapes instead of synthetic mirrored profiles, including:
+  - an interrupted momentary-layer tap that blocks only before hold ownership settles,
+  - a plain handled tap that still blocks after `tap_hold_term`, and
+  - reducer-owned interruption clearing a first token's quick-tap blocker when a foreign press arrives.
+
+Reconciliation Note:
+
+- The earlier "Runtime V2 Blocker Observation Note" below is now an audit-time snapshot only.
+- It still describes the intermediate step correctly, but it is no longer the current architecture for blocker semantics inside `runtime_v2`.
+- The current tree now derives blocker truth natively in the reducer and uses the observer hook only for compatibility during migration.
+
+Inference from the current tree: blocker timing and blocker semantics are now both modeled inside `runtime_v2`. That is a meaningful reduction in split-brain risk. The remaining open architecture gap is production ownership: the real release/deferred-emission path still runs through the legacy runtime, so the board can still wedge until the production blocker decision and release cleanup migrate onto the single-authority reducer path.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

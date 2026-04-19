@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Native Blocker Derivation Pass
+
+- Replaced the shadow reducer's observer-fed deferred-release blocker semantics with native blocker derivation from authored token state.
+- `users/noah/lib/runtime_v2/runtime_v2.c` now derives blocker truth from:
+  - immutable press-token identity,
+  - handled-key materialization resolved at press time against shadow layer state,
+  - token-owned interruption latches,
+  - token-owned timing (`pressed_at`, `hold_term_ms`), and
+  - tap-series pending-hold state.
+- `runtime_v2_press_token_begin(...)` now resolves handled-key contract once on press, stores blocker-relevant contract fields on the press token, and latches foreign-key interruption on already-active tokens inside the reducer instead of waiting for legacy blocker observation.
+- `runtime_v2_deferred_release_blocker_count_for_keypos(...)` and projection capture now compute blocker counts directly from live press tokens, not from mirrored `deferred_release_blocker_t` records.
+- `runtime_v2_observe_deferred_release_blocker_profile(...)` is now compatibility-only. The legacy blocker owner can still call it while the mixed architecture exists, but the reducer no longer depends on that observer input for blocker semantics.
+- `tests/host/runtime_debug_test.c` now proves real authored blocker shapes instead of synthetic observer-fed profiles:
+  - an interrupted momentary-layer tap blocks before `tap_hold_term` and expires once the hold owns state,
+  - a plain handled tap keeps blocking after `tap_hold_term`, and
+  - a foreign press clears the first token's quick-tap blocker through reducer-owned interruption state.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Pass
 
 - Extended the shadow reducer into deferred-release blocker ownership so blocker state is now visible in `runtime_v2` and the parity snapshot surface instead of staying entirely trapped in legacy slot/index storage.

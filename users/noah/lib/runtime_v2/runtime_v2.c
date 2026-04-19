@@ -45,6 +45,10 @@ static uint16_t runtime_v2_default_hold_term(uint16_t keycode) {
     return (IS_QK_LAYER_TAP(keycode) || IS_QK_MOD_TAP(keycode)) ? TAPPING_TERM : CUSTOM_TAP_HOLD_TERM;
 }
 
+static uint16_t runtime_v2_default_longer_hold_term(void) {
+    return CUSTOM_LONGER_HOLD_TERM;
+}
+
 static uint16_t runtime_v2_default_multi_tap_term(void) {
     return CUSTOM_MULTI_TAP_TERM;
 }
@@ -63,14 +67,6 @@ static tap_series_t *runtime_v2_tap_series_state(runtime_v2_state_t *state, keyp
     }
 
     return &state->tap_series[runtime_v2_keypos_index(key_pos)];
-}
-
-static deferred_release_blocker_t *runtime_v2_deferred_release_blocker_state(runtime_v2_state_t *state, keypos_t key_pos) {
-    if (!(state && runtime_v2_keypos_valid(key_pos))) {
-        return NULL;
-    }
-
-    return &state->deferred_release_blockers[runtime_v2_keypos_index(key_pos)];
 }
 
 static pending_release_t *runtime_v2_allocate_pending_release(runtime_v2_state_t *state) {
@@ -114,42 +110,106 @@ static uint16_t runtime_v2_elapsed(uint16_t start, uint16_t end) {
     return (uint16_t)(end - start);
 }
 
-static bool runtime_v2_deferred_release_blocker_tracks_tap_term(const deferred_release_blocker_t *blocker) {
-    return blocker && blocker->active && blocker->blocks_before_tap_term != blocker->blocks_after_tap_term;
+static layer_state_t runtime_v2_resolution_layers(const runtime_v2_state_t *state) {
+    return ((state ? state->shadow_projection.layer_state : 0u) | ((layer_state_t)1u << 0));
 }
 
-static const press_token_t *runtime_v2_active_press_token_for_blocker(const runtime_v2_state_t *state, const deferred_release_blocker_t *blocker) {
-    const press_token_t *token;
+static bool runtime_v2_press_token_has_pending_hold_series(const runtime_v2_state_t *state, const press_token_t *token) {
+    const tap_series_t *series;
 
-    if (!(state && blocker && blocker->active && blocker->owner_token_id != 0u)) {
-        return NULL;
-    }
-
-    token = runtime_v2_press_token_state((runtime_v2_state_t *)state, blocker->key_pos);
-    if (!(token && token->active && token->token_id == blocker->owner_token_id)) {
-        return NULL;
-    }
-
-    return token;
-}
-
-static bool runtime_v2_deferred_release_blocker_is_effective(const runtime_v2_state_t *state, const deferred_release_blocker_t *blocker) {
-    const press_token_t *token;
-
-    if (!(state && blocker && blocker->active)) {
+    if (!(state && token && token->active)) {
         return false;
     }
 
-    if (!runtime_v2_deferred_release_blocker_tracks_tap_term(blocker)) {
-        return blocker->blocks_before_tap_term;
-    }
+    series = runtime_v2_tap_series_state((runtime_v2_state_t *)state, token->key_pos);
+    return series && series->active && series->pending_hold && series->keycode == token->physical_keycode;
+}
 
-    token = runtime_v2_active_press_token_for_blocker(state, blocker);
-    if (!token) {
+static bool runtime_v2_hold_semantics_owns_state_at_threshold(handled_key_hold_semantics_t semantics) {
+    return handled_key_hold_semantics_registers_held(semantics) || handled_key_hold_semantics_repeats_while_held(semantics);
+}
+
+static bool runtime_v2_press_token_quick_tap_suppressed(const press_token_t *token) {
+    return token && token->behavior_contract.suppress_tap_on_layer_interrupt && token->momentary_layer_tap_interrupted;
+}
+
+static bool runtime_v2_press_token_has_pd_mode_quick_lock_candidate(const press_token_t *token) {
+    return token && token->behavior_contract.quick_tap_pd_mode_lock != 0 && token->pd_mode_was_locked_on_press &&
+           !runtime_v2_press_token_quick_tap_suppressed(token);
+}
+
+static bool runtime_v2_press_token_owned_state_active(const runtime_v2_state_t *state, const press_token_t *token) {
+    if (!(state && token && token->active)) {
         return false;
     }
 
-    return runtime_v2_elapsed(token->pressed_at, state->current_time) < token->hold_term_ms ? blocker->blocks_before_tap_term : blocker->blocks_after_tap_term;
+    if (token->behavior_contract.quick_release_of_immediate_hold_dispatches_tap && !handled_key_hold_semantics_fires_at_threshold(token->behavior_contract.hold)) {
+        return true;
+    }
+
+    if (runtime_v2_elapsed(token->pressed_at, state->current_time) < token->hold_term_ms) {
+        return false;
+    }
+
+    return runtime_v2_hold_semantics_owns_state_at_threshold(token->behavior_contract.hold);
+}
+
+static void runtime_v2_press_token_deferred_release_profile(const runtime_v2_state_t *state, const press_token_t *token, bool *before_tap_term, bool *after_tap_term) {
+    bool before = false;
+    bool after  = false;
+
+    if (!(state && token && token->active && token->handled_key)) {
+        goto done;
+    }
+
+    if (runtime_v2_press_token_has_pending_hold_series(state, token) || runtime_v2_press_token_owned_state_active(state, token)) {
+        goto done;
+    }
+
+    if (token->behavior_contract.buffered_base_tap_dispatches_tap) {
+        before = true;
+        after  = true;
+        goto done;
+    }
+
+    if (!runtime_v2_press_token_quick_tap_suppressed(token)) {
+        before = token->tap_outcome_available || runtime_v2_press_token_has_pd_mode_quick_lock_candidate(token);
+    }
+
+    after = token->behavior_contract.nonquick_release_dispatches_tap;
+
+done:
+    if (before_tap_term) {
+        *before_tap_term = before;
+    }
+
+    if (after_tap_term) {
+        *after_tap_term = after;
+    }
+}
+
+static bool runtime_v2_press_token_deferred_release_blocker_tracks_tap_term(const runtime_v2_state_t *state, const press_token_t *token) {
+    bool before = false;
+    bool after  = false;
+
+    runtime_v2_press_token_deferred_release_profile(state, token, &before, &after);
+    return before != after;
+}
+
+static bool runtime_v2_press_token_blocks_deferred_release(const runtime_v2_state_t *state, const press_token_t *token) {
+    bool before = false;
+    bool after  = false;
+
+    if (!(state && token && token->active)) {
+        return false;
+    }
+
+    runtime_v2_press_token_deferred_release_profile(state, token, &before, &after);
+    if (before == after) {
+        return before;
+    }
+
+    return runtime_v2_elapsed(token->pressed_at, state->current_time) < token->hold_term_ms ? before : after;
 }
 
 static uint8_t runtime_v2_effective_deferred_release_blocker_count(const runtime_v2_state_t *state) {
@@ -159,8 +219,24 @@ static uint8_t runtime_v2_effective_deferred_release_blocker_count(const runtime
         return 0u;
     }
 
-    for (uint16_t index = 0; index < RUNTIME_V2_DEFERRED_RELEASE_BLOCKER_CAPACITY; index++) {
-        if (runtime_v2_deferred_release_blocker_is_effective(state, &state->deferred_release_blockers[index])) {
+    for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+        if (runtime_v2_press_token_blocks_deferred_release(state, &state->press_tokens[index])) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
+static uint8_t runtime_v2_timed_deferred_release_blocker_count(const runtime_v2_state_t *state) {
+    uint8_t count = 0;
+
+    if (!state) {
+        return 0u;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+        if (runtime_v2_press_token_deferred_release_blocker_tracks_tap_term(state, &state->press_tokens[index])) {
             count++;
         }
     }
@@ -855,9 +931,17 @@ static void runtime_v2_refresh_for_time(runtime_v2_state_t *state, uint16_t now)
 }
 
 static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtime_key_event_t *event, uint16_t now) {
-    press_token_t *token;
-    tap_series_t  *series;
-    uint16_t       hold_term_ms;
+    press_token_t             *token;
+    tap_series_t              *series;
+    handled_key_resolution_t   resolution;
+    handled_key_materialized_t materialized;
+    handled_key_resolution_ctx_t ctx;
+    uint16_t                   hold_term_ms;
+    uint16_t                   longer_hold_term_ms;
+    uint8_t                    tap_count = 1u;
+    bool                       handled   = false;
+    bool                       tap_outcome_available = false;
+    bool                       pd_mode_was_locked_on_press = false;
 
     if (!(state && event)) {
         return;
@@ -874,22 +958,58 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
         runtime_v2_press_token_cancel(state, token, now);
     }
 
+    if (series && series->active && series->keycode == event->keycode && runtime_v2_elapsed(series->last_tap_at, now) <= series->tap_term_ms) {
+        tap_count = (uint8_t)(series->tap_count + 1u);
+    }
+
+    resolution           = handled_key_lookup_tap_count(event->keycode, tap_count);
+    handled              = handled_key_resolution_is_handled(resolution);
+    materialized         = handled_key_materialized_default(resolution);
     hold_term_ms = runtime_v2_default_hold_term(event->keycode);
+    longer_hold_term_ms  = runtime_v2_default_longer_hold_term();
+
+    if (handled) {
+        ctx                      = handled_key_resolution_ctx_make(event->key_pos, runtime_v2_resolution_layers(state));
+        materialized             = handled_key_materialize(resolution, ctx);
+        hold_term_ms             = handled_key_resolution_tap_hold_term(resolution);
+        longer_hold_term_ms      = handled_key_resolution_longer_hold_term(resolution);
+        tap_outcome_available    = handled_key_resolution_has_multi_tap(resolution) || materialized.tap_action != KC_NO;
+        pd_mode_was_locked_on_press = materialized.pd_mode != 0 && state->shadow_projection.pd_mode_local_locked == materialized.pd_mode;
+    }
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+        press_token_t *other = &state->press_tokens[index];
+
+        if (!(other->active && !runtime_v2_keypos_equal(other->key_pos, event->key_pos))) {
+            continue;
+        }
+
+        other->other_press_interrupted = true;
+        if (other->behavior_contract.suppress_tap_on_layer_interrupt) {
+            other->momentary_layer_tap_interrupted = true;
+        }
+    }
+
     *token = (press_token_t){
-        .active             = true,
-        .token_id           = state->next_token_id++,
-        .key_pos            = event->key_pos,
-        .physical_keycode   = event->keycode,
-        .resolved_keycode   = event->keycode,
+        .active                   = true,
+        .token_id                 = state->next_token_id++,
+        .key_pos                  = event->key_pos,
+        .physical_keycode         = event->keycode,
+        .resolved_keycode         = event->keycode,
         .observed_release_keycode = KC_NO,
-        .pressed_at         = now,
-        .hold_term_ms       = hold_term_ms,
-        .phase              = PRESS_TOKEN_PHASE_PRESSED,
+        .pressed_at               = now,
+        .hold_term_ms             = hold_term_ms,
+        .longer_hold_term_ms      = longer_hold_term_ms,
+        .phase                    = PRESS_TOKEN_PHASE_PRESSED,
+        .behavior_contract        = materialized.contract,
+        .handled_key              = handled,
+        .tap_outcome_available    = tap_outcome_available,
+        .pd_mode_was_locked_on_press = pd_mode_was_locked_on_press,
     };
     state->press_token_count++;
     runtime_v2_press_token_attach_press_leases(state, token);
 
-    if (series && series->active && series->keycode == event->keycode && runtime_v2_elapsed(series->last_tap_at, now) <= series->tap_term_ms) {
+    if (series && tap_count > 1u) {
         series->pending_hold = true;
     }
 }
@@ -1079,10 +1199,10 @@ uint8_t runtime_v2_pending_release_count_for_keypos(keypos_t key_pos) {
 }
 
 uint8_t runtime_v2_deferred_release_blocker_count_for_keypos(keypos_t key_pos) {
-    runtime_v2_state_t           *state   = runtime_v2_state();
-    deferred_release_blocker_t   *blocker = runtime_v2_deferred_release_blocker_state(state, key_pos);
+    runtime_v2_state_t *state = runtime_v2_state();
+    press_token_t      *token = runtime_v2_press_token_state(state, key_pos);
 
-    return runtime_v2_deferred_release_blocker_is_effective(state, blocker) ? 1u : 0u;
+    return runtime_v2_press_token_blocks_deferred_release(state, token) ? 1u : 0u;
 }
 
 void runtime_v2_layer_lock_set(uint8_t layer, bool active) {
@@ -1171,52 +1291,10 @@ void runtime_v2_observe_release_dispatch_drained(keypos_t key_pos, uint16_t acti
 }
 
 void runtime_v2_observe_deferred_release_blocker_profile(keypos_t key_pos, bool active, bool blocks_before_tap_term, bool blocks_after_tap_term) {
-    runtime_v2_state_t         *state   = runtime_v2_state();
-    deferred_release_blocker_t *blocker;
-    press_token_t              *token;
-    bool                        was_active;
-    bool                        was_timed;
-    bool                        now_active;
-    bool                        now_timed;
-
-    if (!(state && runtime_v2_keypos_valid(key_pos))) {
-        return;
-    }
-
-    blocker    = runtime_v2_deferred_release_blocker_state(state, key_pos);
-    token      = runtime_v2_press_token_state(state, key_pos);
-    was_active = blocker && blocker->active;
-    was_timed  = runtime_v2_deferred_release_blocker_tracks_tap_term(blocker);
-    now_active = active && (blocks_before_tap_term || blocks_after_tap_term);
-    now_timed  = now_active && blocks_before_tap_term != blocks_after_tap_term;
-
-    if (was_active && state->deferred_release_blocker_count != 0u) {
-        state->deferred_release_blocker_count--;
-    }
-    if (was_timed && state->deferred_release_timed_blocker_count != 0u) {
-        state->deferred_release_timed_blocker_count--;
-    }
-
-    if (!blocker) {
-        return;
-    }
-
-    if (!now_active) {
-        *blocker = (deferred_release_blocker_t){0};
-        return;
-    }
-
-    *blocker = (deferred_release_blocker_t){
-        .active                 = true,
-        .owner_token_id         = (token && token->active) ? token->token_id : 0u,
-        .key_pos                = key_pos,
-        .blocks_before_tap_term = blocks_before_tap_term,
-        .blocks_after_tap_term  = blocks_after_tap_term,
-    };
-    state->deferred_release_blocker_count++;
-    if (now_timed) {
-        state->deferred_release_timed_blocker_count++;
-    }
+    (void)key_pos;
+    (void)active;
+    (void)blocks_before_tap_term;
+    (void)blocks_after_tap_term;
 }
 
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
@@ -1273,7 +1351,7 @@ projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
         snapshot.v2_lease_count           = state->lease_count;
         snapshot.v2_pending_release_count = state->pending_release_count;
         snapshot.v2_deferred_release_blocker_count = runtime_v2_effective_deferred_release_blocker_count(state);
-        snapshot.v2_deferred_release_timed_blocker_count = state->deferred_release_timed_blocker_count;
+        snapshot.v2_deferred_release_timed_blocker_count = runtime_v2_timed_deferred_release_blocker_count(state);
         snapshot.v2_persistent_intent_count = state->persistent_intent_count;
         snapshot.v2_release_keycode_mismatch_count = state->release_keycode_mismatch_count;
         snapshot.v2_orphan_release_count = state->orphan_release_count;

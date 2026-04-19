@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "../key/interaction/handled_key.h"
 #include "../pointing/defs/pd_mode_flags.h"
 #include "../state/runtime/keyboard_mod_state.h"
 
@@ -82,7 +83,14 @@ typedef struct {
     uint16_t            pressed_at;
     uint16_t            released_at;
     uint16_t            hold_term_ms;
+    uint16_t            longer_hold_term_ms;
     press_token_phase_t phase;
+    handled_key_behavior_contract_t behavior_contract;
+    bool                handled_key;
+    bool                tap_outcome_available;
+    bool                pd_mode_was_locked_on_press;
+    bool                other_press_interrupted;
+    bool                momentary_layer_tap_interrupted;
     bool                resolved_from_transparent;
     bool                pending_release_emission;
     bool                release_keycode_mismatched;
