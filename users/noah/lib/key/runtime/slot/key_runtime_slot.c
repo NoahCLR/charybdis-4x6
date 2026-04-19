@@ -82,6 +82,103 @@ bool key_runtime_slot_hold_is_complete(const active_key_state_t *slot) {
     return key_runtime_slot_phase(slot) == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE;
 }
 
+static bool key_runtime_slot_momentary_layer_tap_suppresses_quick_tap(const active_key_state_t *slot, key_runtime_slot_release_contract_t contract) {
+    return slot && contract.suppress_tap_on_layer_interrupt && slot->lifecycle.momentary_layer_tap_interrupted;
+}
+
+static bool key_runtime_slot_has_pd_mode_quick_lock_candidate(const active_key_state_t *slot, key_runtime_slot_release_contract_t contract) {
+    return slot && contract.quick_tap_pd_mode_lock != 0 && slot->lifecycle.pd_mode_was_locked_on_press && !key_runtime_slot_momentary_layer_tap_suppresses_quick_tap(slot, contract);
+}
+
+static void key_runtime_slot_deferred_release_blocker_profile(const active_key_state_t *slot, bool *before_tap_term, bool *after_tap_term) {
+    key_runtime_slot_interaction_t      interaction;
+    key_runtime_slot_release_contract_t contract;
+    key_runtime_slot_phase_t            phase;
+    bool                                before = false;
+    bool                                after  = false;
+
+    if (!key_runtime_slot_active(slot)) {
+        goto done;
+    }
+
+    if (key_runtime_slot_pending_multi_tap_pending_hold(slot)) {
+        goto done;
+    }
+
+    if (slot->lifecycle.held_action_keycode != KC_NO || slot->lifecycle.repeat_binding_active) {
+        goto done;
+    }
+
+    interaction = key_runtime_slot_cached_interaction(slot);
+    contract    = key_runtime_slot_release_contract(interaction);
+    phase       = key_runtime_slot_phase(slot);
+
+    switch (phase) {
+        case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
+            if (contract.buffered_base_tap_dispatches_tap) {
+                before = true;
+                after  = true;
+                break;
+            }
+
+            if (!key_runtime_slot_momentary_layer_tap_suppresses_quick_tap(slot, contract)) {
+                before = contract.tap.outcome != KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE || key_runtime_slot_has_pd_mode_quick_lock_candidate(slot, contract);
+            }
+
+            after = contract.nonquick_release_dispatches_tap;
+            break;
+        case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
+            before = (!slot->lifecycle.other_press_interrupted && contract.quick_release_of_immediate_hold_dispatches_tap && !key_runtime_slot_momentary_layer_tap_suppresses_quick_tap(slot, contract)) ||
+                     key_runtime_slot_has_pd_mode_quick_lock_candidate(slot, contract);
+            break;
+        case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
+        case KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE:
+        case KEY_RUNTIME_SLOT_PHASE_IDLE:
+        default:
+            break;
+    }
+
+done:
+    if (before_tap_term) {
+        *before_tap_term = before;
+    }
+
+    if (after_tap_term) {
+        *after_tap_term = after;
+    }
+}
+
+void key_runtime_slot_sync_deferred_release_blocker_profile(active_key_state_t *slot) {
+    bool before = false;
+    bool after  = false;
+
+    if (!slot) {
+        return;
+    }
+
+    key_runtime_slot_deferred_release_blocker_profile(slot, &before, &after);
+    slot->lifecycle.deferred_release_blocker_before_tap_term = before;
+    slot->lifecycle.deferred_release_blocker_after_tap_term  = after;
+}
+
+bool key_runtime_slot_deferred_release_blocker_tracks_tap_term(const active_key_state_t *slot) {
+    return slot && key_runtime_slot_active(slot) && slot->lifecycle.deferred_release_blocker_before_tap_term != slot->lifecycle.deferred_release_blocker_after_tap_term;
+}
+
+bool key_runtime_slot_blocks_deferred_release_dispatch(const active_key_state_t *slot) {
+    if (!key_runtime_slot_active(slot)) {
+        return false;
+    }
+
+    if (!key_runtime_slot_deferred_release_blocker_tracks_tap_term(slot)) {
+        return slot->lifecycle.deferred_release_blocker_before_tap_term;
+    }
+
+    return timer_elapsed(slot->timer) < key_runtime_slot_cached_interaction(slot).binding.tap_hold_term ? slot->lifecycle.deferred_release_blocker_before_tap_term
+                                                                                                         : slot->lifecycle.deferred_release_blocker_after_tap_term;
+}
+
 bool key_runtime_slot_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos) {
     return key_runtime_slot_active(slot) && slot->owner.keycode == keycode && key_runtime_keypos_equal(slot->owner.key_pos, key_pos);
 }

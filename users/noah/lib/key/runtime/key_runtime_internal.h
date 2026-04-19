@@ -38,6 +38,9 @@ bool                                       key_runtime_slot_allows_tap_release(c
 bool                                       key_runtime_slot_has_pending_release_hold(const active_key_state_t *slot);
 bool                                       key_runtime_slot_has_active_hold_tier(const active_key_state_t *slot);
 bool                                       key_runtime_slot_hold_is_complete(const active_key_state_t *slot);
+bool                                       key_runtime_slot_blocks_deferred_release_dispatch(const active_key_state_t *slot);
+bool                                       key_runtime_slot_deferred_release_blocker_tracks_tap_term(const active_key_state_t *slot);
+void                                       key_runtime_slot_sync_deferred_release_blocker_profile(active_key_state_t *slot);
 bool                                       key_runtime_slot_matches(const active_key_state_t *slot, uint16_t keycode, keypos_t key_pos);
 bool                                       key_runtime_slot_owns_key_position(const active_key_state_t *slot, keypos_t key_pos);
 uint8_t                                    key_runtime_slot_preview_layer_hint(const active_key_state_t *slot);

@@ -56,6 +56,27 @@ static key_runtime_slot_interaction_t test_interaction(uint8_t preview_layer, ui
     return interaction;
 }
 
+static key_runtime_slot_interaction_t test_tap_release_blocker_interaction(void) {
+    key_runtime_slot_interaction_t interaction = test_interaction(UINT8_MAX, 0);
+    interaction.release.tap.outcome            = KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION;
+    interaction.release.tap.action             = TEST_TAP_1;
+    interaction.binding.tap_hold_term          = 120;
+    return interaction;
+}
+
+static key_runtime_slot_interaction_t test_interrupted_layer_tap_blocker_interaction(void) {
+    key_runtime_slot_interaction_t interaction = test_tap_release_blocker_interaction();
+    interaction.flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
+    interaction.release.suppress_tap_on_layer_interrupt = true;
+    return interaction;
+}
+
+static key_runtime_slot_interaction_t test_interrupted_nonquick_layer_tap_blocker_interaction(void) {
+    key_runtime_slot_interaction_t interaction = test_interrupted_layer_tap_blocker_interaction();
+    interaction.release.nonquick_release_dispatches_tap = true;
+    return interaction;
+}
+
 static void test_reset_state(void) {
     fake_time = 1000;
     host_runtime_fixture_reset_userspace_runtime();
@@ -75,6 +96,14 @@ static void test_expect_pending_order(const keypos_t *positions, uint8_t count) 
         CHECK(key_runtime_pending_multi_tap_slot_by_order(order) == test_slot(positions[order]));
     }
     CHECK(key_runtime_pending_multi_tap_slot_by_order(count) == NULL);
+}
+
+static void test_expect_blocker_order(const keypos_t *positions, uint8_t count) {
+    CHECK(key_runtime_deferred_release_blocker_count() == count);
+    for (uint8_t order = 0; order < count; order++) {
+        CHECK(key_runtime_deferred_release_blocker_slot_by_order(order) == test_slot(positions[order]));
+    }
+    CHECK(key_runtime_deferred_release_blocker_slot_by_order(count) == NULL);
 }
 
 static void test_active_slot_order_updates_after_track_and_reset(void) {
@@ -210,6 +239,85 @@ static void test_pending_fallback_updates_immediately_after_mutations(void) {
     CHECK(key_runtime_pending_fallback_slot() == NULL);
 }
 
+static void test_deferred_release_blocker_index_updates_immediately_after_mutations(void) {
+    static const keypos_t expected_initial[] = {
+        {.row = 4, .col = 1},
+        {.row = 4, .col = 3},
+    };
+    static const keypos_t expected_after_commit[] = {
+        {.row = 4, .col = 3},
+    };
+    keypos_t later_blocker   = test_keypos(4, 3);
+    keypos_t earlier_blocker = test_keypos(4, 1);
+
+    test_reset_state();
+
+    key_runtime_slot_track(test_slot(later_blocker), TEST_KEY_A, later_blocker, test_tap_release_blocker_interaction(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    key_runtime_slot_track(test_slot(earlier_blocker), TEST_KEY_B, earlier_blocker, test_tap_release_blocker_interaction(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+
+    test_expect_blocker_order(expected_initial, 2);
+    CHECK(key_runtime_index_has_any_deferred_release_blocker());
+    CHECK(key_runtime_index_has_foreign_deferred_release_blocker_except(test_keypos(7, 7)));
+    CHECK(key_runtime_index_has_foreign_deferred_release_blocker_except(later_blocker));
+    CHECK(key_runtime_index_has_foreign_deferred_release_blocker_except(earlier_blocker));
+
+    key_runtime_slot_set_held_action_keycode(test_slot(earlier_blocker), TEST_KEY_D);
+    test_expect_blocker_order(expected_after_commit, 1);
+    CHECK(key_runtime_index_has_any_deferred_release_blocker());
+    CHECK(!key_runtime_index_has_foreign_deferred_release_blocker_except(later_blocker));
+    CHECK(key_runtime_index_has_foreign_deferred_release_blocker_except(earlier_blocker));
+
+    key_runtime_slot_reset(test_slot(later_blocker));
+    test_expect_blocker_order(NULL, 0);
+    CHECK(!key_runtime_index_has_any_deferred_release_blocker());
+}
+
+static void test_deferred_release_blocker_excludes_interrupted_layer_taps(void) {
+    keypos_t blocker_pos = test_keypos(5, 2);
+
+    test_reset_state();
+
+    key_runtime_slot_track(test_slot(blocker_pos), TEST_KEY_C, blocker_pos, test_interrupted_layer_tap_blocker_interaction(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    test_expect_blocker_order(&blocker_pos, 1);
+
+    test_slot(blocker_pos)->lifecycle.momentary_layer_tap_interrupted = true;
+    key_runtime_index_sync_slot(test_slot(blocker_pos));
+    test_expect_blocker_order(NULL, 0);
+    CHECK(!key_runtime_index_has_any_deferred_release_blocker());
+
+    test_slot(blocker_pos)->lifecycle.momentary_layer_tap_interrupted = false;
+    key_runtime_index_sync_slot(test_slot(blocker_pos));
+    test_expect_blocker_order(&blocker_pos, 1);
+}
+
+static void test_deferred_release_blocker_quick_tap_expires_without_active_rescan(void) {
+    keypos_t blocker_pos = test_keypos(5, 4);
+
+    test_reset_state();
+
+    key_runtime_slot_track(test_slot(blocker_pos), TEST_KEY_D, blocker_pos, test_tap_release_blocker_interaction(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    test_expect_blocker_order(&blocker_pos, 1);
+
+    fake_time += 200;
+    test_expect_blocker_order(NULL, 0);
+    CHECK(!key_runtime_index_has_any_deferred_release_blocker());
+}
+
+static void test_deferred_release_blocker_can_activate_after_tap_term_without_active_rescan(void) {
+    keypos_t blocker_pos = test_keypos(5, 5);
+
+    test_reset_state();
+
+    key_runtime_slot_track(test_slot(blocker_pos), TEST_KEY_E, blocker_pos, test_interrupted_nonquick_layer_tap_blocker_interaction(), KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
+    test_slot(blocker_pos)->lifecycle.momentary_layer_tap_interrupted = true;
+    key_runtime_index_sync_slot(test_slot(blocker_pos));
+    test_expect_blocker_order(NULL, 0);
+
+    fake_time += 200;
+    test_expect_blocker_order(&blocker_pos, 1);
+    CHECK(key_runtime_index_has_any_deferred_release_blocker());
+}
+
 uint16_t timer_read(void) {
     return fake_time;
 }
@@ -276,6 +384,10 @@ int main(void) {
     test_active_slot_excludes_pending_multi_tap_until_owner_clears();
     test_preview_owner_updates_immediately_after_mutations();
     test_pending_fallback_updates_immediately_after_mutations();
+    test_deferred_release_blocker_index_updates_immediately_after_mutations();
+    test_deferred_release_blocker_excludes_interrupted_layer_taps();
+    test_deferred_release_blocker_quick_tap_expires_without_active_rescan();
+    test_deferred_release_blocker_can_activate_after_tap_term_without_active_rescan();
     puts("key_runtime_index host tests passed");
     return 0;
 }

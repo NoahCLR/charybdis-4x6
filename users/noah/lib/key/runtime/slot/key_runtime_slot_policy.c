@@ -122,16 +122,26 @@ key_runtime_effect_builder_t key_runtime_slot_policy_activate_pending_fallback_h
 }
 
 key_runtime_effect_builder_t key_runtime_slot_policy_interrupt_on_other_press(active_key_state_t *slot, keypos_t other_key_pos) {
+    bool updated_lifecycle = false;
+
     if (!key_runtime_slot_active(slot) || key_runtime_keypos_equal(slot->owner.key_pos, other_key_pos)) {
         return (key_runtime_effect_builder_t){0};
     }
 
     key_runtime_effect_builder_t builder = key_runtime_slot_policy_activate_pending_fallback_hold(slot);
 
-    slot->lifecycle.other_press_interrupted = true;
+    if (!slot->lifecycle.other_press_interrupted) {
+        slot->lifecycle.other_press_interrupted = true;
+        updated_lifecycle                       = true;
+    }
 
-    if (key_runtime_slot_policy_other_press_interrupts_momentary_layer_tap(slot)) {
+    if (key_runtime_slot_policy_other_press_interrupts_momentary_layer_tap(slot) && !slot->lifecycle.momentary_layer_tap_interrupted) {
         slot->lifecycle.momentary_layer_tap_interrupted = true;
+        updated_lifecycle                               = true;
+    }
+
+    if (updated_lifecycle) {
+        key_runtime_index_sync_slot(slot);
     }
 
     return builder;

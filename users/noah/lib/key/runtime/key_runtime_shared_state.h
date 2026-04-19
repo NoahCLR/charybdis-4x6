@@ -27,6 +27,8 @@ typedef struct {
     bool                     pd_mode_was_locked_on_press;
     bool                     other_press_interrupted;
     bool                     momentary_layer_tap_interrupted;
+    bool                     deferred_release_blocker_before_tap_term;
+    bool                     deferred_release_blocker_after_tap_term;
 } key_runtime_slot_lifecycle_state_t;
 
 // One handled-key runtime slot: active press/hold state plus any deferred
@@ -48,6 +50,10 @@ typedef struct {
     uint8_t active_slot_count;
     uint8_t pending_multi_tap_slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
     uint8_t pending_multi_tap_count;
+    uint8_t deferred_release_blocker_slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t deferred_release_blocker_count;
+    uint8_t deferred_release_blocker_timed_slots[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t deferred_release_blocker_timed_count;
     uint8_t preview_owner_slot;
     uint8_t pending_fallback_slot;
 } key_runtime_index_state_t;

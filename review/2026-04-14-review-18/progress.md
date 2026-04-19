@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-04-19 Deferred Release Timed Blocker Ownership Pass
+
+- Tightened deferred-release blocker ownership so blocker queries no longer rebuild blocker membership by rescanning every active slot and rerunning the blocker predicate over the whole live set.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot.c` now records an explicit blocker profile per slot:
+  - blocks before `tap_hold_term`
+  - blocks after `tap_hold_term`
+- That profile is derived from the slot's immutable press-resolved interaction plus slot-owned lifecycle latches, so timed blocker refresh now consults slot-owned facts instead of re-deriving semantics from the active-slot world.
+- `users/noah/lib/key/runtime/key_runtime_index.c` now keeps both:
+  - the effective deferred-release blocker subset, and
+  - a smaller timed subset whose membership only changes when `tap_hold_term` is crossed.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_policy.c` now re-syncs the slot index immediately when foreign-key interruption latches change, which was required once blocker membership stopped being a live recomputation.
+- `tests/host/key_runtime_index_test.c` now proves both timed directions of that ownership model:
+  - a quick-tap blocker can expire after `tap_hold_term` without an active-slot resync, and
+  - an interrupted layer-tap blocker with nonquick tap behavior can become active after `tap_hold_term` without rescanning the active set.
+
+## 2026-04-19 Deferred Release Blocker Index Pass
+
+- Moved deferred-release blocker classification out of `key_runtime_transition.c` and into the key-runtime index owner layer.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot.c` now owns `key_runtime_slot_blocks_deferred_release_dispatch(...)`, which centralizes the blocker rule that was previously embedded in the transition module.
+- `users/noah/lib/key/runtime/key_runtime_index.c` now maintains a dedicated deferred-release blocker subset, and `key_runtime_transition_has_foreign_tap_release_slot_except(...)` / `key_runtime_transition_has_any_tap_release_slot()` now query that index instead of rescanning and re-deriving blocker semantics themselves.
+- `tests/host/key_runtime_index_test.c` now proves blocker ownership updates immediately on slot mutations and excludes interrupted layer taps from the blocker subset, while the release matrix and real-profile overlap suites prove the higher-level behavior stayed intact.
+
 ## 2026-04-19 Runtime V2 Pending Release Ownership Pass
 
 - Moved the next release-path seam away from anonymous shared state by adding explicit owner identity to deferred release dispatches and shadowing them as owned v2 pending-release records.
@@ -225,6 +247,28 @@
 - `closure verdict`: keep this thread open until the hardware regression is closed on-device, and until the remaining `should-fix` items are either resolved or explicitly downgraded out of the closure bar.
 
 ## Verification
+
+- Passed during the deferred-release timed blocker ownership pass:
+  - `sh tests/host/run_key_runtime_index_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+
+- Passed during the deferred-release blocker index pass:
+  - `sh tests/host/run_key_runtime_index_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - `git diff --check`
 
 - Passed during the runtime-v2 pending release ownership pass:
   - `sh tests/host/run_runtime_debug_tests.sh`
@@ -463,6 +507,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Replace the legacy live-slot blocker scan for deferred release dispatch with reducer-owned blocker state, so release deferral stops being re-derived from the current world on every drain attempt.
+3. Move the new timed blocker profile and blocker subset fully into runtime-v2, so blocker ownership stops living in legacy slot/index storage.
 4. Fold the remaining release/deferred-emission paths into the lease/reducer model before any production hook cutover.
-4. Extend the cutover from persistent lock mutations into the remaining release/deferred-emission paths, where the legacy runtime still re-derives behavior from live state.

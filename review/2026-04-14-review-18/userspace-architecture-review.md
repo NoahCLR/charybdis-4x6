@@ -342,3 +342,30 @@ The next release-path seam is now landed as well:
 - `tests/host/key_runtime_release_matrix_test.c` now mechanically proves the production deferred queue retains the releasing key position, and `tests/host/runtime_debug_test.c` now proves a v2 pending-release record survives a same-key re-press until the deferred action actually drains.
 
 Inference from the current tree: deferred release is no longer an anonymous action FIFO in either the legacy debug surface or the v2 shadow model. That is a real architectural step forward. The deeper problem still remains open, though: the decision about whether a deferred release is blocked still comes from `key_runtime_transition_has_foreign_tap_release_slot_except(...)` and `key_runtime_transition_has_any_tap_release_slot(...)`, which re-derive blocker state by scanning the live slot world instead of consulting reducer-owned blocker records.
+
+## 2026-04-19 Deferred Release Timed Blocker Ownership Note
+
+The next blocker-path refinement is now landed too:
+
+- `users/noah/lib/key/runtime/slot/key_runtime_slot.c` now stores an explicit deferred-release blocker profile on each slot:
+  - blocks before `tap_hold_term`
+  - blocks after `tap_hold_term`
+- `users/noah/lib/key/runtime/key_runtime_index.c` now maintains both the effective blocker subset and a dedicated timed subset whose membership only changes when `tap_hold_term` is crossed.
+- Timed blocker refresh no longer rescans the full active-slot set and reruns blocker classification. It now consults immutable press-resolved slot interaction plus slot-owned lifecycle latches, then updates only the threshold-tracked subset.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_policy.c` now re-syncs the slot index immediately when foreign-key interruption latches change, which was required once blocker membership stopped being a live recomputation.
+- `tests/host/key_runtime_index_test.c` now proves the two time-boundary contracts directly:
+  - a quick-tap blocker expires after `tap_hold_term` without an active-slot resync, and
+  - an interrupted layer-tap blocker with nonquick tap behavior becomes active after `tap_hold_term` without rescanning the active set.
+
+Inference from the current tree: blocker ownership is materially cleaner now. The remaining architectural gap is no longer “rescan every active slot and rediscover blocker semantics.” It is that the timed blocker profile still lives in legacy slot/index state instead of the v2 reducer.
+
+## 2026-04-19 Deferred Release Blocker Index Note
+
+The next blocker-path seam is now landed too:
+
+- `users/noah/lib/key/runtime/slot/key_runtime_slot.c` now owns the blocker predicate in `key_runtime_slot_blocks_deferred_release_dispatch(...)` instead of leaving that logic embedded in `key_runtime_transition.c`.
+- `users/noah/lib/key/runtime/key_runtime_index.c` now maintains a dedicated deferred-release blocker subset derived from the active-slot index, and transition-layer blocker queries now ask the index instead of rescanning active slots and re-deriving the blocker rule themselves.
+- `tests/host/key_runtime_index_test.c` now locks the low-level ownership contract directly, including immediate blocker-index updates on slot mutations and the interrupted-layer-tap exclusion.
+- The release matrix, modifier-hold, pd-mode integration, and real-profile overlap suites stayed green after this move, so the new owner layer preserved the existing outward behavior.
+
+Inference from the current tree at that stage: blocker ownership had moved in the right direction, but it was still not a fully reducer-owned fact because the index still refreshed blocker membership by rescanning the active-slot set as time passed. The later timed-blocker ownership pass above narrowed that seam further, but blocker state is still legacy-owned rather than v2-owned.

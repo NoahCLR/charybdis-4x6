@@ -103,6 +103,27 @@ static void key_runtime_index_refresh_single_owner_answers(key_runtime_shared_st
     }
 }
 
+static void key_runtime_index_sync_deferred_release_blocker(active_key_state_t *slot, uint8_t slot_index, key_runtime_shared_state_t *state) {
+    if (!(state && slot)) {
+        return;
+    }
+
+    key_runtime_index_remove(state->index.deferred_release_blocker_slots, &state->index.deferred_release_blocker_count, slot_index);
+    key_runtime_index_remove(state->index.deferred_release_blocker_timed_slots, &state->index.deferred_release_blocker_timed_count, slot_index);
+
+    if (!key_runtime_slot_active(slot)) {
+        return;
+    }
+
+    if (key_runtime_slot_deferred_release_blocker_tracks_tap_term(slot)) {
+        key_runtime_index_insert_sorted(state->index.deferred_release_blocker_timed_slots, &state->index.deferred_release_blocker_timed_count, slot_index);
+    }
+
+    if (key_runtime_slot_blocks_deferred_release_dispatch(slot)) {
+        key_runtime_index_insert_sorted(state->index.deferred_release_blocker_slots, &state->index.deferred_release_blocker_count, slot_index);
+    }
+}
+
 void key_runtime_index_sync_slot(active_key_state_t *slot) {
     key_runtime_shared_state_t *state;
     int16_t                     slot_index;
@@ -112,6 +133,8 @@ void key_runtime_index_sync_slot(active_key_state_t *slot) {
     if (!(state && slot_index >= 0)) {
         return;
     }
+
+    key_runtime_slot_sync_deferred_release_blocker_profile(slot);
 
     if (key_runtime_slot_active(slot)) {
         key_runtime_index_insert_sorted(state->index.active_slots, &state->index.active_slot_count, (uint8_t)slot_index);
@@ -125,7 +148,44 @@ void key_runtime_index_sync_slot(active_key_state_t *slot) {
         key_runtime_index_remove(state->index.pending_multi_tap_slots, &state->index.pending_multi_tap_count, (uint8_t)slot_index);
     }
 
+    key_runtime_index_sync_deferred_release_blocker(slot, (uint8_t)slot_index, state);
     key_runtime_index_refresh_single_owner_answers(state);
+}
+
+void key_runtime_index_refresh_timed_deferred_release_blockers(void) {
+    key_runtime_shared_state_t *state = key_runtime_shared_state();
+    uint8_t                     snapshot[KEY_RUNTIME_SLOT_TABLE_CAPACITY];
+    uint8_t                     count;
+
+    if (!state) {
+        return;
+    }
+
+    count = state->index.deferred_release_blocker_timed_count;
+    for (uint8_t order = 0; order < count; order++) {
+        snapshot[order] = state->index.deferred_release_blocker_timed_slots[order];
+    }
+
+    for (uint8_t order = 0; order < count; order++) {
+        uint8_t             slot_index = snapshot[order];
+        active_key_state_t *slot       = key_runtime_slot_at(slot_index);
+
+        if (!slot) {
+            continue;
+        }
+
+        if (!key_runtime_slot_active(slot) || !key_runtime_slot_deferred_release_blocker_tracks_tap_term(slot)) {
+            key_runtime_index_remove(state->index.deferred_release_blocker_timed_slots, &state->index.deferred_release_blocker_timed_count, slot_index);
+            key_runtime_index_remove(state->index.deferred_release_blocker_slots, &state->index.deferred_release_blocker_count, slot_index);
+            continue;
+        }
+
+        if (key_runtime_slot_blocks_deferred_release_dispatch(slot)) {
+            key_runtime_index_insert_sorted(state->index.deferred_release_blocker_slots, &state->index.deferred_release_blocker_count, slot_index);
+        } else {
+            key_runtime_index_remove(state->index.deferred_release_blocker_slots, &state->index.deferred_release_blocker_count, slot_index);
+        }
+    }
 }
 
 static const key_runtime_index_state_t *key_runtime_index_state_snapshot(void) {
@@ -173,6 +233,29 @@ active_key_state_t *key_runtime_pending_fallback_slot(void) {
     return (!index || index->pending_fallback_slot == UINT8_MAX) ? NULL : key_runtime_slot_at(index->pending_fallback_slot);
 }
 
+uint8_t key_runtime_deferred_release_blocker_count(void) {
+    key_runtime_shared_state_t      *state = key_runtime_shared_state();
+    const key_runtime_index_state_t *index;
+
+    key_runtime_index_refresh_timed_deferred_release_blockers();
+    index = state ? &state->index : NULL;
+    return index ? index->deferred_release_blocker_count : 0;
+}
+
+active_key_state_t *key_runtime_deferred_release_blocker_slot_by_order(uint8_t order) {
+    key_runtime_shared_state_t      *state = key_runtime_shared_state();
+    const key_runtime_index_state_t *index;
+
+    key_runtime_index_refresh_timed_deferred_release_blockers();
+    index = state ? &state->index : NULL;
+
+    if (!index || order >= index->deferred_release_blocker_count) {
+        return NULL;
+    }
+
+    return key_runtime_slot_at(index->deferred_release_blocker_slots[order]);
+}
+
 uint8_t key_runtime_index_snapshot_active_slots(active_key_state_t **out_slots, uint8_t capacity) {
     const key_runtime_index_state_t *index = key_runtime_index_state_snapshot();
     uint8_t                          count = index ? index->active_slot_count : 0;
@@ -201,4 +284,30 @@ uint8_t key_runtime_index_snapshot_pending_multi_tap_slots(active_key_state_t **
     }
 
     return count;
+}
+
+bool key_runtime_index_has_any_deferred_release_blocker(void) {
+    return key_runtime_deferred_release_blocker_count() != 0u;
+}
+
+bool key_runtime_index_has_foreign_deferred_release_blocker_except(keypos_t key_pos) {
+    key_runtime_shared_state_t      *state = key_runtime_shared_state();
+    const key_runtime_index_state_t *index;
+
+    key_runtime_index_refresh_timed_deferred_release_blockers();
+    index = state ? &state->index : NULL;
+
+    if (!index) {
+        return false;
+    }
+
+    for (uint8_t order = 0; order < index->deferred_release_blocker_count; order++) {
+        active_key_state_t *slot = key_runtime_slot_at(index->deferred_release_blocker_slots[order]);
+
+        if (slot && !key_runtime_keypos_equal(slot->owner.key_pos, key_pos)) {
+            return true;
+        }
+    }
+
+    return false;
 }
