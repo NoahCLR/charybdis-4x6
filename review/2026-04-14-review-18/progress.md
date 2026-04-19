@@ -90,6 +90,15 @@
 - Extended the audit to the post-overlap drain seam:
   - the release matrix suite now asserts that a sibling delayed-action replay from the normal scan plan executes before the deferred release queue drains in the same scan,
   - a new dedicated delayed-action host suite now proves replay still settles pending fallback holds inside the delayed-action window while restoring the caller's saved keyboard mod state afterward.
+- Landed the right-alt arrow-lock tap-path narrowing on `arrowmodefix2`:
+  - handled-key release-time `KEY_RUNTIME_EFFECT_DISPATCH_ACTION` now skips fallback-hold settlement when the emitted tap action is a pd-mode lock action,
+  - ordinary handled tap actions still keep the existing settle-all pending-fallback-holds policy from the overlap remediation,
+  - host coverage now locks the new contract in at the transition seam and upgrades the pd-mode key-runtime integration harness to use real `action_dispatch.c`, real `KC_RIGHT_ALT` authored behavior, and the auto-mouse arrow-entry side effect instead of a test-local tap dispatcher.
+- Reconciled the right-alt tap-path fix on `arrowmodefix2` after the emit-policy narrowing failed on hardware:
+  - handled active-slot release now maps authored pd-mode lock taps onto `KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP` directly instead of routing them through the generic `KEY_RUNTIME_EFFECT_DISPATCH_ACTION -> noah_emit_action_tap(...)` seam,
+  - this keeps ordinary authored tap actions on the shared emit path while giving release-time pd-mode locks the same native runtime effect that already covered quick-tap lock toggles on real pd-mode keys,
+  - `tests/host/key_runtime_transition_test.c` now asserts that a `KC_RIGHT_ALT` fallback tap to `ARROW_MODE_LOCK` produces the native pd-mode-lock effect and split-sync outcome instead of a generic dispatched action,
+  - `tests/host/pd_mode_key_runtime_integration_test.c` and `run_pd_mode_key_runtime_integration_tests.sh` now model the real `auto_mouse_layer_off() -> layer_off() -> noah_layer_state_set_user()` stack by linking `pd_runtime.c` and `pointer_layer_policy.c` instead of using a direct layer-bit clear stub.
 
 ## Findings Snapshot
 
@@ -103,6 +112,18 @@
 - Passed: `sh tests/host/run_all_host_tests.sh`
 - Passed: `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Passed during remediation:
+  - `sh tests/host/run_key_runtime_transition_tests.sh`
+  - `sh tests/host/run_key_runtime_slot_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Current full-suite status:
+  - `sh tests/host/run_all_host_tests.sh` is still blocked by the pre-existing `docs/KEYMAP-OVERVIEW.md` introspection drift against the dirty `keymap.c` right-alt row (`LOCK_PD_MODE(ARROW_MODE)` vs `ARROW_MODE_LOCK` wording), not by this runtime change.
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes with the current tree.
+  - Earlier notes above that marked the full host suite as passed predate this unrelated dirty-tree drift and should be read as audit-time snapshots.
+  - `sh tests/host/run_action_dispatch_tests.sh`
   - `sh tests/host/run_action_dispatch_tests.sh`
   - `sh tests/host/run_pd_mode_handlers_tests.sh`
   - `sh tests/host/run_held_action_tests.sh`
@@ -207,6 +228,17 @@
   - `sh tests/host/run_feature_gate_compile_tests.sh`
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Passed during right-alt arrow-lock tap-path narrowing on `arrowmodefix2`:
+  - `sh tests/host/run_key_runtime_transition_tests.sh`
+  - `sh tests/host/run_action_dispatch_tests.sh`
+  - `sh tests/host/run_key_runtime_preflight_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_pd_mode_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Current full-suite status on `arrowmodefix2`:
+  - `sh tests/host/run_all_host_tests.sh` is still blocked by pre-existing introspection drift between the dirty right-alt authored row in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c` and `docs/KEYMAP-OVERVIEW.md`; this pass did not touch either file.
 - Cleanup follow-up on `codex/fix-authored-key-freeze`:
   - removed the leftover `NOAH_DIAGNOSTIC_*` compile gates from the normal action and key-runtime code paths
   - deleted the one-off host runners that only existed to exercise those diagnostic branches
@@ -215,6 +247,6 @@
 
 ## Next Steps
 
-1. Keep auditing the same overlap family by classifying any new release-time or scan-time effect kinds against the current safe/immediate versus deferred contract whenever authored behavior grows.
-2. If new hardware issues appear in this family, inspect whether any non-action drain work now needs the same kind of deferred queue separation that release dispatch needed.
-3. When the overlap family feels stable, return to the older thread-level `should-fix` items on the registry DSLs and the breadth of `key_runtime_internal.h`.
+1. Confirm on-device that single-tap `KC_RIGHT_ALT` now enters arrow mode without freezing and that a second tap still unlocks cleanly.
+2. Reconcile the existing `docs/KEYMAP-OVERVIEW.md` introspection drift against the dirty `keymap.c` row, then rerun `sh tests/host/run_all_host_tests.sh` for a clean full-suite baseline on this branch.
+3. When this tap-path regression is fully closed, return to the older thread-level `should-fix` items on the registry DSLs and the breadth of `key_runtime_internal.h`.

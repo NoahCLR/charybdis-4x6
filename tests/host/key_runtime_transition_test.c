@@ -72,6 +72,7 @@ static uint8_t  fake_mods;
 static uint8_t  fake_weak_mods;
 static uint8_t  fake_oneshot_mods;
 static uint8_t  fake_oneshot_locked_mods;
+static noah_emit_policy_t last_emit_policy;
 
 static behavior_step_stub_t behavior_steps[TEST_MAX_BEHAVIOR_STEPS];
 static uint8_t              behavior_step_count;
@@ -368,6 +369,7 @@ static void test_reset_stubs(void) {
     fake_weak_mods                    = 0;
     fake_oneshot_mods                 = 0;
     fake_oneshot_locked_mods          = 0;
+    last_emit_policy                  = NOAH_EMIT_POLICY_NONE;
     held_action_survives_flush_result = false;
     overflow_log_count                = 0;
 
@@ -480,6 +482,15 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     return 0;
 }
 
+const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+    static const pd_mode_def_t arrow_lock = {
+        .mode_flag   = PD_MODE_ARROW,
+        .lock_action = ARROW_MODE_LOCK,
+    };
+
+    return action == ARROW_MODE_LOCK ? &arrow_lock : NULL;
+}
+
 bool pd_mode_local_locked(pd_mode_mask_t mode) {
     return (pd_locked_modes & mode) != 0;
 }
@@ -493,12 +504,11 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
 }
 
 bool is_pd_mode_lock_action(uint16_t action) {
-    (void)action;
-    return false;
+    return action == ARROW_MODE_LOCK;
 }
 
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
-    (void)policy;
+    last_emit_policy = policy;
     test_log_call(TEST_CALL_DISPATCH_ACTION, action, test_keypos(0, 0), 0, false, (delayed_action_mods_t){0});
 }
 
@@ -821,6 +831,37 @@ static void test_single_tap_override_long_release_does_not_dispatch_tap(void) {
     CHECK(plan.count == 0);
     CHECK(active_key.owner.keycode == KC_NO);
     CHECK(test_call_count == 0);
+}
+
+static void test_single_tap_pd_mode_lock_release_uses_native_pd_mode_lock_effect(void) {
+    key_runtime_transition_plan_t plan;
+    keyrecord_t                   press_record   = test_record(test_keypos(4, 6), true);
+    keyrecord_t                   release_record = test_record(test_keypos(4, 6), false);
+    handled_key_resolution_t      key            = test_handled_key(KC_RIGHT_ALT);
+
+    test_reset_stubs();
+    test_set_default_slot_key_pos(press_record.event.key);
+    test_handled_key_set_fallback_tap(&key, ARROW_MODE_LOCK);
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_press(key_runtime_select_slot_for_press(press_record.event.key), KC_RIGHT_ALT, press_record.event.key, key, false, &plan));
+    CHECK(plan.count == 0);
+
+    fake_time = (uint16_t)(fake_time + 50);
+
+    key_runtime_transition_plan_init(&plan);
+    CHECK(key_runtime_transition_handled_key_release(KC_RIGHT_ALT, &release_record, key, &plan));
+
+    CHECK(plan.count == 1);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP);
+    CHECK(plan.items[0].data.pd_mode == PD_MODE_ARROW);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(test_call_count == 1);
+    CHECK(test_calls[0].kind == TEST_CALL_SYNC_SPLIT_RUNTIME);
+    CHECK(pd_locked_modes == PD_MODE_ARROW);
+    CHECK(!last_emit_policy.settle_pending_fallback_holds);
+    CHECK(!last_emit_policy.preserve_keyboard_mod_state);
 }
 
 static void test_non_modifier_single_tap_override_activates_fallback_hold_at_threshold(void) {
@@ -1913,6 +1954,7 @@ int main(void) {
     test_modifier_multi_tap_first_tap_is_buffered();
     test_single_tap_override_activates_fallback_hold_at_threshold();
     test_single_tap_override_long_release_does_not_dispatch_tap();
+    test_single_tap_pd_mode_lock_release_uses_native_pd_mode_lock_effect();
     test_non_modifier_single_tap_override_activates_fallback_hold_at_threshold();
     test_interrupt_other_press_queues_pending_fallback_hold();
     test_settle_pending_fallback_holds_activates_all_candidates();

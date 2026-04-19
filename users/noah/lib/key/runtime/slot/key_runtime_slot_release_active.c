@@ -11,6 +11,12 @@
 
 #include "../key_runtime_trace.h"
 #include "../../../action/action_lifecycle.h"
+#include "../../../pointing/defs/pd_modes.h"
+
+__attribute__((weak)) const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+    (void)action;
+    return NULL;
+}
 
 typedef struct {
     active_key_state_t                  released_key;
@@ -248,13 +254,32 @@ static void key_runtime_slot_release_apply_tap(key_runtime_slot_result_t *result
         case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP:
             key_runtime_slot_begin_pending_multi_tap(slot, keycode, key_pos, contract.tap.action, contract.tap.repeat_count, interaction.binding.tap_hold_term, interaction.binding.multi_tap_term, interaction.binding.has_more_taps);
             return;
-        case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
+        case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION: {
+            const pd_mode_def_t *def = pd_mode_lock_action_lookup(contract.tap.action);
+
+            if (def) {
+                key_runtime_slot_result_push_pd_mode_lock_tap(result, def->mode_flag);
+                return;
+            }
+
             key_runtime_slot_result_push_dispatch_action(result, key_pos, contract.tap.action);
             return;
+        }
         case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE:
         default:
             return;
     }
+}
+
+static void key_runtime_slot_release_push_action_or_pd_mode_lock_tap(key_runtime_slot_result_t *result, keypos_t key_pos, uint16_t action) {
+    const pd_mode_def_t *def = pd_mode_lock_action_lookup(action);
+
+    if (def) {
+        key_runtime_slot_result_push_pd_mode_lock_tap(result, def->mode_flag);
+        return;
+    }
+
+    key_runtime_slot_result_push_dispatch_action(result, key_pos, action);
 }
 
 key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_state_t *slot, uint16_t keycode) {
@@ -292,7 +317,7 @@ key_runtime_slot_result_t key_runtime_slot_reduce_active_release(active_key_stat
             key_runtime_slot_release_apply_tap(&result, slot, keycode, released_key.owner.key_pos, interaction, contract);
             return result;
         case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION:
-            key_runtime_slot_result_push_dispatch_action(&result, released_key.owner.key_pos, decision.action);
+            key_runtime_slot_release_push_action_or_pd_mode_lock_tap(&result, released_key.owner.key_pos, decision.action);
             return result;
         case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
             key_runtime_slot_result_push_pd_mode_lock_tap(&result, decision.pd_mode_lock_tap);

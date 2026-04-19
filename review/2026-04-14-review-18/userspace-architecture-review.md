@@ -71,6 +71,22 @@ This keeps the QMK-shaped `pre/process/post` hooks intact while giving the share
 
 I reran the follow-up audit after the two remediation-specific should-fix items were addressed. No new findings were introduced by that last cleanup. `users/noah/noah_runtime.h:8-12` now states the correct final-false contract, `tests/host/hook_chaining_test.c:224-250,499-518` covers both the `&&` narrowing shape and the pass-through false shape, `tests/host/key_runtime_integration_harness.c:31-39` now gives the weak default `post` path the same finalize-on-true behavior as production, and `tests/host/key_runtime_integration_harness_test.c:1-91` plus `tests/host/run_all_host_tests.sh:37-40` mechanically enforce that harness behavior in the full host suite. The original thread-level maintainability findings remain open, but the remediation-specific review gaps for this hook/harness fix are closed.
 
+Another narrow handled-key runtime adjustment landed later on `arrowmodefix2` without changing the broader architecture assessment:
+
+- `users/noah/lib/key/runtime/key_runtime_transition.c` now treats handled release-time tap actions that resolve to pd-mode lock actions as a special emit-policy case: they still dispatch through the shared action tap seam, but they no longer settle pending fallback holds first;
+- this keeps the earlier overlap remediation intact for ordinary handled tap actions while isolating the one right-alt arrow-lock tap path that was wedging hardware after the settle-all fallback-hold change;
+- `tests/host/key_runtime_transition_test.c` now mechanically covers that release-time emit-policy split, and `tests/host/pd_mode_key_runtime_integration_test.c` plus `run_pd_mode_key_runtime_integration_tests.sh` now exercise the real `KC_RIGHT_ALT -> ARROW_MODE_LOCK` tap path through `action_dispatch.c` instead of a test-local tap shim.
+
+This is still the same central-output-seam design, not a new bypass. The runtime continues to emit lock taps through `noah_emit_action_tap(...)`; the only change is that release-time pd-mode lock taps now opt out of fallback-hold settlement before the emit. Verification on this pass was `sh tests/host/run_key_runtime_transition_tests.sh`, `sh tests/host/run_action_dispatch_tests.sh`, `sh tests/host/run_key_runtime_preflight_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_key_runtime_release_matrix_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. The normal full-host baseline was not rerun cleanly on this pass because `sh tests/host/run_all_host_tests.sh` is currently stopped by pre-existing `docs/KEYMAP-OVERVIEW.md` introspection drift against the dirty `keymap.c` right-alt row.
+
+That emit-policy theory turned out not to be the real durable seam. The current tree now does the narrower thing instead:
+
+- `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c` maps authored release-time pd-mode lock taps straight onto the native `KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP` effect instead of representing them as a generic dispatched action;
+- this lines `KC_RIGHT_ALT` tap behavior up with the existing quick-tap lock path for real pd-mode keys, so release-time lock toggles no longer depend on the generic action emit wrapper at all;
+- the strengthened host harness now links `users/noah/lib/pointing/runtime/pd_runtime.c` and `users/noah/lib/pointing/policy/pointer_layer_policy.c`, so the right-alt integration test exercises the real `auto_mouse_layer_off() -> layer_off() -> noah_layer_state_set_user()` activation stack instead of a direct layer-bit clear stub.
+
+Inference from the current code and tests: the relevant distinction was not split sync and not the generic pd-mode core, but the fact that authored release taps to lock actions were taking a different runtime effect path than native pd-mode quick-lock releases. The current mapping removes that divergence while preserving the overlap-remediation behavior for ordinary tap actions.
+
 ## Follow-Up Audit
 
 Date: 2026-04-14  

@@ -26,11 +26,38 @@ enum {
     TEST_LAYER_BASE        = 0,
     TEST_LAYER_POINTER     = 1,
     TEST_LAYER_SYM         = 2,
+    TEST_LAYER_NAV         = 3,
 };
+
+#ifndef CHARYBDIS_AUTO_SNIPING_LAYER
+#    define CHARYBDIS_AUTO_SNIPING_LAYER TEST_LAYER_NAV
+#endif
+
+#ifndef DPI_MOD
+#    define DPI_MOD 0x7000u
+#endif
+#ifndef DPI_RMOD
+#    define DPI_RMOD 0x7001u
+#endif
+#ifndef S_D_MOD
+#    define S_D_MOD 0x7002u
+#endif
+#ifndef S_D_RMOD
+#    define S_D_RMOD 0x7003u
+#endif
 
 layer_state_t    layer_state = 0;
 static uint16_t  test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 const key_behavior_t key_behaviors[] = {
+    {
+        .keycode        = KC_RIGHT_ALT,
+        .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
+        .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
+        .tap_counts[0] =
+            {
+                .tap = TAP_SENDS(ARROW_MODE_LOCK),
+            },
+    },
     {
         .keycode        = TEST_PD_HOLD_KEY,
         .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
@@ -68,6 +95,8 @@ static uint16_t current_cpi;
 static uint16_t default_dpi;
 static uint8_t  split_sync_count;
 static uint8_t  reset_volume_count;
+static uint8_t  layer_state_set_count;
+static uint8_t  layer_off_count;
 static uint8_t  fake_mods;
 static uint8_t  fake_weak_mods;
 static uint8_t  fake_oneshot_mods;
@@ -75,6 +104,16 @@ static uint8_t  fake_oneshot_locked_mods;
 static uint8_t  fake_managed_mods;
 static uint8_t  fake_physical_mods;
 static uint8_t  delayed_action_count;
+static uint8_t  auto_mouse_layer_off_count;
+static uint8_t  auto_mouse_layer_target;
+static bool     auto_mouse_enabled;
+static bool     auto_mouse_toggled;
+static int8_t   auto_mouse_key_tracker;
+static uint8_t  auto_mouse_layer_off_active_slot_count;
+static bool     auto_mouse_layer_off_pending_fallback;
+static uint8_t  auto_mouse_layer_off_real_mods;
+static uint8_t  auto_mouse_layer_off_managed_mods;
+static uint8_t  auto_mouse_layer_off_physical_mods;
 static uint16_t last_delayed_action;
 static delayed_action_mods_t last_delayed_mods;
 
@@ -130,6 +169,8 @@ static void test_reset_state(void) {
     default_dpi             = 900;
     split_sync_count        = 0;
     reset_volume_count      = 0;
+    layer_state_set_count   = 0;
+    layer_off_count         = 0;
     layer_state             = test_layer_mask(TEST_LAYER_BASE);
     fake_mods                = 0;
     fake_weak_mods           = 0;
@@ -138,6 +179,16 @@ static void test_reset_state(void) {
     fake_managed_mods        = 0;
     fake_physical_mods       = 0;
     delayed_action_count     = 0;
+    auto_mouse_layer_off_count = 0;
+    auto_mouse_layer_target    = TEST_LAYER_POINTER;
+    auto_mouse_enabled         = true;
+    auto_mouse_toggled         = false;
+    auto_mouse_key_tracker     = 0;
+    auto_mouse_layer_off_active_slot_count = 0;
+    auto_mouse_layer_off_pending_fallback  = false;
+    auto_mouse_layer_off_real_mods         = 0;
+    auto_mouse_layer_off_managed_mods      = 0;
+    auto_mouse_layer_off_physical_mods     = 0;
     last_delayed_action      = KC_NO;
     last_delayed_mods        = (delayed_action_mods_t){0};
 }
@@ -170,6 +221,24 @@ uint32_t timer_elapsed32(uint32_t last) {
 
 bool is_keyboard_master(void) {
     return true;
+}
+
+bool layer_state_cmp(layer_state_t state, uint8_t layer) {
+    return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
+}
+
+static void test_apply_layer_state(layer_state_t next_state) {
+    layer_state_set_count++;
+    layer_state = noah_layer_state_set_user(next_state);
+}
+
+void layer_on(uint8_t layer) {
+    test_apply_layer_state(layer_state | ((layer_state_t)1u << layer));
+}
+
+void layer_off(uint8_t layer) {
+    layer_off_count++;
+    test_apply_layer_state(layer_state & (layer_state_t)~((layer_state_t)1u << layer));
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
@@ -255,31 +324,6 @@ void wait_ms(uint16_t ms) {
     (void)ms;
 }
 
-void action_dispatch(uint16_t action) {
-    const pd_mode_def_t *lock_mode = pd_mode_lock_action_lookup(action);
-    pd_mode_mask_t       mode      = pd_mode_for_keycode(action);
-
-    if (lock_mode) {
-        pd_mode_toggle_lock_state(lock_mode->mode_flag);
-        return;
-    }
-
-    if (mode != 0) {
-        pd_mode_handle_keycode_press(action);
-        pd_mode_handle_keycode_release(action);
-    }
-}
-
-void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
-    (void)policy;
-    action_dispatch(action);
-}
-
-void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
-    (void)action;
-    (void)pressed;
-}
-
 bool macro_dispatch(uint16_t action) {
     (void)action;
     return false;
@@ -330,6 +374,9 @@ void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyre
         case KC_LEFT_GUI:
             mask = MOD_BIT(KC_LEFT_GUI);
             break;
+        case KC_RIGHT_ALT:
+            mask = MOD_BIT(KC_RIGHT_ALT);
+            break;
         default:
             return;
     }
@@ -363,14 +410,28 @@ void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
 }
 
 void keyboard_mod_ownership_register(uint16_t keycode) {
-    if (keycode == KC_LEFT_GUI) {
-        keyboard_mod_ownership_register_mods(MOD_BIT(KC_LEFT_GUI));
+    switch (keycode) {
+        case KC_LEFT_GUI:
+            keyboard_mod_ownership_register_mods(MOD_BIT(KC_LEFT_GUI));
+            break;
+        case KC_RIGHT_ALT:
+            keyboard_mod_ownership_register_mods(MOD_BIT(KC_RIGHT_ALT));
+            break;
+        default:
+            break;
     }
 }
 
 void keyboard_mod_ownership_unregister(uint16_t keycode) {
-    if (keycode == KC_LEFT_GUI) {
-        keyboard_mod_ownership_unregister_mods(MOD_BIT(KC_LEFT_GUI));
+    switch (keycode) {
+        case KC_LEFT_GUI:
+            keyboard_mod_ownership_unregister_mods(MOD_BIT(KC_LEFT_GUI));
+            break;
+        case KC_RIGHT_ALT:
+            keyboard_mod_ownership_unregister_mods(MOD_BIT(KC_RIGHT_ALT));
+            break;
+        default:
+            break;
     }
 }
 
@@ -381,6 +442,11 @@ uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     (void)key_pos;
     (void)layer;
+}
+
+bool layer_ownership_is_locked(uint8_t layer) {
+    (void)layer;
+    return false;
 }
 
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
@@ -437,6 +503,57 @@ void key_feedback_pulse_arm(bool long_hold_level) {
 
 void split_runtime_sync(void) {
     split_sync_count++;
+}
+
+bool get_auto_mouse_toggle(void) {
+    return auto_mouse_toggled;
+}
+
+int8_t get_auto_mouse_key_tracker(void) {
+    return auto_mouse_key_tracker;
+}
+
+uint8_t get_auto_mouse_layer(void) {
+    return auto_mouse_layer_target;
+}
+
+uint16_t auto_mouse_get_time_elapsed(void) {
+    return 0;
+}
+
+bool is_auto_mouse_active(void) {
+    return false;
+}
+
+void set_auto_mouse_enable(bool enable) {
+    auto_mouse_enabled = enable;
+}
+
+void set_auto_mouse_layer(uint8_t layer) {
+    auto_mouse_layer_target = layer;
+}
+
+void auto_mouse_layer_off(void) {
+    keypos_t pending_fallback_pos;
+
+    auto_mouse_layer_off_count++;
+    auto_mouse_layer_off_active_slot_count = noah_runtime_debug_active_slot_count();
+    auto_mouse_layer_off_pending_fallback  = noah_runtime_debug_pending_fallback_slot_key_pos(&pending_fallback_pos);
+    auto_mouse_layer_off_real_mods         = fake_mods;
+    auto_mouse_layer_off_managed_mods      = fake_managed_mods;
+    auto_mouse_layer_off_physical_mods     = fake_physical_mods;
+
+    if (layer_state_cmp(layer_state, auto_mouse_layer_target) && auto_mouse_enabled && !auto_mouse_toggled && auto_mouse_key_tracker == 0) {
+        layer_off(auto_mouse_layer_target);
+    }
+}
+
+void auto_mouse_toggle(void) {
+    auto_mouse_toggled = !auto_mouse_toggled;
+}
+
+void auto_mouse_keyevent(bool pressed) {
+    auto_mouse_key_tracker += pressed ? 1 : -1;
 }
 
 bool charybdis_get_pointer_dragscroll_enabled(void) {
@@ -604,6 +721,48 @@ static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
     CHECK(current_cpi == default_dpi);
 }
 
+static void test_right_alt_single_tap_locks_arrow_mode_without_leaking_ralt_state(void) {
+    keypos_t right_alt_pos = test_keypos(3, 5);
+
+    test_reset_state();
+
+    CHECK(key_behavior_lookup(KC_RIGHT_ALT).config != NULL);
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(fake_mods == 0);
+    CHECK(fake_managed_mods == 0);
+    CHECK(fake_physical_mods == 0);
+    layer_state |= test_layer_mask(TEST_LAYER_POINTER);
+
+    CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, right_alt_pos, true));
+    CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_RIGHT_ALT);
+    CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == ARROW_MODE_LOCK);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(right_alt_pos) == KC_NO);
+
+    CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, right_alt_pos, false));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+    CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(right_alt_pos) == KC_NO);
+    CHECK(fake_managed_mods == 0);
+    CHECK(fake_physical_mods == 0);
+    CHECK((fake_mods & MOD_BIT(KC_RIGHT_ALT)) == 0);
+    CHECK((get_mods() & MOD_BIT(KC_RIGHT_ALT)) == 0);
+    CHECK(auto_mouse_layer_off_count == 1);
+    CHECK(auto_mouse_layer_off_active_slot_count == 0);
+    CHECK(!auto_mouse_layer_off_pending_fallback);
+    CHECK((auto_mouse_layer_off_real_mods & MOD_BIT(KC_RIGHT_ALT)) == 0);
+    CHECK((auto_mouse_layer_off_managed_mods & MOD_BIT(KC_RIGHT_ALT)) == 0);
+    CHECK((auto_mouse_layer_off_physical_mods & MOD_BIT(KC_RIGHT_ALT)) == 0);
+    CHECK(layer_off_count == 1);
+    CHECK(layer_state_set_count == 1);
+    CHECK((layer_state & test_layer_mask(TEST_LAYER_POINTER)) == 0);
+    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
+
+    CHECK(key_runtime_integration_process_record(KC_C, test_keypos(0, 0), true));
+    CHECK(key_runtime_integration_process_record(KC_C, test_keypos(0, 0), false));
+}
+
 static void test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay(void) {
     keypos_t                             key_pos         = test_keypos(2, 4);
     const key_runtime_integration_step_t press_steps[]   = {
@@ -741,6 +900,7 @@ int main(void) {
     test_authored_hold_action_activates_pd_mode_while_held();
     test_authored_double_tap_lock_locks_pd_mode();
     test_authored_second_press_hold_branches_into_other_pd_mode();
+    test_right_alt_single_tap_locks_arrow_mode_without_leaking_ralt_state();
     test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay();
     test_pinch_single_tap_preserves_physically_held_gui_on_delayed_replay();
     test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processing();

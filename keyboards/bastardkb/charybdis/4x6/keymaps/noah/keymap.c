@@ -61,22 +61,22 @@ enum keymap_custom_keycodes {
 //   - {250} wait 250 ms before the next macro step
 //     e.g. {KC_A}{250}{KC_B} pauses between A and B; other keys pressed
 //     during the delay are queued
-#define VIA_MACROS(MACRO) \
-    MACRO(VIA_MACRO_0, "{KC_LGUI,KC_SPC}") \
-    MACRO(VIA_MACRO_1, "{KC_LALT,KC_SPC}") \
-    MACRO(VIA_MACRO_2, "{KC_LALT,KC_LGUI,KC_SPC}") \
+#define VIA_MACROS(MACRO)                                \
+    MACRO(VIA_MACRO_0, "{KC_LGUI,KC_SPC}")               \
+    MACRO(VIA_MACRO_1, "{KC_LALT,KC_SPC}")               \
+    MACRO(VIA_MACRO_2, "{KC_LALT,KC_LGUI,KC_SPC}")       \
     MACRO(VIA_MACRO_3, "{KC_LCTL,KC_LALT,KC_LGUI,KC_C}") \
     MACRO(VIA_MACRO_4, "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}") \
-    MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}") \
-    MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}") \
+    MACRO(VIA_MACRO_5, "{KC_LCTL,KC_LGUI,KC_SPC}")       \
+    MACRO(VIA_MACRO_6, "{KC_LALT,KC_LGUI,KC_8}")         \
     MACRO(VIA_MACRO_7, "{KC_LCTL,KC_LALT,KC_LGUI,KC_V}") \
-    MACRO(VIA_MACRO_8, "{KC_LSFT,KC_LGUI,KC_V}") \
-    MACRO(VIA_MACRO_9, "{KC_LSFT,KC_LGUI,KC_P}") \
-    MACRO(VIA_MACRO_10, "") \
-    MACRO(VIA_MACRO_11, "") \
-    MACRO(VIA_MACRO_12, "") \
-    MACRO(VIA_MACRO_13, "") \
-    MACRO(VIA_MACRO_14, "") \
+    MACRO(VIA_MACRO_8, "{KC_LSFT,KC_LGUI,KC_V}")         \
+    MACRO(VIA_MACRO_9, "{KC_LSFT,KC_LGUI,KC_P}")         \
+    MACRO(VIA_MACRO_10, "")                              \
+    MACRO(VIA_MACRO_11, "")                              \
+    MACRO(VIA_MACRO_12, "")                              \
+    MACRO(VIA_MACRO_13, "")                              \
+    MACRO(VIA_MACRO_14, "")                              \
     MACRO(VIA_MACRO_15, "")
 
 // ─── Hardcoded Macros ───────────────────────────────────────────────────────
@@ -318,7 +318,7 @@ const key_behavior_t
             // ─── Editing / System Keys ───────────────────────────────────────────────────────
             {.keycode = KC_ESC, .tap_counts = {[0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))}, [1] = {.tap = TAP_SENDS(S(KC_GRV))}}},
             {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
-            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(LOCK_PD_MODE(ARROW_MODE))}}},
+            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(ARROW_MODE_LOCK)}}},
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
             {.keycode = KC_LEFT_GUI, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}}},
 
