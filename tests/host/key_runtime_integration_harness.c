@@ -7,6 +7,10 @@
 
 __attribute__((weak)) layer_state_t layer_state;
 
+__attribute__((weak)) uint16_t timer_read(void) {
+    return 0u;
+}
+
 __attribute__((weak)) bool layer_state_cmp(layer_state_t state, uint8_t layer) {
     return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
 }
@@ -55,6 +59,11 @@ __attribute__((weak)) bool key_runtime_integration_pre_userspace_record(uint16_t
     return true;
 }
 
+__attribute__((weak)) void key_runtime_integration_shadow_runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time) {
+    (void)event;
+    (void)event_time;
+}
+
 static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed) {
     return (keyrecord_t){
         .event =
@@ -75,12 +84,11 @@ void key_runtime_integration_advance(uint16_t *time, uint16_t advance_ms) {
     };
 
     runtime_v2_trace_record_input_event(&event);
+    key_runtime_integration_shadow_runtime_v2_apply_event(&event, time ? *time : timer_read());
 
-    if (!time) {
-        return;
+    if (time) {
+        *time = (uint16_t)(*time + advance_ms);
     }
-
-    *time = (uint16_t)(*time + advance_ms);
 }
 
 void key_runtime_integration_scan(void) {
@@ -89,6 +97,7 @@ void key_runtime_integration_scan(void) {
     };
 
     runtime_v2_trace_record_input_event(&event);
+    key_runtime_integration_shadow_runtime_v2_apply_event(&event, timer_read());
     noah_key_runtime_scan();
     runtime_v2_trace_capture_projection();
 }
@@ -106,6 +115,7 @@ bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, 
     };
 
     runtime_v2_trace_record_input_event(&event);
+    key_runtime_integration_shadow_runtime_v2_apply_event(&event, timer_read());
 
     if (!key_runtime_integration_pre_userspace_record(keycode, &record)) {
         runtime_v2_trace_capture_projection();
@@ -147,11 +157,13 @@ bool key_runtime_integration_apply_runtime_v2_event(uint16_t *time, const runtim
             return true;
         case RUNTIME_EVENT_KIND_POINTER_REPORT:
             runtime_v2_trace_record_input_event(event);
+            key_runtime_integration_shadow_runtime_v2_apply_event(event, time ? *time : timer_read());
             (void)noah_pointing_device_task_user(event->data.pointer_report.report);
             runtime_v2_trace_capture_projection();
             return true;
         case RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT:
             runtime_v2_trace_record_input_event(event);
+            key_runtime_integration_shadow_runtime_v2_apply_event(event, time ? *time : timer_read());
             pd_mode_apply_remote_snapshot(event->data.remote_snapshot.active_mode, event->data.remote_snapshot.locked_mode);
             runtime_v2_trace_capture_projection();
             return true;

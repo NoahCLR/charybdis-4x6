@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Identity Shadow Pass
+
+- Advanced the single-authority runtime redesign beyond pure scaffolding and into a real shadow reducer for the first migration domain: press/release identity and tap-series lifetime.
+- Kept production behavior on the legacy runtime, but taught the host integration harness to feed normalized events into runtime-v2 through an explicit opt-in adapter instead of assuming every harness consumer must link the new reducer immediately.
+- Added direct reducer invariants in `tests/host/runtime_debug_test.c` for:
+  - release-by-position surviving release-keycode mismatch,
+  - timer/scan hold promotion preserving immutable press identity, and
+  - tap-series state remaining separate from active press-token storage.
+- Tightened the new reducer in `users/noah/lib/runtime_v2/runtime_v2.c` so a same-key pending-hold tap series cannot expire just because tap-term time elapsed while its owning second press is still physically active. That was a real shadow-runtime bug and exactly the kind of cross-state corruption the redesign is meant to eliminate.
+- Extended the runtime-debug host support manifest so the new reducer, v2 trace helpers, and pointer-layer policy debug surface are linked together coherently in white-box test builds.
+- Wired the real-profile shadow replay suite onto the reducer-backed harness path with `tests/host/key_runtime_integration_runtime_v2_adapter.c`, so the existing nav/dragscroll and GUI-alt/nav overlap parity scenarios now replay against live press-token/tap-series state instead of trace encoding alone.
+- This pass still does not cut over production hooks. It does move the active review from "trace substrate only" to "shadow reducer with mechanical invariants," which is the first real step toward deleting release-time reinterpretation from the architecture.
+
 ## 2026-04-19 Single-Authority Runtime V2 Foundation
 
 - Landed the first implementation pass of the single-authority runtime redesign without cutting over production behavior yet.
@@ -159,6 +172,16 @@
 - `closure verdict`: keep this thread open until the hardware regression is closed on-device, and until the remaining `should-fix` items are either resolved or explicitly downgraded out of the closure bar.
 
 ## Verification
+
+- Passed during the runtime-v2 identity shadow pass:
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - `git diff --check`
 
 - Passed during the runtime-v2 foundation landing:
   - `sh tests/host/run_key_runtime_integration_harness_tests.sh`
@@ -343,6 +366,6 @@
 ## Next Steps
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
-2. Migrate press/release identity into real immutable `press_token_t` ownership instead of legacy slot reinterpretation.
-3. Move tap-series state out of `active_key_state_t` and into the new `tap_series_t` store.
-4. Replace imperative layer/modifier/pd cleanup branches with lease-backed projection recompute before any production hook cutover.
+2. Expand the shadow reducer from identity/tap-series timing into real lease-backed layer and modifier ownership so production cleanup can eventually stop depending on legacy slot release reinterpretation.
+3. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
+4. Replace imperative pd-mode and pointer-layer cleanup branches with reducer-owned leases and projection recompute before any production hook cutover.

@@ -28,6 +28,250 @@ static uint8_t runtime_v2_refcount_mask(const uint8_t *refcounts, uint8_t count)
     return mask;
 }
 
+static bool runtime_v2_keypos_valid(keypos_t key_pos) {
+    return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
+}
+
+static uint16_t runtime_v2_keypos_index(keypos_t key_pos) {
+    return (uint16_t)((uint16_t)key_pos.row * MATRIX_COLS + key_pos.col);
+}
+
+static uint16_t runtime_v2_default_hold_term(uint16_t keycode) {
+    return IS_QK_LAYER_TAP(keycode) ? TAPPING_TERM : CUSTOM_TAP_HOLD_TERM;
+}
+
+static uint16_t runtime_v2_default_multi_tap_term(void) {
+    return CUSTOM_MULTI_TAP_TERM;
+}
+
+static press_token_t *runtime_v2_press_token_state(runtime_v2_state_t *state, keypos_t key_pos) {
+    if (!(state && runtime_v2_keypos_valid(key_pos))) {
+        return NULL;
+    }
+
+    return &state->press_tokens[runtime_v2_keypos_index(key_pos)];
+}
+
+static tap_series_t *runtime_v2_tap_series_state(runtime_v2_state_t *state, keypos_t key_pos) {
+    if (!(state && runtime_v2_keypos_valid(key_pos))) {
+        return NULL;
+    }
+
+    return &state->tap_series[runtime_v2_keypos_index(key_pos)];
+}
+
+static uint16_t runtime_v2_elapsed(uint16_t start, uint16_t end) {
+    return (uint16_t)(end - start);
+}
+
+static void runtime_v2_press_token_refresh_phase(press_token_t *token, uint16_t now) {
+    if (!(token && token->active)) {
+        return;
+    }
+
+    if (token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING || token->phase == PRESS_TOKEN_PHASE_RELEASED || token->phase == PRESS_TOKEN_PHASE_CANCELLED) {
+        return;
+    }
+
+    if (runtime_v2_elapsed(token->pressed_at, now) >= token->hold_term_ms) {
+        token->phase = PRESS_TOKEN_PHASE_HELD;
+        return;
+    }
+
+    if (token->phase == PRESS_TOKEN_PHASE_PRESSED) {
+        token->phase = PRESS_TOKEN_PHASE_HOLD_PENDING;
+    }
+}
+
+static void runtime_v2_tap_series_release_if_expired(tap_series_t *series, uint16_t now, runtime_v2_state_t *state) {
+    if (!(series && state && series->active)) {
+        return;
+    }
+
+    if (series->pending_hold) {
+        return;
+    }
+
+    if (runtime_v2_elapsed(series->last_tap_at, now) <= series->tap_term_ms) {
+        return;
+    }
+
+    *series = (tap_series_t){0};
+    if (state->tap_series_count != 0u) {
+        state->tap_series_count--;
+    }
+}
+
+static void runtime_v2_refresh_for_time(runtime_v2_state_t *state, uint16_t now) {
+    if (!state) {
+        return;
+    }
+
+    state->current_time = now;
+
+    for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+        runtime_v2_press_token_refresh_phase(&state->press_tokens[index], now);
+        runtime_v2_tap_series_release_if_expired(&state->tap_series[index], now, state);
+    }
+}
+
+static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtime_key_event_t *event, uint16_t now) {
+    press_token_t *token;
+    tap_series_t  *series;
+    uint16_t       hold_term_ms;
+
+    if (!(state && event)) {
+        return;
+    }
+
+    token = runtime_v2_press_token_state(state, event->key_pos);
+    series = runtime_v2_tap_series_state(state, event->key_pos);
+    if (!token) {
+        return;
+    }
+
+    if (token->active) {
+        state->cancelled_press_count++;
+    } else {
+        state->press_token_count++;
+    }
+
+    hold_term_ms = runtime_v2_default_hold_term(event->keycode);
+    *token = (press_token_t){
+        .active             = true,
+        .token_id           = state->next_token_id++,
+        .key_pos            = event->key_pos,
+        .physical_keycode   = event->keycode,
+        .resolved_keycode   = event->keycode,
+        .observed_release_keycode = KC_NO,
+        .pressed_at         = now,
+        .hold_term_ms       = hold_term_ms,
+        .phase              = PRESS_TOKEN_PHASE_PRESSED,
+    };
+
+    if (series && series->active && series->keycode == event->keycode && runtime_v2_elapsed(series->last_tap_at, now) <= series->tap_term_ms) {
+        series->pending_hold = true;
+    }
+}
+
+static void runtime_v2_tap_series_note_tap(runtime_v2_state_t *state, const press_token_t *token, uint16_t now) {
+    tap_series_t *series;
+    bool          reuse_existing;
+
+    if (!(state && token && token->active)) {
+        return;
+    }
+
+    series = runtime_v2_tap_series_state(state, token->key_pos);
+    if (!series) {
+        return;
+    }
+
+    reuse_existing = series->active && series->keycode == token->resolved_keycode && runtime_v2_elapsed(series->last_tap_at, now) <= series->tap_term_ms;
+
+    if (!series->active) {
+        state->tap_series_count++;
+    }
+
+    *series = (tap_series_t){
+        .active       = true,
+        .key_pos      = token->key_pos,
+        .keycode      = token->resolved_keycode,
+        .tap_count    = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u),
+        .pending_hold = false,
+        .last_action  = token->resolved_keycode,
+        .last_tap_at  = now,
+        .tap_term_ms  = runtime_v2_default_multi_tap_term(),
+    };
+}
+
+static void runtime_v2_tap_series_note_hold_release(runtime_v2_state_t *state, const press_token_t *token) {
+    tap_series_t *series;
+
+    if (!(state && token)) {
+        return;
+    }
+
+    series = runtime_v2_tap_series_state(state, token->key_pos);
+    if (!(series && series->active && series->pending_hold && series->keycode == token->resolved_keycode)) {
+        return;
+    }
+
+    series->pending_hold = false;
+}
+
+static void runtime_v2_press_token_end(runtime_v2_state_t *state, const runtime_key_event_t *event, uint16_t now) {
+    press_token_t released_token;
+    press_token_t *token;
+
+    if (!(state && event)) {
+        return;
+    }
+
+    token = runtime_v2_press_token_state(state, event->key_pos);
+    if (!(token && token->active)) {
+        state->orphan_release_count++;
+        return;
+    }
+
+    runtime_v2_press_token_refresh_phase(token, now);
+    token->observed_release_keycode = event->keycode;
+    token->released_at              = now;
+    if (event->keycode != token->resolved_keycode) {
+        token->release_keycode_mismatched = true;
+        state->release_keycode_mismatch_count++;
+    }
+
+    released_token = *token;
+    if (runtime_v2_elapsed(token->pressed_at, now) < token->hold_term_ms) {
+        runtime_v2_tap_series_note_tap(state, token, now);
+    } else {
+        runtime_v2_tap_series_note_hold_release(state, token);
+    }
+
+    *token = released_token;
+    token->active = false;
+    token->phase  = PRESS_TOKEN_PHASE_RELEASED;
+    if (state->press_token_count != 0u) {
+        state->press_token_count--;
+    }
+}
+
+void runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    if (!(state && event)) {
+        return;
+    }
+
+    switch (event->kind) {
+        case RUNTIME_EVENT_KIND_KEY_DOWN:
+            runtime_v2_refresh_for_time(state, event_time);
+            runtime_v2_press_token_begin(state, &event->data.key_event, event_time);
+            return;
+        case RUNTIME_EVENT_KIND_KEY_UP:
+            runtime_v2_refresh_for_time(state, event_time);
+            runtime_v2_press_token_end(state, &event->data.key_event, event_time);
+            return;
+        case RUNTIME_EVENT_KIND_TIMER_ADVANCE:
+            runtime_v2_refresh_for_time(state, (uint16_t)(event_time + event->data.timer_advance.advance_ms));
+            return;
+        case RUNTIME_EVENT_KIND_SCAN:
+        case RUNTIME_EVENT_KIND_POINTER_REPORT:
+        case RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT:
+            runtime_v2_refresh_for_time(state, event_time);
+            return;
+    }
+}
+
+const press_token_t *runtime_v2_press_token_at(keypos_t key_pos) {
+    return runtime_v2_press_token_state(runtime_v2_state(), key_pos);
+}
+
+const tap_series_t *runtime_v2_tap_series_at(keypos_t key_pos) {
+    return runtime_v2_tap_series_state(runtime_v2_state(), key_pos);
+}
+
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
     projection_snapshot_t                  snapshot = {0};
     layer_ownership_debug_snapshot_t       layer_snapshot;
@@ -68,6 +312,9 @@ projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
         snapshot.v2_tap_series_count      = state->tap_series_count;
         snapshot.v2_lease_count           = state->lease_count;
         snapshot.v2_persistent_intent_count = state->persistent_intent_count;
+        snapshot.v2_release_keycode_mismatch_count = state->release_keycode_mismatch_count;
+        snapshot.v2_orphan_release_count = state->orphan_release_count;
+        snapshot.v2_cancelled_press_count = state->cancelled_press_count;
         state->last_projection            = snapshot;
     }
 
@@ -104,7 +351,10 @@ bool runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, cons
            lhs->v2_press_token_count == rhs->v2_press_token_count &&
            lhs->v2_tap_series_count == rhs->v2_tap_series_count &&
            lhs->v2_lease_count == rhs->v2_lease_count &&
-           lhs->v2_persistent_intent_count == rhs->v2_persistent_intent_count;
+           lhs->v2_persistent_intent_count == rhs->v2_persistent_intent_count &&
+           lhs->v2_release_keycode_mismatch_count == rhs->v2_release_keycode_mismatch_count &&
+           lhs->v2_orphan_release_count == rhs->v2_orphan_release_count &&
+           lhs->v2_cancelled_press_count == rhs->v2_cancelled_press_count;
 }
 
 #if defined(NOAH_RUNTIME_TRACE_ENABLE)

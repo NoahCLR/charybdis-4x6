@@ -98,10 +98,13 @@ noah_host_runtime_debug_support_paths() {
 lib/key/ownership/held_action.c
 lib/key/ownership/held_repeat.c
 lib/key/runtime/key_runtime_feedback.c
+lib/runtime_v2/runtime_v2.c
+lib/runtime_v2/runtime_v2_trace.c
 lib/state/ownership/keyboard_mod_ownership.c
 lib/state/ownership/layer_ownership.c
 lib/state/runtime/runtime_trace.c'
     pointing_additions='
+lib/pointing/policy/pointer_layer_policy.c
 lib/pointing/runtime/pd_mode_snapshot.c
 lib/pointing/runtime/pd_mode_state.c'
     base_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$base_sources")"

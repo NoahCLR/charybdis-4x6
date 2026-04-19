@@ -283,3 +283,14 @@ The first implementation pass of the single-authority runtime redesign is now la
 This foundation changes the architecture direction in one important way: the review thread now has an explicit migration path away from "release re-derives meaning from the live world" toward "press resolves once, leases own state, projection recomputes from owned records." That is the right direction for the wedge class.
 
 It does **not** yet resolve the earlier open finding about `users/noah/lib/key/runtime/key_runtime_internal.h` being too broad, because the live production behavior still runs through the legacy runtime. The v2 subtree reduces the need to widen that seam again, but the closure bar for that finding stays open until production behavior migrates off it and the old seam can be narrowed or deleted.
+
+## 2026-04-19 Runtime V2 Identity Shadow Note
+
+The next runtime-v2 pass is now landed as shadow behavior, still without production cutover:
+
+- `users/noah/lib/runtime_v2/runtime_v2.c` now owns a real shadow reducer for immutable press identity, release-by-position, basic hold promotion timing, and tap-series lifetime instead of acting as a projection-only container.
+- `tests/host/key_runtime_integration_harness.c` can now feed normalized events into runtime-v2 through an explicit adapter seam, and `tests/host/key_runtime_integration_runtime_v2_adapter.c` enables that path only in suites that are intentionally exercising the shadow reducer.
+- `tests/host/runtime_debug_test.c` now locks the first reducer invariants directly: release-keycode mismatch must still retire the press bound to the physical key position, timer/scan advancement must not rewrite press identity, and tap-series state must remain independent from active press-token storage.
+- That new white-box coverage immediately found one real shadow-runtime bug: pending-hold tap series were expiring on elapsed tap time even while the matching second press was still active. `users/noah/lib/runtime_v2/runtime_v2.c` now keeps a pending-hold series alive until the owning press resolves, which is exactly the kind of state isolation the redesign needs.
+
+Inference from the current tree: the right migration shape is still the reducer/lease model, but the validation strategy also matters. The shadow runtime is now strong enough to catch architectural leaks inside the replacement core before any production cutover. That is progress, but it still does **not** close the authored-key wedge or the broader internal-seam finding yet.

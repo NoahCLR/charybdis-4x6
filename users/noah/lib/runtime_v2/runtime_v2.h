@@ -76,19 +76,25 @@ typedef struct {
     keypos_t            key_pos;
     uint16_t            physical_keycode;
     uint16_t            resolved_keycode;
+    uint16_t            observed_release_keycode;
     uint16_t            pressed_at;
+    uint16_t            released_at;
     uint16_t            hold_term_ms;
     press_token_phase_t phase;
     bool                resolved_from_transparent;
     bool                pending_release_emission;
+    bool                release_keycode_mismatched;
 } press_token_t;
 
 typedef struct {
     bool     active;
     keypos_t key_pos;
+    uint16_t keycode;
     uint8_t  tap_count;
     bool     pending_hold;
     uint16_t last_action;
+    uint16_t last_tap_at;
+    uint16_t tap_term_ms;
 } tap_series_t;
 
 typedef enum {
@@ -162,6 +168,9 @@ typedef struct {
     uint8_t              v2_tap_series_count;
     uint8_t              v2_lease_count;
     uint8_t              v2_persistent_intent_count;
+    uint8_t              v2_release_keycode_mismatch_count;
+    uint8_t              v2_orphan_release_count;
+    uint8_t              v2_cancelled_press_count;
 } projection_snapshot_t;
 
 typedef struct {
@@ -170,14 +179,21 @@ typedef struct {
     lease_t             leases[RUNTIME_V2_LEASE_CAPACITY];
     persistent_intent_t persistent_intents[RUNTIME_V2_PERSISTENT_INTENT_CAPACITY];
     projection_snapshot_t last_projection;
+    uint16_t            current_time;
     uint16_t            next_token_id;
     uint8_t             press_token_count;
     uint8_t             tap_series_count;
     uint8_t             lease_count;
     uint8_t             persistent_intent_count;
+    uint8_t             release_keycode_mismatch_count;
+    uint8_t             orphan_release_count;
+    uint8_t             cancelled_press_count;
 } runtime_v2_state_t;
 
 runtime_v2_state_t  *runtime_v2_state(void);
+void                 runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time);
+const press_token_t *runtime_v2_press_token_at(keypos_t key_pos);
+const tap_series_t  *runtime_v2_tap_series_at(keypos_t key_pos);
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void);
 bool                 runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, const projection_snapshot_t *rhs);
 
