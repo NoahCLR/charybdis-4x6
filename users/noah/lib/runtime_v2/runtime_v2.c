@@ -1577,6 +1577,64 @@ uint8_t runtime_v2_pending_release_count(void) {
     return state ? state->pending_release_count : 0u;
 }
 
+bool runtime_v2_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *action, uint8_t *repeat_count) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    tap_series_t       *series;
+
+    if (action) {
+        *action = KC_NO;
+    }
+    if (repeat_count) {
+        *repeat_count = 0u;
+    }
+
+    if (!(state && runtime_v2_blocker_queries_authoritative() && runtime_v2_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    series = runtime_v2_tap_series_state(state, key_pos);
+    if (!runtime_v2_pending_multi_tap_flush_resolution(series, action, repeat_count)) {
+        return false;
+    }
+
+    runtime_v2_tap_series_clear(state, series);
+    return true;
+}
+
+bool runtime_v2_reset_pending_multi_tap(keypos_t key_pos) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    tap_series_t       *series;
+
+    if (!(state && runtime_v2_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    series = runtime_v2_tap_series_state(state, key_pos);
+    if (!(series && series->active)) {
+        return false;
+    }
+
+    runtime_v2_tap_series_clear(state, series);
+    return true;
+}
+
+bool runtime_v2_retire_press_token(keypos_t key_pos) {
+    runtime_v2_state_t *state = runtime_v2_state();
+    press_token_t      *token;
+
+    if (!(state && runtime_v2_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    token = runtime_v2_press_token_state(state, key_pos);
+    if (!(token && token->active)) {
+        return false;
+    }
+
+    runtime_v2_press_token_cancel(state, token, state->current_time);
+    return true;
+}
+
 uint8_t runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity) {
     runtime_v2_state_t *state = runtime_v2_state();
     uint8_t             count = 0;

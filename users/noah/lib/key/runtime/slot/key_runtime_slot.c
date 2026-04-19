@@ -13,6 +13,27 @@
 
 #include <stddef.h>
 
+__attribute__((weak)) bool runtime_v2_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *action, uint8_t *repeat_count) {
+    (void)key_pos;
+    if (action) {
+        *action = KC_NO;
+    }
+    if (repeat_count) {
+        *repeat_count = 0u;
+    }
+    return false;
+}
+
+__attribute__((weak)) bool runtime_v2_reset_pending_multi_tap(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+__attribute__((weak)) bool runtime_v2_retire_press_token(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
 bool key_runtime_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
 }
@@ -332,6 +353,8 @@ uint16_t key_runtime_slot_resolve_pending_multi_tap_hold(active_key_state_t *slo
 key_runtime_slot_pending_multi_tap_flush_t key_runtime_slot_take_pending_multi_tap_flush(active_key_state_t *slot) {
     key_runtime_slot_pending_multi_tap_flush_t flush = {0};
     multi_tap_t                               *mt    = key_runtime_multi_tap_for_slot(slot);
+    uint16_t                                   action = KC_NO;
+    uint8_t                                    repeat_count = 0u;
 
     if (!key_runtime_slot_has_pending_multi_tap(slot) || !mt) {
         return flush;
@@ -340,8 +363,13 @@ key_runtime_slot_pending_multi_tap_flush_t key_runtime_slot_take_pending_multi_t
     flush.handled = true;
     flush.mods    = delayed_action_mods_from_multi_tap(mt);
 
-    flush.action       = mt->tap_repeat_count > 0 ? mt->tap_action : mt->single_action;
-    flush.repeat_count = mt->tap_repeat_count > 0 ? mt->tap_repeat_count : mt->count;
+    if (runtime_v2_take_pending_multi_tap_flush(mt->key_pos, &action, &repeat_count)) {
+        flush.action       = action;
+        flush.repeat_count = repeat_count;
+    } else {
+        flush.action       = mt->tap_repeat_count > 0 ? mt->tap_action : mt->single_action;
+        flush.repeat_count = mt->tap_repeat_count > 0 ? mt->tap_repeat_count : mt->count;
+    }
     key_runtime_slot_reset_pending_multi_tap(slot);
     return flush;
 }
@@ -349,6 +377,10 @@ key_runtime_slot_pending_multi_tap_flush_t key_runtime_slot_take_pending_multi_t
 void key_runtime_slot_reset_pending_multi_tap(active_key_state_t *slot) {
     if (!slot) {
         return;
+    }
+
+    if (multi_tap_active(&slot->pending_multi_tap)) {
+        runtime_v2_reset_pending_multi_tap(slot->pending_multi_tap.key_pos);
     }
 
     multi_tap_reset(&slot->pending_multi_tap);
@@ -374,8 +406,21 @@ void key_runtime_slot_set_repeat_binding_active(active_key_state_t *slot, bool a
 }
 
 void key_runtime_slot_reset(active_key_state_t *slot) {
+    keypos_t owner_key_pos;
+    keypos_t pending_key_pos;
+
     if (!slot) {
         return;
+    }
+
+    owner_key_pos   = slot->owner.key_pos;
+    pending_key_pos = slot->pending_multi_tap.key_pos;
+
+    if (slot->owner.keycode != KC_NO) {
+        runtime_v2_retire_press_token(owner_key_pos);
+    }
+    if (multi_tap_active(&slot->pending_multi_tap)) {
+        runtime_v2_reset_pending_multi_tap(pending_key_pos);
     }
 
     *slot = (active_key_state_t)ACTIVE_KEY_STATE_INIT;

@@ -52,6 +52,27 @@ uint8_t runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8
     return 0u;
 }
 
+bool runtime_v2_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *action, uint8_t *repeat_count) {
+    (void)key_pos;
+    if (action) {
+        *action = KC_NO;
+    }
+    if (repeat_count) {
+        *repeat_count = 0u;
+    }
+    return false;
+}
+
+bool runtime_v2_reset_pending_multi_tap(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+bool runtime_v2_retire_press_token(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
 void runtime_v2_observe_held_action_register(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;

@@ -903,6 +903,60 @@ static void test_runtime_v2_pending_multi_tap_scan_resolution_flushes_expired_ch
     CHECK(!series->active);
 }
 
+static void test_runtime_v2_transition_flush_foreign_multi_tap_clears_shadow_series(void) {
+    key_runtime_transition_plan_t plan;
+    const tap_series_t           *series;
+    keypos_t                      pending_key = test_keypos(5, 3);
+    keypos_t                      other_key   = test_keypos(5, 4);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_stage_pending_multi_tap(pending_key);
+    series = runtime_v2_tap_series_at(pending_key);
+    CHECK(series != NULL);
+    CHECK(series->active);
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_flush_foreign_multi_tap(TEST_RELEASE_PRIMARY_KEY, other_key, &plan);
+
+    CHECK(plan.count == 1u);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
+    CHECK(plan.items[0].data.delayed_action.repeat_count == 1u);
+
+    series = runtime_v2_tap_series_at(pending_key);
+    CHECK(series != NULL);
+    CHECK(!series->active);
+}
+
+static void test_runtime_v2_transition_flush_active_keys_retires_shadow_token(void) {
+    key_runtime_transition_plan_t plan;
+    const press_token_t          *token;
+    projection_snapshot_t         snapshot;
+    keypos_t                      active_key = test_keypos(5, 5);
+    keypos_t                      survivor   = test_keypos(5, 6);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(TEST_RELEASE_PRIMARY_KEY, active_key, true));
+    token = runtime_v2_press_token_at(active_key);
+    CHECK(token != NULL);
+    CHECK(token->active);
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_flush_active_keys_except(survivor, &plan);
+
+    token = runtime_v2_press_token_at(active_key);
+    CHECK(token != NULL);
+    CHECK(!token->active);
+    CHECK(token->phase == PRESS_TOKEN_PHASE_CANCELLED);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_press_token_count == 0u);
+}
+
 static void test_runtime_v2_tap_series_state_stays_independent_from_active_token_storage(void) {
     keypos_t                key_pos = test_keypos(6, 2);
     const press_token_t    *token;
@@ -1566,6 +1620,8 @@ int main(void) {
     test_runtime_v2_pending_multi_tap_scan_resolution_promotes_hold_threshold();
     test_runtime_v2_pending_multi_tap_scan_resolution_promotes_long_hold();
     test_runtime_v2_pending_multi_tap_scan_resolution_flushes_expired_chain();
+    test_runtime_v2_transition_flush_foreign_multi_tap_clears_shadow_series();
+    test_runtime_v2_transition_flush_active_keys_retires_shadow_token();
     test_runtime_v2_tap_series_state_stays_independent_from_active_token_storage();
     test_runtime_v2_layer_lock_observes_live_layer_ownership_state();
     test_runtime_v2_layer_tap_hold_creates_and_retires_layer_lease();

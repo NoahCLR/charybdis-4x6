@@ -507,6 +507,33 @@ Reconciliation Note:
 
 Inference from the current tree: authored pending multi-tap timing is substantially less split-brained than it was. Both handled release settlement and scan-time pending-hold / expiry settlement now come from reducer-owned token/tap-series state. The remaining wedge risk is no longer "which timer owns multi-tap lifecycle," but the downstream legacy effect-planning and reset seams that still consume those decisions.
 
+## 2026-04-19 Runtime V2 Slot Retirement And Explicit Flush Note
+
+The next reset/retirement seam has now crossed into reducer-aware cleanup too:
+
+- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now expose:
+  - `runtime_v2_take_pending_multi_tap_flush(...)`,
+  - `runtime_v2_reset_pending_multi_tap(...)`, and
+  - `runtime_v2_retire_press_token(...)`.
+- `runtime_v2_take_pending_multi_tap_flush(...)` resolves explicit pending-multi-tap flush action/repeat payload from reducer-owned tap-series state and clears that reducer-owned series when the production flush path consumes it.
+- `runtime_v2_reset_pending_multi_tap(...)` lets direct legacy pending-multi-tap resets clear reducer-owned tap-series state at the same moment, instead of leaving v2 waiting for a later scan or key event.
+- `runtime_v2_retire_press_token(...)` cancels an active reducer-owned press token when the production slot world forcibly flushes that key before physical key-up, releasing leases and recomputing the shadow projection immediately.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot.c` now bridges the legacy slot helpers into those reducer APIs:
+  - `key_runtime_slot_take_pending_multi_tap_flush(...)` prefers reducer-owned tap-series payload when available,
+  - `key_runtime_slot_reset_pending_multi_tap(...)` clears reducer-owned tap-series state when the legacy pending chain is reset, and
+  - `key_runtime_slot_reset(...)` retires the reducer-owned active token plus any reducer-owned tap-series state before the legacy slot is zeroed.
+- `tests/host/runtime_debug_test.c` now proves the two production-shaped seams directly:
+  - foreign pending-multi-tap flush clears the reducer-owned tap series, and
+  - forced active-slot flush retires the reducer-owned active press token.
+
+Inference from the current tree: the reducer now sees the same lifetime end points the production slot world sees for three separate cases:
+
+- handled release settlement,
+- scan-time pending-multi-tap settlement, and
+- explicit slot/tap-series flush/reset.
+
+That is a meaningful reduction in architecture risk, because shadow state is less able to survive after the legacy slot world has already declared a key path dead. The remaining split is now mostly in the last step after the decision: production still uses the legacy plan/effect/slot-retirement machinery to emit the final actions and unwind the world, rather than having runtime-v2 own that whole aftermath end-to-end.
+
 ## 2026-04-19 Runtime V2 Blocker Observation Note
 
 The blocker seam moved one step further toward the intended shadow-reducer model:

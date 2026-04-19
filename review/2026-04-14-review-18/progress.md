@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-04-19 Runtime V2 Slot Retirement And Explicit Multi-Tap Flush Pass
+
+- Moved the next mixed-ownership cleanup seam into the reducer-aware path: explicit pending-multi-tap flush/reset and forced active-slot retirement no longer leave `runtime_v2` state live after the legacy slot world has been cleared.
+- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now expose:
+  - `runtime_v2_take_pending_multi_tap_flush(...)` to resolve and clear reducer-owned tap-series state during explicit flush,
+  - `runtime_v2_reset_pending_multi_tap(...)` to clear reducer-owned tap-series state when legacy slot storage is reset directly, and
+  - `runtime_v2_retire_press_token(...)` to cancel an active reducer-owned press token when the legacy slot is forcibly flushed/reset before physical key-up.
+- `users/noah/lib/key/runtime/slot/key_runtime_slot.c` now bridges the legacy slot helpers into that reducer state:
+  - `key_runtime_slot_take_pending_multi_tap_flush(...)` uses the reducer-owned tap-series payload when available before clearing legacy pending-multi-tap storage,
+  - `key_runtime_slot_reset_pending_multi_tap(...)` clears reducer-owned tap-series state alongside legacy slot state, and
+  - `key_runtime_slot_reset(...)` retires the active reducer-owned press token plus any reducer-owned tap series before zeroing the legacy slot.
+- This keeps the migration cut narrow:
+  - saved delayed-action mods still come from the slot-owned multi-tap payload,
+  - transition/effect planning still runs through the legacy plan builder,
+  - but reducer-owned lifetime now ends when the production slot lifetime ends instead of waiting for some later physical event.
+- `tests/host/runtime_debug_test.c` now proves both production-shaped seams directly:
+  - `key_runtime_transition_flush_foreign_multi_tap(...)` clears the reducer-owned tap series when it flushes the legacy pending chain, and
+  - `key_runtime_transition_flush_active_keys_except(...)` retires the reducer-owned active press token when it flushes the legacy active slot.
+
 ## 2026-04-19 Runtime V2 Pending Multi-Tap Lifecycle Pass
 
 - Moved the next multi-tap lifecycle seam into the reducer-owned shadow path: scan-time pending-hold promotion and chain-expiry flush now resolve from runtime-v2 token/tap-series state instead of only from slot-local timer state.
@@ -664,5 +683,5 @@
 
 1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
 2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Move the remaining explicit pending-multi-tap flush/reset paths onto runtime-v2 so foreign-chain flush and slot-owned reset no longer leave lifecycle ownership split.
-4. Fold the remaining release/deferred-emission effect planning and slot retirement paths into the lease/reducer model before any production hook cutover.
+3. Move the remaining release/deferred-emission effect planning and slot-retirement aftermath onto the reducer path so v2 owns not just lifetime end, but the complete settlement/cleanup contract.
+4. Capture and replay on-device traces for the original wedge repros now that blocker gating, pending multi-tap lifecycle, explicit flush/reset, and active-slot retirement all have reducer-owned visibility.
