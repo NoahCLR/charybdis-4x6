@@ -7,9 +7,9 @@ PD mode names and bindings in this report stay in sync with the shared definitio
 | Where | Marker | Meaning |
 | --- | --- | --- |
 | Layer image | `C1`, `C2`, ... | Combo badge. Match the badge id to the layer-local combo table below the image. |
-| Layer image | `tap / multi-tap` dot <img alt="Tap or multi-tap indicator color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> | This key has authored tap or multi-tap handling. The image does not show which tap tier fired; use the behavior table below for `single`, `double`, `triple`, and higher tap counts. |
-| Layer image | `hold` dot <img alt="Hold indicator color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> | This key has an authored hold tier. |
-| Layer image | `long hold` dot <img alt="Long hold indicator color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> | This key has an authored long-hold tier. |
+| Layer image | `tap` dot <img alt="Tap indicator color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> with optional count | This key has authored tap actions. A plain dot means one authored tap action; a numbered dot means multiple tap tiers on that key define a tap action. Use the behavior table below for `single`, `double`, `triple`, and higher tap counts. |
+| Layer image | `hold` dot <img alt="Hold indicator color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> with optional count | This key has authored hold tiers. A plain dot means one hold tier; a numbered dot means multiple tap tiers on that key define a hold action. |
+| Layer image | `long hold` dot <img alt="Long hold indicator color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> with optional count | This key has authored long-hold tiers. A plain dot means one long-hold tier; a numbered dot means multiple tap tiers on that key define a long-hold action. |
 | Behavior table | `single`, `double`, `triple`, `quadruple`, `quintuple` | Tap tiers for the same physical key: 1 tap, 2 taps, 3 taps, 4 taps, 5 taps. |
 | Behavior table | repeated rows for one key | The same physical key exposes different actions at different tap tiers. |
 | Behavior table | `Tap` / `Hold` / `Long Hold` | Actions that fire for that tap tier on tap, hold, or deeper long hold. |
@@ -21,7 +21,7 @@ These previews are generated as SVG image assets under [docs/media/profile-intro
 - `ALL_KEYS`: tint every physical key with the layer color
 - `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys
 - `LAYER_BASE` falls back to the default RGB color from [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) when its authored layer color is `HSV(0, 0, 0)`
-- Keys with authored `key_behaviors[]` rows in [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers
+- Keys with authored `key_behaviors[]` rows in [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show numbered activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): white for authored tap actions, orange for authored hold tiers, and cyan for authored long-hold tiers
 - Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer
 - Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer
 

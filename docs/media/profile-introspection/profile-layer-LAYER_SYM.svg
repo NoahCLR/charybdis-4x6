@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620" role="img" aria-labelledby="title desc">
   <title id="title">LAYER_SYM layout preview</title>
-  <desc id="desc">Generated layer preview for LAYER_SYM using authored RGB layer color, mapped-key render mode, activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>
+  <desc id="desc">Generated layer preview for LAYER_SYM using authored RGB layer color, mapped-key render mode, numbered activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.22"/>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620" role="img" aria-labelledby="title desc">
   <title id="title">LAYER_BASE layout preview</title>
-  <desc id="desc">Generated layer preview for LAYER_BASE using authored RGB layer color, mapped-key render mode, activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>
+  <desc id="desc">Generated layer preview for LAYER_BASE using authored RGB layer color, mapped-key render mode, numbered activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.22"/>
@@ -52,12 +52,14 @@
     <text x="793.0" y="165.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">7</text>
     <circle cx="800.0" cy="142.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
     <circle cx="812.0" cy="142.0" r="5.5" fill="#ff7e00" stroke="#f7f7f4" stroke-width="1.5"/>
+    <text x="812.0" y="142.5" fill="#f7f7f4" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">2</text>
   </g>
   <g transform="rotate(0 859.0 137.0)">
     <rect x="830.0" y="108.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="859.0" y="141.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">8</text>
     <circle cx="866.0" cy="118.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
     <circle cx="878.0" cy="118.0" r="5.5" fill="#ff7e00" stroke="#f7f7f4" stroke-width="1.5"/>
+    <text x="878.0" y="118.5" fill="#f7f7f4" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">2</text>
   </g>
   <g transform="rotate(0 925.0 161.0)">
     <rect x="896.0" y="132.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
@@ -244,15 +246,21 @@
     <rect x="468.0" y="412.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="497.0" y="445.0" fill="#f7f7f4" fill-opacity="1.0" font-size="11" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" textLength="42" lengthAdjust="spacingAndGlyphs">LTHUMB</text>
     <circle cx="492.0" cy="422.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
+    <text x="492.0" y="422.5" fill="#1c1f1c" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">4</text>
     <circle cx="504.0" cy="422.0" r="5.5" fill="#ff7e00" stroke="#f7f7f4" stroke-width="1.5"/>
+    <text x="504.0" y="422.5" fill="#f7f7f4" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">2</text>
     <circle cx="516.0" cy="422.0" r="5.5" fill="#00fffc" stroke="#f7f7f4" stroke-width="1.5"/>
+    <text x="516.0" y="422.5" fill="#1c1f1c" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">3</text>
   </g>
   <g transform="rotate(-17 605.0 441.0)">
     <rect x="576.0" y="412.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="605.0" y="445.0" fill="#f7f7f4" fill-opacity="1.0" font-size="11" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" textLength="42" lengthAdjust="spacingAndGlyphs">RTHUMB</text>
     <circle cx="600.0" cy="422.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
+    <text x="600.0" y="422.5" fill="#1c1f1c" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">4</text>
     <circle cx="612.0" cy="422.0" r="5.5" fill="#ff7e00" stroke="#f7f7f4" stroke-width="1.5"/>
+    <text x="612.0" y="422.5" fill="#f7f7f4" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">2</text>
     <circle cx="624.0" cy="422.0" r="5.5" fill="#00fffc" stroke="#f7f7f4" stroke-width="1.5"/>
+    <text x="624.0" y="422.5" fill="#1c1f1c" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">3</text>
   </g>
   <g transform="rotate(-10 677.0 433.0)">
     <rect x="648.0" y="404.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>

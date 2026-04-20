@@ -1235,9 +1235,9 @@ def render_quick_legend_section(profile: dict[str, object]) -> str:
         "| Where | Marker | Meaning |",
         "| --- | --- | --- |",
         "| Layer image | `C1`, `C2`, ... | Combo badge. Match the badge id to the layer-local combo table below the image. |",
-        f"| Layer image | `tap / multi-tap` dot {indicator_preview('tap', 'Tap or multi-tap indicator color')} | This key has authored tap or multi-tap handling. The image does not show which tap tier fired; use the behavior table below for `single`, `double`, `triple`, and higher tap counts. |",
-        f"| Layer image | `hold` dot {indicator_preview('hold', 'Hold indicator color')} | This key has an authored hold tier. |",
-        f"| Layer image | `long hold` dot {indicator_preview('long_hold', 'Long hold indicator color')} | This key has an authored long-hold tier. |",
+        f"| Layer image | `tap` dot {indicator_preview('tap', 'Tap indicator color')} with optional count | This key has authored tap actions. A plain dot means one authored tap action; a numbered dot means multiple tap tiers on that key define a tap action. Use the behavior table below for `single`, `double`, `triple`, and higher tap counts. |",
+        f"| Layer image | `hold` dot {indicator_preview('hold', 'Hold indicator color')} with optional count | This key has authored hold tiers. A plain dot means one hold tier; a numbered dot means multiple tap tiers on that key define a hold action. |",
+        f"| Layer image | `long hold` dot {indicator_preview('long_hold', 'Long hold indicator color')} with optional count | This key has authored long-hold tiers. A plain dot means one long-hold tier; a numbered dot means multiple tap tiers on that key define a long-hold action. |",
         "| Behavior table | `single`, `double`, `triple`, `quadruple`, `quintuple` | Tap tiers for the same physical key: 1 tap, 2 taps, 3 taps, 4 taps, 5 taps. |",
         "| Behavior table | repeated rows for one key | The same physical key exposes different actions at different tap tiers. |",
         "| Behavior table | `Tap` / `Hold` / `Long Hold` | Actions that fire for that tap tier on tap, hold, or deeper long hold. |",
@@ -1329,7 +1329,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "- `ALL_KEYS`: tint every physical key with the layer color",
         "- `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys",
         f"- `LAYER_BASE` falls back to the default RGB color from {config_link} when its authored layer color is `HSV(0, 0, 0)`",
-        f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers",
+        f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show numbered activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap actions, orange for authored hold tiers, and cyan for authored long-hold tiers",
         "- Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer",
         "- Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer",
         "",
@@ -1694,25 +1694,29 @@ def resolve_behavior_indicator_preview_colors(profile: dict[str, object]) -> dic
     }
 
 
-def build_behavior_indicator_map(profile: dict[str, object]) -> dict[str, list[str]]:
-    indicator_map: dict[str, list[str]] = {}
+def count_behavior_tap_actions(behavior: dict[str, object]) -> int:
+    return sum(1 for step in behavior["steps"] if step["tap"] is not None)
+
+
+def build_behavior_indicator_map(profile: dict[str, object]) -> dict[str, list[dict[str, object]]]:
+    indicator_map: dict[str, list[dict[str, object]]] = {}
     indicator_colors = resolve_behavior_indicator_preview_colors(profile)
     tap_color = indicator_colors["tap"]["hex"] if indicator_colors["tap"] is not None else None
     hold_color = indicator_colors["hold"]["hex"] if indicator_colors["hold"] is not None else None
     long_hold_color = indicator_colors["long_hold"]["hex"] if indicator_colors["long_hold"] is not None else None
 
     for behavior in profile["key_behaviors"]:
-        has_tap = any(step["tap"] is not None for step in behavior["steps"]) or len(behavior["steps"]) > 1
-        has_long_hold = any(step["long_hold"] is not None for step in behavior["steps"])
-        has_hold = any(step["hold"] is not None for step in behavior["steps"])
-        dots: list[str] = []
+        tap_count = count_behavior_tap_actions(behavior)
+        hold_count = sum(1 for step in behavior["steps"] if step["hold"] is not None)
+        long_hold_count = sum(1 for step in behavior["steps"] if step["long_hold"] is not None)
+        dots: list[dict[str, object]] = []
 
-        if has_tap and tap_color is not None:
-            dots.append(tap_color)
-        if has_hold and hold_color is not None:
-            dots.append(hold_color)
-        if has_long_hold and long_hold_color is not None:
-            dots.append(long_hold_color)
+        if tap_count > 0 and tap_color is not None:
+            dots.append({"color": tap_color, "count": tap_count})
+        if hold_count > 0 and hold_color is not None:
+            dots.append({"color": hold_color, "count": hold_count})
+        if long_hold_count > 0 and long_hold_color is not None:
+            dots.append({"color": long_hold_color, "count": long_hold_count})
 
         if dots:
             indicator_map[behavior_lookup_key(behavior["keycode"])] = dots
@@ -1754,14 +1758,14 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
 def render_layer_svg(
     layer: dict[str, object],
     color_config: dict[str, object],
-    behavior_indicator_map: dict[str, list[str]],
+    behavior_indicator_map: dict[str, list[dict[str, object]]],
     combo_badge_map: dict[str, list[str]],
 ) -> str:
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{SVG_CANVAS_WIDTH}" height="{SVG_CANVAS_HEIGHT}" viewBox="0 0 {SVG_CANVAS_WIDTH} {SVG_CANVAS_HEIGHT}" role="img" aria-labelledby="title desc">',
         f"  <title id=\"title\">{layer['name']} layout preview</title>",
-        f"  <desc id=\"desc\">Generated layer preview for {layer['name']} using authored RGB layer color, mapped-key render mode, activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>",
+        f"  <desc id=\"desc\">Generated layer preview for {layer['name']} using authored RGB layer color, mapped-key render mode, numbered activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>",
         "  <defs>",
         "    <filter id=\"shadow\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\">",
         "      <feDropShadow dx=\"0\" dy=\"5\" stdDeviation=\"4\" flood-color=\"#000000\" flood-opacity=\"0.22\"/>",
@@ -1776,9 +1780,9 @@ def render_layer_svg(
         geometry = visual_geometry(position)
         style = layer_key_style(position, color_config)
         label = visual_label_for_position(position, style["variant"])
-        behavior_dot_colors = behavior_indicator_map.get(behavior_lookup_key(position["keycode"])) if position["has_key_behavior"] else None
+        behavior_dots = behavior_indicator_map.get(behavior_lookup_key(position["keycode"])) if position["has_key_behavior"] else None
         combo_badges = combo_badge_map.get(position["keycode"])
-        parts.extend(render_svg_key(geometry, label, style, behavior_dot_colors, combo_badges))
+        parts.extend(render_svg_key(geometry, label, style, behavior_dots, combo_badges))
 
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
@@ -1863,7 +1867,7 @@ def render_svg_key(
     geometry: dict[str, float],
     label: str,
     style: dict[str, object],
-    behavior_dot_colors: list[str] | None = None,
+    behavior_dots: list[dict[str, object]] | None = None,
     combo_badges: list[str] | None = None,
 ) -> list[str]:
     x = geometry["x"]
@@ -1882,13 +1886,21 @@ def render_svg_key(
         parts.append(
             f'    <text x="{cx:.1f}" y="{cy + 4:.1f}" fill="{style["text"]}" fill-opacity="{style["label_opacity"]}" font-size="{font_size}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600"{text_suffix}>{escape_xml(label)}</text>'
         )
-    if behavior_dot_colors:
-        count = len(behavior_dot_colors)
-        start_x = x + KEY_WIDTH - 10 - ((count - 1) * 12)
-        for index, behavior_dot_color in enumerate(behavior_dot_colors):
+    if behavior_dots:
+        dot_count = len(behavior_dots)
+        start_x = x + KEY_WIDTH - 10 - ((dot_count - 1) * 12)
+        for index, behavior_dot in enumerate(behavior_dots):
+            dot_x = start_x + (index * 12)
+            dot_y = y + 10
+            dot_color = behavior_dot["color"]
+            dot_label = str(behavior_dot["count"]) if int(behavior_dot["count"]) > 1 else ""
             parts.append(
-                f'    <circle cx="{start_x + (index * 12):.1f}" cy="{y + 10:.1f}" r="5.5" fill="{behavior_dot_color}" stroke="{style["text"]}" stroke-width="1.5"/>'
+                f'    <circle cx="{dot_x:.1f}" cy="{dot_y:.1f}" r="5.5" fill="{dot_color}" stroke="{style["text"]}" stroke-width="1.5"/>'
             )
+            if dot_label:
+                parts.append(
+                    f'    <text x="{dot_x:.1f}" y="{dot_y + 0.5:.1f}" fill="{ideal_text_color(dot_color)}" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">{escape_xml(dot_label)}</text>'
+                )
     if combo_badges:
         badge_height = 12
         badge_spacing = 3
