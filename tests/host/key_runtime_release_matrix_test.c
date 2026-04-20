@@ -501,6 +501,16 @@ static void test_pending_release_edge_cases(void) {
             .expected          = TEST_EXPECT_PRESERVE_CHAIN(),
         },
         {
+            .name              = "quick release preserves pending chain when later tap has explicit tap action",
+            .second_tap_action = TEST_SECOND_TAP_ACTION,
+            .hold              = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold         = HOLD_NONE_LIT,
+            .has_more_taps     = true,
+            .pending_setup     = TEST_PENDING_SETUP_NONE,
+            .release_elapsed   = 60,
+            .expected          = TEST_EXPECT_PRESERVE_CHAIN(),
+        },
+        {
             .name              = "quick release falls back to second tap action when chain ends",
             .second_tap_action = TEST_SECOND_TAP_ACTION,
             .hold              = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),

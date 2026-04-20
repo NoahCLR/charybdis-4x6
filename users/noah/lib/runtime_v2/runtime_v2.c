@@ -1754,6 +1754,24 @@ static void runtime_v2_tap_series_note_hold_release(runtime_v2_state_t *state, c
     series->pending_hold = false;
 }
 
+static void runtime_v2_tap_series_preserve_pending_hold_release(runtime_v2_state_t *state, keypos_t key_pos) {
+    tap_series_t *series;
+
+    if (!(state && runtime_v2_keypos_valid(key_pos))) {
+        return;
+    }
+
+    series = runtime_v2_tap_series_state(state, key_pos);
+    if (!(series && series->active && series->pending_hold)) {
+        return;
+    }
+
+    series->pending_hold = false;
+    series->hold         = hold_behavior_none();
+    series->long_hold    = hold_behavior_none();
+    series->last_tap_at  = state->current_time;
+}
+
 static uint16_t runtime_v2_pending_multi_tap_release_held_lifecycle_action(const press_token_t *token, uint16_t candidate_action, uint16_t elapsed) {
     handled_key_hold_semantics_t semantics;
 
@@ -2319,6 +2337,7 @@ bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap
     };
     key_runtime_slot_release_decision_t decision;
     uint16_t                            elapsed;
+    bool                                preserve_chain;
 
     if (out) {
         *out = (runtime_v2_pending_multi_tap_release_resolution_t){0};
@@ -2335,6 +2354,9 @@ bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap
     }
 
     elapsed = runtime_v2_elapsed(token->pressed_at, token->released_at);
+    preserve_chain =
+        preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term &&
+        (token->interaction.binding.has_more_taps || (tap_action == KC_NO && tap_repeat_count == 0u));
 
     if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term
                                                                  : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term) {
@@ -2382,7 +2404,7 @@ bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap
                 return true;
             }
 
-            if (tap_action == KC_NO && tap_repeat_count == 0u && preserve_chain_available) {
+            if (preserve_chain) {
                 *out = (runtime_v2_pending_multi_tap_release_resolution_t){
                     .outcome = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN,
                 };
@@ -2412,7 +2434,7 @@ bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap
                 return true;
             }
 
-            if (tap_action == KC_NO && tap_repeat_count == 0u && preserve_chain_available) {
+            if (preserve_chain) {
                 *out = (runtime_v2_pending_multi_tap_release_resolution_t){
                     .outcome = RUNTIME_V2_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN,
                 };
@@ -2620,6 +2642,7 @@ static void runtime_v2_apply_release_settlement(runtime_v2_state_t *state, keypo
 
     switch (release_plan->settlement) {
         case RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_CLEAR_ACTIVE_PRESERVE_PENDING_MULTI_TAP:
+            runtime_v2_tap_series_preserve_pending_hold_release(state, key_pos);
             break;
         case RUNTIME_V2_RELEASE_SLOT_SETTLEMENT_RESET:
             (void)runtime_v2_reset_pending_multi_tap(key_pos);

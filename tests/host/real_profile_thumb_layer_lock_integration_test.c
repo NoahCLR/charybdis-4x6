@@ -247,6 +247,22 @@ static void test_run_double_tap_hold_cycle_with_intermediate_scan(keypos_t key_p
     test_release_resolved(key_pos);
 }
 
+static void test_run_quick_tap(keypos_t key_pos) {
+    test_press_resolved(key_pos);
+    test_release_resolved(key_pos);
+}
+
+static void test_advance_thumb_multi_tap_gap(void) {
+    key_runtime_integration_advance(&fake_time, 40);
+}
+
+static void test_assert_thumb_runtime_quiescent(keypos_t key_pos) {
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 0);
+    CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(key_pos));
+}
+
 typedef enum {
     TEST_RELEASE_TARGET_CHILD = 0,
     TEST_RELEASE_TARGET_PARENT,
@@ -1027,6 +1043,80 @@ static void test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_
     test_run_double_tap_hold_cycle_with_intermediate_scan(key_pos, 120, 281);
     CHECK(!test_layer_locked(LAYER_NUM));
     CHECK(!test_layer_active(LAYER_NUM));
+}
+
+static void test_right_thumb_triple_tap_flushes_next_track_after_timeout(void) {
+    keypos_t  key_pos      = test_right_thumb_pos();
+    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+
+    test_reset_state();
+
+    CHECK(test_resolve_keycode(key_pos) == base_keycode);
+    test_run_quick_tap(key_pos);
+    test_advance_thumb_multi_tap_gap();
+    test_run_quick_tap(key_pos);
+    test_advance_thumb_multi_tap_gap();
+    test_run_quick_tap(key_pos);
+
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 3);
+    CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(key_pos));
+    CHECK(test_tap_code16_count == 0);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+    key_runtime_integration_scan();
+
+    CHECK(test_tap_code16_count == 0);
+    CHECK(test_delayed_action_count == 1);
+    CHECK(test_last_delayed_action == KC_MNXT);
+    test_assert_thumb_runtime_quiescent(key_pos);
+}
+
+static void test_right_thumb_triple_tap_long_hold_registers_next_track_hold(void) {
+    keypos_t  key_pos      = test_right_thumb_pos();
+    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+
+    test_reset_state();
+
+    CHECK(test_resolve_keycode(key_pos) == base_keycode);
+    test_run_quick_tap(key_pos);
+    test_advance_thumb_multi_tap_gap();
+    test_run_quick_tap(key_pos);
+    test_advance_thumb_multi_tap_gap();
+    test_press_resolved(key_pos);
+
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 3);
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_holding(key_pos));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == base_keycode);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_LONGER_HOLD_TERM + 1);
+    key_runtime_integration_scan();
+
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_MNXT);
+    CHECK(test_tap_code16_count == 0);
+
+    test_release_resolved(key_pos);
+    test_assert_thumb_runtime_quiescent(key_pos);
+}
+
+static void test_right_thumb_quadruple_tap_dispatches_previous_track(void) {
+    keypos_t  key_pos      = test_right_thumb_pos();
+    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+
+    test_reset_state();
+
+    CHECK(test_resolve_keycode(key_pos) == base_keycode);
+    test_run_quick_tap(key_pos);
+    test_advance_thumb_multi_tap_gap();
+    test_run_quick_tap(key_pos);
+    test_advance_thumb_multi_tap_gap();
+    test_run_quick_tap(key_pos);
+    test_advance_thumb_multi_tap_gap();
+    test_run_quick_tap(key_pos);
+
+    CHECK(test_tap_code16_count == 0);
+    CHECK(test_delayed_action_count == 1);
+    CHECK(test_last_delayed_action == KC_MPRV);
+    test_assert_thumb_runtime_quiescent(key_pos);
 }
 
 static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
@@ -2046,6 +2136,9 @@ int main(void) {
     test_left_thumb_double_tap_hold_toggles_num_layer();
     test_right_thumb_double_tap_hold_toggles_num_layer();
     test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle();
+    test_right_thumb_triple_tap_flushes_next_track_after_timeout();
+    test_right_thumb_triple_tap_long_hold_registers_next_track_hold();
+    test_right_thumb_quadruple_tap_dispatches_previous_track();
     test_right_nav_layer_hold_dispatches_nav_taps_immediately();
     test_right_thumb_hold_dispatches_nav_taps_immediately();
     test_raw_nav_layer_hold_enters_dragscroll_mode_cleanly();
