@@ -381,7 +381,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supported_as_authored_action(macro_action, NOAH_ACTION_AUTHORED_USE_TAP));
     CHECK(noah_action_desc_supported_as_authored_action(macro_action, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
     CHECK(noah_action_desc_supported_as_authored_action(macro_action, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
-    CHECK(!noah_action_desc_consumes_direct_press(macro_action));
+    CHECK(noah_action_desc_consumes_direct_press(macro_action));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(macro_action));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(macro_action));
     CHECK(!noah_action_desc_is_pure_modifier_literal(macro_action));

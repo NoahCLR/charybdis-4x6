@@ -230,6 +230,7 @@ static void test_descriptor_classifies_dispatch_shapes(void) {
     CHECK(noah_action_desc_is_press_only(noah_action_describe(LOCK_LAYER(3))));
     CHECK(noah_action_desc_is_press_only(noah_action_describe(ARROW_MODE_LOCK)));
     CHECK(noah_action_desc_is_press_only(noah_action_describe(MACRO_0)));
+    CHECK(noah_action_desc_consumes_direct_press(noah_action_describe(VIA_MACRO_6)));
     CHECK(noah_action_desc_requires_per_key_hold(noah_action_describe(MO(2))));
     CHECK(noah_action_desc_uses_shared_hold(noah_action_describe(KC_C)));
 }

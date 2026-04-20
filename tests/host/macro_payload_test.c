@@ -22,10 +22,14 @@ typedef struct {
     uint16_t       value;
 } test_op_t;
 
-#define TEST_MAX_OPS 32
+#define TEST_MAX_OPS 512
+
+static const char *const test_long_delay_heavy_payload =
+    "h{829}e{627}y{665} {249}h{158}a{167}l{424}o{386} {448}h{144}o{111}e{103} {118}i{123}s{118} {125}h{132}e{134}t{158} {133}m{118}e{493}t{156} {503}y{503}u{10}o{695} {382}h{113}e{212}b{149}b{83}e{155}n{60} {102}e{65}w{164} {79} {152}h{109}i{79}e{129}r{146} {143}e{176}e{104}n{98} {148}p{124}r{119}o{165}b{126}l{130}e{172}e{104}m{1032}{+KC_LSFT}{189};{140}{-KC_LSFT}";
 
 static test_op_t test_ops[TEST_MAX_OPS];
-static uint8_t   test_op_count;
+static uint16_t  test_op_count;
+static uint16_t  test_runtime_diag_heartbeat_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -52,7 +56,8 @@ static void test_log_op(test_op_kind_t kind, uint16_t value) {
 
 static void test_reset_stubs(void) {
     memset(test_ops, 0, sizeof(test_ops));
-    test_op_count = 0;
+    test_op_count                     = 0;
+    test_runtime_diag_heartbeat_count = 0;
 }
 
 void send_char(char ascii_code) {
@@ -80,6 +85,10 @@ bool owned_keycode_unregister(uint16_t keycode) {
 bool owned_keycode_tap(uint16_t keycode) {
     test_log_op(TEST_OP_TAP, keycode);
     return true;
+}
+
+void noah_runtime_diag_heartbeat(void) {
+    test_runtime_diag_heartbeat_count++;
 }
 
 static void test_validate_accepts_mixed_payload(void) {
@@ -188,6 +197,13 @@ static void test_compile_rejects_invalid_payloads(void) {
     CHECK(ir.length == 0);
 }
 
+static void test_compile_accepts_long_delay_heavy_payload(void) {
+    macro_payload_ir_t ir = {0};
+
+    CHECK(macro_payload_compile(test_long_delay_heavy_payload, &ir));
+    CHECK(ir.length > 128u);
+}
+
 static void test_encode_emits_expected_qmk_sequence(void) {
     uint8_t  buffer[32] = {0};
     uint16_t written    = 0;
@@ -243,16 +259,50 @@ static void test_play_ir_with_delayed_text_uses_send_char_with_delay(void) {
     CHECK((uint8_t)(test_ops[1].value >> 8) == TAP_CODE_DELAY);
 }
 
+static void test_play_long_delay_heavy_payload_keeps_watchdog_heartbeat_alive(void) {
+    macro_payload_ir_t ir            = {0};
+    uint32_t           total_wait_ms = 0;
+    uint16_t           delayed_chars = 0;
+    uint16_t           shift_downs   = 0;
+    uint16_t           shift_ups     = 0;
+
+    CHECK(macro_payload_compile(test_long_delay_heavy_payload, &ir));
+
+    test_reset_stubs();
+
+    CHECK(macro_payload_play_ir_with_text_output(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, TAP_CODE_DELAY));
+
+    for (uint16_t index = 0; index < test_op_count; index++) {
+        if (test_ops[index].kind == TEST_OP_WAIT) {
+            total_wait_ms += test_ops[index].value;
+        } else if (test_ops[index].kind == TEST_OP_SEND_CHAR_DELAYED) {
+            delayed_chars++;
+        } else if (test_ops[index].kind == TEST_OP_REGISTER && test_ops[index].value == TEST_SEND_STRING_U8(X_LEFT_SHIFT)) {
+            shift_downs++;
+        } else if (test_ops[index].kind == TEST_OP_UNREGISTER && test_ops[index].value == TEST_SEND_STRING_U8(X_LEFT_SHIFT)) {
+            shift_ups++;
+        }
+    }
+
+    CHECK(delayed_chars == 57u);
+    CHECK(shift_downs == 1u);
+    CHECK(shift_ups == 1u);
+    CHECK(total_wait_ms == 13579u);
+    CHECK(test_runtime_diag_heartbeat_count > 0u);
+}
+
 int main(void) {
     test_validate_accepts_mixed_payload();
     test_validate_rejects_invalid_payloads();
     test_play_runs_text_chords_and_delays_in_order();
     test_compile_and_play_ir_runs_without_reparsing_source();
     test_compile_rejects_invalid_payloads();
+    test_compile_accepts_long_delay_heavy_payload();
     test_encode_emits_expected_qmk_sequence();
     test_encode_fails_when_buffer_is_too_small();
     test_encode_and_decode_qmk_round_trip_through_ir();
     test_play_ir_with_delayed_text_uses_send_char_with_delay();
+    test_play_long_delay_heavy_payload_keeps_watchdog_heartbeat_alive();
 
     puts("macro_payload host tests passed");
     return 0;

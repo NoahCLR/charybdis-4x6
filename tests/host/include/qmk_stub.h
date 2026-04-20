@@ -65,8 +65,12 @@
 #ifndef KEY_BEHAVIOR_MAX_TAP_COUNT
 #    define KEY_BEHAVIOR_MAX_TAP_COUNT 5u
 #endif
-#define TAP_CODE_DELAY 10u
-#define TAP_HOLD_CAPS_DELAY 80u
+#ifndef TAP_CODE_DELAY
+#    define TAP_CODE_DELAY 10u
+#endif
+#ifndef TAP_HOLD_CAPS_DELAY
+#    define TAP_HOLD_CAPS_DELAY 80u
+#endif
 #ifndef DYNAMIC_KEYMAP_LAYER_COUNT
 #    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
 #endif

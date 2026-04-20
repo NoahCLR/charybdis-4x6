@@ -241,6 +241,10 @@ The same payload language is used for source-authored defaults, and the repo
 can seed VIA's macro EEPROM defaults from those authored values on first init
 and supported reset paths.
 
+This repo also sets `TAP_CODE_DELAY` to `10` in
+[`users/noah/config.h`](./users/noah/config.h) so synthetic taps used by
+macro chords stay registered long enough to land reliably on the host.
+
 ## Combos
 
 Combos are authored directly in

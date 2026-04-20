@@ -6,7 +6,7 @@
 typedef bool (*macro_payload_write_byte_fn)(uint8_t byte, void *context);
 typedef bool (*macro_payload_read_byte_fn)(uint16_t offset, uint8_t *byte, void *context);
 
-#define MACRO_PAYLOAD_IR_MAX_BYTES 128
+#define MACRO_PAYLOAD_IR_MAX_BYTES 512
 
 typedef enum {
     MACRO_PAYLOAD_IR_OP_TEXT = 1,

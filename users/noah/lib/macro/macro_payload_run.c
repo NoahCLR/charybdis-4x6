@@ -3,14 +3,30 @@
 #include "send_string.h"
 
 #include "../action/owned_keycode.h"
+#include "../state/runtime/runtime_diag.h"
 #include "macro_payload_internal.h"
 
+static void macro_payload_wait_ms(uint16_t delay_ms) {
+    static const uint16_t macro_payload_wait_slice_ms = 100u;
+
+    while (delay_ms > macro_payload_wait_slice_ms) {
+        wait_ms(macro_payload_wait_slice_ms);
+        noah_runtime_diag_heartbeat();
+        delay_ms = (uint16_t)(delay_ms - macro_payload_wait_slice_ms);
+    }
+
+    if (delay_ms > 0u) {
+        wait_ms(delay_ms);
+        noah_runtime_diag_heartbeat();
+    }
+}
+
 static void macro_payload_wait_interval(void) {
-    wait_ms(TAP_CODE_DELAY);
+    macro_payload_wait_ms(TAP_CODE_DELAY);
 }
 
 static bool macro_payload_run_delay(uint16_t delay_ms) {
-    wait_ms(delay_ms);
+    macro_payload_wait_ms(delay_ms);
     macro_payload_wait_interval();
     return true;
 }
