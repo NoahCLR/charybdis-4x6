@@ -27,4 +27,3 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz);
 void held_repeat_tick(void);
 bool held_repeat_release_owned_by_key(keypos_t key_pos);
 void held_repeat_debug_snapshot(held_repeat_debug_snapshot_t *out);
-void held_repeat_reset_for_test(void);

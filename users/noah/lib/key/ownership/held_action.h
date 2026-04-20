@@ -31,4 +31,3 @@ bool held_action_survives_flush(keypos_t key_pos, uint16_t action);
 bool held_action_release_owned_by_key(keypos_t key_pos);
 bool held_modifier_release_owned_by_key(keypos_t key_pos);
 void held_action_debug_snapshot(held_action_debug_snapshot_t *out);
-void held_action_reset_for_test(void);

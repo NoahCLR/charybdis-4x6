@@ -183,7 +183,6 @@ static inline bool noah_action_desc_consumes_direct_press(noah_action_desc_t des
 }
 
 noah_action_desc_t noah_action_describe(uint16_t action);
-bool               action_dispatch_layer_is_locked(uint8_t layer);
 void               noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy);
 void               noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy);
 void               noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds);

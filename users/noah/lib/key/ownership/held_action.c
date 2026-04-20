@@ -319,7 +319,3 @@ void held_action_debug_snapshot(held_action_debug_snapshot_t *out) {
         };
     }
 }
-
-void held_action_reset_for_test(void) {
-    memset(held_action_state(), 0, sizeof(*held_action_state()));
-}

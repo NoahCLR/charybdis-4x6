@@ -159,7 +159,3 @@ void held_repeat_debug_snapshot(held_repeat_debug_snapshot_t *out) {
         };
     }
 }
-
-void held_repeat_reset_for_test(void) {
-    memset(held_repeat_state(), 0, sizeof(*held_repeat_state()));
-}

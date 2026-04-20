@@ -8,7 +8,6 @@
 #include "synthetic_record.h"
 #include "../key/runtime/key_runtime_api.h"
 #include "../state/runtime/keyboard_mod_state.h"
-#include "../state/ownership/layer_ownership.h"
 #include "action_dispatch.h"
 
 typedef void (*noah_emit_tap_fn_t)(uint16_t keycode);
@@ -37,10 +36,6 @@ static void noah_emit_run(uint16_t keycode, noah_emit_tap_fn_t emit, noah_emit_p
     if (policy.preserve_keyboard_mod_state) {
         keyboard_mod_state_apply(saved_mod_state);
     }
-}
-
-bool action_dispatch_layer_is_locked(uint8_t layer) {
-    return layer_ownership_is_locked(layer);
 }
 
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {

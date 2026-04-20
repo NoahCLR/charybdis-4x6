@@ -4,19 +4,6 @@ static bool macro_slot_provider_slot_in_range(const macro_slot_provider_t *provi
     return provider && slot < provider->slot_count;
 }
 
-bool macro_slot_provider_lookup(const macro_slot_provider_t *provider, uint8_t slot, const char **payload) {
-    if (!payload || !macro_slot_provider_slot_in_range(provider, slot)) {
-        return false;
-    }
-
-    *payload = NULL;
-    if (!provider->lookup_payload) {
-        return true;
-    }
-
-    return provider->lookup_payload(slot, payload, provider->context);
-}
-
 bool macro_slot_provider_load(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot) {
     if (!cache || !macro_slot_provider_slot_in_range(provider, slot) || !provider->load_ir) {
         return false;
@@ -38,16 +25,6 @@ bool macro_slot_provider_load(const macro_slot_provider_t *provider, macro_slot_
     cache[slot].state     = MACRO_SLOT_CACHE_INVALID;
     cache[slot].ir.length = 0;
     return false;
-}
-
-void macro_slot_provider_validate_all(const macro_slot_provider_t *provider, macro_slot_cache_t *cache) {
-    if (!provider || !cache) {
-        return;
-    }
-
-    for (uint8_t slot = 0; slot < provider->slot_count; slot++) {
-        (void)macro_slot_provider_load(provider, cache, slot);
-    }
 }
 
 bool macro_slot_provider_encode_write(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {

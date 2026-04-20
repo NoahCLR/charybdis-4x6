@@ -30,9 +30,7 @@ typedef struct {
     macro_payload_ir_t       ir;
 } macro_slot_cache_t;
 
-bool macro_slot_provider_lookup(const macro_slot_provider_t *provider, uint8_t slot, const char **payload);
 bool macro_slot_provider_load(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot);
-void macro_slot_provider_validate_all(const macro_slot_provider_t *provider, macro_slot_cache_t *cache);
 bool macro_slot_provider_encode_write(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written);
 bool macro_slot_provider_play(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval);
 void macro_slot_provider_invalidate(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot);

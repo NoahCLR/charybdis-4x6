@@ -381,10 +381,6 @@ uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
     return 0;
 }
 
-bool action_dispatch_layer_is_locked(uint8_t layer) {
-    return key_runtime_scenario_layer_locked(layer);
-}
-
 void action_dispatch(uint16_t action) {
     noah_action_desc_t desc = noah_action_describe(action);
 
