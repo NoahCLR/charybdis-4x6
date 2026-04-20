@@ -176,6 +176,7 @@ SWATCH_HEIGHT = 28
 KEY_WIDTH = 58
 KEY_HEIGHT = 58
 KEY_RADIUS = 7
+KEY_TEXT_HORIZONTAL_PADDING = 8
 KEYBOARD_Y_OFFSET = 54
 TITLE_X = 32
 TITLE_Y = 40
@@ -1836,9 +1837,11 @@ def render_svg_key(
         f'    <rect x="{x:.1f}" y="{y:.1f}" width="{KEY_WIDTH}" height="{KEY_HEIGHT}" rx="{KEY_RADIUS}" fill="{style["fill"]}" stroke="{style["stroke"]}" stroke-width="1.5" filter="url(#shadow)"/>'
     )
     if label:
-        font_size = 12 if len(label) <= 5 else 11 if len(label) <= 8 else 9
+        font_size = font_size_for_key_label(label)
+        text_attributes = render_svg_text_fit_attributes(label, font_size)
+        text_suffix = f" {text_attributes}" if text_attributes else ""
         parts.append(
-            f'    <text x="{cx:.1f}" y="{cy + 4:.1f}" fill="{style["text"]}" fill-opacity="{style["label_opacity"]}" font-size="{font_size}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">{escape_xml(label)}</text>'
+            f'    <text x="{cx:.1f}" y="{cy + 4:.1f}" fill="{style["text"]}" fill-opacity="{style["label_opacity"]}" font-size="{font_size}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600"{text_suffix}>{escape_xml(label)}</text>'
         )
     if behavior_dot_colors:
         count = len(behavior_dot_colors)
@@ -1864,6 +1867,38 @@ def render_svg_key(
             badge_x += badge_width + badge_spacing
     parts.append("  </g>")
     return parts
+
+
+def font_size_for_key_label(label: str) -> int:
+    if len(label) <= 5:
+        return 12
+    if len(label) <= 8:
+        return 11
+    if len(label) <= 10:
+        return 8
+    return 7
+
+
+def render_svg_text_fit_attributes(label: str, font_size: int) -> str:
+    text_length = estimated_svg_text_length(label, font_size)
+    max_width = KEY_WIDTH - (2 * KEY_TEXT_HORIZONTAL_PADDING)
+    if text_length <= max_width:
+        return ""
+    return f'textLength="{max_width}" lengthAdjust="spacingAndGlyphs"'
+
+
+def estimated_svg_text_length(label: str, font_size: int) -> float:
+    width = 0.0
+    for char in label:
+        if char in "MW@#%&":
+            width += font_size * 0.9
+        elif char in "Il1()[]{}'\"|.,:;!":
+            width += font_size * 0.35
+        elif char == " ":
+            width += font_size * 0.32
+        else:
+            width += font_size * 0.62
+    return width
 
 
 def escape_xml(text: str) -> str:
