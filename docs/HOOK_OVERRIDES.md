@@ -12,6 +12,13 @@ If you still want the shared `noah` userspace behavior, call the matching
 `noah_*` helper from
 [`users/noah/noah_runtime.h`](../users/noah/noah_runtime.h).
 
+One important process-chain detail:
+
+- if your override returns `false` after calling
+  `noah_process_record_user(...)`, call
+  `noah_process_record_user_finalize(..., false)` before returning because QMK
+  will skip `post_process_record_user()` on a final `false`
+
 One important boundary in this repo:
 
 - keymap-owned translation units under `keyboards/.../keymaps/noah/` are
@@ -25,8 +32,11 @@ If you do nothing, the weak hooks in [`users/noah/hooks.c`](../users/noah/hooks.
 
 - `eeconfig_init_user()`
 - `get_hold_on_other_key_press()`
+- `pre_process_record_user()`
 - `process_record_user()`
+- `post_process_record_user()`
 - `matrix_scan_user()`
+- `housekeeping_task_user()`
 - `keyboard_post_init_user()`
 - `layer_state_set_user()`
 - `pointing_device_task_user()`
@@ -54,6 +64,7 @@ This pattern applies to:
 
 - `eeconfig_init_user()` -> `noah_eeconfig_init_user()`
 - `matrix_scan_user()` -> `noah_matrix_scan_user()`
+- `housekeeping_task_user()` -> `noah_housekeeping_task_user()`
 - `keyboard_post_init_user()` -> `noah_keyboard_post_init_user()`
 - `pointing_device_init_user()` -> `noah_pointing_device_init_user()`
 
@@ -61,37 +72,15 @@ This pattern applies to:
 
 Let the shared helper short-circuit first. If it returns `false`, stop.
 
+For pre-process filters, pass through the shared helper first:
+
 ```c
-bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (!noah_process_record_user(keycode, record)) {
+bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (!noah_pre_process_record_user(keycode, record)) {
         return false;
     }
 
-    switch (keycode) {
-        case MY_CUSTOM_KEY:
-            if (record->event.pressed) {
-                // Custom action here.
-            }
-            return false;
-        default:
-            return true;
-    }
-}
-```
-
-This pattern applies to:
-
-- `process_record_user()` -> `noah_process_record_user()`
-
-For mouse-record classification, let the shared helper claim its keys first:
-
-```c
-bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (noah_is_mouse_record_user(keycode, record)) {
-        return true;
-    }
-
-    return keycode == MY_MOUSE_RELATED_KEY;
+    return true;
 }
 ```
 
@@ -111,6 +100,62 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 Right now, `noah_get_hold_on_other_key_press()` is effectively a no-op and
 returns `false`, so this pattern only matters if the shared userspace later
 gains hold-preference logic or if your keymap adds its own checks after it.
+
+For mouse-record classification, let the shared helper claim its keys first:
+
+```c
+bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (noah_is_mouse_record_user(keycode, record)) {
+        return true;
+    }
+
+    return keycode == MY_MOUSE_RELATED_KEY;
+}
+```
+
+### Process-Record Hooks
+
+The shared userspace splits record handling across three hooks:
+
+- `pre_process_record_user()` tracks physical-key metadata before the main
+  process path runs
+- `process_record_user()` owns the main key-runtime, pd-mode, direct-action,
+  and macro path
+- `post_process_record_user()` finalizes process-return tracing and keyboard
+  event modifier masking when the main process path returns `true`
+
+If you override the main process hook, keep the shared return/finalize
+contract intact:
+
+```c
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    bool keep_processing = noah_process_record_user(keycode, record);
+
+    if (!keep_processing) {
+        noah_process_record_user_finalize(keycode, record, false);
+        return false;
+    }
+
+    switch (keycode) {
+        case MY_CUSTOM_KEY:
+            if (record->event.pressed) {
+                // Custom action here.
+            }
+            noah_process_record_user_finalize(keycode, record, false);
+            return false;
+        default:
+            return true;
+    }
+}
+```
+
+If you also override the post-process hook, keep the shared finalize path:
+
+```c
+void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    noah_post_process_record_user(keycode, record);
+}
+```
 
 ### State-Transform Hooks
 
@@ -171,8 +216,11 @@ This pattern applies to:
 | --- | --- | --- |
 | `eeconfig_init_user()` | `noah_eeconfig_init_user()` | VIA macro seeding after EEPROM init |
 | `get_hold_on_other_key_press()` | `noah_get_hold_on_other_key_press()` | currently no shared behavior; keep the call-through if you want future shared hold-preference logic |
-| `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, macros, direct actions |
+| `pre_process_record_user()` | `noah_pre_process_record_user()` | physical-key tracking for keyboard modifier ownership before the main process path |
+| `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, non-handled release cleanup, direct actions, macros, and process-entry tracing |
+| `post_process_record_user()` | `noah_post_process_record_user()` | process-return finalization, including keyboard-event modifier-mask teardown and process trace result emission |
 | `matrix_scan_user()` | `noah_matrix_scan_user()` | VIA macro default reseeding, key runtime scanning, and split shared-state sync ticks |
+| `housekeeping_task_user()` | `noah_housekeeping_task_user()` | held-repeat ticking and runtime diagnostic heartbeat/watchdog servicing |
 | `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | macro and keymap validation, VIA macro default seeding, RGB runtime init, and split shared-state init |
 | `layer_state_set_user()` | `noah_layer_state_set_user()` | pointer-layer policy, sniping state, and re-applying the active pd-mode DPI policy after layer-owned sniping changes |
 | `pointing_device_task_user()` | `noah_pointing_device_task_user()` | pointer-mode mouse-report transforms and pointing idle-noise suppression |

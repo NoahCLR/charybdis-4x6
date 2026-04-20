@@ -63,8 +63,9 @@ to understand and easy to change:
   of that, two optional overlays, an auto-mouse countdown gradient and
   key-behavior engine feedback, can be independently toggled
 - the userspace hooks into QMK through weak defaults in
-  [`hooks.c`](./users/noah/hooks.c). If you add repo-specific hook overrides,
-  call the matching `noah_*` helper to keep the shared behavior unless you are
+  [`hooks.c`](./users/noah/hooks.c), including the pre/process/post record
+  chain and housekeeping task. If you add repo-specific hook overrides, call
+  the matching `noah_*` helper to keep the shared behavior unless you are
   intentionally replacing it (see
   [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md))
 - `split_runtime_sync` syncs active and locked pointing-device mode ids,

@@ -59,7 +59,6 @@ The current keymap sets these defaults in
 
 There are also current per-key exceptions:
 
-- `RIGHT_THUMB` uses `.tap_hold_term = 100`
 - `LT(LAYER_NAV, KC_SLSH)` uses `.tap_hold_term = 100`
 - `CLICK_SPAM` uses `.tap_hold_term = 1`
 
@@ -75,7 +74,7 @@ lot of the profile's structure:
 - `LEFT_THUMB` and `RIGHT_THUMB` are custom keymap-local keys, not plain QMK
   mod-taps
 - `KC_RIGHT_ALT` is a profile-specific dual-use key: tap toggles
-  `ARROW_MODE`, hold stays normal right `Alt`
+  `ARROW_MODE_LOCK`, hold stays normal right `Alt`
 
 The current combo set is intentionally small:
 
@@ -152,8 +151,7 @@ profile.
 - quadruple tap -> previous track
 - quadruple-tap longer hold -> keep previous-track held
 
-The current profile also gives `RIGHT_THUMB` a shorter `100 ms` tap-hold term
-so the nav thumb feels snappier than the general default.
+Both thumbs currently keep the default `150 ms` tap-hold term.
 
 ### Slash / Nav Key
 
