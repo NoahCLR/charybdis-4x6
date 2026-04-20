@@ -58,7 +58,21 @@ static void pd_mode_auto_mouse_deactivate(pd_mode_mask_t mode, bool was_any_mode
 }
 #endif
 
+void pd_mode_request_active_dpi_sync(void) {
+    pd_mode_runtime_shared_state()->active_dpi_sync_pending = true;
+}
+
+void pd_mode_service_active_dpi_sync(void) {
+    if (!pd_mode_runtime_shared_state()->active_dpi_sync_pending) {
+        return;
+    }
+
+    pd_mode_apply_active_dpi();
+}
+
 void pd_mode_apply_active_dpi(void) {
+    pd_mode_runtime_shared_state()->active_dpi_sync_pending = false;
+
     pd_mode_snapshot_t   snapshot    = pd_mode_snapshot();
     const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
 
@@ -96,7 +110,7 @@ void pd_mode_transition_activate(pd_mode_mask_t mode) {
     pd_mode_auto_mouse_activate(mode, was_any_mode_active, locked);
 #endif
 
-    pd_mode_apply_active_dpi();
+    pd_mode_request_active_dpi_sync();
 
     if (!was_active) {
         pd_mode_registry_run_activate_hooks(mode);
@@ -120,7 +134,7 @@ static void pd_mode_transition_deactivate_with_lock_state(pd_mode_mask_t mode, b
         def->reset();
     }
 
-    pd_mode_apply_active_dpi();
+    pd_mode_request_active_dpi_sync();
 
     if (was_active) {
         pd_mode_registry_run_deactivate_hooks(mode);

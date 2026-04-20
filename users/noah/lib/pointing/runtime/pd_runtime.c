@@ -116,9 +116,10 @@ layer_state_t noah_layer_state_set_user(layer_state_t state) {
 #    else
     noah_qmk_contract_pointer_set_sniping_enabled(false);
 #    endif
-    // Sniping can temporarily own CPI, so always re-apply the active pd-mode DPI
-    // policy after the layer-owned sniping state changes.
-    pd_mode_apply_active_dpi();
+    // Sniping can temporarily own CPI, so queue a re-apply of the active
+    // pd-mode DPI policy after the layer-owned sniping state changes. Service
+    // the actual hardware write on scan instead of from this layer hook.
+    pd_mode_request_active_dpi_sync();
     return pointer_layer_policy_apply(state);
 #else
     return state;

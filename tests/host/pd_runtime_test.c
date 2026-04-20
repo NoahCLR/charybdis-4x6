@@ -458,6 +458,7 @@ static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_afte
     test_reset_stubs();
 
     CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
+    pd_mode_service_active_dpi_sync();
     current_cpi     = 0;
     cpi_set_count   = 0;
     sniping_enabled = true;
@@ -465,6 +466,9 @@ static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_afte
     layer_state_t next = noah_layer_state_set_user((layer_state_t)1u << 0);
 
     CHECK(!sniping_enabled);
+    CHECK(current_cpi == 0);
+    CHECK(cpi_set_count == 0);
+    pd_mode_service_active_dpi_sync();
     CHECK(current_cpi == PD_MODE_VOLUME_DPI);
     CHECK(cpi_set_count == 1);
     CHECK((next & ((layer_state_t)1u << 0)) != 0);
@@ -475,12 +479,16 @@ static void test_layer_state_set_strips_pointer_layer_for_arrow_mode(void) {
     test_reset_stubs();
 
     CHECK(pd_mode_handle_keycode_press(ARROW_MODE));
+    pd_mode_service_active_dpi_sync();
     current_cpi   = 0;
     cpi_set_count = 0;
 
     layer_state_t next = noah_layer_state_set_user(((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER));
 
     CHECK(!sniping_enabled);
+    CHECK(current_cpi == 0);
+    CHECK(cpi_set_count == 0);
+    pd_mode_service_active_dpi_sync();
     CHECK(current_cpi == PD_MODE_ARROW_DPI);
     CHECK(cpi_set_count == 1);
     CHECK((next & ((layer_state_t)1u << 0)) != 0);
@@ -493,6 +501,8 @@ static void test_layer_state_set_enables_sniping_and_blocks_dpi_restore_while_sn
     layer_state_t next = noah_layer_state_set_user(((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER) | ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER));
 
     CHECK(sniping_enabled);
+    CHECK(cpi_set_count == 0);
+    pd_mode_service_active_dpi_sync();
     CHECK(cpi_set_count == 0);
     CHECK((next & ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER)) != 0);
     CHECK((next & ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER)) == 0);

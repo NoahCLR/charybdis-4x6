@@ -409,6 +409,8 @@ bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     return false;
 }
 
+void pd_mode_service_active_dpi_sync(void) {}
+
 bool is_pd_mode_lock_action(uint16_t action) {
     (void)action;
     return false;

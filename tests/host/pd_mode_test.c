@@ -382,8 +382,11 @@ static void test_set_lock_state_switches_to_single_locked_mode(void) {
     CHECK(!pd_mode_local_active(PD_MODE_BRIGHTNESS));
     CHECK(reset_arrow_count == 0);
     CHECK(reset_brightness_count == 1);
+    CHECK(cpi_set_count == 0);
+
+    pd_mode_service_active_dpi_sync();
     CHECK(current_cpi == PD_MODE_VOLUME_DPI);
-    CHECK(cpi_set_count >= 1);
+    CHECK(cpi_set_count == 1);
 }
 
 static void test_activate_switches_to_single_unlocked_mode(void) {
@@ -489,6 +492,28 @@ static void test_handle_keycode_press_and_release_updates_state_and_syncs(void) 
     CHECK(reset_brightness_count == 1);
 }
 
+static void test_handle_keycode_press_and_release_defer_dpi_until_service(void) {
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(current_cpi == 0);
+    CHECK(cpi_set_count == 0);
+
+    pd_mode_service_active_dpi_sync();
+    CHECK(current_cpi == PD_MODE_VOLUME_DPI);
+    CHECK(cpi_set_count == 1);
+
+    CHECK(pd_mode_handle_keycode_release(VOLUME_MODE));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(current_cpi == PD_MODE_VOLUME_DPI);
+    CHECK(cpi_set_count == 1);
+
+    pd_mode_service_active_dpi_sync();
+    CHECK(current_cpi == default_dpi);
+    CHECK(cpi_set_count == 2);
+}
+
 static void test_locked_mode_release_keeps_mode_active(void) {
     test_reset_stubs();
 
@@ -507,13 +532,17 @@ static void test_apply_active_dpi_respects_pointer_state(void) {
     test_reset_stubs();
 
     pd_mode_activate(PD_MODE_VOLUME);
+    CHECK(cpi_set_count == 0);
+    pd_mode_service_active_dpi_sync();
     CHECK(current_cpi == PD_MODE_VOLUME_DPI);
 
     cpi_set_count = 0;
     current_cpi   = 7777;
     pd_mode_activate(PD_MODE_DRAGSCROLL);
+    CHECK(cpi_set_count == 0);
+    pd_mode_service_active_dpi_sync();
     CHECK(current_cpi == CHARYBDIS_DRAGSCROLL_DPI);
-    CHECK(cpi_set_count >= 1);
+    CHECK(cpi_set_count == 1);
 
     pd_mode_deactivate(PD_MODE_DRAGSCROLL);
     cpi_set_count   = 0;
@@ -537,12 +566,15 @@ static void test_pinch_mode_registers_gui_and_dragscroll_side_effects(void) {
 
     pd_mode_activate(PD_MODE_PINCH);
     CHECK(pd_mode_local_active(PD_MODE_PINCH));
+    CHECK(cpi_set_count == 0);
+    pd_mode_service_active_dpi_sync();
     CHECK(current_cpi == CHARYBDIS_DRAGSCROLL_DPI);
     CHECK(keyboard_mod_register_count == 1);
     CHECK(last_registered_keycode == KC_LEFT_GUI);
 
     pd_mode_deactivate(PD_MODE_PINCH);
     CHECK(!pd_mode_local_active(PD_MODE_PINCH));
+    pd_mode_service_active_dpi_sync();
     CHECK(current_cpi == default_dpi);
     CHECK(keyboard_mod_unregister_count == 1);
     CHECK(last_unregistered_keycode == KC_LEFT_GUI);
@@ -674,6 +706,7 @@ int main(void) {
     test_apply_command_reports_display_only_remote_snapshot_change();
     test_apply_command_release_reports_handled_without_sync_when_locked();
     test_handle_keycode_press_and_release_updates_state_and_syncs();
+    test_handle_keycode_press_and_release_defer_dpi_until_service();
     test_locked_mode_release_keeps_mode_active();
     test_apply_active_dpi_respects_pointer_state();
     test_pinch_mode_registers_gui_and_dragscroll_side_effects();

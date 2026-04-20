@@ -419,6 +419,8 @@ void pd_mode_transition_unlock(pd_mode_mask_t mode) {
     pd_mode_clear(mode);
 }
 
+void pd_mode_service_active_dpi_sync(void) {}
+
 void noah_action_press(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;

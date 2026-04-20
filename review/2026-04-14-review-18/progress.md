@@ -947,10 +947,42 @@
     - `review/2026-04-14-review-18/userspace-architecture-review.md`
     - `review/2026-04-14-review-18/runtime-v2-preservation-matrix.md`
     - `review/2026-04-14-review-18/authored-key-overlap-wedge-regression.md`
+- PD-mode activation crash remediation on `codex/authored-key-wedge-debug`:
+  - narrowed the remaining on-device wedge to activation-only pd-mode paths; pointer movement was not required to reproduce it
+  - removed synchronous CPI writes from the pd-mode activation/deactivation and layer-state hooks:
+    - `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`
+    - `users/noah/lib/pointing/runtime/pd_runtime.c`
+  - added reducer-owned pending DPI sync state and serviced it from the normal scan path:
+    - `users/noah/lib/pointing/runtime/pd_mode_runtime_shared_state_internal.h`
+    - `users/noah/lib/pointing/defs/pd_modes.h`
+    - `users/noah/lib/key/runtime/key_runtime_scan.c`
+  - kept direct `pd_mode_apply_active_dpi()` for explicit apply logic/tests, but normal authored activation now queues the request and lets scan perform the hardware write
+  - updated host coverage to assert the new contract:
+    - `tests/host/pd_mode_test.c`
+    - `tests/host/pd_runtime_test.c`
+    - `tests/host/pd_mode_key_runtime_integration_test.c`
+  - reconciled host-only harnesses that stub pd-mode runtime state but still link `key_runtime_scan.c`:
+    - `tests/host/key_runtime_integration_harness.c`
+    - `tests/host/key_runtime_scenario_harness.c`
+    - `tests/host/runtime_debug_test.c`
+  - verification that passed for this remediation:
+    - `sh tests/host/run_pd_mode_tests.sh`
+    - `sh tests/host/run_pd_runtime_tests.sh`
+    - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+    - `sh tests/host/run_feature_gate_compile_tests.sh`
+    - `sh tests/host/run_key_runtime_scenario_tests.sh`
+    - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+    - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+    - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+    - `sh tests/host/run_runtime_trace_tests.sh`
+    - `sh tests/host/run_runtime_debug_tests.sh`
+    - `sh tests/host/run_split_runtime_sync_tests.sh`
+    - `sh tests/host/run_all_host_tests.sh`
+    - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
-1. Keep replaying the original hardware wedge families against the v2-only runtime until the thread is ready for closure.
-2. Run closure verification for the active review thread once the full host suite and firmware build are green on this cutover pass.
+1. Flash this build and verify that pd-mode activation no longer wedges the board before any pointer movement occurs.
+2. Keep replaying the original hardware wedge families against the v2-only runtime until the thread is ready for closure.
 3. If on-device traces still expose a wedge, treat it as a v2 runtime bug now; do not reopen slot/index fallback infrastructure.

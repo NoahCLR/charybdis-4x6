@@ -58,6 +58,8 @@ __attribute__((weak)) void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_f
     (void)locked_flags;
 }
 
+__attribute__((weak)) void pd_mode_service_active_dpi_sync(void) {}
+
 __attribute__((weak)) uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
     return 0u;
 }
