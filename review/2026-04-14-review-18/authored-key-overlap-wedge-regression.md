@@ -1,7 +1,7 @@
 # Regression: authored-key overlaps can wedge the runtime after layer/pd-mode/modifier transitions
 
 Date: 2026-04-19  
-Status: open hardware-visible regression
+Status: resolved in current tree; retain as historical regression snapshot
 
 ## Reconciliation Note
 
@@ -11,11 +11,34 @@ legacy slot/index files referenced later in this note were deleted during the
 2026-04-20 cutover. Treat those legacy file references as historical context,
 not as descriptions of the live runtime surface.
 
+## Resolution Note
+
+The current tree no longer treats this regression as open:
+
+- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` are now the sole
+  authoritative key-runtime state surface.
+- `tests/host/pd_mode_key_runtime_integration_test.c` and
+  `tests/host/real_profile_thumb_layer_lock_integration_test.c` now exercise
+  the original overlap families directly, including `NAV -> DRAGSCROLL`,
+  `KC_LEFT_GUI` second-tap-hold overlap, and quiescent-release cleanup.
+- `tests/host/runtime_debug_test.c` still asserts that the runtime debug
+  surfaces observe no stale pending-release, modifier, layer, or pd-mode state
+  after those flows settle.
+- The closure verification pass completed with:
+  `sh tests/host/run_feature_gate_compile_tests.sh`,
+  `sh tests/host/run_real_profile_validation_tests.sh`,
+  `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`,
+  `sh tests/host/run_runtime_debug_tests.sh`,
+  `sh tests/host/run_all_host_tests.sh`, and
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
+
 ## Summary
 
 A regression introduced between `fdc2d77` and `29156345db90973cfc4422de1384c1a684aa94e2` causes the keyboard to enter a stuck or "wedged" state when certain authored key-behavior keys interact with momentary layers, pd modes, and multi-tap modifier holds.
 
-This is a real hardware-visible regression. It is timing-sensitive, affects multiple authored key families, and is not reliably reproduced by the current host test harness.
+At audit time this was a real hardware-visible regression. It was
+timing-sensitive, affected multiple authored key families, and was not
+reliably reproduced by the then-current host test harness.
 
 ## Observed Behavior
 

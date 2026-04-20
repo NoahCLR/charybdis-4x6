@@ -1,5 +1,37 @@
 # Progress
 
+## 2026-04-20 Closure Verification Review
+
+- Used `prompts/closure-verification-review.md` for a clean close/no-close pass
+  on the active authored-key wedge / `runtime_v2` cutover thread.
+- Re-checked the major prior findings against the current tree:
+  - `runtime_v2` remains the only key-runtime authority,
+  - the deleted slot/index/internal seams are still compile-gated out, and
+  - the original overlap repro families are now covered by regression-specific
+    integration suites instead of relying on “host green plus hardware faith”.
+- Reconciled the active review notes with the current tree:
+  - `userspace-architecture-review.md` now records this pass as the closure
+    verification review,
+  - `authored-key-overlap-wedge-regression.md` is now an explicitly historical
+    regression snapshot instead of a stale open-finding document, and
+  - the remaining registry/keymap-materialization/pd-runtime concerns are now
+    carried as optional cleanup outside this thread's closure bar.
+- Verification completed for this closure pass:
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_real_profile_validation_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Closure verdict:
+  - close thread
+- Next steps:
+  - if the registry DSLs, keymap materialization macros, or pointing-runtime
+    responsibility split become active work, open a new review folder for that
+    separate maintainability thread, and
+  - otherwise treat `review/2026-04-14-review-18/` as closed historical
+    context for the authored-key wedge / `runtime_v2` cutover.
+
 ## 2026-04-20 Runtime Freeze Watchdog Trigger Cleanup Pass
 
 - Removed the deliberate on-device watchdog fault injector now that the
