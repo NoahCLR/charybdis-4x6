@@ -1207,63 +1207,45 @@ def render_markdown(profile: dict[str, object]) -> str:
         "",
         f"PD mode names and bindings in this report stay in sync with the shared definitions in {pd_manifest_link}.",
         "",
-        render_summary_section(profile),
-        render_key_behavior_feedback_section(profile),
         render_layer_maps_section(profile),
+        render_key_behavior_feedback_section(profile),
         render_macro_section(profile),
+        render_reference_section(profile),
+        render_summary_section(profile),
+        render_config_defines_section(profile),
         render_generated_assets_section(),
     ]
     return "\n".join(section for section in sections if section)
 
 
-def render_summary_section(profile: dict[str, object]) -> str:
-    summary = profile["summary"]
+def render_reference_section(profile: dict[str, object]) -> str:
     config = profile["config"]
     rgb = profile["rgb"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
-    pd_manifest_link = markdown_path_link(PD_MODE_MANIFEST_FILE, "pd_mode_manifest.h")
     lines = [
-        "## Summary",
+        "## Reference",
         "",
-        "| Field | Value |",
+        "### Authored Sources",
+        "",
+        "| File | Authored Surface |",
         "| --- | --- |",
+        f"| {keymap_link} | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |",
+        f"| {config_link} | layer enum, timing, RGB defaults, and keymap-facing feature config |",
+        f"| {rgb_link} | layer colors, pd-mode colors, and key-behavior feedback colors |",
+        "",
+        "### Shared Keycode Surfaces",
+        "",
+        f"- Layers: {', '.join(f'`{layer}`' for layer in config['layers'])}",
+        f"- Keymap-local custom keycodes: {', '.join(f'`{name}`' for name in profile['keymap_custom_keycodes']) or '`none`'}",
+        f"- PD color overlays: {', '.join(f'`{row['pointing_mode']}`' for row in rgb['pd_mode_colors']) or '`none`'}",
+        "",
+        "### Layer RGB Config",
+        "",
+        "| Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |",
+        "| --- | --- | --- | --- |",
     ]
-    for key, value in summary.items():
-        lines.append(f"| `{key}` | `{value}` |")
-
-    lines.extend(
-        [
-            "",
-            "### Config Defines",
-            "",
-            "| Macro | Value |",
-            "| --- | --- |",
-        ]
-    )
-    for name, value in config["macros"].items():
-        lines.append(f"| `{name}` | `{value}` |")
-
-    lines.extend(
-        [
-            "",
-            "### Authored Sources",
-            "",
-            "| File | Authored Surface |",
-            "| --- | --- |",
-            f"| {keymap_link} | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |",
-            f"| {config_link} | layer enum, timing, RGB defaults, and keymap-facing feature config |",
-            f"| {rgb_link} | layer colors, pd-mode colors, and key-behavior feedback colors |",
-            "",
-            f"PD mode names and bindings in this report stay in sync with the shared definitions in {pd_manifest_link}.",
-            "",
-            "### Layer RGB Config",
-            "",
-            "| Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |",
-            "| --- | --- | --- | --- |",
-        ]
-    )
     for row in rgb["layer_colors"]:
         color = row["color"]
         preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['layer']} preview color")
@@ -1271,17 +1253,37 @@ def render_summary_section(profile: dict[str, object]) -> str:
             f"| `{row['layer']}` | `{row['mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
         )
 
-    lines.extend(
-        [
-            "",
-            "### Shared Keycode Surfaces",
-            "",
-            f"- Layers: {', '.join(f'`{layer}`' for layer in config['layers'])}",
-            f"- Keymap-local custom keycodes: {', '.join(f'`{name}`' for name in profile['keymap_custom_keycodes']) or '`none`'}",
-            f"- PD color overlays: {', '.join(f'`{row['pointing_mode']}`' for row in rgb['pd_mode_colors']) or '`none`'}",
-            "",
-        ]
-    )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_summary_section(profile: dict[str, object]) -> str:
+    lines = [
+        "## Summary",
+        "",
+        "| Field | Value |",
+        "| --- | --- |",
+    ]
+
+    for key, value in profile["summary"].items():
+        lines.append(f"| `{key}` | `{value}` |")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_config_defines_section(profile: dict[str, object]) -> str:
+    lines = [
+        "## Config Defines",
+        "",
+        "| Macro | Value |",
+        "| --- | --- |",
+    ]
+
+    for name, value in profile["config"]["macros"].items():
+        lines.append(f"| `{name}` | `{value}` |")
+
+    lines.append("")
     return "\n".join(lines)
 
 

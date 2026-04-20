@@ -2,95 +2,6 @@
 # Profile Introspection
 This report is generated from the authored profile files [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), and [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). The renderer is board-specific to the Charybdis 4x6 and derives the current `LAYOUT()` slot order directly from [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 PD mode names and bindings in this report stay in sync with the shared definitions in [pd_mode_manifest.h](../users/noah/lib/pointing/defs/pd_mode_manifest.h).
-## Summary
-
-| Field | Value |
-| --- | --- |
-| `layer_count` | `5` |
-| `layout_key_count` | `56` |
-| `key_behavior_count` | `33` |
-| `key_behavior_step_count` | `47` |
-| `combo_count` | `2` |
-| `via_macro_count` | `16` |
-| `via_macro_non_empty_count` | `10` |
-| `hardcoded_macro_count` | `16` |
-| `hardcoded_macro_non_empty_count` | `0` |
-| `keymap_custom_keycode_count` | `3` |
-| `pd_mode_count` | `6` |
-| `pd_mode_color_count` | `6` |
-
-### Config Defines
-
-| Macro | Value |
-| --- | --- |
-| `TAPPING_TERM` | `200` |
-| `COMBO_TERM` | `50` |
-| `KEY_BEHAVIOR_MAX_TAP_COUNT` | `5` |
-| `CUSTOM_TAP_HOLD_TERM` | `150` |
-| `CUSTOM_LONGER_HOLD_TERM` | `400` |
-| `CUSTOM_MULTI_TAP_TERM` | `150` |
-| `CHARYBDIS_DRAGSCROLL_DPI` | `100` |
-| `PD_MODE_VOLUME_DPI` | `0` |
-| `PD_MODE_BRIGHTNESS_DPI` | `0` |
-| `PD_MODE_ZOOM_DPI` | `400` |
-| `PD_MODE_ARROW_DPI` | `400` |
-| `CHARYBDIS_MINIMUM_DEFAULT_DPI` | `800` |
-| `CHARYBDIS_DEFAULT_DPI_CONFIG_STEP` | `200` |
-| `CHARYBDIS_MINIMUM_SNIPING_DPI` | `200` |
-| `CHARYBDIS_SNIPING_DPI_CONFIG_STEP` | `100` |
-| `CHARYBDIS_AUTO_SNIPING_ENABLE` | `defined` |
-| `CHARYBDIS_AUTO_SNIPING_LAYER` | `LAYER_NAV` |
-| `POINTING_DEVICE_AUTO_MOUSE_ENABLE` | `defined` |
-| `AUTO_MOUSE_DEFAULT_LAYER` | `LAYER_POINTER` |
-| `AUTO_MOUSE_TIME` | `1200` |
-| `RGB_MATRIX_DEFAULT_MODE` | `RGB_MATRIX_SOLID_COLOR` |
-| `RGB_MATRIX_DEFAULT_HUE` | `0` |
-| `RGB_MATRIX_DEFAULT_SAT` | `255` |
-| `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | `200` |
-| `RGB_MATRIX_DEFAULT_VAL` | `RGB_MATRIX_MAXIMUM_BRIGHTNESS` |
-| `RGB_MATRIX_LED_FLUSH_LIMIT` | `32` |
-| `RGB_MATRIX_TIMEOUT` | `900000` |
-| `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` | `defined` |
-| `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` | `200` |
-| `RGB_AUTOMOUSE_GRADIENT_ENABLE` | `defined` |
-| `AUTOMOUSE_RGB_DEAD_TIME` | `(AUTO_MOUSE_TIME/3)` |
-
-### Authored Sources
-
-| File | Authored Surface |
-| --- | --- |
-| [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |
-| [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
-| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pd-mode colors, and key-behavior feedback colors |
-
-PD mode names and bindings in this report stay in sync with the shared definitions in [pd_mode_manifest.h](../users/noah/lib/pointing/defs/pd_mode_manifest.h).
-
-### Layer RGB Config
-
-| Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |
-| --- | --- | --- | --- |
-| `LAYER_BASE` | `ALL_KEYS` | `HSV(0, 0, 0)` | <img alt="LAYER_BASE preview color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" /> |
-| `LAYER_NUM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(85, 255, 200)` | <img alt="LAYER_NUM preview color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
-| `LAYER_SYM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(169, 255, 200)` | <img alt="LAYER_SYM preview color" src="media/profile-introspection/profile-color-swatch-0006ff.svg" width="96" height="28" /> |
-| `LAYER_NAV` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(180, 255, 200)` | <img alt="LAYER_NAV preview color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
-| `LAYER_POINTER` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 150)` | <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
-
-### Shared Keycode Surfaces
-
-- Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`
-- Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`
-- PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
-
-## Key-Behavior Feedback LEDs
-
-These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer and any pd-mode overlay.
-
-| State | Meaning | Authored HSV | Preview Color |
-| --- | --- | --- | --- |
-| `Multi Tap Pending` | Neutral white while the engine is still resolving the active tap index. | `HSV(0, 0, 150)` | <img alt="Multi Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
-| `Hold Active` | Orange for authored hold-tier pending / active states and hold-tier commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `Long Hold Active` | Icy cyan for authored long-hold-tier active states and long-hold-tier commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
-
 ## Layer Images
 
 These previews are generated as SVG image assets under [docs/media/profile-introspection/](media/profile-introspection). The renderer uses the authored `layer_colors[]` config from [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and the current `LAYOUT()` slot order from [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c):
@@ -292,6 +203,16 @@ No authored combos resolve entirely from keys on this layer.
 | --- | --- |
 | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
 
+## Key-Behavior Feedback LEDs
+
+These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer and any pd-mode overlay.
+
+| State | Meaning | Authored HSV | Preview Color |
+| --- | --- | --- | --- |
+| `Multi Tap Pending` | Neutral white while the engine is still resolving the active tap index. | `HSV(0, 0, 150)` | <img alt="Multi Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+| `Hold Active` | Orange for authored hold-tier pending / active states and hold-tier commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `Long Hold Active` | Icy cyan for authored long-hold-tier active states and long-hold-tier commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+
 ## Macro Inventory
 
 ### VIA Macros
@@ -312,6 +233,85 @@ No authored combos resolve entirely from keys on this layer.
 ### Hardcoded Macros
 
 No filled hardcoded macro slots.
+
+## Reference
+
+### Authored Sources
+
+| File | Authored Surface |
+| --- | --- |
+| [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |
+| [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
+| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pd-mode colors, and key-behavior feedback colors |
+
+### Shared Keycode Surfaces
+
+- Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`
+- Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`
+- PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
+
+### Layer RGB Config
+
+| Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |
+| --- | --- | --- | --- |
+| `LAYER_BASE` | `ALL_KEYS` | `HSV(0, 0, 0)` | <img alt="LAYER_BASE preview color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" /> |
+| `LAYER_NUM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(85, 255, 200)` | <img alt="LAYER_NUM preview color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
+| `LAYER_SYM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(169, 255, 200)` | <img alt="LAYER_SYM preview color" src="media/profile-introspection/profile-color-swatch-0006ff.svg" width="96" height="28" /> |
+| `LAYER_NAV` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(180, 255, 200)` | <img alt="LAYER_NAV preview color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
+| `LAYER_POINTER` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 150)` | <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+
+## Summary
+
+| Field | Value |
+| --- | --- |
+| `layer_count` | `5` |
+| `layout_key_count` | `56` |
+| `key_behavior_count` | `33` |
+| `key_behavior_step_count` | `47` |
+| `combo_count` | `2` |
+| `via_macro_count` | `16` |
+| `via_macro_non_empty_count` | `10` |
+| `hardcoded_macro_count` | `16` |
+| `hardcoded_macro_non_empty_count` | `0` |
+| `keymap_custom_keycode_count` | `3` |
+| `pd_mode_count` | `6` |
+| `pd_mode_color_count` | `6` |
+
+## Config Defines
+
+| Macro | Value |
+| --- | --- |
+| `TAPPING_TERM` | `200` |
+| `COMBO_TERM` | `50` |
+| `KEY_BEHAVIOR_MAX_TAP_COUNT` | `5` |
+| `CUSTOM_TAP_HOLD_TERM` | `150` |
+| `CUSTOM_LONGER_HOLD_TERM` | `400` |
+| `CUSTOM_MULTI_TAP_TERM` | `150` |
+| `CHARYBDIS_DRAGSCROLL_DPI` | `100` |
+| `PD_MODE_VOLUME_DPI` | `0` |
+| `PD_MODE_BRIGHTNESS_DPI` | `0` |
+| `PD_MODE_ZOOM_DPI` | `400` |
+| `PD_MODE_ARROW_DPI` | `400` |
+| `CHARYBDIS_MINIMUM_DEFAULT_DPI` | `800` |
+| `CHARYBDIS_DEFAULT_DPI_CONFIG_STEP` | `200` |
+| `CHARYBDIS_MINIMUM_SNIPING_DPI` | `200` |
+| `CHARYBDIS_SNIPING_DPI_CONFIG_STEP` | `100` |
+| `CHARYBDIS_AUTO_SNIPING_ENABLE` | `defined` |
+| `CHARYBDIS_AUTO_SNIPING_LAYER` | `LAYER_NAV` |
+| `POINTING_DEVICE_AUTO_MOUSE_ENABLE` | `defined` |
+| `AUTO_MOUSE_DEFAULT_LAYER` | `LAYER_POINTER` |
+| `AUTO_MOUSE_TIME` | `1200` |
+| `RGB_MATRIX_DEFAULT_MODE` | `RGB_MATRIX_SOLID_COLOR` |
+| `RGB_MATRIX_DEFAULT_HUE` | `0` |
+| `RGB_MATRIX_DEFAULT_SAT` | `255` |
+| `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | `200` |
+| `RGB_MATRIX_DEFAULT_VAL` | `RGB_MATRIX_MAXIMUM_BRIGHTNESS` |
+| `RGB_MATRIX_LED_FLUSH_LIMIT` | `32` |
+| `RGB_MATRIX_TIMEOUT` | `900000` |
+| `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` | `defined` |
+| `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` | `200` |
+| `RGB_AUTOMOUSE_GRADIENT_ENABLE` | `defined` |
+| `AUTOMOUSE_RGB_DEAD_TIME` | `(AUTO_MOUSE_TIME/3)` |
 
 ## Generated Assets
 
