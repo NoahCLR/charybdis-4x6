@@ -1,5 +1,32 @@
 # Progress
 
+## 2026-04-20 Runtime Freeze Watchdog Hardware Trigger Pass
+
+- Added one deliberate hardware watchdog trigger for validating the diagnostic
+  on-device from a non-idle runtime stage:
+  - `WATCHDOG_TEST_PROCESS_RECORD` is now a shared userspace keycode in `users/noah/noah_keymap_ids.h`,
+  - `users/noah/lib/key/runtime/key_runtime_process.c` consumes that key on press and freezes immediately from inside `NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD`, and
+  - the current profile exposes it only through a deliberate combo chord in `keymap.c`: `KC_ESC + LEFT_THUMB + RIGHT_THUMB`.
+- Kept the injector narrow and host-testable:
+  - `users/noah/lib/state/runtime/runtime_diag.h` and `.c` now expose `noah_runtime_diag_trigger_test_fault(...)`,
+  - RP2040 firmware builds still hard-freeze and let the watchdog reset the board, and
+  - the host backend records the triggered stage instead of hanging so the injector path is testable without weakening the real firmware behavior.
+- Hardened the deliberate reboot proof against ambiguous hardware-stage replay:
+  - `runtime_diag.c` now reserves separate watchdog scratch slots for the deliberate test fault breadcrumb,
+  - `noah_runtime_diag_post_init()` prefers that reserved breadcrumb when a deliberate watchdog test reboot is detected, and
+  - the reserved test breadcrumb is cleared during boot so it does not leak into later ordinary reconnects.
+- Fixed an RP2040 scratch-register collision in that same proof path:
+  - the first deliberate-test implementation reused watchdog scratch register `4`,
+  - Pico SDK uses `scratch[4]` internally for `watchdog_enable_caused_reboot()`, and
+  - the deliberate test breadcrumb is now packed into userspace-owned scratch slot `3` so the SDK watchdog reboot marker survives the reset.
+- Updated docs to make the verification path explicit:
+  - `docs/KEYMAP.md` now documents the deliberate combo and its expected `PROCESS_RECORD` breadcrumb result, and
+  - `README.md` now calls out the watchdog diagnostic and the hardware verification chord as part of the shared userspace capability set.
+- Next steps:
+  - flash the updated build,
+  - trigger `KC_ESC + LEFT_THUMB + RIGHT_THUMB` on hardware, and
+  - verify the reboot breadcrumb color now matches `PROCESS_RECORD` instead of collapsing back to `IDLE`.
+
 ## 2026-04-20 Runtime Freeze Watchdog Breadcrumb Pass
 
 - Added a master-side freeze diagnostic surface in `users/noah/lib/state/runtime/runtime_diag.h` and `.c`:

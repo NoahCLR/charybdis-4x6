@@ -10,7 +10,7 @@ PD mode names and bindings in this report stay in sync with the shared definitio
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `33` |
 | `key_behavior_step_count` | `46` |
-| `combo_count` | `2` |
+| `combo_count` | `3` |
 | `via_macro_count` | `16` |
 | `via_macro_non_empty_count` | `10` |
 | `hardcoded_macro_count` | `16` |
@@ -166,6 +166,7 @@ Timing legend for the layer-local behavior tables:
 | Inputs On This Layer | Output |
 | --- | --- |
 | `D` + `LT[NAV]/F` | `TAB` (`KC_TAB`) |
+| `ESC` + `LTHUMB` + `RTHUMB` | `WATCHDOG_TEST_PROCESS_RECORD` |
 
 ### `LAYER_NUM`
 

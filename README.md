@@ -70,6 +70,11 @@ to understand and easy to change:
 - `split_runtime_sync` syncs active and locked pointing-device mode ids,
   auto-mouse progress, key-feedback flags, and preview-layer state from master
   to slave so both halves render consistently
+- RP2040 builds also carry a master-side runtime freeze diagnostic: the
+  watchdog is only petted from housekeeping, the current outer runtime stage is
+  mirrored into watchdog scratch, RGB can show the latched reboot stage on the
+  next boot, and the keymap includes a deliberate `PROCESS_RECORD` watchdog
+  test chord for hardware verification
 
 The README is intentionally capability-focused. It explains what the shared
 runtime supports and how the pieces fit together. If you want one concrete

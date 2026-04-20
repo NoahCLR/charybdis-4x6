@@ -18,6 +18,7 @@
 #include "users/noah/lib/runtime_v2/runtime_v2_release_internal.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
+#include "users/noah/lib/state/runtime/runtime_diag.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_reset.h"
 #include "users/noah/lib/state/runtime/runtime_trace.h"
@@ -514,6 +515,18 @@ static void test_debug_reports_slot_phase_and_momentary_layer_interrupt_state(vo
     CHECK(!test_process_record(KC_V, other_key, true));
     CHECK(noah_runtime_debug_slot_phase(layer_key) == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
     CHECK(noah_runtime_debug_slot_momentary_tap_interrupted(layer_key));
+}
+
+static void test_watchdog_test_key_consumes_press_and_targets_process_record_stage(void) {
+    keypos_t key_pos = test_keypos(2, 3);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    noah_runtime_diag_post_init();
+
+    CHECK(!test_process_record(WATCHDOG_TEST_PROCESS_RECORD, key_pos, true));
+    CHECK(noah_runtime_diag_test_backend_fault_triggered());
+    CHECK(noah_runtime_diag_test_backend_fault_stage() == NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
 }
 
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
@@ -1871,6 +1884,7 @@ static void test_runtime_v2_projector_executes_effects_and_pending_dispatches(vo
 
 int main(void) {
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
+    test_watchdog_test_key_consumes_press_and_targets_process_record_stage();
     test_snapshot_captures_cross_subsystem_runtime_state();
     test_reset_clears_all_runtime_surfaces();
     test_runtime_v2_release_tracks_press_by_position_despite_keycode_mismatch();

@@ -26,9 +26,12 @@
 #endif
 
 #define NOAH_RUNTIME_DIAG_SCRATCH_MAGIC 0x4E444947u
+#define NOAH_RUNTIME_DIAG_TEST_FAULT_MAGIC 0x54455300u
+#define NOAH_RUNTIME_DIAG_TEST_FAULT_STAGE_MASK 0x000000FFu
 #define NOAH_RUNTIME_DIAG_SCRATCH_INDEX_MAGIC 0u
 #define NOAH_RUNTIME_DIAG_SCRATCH_INDEX_STAGE 1u
 #define NOAH_RUNTIME_DIAG_SCRATCH_INDEX_REBOOT_COUNT 2u
+#define NOAH_RUNTIME_DIAG_SCRATCH_INDEX_TEST_FAULT 3u
 
 typedef struct {
     bool                      initialized;
@@ -51,6 +54,8 @@ static bool     noah_runtime_diag_test_backend_watchdog_reboot_flag;
 static bool     noah_runtime_diag_test_backend_watchdog_enabled_flag;
 static uint32_t noah_runtime_diag_test_backend_watchdog_enable_calls;
 static uint32_t noah_runtime_diag_test_backend_watchdog_update_calls;
+static bool     noah_runtime_diag_test_backend_fault_triggered_flag;
+static uint32_t noah_runtime_diag_test_backend_fault_stage_value;
 #endif
 
 static bool noah_runtime_diag_backend_supported(void) {
@@ -153,6 +158,41 @@ static void noah_runtime_diag_backend_store_stage(noah_runtime_diag_stage_t stag
     noah_runtime_diag_backend_scratch_set(NOAH_RUNTIME_DIAG_SCRATCH_INDEX_REBOOT_COUNT, noah_runtime_diag_state.reboot_count);
 }
 
+static void noah_runtime_diag_backend_clear_test_fault_stage(void) {
+    if (!noah_runtime_diag_backend_supported()) {
+        return;
+    }
+
+    noah_runtime_diag_backend_scratch_set(NOAH_RUNTIME_DIAG_SCRATCH_INDEX_TEST_FAULT, 0u);
+}
+
+static void noah_runtime_diag_backend_store_test_fault_stage(noah_runtime_diag_stage_t stage) {
+    if (!noah_runtime_diag_backend_supported()) {
+        return;
+    }
+
+    noah_runtime_diag_backend_scratch_set(NOAH_RUNTIME_DIAG_SCRATCH_INDEX_TEST_FAULT, NOAH_RUNTIME_DIAG_TEST_FAULT_MAGIC | ((uint32_t)stage & NOAH_RUNTIME_DIAG_TEST_FAULT_STAGE_MASK));
+}
+
+static bool noah_runtime_diag_backend_load_test_fault_stage(noah_runtime_diag_stage_t *stage) {
+    uint32_t packed;
+
+    if (!noah_runtime_diag_backend_supported()) {
+        return false;
+    }
+
+    packed = noah_runtime_diag_backend_scratch_get(NOAH_RUNTIME_DIAG_SCRATCH_INDEX_TEST_FAULT);
+    if ((packed & ~NOAH_RUNTIME_DIAG_TEST_FAULT_STAGE_MASK) != NOAH_RUNTIME_DIAG_TEST_FAULT_MAGIC) {
+        return false;
+    }
+
+    if (stage) {
+        *stage = (noah_runtime_diag_stage_t)(packed & NOAH_RUNTIME_DIAG_TEST_FAULT_STAGE_MASK);
+    }
+
+    return true;
+}
+
 static void noah_runtime_diag_refresh_indicator(void) {
     if (noah_runtime_diag_state.indicator_active && noah_runtime_diag_backend_timer_elapsed32(noah_runtime_diag_state.indicator_started_at) >= NOAH_RUNTIME_DIAG_INDICATOR_MS) {
         noah_runtime_diag_state.indicator_active = false;
@@ -170,9 +210,10 @@ static void noah_runtime_diag_enable_watchdog_if_needed(void) {
 }
 
 void noah_runtime_diag_post_init(void) {
-    bool     reboot_latched = false;
-    uint32_t reboot_count   = 0u;
-    uint32_t stage          = 0u;
+    bool                      reboot_latched   = false;
+    uint32_t                  reboot_count     = 0u;
+    uint32_t                  stage            = 0u;
+    noah_runtime_diag_stage_t test_fault_stage = NOAH_RUNTIME_DIAG_STAGE_IDLE;
 
     noah_runtime_diag_state.initialized = true;
 
@@ -181,8 +222,12 @@ void noah_runtime_diag_post_init(void) {
         reboot_latched = true;
         stage          = noah_runtime_diag_backend_scratch_get(NOAH_RUNTIME_DIAG_SCRATCH_INDEX_STAGE);
         reboot_count   = noah_runtime_diag_backend_scratch_get(NOAH_RUNTIME_DIAG_SCRATCH_INDEX_REBOOT_COUNT);
+        if (noah_runtime_diag_backend_load_test_fault_stage(&test_fault_stage)) {
+            stage = (uint32_t)test_fault_stage;
+        }
     }
 
+    noah_runtime_diag_backend_clear_test_fault_stage();
     noah_runtime_diag_state.watchdog_reboot_latched = reboot_latched;
     noah_runtime_diag_state.latched_stage           = reboot_latched ? (noah_runtime_diag_stage_t)stage : NOAH_RUNTIME_DIAG_STAGE_IDLE;
     noah_runtime_diag_state.reboot_count            = reboot_latched && reboot_count < UINT8_MAX ? (uint8_t)(reboot_count + 1u) : 0u;
@@ -241,6 +286,20 @@ bool noah_runtime_diag_indicator_active(void) {
     return noah_runtime_diag_state.indicator_active;
 }
 
+void noah_runtime_diag_trigger_test_fault(noah_runtime_diag_stage_t stage) {
+    noah_runtime_diag_state.current_stage = stage;
+    noah_runtime_diag_backend_store_stage(stage);
+    noah_runtime_diag_backend_store_test_fault_stage(stage);
+
+#if defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
+    noah_runtime_diag_test_backend_fault_triggered_flag = true;
+    noah_runtime_diag_test_backend_fault_stage_value    = (uint32_t)stage;
+#else
+    while (true) {
+    }
+#endif
+}
+
 void noah_runtime_diag_reset_for_test(void) {
     memset(&noah_runtime_diag_state, 0, sizeof(noah_runtime_diag_state));
 #if defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
@@ -255,6 +314,8 @@ void noah_runtime_diag_test_backend_reset(void) {
     noah_runtime_diag_test_backend_watchdog_enabled_flag = false;
     noah_runtime_diag_test_backend_watchdog_enable_calls = 0u;
     noah_runtime_diag_test_backend_watchdog_update_calls = 0u;
+    noah_runtime_diag_test_backend_fault_triggered_flag  = false;
+    noah_runtime_diag_test_backend_fault_stage_value     = (uint32_t)NOAH_RUNTIME_DIAG_STAGE_IDLE;
 }
 
 void noah_runtime_diag_test_backend_seed_watchdog_reboot(noah_runtime_diag_stage_t stage, uint8_t reboot_count) {
@@ -290,5 +351,13 @@ uint32_t noah_runtime_diag_test_backend_watchdog_enable_count(void) {
 
 uint32_t noah_runtime_diag_test_backend_watchdog_update_count(void) {
     return noah_runtime_diag_test_backend_watchdog_update_calls;
+}
+
+bool noah_runtime_diag_test_backend_fault_triggered(void) {
+    return noah_runtime_diag_test_backend_fault_triggered_flag;
+}
+
+noah_runtime_diag_stage_t noah_runtime_diag_test_backend_fault_stage(void) {
+    return (noah_runtime_diag_stage_t)noah_runtime_diag_test_backend_fault_stage_value;
 }
 #endif

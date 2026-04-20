@@ -19,6 +19,7 @@ trap cleanup EXIT INT TERM
 # shellcheck disable=SC2086
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DNOAH_RUNTIME_TRACE_ENABLE \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

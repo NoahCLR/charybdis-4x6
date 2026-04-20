@@ -5,6 +5,11 @@
 
 #include "users/noah/lib/state/runtime/runtime_diag.h"
 
+enum {
+    TEST_FAULT_MAGIC      = 0x54455300u,
+    TEST_FAULT_STAGE_MASK = 0x000000FFu,
+};
+
 static uint32_t fake_time32;
 static bool     fake_is_master;
 
@@ -106,6 +111,18 @@ static void test_watchdog_reboot_latches_previous_stage(void) {
     CHECK(noah_runtime_diag_test_backend_scratch(2u) == 5u);
 }
 
+static void test_watchdog_reboot_prefers_deliberate_test_fault_stage(void) {
+    test_reset();
+    noah_runtime_diag_test_backend_seed_watchdog_reboot(NOAH_RUNTIME_DIAG_STAGE_IDLE, 1u);
+    noah_runtime_diag_test_backend_set_scratch(3u, TEST_FAULT_MAGIC | NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
+
+    noah_runtime_diag_post_init();
+
+    CHECK(noah_runtime_diag_watchdog_reboot_latched());
+    CHECK(noah_runtime_diag_watchdog_stage() == NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
+    CHECK(noah_runtime_diag_test_backend_scratch(3u) == 0u);
+}
+
 static void test_indicator_expires_after_timeout(void) {
     test_reset();
     noah_runtime_diag_test_backend_seed_watchdog_reboot(NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER, 0u);
@@ -117,13 +134,29 @@ static void test_indicator_expires_after_timeout(void) {
     CHECK(!noah_runtime_diag_indicator_active());
 }
 
+static void test_trigger_test_fault_records_stage_without_hanging_host(void) {
+    test_reset();
+    noah_runtime_diag_post_init();
+    noah_runtime_diag_test_backend_set_scratch(4u, 0x6ab73121u);
+
+    noah_runtime_diag_trigger_test_fault(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
+
+    CHECK(noah_runtime_diag_test_backend_fault_triggered());
+    CHECK(noah_runtime_diag_test_backend_fault_stage() == NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
+    CHECK(noah_runtime_diag_test_backend_scratch(1u) == NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
+    CHECK(noah_runtime_diag_test_backend_scratch(3u) == (TEST_FAULT_MAGIC | (NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD & TEST_FAULT_STAGE_MASK)));
+    CHECK(noah_runtime_diag_test_backend_scratch(4u) == 0x6ab73121u);
+}
+
 int main(void) {
     test_post_init_enables_watchdog_on_master();
     test_post_init_skips_watchdog_on_slave();
     test_nested_scopes_restore_parent_stage();
     test_heartbeat_updates_watchdog();
     test_watchdog_reboot_latches_previous_stage();
+    test_watchdog_reboot_prefers_deliberate_test_fault_stage();
     test_indicator_expires_after_timeout();
+    test_trigger_test_fault_records_stage_without_hanging_host();
 
     puts("runtime_diag host tests passed");
     return 0;

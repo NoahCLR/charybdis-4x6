@@ -141,6 +141,19 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key
     return KEY_RUNTIME_PROCESS_RETURN_FALSE;
 }
 
+static key_runtime_process_stage_outcome_t key_runtime_process_stage_watchdog_test(key_runtime_process_ctx_t *ctx) {
+    if (ctx->keycode != WATCHDOG_TEST_PROCESS_RECORD) {
+        return KEY_RUNTIME_PROCESS_NEXT;
+    }
+
+    if (ctx->record->event.pressed) {
+        key_runtime_trace_message("process:watchdog_test", "injecting deliberate process_record watchdog fault");
+        noah_runtime_diag_trigger_test_fault(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
+    }
+
+    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
+}
+
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key(key_runtime_process_ctx_t *ctx) {
     handled_key_resolution_t resolution = key_runtime_process_resolution(ctx);
     bool                     handled;
@@ -216,6 +229,7 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
         {.name = "preflight", .handler = key_runtime_process_stage_preflight},
         {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode},
         {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode},
+        {.name = "watchdog_test", .handler = key_runtime_process_stage_watchdog_test},
         {.name = "handled_key", .handler = key_runtime_process_stage_handled_key},
         {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup},
         {.name = "direct_action", .handler = key_runtime_process_stage_direct_action},
