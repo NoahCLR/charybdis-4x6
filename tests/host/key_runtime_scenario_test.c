@@ -311,11 +311,7 @@ static void test_other_press_does_not_flush_active_same_key_multi_tap_chain(void
 
 static void test_independent_pending_multi_tap_chains_can_coexist_and_flush_independently(void) {
     static const key_runtime_scenario_step_t setup[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 1, 1),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 1, 1),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY_TWO, 1, 3),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY_TWO, 1, 3),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 1, 1), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 1, 1), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY_TWO, 1, 3), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY_TWO, 1, 3),
     };
     static const key_runtime_scenario_step_t timeout_and_scan[] = {
         KEY_RUNTIME_SCENARIO_ADVANCE(121),

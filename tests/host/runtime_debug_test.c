@@ -758,7 +758,7 @@ static void test_key_runtime_core_timer_and_scan_do_not_rewrite_press_identity(v
 
 static void test_key_runtime_core_active_release_resolution_preserves_tap_window_without_scan(void) {
     key_runtime_core_active_release_resolution_t resolution;
-    keypos_t                               key_pos = test_keypos(4, 2);
+    keypos_t                                     key_pos = test_keypos(4, 2);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -776,7 +776,7 @@ static void test_key_runtime_core_active_release_resolution_preserves_tap_window
 
 static void test_key_runtime_core_active_release_resolution_tracks_threshold_hold_after_scan(void) {
     key_runtime_core_active_release_resolution_t resolution;
-    keypos_t                               key_pos = test_keypos(4, 3);
+    keypos_t                                     key_pos = test_keypos(4, 3);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -808,7 +808,7 @@ static void test_key_runtime_core_active_release_resolution_tracks_threshold_hol
 static void test_key_runtime_core_active_release_effect_plan_buffers_multi_tap(void) {
     key_runtime_core_active_release_resolution_t resolution;
     key_runtime_core_release_effect_plan_t       plan;
-    keypos_t                               key_pos = test_keypos(4, 6);
+    keypos_t                                     key_pos = test_keypos(4, 6);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -834,7 +834,7 @@ static void test_key_runtime_core_active_release_effect_plan_buffers_multi_tap(v
 static void test_key_runtime_core_active_release_effect_plan_releases_layer_and_taps(void) {
     key_runtime_core_active_release_resolution_t resolution;
     key_runtime_core_release_effect_plan_t       plan;
-    keypos_t                               key_pos = test_keypos(6, 3);
+    keypos_t                                     key_pos = test_keypos(6, 3);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -856,9 +856,9 @@ static void test_key_runtime_core_active_release_effect_plan_releases_layer_and_
 
 static void test_key_runtime_core_direct_active_release_helper_seeds_pending_multi_tap(void) {
     key_runtime_core_effect_plan_t plan;
-    const press_token_t     *token;
-    const tap_series_t      *series;
-    keypos_t                 key_pos = test_keypos(6, 6);
+    const press_token_t           *token;
+    const tap_series_t            *series;
+    keypos_t                       key_pos = test_keypos(6, 6);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -888,7 +888,7 @@ static void test_key_runtime_core_direct_active_release_helper_seeds_pending_mul
 
 static void test_key_runtime_core_pending_multi_tap_release_resolution_preserves_chain(void) {
     key_runtime_core_pending_multi_tap_release_resolution_t resolution;
-    keypos_t                                          key_pos = test_keypos(4, 4);
+    keypos_t                                                key_pos = test_keypos(4, 4);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -906,7 +906,7 @@ static void test_key_runtime_core_pending_multi_tap_release_resolution_preserves
 static void test_key_runtime_core_pending_multi_tap_release_effect_plan_preserves_chain(void) {
     key_runtime_core_pending_multi_tap_release_resolution_t resolution;
     key_runtime_core_release_effect_plan_t                  plan;
-    keypos_t                                          key_pos = test_keypos(6, 0);
+    keypos_t                                                key_pos = test_keypos(6, 0);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -923,7 +923,7 @@ static void test_key_runtime_core_pending_multi_tap_release_effect_plan_preserve
 
 static void test_key_runtime_core_pending_multi_tap_release_resolution_uses_hold_action_after_term(void) {
     key_runtime_core_pending_multi_tap_release_resolution_t resolution;
-    keypos_t                                          key_pos = test_keypos(4, 5);
+    keypos_t                                                key_pos = test_keypos(4, 5);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -941,7 +941,7 @@ static void test_key_runtime_core_pending_multi_tap_release_resolution_uses_hold
 static void test_key_runtime_core_pending_multi_tap_release_effect_plan_delays_action(void) {
     key_runtime_core_pending_multi_tap_release_resolution_t resolution;
     key_runtime_core_release_effect_plan_t                  plan;
-    delayed_action_mods_t                             mods = {
+    delayed_action_mods_t                                   mods = {
         .real = MOD_BIT(KC_LEFT_SHIFT),
     };
     keypos_t key_pos = test_keypos(6, 1);
@@ -966,9 +966,9 @@ static void test_key_runtime_core_pending_multi_tap_release_effect_plan_delays_a
 static void test_key_runtime_core_direct_pending_multi_tap_release_helper_resets_slot(void) {
     key_runtime_core_pending_multi_tap_release_resolution_t resolution;
     key_runtime_core_release_effect_plan_t                  plan;
-    const press_token_t                              *token;
-    const tap_series_t                               *series;
-    keypos_t                                          key_pos = test_keypos(6, 7);
+    const press_token_t                                    *token;
+    const tap_series_t                                     *series;
+    keypos_t                                                key_pos = test_keypos(6, 7);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1005,8 +1005,8 @@ static void test_key_runtime_core_direct_pending_multi_tap_release_helper_resets
 
 static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hold_threshold(void) {
     key_runtime_core_pending_multi_tap_scan_resolution_t resolution;
-    const tap_series_t                            *series;
-    keypos_t                                       key_pos = test_keypos(5, 0);
+    const tap_series_t                                  *series;
+    keypos_t                                             key_pos = test_keypos(5, 0);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1038,8 +1038,8 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hol
 
 static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_long_hold(void) {
     key_runtime_core_pending_multi_tap_scan_resolution_t resolution;
-    const tap_series_t                            *series;
-    keypos_t                                       key_pos = test_keypos(5, 1);
+    const tap_series_t                                  *series;
+    keypos_t                                             key_pos = test_keypos(5, 1);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1066,8 +1066,8 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_lon
 
 static void test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expired_chain(void) {
     key_runtime_core_pending_multi_tap_scan_resolution_t resolution;
-    const tap_series_t                            *series;
-    keypos_t                                       key_pos = test_keypos(5, 2);
+    const tap_series_t                                  *series;
+    keypos_t                                             key_pos = test_keypos(5, 2);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1151,12 +1151,12 @@ static void test_key_runtime_core_transition_flush_active_keys_retires_shadow_to
 }
 
 static void test_key_runtime_core_tap_series_state_stays_independent_from_active_token_storage(void) {
-    keypos_t                                       key_pos = test_keypos(6, 2);
-    const press_token_t                           *token;
-    const tap_series_t                            *series;
-    projection_snapshot_t                          snapshot;
+    keypos_t                                             key_pos = test_keypos(6, 2);
+    const press_token_t                                 *token;
+    const tap_series_t                                  *series;
+    projection_snapshot_t                                snapshot;
     key_runtime_core_pending_multi_tap_scan_resolution_t resolution;
-    runtime_event_t                                advance = {
+    runtime_event_t                                      advance = {
         .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
         .data.timer_advance =
             {
@@ -1239,8 +1239,8 @@ static void test_key_runtime_core_tap_series_state_stays_independent_from_active
 
 static void test_key_runtime_core_layer_lock_observes_live_layer_ownership_state(void) {
     const key_runtime_core_shadow_projection_t *shadow;
-    projection_snapshot_t                 snapshot;
-    keypos_t                              key_pos = test_keypos(1, 1);
+    projection_snapshot_t                       snapshot;
+    keypos_t                                    key_pos = test_keypos(1, 1);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1323,9 +1323,9 @@ static void test_key_runtime_core_layer_tap_hold_creates_and_retires_layer_lease
 
 static void test_key_runtime_core_modifier_leases_keep_physical_and_managed_masks_separate(void) {
     const key_runtime_core_shadow_projection_t *shadow;
-    keypos_t                              physical_pos = test_keypos(3, 3);
-    keypos_t                              mod_tap_pos  = test_keypos(3, 4);
-    runtime_event_t                       advance      = {
+    keypos_t                                    physical_pos = test_keypos(3, 3);
+    keypos_t                                    mod_tap_pos  = test_keypos(3, 4);
+    runtime_event_t                             advance      = {
         .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
         .data.timer_advance =
             {
@@ -1364,8 +1364,8 @@ static void test_key_runtime_core_modifier_leases_keep_physical_and_managed_mask
 
 static void test_key_runtime_core_replacing_a_live_token_cleans_up_owned_leases(void) {
     const key_runtime_core_shadow_projection_t *shadow;
-    projection_snapshot_t                 snapshot;
-    keypos_t                              key_pos = test_keypos(5, 5);
+    projection_snapshot_t                       snapshot;
+    keypos_t                                    key_pos = test_keypos(5, 5);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1387,8 +1387,8 @@ static void test_key_runtime_core_replacing_a_live_token_cleans_up_owned_leases(
 
 static void test_key_runtime_core_pd_mode_press_creates_active_mode_and_pointer_anchor(void) {
     const key_runtime_core_shadow_projection_t *shadow;
-    projection_snapshot_t                 snapshot;
-    keypos_t                              key_pos = test_keypos(1, 6);
+    projection_snapshot_t                       snapshot;
+    keypos_t                                    key_pos = test_keypos(1, 6);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1419,8 +1419,8 @@ static void test_key_runtime_core_pd_mode_press_creates_active_mode_and_pointer_
 
 static void test_key_runtime_core_arrow_mode_prefers_typing_without_pointer_anchor(void) {
     const key_runtime_core_shadow_projection_t *shadow;
-    projection_snapshot_t                 snapshot;
-    keypos_t                              key_pos = test_keypos(1, 7);
+    projection_snapshot_t                       snapshot;
+    keypos_t                                    key_pos = test_keypos(1, 7);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1444,7 +1444,7 @@ static void test_key_runtime_core_arrow_mode_prefers_typing_without_pointer_anch
 
 static void test_key_runtime_core_pd_mode_lock_observes_live_pd_mode_state(void) {
     const key_runtime_core_shadow_projection_t *shadow;
-    projection_snapshot_t                 snapshot;
+    projection_snapshot_t                       snapshot;
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1486,9 +1486,9 @@ static void test_key_runtime_core_pd_mode_lock_observes_live_pd_mode_state(void)
 
 static void test_key_runtime_core_activating_new_pd_mode_clears_foreign_mode_leases(void) {
     const key_runtime_core_shadow_projection_t *shadow;
-    projection_snapshot_t                 snapshot;
-    keypos_t                              volume_pos = test_keypos(2, 6);
-    keypos_t                              arrow_pos  = test_keypos(2, 7);
+    projection_snapshot_t                       snapshot;
+    keypos_t                                    volume_pos = test_keypos(2, 6);
+    keypos_t                                    arrow_pos  = test_keypos(2, 7);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();

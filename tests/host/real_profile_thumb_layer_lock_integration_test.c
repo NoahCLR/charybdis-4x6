@@ -282,11 +282,11 @@ static const test_release_order_case_t test_release_orders[] = {
 };
 
 static void test_reset_state(void) {
-    fake_time                  = 1000;
-    test_tap_code16_count      = 0;
-    test_last_tap_code16       = KC_NO;
-    test_delayed_action_count  = 0;
-    test_last_delayed_action   = KC_NO;
+    fake_time                 = 1000;
+    test_tap_code16_count     = 0;
+    test_last_tap_code16      = KC_NO;
+    test_delayed_action_count = 0;
+    test_last_delayed_action  = KC_NO;
     memset(test_delayed_actions, 0, sizeof(test_delayed_actions));
     current_cpi                = 0;
     fake_mods                  = 0;

@@ -9,7 +9,7 @@ PD mode names and bindings in this report stay in sync with the shared definitio
 | `layer_count` | `5` |
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `33` |
-| `key_behavior_step_count` | `46` |
+| `key_behavior_step_count` | `47` |
 | `combo_count` | `2` |
 | `via_macro_count` | `16` |
 | `via_macro_non_empty_count` | `10` |
@@ -145,6 +145,7 @@ Timing legend for the layer-local behavior tables:
 | `LT[NAV]/SLSH` | `LT[NAV]/SLSH` (`LT(LAYER_NAV,KC_SLSH)`) | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))` | `-` | `tap_hold=100, multi_tap(150)` |
 | `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(ARROW_MODE_LOCK)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)` | `-` | `tap_hold(150), multi_tap(150)` |
+| `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `triple` | `TAP_SENDS(OSM(MOD_LSFT))` | `-` | `-` | `multi_tap(150)` |
 | `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `tap_hold=150, multi_tap(150)` |
 | `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold=150, long_hold(400), multi_tap(150)` |
 | `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `tap_hold=150, long_hold(400), multi_tap(150)` |

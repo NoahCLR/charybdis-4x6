@@ -37,8 +37,8 @@ typedef enum {
 
 typedef struct {
     key_runtime_core_pending_multi_tap_release_outcome_t outcome;
-    uint16_t                                       action;
-    uint8_t                                        repeat_count;
+    uint16_t                                             action;
+    uint8_t                                              repeat_count;
 } key_runtime_core_pending_multi_tap_release_resolution_t;
 
 typedef enum {
@@ -50,11 +50,11 @@ typedef enum {
 
 typedef struct {
     key_runtime_core_pending_multi_tap_scan_outcome_t outcome;
-    hold_behavior_t                             hold;
-    handled_key_hold_semantics_t                semantics;
-    bool                                        completes_hold;
-    uint16_t                                    action;
-    uint8_t                                     repeat_count;
+    hold_behavior_t                                   hold;
+    handled_key_hold_semantics_t                      semantics;
+    bool                                              completes_hold;
+    uint16_t                                          action;
+    uint8_t                                           repeat_count;
 } key_runtime_core_pending_multi_tap_scan_resolution_t;
 
 typedef enum {

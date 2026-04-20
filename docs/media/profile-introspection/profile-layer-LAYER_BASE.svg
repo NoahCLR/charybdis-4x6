@@ -229,6 +229,7 @@
   <g transform="rotate(0 357.0 437.0)">
     <rect x="328.0" y="408.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="357.0" y="441.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LGUI</text>
+    <circle cx="364.0" cy="418.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
     <circle cx="376.0" cy="418.0" r="5.5" fill="#ff7e00" stroke="#f7f7f4" stroke-width="1.5"/>
   </g>
   <g transform="rotate(10 425.0 433.0)">

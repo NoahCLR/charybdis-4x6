@@ -91,9 +91,9 @@ static void key_runtime_core_effect_plan_push_dispatch_action(key_runtime_core_e
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                          .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
-                                          .data.action = action,
-                                      });
+                                                .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+                                                .data.action = action,
+                                            });
 }
 
 static void key_runtime_core_effect_plan_push_held_action(key_runtime_core_effect_plan_t *plan, key_runtime_effect_kind_t kind, keypos_t key_pos, uint16_t action) {
@@ -102,13 +102,13 @@ static void key_runtime_core_effect_plan_push_held_action(key_runtime_core_effec
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                          .kind = kind,
-                                          .data.held_action =
-                                              {
-                                                  .key_pos = key_pos,
-                                                  .action  = action,
-                                              },
-                                      });
+                                                .kind = kind,
+                                                .data.held_action =
+                                                    {
+                                                        .key_pos = key_pos,
+                                                        .action  = action,
+                                                    },
+                                            });
 }
 
 static void key_runtime_core_effect_plan_push_release_owned_state(key_runtime_core_effect_plan_t *plan, keypos_t key_pos) {
@@ -117,9 +117,9 @@ static void key_runtime_core_effect_plan_push_release_owned_state(key_runtime_co
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                          .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
-                                          .data.key_pos = key_pos,
-                                      });
+                                                .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+                                                .data.key_pos = key_pos,
+                                            });
 }
 
 static void key_runtime_core_effect_plan_push_repeat_start(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
@@ -128,14 +128,14 @@ static void key_runtime_core_effect_plan_push_repeat_start(key_runtime_core_effe
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                          .kind = KEY_RUNTIME_EFFECT_REPEAT_START,
-                                          .data.repeat =
-                                              {
-                                                  .key_pos   = key_pos,
-                                                  .action    = action,
-                                                  .repeat_hz = repeat_hz,
-                                              },
-                                      });
+                                                .kind = KEY_RUNTIME_EFFECT_REPEAT_START,
+                                                .data.repeat =
+                                                    {
+                                                        .key_pos   = key_pos,
+                                                        .action    = action,
+                                                        .repeat_hz = repeat_hz,
+                                                    },
+                                            });
 }
 
 static void key_runtime_core_effect_plan_push_layer_press(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint8_t layer) {
@@ -144,13 +144,13 @@ static void key_runtime_core_effect_plan_push_layer_press(key_runtime_core_effec
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                          .kind = KEY_RUNTIME_EFFECT_LAYER_PRESS,
-                                          .data.layer_press =
-                                              {
-                                                  .key_pos = key_pos,
-                                                  .layer   = layer,
-                                              },
-                                      });
+                                                .kind = KEY_RUNTIME_EFFECT_LAYER_PRESS,
+                                                .data.layer_press =
+                                                    {
+                                                        .key_pos = key_pos,
+                                                        .layer   = layer,
+                                                    },
+                                            });
 }
 
 static void key_runtime_core_effect_plan_push_layer_release(key_runtime_core_effect_plan_t *plan, keypos_t key_pos) {
@@ -159,9 +159,9 @@ static void key_runtime_core_effect_plan_push_layer_release(key_runtime_core_eff
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                          .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
-                                          .data.key_pos = key_pos,
-                                      });
+                                                .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
+                                                .data.key_pos = key_pos,
+                                            });
 }
 
 static void key_runtime_core_effect_plan_push_feedback_pulse(key_runtime_core_effect_plan_t *plan, bool long_hold_level) {
@@ -170,9 +170,9 @@ static void key_runtime_core_effect_plan_push_feedback_pulse(key_runtime_core_ef
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                          .kind                 = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-                                          .data.long_hold_level = long_hold_level,
-                                      });
+                                                .kind                 = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
+                                                .data.long_hold_level = long_hold_level,
+                                            });
 }
 
 static void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_effect_plan_t *plan, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
@@ -181,14 +181,14 @@ static void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_ef
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                          .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
-                                          .data.delayed_action =
-                                              {
-                                                  .action       = action,
-                                                  .mods         = mods,
-                                                  .repeat_count = repeat_count,
-                                              },
-                                      });
+                                                .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
+                                                .data.delayed_action =
+                                                    {
+                                                        .action       = action,
+                                                        .mods         = mods,
+                                                        .repeat_count = repeat_count,
+                                                    },
+                                            });
 }
 
 static void key_runtime_core_release_effect_plan_push(key_runtime_core_release_effect_plan_t *plan, key_runtime_effect_t effect) {
@@ -210,9 +210,9 @@ static void key_runtime_core_release_effect_plan_push_dispatch_action(key_runtim
     }
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                  .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
-                                                  .data.action = action,
-                                              });
+                                                        .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+                                                        .data.action = action,
+                                                    });
 }
 
 static void key_runtime_core_release_effect_plan_push_held_action(key_runtime_core_release_effect_plan_t *plan, key_runtime_effect_kind_t kind, keypos_t key_pos, uint16_t action) {
@@ -221,13 +221,13 @@ static void key_runtime_core_release_effect_plan_push_held_action(key_runtime_co
     }
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                  .kind = kind,
-                                                  .data.held_action =
-                                                      {
-                                                          .key_pos = key_pos,
-                                                          .action  = action,
-                                                      },
-                                              });
+                                                        .kind = kind,
+                                                        .data.held_action =
+                                                            {
+                                                                .key_pos = key_pos,
+                                                                .action  = action,
+                                                            },
+                                                    });
 }
 
 static void key_runtime_core_release_effect_plan_push_release_owned_state(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos) {
@@ -236,9 +236,9 @@ static void key_runtime_core_release_effect_plan_push_release_owned_state(key_ru
     }
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                  .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
-                                                  .data.key_pos = key_pos,
-                                              });
+                                                        .kind         = KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY,
+                                                        .data.key_pos = key_pos,
+                                                    });
 }
 
 static void key_runtime_core_release_effect_plan_push_layer_release(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos) {
@@ -247,9 +247,9 @@ static void key_runtime_core_release_effect_plan_push_layer_release(key_runtime_
     }
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                  .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
-                                                  .data.key_pos = key_pos,
-                                              });
+                                                        .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
+                                                        .data.key_pos = key_pos,
+                                                    });
 }
 
 static void key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, pd_mode_mask_t mode) {
@@ -258,9 +258,9 @@ static void key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(key_runti
     }
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                  .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
-                                                  .data.pd_mode = mode,
-                                              });
+                                                        .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+                                                        .data.pd_mode = mode,
+                                                    });
 }
 
 static void key_runtime_core_release_effect_plan_push_delayed_action(key_runtime_core_release_effect_plan_t *plan, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
@@ -269,14 +269,14 @@ static void key_runtime_core_release_effect_plan_push_delayed_action(key_runtime
     }
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                  .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
-                                                  .data.delayed_action =
-                                                      {
-                                                          .action       = action,
-                                                          .mods         = mods,
-                                                          .repeat_count = repeat_count,
-                                                      },
-                                              });
+                                                        .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
+                                                        .data.delayed_action =
+                                                            {
+                                                                .action       = action,
+                                                                .mods         = mods,
+                                                                .repeat_count = repeat_count,
+                                                            },
+                                                    });
 }
 
 static void key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, uint16_t action) {
@@ -1335,7 +1335,7 @@ static void key_runtime_core_release_pd_related_leases_for_token(key_runtime_cor
 
 static void key_runtime_core_shadow_projection_recompute(key_runtime_core_state_t *state) {
     key_runtime_core_shadow_projection_t projection                  = {0};
-    bool                           pointer_anchor_lease_active = false;
+    bool                                 pointer_anchor_lease_active = false;
 
     if (!state) {
         return;
@@ -1965,8 +1965,8 @@ uint8_t key_runtime_core_pending_release_count(void) {
 
 bool key_runtime_core_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    press_token_t      *token;
-    pending_release_t  *pending;
+    press_token_t            *token;
+    pending_release_t        *pending;
 
     if (!(state && action != KC_NO && key_runtime_core_keypos_valid(key_pos))) {
         return false;
@@ -1992,7 +1992,7 @@ bool key_runtime_core_queue_pending_release_dispatch(keypos_t key_pos, uint16_t 
 
 bool key_runtime_core_pending_release_at_order(uint8_t order, pending_release_t *out) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    int16_t             index;
+    int16_t                   index;
 
     if (out) {
         *out = (pending_release_t){0};
@@ -2013,7 +2013,7 @@ bool key_runtime_core_pending_release_at_order(uint8_t order, pending_release_t 
 
 bool key_runtime_core_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *action, uint8_t *repeat_count) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    tap_series_t       *series;
+    tap_series_t             *series;
 
     if (action) {
         *action = KC_NO;
@@ -2037,7 +2037,7 @@ bool key_runtime_core_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *a
 
 bool key_runtime_core_reset_pending_multi_tap(keypos_t key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    tap_series_t       *series;
+    tap_series_t             *series;
 
     if (!(state && key_runtime_core_keypos_valid(key_pos))) {
         return false;
@@ -2054,7 +2054,7 @@ bool key_runtime_core_reset_pending_multi_tap(keypos_t key_pos) {
 
 bool key_runtime_core_retire_press_token(keypos_t key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    press_token_t      *token;
+    press_token_t            *token;
 
     if (!(state && key_runtime_core_keypos_valid(key_pos))) {
         return false;
@@ -2071,7 +2071,7 @@ bool key_runtime_core_retire_press_token(keypos_t key_pos) {
 
 uint8_t key_runtime_core_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    uint8_t             count = 0;
+    uint8_t                   count = 0;
 
     if (!(state && out && capacity != 0u) || key_runtime_core_effective_deferred_release_blocker_count(state) != 0u) {
         return 0u;
@@ -2099,7 +2099,7 @@ uint8_t key_runtime_core_take_pending_release_dispatches(pending_release_t *out,
 
 void key_runtime_core_observe_held_action_register(keypos_t key_pos, uint16_t action) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    press_token_t      *token;
+    press_token_t            *token;
 
     if (!(state && action != KC_NO && key_runtime_core_keypos_valid(key_pos))) {
         return;
@@ -2131,7 +2131,7 @@ void key_runtime_core_observe_held_action_register(keypos_t key_pos, uint16_t ac
 
 void key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t action) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    lease_t            *lease;
+    lease_t                  *lease;
 
     if (!(state && action != KC_NO && key_runtime_core_keypos_valid(key_pos))) {
         return;
@@ -2150,7 +2150,7 @@ void key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t 
 
 void key_runtime_core_observe_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    press_token_t      *token;
+    press_token_t            *token;
 
     if (!(state && action != KC_NO && key_runtime_core_keypos_valid(key_pos))) {
         return;
@@ -2185,9 +2185,9 @@ bool key_runtime_core_release_owned_state_by_key(keypos_t key_pos) {
 
 bool key_runtime_core_finalize_non_handled_release(keypos_t key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    press_token_t      *token;
-    uint8_t             lease_count_before;
-    bool                changed = false;
+    press_token_t            *token;
+    uint8_t                   lease_count_before;
+    bool                      changed = false;
 
     if (!(state && key_runtime_core_keypos_valid(key_pos))) {
         return false;
@@ -2215,7 +2215,7 @@ bool key_runtime_core_finalize_non_handled_release(keypos_t key_pos) {
 }
 
 bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_active_release_resolution_t *out) {
-    key_runtime_core_state_t                  *state = key_runtime_core_state();
+    key_runtime_core_state_t            *state = key_runtime_core_state();
     press_token_t                       *token;
     key_runtime_slot_release_semantics_t semantics;
     key_runtime_slot_release_query_t     query;
@@ -2325,7 +2325,7 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
 }
 
 bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, key_runtime_core_pending_multi_tap_release_resolution_t *out) {
-    key_runtime_core_state_t                  *state = key_runtime_core_state();
+    key_runtime_core_state_t            *state = key_runtime_core_state();
     press_token_t                       *token;
     tap_series_t                        *series;
     key_runtime_slot_release_semantics_t semantics = {
@@ -2477,11 +2477,11 @@ bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, b
 
 bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runtime_core_pending_multi_tap_scan_resolution_t *out) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    press_token_t      *token;
-    tap_series_t       *series;
-    uint16_t            elapsed;
-    uint16_t            flush_action;
-    uint8_t             flush_repeat_count;
+    press_token_t            *token;
+    tap_series_t             *series;
+    uint16_t                  elapsed;
+    uint16_t                  flush_action;
+    uint8_t                   flush_repeat_count;
 
     if (out) {
         *out = (key_runtime_core_pending_multi_tap_scan_resolution_t){0};
@@ -2785,9 +2785,9 @@ static void key_runtime_core_plan_threshold_hold_effects(key_runtime_core_state_
 
 static void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state_t *state, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_pending_multi_tap_scan_resolution_t resolution;
-    press_token_t                                 *token;
-    tap_series_t                                  *series;
-    delayed_action_mods_t                          mods;
+    press_token_t                                       *token;
+    tap_series_t                                        *series;
+    delayed_action_mods_t                                mods;
 
     if (!(state && plan)) {
         return;
@@ -2980,12 +2980,12 @@ void key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_cor
 }
 
 bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_core_effect_plan_t *plan) {
-    key_runtime_core_state_t   *state = key_runtime_core_state();
-    press_token_t        *token;
-    tap_series_t         *series;
-    uint16_t              action;
-    uint8_t               repeat_count;
-    delayed_action_mods_t mods;
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    press_token_t            *token;
+    tap_series_t             *series;
+    uint16_t                  action;
+    uint8_t                   repeat_count;
+    delayed_action_mods_t     mods;
 
     if (!(state && plan && handled_key_resolution_is_handled(resolution) && key_runtime_core_keypos_valid(key_pos))) {
         return false;
@@ -3033,12 +3033,12 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
 
 bool key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_state_t                               *state = key_runtime_core_state();
-    press_token_t                                    *token;
-    tap_series_t                                     *series;
+    press_token_t                                          *token;
+    tap_series_t                                           *series;
     key_runtime_core_release_effect_plan_t                  release_plan;
     key_runtime_core_active_release_resolution_t            active_resolution;
     key_runtime_core_pending_multi_tap_release_resolution_t pending_resolution;
-    delayed_action_mods_t                             series_mods;
+    delayed_action_mods_t                                   series_mods;
 
     if (!(state && plan && handled_key_resolution_is_handled(resolution) && key_runtime_core_keypos_valid(key_pos))) {
         return false;
@@ -3096,7 +3096,7 @@ void key_runtime_core_scan(key_runtime_core_effect_plan_t *plan, uint16_t now) {
 
 bool key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_state_t *state       = key_runtime_core_state();
-    bool                settled_any = false;
+    bool                      settled_any = false;
 
     if (!(state && plan)) {
         return false;
@@ -3130,7 +3130,7 @@ uint8_t key_runtime_core_active_press_token_count(void) {
 
 bool key_runtime_core_active_press_token_key_pos(uint8_t order, keypos_t *out) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    uint8_t             seen  = 0u;
+    uint8_t                   seen  = 0u;
 
     if (out) {
         *out = (keypos_t){0};
@@ -3163,7 +3163,7 @@ uint8_t key_runtime_core_pending_multi_tap_count(void) {
 
 bool key_runtime_core_pending_multi_tap_key_pos(uint8_t order, keypos_t *out) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    uint8_t             seen  = 0u;
+    uint8_t                   seen  = 0u;
 
     if (out) {
         *out = (keypos_t){0};
@@ -3339,7 +3339,7 @@ const key_runtime_core_shadow_projection_t *key_runtime_core_shadow_projection(v
 
 uint8_t key_runtime_core_pending_release_count_for_keypos(keypos_t key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    uint8_t             count = 0;
+    uint8_t                   count = 0;
 
     if (!(state && key_runtime_core_keypos_valid(key_pos))) {
         return 0u;
@@ -3358,7 +3358,7 @@ uint8_t key_runtime_core_pending_release_count_for_keypos(keypos_t key_pos) {
 
 uint8_t key_runtime_core_deferred_release_blocker_count_for_keypos(keypos_t key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    press_token_t      *token = key_runtime_core_press_token_state(state, key_pos);
+    press_token_t            *token = key_runtime_core_press_token_state(state, key_pos);
 
     return key_runtime_core_press_token_blocks_deferred_release(state, token) ? 1u : 0u;
 }
@@ -3373,7 +3373,7 @@ void key_runtime_core_layer_lock_set(uint8_t layer, bool active) {
 
 void key_runtime_core_pd_mode_lock_set(pd_mode_mask_t mode, bool active) {
     key_runtime_core_state_t *state   = key_runtime_core_state();
-    bool                changed = false;
+    bool                      changed = false;
 
     if (!(state && mode != 0)) {
         return;
@@ -3439,7 +3439,7 @@ projection_snapshot_t key_runtime_core_projection_snapshot_capture(void) {
     layer_ownership_debug_snapshot_t        layer_snapshot;
     keyboard_mod_ownership_debug_snapshot_t mod_snapshot;
     pointer_layer_policy_debug_snapshot_t   pointer_snapshot;
-    key_runtime_core_state_t                     *state = key_runtime_core_state();
+    key_runtime_core_state_t               *state = key_runtime_core_state();
 
     memset(&layer_snapshot, 0, sizeof(layer_snapshot));
     memset(&mod_snapshot, 0, sizeof(mod_snapshot));
@@ -3504,9 +3504,9 @@ bool key_runtime_core_projection_snapshot_equal(const projection_snapshot_t *lhs
     }
 
     return lhs->layer_state == rhs->layer_state && lhs->locked_layer_mask == rhs->locked_layer_mask && lhs->keyboard_mod_state.real == rhs->keyboard_mod_state.real && lhs->keyboard_mod_state.weak == rhs->keyboard_mod_state.weak && lhs->keyboard_mod_state.oneshot == rhs->keyboard_mod_state.oneshot && lhs->keyboard_mod_state.oneshot_locked == rhs->keyboard_mod_state.oneshot_locked && lhs->keyboard_managed_mod_mask == rhs->keyboard_managed_mod_mask && lhs->keyboard_physical_mod_mask == rhs->keyboard_physical_mod_mask && lhs->pd_mode_local_active == rhs->pd_mode_local_active && lhs->pd_mode_local_locked == rhs->pd_mode_local_locked && lhs->pd_mode_display_active == rhs->pd_mode_display_active && lhs->pd_mode_display_locked == rhs->pd_mode_display_locked && lhs->pointer_anchor_active == rhs->pointer_anchor_active && lhs->pointer_pd_mode_anchor_active == rhs->pointer_pd_mode_anchor_active && lhs->pointer_prefers_typing_layer == rhs->pointer_prefers_typing_layer &&
-           lhs->pointer_toggle_enabled == rhs->pointer_toggle_enabled && lhs->pointer_sniping_layer_active == rhs->pointer_sniping_layer_active && lhs->pointer_key_tracker == rhs->pointer_key_tracker && lhs->pointer_layer == rhs->pointer_layer && lhs->active_slot_count == rhs->active_slot_count && lhs->pending_multi_tap_slot_count == rhs->pending_multi_tap_slot_count && lhs->deferred_release_count == rhs->deferred_release_count && lhs->deferred_release_blocker_count == rhs->deferred_release_blocker_count && lhs->deferred_release_timed_blocker_count == rhs->deferred_release_timed_blocker_count && lhs->core_shadow_layer_state == rhs->core_shadow_layer_state && lhs->core_shadow_locked_layer_mask == rhs->core_shadow_locked_layer_mask && lhs->core_shadow_keyboard_mod_state.real == rhs->core_shadow_keyboard_mod_state.real && lhs->core_shadow_keyboard_mod_state.weak == rhs->core_shadow_keyboard_mod_state.weak && lhs->core_shadow_keyboard_mod_state.oneshot == rhs->core_shadow_keyboard_mod_state.oneshot &&
-           lhs->core_shadow_keyboard_mod_state.oneshot_locked == rhs->core_shadow_keyboard_mod_state.oneshot_locked && lhs->core_shadow_keyboard_managed_mod_mask == rhs->core_shadow_keyboard_managed_mod_mask && lhs->core_shadow_keyboard_physical_mod_mask == rhs->core_shadow_keyboard_physical_mod_mask && lhs->core_shadow_pd_mode_local_active == rhs->core_shadow_pd_mode_local_active && lhs->core_shadow_pd_mode_local_locked == rhs->core_shadow_pd_mode_local_locked && lhs->core_shadow_pointer_anchor_active == rhs->core_shadow_pointer_anchor_active && lhs->core_shadow_pointer_pd_mode_anchor_active == rhs->core_shadow_pointer_pd_mode_anchor_active && lhs->core_shadow_pointer_prefers_typing_layer == rhs->core_shadow_pointer_prefers_typing_layer && lhs->core_shadow_pointer_toggle_enabled == rhs->core_shadow_pointer_toggle_enabled && lhs->core_press_token_count == rhs->core_press_token_count && lhs->core_tap_series_count == rhs->core_tap_series_count && lhs->core_lease_count == rhs->core_lease_count &&
-           lhs->core_pending_release_count == rhs->core_pending_release_count && lhs->core_deferred_release_blocker_count == rhs->core_deferred_release_blocker_count && lhs->core_deferred_release_timed_blocker_count == rhs->core_deferred_release_timed_blocker_count && lhs->core_persistent_intent_count == rhs->core_persistent_intent_count && lhs->core_release_keycode_mismatch_count == rhs->core_release_keycode_mismatch_count && lhs->core_orphan_release_count == rhs->core_orphan_release_count && lhs->core_cancelled_press_count == rhs->core_cancelled_press_count;
+           lhs->pointer_toggle_enabled == rhs->pointer_toggle_enabled && lhs->pointer_sniping_layer_active == rhs->pointer_sniping_layer_active && lhs->pointer_key_tracker == rhs->pointer_key_tracker && lhs->pointer_layer == rhs->pointer_layer && lhs->active_slot_count == rhs->active_slot_count && lhs->pending_multi_tap_slot_count == rhs->pending_multi_tap_slot_count && lhs->deferred_release_count == rhs->deferred_release_count && lhs->deferred_release_blocker_count == rhs->deferred_release_blocker_count && lhs->deferred_release_timed_blocker_count == rhs->deferred_release_timed_blocker_count && lhs->core_shadow_layer_state == rhs->core_shadow_layer_state && lhs->core_shadow_locked_layer_mask == rhs->core_shadow_locked_layer_mask && lhs->core_shadow_keyboard_mod_state.real == rhs->core_shadow_keyboard_mod_state.real && lhs->core_shadow_keyboard_mod_state.weak == rhs->core_shadow_keyboard_mod_state.weak &&
+           lhs->core_shadow_keyboard_mod_state.oneshot == rhs->core_shadow_keyboard_mod_state.oneshot && lhs->core_shadow_keyboard_mod_state.oneshot_locked == rhs->core_shadow_keyboard_mod_state.oneshot_locked && lhs->core_shadow_keyboard_managed_mod_mask == rhs->core_shadow_keyboard_managed_mod_mask && lhs->core_shadow_keyboard_physical_mod_mask == rhs->core_shadow_keyboard_physical_mod_mask && lhs->core_shadow_pd_mode_local_active == rhs->core_shadow_pd_mode_local_active && lhs->core_shadow_pd_mode_local_locked == rhs->core_shadow_pd_mode_local_locked && lhs->core_shadow_pointer_anchor_active == rhs->core_shadow_pointer_anchor_active && lhs->core_shadow_pointer_pd_mode_anchor_active == rhs->core_shadow_pointer_pd_mode_anchor_active && lhs->core_shadow_pointer_prefers_typing_layer == rhs->core_shadow_pointer_prefers_typing_layer && lhs->core_shadow_pointer_toggle_enabled == rhs->core_shadow_pointer_toggle_enabled && lhs->core_press_token_count == rhs->core_press_token_count &&
+           lhs->core_tap_series_count == rhs->core_tap_series_count && lhs->core_lease_count == rhs->core_lease_count && lhs->core_pending_release_count == rhs->core_pending_release_count && lhs->core_deferred_release_blocker_count == rhs->core_deferred_release_blocker_count && lhs->core_deferred_release_timed_blocker_count == rhs->core_deferred_release_timed_blocker_count && lhs->core_persistent_intent_count == rhs->core_persistent_intent_count && lhs->core_release_keycode_mismatch_count == rhs->core_release_keycode_mismatch_count && lhs->core_orphan_release_count == rhs->core_orphan_release_count && lhs->core_cancelled_press_count == rhs->core_cancelled_press_count;
 }
 
 #if defined(NOAH_RUNTIME_TRACE_ENABLE)

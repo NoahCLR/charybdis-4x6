@@ -156,7 +156,7 @@ static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
 }
 
 uint8_t key_feedback_pack(void) {
-    uint8_t             flags = 0u;
+    uint8_t                   flags = 0u;
     key_runtime_core_state_t *state = key_runtime_core_state();
 
     if (key_feedback_pulse_active()) {
