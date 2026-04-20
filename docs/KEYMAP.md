@@ -81,19 +81,9 @@ The current combo set is intentionally small:
 
 - `KC_D` + `LT(LAYER_NAV, KC_F)` -> `KC_TAB`
 - `MS_BTN1` + `MS_BTN2` -> `CLICK_SPAM`
-- `KC_ESC` + `LEFT_THUMB` + `RIGHT_THUMB` -> `WATCHDOG_TEST_PROCESS_RECORD`
 
 That keeps the layout readable while still giving one easy chorded `Tab` and a
 single pointer-specific utility chord.
-
-The watchdog test combo is deliberate maintenance-only surface. It exists to
-prove the RP2040 watchdog really reboots the master from a non-idle runtime
-stage: pressing `Esc` with both thumbs together intentionally freezes inside
-`PROCESS_RECORD`, so the next boot should show the `PROCESS_RECORD` watchdog
-breadcrumb color rather than `IDLE`. That deliberate test path now also stores
-its own reserved breadcrumb in watchdog scratch so the reboot color stays tied
-to the injected `PROCESS_RECORD` fault even if the ordinary stage slot would be
-ambiguous on hardware.
 
 ## Signature Behaviors
 

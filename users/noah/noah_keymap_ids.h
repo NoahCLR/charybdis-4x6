@@ -64,8 +64,6 @@ enum {
 // Use the generated *_LOCK keycode for a persistent toggle inside tap/hold rows.
 // Each pd mode gets an explicit generated lock keycode, so mode identity no
 // longer depends on contiguous enum math.
-// WATCHDOG_TEST_* keycodes are deliberate hardware-only fault injectors for
-// proving the RP2040 watchdog reboots from a known runtime stage.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
 // actions authored in key_behaviors[]. Use the LOCK_LAYER(n) macro there.
 // Keymap-local custom keycodes are declared in keymap.c's
@@ -91,7 +89,6 @@ enum custom_keycodes {
     MACRO_13,
     MACRO_14,
     MACRO_15,
-    WATCHDOG_TEST_PROCESS_RECORD,
 #define NOAH_PD_MODE_KEYCODE(name, keycode, handler, key_handler, reset, dpi, traits, lifecycle) keycode,
     NOAH_PD_MODE_LIST(NOAH_PD_MODE_KEYCODE)
 #undef NOAH_PD_MODE_KEYCODE

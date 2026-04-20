@@ -540,7 +540,7 @@ static void test_pending_release_edge_cases(void) {
 }
 
 static void test_release_with_live_tap_release_sibling_defers_dispatch(void) {
-    static const char *case_name = "release with live tap-release sibling defers dispatch";
+    static const char                       *case_name     = "release with live tap-release sibling defers dispatch";
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
@@ -565,7 +565,7 @@ static void test_release_with_live_tap_release_sibling_defers_dispatch(void) {
 }
 
 static void test_release_with_live_held_sibling_dispatches_immediately(void) {
-    static const char *case_name = "release with live held sibling dispatches immediately";
+    static const char                       *case_name     = "release with live held sibling dispatches immediately";
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
@@ -601,8 +601,8 @@ static void test_release_with_live_held_sibling_dispatches_immediately(void) {
 }
 
 static void test_release_dispatch_is_deferred_until_tap_release_sibling_clears(void) {
-    static const char *case_name = "release dispatch is deferred until tap-release sibling clears";
-    keypos_t            deferred_key_pos;
+    static const char                       *case_name = "release dispatch is deferred until tap-release sibling clears";
+    keypos_t                                 deferred_key_pos;
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
@@ -644,7 +644,7 @@ static void test_release_dispatch_is_deferred_until_tap_release_sibling_clears(v
 }
 
 static void test_release_dispatch_drains_when_last_blocker_clears_on_release(void) {
-    static const char *case_name = "release dispatch drains when last blocker clears on release";
+    static const char                       *case_name     = "release dispatch drains when last blocker clears on release";
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
@@ -680,7 +680,7 @@ static void test_release_dispatch_drains_when_last_blocker_clears_on_release(voi
 }
 
 static void test_release_dispatch_drains_after_sibling_delayed_action_in_same_scan(void) {
-    static const char *case_name = "release dispatch drains after sibling delayed action in same scan";
+    static const char                       *case_name     = "release dispatch drains after sibling delayed action in same scan";
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
@@ -718,7 +718,7 @@ static void test_release_dispatch_drains_after_sibling_delayed_action_in_same_sc
 }
 
 static void test_release_with_live_tap_release_sibling_keeps_owned_cleanup_immediate(void) {
-    static const char *case_name = "release with live tap-release sibling keeps owned cleanup immediate";
+    static const char                       *case_name     = "release with live tap-release sibling keeps owned cleanup immediate";
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
@@ -757,13 +757,9 @@ static void test_release_with_live_tap_release_sibling_keeps_owned_cleanup_immed
 }
 
 static void test_release_with_live_tap_release_sibling_splits_owned_cleanup_and_deferred_action(void) {
-    static const char *case_name = "release with live tap-release sibling splits owned cleanup and deferred action";
+    static const char                       *case_name     = "release with live tap-release sibling splits owned cleanup and deferred action";
     static const key_runtime_scenario_step_t setup_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
-        KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
-        KEY_RUNTIME_SCENARIO_SCAN(),
-        KEY_RUNTIME_SCENARIO_ADVANCE((uint16_t)(TEST_LONG_SETUP_ELAPSED_MS - TEST_TAP_SETUP_ELAPSED_MS)),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1), KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE((uint16_t)(TEST_LONG_SETUP_ELAPSED_MS - TEST_TAP_SETUP_ELAPSED_MS)), KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
     };
     static const key_runtime_scenario_step_t release_steps[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_ACTIVE_KEY, 1, 1),
@@ -774,8 +770,7 @@ static void test_release_with_live_tap_release_sibling_splits_owned_cleanup_and_
     };
 
     key_runtime_scenario_reset();
-    test_configure_active_release_key(HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
-                                      HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)));
+    test_configure_active_release_key(HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)), HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)));
     test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
@@ -800,7 +795,7 @@ static void test_release_with_live_tap_release_sibling_splits_owned_cleanup_and_
 }
 
 static void test_release_with_live_tap_release_sibling_keeps_layer_release_immediate(void) {
-    static const char *case_name = "release with live tap-release sibling keeps layer release immediate";
+    static const char                       *case_name     = "release with live tap-release sibling keeps layer release immediate";
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
@@ -837,9 +832,9 @@ static void test_release_with_live_tap_release_sibling_keeps_layer_release_immed
 }
 
 static void test_release_with_interrupted_layer_tap_sibling_dispatches_immediately(void) {
-    static const char *case_name = "release with interrupted layer-tap sibling dispatches immediately";
-    const uint16_t sibling_layer_tap_key = LT(TEST_OTHER_LAYER, KC_NO);
-    const key_runtime_scenario_step_t setup_steps[] = {
+    static const char                *case_name             = "release with interrupted layer-tap sibling dispatches immediately";
+    const uint16_t                    sibling_layer_tap_key = LT(TEST_OTHER_LAYER, KC_NO);
+    const key_runtime_scenario_step_t setup_steps[]         = {
         KEY_RUNTIME_SCENARIO_PRESS(sibling_layer_tap_key, 1, 2),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
     };
@@ -863,7 +858,7 @@ static void test_release_with_interrupted_layer_tap_sibling_dispatches_immediate
 }
 
 static void test_release_with_interrupted_pd_mode_press_keeps_lock_tap_immediate(void) {
-    static const char *case_name = "release with interrupted pd-mode press keeps lock tap immediate";
+    static const char                       *case_name     = "release with interrupted pd-mode press keeps lock tap immediate";
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
@@ -904,13 +899,9 @@ static void test_release_with_interrupted_pd_mode_press_keeps_lock_tap_immediate
 }
 
 static void test_pending_multi_tap_release_with_live_tap_release_sibling_keeps_held_lifecycle_immediate(void) {
-    static const char *case_name = "pending multi-tap release with live tap-release sibling keeps held lifecycle immediate";
+    static const char                       *case_name     = "pending multi-tap release with live tap-release sibling keeps held lifecycle immediate";
     static const key_runtime_scenario_step_t setup_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 2, 3),
-        KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 2, 3), KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
     };
     static const key_runtime_scenario_step_t release_chain[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),

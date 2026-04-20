@@ -27,8 +27,8 @@ typedef struct {
     uint8_t  chunk[VIA_MACRO_SEED_CHUNK_SIZE];
 } via_macro_seed_writer_t;
 
-static bool               via_macro_seed_post_init_pending = false;
-static bool               via_macro_seed_scan_pending      = false;
+static bool via_macro_seed_post_init_pending = false;
+static bool via_macro_seed_scan_pending      = false;
 
 static bool via_macro_defaults_lookup_payload(uint8_t slot, const char **payload, void *context) {
     (void)context;
@@ -68,8 +68,8 @@ static void log_invalid_via_macro_payload(uint8_t slot, const char *payload) {
 }
 
 static bool via_macro_payload_slot_is_valid(uint8_t slot) {
-    const char         *payload = via_macro_payloads[slot];
-    macro_payload_ir_t ir       = {0};
+    const char        *payload = via_macro_payloads[slot];
+    macro_payload_ir_t ir      = {0};
 
     if (via_macro_defaults_load_ir(slot, &ir, NULL)) {
         return true;

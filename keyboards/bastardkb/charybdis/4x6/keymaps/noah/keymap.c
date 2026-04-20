@@ -131,15 +131,14 @@ enum keymap_custom_keycodes {
 //
 // Combo timing is tuned in config.h via COMBO_TERM.
 // Current default: COMBO_TERM = 50 ms.
-#define COMBOS(COMBO)                                      \
-    COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))             \
-    COMBO(CLICK_SPAM, (MS_BTN1, MS_BTN2))                  \
-    COMBO(WATCHDOG_TEST_PROCESS_RECORD, (KC_ESC, LEFT_THUMB, RIGHT_THUMB)) \
-    /* COMBO(MACRO_0, (KC_Q, KC_W)) */                     \
-    /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */                 \
-    /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */       \
-    /* COMBO(ARROW_MODE_LOCK, (KC_M, KC_COMM)) */          \
-    /* COMBO(..., (...)) */                                \
+#define COMBOS(COMBO)                                \
+    COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))       \
+    COMBO(CLICK_SPAM, (MS_BTN1, MS_BTN2))            \
+    /* COMBO(MACRO_0, (KC_Q, KC_W)) */               \
+    /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */           \
+    /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */ \
+    /* COMBO(ARROW_MODE_LOCK, (KC_M, KC_COMM)) */    \
+    /* COMBO(..., (...)) */                          \
     /* ... */
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────

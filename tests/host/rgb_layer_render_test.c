@@ -569,17 +569,7 @@ static void test_runtime_diag_overlay_overrides_scene(void) {
 
 static void test_runtime_diag_stage_palette_is_unique(void) {
     static const noah_runtime_diag_stage_t stages[] = {
-        NOAH_RUNTIME_DIAG_STAGE_IDLE,
-        NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD,
-        NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE,
-        NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET,
-        NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK,
-        NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS,
-        NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME,
-        NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC,
-        NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER,
-        NOAH_RUNTIME_DIAG_STAGE_HOUSEKEEPING,
-        NOAH_RUNTIME_DIAG_STAGE_POST_INIT,
+        NOAH_RUNTIME_DIAG_STAGE_IDLE, NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD, NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE, NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET, NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK, NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS, NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME, NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC, NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER, NOAH_RUNTIME_DIAG_STAGE_HOUSEKEEPING, NOAH_RUNTIME_DIAG_STAGE_POST_INIT,
     };
     const uint8_t stage_count = (uint8_t)(sizeof(stages) / sizeof(stages[0]));
 
@@ -589,13 +579,7 @@ static void test_runtime_diag_stage_palette_is_unique(void) {
             rgb_t rhs = test_runtime_diag_stage_rgb(stages[rhs_index]);
 
             if (rgb_equal(lhs, rhs)) {
-                fprintf(stderr,
-                        "duplicate watchdog stage colors for %u and %u: (%u,%u,%u)\n",
-                        (unsigned int)stages[lhs_index],
-                        (unsigned int)stages[rhs_index],
-                        (unsigned int)lhs.r,
-                        (unsigned int)lhs.g,
-                        (unsigned int)lhs.b);
+                fprintf(stderr, "duplicate watchdog stage colors for %u and %u: (%u,%u,%u)\n", (unsigned int)stages[lhs_index], (unsigned int)stages[rhs_index], (unsigned int)lhs.r, (unsigned int)lhs.g, (unsigned int)lhs.b);
             }
 
             CHECK(!rgb_equal(lhs, rhs));

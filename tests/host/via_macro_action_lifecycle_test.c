@@ -30,8 +30,7 @@ typedef struct {
 #define TEST_MAX_CALLS 512
 #define TEST_MACRO_BUFFER_SIZE 512
 
-static const char *const test_long_delay_heavy_payload =
-    "h{829}e{627}y{665} {249}h{158}a{167}l{424}o{386} {448}h{144}o{111}e{103} {118}i{123}s{118} {125}h{132}e{134}t{158} {133}m{118}e{493}t{156} {503}y{503}u{10}o{695} {382}h{113}e{212}b{149}b{83}e{155}n{60} {102}e{65}w{164} {79} {152}h{109}i{79}e{129}r{146} {143}e{176}e{104}n{98} {148}p{124}r{119}o{165}b{126}l{130}e{172}e{104}m{1032}{+KC_LSFT}{189};{140}{-KC_LSFT}";
+static const char *const test_long_delay_heavy_payload = "h{829}e{627}y{665} {249}h{158}a{167}l{424}o{386} {448}h{144}o{111}e{103} {118}i{123}s{118} {125}h{132}e{134}t{158} {133}m{118}e{493}t{156} {503}y{503}u{10}o{695} {382}h{113}e{212}b{149}b{83}e{155}n{60} {102}e{65}w{164} {79} {152}h{109}i{79}e{129}r{146} {143}e{176}e{104}n{98} {148}p{124}r{119}o{165}b{126}l{130}e{172}e{104}m{1032}{+KC_LSFT}{189};{140}{-KC_LSFT}";
 
 static uint8_t     macro_buffer[TEST_MACRO_BUFFER_SIZE];
 static uint16_t    fake_macro_buffer_size;
@@ -64,9 +63,9 @@ static void test_log_call(test_call_kind_t kind, uint16_t value, uint8_t interva
 static void test_reset_state(void) {
     memset(macro_buffer, 0, sizeof(macro_buffer));
     memset(test_calls, 0, sizeof(test_calls));
-    fake_macro_buffer_size = sizeof(macro_buffer);
-    fake_macro_count       = DYNAMIC_KEYMAP_MACRO_COUNT;
-    test_call_count        = 0;
+    fake_macro_buffer_size       = sizeof(macro_buffer);
+    fake_macro_count             = DYNAMIC_KEYMAP_MACRO_COUNT;
+    test_call_count              = 0;
     runtime_diag_heartbeat_count = 0;
     via_macro_provider_invalidate_all();
 }
@@ -394,8 +393,8 @@ static void test_slot_six_long_delay_heavy_payload_replays_from_via_buffer(void)
 static void test_out_of_range_macro_slot_is_ignored(void) {
     test_reset_state();
     fake_macro_count = 2;
-    macro_buffer[0] = 'A';
-    macro_buffer[1] = 0;
+    macro_buffer[0]  = 'A';
+    macro_buffer[1]  = 0;
 
     noah_action_tap(QK_MACRO_0 + 2);
 

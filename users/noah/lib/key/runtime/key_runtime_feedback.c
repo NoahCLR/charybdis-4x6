@@ -75,8 +75,7 @@ static uint8_t key_feedback_preview_layer_for_token(const press_token_t *token) 
         return UINT8_MAX;
     }
 
-    if (runtime_v2_held_action_keycode_at(token->key_pos) != KC_NO || runtime_v2_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE ||
-        runtime_v2_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE || !key_feedback_token_allows_tap_release(token)) {
+    if (runtime_v2_held_action_keycode_at(token->key_pos) != KC_NO || runtime_v2_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE || runtime_v2_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE || !key_feedback_token_allows_tap_release(token)) {
         return UINT8_MAX;
     }
 
@@ -105,7 +104,7 @@ static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
         return 0u;
     }
 
-    held_action = runtime_v2_held_action_keycode_at(token->key_pos);
+    held_action            = runtime_v2_held_action_keycode_at(token->key_pos);
     bool long_hold_reached = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.longer_hold_term;
 
     if (held_action != KC_NO) {
@@ -149,9 +148,7 @@ static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
         return flags;
     }
 
-    if (!key_feedback_hold_contract_uses_preview_layer(token->interaction.contract.hold) && key_feedback_token_allows_tap_release(token) &&
-        timer_elapsed(token->pressed_at) >= token->interaction.binding.tap_hold_term &&
-        (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.hold) || token->interaction.contract.hold.keeps_pending_feedback)) {
+    if (!key_feedback_hold_contract_uses_preview_layer(token->interaction.contract.hold) && key_feedback_token_allows_tap_release(token) && timer_elapsed(token->pressed_at) >= token->interaction.binding.tap_hold_term && (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.hold) || token->interaction.contract.hold.keeps_pending_feedback)) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
     }
 
@@ -159,7 +156,7 @@ static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
 }
 
 uint8_t key_feedback_pack(void) {
-    uint8_t            flags = 0u;
+    uint8_t             flags = 0u;
     runtime_v2_state_t *state = runtime_v2_state();
 
     if (key_feedback_pulse_active()) {

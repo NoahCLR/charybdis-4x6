@@ -52,7 +52,7 @@ static keyboard_mod_state_t key_runtime_keyboard_mod_state_current(void) {
 }
 
 static void key_runtime_process_end_keyboard_event_mod_mask(void) {
-    runtime_v2_state_t  *state    = runtime_v2_state();
+    runtime_v2_state_t  *state = runtime_v2_state();
     keyboard_mod_state_t restored;
 
     if (!(state && state->keyboard_event_mask_active)) {
@@ -141,19 +141,6 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key
     return KEY_RUNTIME_PROCESS_RETURN_FALSE;
 }
 
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_watchdog_test(key_runtime_process_ctx_t *ctx) {
-    if (ctx->keycode != WATCHDOG_TEST_PROCESS_RECORD) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-
-    if (ctx->record->event.pressed) {
-        key_runtime_trace_message("process:watchdog_test", "injecting deliberate process_record watchdog fault");
-        noah_runtime_diag_trigger_test_fault(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
-    }
-
-    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
-}
-
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key(key_runtime_process_ctx_t *ctx) {
     handled_key_resolution_t resolution = key_runtime_process_resolution(ctx);
     bool                     handled;
@@ -162,8 +149,7 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
-    handled = ctx->record->event.pressed ? key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record, resolution)
-                                         : key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
+    handled = ctx->record->event.pressed ? key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record, resolution) : key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
     key_runtime_trace_bool_result("process:handled_key", ctx->runtime_keycode, ctx->record, handled);
     return handled ? KEY_RUNTIME_PROCESS_RETURN_FALSE : KEY_RUNTIME_PROCESS_NEXT;
 }
@@ -225,15 +211,7 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough},
-        {.name = "preflight", .handler = key_runtime_process_stage_preflight},
-        {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode},
-        {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode},
-        {.name = "watchdog_test", .handler = key_runtime_process_stage_watchdog_test},
-        {.name = "handled_key", .handler = key_runtime_process_stage_handled_key},
-        {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup},
-        {.name = "direct_action", .handler = key_runtime_process_stage_direct_action},
-        {.name = "macro_dispatch", .handler = key_runtime_process_stage_macro_dispatch},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "macro_dispatch", .handler = key_runtime_process_stage_macro_dispatch},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,

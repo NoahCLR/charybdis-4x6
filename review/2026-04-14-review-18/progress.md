@@ -1,5 +1,34 @@
 # Progress
 
+## 2026-04-20 Runtime Freeze Watchdog Trigger Cleanup Pass
+
+- Removed the deliberate on-device watchdog fault injector now that the
+  hardware watchdog path has been confirmed:
+  - `WATCHDOG_TEST_PROCESS_RECORD` is gone from `users/noah/noah_keymap_ids.h`,
+  - the temporary `KC_ESC + LEFT_THUMB + RIGHT_THUMB` combo was removed from
+    `keymap.c`, and
+  - `users/noah/lib/key/runtime/key_runtime_process.c` no longer carries a
+    maintenance-only hard-freeze branch in normal `process_record` flow.
+- Simplified `runtime_diag` back to production-only breadcrumb handling:
+  - the temporary deliberate-fault trigger API and host-only fault bookkeeping
+    were removed from `users/noah/lib/state/runtime/runtime_diag.h` and `.c`,
+  - watchdog boot latching is back to using the ordinary production stage slot
+    only, and
+  - the SDK scratch-register collision workaround disappeared with the
+    deliberate injector itself.
+- Cleaned up the supporting docs and host tests:
+  - `README.md` and `docs/KEYMAP.md` no longer advertise a maintenance-only
+    watchdog test chord,
+  - `tests/host/runtime_diag_test.c` and `runtime_debug_test.c` dropped the
+    deliberate-fault assertions, and
+  - `tests/host/run_runtime_debug_tests.sh` no longer needs the
+    `NOAH_RUNTIME_DIAG_TEST_BACKEND` define.
+- Next steps:
+  - keep the validated watchdog diagnostic as-is unless a future real hardware
+    freeze needs a new targeted reproduction surface, and
+  - if that happens, add a temporary injector again in a separate pass instead
+    of shipping it permanently in the keymap.
+
 ## 2026-04-20 Runtime Freeze Watchdog Hardware Trigger Pass
 
 - Added one deliberate hardware watchdog trigger for validating the diagnostic

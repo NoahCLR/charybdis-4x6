@@ -72,9 +72,8 @@ to understand and easy to change:
   to slave so both halves render consistently
 - RP2040 builds also carry a master-side runtime freeze diagnostic: the
   watchdog is only petted from housekeeping, the current outer runtime stage is
-  mirrored into watchdog scratch, RGB can show the latched reboot stage on the
-  next boot, and the keymap includes a deliberate `PROCESS_RECORD` watchdog
-  test chord for hardware verification
+  mirrored into watchdog scratch, and RGB can show the latched reboot stage on
+  the next boot
 
 The README is intentionally capability-focused. It explains what the shared
 runtime supports and how the pieces fit together. If you want one concrete

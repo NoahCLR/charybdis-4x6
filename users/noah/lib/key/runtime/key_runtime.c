@@ -7,8 +7,8 @@
 #include "../../runtime_v2/runtime_v2.h"
 
 bool noah_key_runtime_settle_pending_fallback_hold(void) {
-    runtime_v2_effect_plan_t      v2_plan;
-    bool                          settled_any;
+    runtime_v2_effect_plan_t v2_plan;
+    bool                     settled_any;
 
     runtime_v2_effect_plan_init(&v2_plan);
     settled_any = runtime_v2_settle_pending_fallback_hold(&v2_plan);

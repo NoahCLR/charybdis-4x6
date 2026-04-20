@@ -57,13 +57,13 @@ typedef struct {
 } key_runtime_slot_binding_t;
 
 typedef struct {
-    key_runtime_slot_selection_t        selection;
-    key_runtime_slot_binding_t          binding;
-    key_runtime_slot_hold_strategy_t    hold_strategy;
-    uint8_t                             layer;
-    pd_mode_mask_t                      pd_mode;
-    uint16_t                            flags;
-    handled_key_behavior_contract_t     contract;
+    key_runtime_slot_selection_t     selection;
+    key_runtime_slot_binding_t       binding;
+    key_runtime_slot_hold_strategy_t hold_strategy;
+    uint8_t                          layer;
+    pd_mode_mask_t                   pd_mode;
+    uint16_t                         flags;
+    handled_key_behavior_contract_t  contract;
 } key_runtime_slot_interaction_t;
 
 static inline key_runtime_slot_selection_t key_runtime_slot_selection_from_resolution(handled_key_resolution_t resolution) {

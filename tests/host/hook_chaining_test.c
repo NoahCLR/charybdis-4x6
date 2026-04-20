@@ -73,29 +73,29 @@ typedef enum {
 } hook_process_chain_style_t;
 
 typedef struct {
-    unsigned      eeconfig_calls;
-    unsigned      hold_calls;
-    unsigned      pre_process_calls;
-    unsigned      process_calls;
-    unsigned      post_process_calls;
-    unsigned      scan_calls;
-    unsigned      housekeeping_calls;
-    unsigned      post_init_calls;
-    unsigned      layer_state_calls;
-    unsigned      pointing_task_calls;
-    unsigned      pointing_init_calls;
-    unsigned      mouse_record_calls;
-    unsigned      rgb_calls;
-    bool          hold_force_true;
-    bool          pre_process_keep_processing;
-    bool          process_keep_processing;
+    unsigned                   eeconfig_calls;
+    unsigned                   hold_calls;
+    unsigned                   pre_process_calls;
+    unsigned                   process_calls;
+    unsigned                   post_process_calls;
+    unsigned                   scan_calls;
+    unsigned                   housekeeping_calls;
+    unsigned                   post_init_calls;
+    unsigned                   layer_state_calls;
+    unsigned                   pointing_task_calls;
+    unsigned                   pointing_init_calls;
+    unsigned                   mouse_record_calls;
+    unsigned                   rgb_calls;
+    bool                       hold_force_true;
+    bool                       pre_process_keep_processing;
+    bool                       process_keep_processing;
     hook_process_chain_style_t process_chain_style;
-    layer_state_t layer_state_extra_bits;
-    int8_t        pointing_task_x_delta;
-    int8_t        pointing_task_y_delta;
-    uint8_t       pointing_task_extra_buttons;
-    bool          mouse_record_force_true;
-    bool          rgb_force_true;
+    layer_state_t              layer_state_extra_bits;
+    int8_t                     pointing_task_x_delta;
+    int8_t                     pointing_task_y_delta;
+    uint8_t                    pointing_task_extra_buttons;
+    bool                       mouse_record_force_true;
+    bool                       rgb_force_true;
 } hook_override_state_t;
 
 static hook_override_state_t hook_override_state;
@@ -501,9 +501,9 @@ static void test_strong_override_passthrough_false_path_finalizes_without_post(v
 
     keyrecord_t record = test_record(6, 1, true);
 
-    noah_hook_stub_state.process_return_value       = false;
-    hook_override_state.process_keep_processing     = true;
-    hook_override_state.process_chain_style         = HOOK_PROCESS_CHAIN_PASSTHROUGH_FALSE;
+    noah_hook_stub_state.process_return_value   = false;
+    hook_override_state.process_keep_processing = true;
+    hook_override_state.process_chain_style     = HOOK_PROCESS_CHAIN_PASSTHROUGH_FALSE;
 
     CHECK(!process_record_user(0x6123u, &record));
     CHECK(hook_override_state.process_calls == 1);

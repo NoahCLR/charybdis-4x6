@@ -181,8 +181,8 @@ void key_runtime_integration_scan(void) {
 }
 
 bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed) {
-    keyrecord_t record = key_runtime_integration_record(key_pos, pressed);
-    bool        keep_processing;
+    keyrecord_t     record = key_runtime_integration_record(key_pos, pressed);
+    bool            keep_processing;
     runtime_event_t event = {
         .kind = pressed ? RUNTIME_EVENT_KIND_KEY_DOWN : RUNTIME_EVENT_KIND_KEY_UP,
         .data.key_event =

@@ -23,11 +23,11 @@
 #    include "split_runtime_sync.h"
 #    include "transactions.h" // QMK
 
-split_runtime_sync_packet_t        split_runtime_sync_remote      = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
-static split_runtime_sync_packet_t split_runtime_sync_last_sent   = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
-static bool                        split_runtime_sync_sent_once   = false;
-static bool                        split_runtime_sync_initialized = false;
-static uint32_t                    split_runtime_sync_last_send   = 0;
+split_runtime_sync_packet_t        split_runtime_sync_remote        = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
+static split_runtime_sync_packet_t split_runtime_sync_last_sent     = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
+static bool                        split_runtime_sync_sent_once     = false;
+static bool                        split_runtime_sync_initialized   = false;
+static uint32_t                    split_runtime_sync_last_send     = 0;
 static bool                        split_runtime_sync_force_pending = false;
 
 #    ifndef SPLIT_RUNTIME_SYNC_HEARTBEAT_MS
@@ -109,11 +109,11 @@ static void split_runtime_sync_slave_rpc(uint8_t initiator2target_buffer_size, c
 
 void split_runtime_sync_init(void) {
     transaction_register_rpc(PUT_SPLIT_RUNTIME_SYNC, split_runtime_sync_slave_rpc);
-    split_runtime_sync_remote      = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
-    split_runtime_sync_last_sent   = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
-    split_runtime_sync_sent_once   = false;
-    split_runtime_sync_initialized = true;
-    split_runtime_sync_last_send   = timer_read32();
+    split_runtime_sync_remote        = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
+    split_runtime_sync_last_sent     = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
+    split_runtime_sync_sent_once     = false;
+    split_runtime_sync_initialized   = true;
+    split_runtime_sync_last_send     = timer_read32();
     split_runtime_sync_force_pending = false;
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_INIT, is_keyboard_master() ? 1u : 0u, 0u);
 

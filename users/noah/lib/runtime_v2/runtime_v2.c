@@ -401,7 +401,7 @@ static pending_release_t *runtime_v2_allocate_pending_release(runtime_v2_state_t
         pending_release_t *pending = &state->pending_releases[index];
 
         if (!pending->active) {
-            *pending = (pending_release_t){0};
+            *pending        = (pending_release_t){0};
             pending->active = true;
             state->pending_release_count++;
             return pending;
@@ -515,8 +515,7 @@ static bool runtime_v2_press_token_quick_tap_suppressed(const press_token_t *tok
 }
 
 static bool runtime_v2_press_token_has_pd_mode_quick_lock_candidate(const press_token_t *token) {
-    return token && token->interaction.contract.quick_tap_pd_mode_lock != 0 && token->pd_mode_was_locked_on_press &&
-           !runtime_v2_press_token_quick_tap_suppressed(token);
+    return token && token->interaction.contract.quick_tap_pd_mode_lock != 0 && token->pd_mode_was_locked_on_press && !runtime_v2_press_token_quick_tap_suppressed(token);
 }
 
 static bool runtime_v2_owner_has_lease_kind(const runtime_v2_state_t *state, uint16_t owner_token_id, lease_kind_t kind);
@@ -824,8 +823,7 @@ static lease_t *runtime_v2_find_modifier_lease(runtime_v2_state_t *state, uint16
     for (uint16_t index = 0; index < RUNTIME_V2_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->kind == LEASE_KIND_MODIFIER && lease->owner_token_id == owner_token_id &&
-            lease->data.modifier.modifiers == modifiers && lease->data.modifier.physical == physical) {
+        if (lease->active && lease->kind == LEASE_KIND_MODIFIER && lease->owner_token_id == owner_token_id && lease->data.modifier.modifiers == modifiers && lease->data.modifier.physical == physical) {
             return lease;
         }
     }
@@ -890,7 +888,7 @@ static lease_t *runtime_v2_allocate_lease(runtime_v2_state_t *state) {
         lease_t *lease = &state->leases[index];
 
         if (!lease->active) {
-            *lease = (lease_t){0};
+            *lease        = (lease_t){0};
             lease->active = true;
             state->lease_count++;
             return lease;
@@ -1100,8 +1098,8 @@ static bool runtime_v2_persistent_layer_lock_update(runtime_v2_state_t *state, u
     }
 
     *empty_slot = (persistent_intent_t){
-        .active = true,
-        .kind   = PERSISTENT_INTENT_KIND_LAYER_LOCK,
+        .active     = true,
+        .kind       = PERSISTENT_INTENT_KIND_LAYER_LOCK,
         .data.layer = layer,
     };
     state->persistent_intent_count++;
@@ -1336,7 +1334,7 @@ static void runtime_v2_release_pd_related_leases_for_token(runtime_v2_state_t *s
 }
 
 static void runtime_v2_shadow_projection_recompute(runtime_v2_state_t *state) {
-    runtime_v2_shadow_projection_t projection = {0};
+    runtime_v2_shadow_projection_t projection                  = {0};
     bool                           pointer_anchor_lease_active = false;
 
     if (!state) {
@@ -1405,7 +1403,7 @@ static void runtime_v2_shadow_projection_recompute(runtime_v2_state_t *state) {
 }
 
 static void runtime_v2_press_token_attach_press_leases(runtime_v2_state_t *state, const press_token_t *token) {
-    bool changed = false;
+    bool           changed = false;
     pd_mode_mask_t mode;
 
     if (!(state && token && token->active)) {
@@ -1559,25 +1557,25 @@ static void runtime_v2_refresh_slot_phases_for_scan(runtime_v2_state_t *state, u
 }
 
 static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtime_key_event_t *event, uint16_t now) {
-    press_token_t             *token;
-    tap_series_t              *series;
-    handled_key_resolution_t   resolution;
-    handled_key_materialized_t materialized;
+    press_token_t                 *token;
+    tap_series_t                  *series;
+    handled_key_resolution_t       resolution;
+    handled_key_materialized_t     materialized;
     key_runtime_slot_interaction_t interaction = key_runtime_slot_interaction_default();
-    handled_key_resolution_ctx_t ctx;
-    uint16_t                   hold_term_ms;
-    uint16_t                   longer_hold_term_ms;
-    uint8_t                    tap_count = 1u;
-    bool                       handled   = false;
-    bool                       tap_outcome_available = false;
-    bool                       pd_mode_was_locked_on_press = false;
-    key_runtime_slot_phase_t   slot_phase = KEY_RUNTIME_SLOT_PHASE_IDLE;
+    handled_key_resolution_ctx_t   ctx;
+    uint16_t                       hold_term_ms;
+    uint16_t                       longer_hold_term_ms;
+    uint8_t                        tap_count                   = 1u;
+    bool                           handled                     = false;
+    bool                           tap_outcome_available       = false;
+    bool                           pd_mode_was_locked_on_press = false;
+    key_runtime_slot_phase_t       slot_phase                  = KEY_RUNTIME_SLOT_PHASE_IDLE;
 
     if (!(state && event)) {
         return;
     }
 
-    token = runtime_v2_press_token_state(state, event->key_pos);
+    token  = runtime_v2_press_token_state(state, event->key_pos);
     series = runtime_v2_tap_series_state(state, event->key_pos);
     if (!token) {
         return;
@@ -1592,21 +1590,21 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
         tap_count = (uint8_t)(series->tap_count + 1u);
     }
 
-    resolution           = handled_key_lookup_tap_count(event->keycode, tap_count);
-    handled              = handled_key_resolution_is_handled(resolution);
-    materialized         = handled_key_materialized_default(resolution);
-    hold_term_ms = runtime_v2_default_hold_term(event->keycode);
-    longer_hold_term_ms  = runtime_v2_default_longer_hold_term();
+    resolution          = handled_key_lookup_tap_count(event->keycode, tap_count);
+    handled             = handled_key_resolution_is_handled(resolution);
+    materialized        = handled_key_materialized_default(resolution);
+    hold_term_ms        = runtime_v2_default_hold_term(event->keycode);
+    longer_hold_term_ms = runtime_v2_default_longer_hold_term();
 
     if (handled) {
-        ctx                      = handled_key_resolution_ctx_make(event->key_pos, runtime_v2_resolution_layers(state));
-        materialized             = handled_key_materialize(resolution, ctx);
-        interaction              = key_runtime_slot_interaction_from_materialized(materialized);
-        hold_term_ms             = handled_key_resolution_tap_hold_term(resolution);
-        longer_hold_term_ms      = handled_key_resolution_longer_hold_term(resolution);
-        tap_outcome_available    = handled_key_resolution_has_multi_tap(resolution) || materialized.tap_action != KC_NO;
+        ctx                         = handled_key_resolution_ctx_make(event->key_pos, runtime_v2_resolution_layers(state));
+        materialized                = handled_key_materialize(resolution, ctx);
+        interaction                 = key_runtime_slot_interaction_from_materialized(materialized);
+        hold_term_ms                = handled_key_resolution_tap_hold_term(resolution);
+        longer_hold_term_ms         = handled_key_resolution_longer_hold_term(resolution);
+        tap_outcome_available       = handled_key_resolution_has_multi_tap(resolution) || materialized.tap_action != KC_NO;
         pd_mode_was_locked_on_press = materialized.pd_mode != 0 && state->shadow_projection.pd_mode_local_locked == materialized.pd_mode;
-        slot_phase               = hold_registers_on_press(materialized.hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
+        slot_phase                  = hold_registers_on_press(materialized.hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
     }
 
     for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
@@ -1623,21 +1621,21 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
     }
 
     *token = (press_token_t){
-        .active                   = true,
-        .token_id                 = state->next_token_id++,
-        .key_pos                  = event->key_pos,
-        .physical_keycode         = event->keycode,
-        .resolved_keycode         = event->keycode,
-        .observed_release_keycode = KC_NO,
-        .pressed_at               = now,
-        .hold_term_ms             = hold_term_ms,
-        .longer_hold_term_ms      = longer_hold_term_ms,
+        .active                      = true,
+        .token_id                    = state->next_token_id++,
+        .key_pos                     = event->key_pos,
+        .physical_keycode            = event->keycode,
+        .resolved_keycode            = event->keycode,
+        .observed_release_keycode    = KC_NO,
+        .pressed_at                  = now,
+        .hold_term_ms                = hold_term_ms,
+        .longer_hold_term_ms         = longer_hold_term_ms,
         .phase                       = PRESS_TOKEN_PHASE_PRESSED,
         .handled_key                 = handled,
         .tap_outcome_available       = tap_outcome_available,
         .pd_mode_was_locked_on_press = pd_mode_was_locked_on_press,
-        .interaction                  = interaction,
-        .slot_phase                   = slot_phase,
+        .interaction                 = interaction,
+        .slot_phase                  = slot_phase,
     };
     state->press_token_count++;
     runtime_v2_press_token_attach_press_leases(state, token);
@@ -1648,19 +1646,19 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
 }
 
 static void runtime_v2_tap_series_note_tap(runtime_v2_state_t *state, const press_token_t *token, uint16_t now) {
-    tap_series_t *series;
-    bool          reuse_existing;
-    bool          needs_series;
-    uint16_t      single_action;
-    uint16_t      tap_action;
-    uint8_t       tap_repeat_count;
-    bool          has_more_taps;
-    hold_behavior_t hold;
-    hold_behavior_t long_hold;
-    uint16_t      tap_hold_term_ms;
-    uint16_t      tap_term_ms;
-    uint8_t       tap_count;
-    bool          pending_hold = false;
+    tap_series_t        *series;
+    bool                 reuse_existing;
+    bool                 needs_series;
+    uint16_t             single_action;
+    uint16_t             tap_action;
+    uint8_t              tap_repeat_count;
+    bool                 has_more_taps;
+    hold_behavior_t      hold;
+    hold_behavior_t      long_hold;
+    uint16_t             tap_hold_term_ms;
+    uint16_t             tap_term_ms;
+    uint8_t              tap_count;
+    bool                 pending_hold = false;
     keyboard_mod_state_t saved_mod_state;
 
     if (!(state && token && token->active)) {
@@ -1672,23 +1670,23 @@ static void runtime_v2_tap_series_note_tap(runtime_v2_state_t *state, const pres
         return;
     }
 
-    reuse_existing = series->active && series->keycode == token->resolved_keycode && runtime_v2_elapsed(series->last_tap_at, now) <= series->tap_term_ms;
-    single_action   = reuse_existing ? series->single_action : token->resolved_keycode;
-    tap_action      = token->resolved_keycode;
+    reuse_existing   = series->active && series->keycode == token->resolved_keycode && runtime_v2_elapsed(series->last_tap_at, now) <= series->tap_term_ms;
+    single_action    = reuse_existing ? series->single_action : token->resolved_keycode;
+    tap_action       = token->resolved_keycode;
     tap_repeat_count = 0u;
-    has_more_taps   = false;
-    hold            = hold_behavior_none();
-    long_hold       = hold_behavior_none();
+    has_more_taps    = false;
+    hold             = hold_behavior_none();
+    long_hold        = hold_behavior_none();
     tap_hold_term_ms = runtime_v2_default_hold_term(token->resolved_keycode);
-    tap_term_ms     = runtime_v2_default_multi_tap_term();
-    tap_count       = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u);
-    saved_mod_state = reuse_existing ? series->saved_mod_state
-                                     : (keyboard_mod_state_t){
-                                           .real           = get_mods(),
-                                           .weak           = get_weak_mods(),
-                                           .oneshot        = get_oneshot_mods(),
-                                           .oneshot_locked = get_oneshot_locked_mods(),
-                                       };
+    tap_term_ms      = runtime_v2_default_multi_tap_term();
+    tap_count        = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u);
+    saved_mod_state  = reuse_existing ? series->saved_mod_state
+                                      : (keyboard_mod_state_t){
+                                            .real           = get_mods(),
+                                            .weak           = get_weak_mods(),
+                                            .oneshot        = get_oneshot_mods(),
+                                            .oneshot_locked = get_oneshot_locked_mods(),
+                                        };
     if (!reuse_existing) {
         saved_mod_state.real &= (uint8_t)~pd_mode_buffered_tap_masked_real_mods(token->resolved_keycode);
     }
@@ -1815,8 +1813,7 @@ static bool runtime_v2_pending_multi_tap_flush_resolution(const tap_series_t *se
 }
 
 static bool runtime_v2_pending_release_matches(const pending_release_t *pending, keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
-    return pending && pending->active && runtime_v2_keypos_equal(pending->key_pos, key_pos) && pending->action == action && pending->mods.real == mods.real &&
-           pending->mods.weak == mods.weak && pending->mods.oneshot == mods.oneshot && pending->mods.oneshot_locked == mods.oneshot_locked;
+    return pending && pending->active && runtime_v2_keypos_equal(pending->key_pos, key_pos) && pending->action == action && pending->mods.real == mods.real && pending->mods.weak == mods.weak && pending->mods.oneshot == mods.oneshot && pending->mods.oneshot_locked == mods.oneshot_locked;
 }
 
 static void runtime_v2_pending_release_mark_token(runtime_v2_state_t *state, uint16_t owner_token_id) {
@@ -1854,7 +1851,7 @@ static void runtime_v2_pending_release_clear_token(runtime_v2_state_t *state, ui
 }
 
 static void runtime_v2_press_token_end(runtime_v2_state_t *state, const runtime_key_event_t *event, uint16_t now) {
-    press_token_t released_token;
+    press_token_t  released_token;
     press_token_t *token;
 
     if (!(state && event)) {
@@ -1882,7 +1879,7 @@ static void runtime_v2_press_token_end(runtime_v2_state_t *state, const runtime_
         runtime_v2_tap_series_note_hold_release(state, token);
     }
 
-    *token = released_token;
+    *token        = released_token;
     token->active = false;
     token->phase  = PRESS_TOKEN_PHASE_RELEASED;
     if (state->press_token_count != 0u) {
@@ -1980,7 +1977,7 @@ bool runtime_v2_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action
         return false;
     }
 
-    token = runtime_v2_press_token_state(state, key_pos);
+    token    = runtime_v2_press_token_state(state, key_pos);
     *pending = (pending_release_t){
         .active         = true,
         .owner_token_id = token ? token->token_id : 0u,
@@ -2081,15 +2078,15 @@ uint8_t runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8
     }
 
     while (count < capacity) {
-        int16_t          index   = runtime_v2_oldest_pending_release_index(state);
+        int16_t           index = runtime_v2_oldest_pending_release_index(state);
         pending_release_t pending;
 
         if (index < 0) {
             break;
         }
 
-        pending                    = state->pending_releases[index];
-        out[count++]               = pending;
+        pending                        = state->pending_releases[index];
+        out[count++]                   = pending;
         state->pending_releases[index] = (pending_release_t){0};
         if (state->pending_release_count != 0u) {
             state->pending_release_count--;
@@ -2218,13 +2215,13 @@ bool runtime_v2_finalize_non_handled_release(keypos_t key_pos) {
 }
 
 bool runtime_v2_resolve_active_release(keypos_t key_pos, runtime_v2_active_release_resolution_t *out) {
-    runtime_v2_state_t                    *state = runtime_v2_state();
-    press_token_t                         *token;
-    key_runtime_slot_release_semantics_t   semantics;
-    key_runtime_slot_release_query_t       query;
-    uint16_t                               elapsed;
-    bool                                   held_action_active;
-    bool                                   repeat_active;
+    runtime_v2_state_t                  *state = runtime_v2_state();
+    press_token_t                       *token;
+    key_runtime_slot_release_semantics_t semantics;
+    key_runtime_slot_release_query_t     query;
+    uint16_t                             elapsed;
+    bool                                 held_action_active;
+    bool                                 repeat_active;
 
     if (out) {
         *out = (runtime_v2_active_release_resolution_t){0};
@@ -2239,11 +2236,11 @@ bool runtime_v2_resolve_active_release(keypos_t key_pos, runtime_v2_active_relea
         return false;
     }
 
-    elapsed   = runtime_v2_elapsed(token->pressed_at, token->released_at);
-    semantics = key_runtime_slot_release_semantics_for_phase(token->slot_phase);
+    elapsed            = runtime_v2_elapsed(token->pressed_at, token->released_at);
+    semantics          = key_runtime_slot_release_semantics_for_phase(token->slot_phase);
     held_action_active = runtime_v2_owner_has_lease_kind(state, token->token_id, LEASE_KIND_HELD_ACTION);
     repeat_active      = runtime_v2_owner_has_lease_kind(state, token->token_id, LEASE_KIND_REPEAT);
-    query     = (key_runtime_slot_release_query_t){
+    query              = (key_runtime_slot_release_query_t){
         .interaction                     = token->interaction,
         .semantics                       = semantics,
         .elapsed                         = elapsed,
@@ -2347,19 +2344,16 @@ bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap
         return false;
     }
 
-    token = runtime_v2_press_token_state(state, key_pos);
+    token  = runtime_v2_press_token_state(state, key_pos);
     series = runtime_v2_tap_series_state(state, key_pos);
     if (!(token && token->handled_key && !token->active && token->observed_release_keycode != KC_NO)) {
         return false;
     }
 
-    elapsed = runtime_v2_elapsed(token->pressed_at, token->released_at);
-    preserve_chain =
-        preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term &&
-        (token->interaction.binding.has_more_taps || (tap_action == KC_NO && tap_repeat_count == 0u));
+    elapsed        = runtime_v2_elapsed(token->pressed_at, token->released_at);
+    preserve_chain = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term && (token->interaction.binding.has_more_taps || (tap_action == KC_NO && tap_repeat_count == 0u));
 
-    if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term
-                                                                 : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term) {
+    if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term) {
         semantics.hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
     }
 
@@ -2370,8 +2364,7 @@ bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap
     });
 
     switch (decision.outcome) {
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION:
-        {
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION: {
             uint16_t held_lifecycle_action = runtime_v2_pending_multi_tap_release_held_lifecycle_action(token, decision.action, elapsed);
 
             if (held_lifecycle_action != KC_NO) {
@@ -2391,8 +2384,7 @@ bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap
             };
             return true;
         }
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_TAP:
-        {
+        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_TAP: {
             uint16_t held_lifecycle_action = runtime_v2_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed);
 
             if (held_lifecycle_action != KC_NO) {
@@ -2421,8 +2413,7 @@ bool runtime_v2_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap
         }
         case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
         case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE:
-        default:
-        {
+        default: {
             uint16_t held_lifecycle_action = runtime_v2_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed);
 
             if (held_lifecycle_action != KC_NO) {
@@ -2485,7 +2476,7 @@ bool runtime_v2_plan_pending_multi_tap_release_effects(keypos_t key_pos, bool is
 }
 
 bool runtime_v2_resolve_pending_multi_tap_scan(keypos_t key_pos, runtime_v2_pending_multi_tap_scan_resolution_t *out) {
-    runtime_v2_state_t *state  = runtime_v2_state();
+    runtime_v2_state_t *state = runtime_v2_state();
     press_token_t      *token;
     tap_series_t       *series;
     uint16_t            elapsed;
@@ -2507,8 +2498,7 @@ bool runtime_v2_resolve_pending_multi_tap_scan(keypos_t key_pos, runtime_v2_pend
     }
 
     if (!series->pending_hold) {
-        if (runtime_v2_elapsed(series->last_tap_at, state->current_time) > series->tap_term_ms &&
-            runtime_v2_pending_multi_tap_flush_resolution(series, &flush_action, &flush_repeat_count)) {
+        if (runtime_v2_elapsed(series->last_tap_at, state->current_time) > series->tap_term_ms && runtime_v2_pending_multi_tap_flush_resolution(series, &flush_action, &flush_repeat_count)) {
             runtime_v2_tap_series_clear(state, series);
             *out = (runtime_v2_pending_multi_tap_scan_resolution_t){
                 .outcome      = RUNTIME_V2_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH,
@@ -2914,10 +2904,10 @@ void runtime_v2_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, runt
     }
 
     for (uint16_t index = 0; index < RUNTIME_V2_TAP_SERIES_CAPACITY; index++) {
-        tap_series_t *series = &state->tap_series[index];
-        press_token_t *owner;
-        uint16_t      action;
-        uint8_t       repeat_count;
+        tap_series_t         *series = &state->tap_series[index];
+        press_token_t        *owner;
+        uint16_t              action;
+        uint8_t               repeat_count;
         delayed_action_mods_t mods;
 
         if (!(series->active && !(runtime_v2_keypos_equal(series->key_pos, key_pos) && series->keycode == keycode))) {
@@ -2946,9 +2936,9 @@ void runtime_v2_flush_multi_tap(runtime_v2_effect_plan_t *plan) {
     }
 
     for (uint16_t index = 0; index < RUNTIME_V2_TAP_SERIES_CAPACITY; index++) {
-        tap_series_t *series = &state->tap_series[index];
-        uint16_t      action;
-        uint8_t       repeat_count;
+        tap_series_t         *series = &state->tap_series[index];
+        uint16_t              action;
+        uint8_t               repeat_count;
         delayed_action_mods_t mods;
 
         if (!runtime_v2_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
@@ -2976,8 +2966,7 @@ void runtime_v2_flush_active_keys_except(keypos_t key_pos, runtime_v2_effect_pla
         }
 
         held_action = runtime_v2_key_pos_held_action_keycode(state, token->key_pos);
-        if (runtime_v2_press_token_allows_tap_release(token) && held_action == KC_NO && !runtime_v2_key_pos_repeat_active(state, token->key_pos) && !is_layer_key(token->resolved_keycode) &&
-            token->interaction.binding.tap_action != KC_NO) {
+        if (runtime_v2_press_token_allows_tap_release(token) && held_action == KC_NO && !runtime_v2_key_pos_repeat_active(state, token->key_pos) && !is_layer_key(token->resolved_keycode) && token->interaction.binding.tap_action != KC_NO) {
             runtime_v2_effect_plan_push_dispatch_action(plan, token->interaction.binding.tap_action);
         } else if (held_action != KC_NO && !held_action_survives_flush(token->key_pos, held_action)) {
             runtime_v2_effect_plan_push_held_action(plan, KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER, token->key_pos, held_action);
@@ -2991,11 +2980,11 @@ void runtime_v2_flush_active_keys_except(keypos_t key_pos, runtime_v2_effect_pla
 }
 
 bool runtime_v2_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, runtime_v2_effect_plan_t *plan) {
-    runtime_v2_state_t *state = runtime_v2_state();
-    press_token_t      *token;
-    tap_series_t       *series;
-    uint16_t            action;
-    uint8_t             repeat_count;
+    runtime_v2_state_t   *state = runtime_v2_state();
+    press_token_t        *token;
+    tap_series_t         *series;
+    uint16_t              action;
+    uint8_t               repeat_count;
     delayed_action_mods_t mods;
 
     if (!(state && plan && handled_key_resolution_is_handled(resolution) && runtime_v2_keypos_valid(key_pos))) {
@@ -3043,25 +3032,22 @@ bool runtime_v2_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, han
 }
 
 bool runtime_v2_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, keyboard_mod_state_t keyboard_mod_state, runtime_v2_effect_plan_t *plan) {
-    runtime_v2_state_t                    *state = runtime_v2_state();
-    press_token_t                         *token;
-    tap_series_t                          *series;
-    runtime_v2_release_effect_plan_t       release_plan;
-    runtime_v2_active_release_resolution_t active_resolution;
+    runtime_v2_state_t                               *state = runtime_v2_state();
+    press_token_t                                    *token;
+    tap_series_t                                     *series;
+    runtime_v2_release_effect_plan_t                  release_plan;
+    runtime_v2_active_release_resolution_t            active_resolution;
     runtime_v2_pending_multi_tap_release_resolution_t pending_resolution;
-    delayed_action_mods_t                  series_mods;
+    delayed_action_mods_t                             series_mods;
 
     if (!(state && plan && handled_key_resolution_is_handled(resolution) && runtime_v2_keypos_valid(key_pos))) {
         return false;
     }
 
-    token  = runtime_v2_press_token_state(state, key_pos);
-    series = runtime_v2_tap_series_state(state, key_pos);
+    token       = runtime_v2_press_token_state(state, key_pos);
+    series      = runtime_v2_tap_series_state(state, key_pos);
     series_mods = series ? series->saved_mod_state : (delayed_action_mods_t){0};
-    if (series && series->active && token && token->handled_key && token->interaction.selection.tap_count > 1u && !token->active &&
-        token->observed_release_keycode != KC_NO && series->keycode == token->resolved_keycode &&
-        runtime_v2_resolve_pending_multi_tap_release(key_pos, series->tap_action, series->tap_repeat_count, true, &pending_resolution) &&
-        runtime_v2_plan_pending_multi_tap_release_effects(key_pos, key_runtime_slot_interaction_is_momentary_layer(token->interaction), &pending_resolution, series_mods, &release_plan)) {
+    if (series && series->active && token && token->handled_key && token->interaction.selection.tap_count > 1u && !token->active && token->observed_release_keycode != KC_NO && series->keycode == token->resolved_keycode && runtime_v2_resolve_pending_multi_tap_release(key_pos, series->tap_action, series->tap_repeat_count, true, &pending_resolution) && runtime_v2_plan_pending_multi_tap_release_effects(key_pos, key_runtime_slot_interaction_is_momentary_layer(token->interaction), &pending_resolution, series_mods, &release_plan)) {
         runtime_v2_apply_release_settlement(state, key_pos, &release_plan);
         runtime_v2_effect_plan_append_release_plan(plan, &release_plan);
         return true;
@@ -3109,7 +3095,7 @@ void runtime_v2_scan(runtime_v2_effect_plan_t *plan, uint16_t now) {
 }
 
 bool runtime_v2_settle_pending_fallback_hold(runtime_v2_effect_plan_t *plan) {
-    runtime_v2_state_t *state = runtime_v2_state();
+    runtime_v2_state_t *state       = runtime_v2_state();
     bool                settled_any = false;
 
     if (!(state && plan)) {
@@ -3117,7 +3103,7 @@ bool runtime_v2_settle_pending_fallback_hold(runtime_v2_effect_plan_t *plan) {
     }
 
     for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
-        press_token_t *token = &state->press_tokens[index];
+        press_token_t *token  = &state->press_tokens[index];
         uint8_t        before = plan->count;
 
         runtime_v2_plan_fallback_hold_activation(state, token, plan);
@@ -3309,9 +3295,7 @@ bool runtime_v2_preview_owner_key_pos(keypos_t *out) {
     for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
         const press_token_t *token = &state->press_tokens[index];
 
-        if (!(token->active && token->handled_key) || runtime_v2_press_token_uses_implicit_hold(token) || runtime_v2_press_token_uses_fallback_hold(token) ||
-            runtime_v2_key_pos_held_action_keycode(state, token->key_pos) != KC_NO || runtime_v2_key_pos_repeat_active(state, token->key_pos) ||
-            !runtime_v2_press_token_allows_tap_release(token) || runtime_v2_press_token_preview_layer_hint(token) == UINT8_MAX) {
+        if (!(token->active && token->handled_key) || runtime_v2_press_token_uses_implicit_hold(token) || runtime_v2_press_token_uses_fallback_hold(token) || runtime_v2_key_pos_held_action_keycode(state, token->key_pos) != KC_NO || runtime_v2_key_pos_repeat_active(state, token->key_pos) || !runtime_v2_press_token_allows_tap_release(token) || runtime_v2_press_token_preview_layer_hint(token) == UINT8_MAX) {
             continue;
         }
 
@@ -3336,8 +3320,7 @@ bool runtime_v2_pending_fallback_key_pos(keypos_t *out) {
     for (uint16_t index = 0; index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
         const press_token_t *token = &state->press_tokens[index];
 
-        if (!(token->active && token->handled_key) || !runtime_v2_press_token_uses_fallback_hold(token) || runtime_v2_press_token_has_runtime_owned_state(state, token) ||
-            token->resolved_keycode == KC_NO) {
+        if (!(token->active && token->handled_key) || !runtime_v2_press_token_uses_fallback_hold(token) || runtime_v2_press_token_has_runtime_owned_state(state, token) || token->resolved_keycode == KC_NO) {
             continue;
         }
 
@@ -3452,11 +3435,11 @@ void runtime_v2_observe_deferred_release_blocker_profile(keypos_t key_pos, bool 
 }
 
 projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
-    projection_snapshot_t                  snapshot = {0};
-    layer_ownership_debug_snapshot_t       layer_snapshot;
+    projection_snapshot_t                   snapshot = {0};
+    layer_ownership_debug_snapshot_t        layer_snapshot;
     keyboard_mod_ownership_debug_snapshot_t mod_snapshot;
-    pointer_layer_policy_debug_snapshot_t  pointer_snapshot;
-    runtime_v2_state_t                    *state = runtime_v2_state();
+    pointer_layer_policy_debug_snapshot_t   pointer_snapshot;
+    runtime_v2_state_t                     *state = runtime_v2_state();
 
     memset(&layer_snapshot, 0, sizeof(layer_snapshot));
     memset(&mod_snapshot, 0, sizeof(mod_snapshot));
@@ -3466,50 +3449,50 @@ projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
     keyboard_mod_ownership_debug_snapshot(&mod_snapshot);
     pointer_layer_policy_debug_snapshot(layer_state, &pointer_snapshot);
 
-    snapshot.layer_state                  = layer_state;
-    snapshot.locked_layer_mask            = layer_snapshot.locked_mask;
-    snapshot.keyboard_mod_state           = mod_snapshot.live_state;
-    snapshot.keyboard_managed_mod_mask    = runtime_v2_refcount_mask(mod_snapshot.managed_refcounts, KEYBOARD_MOD_OWNERSHIP_MOD_COUNT);
-    snapshot.keyboard_physical_mod_mask   = runtime_v2_refcount_mask(mod_snapshot.physical_refcounts, KEYBOARD_MOD_OWNERSHIP_MOD_COUNT);
-    snapshot.pd_mode_local_active         = pd_mode_local_active_snapshot();
-    snapshot.pd_mode_local_locked         = pd_mode_local_locked_snapshot();
-    snapshot.pd_mode_display_active       = pd_mode_display_active_snapshot();
-    snapshot.pd_mode_display_locked       = pd_mode_display_locked_snapshot();
-    snapshot.pointer_anchor_active        = pointer_snapshot.auto_mouse_anchored;
-    snapshot.pointer_pd_mode_anchor_active = pointer_snapshot.pd_mode_anchor_active;
-    snapshot.pointer_prefers_typing_layer = pointer_snapshot.prefers_typing_layer;
-    snapshot.pointer_toggle_enabled       = pointer_snapshot.auto_mouse_toggle_enabled;
-    snapshot.pointer_sniping_layer_active = pointer_snapshot.sniping_layer_active;
-    snapshot.pointer_key_tracker          = pointer_snapshot.auto_mouse_key_tracker;
-    snapshot.pointer_layer                = pointer_snapshot.auto_mouse_layer;
-    snapshot.active_slot_count            = noah_runtime_debug_active_slot_count();
-    snapshot.pending_multi_tap_slot_count = noah_runtime_debug_pending_multi_tap_slot_count();
-    snapshot.deferred_release_count       = noah_runtime_debug_deferred_release_count();
-    snapshot.deferred_release_blocker_count = noah_runtime_debug_deferred_release_blocker_count();
+    snapshot.layer_state                          = layer_state;
+    snapshot.locked_layer_mask                    = layer_snapshot.locked_mask;
+    snapshot.keyboard_mod_state                   = mod_snapshot.live_state;
+    snapshot.keyboard_managed_mod_mask            = runtime_v2_refcount_mask(mod_snapshot.managed_refcounts, KEYBOARD_MOD_OWNERSHIP_MOD_COUNT);
+    snapshot.keyboard_physical_mod_mask           = runtime_v2_refcount_mask(mod_snapshot.physical_refcounts, KEYBOARD_MOD_OWNERSHIP_MOD_COUNT);
+    snapshot.pd_mode_local_active                 = pd_mode_local_active_snapshot();
+    snapshot.pd_mode_local_locked                 = pd_mode_local_locked_snapshot();
+    snapshot.pd_mode_display_active               = pd_mode_display_active_snapshot();
+    snapshot.pd_mode_display_locked               = pd_mode_display_locked_snapshot();
+    snapshot.pointer_anchor_active                = pointer_snapshot.auto_mouse_anchored;
+    snapshot.pointer_pd_mode_anchor_active        = pointer_snapshot.pd_mode_anchor_active;
+    snapshot.pointer_prefers_typing_layer         = pointer_snapshot.prefers_typing_layer;
+    snapshot.pointer_toggle_enabled               = pointer_snapshot.auto_mouse_toggle_enabled;
+    snapshot.pointer_sniping_layer_active         = pointer_snapshot.sniping_layer_active;
+    snapshot.pointer_key_tracker                  = pointer_snapshot.auto_mouse_key_tracker;
+    snapshot.pointer_layer                        = pointer_snapshot.auto_mouse_layer;
+    snapshot.active_slot_count                    = noah_runtime_debug_active_slot_count();
+    snapshot.pending_multi_tap_slot_count         = noah_runtime_debug_pending_multi_tap_slot_count();
+    snapshot.deferred_release_count               = noah_runtime_debug_deferred_release_count();
+    snapshot.deferred_release_blocker_count       = noah_runtime_debug_deferred_release_blocker_count();
     snapshot.deferred_release_timed_blocker_count = noah_runtime_debug_deferred_release_timed_blocker_count();
 
     if (state) {
-        snapshot.v2_shadow_layer_state     = state->shadow_projection.layer_state;
-        snapshot.v2_shadow_locked_layer_mask = state->shadow_projection.locked_layer_mask;
-        snapshot.v2_shadow_keyboard_mod_state = state->shadow_projection.keyboard_mod_state;
-        snapshot.v2_shadow_keyboard_managed_mod_mask = state->shadow_projection.keyboard_managed_mod_mask;
-        snapshot.v2_shadow_keyboard_physical_mod_mask = state->shadow_projection.keyboard_physical_mod_mask;
-        snapshot.v2_shadow_pd_mode_local_active = state->shadow_projection.pd_mode_local_active;
-        snapshot.v2_shadow_pd_mode_local_locked = state->shadow_projection.pd_mode_local_locked;
-        snapshot.v2_shadow_pointer_anchor_active = state->shadow_projection.pointer_anchor_active;
+        snapshot.v2_shadow_layer_state                   = state->shadow_projection.layer_state;
+        snapshot.v2_shadow_locked_layer_mask             = state->shadow_projection.locked_layer_mask;
+        snapshot.v2_shadow_keyboard_mod_state            = state->shadow_projection.keyboard_mod_state;
+        snapshot.v2_shadow_keyboard_managed_mod_mask     = state->shadow_projection.keyboard_managed_mod_mask;
+        snapshot.v2_shadow_keyboard_physical_mod_mask    = state->shadow_projection.keyboard_physical_mod_mask;
+        snapshot.v2_shadow_pd_mode_local_active          = state->shadow_projection.pd_mode_local_active;
+        snapshot.v2_shadow_pd_mode_local_locked          = state->shadow_projection.pd_mode_local_locked;
+        snapshot.v2_shadow_pointer_anchor_active         = state->shadow_projection.pointer_anchor_active;
         snapshot.v2_shadow_pointer_pd_mode_anchor_active = state->shadow_projection.pointer_pd_mode_anchor_active;
-        snapshot.v2_shadow_pointer_prefers_typing_layer = state->shadow_projection.pointer_prefers_typing_layer;
-        snapshot.v2_shadow_pointer_toggle_enabled = state->shadow_projection.pointer_toggle_enabled;
-        snapshot.v2_press_token_count     = state->press_token_count;
-        snapshot.v2_tap_series_count      = state->tap_series_count;
-        snapshot.v2_lease_count           = state->lease_count;
-        snapshot.v2_pending_release_count = state->pending_release_count;
-        snapshot.v2_deferred_release_blocker_count = runtime_v2_effective_deferred_release_blocker_count(state);
+        snapshot.v2_shadow_pointer_prefers_typing_layer  = state->shadow_projection.pointer_prefers_typing_layer;
+        snapshot.v2_shadow_pointer_toggle_enabled        = state->shadow_projection.pointer_toggle_enabled;
+        snapshot.v2_press_token_count                    = state->press_token_count;
+        snapshot.v2_tap_series_count                     = state->tap_series_count;
+        snapshot.v2_lease_count                          = state->lease_count;
+        snapshot.v2_pending_release_count                = state->pending_release_count;
+        snapshot.v2_deferred_release_blocker_count       = runtime_v2_effective_deferred_release_blocker_count(state);
         snapshot.v2_deferred_release_timed_blocker_count = runtime_v2_timed_deferred_release_blocker_count(state);
-        snapshot.v2_persistent_intent_count = state->persistent_intent_count;
-        snapshot.v2_release_keycode_mismatch_count = state->release_keycode_mismatch_count;
-        snapshot.v2_orphan_release_count = state->orphan_release_count;
-        snapshot.v2_cancelled_press_count = state->cancelled_press_count;
+        snapshot.v2_persistent_intent_count              = state->persistent_intent_count;
+        snapshot.v2_release_keycode_mismatch_count       = state->release_keycode_mismatch_count;
+        snapshot.v2_orphan_release_count                 = state->orphan_release_count;
+        snapshot.v2_cancelled_press_count                = state->cancelled_press_count;
     }
 
     return snapshot;
@@ -3520,54 +3503,10 @@ bool runtime_v2_projection_snapshot_equal(const projection_snapshot_t *lhs, cons
         return lhs == rhs;
     }
 
-    return lhs->layer_state == rhs->layer_state &&
-           lhs->locked_layer_mask == rhs->locked_layer_mask &&
-           lhs->keyboard_mod_state.real == rhs->keyboard_mod_state.real &&
-           lhs->keyboard_mod_state.weak == rhs->keyboard_mod_state.weak &&
-           lhs->keyboard_mod_state.oneshot == rhs->keyboard_mod_state.oneshot &&
-           lhs->keyboard_mod_state.oneshot_locked == rhs->keyboard_mod_state.oneshot_locked &&
-           lhs->keyboard_managed_mod_mask == rhs->keyboard_managed_mod_mask &&
-           lhs->keyboard_physical_mod_mask == rhs->keyboard_physical_mod_mask &&
-           lhs->pd_mode_local_active == rhs->pd_mode_local_active &&
-           lhs->pd_mode_local_locked == rhs->pd_mode_local_locked &&
-           lhs->pd_mode_display_active == rhs->pd_mode_display_active &&
-           lhs->pd_mode_display_locked == rhs->pd_mode_display_locked &&
-           lhs->pointer_anchor_active == rhs->pointer_anchor_active &&
-           lhs->pointer_pd_mode_anchor_active == rhs->pointer_pd_mode_anchor_active &&
-           lhs->pointer_prefers_typing_layer == rhs->pointer_prefers_typing_layer &&
-           lhs->pointer_toggle_enabled == rhs->pointer_toggle_enabled &&
-           lhs->pointer_sniping_layer_active == rhs->pointer_sniping_layer_active &&
-           lhs->pointer_key_tracker == rhs->pointer_key_tracker &&
-           lhs->pointer_layer == rhs->pointer_layer &&
-           lhs->active_slot_count == rhs->active_slot_count &&
-           lhs->pending_multi_tap_slot_count == rhs->pending_multi_tap_slot_count &&
-           lhs->deferred_release_count == rhs->deferred_release_count &&
-           lhs->deferred_release_blocker_count == rhs->deferred_release_blocker_count &&
-           lhs->deferred_release_timed_blocker_count == rhs->deferred_release_timed_blocker_count &&
-           lhs->v2_shadow_layer_state == rhs->v2_shadow_layer_state &&
-           lhs->v2_shadow_locked_layer_mask == rhs->v2_shadow_locked_layer_mask &&
-           lhs->v2_shadow_keyboard_mod_state.real == rhs->v2_shadow_keyboard_mod_state.real &&
-           lhs->v2_shadow_keyboard_mod_state.weak == rhs->v2_shadow_keyboard_mod_state.weak &&
-           lhs->v2_shadow_keyboard_mod_state.oneshot == rhs->v2_shadow_keyboard_mod_state.oneshot &&
-           lhs->v2_shadow_keyboard_mod_state.oneshot_locked == rhs->v2_shadow_keyboard_mod_state.oneshot_locked &&
-           lhs->v2_shadow_keyboard_managed_mod_mask == rhs->v2_shadow_keyboard_managed_mod_mask &&
-           lhs->v2_shadow_keyboard_physical_mod_mask == rhs->v2_shadow_keyboard_physical_mod_mask &&
-           lhs->v2_shadow_pd_mode_local_active == rhs->v2_shadow_pd_mode_local_active &&
-           lhs->v2_shadow_pd_mode_local_locked == rhs->v2_shadow_pd_mode_local_locked &&
-           lhs->v2_shadow_pointer_anchor_active == rhs->v2_shadow_pointer_anchor_active &&
-           lhs->v2_shadow_pointer_pd_mode_anchor_active == rhs->v2_shadow_pointer_pd_mode_anchor_active &&
-           lhs->v2_shadow_pointer_prefers_typing_layer == rhs->v2_shadow_pointer_prefers_typing_layer &&
-           lhs->v2_shadow_pointer_toggle_enabled == rhs->v2_shadow_pointer_toggle_enabled &&
-           lhs->v2_press_token_count == rhs->v2_press_token_count &&
-           lhs->v2_tap_series_count == rhs->v2_tap_series_count &&
-           lhs->v2_lease_count == rhs->v2_lease_count &&
-           lhs->v2_pending_release_count == rhs->v2_pending_release_count &&
-           lhs->v2_deferred_release_blocker_count == rhs->v2_deferred_release_blocker_count &&
-           lhs->v2_deferred_release_timed_blocker_count == rhs->v2_deferred_release_timed_blocker_count &&
-           lhs->v2_persistent_intent_count == rhs->v2_persistent_intent_count &&
-           lhs->v2_release_keycode_mismatch_count == rhs->v2_release_keycode_mismatch_count &&
-           lhs->v2_orphan_release_count == rhs->v2_orphan_release_count &&
-           lhs->v2_cancelled_press_count == rhs->v2_cancelled_press_count;
+    return lhs->layer_state == rhs->layer_state && lhs->locked_layer_mask == rhs->locked_layer_mask && lhs->keyboard_mod_state.real == rhs->keyboard_mod_state.real && lhs->keyboard_mod_state.weak == rhs->keyboard_mod_state.weak && lhs->keyboard_mod_state.oneshot == rhs->keyboard_mod_state.oneshot && lhs->keyboard_mod_state.oneshot_locked == rhs->keyboard_mod_state.oneshot_locked && lhs->keyboard_managed_mod_mask == rhs->keyboard_managed_mod_mask && lhs->keyboard_physical_mod_mask == rhs->keyboard_physical_mod_mask && lhs->pd_mode_local_active == rhs->pd_mode_local_active && lhs->pd_mode_local_locked == rhs->pd_mode_local_locked && lhs->pd_mode_display_active == rhs->pd_mode_display_active && lhs->pd_mode_display_locked == rhs->pd_mode_display_locked && lhs->pointer_anchor_active == rhs->pointer_anchor_active && lhs->pointer_pd_mode_anchor_active == rhs->pointer_pd_mode_anchor_active && lhs->pointer_prefers_typing_layer == rhs->pointer_prefers_typing_layer &&
+           lhs->pointer_toggle_enabled == rhs->pointer_toggle_enabled && lhs->pointer_sniping_layer_active == rhs->pointer_sniping_layer_active && lhs->pointer_key_tracker == rhs->pointer_key_tracker && lhs->pointer_layer == rhs->pointer_layer && lhs->active_slot_count == rhs->active_slot_count && lhs->pending_multi_tap_slot_count == rhs->pending_multi_tap_slot_count && lhs->deferred_release_count == rhs->deferred_release_count && lhs->deferred_release_blocker_count == rhs->deferred_release_blocker_count && lhs->deferred_release_timed_blocker_count == rhs->deferred_release_timed_blocker_count && lhs->v2_shadow_layer_state == rhs->v2_shadow_layer_state && lhs->v2_shadow_locked_layer_mask == rhs->v2_shadow_locked_layer_mask && lhs->v2_shadow_keyboard_mod_state.real == rhs->v2_shadow_keyboard_mod_state.real && lhs->v2_shadow_keyboard_mod_state.weak == rhs->v2_shadow_keyboard_mod_state.weak && lhs->v2_shadow_keyboard_mod_state.oneshot == rhs->v2_shadow_keyboard_mod_state.oneshot &&
+           lhs->v2_shadow_keyboard_mod_state.oneshot_locked == rhs->v2_shadow_keyboard_mod_state.oneshot_locked && lhs->v2_shadow_keyboard_managed_mod_mask == rhs->v2_shadow_keyboard_managed_mod_mask && lhs->v2_shadow_keyboard_physical_mod_mask == rhs->v2_shadow_keyboard_physical_mod_mask && lhs->v2_shadow_pd_mode_local_active == rhs->v2_shadow_pd_mode_local_active && lhs->v2_shadow_pd_mode_local_locked == rhs->v2_shadow_pd_mode_local_locked && lhs->v2_shadow_pointer_anchor_active == rhs->v2_shadow_pointer_anchor_active && lhs->v2_shadow_pointer_pd_mode_anchor_active == rhs->v2_shadow_pointer_pd_mode_anchor_active && lhs->v2_shadow_pointer_prefers_typing_layer == rhs->v2_shadow_pointer_prefers_typing_layer && lhs->v2_shadow_pointer_toggle_enabled == rhs->v2_shadow_pointer_toggle_enabled && lhs->v2_press_token_count == rhs->v2_press_token_count && lhs->v2_tap_series_count == rhs->v2_tap_series_count && lhs->v2_lease_count == rhs->v2_lease_count &&
+           lhs->v2_pending_release_count == rhs->v2_pending_release_count && lhs->v2_deferred_release_blocker_count == rhs->v2_deferred_release_blocker_count && lhs->v2_deferred_release_timed_blocker_count == rhs->v2_deferred_release_timed_blocker_count && lhs->v2_persistent_intent_count == rhs->v2_persistent_intent_count && lhs->v2_release_keycode_mismatch_count == rhs->v2_release_keycode_mismatch_count && lhs->v2_orphan_release_count == rhs->v2_orphan_release_count && lhs->v2_cancelled_press_count == rhs->v2_cancelled_press_count;
 }
 
 #if defined(NOAH_RUNTIME_TRACE_ENABLE)

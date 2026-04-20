@@ -8,12 +8,14 @@
 #include "runtime_diag.h"
 
 static noah_runtime_context_t noah_runtime_singleton = {
-    .shared = {
-        .v2 = {
-            .next_token_id                 = 1u,
-            .next_pending_release_sequence = 1u,
+    .shared =
+        {
+            .v2 =
+                {
+                    .next_token_id                 = 1u,
+                    .next_pending_release_sequence = 1u,
+                },
         },
-    },
 };
 
 noah_runtime_context_t *noah_runtime_context(void) {

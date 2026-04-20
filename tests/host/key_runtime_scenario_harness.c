@@ -122,14 +122,14 @@ key_behavior_view_t key_runtime_scenario_pressable_handled_key(uint16_t keycode)
 }
 
 void key_runtime_scenario_reset(void) {
-    key_runtime_scenario_time                = 1000;
-    key_runtime_scenario_hold_survives_flush = false;
-    key_runtime_scenario_behavior_count      = 0;
-    key_runtime_scenario_step_entry_count    = 0;
-    key_runtime_scenario_pd_mode_count       = 0;
-    key_runtime_scenario_locked_layers       = 0;
-    key_runtime_scenario_pd_locked_modes     = 0;
-    key_runtime_scenario_effect_count_value  = 0;
+    key_runtime_scenario_time                   = 1000;
+    key_runtime_scenario_hold_survives_flush    = false;
+    key_runtime_scenario_behavior_count         = 0;
+    key_runtime_scenario_step_entry_count       = 0;
+    key_runtime_scenario_pd_mode_count          = 0;
+    key_runtime_scenario_locked_layers          = 0;
+    key_runtime_scenario_pd_locked_modes        = 0;
+    key_runtime_scenario_effect_count_value     = 0;
     key_runtime_scenario_split_sync_count_value = 0;
 
     memset(key_runtime_scenario_behaviors, 0, sizeof(key_runtime_scenario_behaviors));
@@ -141,7 +141,7 @@ void key_runtime_scenario_reset(void) {
 }
 
 void key_runtime_scenario_clear_effects(void) {
-    key_runtime_scenario_effect_count_value = 0;
+    key_runtime_scenario_effect_count_value     = 0;
     key_runtime_scenario_split_sync_count_value = 0;
     memset(key_runtime_scenario_effects, 0, sizeof(key_runtime_scenario_effects));
 }

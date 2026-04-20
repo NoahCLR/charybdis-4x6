@@ -275,35 +275,30 @@ typedef struct {
 } test_release_order_case_t;
 
 static const test_release_order_case_t test_release_orders[] = {
-    {.name = "child-parent-gui", .order = {TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_GUI}},
-    {.name = "child-gui-parent", .order = {TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_PARENT}},
-    {.name = "parent-child-gui", .order = {TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_GUI}},
-    {.name = "parent-gui-child", .order = {TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_CHILD}},
-    {.name = "gui-child-parent", .order = {TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_PARENT}},
-    {.name = "gui-parent-child", .order = {TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_CHILD}},
+    {.name = "child-parent-gui", .order = {TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_GUI}}, {.name = "child-gui-parent", .order = {TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_PARENT}}, {.name = "parent-child-gui", .order = {TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_GUI}}, {.name = "parent-gui-child", .order = {TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_CHILD}}, {.name = "gui-child-parent", .order = {TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_PARENT}}, {.name = "gui-parent-child", .order = {TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_CHILD}},
 };
 
 static void test_reset_state(void) {
-    fake_time                 = 1000;
-    test_tap_code16_count     = 0;
-    test_last_tap_code16      = KC_NO;
-    test_delayed_action_count = 0;
-    test_last_delayed_action  = KC_NO;
-    current_cpi               = 0;
-    fake_mods                = 0;
-    fake_weak_mods           = 0;
-    fake_oneshot_mods        = 0;
-    fake_oneshot_locked_mods = 0;
-    fake_managed_mods        = 0;
-    fake_physical_mods       = 0;
-    dragscroll_enabled       = false;
-    sniping_enabled          = false;
-    auto_mouse_enabled       = true;
-    auto_mouse_toggled       = false;
-    auto_mouse_key_tracker   = 0;
-    auto_mouse_layer_target  = LAYER_POINTER;
+    fake_time                  = 1000;
+    test_tap_code16_count      = 0;
+    test_last_tap_code16       = KC_NO;
+    test_delayed_action_count  = 0;
+    test_last_delayed_action   = KC_NO;
+    current_cpi                = 0;
+    fake_mods                  = 0;
+    fake_weak_mods             = 0;
+    fake_oneshot_mods          = 0;
+    fake_oneshot_locked_mods   = 0;
+    fake_managed_mods          = 0;
+    fake_physical_mods         = 0;
+    dragscroll_enabled         = false;
+    sniping_enabled            = false;
+    auto_mouse_enabled         = true;
+    auto_mouse_toggled         = false;
+    auto_mouse_key_tracker     = 0;
+    auto_mouse_layer_target    = LAYER_POINTER;
     auto_mouse_layer_off_count = 0;
-    reset_dragscroll_count   = 0;
+    reset_dragscroll_count     = 0;
     memset(test_pressed_keycodes, 0, sizeof(test_pressed_keycodes));
     memset(test_held_actions, 0, sizeof(test_held_actions));
     noah_runtime_reset_for_test();
@@ -325,12 +320,12 @@ static void test_assert_runtime_trace_snapshot_equal(const noah_runtime_trace_sn
 }
 
 static void test_shadow_replay_scenario(void (*scenario)(void)) {
-    runtime_event_t                events[128];
-    noah_runtime_trace_snapshot_t  original_trace;
-    noah_runtime_trace_snapshot_t  replay_trace;
-    projection_snapshot_t          original_projection;
-    projection_snapshot_t          replay_projection;
-    uint16_t                       event_count;
+    runtime_event_t               events[128];
+    noah_runtime_trace_snapshot_t original_trace;
+    noah_runtime_trace_snapshot_t replay_trace;
+    projection_snapshot_t         original_projection;
+    projection_snapshot_t         replay_projection;
+    uint16_t                      event_count;
 
     CHECK(scenario != NULL);
 
@@ -401,7 +396,7 @@ void layer_on(uint8_t layer) {
 }
 
 void layer_off(uint8_t layer) {
-    test_apply_layer_state(layer_state & (layer_state_t)~((layer_state_t)1u << layer));
+    test_apply_layer_state(layer_state & (layer_state_t) ~((layer_state_t)1u << layer));
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
@@ -653,7 +648,7 @@ void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot
         uint8_t bit = (uint8_t)(1u << index);
 
         out->physical_refcounts[index] = (fake_physical_mods & bit) != 0 ? 1u : 0u;
-        out->managed_refcounts[index] = (fake_managed_mods & bit) != 0 ? 1u : 0u;
+        out->managed_refcounts[index]  = (fake_managed_mods & bit) != 0 ? 1u : 0u;
     }
 }
 
@@ -932,7 +927,7 @@ void held_action_unregister(keypos_t key_pos, uint16_t action) {
     int16_t slot = test_find_held_action_slot(key_pos);
 
     if (slot >= 0) {
-        action = test_held_actions[slot].action;
+        action                         = test_held_actions[slot].action;
         test_held_actions[slot].active = false;
         test_held_actions[slot].action = KC_NO;
     }
@@ -947,7 +942,7 @@ bool held_action_release_owned_by_key(keypos_t key_pos) {
         return false;
     }
 
-    uint16_t action = test_held_actions[slot].action;
+    uint16_t action                = test_held_actions[slot].action;
     test_held_actions[slot].active = false;
     test_held_actions[slot].action = KC_NO;
     noah_action_release(key_pos, action);
@@ -1046,7 +1041,7 @@ static void test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_
 }
 
 static void test_right_thumb_triple_tap_flushes_next_track_after_timeout(void) {
-    keypos_t  key_pos      = test_right_thumb_pos();
+    keypos_t key_pos      = test_right_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();
@@ -1072,7 +1067,7 @@ static void test_right_thumb_triple_tap_flushes_next_track_after_timeout(void) {
 }
 
 static void test_right_thumb_triple_tap_long_hold_registers_next_track_hold(void) {
-    keypos_t  key_pos      = test_right_thumb_pos();
+    keypos_t key_pos      = test_right_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();
@@ -1099,7 +1094,7 @@ static void test_right_thumb_triple_tap_long_hold_registers_next_track_hold(void
 }
 
 static void test_right_thumb_quadruple_tap_dispatches_previous_track(void) {
-    keypos_t  key_pos      = test_right_thumb_pos();
+    keypos_t key_pos      = test_right_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();
@@ -1146,8 +1141,8 @@ static void test_pointer_pinch_double_tap_queues_via_macro_six(void) {
 
 static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
-    keypos_t        nav_left_pos    = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       nav_left_pos     = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
 
     test_reset_state();
 
@@ -1178,8 +1173,8 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
 }
 
 static void test_right_thumb_hold_dispatches_nav_taps_immediately(void) {
-    keypos_t  right_thumb_pos     = test_right_thumb_pos();
-    keypos_t  nav_left_pos        = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
+    keypos_t right_thumb_pos     = test_right_thumb_pos();
+    keypos_t nav_left_pos        = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
     uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
 
     test_reset_state();
@@ -1758,7 +1753,7 @@ static void test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_q
 
 static void test_gui_double_tap_hold_with_raw_nav_lt_keeps_arrow_taps_immediate(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     test_gui_double_tap_hold_keeps_nav_arrow_taps_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, false);
@@ -1767,7 +1762,7 @@ static void test_gui_double_tap_hold_with_raw_nav_lt_keeps_arrow_taps_immediate(
 }
 
 static void test_gui_double_tap_hold_with_right_thumb_nav_hold_keeps_arrow_taps_immediate(void) {
-    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    keypos_t right_thumb_pos     = test_right_thumb_pos();
     uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
 
     CHECK(right_thumb_keycode != KC_TRNS);
@@ -1813,14 +1808,14 @@ static void test_gui_double_tap_hold_with_repeated_nav_arrow_taps_stays_quiescen
 
 static void test_gui_double_tap_hold_with_raw_nav_lt_repeated_arrow_taps_stays_quiescent(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     test_gui_double_tap_hold_with_repeated_nav_arrow_taps_stays_quiescent(nav_hold_pos, nav_hold_keycode, false);
 }
 
 static void test_gui_double_tap_hold_with_right_thumb_repeated_arrow_taps_stays_quiescent(void) {
-    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    keypos_t right_thumb_pos     = test_right_thumb_pos();
     uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
 
     CHECK(right_thumb_keycode != KC_TRNS);
@@ -1829,7 +1824,7 @@ static void test_gui_double_tap_hold_with_right_thumb_repeated_arrow_taps_stays_
 
 static void test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_arrow_hold_release_immediate(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, false);
@@ -1884,14 +1879,14 @@ static void test_gui_pending_double_tap_hold_keeps_arrow_tap_immediate(keypos_t 
 
 static void test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_arrow_tap_immediate(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     test_gui_pending_double_tap_hold_keeps_arrow_tap_immediate(nav_hold_pos, nav_hold_keycode, false);
 }
 
 static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_arrow_tap_immediate(void) {
-    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    keypos_t right_thumb_pos     = test_right_thumb_pos();
     uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
 
     CHECK(right_thumb_keycode != KC_TRNS);
@@ -1958,14 +1953,14 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent
 
 static void test_gui_double_tap_hold_with_raw_nav_lt_keeps_dragscroll_immediate(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(nav_hold_pos, nav_hold_keycode, false);
 }
 
 static void test_gui_double_tap_hold_with_right_thumb_nav_hold_keeps_dragscroll_immediate(void) {
-    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    keypos_t right_thumb_pos     = test_right_thumb_pos();
     uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
 
     CHECK(right_thumb_keycode != KC_TRNS);
@@ -1974,14 +1969,14 @@ static void test_gui_double_tap_hold_with_right_thumb_nav_hold_keeps_dragscroll_
 
 static void test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_dragscroll_immediate(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(nav_hold_pos, nav_hold_keycode, false);
 }
 
 static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_arrow_hold_release_immediate(void) {
-    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    keypos_t right_thumb_pos     = test_right_thumb_pos();
     uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
 
     CHECK(right_thumb_keycode != KC_TRNS);
@@ -2021,14 +2016,14 @@ static void test_nav_dragscroll_hold_keeps_arrow_taps_immediate(keypos_t parent_
 
 static void test_raw_nav_dragscroll_hold_keeps_arrow_taps_immediate(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     test_nav_dragscroll_hold_keeps_arrow_taps_immediate(nav_hold_pos, nav_hold_keycode, false);
 }
 
 static void test_right_thumb_dragscroll_hold_keeps_arrow_taps_immediate(void) {
-    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    keypos_t right_thumb_pos     = test_right_thumb_pos();
     uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
 
     CHECK(right_thumb_keycode != KC_TRNS);
@@ -2072,14 +2067,14 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_active_keeps_arrow_taps
 
 static void test_gui_double_tap_hold_with_raw_nav_dragscroll_active_keeps_arrow_taps_immediate(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     test_gui_double_tap_hold_with_nav_dragscroll_active_keeps_arrow_taps_immediate(nav_hold_pos, nav_hold_keycode, false);
 }
 
 static void test_gui_double_tap_hold_with_right_thumb_dragscroll_active_keeps_arrow_taps_immediate(void) {
-    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    keypos_t right_thumb_pos     = test_right_thumb_pos();
     uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
 
     CHECK(right_thumb_keycode != KC_TRNS);
@@ -2087,7 +2082,7 @@ static void test_gui_double_tap_hold_with_right_thumb_dragscroll_active_keeps_ar
 }
 
 static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_dragscroll_immediate(void) {
-    keypos_t  right_thumb_pos     = test_right_thumb_pos();
+    keypos_t right_thumb_pos     = test_right_thumb_pos();
     uint16_t right_thumb_keycode = test_keycode_at(LAYER_BASE, right_thumb_pos);
 
     CHECK(right_thumb_keycode != KC_TRNS);
@@ -2096,8 +2091,8 @@ static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_dra
 
 static void test_runtime_v2_raw_nav_dragscroll_shadow_scenario(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
-    keypos_t        dragscroll_pos  = test_find_keypos_on_layer(LAYER_NAV, DRAGSCROLL);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       dragscroll_pos   = test_find_keypos_on_layer(LAYER_NAV, DRAGSCROLL);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     CHECK(test_keypos_valid(dragscroll_pos));
@@ -2117,9 +2112,9 @@ static void test_runtime_v2_raw_nav_dragscroll_shadow_scenario(void) {
 
 static void test_runtime_v2_gui_alt_repeated_nav_shadow_scenario(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
-    keypos_t        gui_pos         = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
-    keypos_t        nav_hold_pos    = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
-    keypos_t        child_pos       = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
+    keypos_t       gui_pos          = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
+    keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
+    keypos_t       child_pos        = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
 
     CHECK(test_keypos_valid(gui_pos));
     CHECK(test_keypos_valid(nav_hold_pos));

@@ -55,8 +55,8 @@ enum {
 #    define S_D_RMOD 0x7003u
 #endif
 
-layer_state_t    layer_state = 0;
-static uint16_t  test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
+layer_state_t        layer_state = 0;
+static uint16_t      test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 const key_behavior_t key_behaviors[] = {
     {
         .keycode        = KC_RIGHT_ALT,
@@ -135,36 +135,36 @@ const key_behavior_t key_behaviors[] = {
 };
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 
-static uint16_t fake_time;
-static uint16_t current_cpi;
-static uint16_t default_dpi;
-static uint8_t  split_sync_count;
-static uint8_t  reset_volume_count;
-static uint8_t  layer_state_set_count;
-static uint8_t  layer_off_count;
-static uint8_t  fake_mods;
-static uint8_t  fake_weak_mods;
-static uint8_t  fake_oneshot_mods;
-static uint8_t  fake_oneshot_locked_mods;
-static uint8_t  fake_managed_mods;
-static uint8_t  fake_physical_mods;
-static uint8_t  delayed_action_count;
-static uint8_t  auto_mouse_layer_off_count;
-static uint8_t  auto_mouse_layer_target;
-static bool     auto_mouse_enabled;
-static bool     auto_mouse_toggled;
-static int8_t   auto_mouse_key_tracker;
-static bool     dragscroll_enabled;
-static bool     sniping_enabled;
-static uint8_t  auto_mouse_layer_off_active_slot_count;
-static bool     auto_mouse_layer_off_pending_fallback;
-static uint8_t  auto_mouse_layer_off_real_mods;
-static uint8_t  auto_mouse_layer_off_managed_mods;
-static uint8_t  auto_mouse_layer_off_physical_mods;
-static uint16_t tap_code16_count;
-static uint16_t last_tap_code16;
-static uint8_t  reset_dragscroll_count;
-static uint16_t last_delayed_action;
+static uint16_t              fake_time;
+static uint16_t              current_cpi;
+static uint16_t              default_dpi;
+static uint8_t               split_sync_count;
+static uint8_t               reset_volume_count;
+static uint8_t               layer_state_set_count;
+static uint8_t               layer_off_count;
+static uint8_t               fake_mods;
+static uint8_t               fake_weak_mods;
+static uint8_t               fake_oneshot_mods;
+static uint8_t               fake_oneshot_locked_mods;
+static uint8_t               fake_managed_mods;
+static uint8_t               fake_physical_mods;
+static uint8_t               delayed_action_count;
+static uint8_t               auto_mouse_layer_off_count;
+static uint8_t               auto_mouse_layer_target;
+static bool                  auto_mouse_enabled;
+static bool                  auto_mouse_toggled;
+static int8_t                auto_mouse_key_tracker;
+static bool                  dragscroll_enabled;
+static bool                  sniping_enabled;
+static uint8_t               auto_mouse_layer_off_active_slot_count;
+static bool                  auto_mouse_layer_off_pending_fallback;
+static uint8_t               auto_mouse_layer_off_real_mods;
+static uint8_t               auto_mouse_layer_off_managed_mods;
+static uint8_t               auto_mouse_layer_off_physical_mods;
+static uint16_t              tap_code16_count;
+static uint16_t              last_tap_code16;
+static uint8_t               reset_dragscroll_count;
+static uint16_t              last_delayed_action;
 static delayed_action_mods_t last_delayed_mods;
 
 typedef enum {
@@ -178,12 +178,7 @@ typedef struct {
 } test_release_order_case_t;
 
 static const test_release_order_case_t test_release_orders[] = {
-    {.order = {TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_GUI}},
-    {.order = {TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_PARENT}},
-    {.order = {TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_GUI}},
-    {.order = {TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_CHILD}},
-    {.order = {TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_PARENT}},
-    {.order = {TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_CHILD}},
+    {.order = {TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_GUI}}, {.order = {TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_PARENT}}, {.order = {TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_GUI}}, {.order = {TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_CHILD}}, {.order = {TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_CHILD, TEST_RELEASE_TARGET_PARENT}}, {.order = {TEST_RELEASE_TARGET_GUI, TEST_RELEASE_TARGET_PARENT, TEST_RELEASE_TARGET_CHILD}},
 };
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -233,38 +228,38 @@ static void test_reset_state(void) {
     noah_runtime_reset_for_test();
     test_reset_keymap();
 
-    fake_time               = 1000;
-    current_cpi             = 0;
-    default_dpi             = 900;
-    split_sync_count        = 0;
-    reset_volume_count      = 0;
-    layer_state_set_count   = 0;
-    layer_off_count         = 0;
-    layer_state             = test_layer_mask(TEST_LAYER_BASE);
-    fake_mods                = 0;
-    fake_weak_mods           = 0;
-    fake_oneshot_mods        = 0;
-    fake_oneshot_locked_mods = 0;
-    fake_managed_mods        = 0;
-    fake_physical_mods       = 0;
-    delayed_action_count     = 0;
-    auto_mouse_layer_off_count = 0;
-    auto_mouse_layer_target    = TEST_LAYER_POINTER;
-    auto_mouse_enabled         = true;
-    auto_mouse_toggled         = false;
-    auto_mouse_key_tracker     = 0;
-    dragscroll_enabled         = false;
-    sniping_enabled            = false;
+    fake_time                              = 1000;
+    current_cpi                            = 0;
+    default_dpi                            = 900;
+    split_sync_count                       = 0;
+    reset_volume_count                     = 0;
+    layer_state_set_count                  = 0;
+    layer_off_count                        = 0;
+    layer_state                            = test_layer_mask(TEST_LAYER_BASE);
+    fake_mods                              = 0;
+    fake_weak_mods                         = 0;
+    fake_oneshot_mods                      = 0;
+    fake_oneshot_locked_mods               = 0;
+    fake_managed_mods                      = 0;
+    fake_physical_mods                     = 0;
+    delayed_action_count                   = 0;
+    auto_mouse_layer_off_count             = 0;
+    auto_mouse_layer_target                = TEST_LAYER_POINTER;
+    auto_mouse_enabled                     = true;
+    auto_mouse_toggled                     = false;
+    auto_mouse_key_tracker                 = 0;
+    dragscroll_enabled                     = false;
+    sniping_enabled                        = false;
     auto_mouse_layer_off_active_slot_count = 0;
     auto_mouse_layer_off_pending_fallback  = false;
     auto_mouse_layer_off_real_mods         = 0;
     auto_mouse_layer_off_managed_mods      = 0;
     auto_mouse_layer_off_physical_mods     = 0;
-    tap_code16_count         = 0;
-    last_tap_code16          = KC_NO;
-    reset_dragscroll_count   = 0;
-    last_delayed_action      = KC_NO;
-    last_delayed_mods        = (delayed_action_mods_t){0};
+    tap_code16_count                       = 0;
+    last_tap_code16                        = KC_NO;
+    reset_dragscroll_count                 = 0;
+    last_delayed_action                    = KC_NO;
+    last_delayed_mods                      = (delayed_action_mods_t){0};
 }
 
 static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
@@ -312,7 +307,7 @@ void layer_on(uint8_t layer) {
 
 void layer_off(uint8_t layer) {
     layer_off_count++;
-    test_apply_layer_state(layer_state & (layer_state_t)~((layer_state_t)1u << layer));
+    test_apply_layer_state(layer_state & (layer_state_t) ~((layer_state_t)1u << layer));
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
@@ -708,12 +703,7 @@ void reset_arrow_mode(void) {}
 
 static void test_activate_gui_double_tap_alt_hold(keypos_t gui_pos) {
     const key_runtime_integration_step_t initial_tap_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(KC_LEFT_GUI, 0, 0),
-        KEY_RUNTIME_INTEGRATION_RELEASE(KC_LEFT_GUI, 0, 0),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(40),
-        KEY_RUNTIME_INTEGRATION_PRESS(KC_LEFT_GUI, 0, 0),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(KC_LEFT_GUI, 0, 0), KEY_RUNTIME_INTEGRATION_RELEASE(KC_LEFT_GUI, 0, 0), KEY_RUNTIME_INTEGRATION_ADVANCE(40), KEY_RUNTIME_INTEGRATION_PRESS(KC_LEFT_GUI, 0, 0), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(),
     };
 
     CHECK(key_behavior_lookup(KC_LEFT_GUI).config != NULL);
@@ -790,7 +780,7 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
 }
 
 static void test_authored_single_press_pd_mode_hold_dispatches_plain_taps_immediately(void) {
-    keypos_t key_pos = test_keypos(1, 2);
+    keypos_t                             key_pos              = test_keypos(1, 2);
     const key_runtime_integration_step_t hold_and_tap_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
@@ -819,9 +809,9 @@ static void test_authored_single_press_pd_mode_hold_dispatches_plain_taps_immedi
 }
 
 static void test_raw_lt_hold_dispatches_authored_tap_key_immediately(void) {
-    keypos_t                             hold_pos   = test_keypos(1, 4);
-    keypos_t                             child_pos  = test_keypos(3, 5);
-    const uint16_t                       hold_key   = LT(TEST_LAYER_NAV, KC_SLSH);
+    keypos_t                             hold_pos     = test_keypos(1, 4);
+    keypos_t                             child_pos    = test_keypos(3, 5);
+    const uint16_t                       hold_key     = LT(TEST_LAYER_NAV, KC_SLSH);
     const key_runtime_integration_step_t hold_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(hold_key, 1, 4),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
@@ -848,7 +838,7 @@ static void test_raw_lt_hold_dispatches_authored_tap_key_immediately(void) {
 }
 
 static void test_raw_lt_hold_dispatches_authored_plain_tap_immediately(void) {
-    const uint16_t                       hold_key   = LT(TEST_LAYER_NAV, KC_SLSH);
+    const uint16_t                       hold_key     = LT(TEST_LAYER_NAV, KC_SLSH);
     const key_runtime_integration_step_t hold_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(hold_key, 1, 4),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
@@ -874,14 +864,10 @@ static void test_raw_lt_hold_dispatches_authored_plain_tap_immediately(void) {
 }
 
 static void test_authored_layer_hold_dispatches_authored_tap_key_immediately(void) {
-    keypos_t                             hold_pos   = test_keypos(1, 4);
-    keypos_t                             child_pos  = test_keypos(3, 5);
+    keypos_t                             hold_pos     = test_keypos(1, 4);
+    keypos_t                             child_pos    = test_keypos(3, 5);
     const key_runtime_integration_step_t hold_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
-        KEY_RUNTIME_INTEGRATION_PRESS(KC_RIGHT_ALT, 3, 5),
-        KEY_RUNTIME_INTEGRATION_RELEASE(KC_RIGHT_ALT, 3, 5),
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_PRESS(KC_RIGHT_ALT, 3, 5), KEY_RUNTIME_INTEGRATION_RELEASE(KC_RIGHT_ALT, 3, 5),
     };
     const key_runtime_integration_step_t release_steps[] = {
         KEY_RUNTIME_INTEGRATION_RELEASE(TEST_LAYER_HOLD_KEY, 1, 4),
@@ -905,11 +891,7 @@ static void test_authored_layer_hold_dispatches_authored_tap_key_immediately(voi
 
 static void test_authored_layer_hold_dispatches_authored_plain_tap_immediately(void) {
     const key_runtime_integration_step_t hold_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
-        KEY_RUNTIME_INTEGRATION_PRESS(TEST_HANDLED_TAP_KEY, 3, 5),
-        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_HANDLED_TAP_KEY, 3, 5),
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_PRESS(TEST_HANDLED_TAP_KEY, 3, 5), KEY_RUNTIME_INTEGRATION_RELEASE(TEST_HANDLED_TAP_KEY, 3, 5),
     };
     const key_runtime_integration_step_t release_steps[] = {
         KEY_RUNTIME_INTEGRATION_RELEASE(TEST_LAYER_HOLD_KEY, 1, 4),
@@ -931,7 +913,7 @@ static void test_authored_layer_hold_dispatches_authored_plain_tap_immediately(v
 }
 
 static void test_interrupted_locked_pd_mode_press_still_toggles_lock_on_release(void) {
-    keypos_t key_pos = test_keypos(1, 2);
+    keypos_t                             key_pos               = test_keypos(1, 2);
     const key_runtime_integration_step_t press_and_interrupt[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
@@ -966,8 +948,8 @@ static void test_interrupted_locked_pd_mode_press_still_toggles_lock_on_release(
 }
 
 static void test_authored_pd_mode_hold_dispatches_authored_tap_key_immediately(void) {
-    keypos_t                             hold_pos   = test_keypos(1, 2);
-    keypos_t                             child_pos  = test_keypos(3, 5);
+    keypos_t                             hold_pos     = test_keypos(1, 2);
+    keypos_t                             child_pos    = test_keypos(3, 5);
     const key_runtime_integration_step_t hold_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
@@ -995,8 +977,8 @@ static void test_authored_pd_mode_hold_dispatches_authored_tap_key_immediately(v
 }
 
 static void test_authored_layer_hold_releases_authored_pd_mode_child_cleanly(void) {
-    keypos_t                             hold_pos  = test_keypos(1, 4);
-    keypos_t                             child_pos = test_keypos(1, 2);
+    keypos_t                             hold_pos     = test_keypos(1, 4);
+    keypos_t                             child_pos    = test_keypos(1, 2);
     const key_runtime_integration_step_t hold_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4),
         KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
@@ -1032,8 +1014,8 @@ static void test_authored_layer_hold_releases_authored_pd_mode_child_cleanly(voi
 }
 
 static void test_authored_pd_mode_hold_releases_authored_pd_mode_child_cleanly(void) {
-    keypos_t                             hold_pos  = test_keypos(1, 2);
-    keypos_t                             child_pos = test_keypos(2, 4);
+    keypos_t                             hold_pos     = test_keypos(1, 2);
+    keypos_t                             child_pos    = test_keypos(2, 4);
     const key_runtime_integration_step_t hold_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
@@ -1071,11 +1053,7 @@ static void test_authored_pd_mode_hold_releases_authored_pd_mode_child_cleanly(v
 static void test_authored_hold_action_activates_pd_mode_while_held(void) {
     keypos_t                             key_pos    = test_keypos(1, 3);
     const key_runtime_integration_step_t scenario[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(TEST_PD_HOLD_KEY, 1, 3),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
-        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_PD_HOLD_KEY, 1, 3),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_PD_HOLD_KEY, 1, 3), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_RELEASE(TEST_PD_HOLD_KEY, 1, 3), KEY_RUNTIME_INTEGRATION_SCAN(),
     };
 
     test_reset_state();
@@ -1101,7 +1079,10 @@ static void test_authored_hold_action_activates_pd_mode_while_held(void) {
 
 static void test_authored_double_tap_lock_locks_pd_mode(void) {
     const key_runtime_integration_step_t setup[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(20),
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
     };
     const key_runtime_integration_step_t release[] = {
         KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
@@ -1301,8 +1282,8 @@ static void test_authored_layer_hold_with_dragscroll_child_stays_quiescent(void)
 }
 
 static void test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay(void) {
-    keypos_t                             key_pos         = test_keypos(2, 4);
-    const key_runtime_integration_step_t press_steps[]   = {
+    keypos_t                             key_pos       = test_keypos(2, 4);
+    const key_runtime_integration_step_t press_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4),
     };
     const key_runtime_integration_step_t release_steps[] = {
@@ -1341,8 +1322,8 @@ static void test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay(void)
 }
 
 static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_replay(void) {
-    keypos_t                             key_pos         = test_keypos(2, 4);
-    const key_runtime_integration_step_t press_steps[]   = {
+    keypos_t                             key_pos       = test_keypos(2, 4);
+    const key_runtime_integration_step_t press_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4),
     };
     const key_runtime_integration_step_t release_steps[] = {
@@ -1354,11 +1335,11 @@ static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_repla
         KEY_RUNTIME_INTEGRATION_SCAN(),
     };
     keyrecord_t gui_press = {
-         .event =
-             {
-                 .key     = {.row = 0, .col = 0},
-                 .pressed = true,
-             },
+        .event =
+            {
+                .key     = {.row = 0, .col = 0},
+                .pressed = true,
+            },
     };
 
     test_reset_state();
@@ -1385,9 +1366,9 @@ static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_repla
 }
 
 static void test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processing(void) {
-    keypos_t pinch_key_pos = test_keypos(2, 4);
-    keypos_t plain_key_pos = test_keypos(0, 1);
-    keyrecord_t plain_press = test_record(plain_key_pos, true);
+    keypos_t    pinch_key_pos = test_keypos(2, 4);
+    keypos_t    plain_key_pos = test_keypos(0, 1);
+    keyrecord_t plain_press   = test_record(plain_key_pos, true);
 
     test_reset_state();
     test_configure_pinch_transparent_profile_path(pinch_key_pos);
@@ -1406,11 +1387,11 @@ static void test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processi
 }
 
 static void test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain_key_processing(void) {
-    keypos_t pinch_key_pos = test_keypos(2, 4);
-    keypos_t gui_key_pos   = test_keypos(0, 0);
-    keypos_t plain_key_pos = test_keypos(0, 1);
-    keyrecord_t gui_press   = test_record(gui_key_pos, true);
-    keyrecord_t plain_press = test_record(plain_key_pos, true);
+    keypos_t    pinch_key_pos = test_keypos(2, 4);
+    keypos_t    gui_key_pos   = test_keypos(0, 0);
+    keypos_t    plain_key_pos = test_keypos(0, 1);
+    keyrecord_t gui_press     = test_record(gui_key_pos, true);
+    keyrecord_t plain_press   = test_record(plain_key_pos, true);
 
     test_reset_state();
     test_configure_pinch_transparent_profile_path(pinch_key_pos);

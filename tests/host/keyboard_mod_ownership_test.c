@@ -130,20 +130,20 @@ static void test_managed_only_mask_reports_managed_gui_without_physical_owner(vo
 }
 
 static void test_managed_only_mask_keeps_physically_held_gui_visible(void) {
-    uint8_t   gui_mask = MOD_BIT(KC_LEFT_GUI);
-    keyrecord_t press  = {
-         .event =
-             {
-                 .key     = {.row = 0, .col = 0},
-                 .pressed = true,
-             },
+    uint8_t     gui_mask = MOD_BIT(KC_LEFT_GUI);
+    keyrecord_t press    = {
+        .event =
+            {
+                .key     = {.row = 0, .col = 0},
+                .pressed = true,
+            },
     };
     keyrecord_t release = {
-         .event =
-             {
-                 .key     = {.row = 0, .col = 0},
-                 .pressed = false,
-             },
+        .event =
+            {
+                .key     = {.row = 0, .col = 0},
+                .pressed = false,
+            },
     };
 
     test_reset_state();

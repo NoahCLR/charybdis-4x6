@@ -26,12 +26,12 @@ static uint8_t  fake_oneshot_locked_mods;
 static uint16_t integration_hold_modifier;
 static uint8_t  integration_expected_mask;
 
-static uint8_t send_keyboard_report_count;
-static uint8_t emitted_action_count;
-static uint16_t last_emitted_action;
-static uint8_t last_emitted_mods;
-static uint8_t delayed_action_count;
-static uint16_t last_delayed_action;
+static uint8_t               send_keyboard_report_count;
+static uint8_t               emitted_action_count;
+static uint16_t              last_emitted_action;
+static uint8_t               last_emitted_mods;
+static uint8_t               delayed_action_count;
+static uint16_t              last_delayed_action;
 static delayed_action_mods_t last_delayed_mods;
 
 static void test_fail(const char *expr, const char *file, int line) {

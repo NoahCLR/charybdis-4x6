@@ -36,8 +36,8 @@ static void pinch_mode_unregister_command(pd_mode_mask_t mode) {
 }
 
 const pd_mode_lifecycle_hooks_t pd_mode_pinch_lifecycle_hooks = {
-    .on_activate                   = pinch_mode_register_command,
-    .on_deactivate                 = pinch_mode_unregister_command,
+    .on_activate                     = pinch_mode_register_command,
+    .on_deactivate                   = pinch_mode_unregister_command,
     .keyboard_event_masked_real_mods = pinch_mode_managed_only_gui_mask,
     .buffered_tap_masked_real_mods   = pinch_mode_managed_only_gui_mask,
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)

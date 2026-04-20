@@ -31,9 +31,9 @@ static uint8_t fallback_hold_settle_weak_mods;
 static uint8_t fallback_hold_settle_oneshot_mods;
 static uint8_t fallback_hold_settle_oneshot_locked_mods;
 
-static uint8_t fallback_hold_activation_count;
+static uint8_t    fallback_hold_activation_count;
 static tap_call_t tap_call;
-static uint8_t tap_call_count;
+static uint8_t    tap_call_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -48,17 +48,17 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset_stubs(void) {
-    fake_mods                         = 0;
-    fake_weak_mods                    = 0;
-    fake_oneshot_mods                 = 0;
-    fake_oneshot_locked_mods          = 0;
-    fallback_hold_settle_real_mods    = 0;
-    fallback_hold_settle_weak_mods    = 0;
-    fallback_hold_settle_oneshot_mods = 0;
+    fake_mods                                = 0;
+    fake_weak_mods                           = 0;
+    fake_oneshot_mods                        = 0;
+    fake_oneshot_locked_mods                 = 0;
+    fallback_hold_settle_real_mods           = 0;
+    fallback_hold_settle_weak_mods           = 0;
+    fallback_hold_settle_oneshot_mods        = 0;
     fallback_hold_settle_oneshot_locked_mods = 0;
-    fallback_hold_activation_count    = 0;
-    tap_call                          = (tap_call_t){0};
-    tap_call_count                    = 0;
+    fallback_hold_activation_count           = 0;
+    tap_call                                 = (tap_call_t){0};
+    tap_call_count                           = 0;
 }
 
 static tap_call_t test_current_tap_call(uint16_t keycode) {
@@ -264,13 +264,13 @@ static void test_delayed_action_settles_fallback_holds_inside_replay_window(void
     };
 
     test_reset_stubs();
-    fake_mods                         = 0x01;
-    fake_weak_mods                    = 0x02;
-    fake_oneshot_mods                 = 0x04;
-    fake_oneshot_locked_mods          = 0x08;
-    fallback_hold_settle_real_mods    = 0x03;
-    fallback_hold_settle_weak_mods    = 0x05;
-    fallback_hold_settle_oneshot_mods = 0x06;
+    fake_mods                                = 0x01;
+    fake_weak_mods                           = 0x02;
+    fake_oneshot_mods                        = 0x04;
+    fake_oneshot_locked_mods                 = 0x08;
+    fallback_hold_settle_real_mods           = 0x03;
+    fallback_hold_settle_weak_mods           = 0x05;
+    fallback_hold_settle_oneshot_mods        = 0x06;
     fallback_hold_settle_oneshot_locked_mods = 0x07;
 
     dispatch_delayed_action(TEST_DELAYED_ACTION_B, mods);

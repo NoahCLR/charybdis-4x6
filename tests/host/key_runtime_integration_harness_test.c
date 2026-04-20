@@ -10,11 +10,11 @@ enum {
     TEST_FALSE_KEYCODE = 0x0005u,
 };
 
-static unsigned finalize_calls;
-static uint16_t finalize_keycode;
+static unsigned     finalize_calls;
+static uint16_t     finalize_keycode;
 static keyrecord_t *finalize_record;
-static bool finalize_keep_processing;
-static bool process_return_value;
+static bool         finalize_keep_processing;
+static bool         process_return_value;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -44,11 +44,11 @@ void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bo
 }
 
 static void test_reset(void) {
-    finalize_calls          = 0;
-    finalize_keycode        = KC_NO;
-    finalize_record         = NULL;
+    finalize_calls           = 0;
+    finalize_keycode         = KC_NO;
+    finalize_record          = NULL;
     finalize_keep_processing = false;
-    process_return_value    = true;
+    process_return_value     = true;
 }
 
 static void test_true_path_uses_default_post_finalize(void) {
@@ -83,9 +83,9 @@ static void test_false_path_finalizes_immediately(void) {
 }
 
 static void test_runtime_v2_event_adapter_routes_key_and_timer_events(void) {
-    uint16_t        time   = 100u;
+    uint16_t        time    = 100u;
     keypos_t        key_pos = {.row = 5, .col = 6};
-    runtime_event_t down = {
+    runtime_event_t down    = {
         .kind = RUNTIME_EVENT_KIND_KEY_DOWN,
         .data.key_event =
             {
