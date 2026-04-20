@@ -1,5 +1,49 @@
 # Progress
 
+## 2026-04-20 Key Runtime Core Symbol Cleanup
+
+- Renamed the reducer-owned symbol family from migration-history names to
+  permanent architecture names:
+  - `runtime_v2_*` -> `key_runtime_core_*`
+  - `RUNTIME_V2_*` -> `KEY_RUNTIME_CORE_*`
+  - reducer-owned projection snapshot fields like `v2_*` -> `core_*`
+- Renamed the live trace kind/event surface to match the core runtime:
+  - `NOAH_TRACE_KEY_RUNTIME_CORE`
+  - `NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_*`
+  - `noah_trace_key_runtime_core_event_t`
+- Renamed the current host helper filenames that still carried the old label:
+  - `tests/host/runtime_v2_state_unit_stub.c` ->
+    `tests/host/key_runtime_core_state_unit_stub.c`
+  - `tests/host/key_runtime_integration_runtime_v2_adapter.c` ->
+    `tests/host/key_runtime_integration_core_adapter.c`
+- Cleaned the remaining live-tree naming rough edges after the mechanical
+  rename:
+  - `runtime_shared_state_t` now stores the reducer state as `.core` instead
+    of `.v2`,
+  - integration harness helpers now use `*_core_*` names instead of mixed
+    `runtime_v2` hybrids, and
+  - the maintainer/runtime comments in `core/` now describe "Key Runtime Core"
+    directly.
+- Updated `docs/KEY_RUNTIME.md` and the active review summary so current-tree
+  docs now describe `key_runtime_core` as the reducer-owned authority. Closed
+  historical thread wording like "`runtime_v2` cutover" remains intact where it
+  is explicitly referring to the old review thread.
+- Verification completed for this naming-only pass:
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_split_runtime_sync_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Next steps:
+  - decide separately whether the still-generic reducer data type names like
+    `press_token_t`, `tap_series_t`, and `projection_snapshot_t` should stay as
+    concise core-owned terms or move to fully namespaced forms, and
+  - keep future new symbols on the `key_runtime_core_*` family so migration
+    naming does not re-enter the live tree.
+
 ## 2026-04-20 Unified Key Runtime Tree Rename
 
 - Collapsed the handled-key runtime onto one permanent subtree rooted at

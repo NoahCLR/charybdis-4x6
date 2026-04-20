@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Runtime V2 Projection Helpers
+// Key Runtime Core Projection Helpers
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Reducer-owned projector surface for applying authored runtime effects to
@@ -11,5 +11,5 @@
 #include "../effects/effect.h"
 #include "runtime.h"
 
-void runtime_v2_project_effect(const key_runtime_effect_t *effect);
-void runtime_v2_project_pending_release_dispatch(const pending_release_t *pending);
+void key_runtime_core_project_effect(const key_runtime_effect_t *effect);
+void key_runtime_core_project_pending_release_dispatch(const pending_release_t *pending);

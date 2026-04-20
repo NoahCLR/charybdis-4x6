@@ -42,7 +42,7 @@ Scope: `users/noah/` runtime ownership, key-runtime architecture, host/build enf
   `users/noah/lib/key/runtime/release.c`,
   `users/noah/lib/key/runtime/scan.c`, and
   `users/noah/lib/key/runtime/transition.c`. Enforcement comes from
-  `tests/host/run_feature_gate_compile_tests.sh`, the v2-focused host suites,
+  `tests/host/run_feature_gate_compile_tests.sh`, the core-runtime host suites,
   the full host suite, and the firmware build. Verified with:
   `sh tests/host/run_feature_gate_compile_tests.sh`,
   `sh tests/host/run_runtime_debug_tests.sh`,
@@ -82,7 +82,7 @@ Scope: `users/noah/` runtime ownership, key-runtime architecture, host/build enf
 
 ## Solid Areas
 
-- The key runtime now has one authority. `runtime_v2` owns press identity,
+- The key runtime now has one authority. `key_runtime_core` owns press identity,
   multi-tap lifetime, reducer-owned leases, persistent intents, pending
   release transport, and debug/projection snapshots.
 - The production runtime path is narrower, not broader. The permanent runtime
@@ -94,7 +94,8 @@ Scope: `users/noah/` runtime ownership, key-runtime architecture, host/build enf
   assert runtime quiescence after release.
 - The build/test surface matches the current architecture. The source manifest,
   compile gate, authored-profile validation, runtime-debug suite, integration
-  suites, full host suite, and firmware build all target the v2-only tree.
+  suites, full host suite, and firmware build all target the current
+  core-owned runtime tree.
 
 ## Closure Verdict
 

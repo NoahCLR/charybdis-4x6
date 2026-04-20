@@ -10,7 +10,7 @@
 static noah_runtime_context_t noah_runtime_singleton = {
     .shared =
         {
-            .v2 =
+            .core =
                 {
                     .next_token_id                 = 1u,
                     .next_pending_release_sequence = 1u,
@@ -26,8 +26,8 @@ pd_mode_runtime_shared_state_t *pd_mode_runtime_shared_state(void) {
     return &noah_runtime_context()->shared.pd;
 }
 
-runtime_v2_state_t *runtime_v2_state(void) {
-    return &noah_runtime_context()->shared.v2;
+key_runtime_core_state_t *key_runtime_core_state(void) {
+    return &noah_runtime_context()->shared.core;
 }
 
 static void runtime_shared_state_reset(runtime_shared_state_t *state) {
@@ -36,7 +36,7 @@ static void runtime_shared_state_reset(runtime_shared_state_t *state) {
     }
 
     *state = (runtime_shared_state_t){0};
-    runtime_v2_state_reset(&state->v2);
+    key_runtime_core_state_reset(&state->core);
 }
 
 void noah_runtime_context_reset_for_test(noah_runtime_context_t *ctx) {

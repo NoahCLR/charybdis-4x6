@@ -28,7 +28,7 @@ static void key_runtime_release_plan_defer_dispatch_actions(key_runtime_transiti
     for (uint8_t read_index = 0; read_index < plan->count; read_index++) {
         const key_runtime_effect_t effect = plan->items[read_index];
 
-        if (effect.kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION && runtime_v2_queue_pending_release_dispatch(key_pos, effect.data.action, mods)) {
+        if (effect.kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION && key_runtime_core_queue_pending_release_dispatch(key_pos, effect.data.action, mods)) {
             continue;
         }
 
@@ -57,10 +57,10 @@ bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *reco
 }
 
 void key_runtime_release_drain_deferred_dispatches(void) {
-    pending_release_t pending[RUNTIME_V2_PENDING_RELEASE_CAPACITY];
-    uint8_t           drained = runtime_v2_take_pending_release_dispatches(pending, ARRAY_SIZE(pending));
+    pending_release_t pending[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
+    uint8_t           drained = key_runtime_core_take_pending_release_dispatches(pending, ARRAY_SIZE(pending));
 
     for (uint8_t index = 0; index < drained; index++) {
-        runtime_v2_project_pending_release_dispatch(&pending[index]);
+        key_runtime_core_project_pending_release_dispatch(&pending[index]);
     }
 }

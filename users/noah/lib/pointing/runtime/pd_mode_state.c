@@ -297,7 +297,7 @@ bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
     });
 
     if (result.local_state_changed) {
-        runtime_v2_pd_mode_lock_set(mode, locked);
+        key_runtime_core_pd_mode_lock_set(mode, locked);
     }
 
     if (result.split_sync_required) {

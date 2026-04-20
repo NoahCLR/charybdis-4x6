@@ -210,7 +210,7 @@ void key_runtime_scenario_define_pd_mode_key(uint16_t keycode, pd_mode_mask_t mo
     key_runtime_scenario_add_pd_mode(keycode, mode);
     if (locked) {
         key_runtime_scenario_pd_locked_modes |= mode;
-        runtime_v2_pd_mode_lock_set(mode, true);
+        key_runtime_core_pd_mode_lock_set(mode, true);
     }
 }
 
@@ -222,7 +222,7 @@ void key_runtime_scenario_set_pd_locked_modes(pd_mode_mask_t modes) {
             continue;
         }
 
-        runtime_v2_pd_mode_lock_set(bit, (modes & bit) != 0u);
+        key_runtime_core_pd_mode_lock_set(bit, (modes & bit) != 0u);
         changed &= (pd_mode_mask_t)~bit;
     }
 
@@ -414,7 +414,7 @@ bool is_pd_mode_lock_action(uint16_t action) {
 
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     key_runtime_scenario_pd_locked_modes ^= mode;
-    runtime_v2_pd_mode_lock_set(mode, (key_runtime_scenario_pd_locked_modes & mode) != 0u);
+    key_runtime_core_pd_mode_lock_set(mode, (key_runtime_scenario_pd_locked_modes & mode) != 0u);
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
         .data.pd_mode = mode,

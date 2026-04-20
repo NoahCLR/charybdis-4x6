@@ -16,7 +16,7 @@
 #include "../../state/runtime/keyboard_mod_state.h"
 
 #ifdef NOAH_HOST_TEST_ENV
-bool key_runtime_integration_userspace_feeds_runtime_v2_key_events(void) {
+bool key_runtime_integration_userspace_feeds_core_key_events(void) {
     return true;
 }
 #endif
@@ -52,7 +52,7 @@ static keyboard_mod_state_t key_runtime_keyboard_mod_state_current(void) {
 }
 
 static void key_runtime_process_end_keyboard_event_mod_mask(void) {
-    runtime_v2_state_t  *state = runtime_v2_state();
+    key_runtime_core_state_t  *state = key_runtime_core_state();
     keyboard_mod_state_t restored;
 
     if (!(state && state->keyboard_event_mask_active)) {
@@ -67,7 +67,7 @@ static void key_runtime_process_end_keyboard_event_mod_mask(void) {
 }
 
 static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
-    runtime_v2_state_t  *state = runtime_v2_state();
+    key_runtime_core_state_t  *state = key_runtime_core_state();
     keyboard_mod_state_t filtered;
     uint8_t              masked_real_mods;
 
@@ -124,7 +124,7 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_release_slo
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
-    token = runtime_v2_press_token_at(ctx->record->event.key);
+    token = key_runtime_core_press_token_at(ctx->record->event.key);
     if (token && token->resolved_keycode != KC_NO) {
         ctx->runtime_keycode = token->resolved_keycode;
     }
@@ -163,8 +163,8 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_non_handled
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
-    if (runtime_v2_finalize_non_handled_release(ctx->record->event.key)) {
-        key_runtime_trace_message("process:non_handled_release_cleanup", "finalized v2-owned release state for non-handled key");
+    if (key_runtime_core_finalize_non_handled_release(ctx->record->event.key)) {
+        key_runtime_trace_message("process:non_handled_release_cleanup", "finalized core-owned release state for non-handled key");
     }
 
     return KEY_RUNTIME_PROCESS_NEXT;
@@ -222,7 +222,7 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
 
     if (!noah_synthetic_record_active()) {
-        runtime_v2_observe_process_record_event(keycode, record);
+        key_runtime_core_observe_process_record_event(keycode, record);
     }
 
     key_runtime_trace_record("process:entry", keycode, record);

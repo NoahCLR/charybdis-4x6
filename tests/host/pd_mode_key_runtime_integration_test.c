@@ -768,7 +768,7 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
     CHECK(split_sync_count >= 1);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
-    const press_token_t *release_token = runtime_v2_press_token_at(key_pos);
+    const press_token_t *release_token = key_runtime_core_press_token_at(key_pos);
 
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(!pd_mode_local_active(PD_MODE_VOLUME));

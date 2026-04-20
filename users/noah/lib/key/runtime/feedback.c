@@ -14,7 +14,7 @@
 #endif
 
 void key_feedback_pulse_arm(bool long_hold_level) {
-    runtime_v2_state_t *state = runtime_v2_state();
+    key_runtime_core_state_t *state = key_runtime_core_state();
 
     if (!state) {
         return;
@@ -26,7 +26,7 @@ void key_feedback_pulse_arm(bool long_hold_level) {
 }
 
 static bool key_feedback_pulse_active(void) {
-    runtime_v2_state_t *state = runtime_v2_state();
+    key_runtime_core_state_t *state = key_runtime_core_state();
 
     if (!(state && state->feedback_pulse_active)) {
         return false;
@@ -75,7 +75,7 @@ static uint8_t key_feedback_preview_layer_for_token(const press_token_t *token) 
         return UINT8_MAX;
     }
 
-    if (runtime_v2_held_action_keycode_at(token->key_pos) != KC_NO || runtime_v2_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE || runtime_v2_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE || !key_feedback_token_allows_tap_release(token)) {
+    if (key_runtime_core_held_action_keycode_at(token->key_pos) != KC_NO || key_runtime_core_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE || key_runtime_core_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE || !key_feedback_token_allows_tap_release(token)) {
         return UINT8_MAX;
     }
 
@@ -85,11 +85,11 @@ static uint8_t key_feedback_preview_layer_for_token(const press_token_t *token) 
 uint8_t key_feedback_preview_layer(void) {
     keypos_t key_pos;
 
-    if (!runtime_v2_preview_owner_key_pos(&key_pos)) {
+    if (!key_runtime_core_preview_owner_key_pos(&key_pos)) {
         return UINT8_MAX;
     }
 
-    return key_feedback_preview_layer_for_token(runtime_v2_press_token_at(key_pos));
+    return key_feedback_preview_layer_for_token(key_runtime_core_press_token_at(key_pos));
 }
 
 static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
@@ -104,7 +104,7 @@ static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
         return 0u;
     }
 
-    held_action            = runtime_v2_held_action_keycode_at(token->key_pos);
+    held_action            = key_runtime_core_held_action_keycode_at(token->key_pos);
     bool long_hold_reached = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.longer_hold_term;
 
     if (held_action != KC_NO) {
@@ -125,7 +125,7 @@ static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
         return flags;
     }
 
-    if (runtime_v2_repeat_active_at(token->key_pos)) {
+    if (key_runtime_core_repeat_active_at(token->key_pos)) {
         flags |= KEY_FEEDBACK_FLAG_LEVEL_FLASH;
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
         if (((timer_read() / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0u) {
@@ -157,7 +157,7 @@ static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
 
 uint8_t key_feedback_pack(void) {
     uint8_t             flags = 0u;
-    runtime_v2_state_t *state = runtime_v2_state();
+    key_runtime_core_state_t *state = key_runtime_core_state();
 
     if (key_feedback_pulse_active()) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
@@ -167,14 +167,14 @@ uint8_t key_feedback_pack(void) {
         return flags;
     }
 
-    for (uint16_t index = 0; state && index < RUNTIME_V2_TAP_SERIES_CAPACITY; index++) {
+    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
         if (state->tap_series[index].active && !state->tap_series[index].pending_hold) {
             flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
             break;
         }
     }
 
-    for (uint16_t index = 0; state && index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
         uint8_t token_flags = key_feedback_pack_for_token(&state->press_tokens[index]);
 
         if (token_flags != 0u) {

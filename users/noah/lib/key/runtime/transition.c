@@ -22,16 +22,16 @@ static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan
     plan->overflowed = true;
 }
 
-static void key_runtime_transition_plan_append_runtime_v2_plan(key_runtime_transition_plan_t *plan, const runtime_v2_effect_plan_t *v2_plan) {
-    if (!(plan && v2_plan)) {
+static void key_runtime_transition_plan_append_core_plan(key_runtime_transition_plan_t *plan, const key_runtime_core_effect_plan_t *core_plan) {
+    if (!(plan && core_plan)) {
         return;
     }
 
-    for (uint8_t index = 0; index < v2_plan->count; index++) {
-        key_runtime_transition_plan_push(plan, v2_plan->items[index]);
+    for (uint8_t index = 0; index < core_plan->count; index++) {
+        key_runtime_transition_plan_push(plan, core_plan->items[index]);
     }
 
-    plan->overflowed |= v2_plan->overflowed;
+    plan->overflowed |= core_plan->overflowed;
 }
 
 static void key_runtime_transition_append_unmatched_release_effects(keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
@@ -80,48 +80,48 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
         const key_runtime_effect_t *effect = &plan->items[index];
 
         key_runtime_trace_effect_execute(index, effect);
-        runtime_v2_project_effect(effect);
+        key_runtime_core_project_effect(effect);
     }
 }
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {
-    runtime_v2_effect_plan_t v2_plan;
+    key_runtime_core_effect_plan_t core_plan;
 
-    runtime_v2_effect_plan_init(&v2_plan);
-    runtime_v2_flush_multi_tap(&v2_plan);
-    key_runtime_transition_plan_append_runtime_v2_plan(plan, &v2_plan);
+    key_runtime_core_effect_plan_init(&core_plan);
+    key_runtime_core_flush_multi_tap(&core_plan);
+    key_runtime_transition_plan_append_core_plan(plan, &core_plan);
 }
 
 void key_runtime_transition_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan) {
-    runtime_v2_effect_plan_t v2_plan;
+    key_runtime_core_effect_plan_t core_plan;
 
-    runtime_v2_effect_plan_init(&v2_plan);
-    runtime_v2_flush_foreign_multi_tap(keycode, key_pos, &v2_plan);
-    key_runtime_transition_plan_append_runtime_v2_plan(plan, &v2_plan);
+    key_runtime_core_effect_plan_init(&core_plan);
+    key_runtime_core_flush_foreign_multi_tap(keycode, key_pos, &core_plan);
+    key_runtime_transition_plan_append_core_plan(plan, &core_plan);
 }
 
 void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
-    runtime_v2_effect_plan_t v2_plan;
+    key_runtime_core_effect_plan_t core_plan;
 
-    runtime_v2_effect_plan_init(&v2_plan);
-    runtime_v2_flush_active_keys_except(key_pos, &v2_plan);
-    key_runtime_transition_plan_append_runtime_v2_plan(plan, &v2_plan);
+    key_runtime_core_effect_plan_init(&core_plan);
+    key_runtime_core_flush_active_keys_except(key_pos, &core_plan);
+    key_runtime_transition_plan_append_core_plan(plan, &core_plan);
 }
 
 bool key_runtime_transition_has_foreign_tap_release_slot_except(keypos_t key_pos) {
-    return runtime_v2_has_foreign_deferred_release_blocker_except(key_pos);
+    return key_runtime_core_has_foreign_deferred_release_blocker_except(key_pos);
 }
 
 bool key_runtime_transition_has_any_tap_release_slot(void) {
-    return runtime_v2_has_any_deferred_release_blocker();
+    return key_runtime_core_has_any_deferred_release_blocker();
 }
 
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
-    runtime_v2_effect_plan_t v2_plan;
+    key_runtime_core_effect_plan_t core_plan;
 
-    runtime_v2_effect_plan_init(&v2_plan);
-    runtime_v2_interrupt_active_keys_on_other_press(key_pos, &v2_plan);
-    key_runtime_transition_plan_append_runtime_v2_plan(plan, &v2_plan);
+    key_runtime_core_effect_plan_init(&core_plan);
+    key_runtime_core_interrupt_active_keys_on_other_press(key_pos, &core_plan);
+    key_runtime_transition_plan_append_core_plan(plan, &core_plan);
 }
 
 void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_transition_plan_t *plan) {
@@ -129,27 +129,27 @@ void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_tran
 }
 
 bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
-    runtime_v2_effect_plan_t v2_plan;
+    key_runtime_core_effect_plan_t core_plan;
 
-    runtime_v2_effect_plan_init(&v2_plan);
-    if (!runtime_v2_handle_handled_key_press(keycode, key_pos, resolution, &v2_plan)) {
+    key_runtime_core_effect_plan_init(&core_plan);
+    if (!key_runtime_core_handle_handled_key_press(keycode, key_pos, resolution, &core_plan)) {
         return false;
     }
 
-    key_runtime_transition_plan_append_runtime_v2_plan(plan, &v2_plan);
+    key_runtime_transition_plan_append_core_plan(plan, &core_plan);
     return true;
 }
 
 bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
-    runtime_v2_effect_plan_t v2_plan;
+    key_runtime_core_effect_plan_t core_plan;
 
     if (!(record && plan)) {
         return false;
     }
 
-    runtime_v2_effect_plan_init(&v2_plan);
-    if (runtime_v2_handle_handled_key_release(keycode, record->event.key, resolution, key_runtime_transition_keyboard_mod_state_current(), &v2_plan)) {
-        key_runtime_transition_plan_append_runtime_v2_plan(plan, &v2_plan);
+    key_runtime_core_effect_plan_init(&core_plan);
+    if (key_runtime_core_handle_handled_key_release(keycode, record->event.key, resolution, key_runtime_transition_keyboard_mod_state_current(), &core_plan)) {
+        key_runtime_transition_plan_append_core_plan(plan, &core_plan);
         return true;
     }
 
@@ -158,9 +158,9 @@ bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *r
 }
 
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
-    runtime_v2_effect_plan_t v2_plan;
+    key_runtime_core_effect_plan_t core_plan;
 
-    runtime_v2_effect_plan_init(&v2_plan);
-    runtime_v2_scan(&v2_plan, timer_read());
-    key_runtime_transition_plan_append_runtime_v2_plan(plan, &v2_plan);
+    key_runtime_core_effect_plan_init(&core_plan);
+    key_runtime_core_scan(&core_plan, timer_read());
+    key_runtime_transition_plan_append_core_plan(plan, &core_plan);
 }

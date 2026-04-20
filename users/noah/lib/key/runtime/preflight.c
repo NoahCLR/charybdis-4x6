@@ -12,7 +12,7 @@
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     handled_key_resolution_t handled_key = handled_key_lookup(keycode);
-    const press_token_t     *token       = runtime_v2_press_token_at(record->event.key);
+    const press_token_t     *token       = key_runtime_core_press_token_at(record->event.key);
 
     if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
         if (!record->event.pressed && ((token && token->resolved_keycode != KC_NO) || handled_key_resolution_is_handled(handled_key))) {
@@ -23,7 +23,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    if (record->event.pressed && runtime_v2_has_other_active_press_token(record->event.key)) {
+    if (record->event.pressed && key_runtime_core_has_other_active_press_token(record->event.key)) {
         key_runtime_transition_plan_t plan;
 
         key_runtime_transition_plan_init(&plan);
@@ -32,7 +32,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         key_runtime_transition_execute_plan(&plan);
     }
 
-    if (record->event.pressed && runtime_v2_has_foreign_pending_multi_tap(keycode, record->event.key)) {
+    if (record->event.pressed && key_runtime_core_has_foreign_pending_multi_tap(keycode, record->event.key)) {
         key_runtime_transition_plan_t plan;
 
         key_runtime_transition_plan_init(&plan);

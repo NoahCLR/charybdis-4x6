@@ -9,7 +9,7 @@
 #include "../../pointing/defs/pd_modes.h"
 
 #ifdef NOAH_HOST_TEST_ENV
-bool key_runtime_integration_userspace_feeds_runtime_v2_scan_events(void) {
+bool key_runtime_integration_userspace_feeds_core_scan_events(void) {
     return true;
 }
 #endif

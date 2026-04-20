@@ -346,7 +346,7 @@ static void test_key_runtime_decision_events_capture_release_hold_and_multi_tap_
     CHECK(snapshot.entries[2].b == KC_V);
 }
 
-static void test_runtime_v2_input_events_round_trip_through_shared_trace_buffer(void) {
+static void test_key_runtime_core_input_events_round_trip_through_shared_trace_buffer(void) {
     noah_runtime_trace_snapshot_t snapshot;
     runtime_event_t               inputs[6] = {
         {
@@ -403,22 +403,22 @@ static void test_runtime_v2_input_events_round_trip_through_shared_trace_buffer(
     test_reset_stubs();
 
     for (uint8_t index = 0; index < ARRAY_SIZE(inputs); index++) {
-        runtime_v2_trace_record_input_event(&inputs[index]);
+        key_runtime_core_trace_record_input_event(&inputs[index]);
     }
 
     snapshot = test_trace_snapshot();
 
     CHECK(snapshot.count == 7u);
-    CHECK(snapshot.entries[0].kind == NOAH_TRACE_RUNTIME_V2);
-    CHECK(snapshot.entries[0].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_KEY_DOWN);
-    CHECK(snapshot.entries[1].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_TIMER_ADVANCE);
-    CHECK(snapshot.entries[2].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_POINTER_REPORT_AXES);
-    CHECK(snapshot.entries[3].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_POINTER_REPORT_BUTTONS);
-    CHECK(snapshot.entries[4].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_REMOTE_SNAPSHOT);
-    CHECK(snapshot.entries[5].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_KEY_UP);
-    CHECK(snapshot.entries[6].event == NOAH_TRACE_RUNTIME_V2_EVENT_INPUT_SCAN);
+    CHECK(snapshot.entries[0].kind == NOAH_TRACE_KEY_RUNTIME_CORE);
+    CHECK(snapshot.entries[0].event == NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_INPUT_KEY_DOWN);
+    CHECK(snapshot.entries[1].event == NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_INPUT_TIMER_ADVANCE);
+    CHECK(snapshot.entries[2].event == NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_INPUT_POINTER_REPORT_AXES);
+    CHECK(snapshot.entries[3].event == NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_INPUT_POINTER_REPORT_BUTTONS);
+    CHECK(snapshot.entries[4].event == NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_INPUT_REMOTE_SNAPSHOT);
+    CHECK(snapshot.entries[5].event == NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_INPUT_KEY_UP);
+    CHECK(snapshot.entries[6].event == NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_INPUT_SCAN);
 
-    CHECK(runtime_v2_trace_decode_input_events(&snapshot, decoded, ARRAY_SIZE(decoded)) == ARRAY_SIZE(inputs));
+    CHECK(key_runtime_core_trace_decode_input_events(&snapshot, decoded, ARRAY_SIZE(decoded)) == ARRAY_SIZE(inputs));
     CHECK(decoded[0].kind == RUNTIME_EVENT_KIND_KEY_DOWN);
     CHECK(decoded[0].data.key_event.keycode == KC_C);
     CHECK(decoded[0].data.key_event.key_pos.row == 2u);
@@ -444,7 +444,7 @@ int main(void) {
     test_key_runtime_and_layer_ownership_share_one_trace_buffer();
     test_pd_mode_and_split_sync_events_share_one_trace_buffer();
     test_key_runtime_decision_events_capture_release_hold_and_multi_tap_details();
-    test_runtime_v2_input_events_round_trip_through_shared_trace_buffer();
+    test_key_runtime_core_input_events_round_trip_through_shared_trace_buffer();
 
     puts("runtime_trace host tests passed");
     return 0;

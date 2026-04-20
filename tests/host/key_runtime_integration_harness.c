@@ -127,16 +127,16 @@ __attribute__((weak)) bool key_runtime_integration_pre_userspace_record(uint16_t
     return true;
 }
 
-__attribute__((weak)) void key_runtime_integration_shadow_runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time) {
+__attribute__((weak)) void key_runtime_integration_shadow_core_apply_event(const runtime_event_t *event, uint16_t event_time) {
     (void)event;
     (void)event_time;
 }
 
-__attribute__((weak)) bool key_runtime_integration_userspace_feeds_runtime_v2_key_events(void) {
+__attribute__((weak)) bool key_runtime_integration_userspace_feeds_core_key_events(void) {
     return false;
 }
 
-__attribute__((weak)) bool key_runtime_integration_userspace_feeds_runtime_v2_scan_events(void) {
+__attribute__((weak)) bool key_runtime_integration_userspace_feeds_core_scan_events(void) {
     return false;
 }
 
@@ -159,8 +159,8 @@ void key_runtime_integration_advance(uint16_t *time, uint16_t advance_ms) {
             },
     };
 
-    runtime_v2_trace_record_input_event(&event);
-    key_runtime_integration_shadow_runtime_v2_apply_event(&event, time ? *time : timer_read());
+    key_runtime_core_trace_record_input_event(&event);
+    key_runtime_integration_shadow_core_apply_event(&event, time ? *time : timer_read());
 
     if (time) {
         *time = (uint16_t)(*time + advance_ms);
@@ -172,12 +172,12 @@ void key_runtime_integration_scan(void) {
         .kind = RUNTIME_EVENT_KIND_SCAN,
     };
 
-    runtime_v2_trace_record_input_event(&event);
-    if (!key_runtime_integration_userspace_feeds_runtime_v2_scan_events()) {
-        key_runtime_integration_shadow_runtime_v2_apply_event(&event, timer_read());
+    key_runtime_core_trace_record_input_event(&event);
+    if (!key_runtime_integration_userspace_feeds_core_scan_events()) {
+        key_runtime_integration_shadow_core_apply_event(&event, timer_read());
     }
     noah_key_runtime_scan();
-    runtime_v2_trace_capture_projection();
+    key_runtime_core_trace_capture_projection();
 }
 
 bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed) {
@@ -192,34 +192,34 @@ bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, 
             },
     };
 
-    runtime_v2_trace_record_input_event(&event);
-    if (!key_runtime_integration_userspace_feeds_runtime_v2_key_events()) {
-        key_runtime_integration_shadow_runtime_v2_apply_event(&event, timer_read());
+    key_runtime_core_trace_record_input_event(&event);
+    if (!key_runtime_integration_userspace_feeds_core_key_events()) {
+        key_runtime_integration_shadow_core_apply_event(&event, timer_read());
     }
 
     if (!key_runtime_integration_pre_userspace_record(keycode, &record)) {
-        runtime_v2_trace_capture_projection();
+        key_runtime_core_trace_capture_projection();
         return false;
     }
 
     if (!noah_pre_process_record_user(keycode, &record)) {
-        runtime_v2_trace_capture_projection();
+        key_runtime_core_trace_capture_projection();
         return false;
     }
 
     keep_processing = noah_process_record_user(keycode, &record);
     if (!keep_processing) {
         noah_process_record_user_finalize(keycode, &record, false);
-        runtime_v2_trace_capture_projection();
+        key_runtime_core_trace_capture_projection();
         return false;
     }
 
     noah_post_process_record_user(keycode, &record);
-    runtime_v2_trace_capture_projection();
+    key_runtime_core_trace_capture_projection();
     return true;
 }
 
-bool key_runtime_integration_apply_runtime_v2_event(uint16_t *time, const runtime_event_t *event) {
+bool key_runtime_integration_apply_core_event(uint16_t *time, const runtime_event_t *event) {
     if (!event) {
         return false;
     }
@@ -236,16 +236,16 @@ bool key_runtime_integration_apply_runtime_v2_event(uint16_t *time, const runtim
             key_runtime_integration_scan();
             return true;
         case RUNTIME_EVENT_KIND_POINTER_REPORT:
-            runtime_v2_trace_record_input_event(event);
-            key_runtime_integration_shadow_runtime_v2_apply_event(event, time ? *time : timer_read());
+            key_runtime_core_trace_record_input_event(event);
+            key_runtime_integration_shadow_core_apply_event(event, time ? *time : timer_read());
             (void)noah_pointing_device_task_user(event->data.pointer_report.report);
-            runtime_v2_trace_capture_projection();
+            key_runtime_core_trace_capture_projection();
             return true;
         case RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT:
-            runtime_v2_trace_record_input_event(event);
-            key_runtime_integration_shadow_runtime_v2_apply_event(event, time ? *time : timer_read());
+            key_runtime_core_trace_record_input_event(event);
+            key_runtime_integration_shadow_core_apply_event(event, time ? *time : timer_read());
             pd_mode_apply_remote_snapshot(event->data.remote_snapshot.active_mode, event->data.remote_snapshot.locked_mode);
-            runtime_v2_trace_capture_projection();
+            key_runtime_core_trace_capture_projection();
             return true;
     }
 

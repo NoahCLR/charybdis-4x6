@@ -333,24 +333,24 @@ static void test_shadow_replay_scenario(void (*scenario)(void)) {
     noah_runtime_trace_reset();
     scenario();
     noah_runtime_trace_snapshot(&original_trace);
-    original_projection = runtime_v2_projection_snapshot_capture();
+    original_projection = key_runtime_core_projection_snapshot_capture();
 
     CHECK(!original_trace.overflowed);
-    event_count = runtime_v2_trace_decode_input_events(&original_trace, events, ARRAY_SIZE(events));
+    event_count = key_runtime_core_trace_decode_input_events(&original_trace, events, ARRAY_SIZE(events));
     CHECK(event_count != 0u);
 
     test_reset_state();
     noah_runtime_trace_reset();
 
     for (uint16_t index = 0; index < event_count; index++) {
-        (void)key_runtime_integration_apply_runtime_v2_event(&fake_time, &events[index]);
+        (void)key_runtime_integration_apply_core_event(&fake_time, &events[index]);
     }
 
     noah_runtime_trace_snapshot(&replay_trace);
-    replay_projection = runtime_v2_projection_snapshot_capture();
+    replay_projection = key_runtime_core_projection_snapshot_capture();
 
     CHECK(!replay_trace.overflowed);
-    CHECK(runtime_v2_projection_snapshot_equal(&original_projection, &replay_projection));
+    CHECK(key_runtime_core_projection_snapshot_equal(&original_projection, &replay_projection));
     test_assert_runtime_trace_snapshot_equal(&original_trace, &replay_trace);
 }
 
@@ -2089,7 +2089,7 @@ static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_dra
     test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(right_thumb_pos, right_thumb_keycode, true);
 }
 
-static void test_runtime_v2_raw_nav_dragscroll_shadow_scenario(void) {
+static void test_key_runtime_core_raw_nav_dragscroll_shadow_scenario(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
     keypos_t       dragscroll_pos   = test_find_keypos_on_layer(LAYER_NAV, DRAGSCROLL);
@@ -2110,7 +2110,7 @@ static void test_runtime_v2_raw_nav_dragscroll_shadow_scenario(void) {
     test_assert_dragscroll_overlap_quiescent(nav_hold_pos, dragscroll_pos);
 }
 
-static void test_runtime_v2_gui_alt_repeated_nav_shadow_scenario(void) {
+static void test_key_runtime_core_gui_alt_repeated_nav_shadow_scenario(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
     keypos_t       gui_pos          = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
@@ -2144,12 +2144,12 @@ static void test_runtime_v2_gui_alt_repeated_nav_shadow_scenario(void) {
     test_assert_nav_overlap_quiescent(gui_pos, nav_hold_pos);
 }
 
-static void test_runtime_v2_shadow_replays_raw_nav_dragscroll_overlap(void) {
-    test_shadow_replay_scenario(test_runtime_v2_raw_nav_dragscroll_shadow_scenario);
+static void test_key_runtime_core_shadow_replays_raw_nav_dragscroll_overlap(void) {
+    test_shadow_replay_scenario(test_key_runtime_core_raw_nav_dragscroll_shadow_scenario);
 }
 
-static void test_runtime_v2_shadow_replays_gui_alt_repeated_nav_overlap(void) {
-    test_shadow_replay_scenario(test_runtime_v2_gui_alt_repeated_nav_shadow_scenario);
+static void test_key_runtime_core_shadow_replays_gui_alt_repeated_nav_overlap(void) {
+    test_shadow_replay_scenario(test_key_runtime_core_gui_alt_repeated_nav_shadow_scenario);
 }
 
 int main(void) {
@@ -2181,8 +2181,8 @@ int main(void) {
     test_gui_double_tap_hold_with_right_thumb_nav_hold_keeps_dragscroll_immediate();
     test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_dragscroll_immediate();
     test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_dragscroll_immediate();
-    test_runtime_v2_shadow_replays_raw_nav_dragscroll_overlap();
-    test_runtime_v2_shadow_replays_gui_alt_repeated_nav_overlap();
+    test_key_runtime_core_shadow_replays_raw_nav_dragscroll_overlap();
+    test_key_runtime_core_shadow_replays_gui_alt_repeated_nav_overlap();
 
     puts("real_profile_thumb_layer_lock integration tests passed");
     return 0;

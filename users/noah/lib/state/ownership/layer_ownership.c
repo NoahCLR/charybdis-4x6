@@ -137,7 +137,7 @@ bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
 
     bool changed = true;
     changed |= layer_ownership_apply_layer(layer);
-    runtime_v2_layer_lock_set(layer, locked);
+    key_runtime_core_layer_lock_set(layer, locked);
     return changed;
 }
 

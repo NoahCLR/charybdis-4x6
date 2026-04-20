@@ -22,7 +22,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
-    "$ROOT/tests/host/runtime_v2_state_unit_stub.c" \
+    "$ROOT/tests/host/key_runtime_core_state_unit_stub.c" \
     -o "$BIN"
 
 "$BIN"

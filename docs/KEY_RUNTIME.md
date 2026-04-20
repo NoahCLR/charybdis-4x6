@@ -18,8 +18,9 @@ The key runtime is now a single-authority reducer-owned system.
   points, effect transport, and QMK hook integration.
 - Long-lived external ownership still lives in the dedicated registries under
   `state/ownership/` and `key/ownership/`.
-- The `runtime_v2_*` symbol family is still in place for now; this pass only
-  normalized the directory and file names.
+- The reducer-owned code now uses the `key_runtime_core_*` symbol family.
+  Historical review notes may still mention `runtime_v2` because that was the
+  cutover thread name.
 
 The legacy slot reducers, slot result transport, slot/index shared state, and
 stub-backed mixed-runtime host surfaces were removed during the full cutover.
@@ -38,7 +39,7 @@ two architectural layers.
   effect-plan transport, trace/debug adapters, and effect projection.
 - The old slot/index runtime is no longer a live production subsystem. The
   only remaining `slot/` file in the production tree is the stateless release
-  resolver helper used by the v2 adapters.
+  resolver helper used by the core adapters.
 
 So when you see both layers, read that as "decision layer plus integration
 layer," not "old runtime plus new runtime running side by side."
@@ -47,7 +48,7 @@ layer," not "old runtime plus new runtime running side by side."
 
 - Runtime authority is by physical key position, not by the keycode currently
   visible on the active layer.
-- `runtime_v2` is the only source of truth for active presses, tap series,
+- `key_runtime_core` is the only source of truth for active presses, tap series,
   reducer-owned leases, persistent lock intents, pending release dispatches,
   and shadow projection state.
 - The runtime plans effects first and projects them second. Runtime logic does
@@ -66,14 +67,14 @@ layer," not "old runtime plus new runtime running side by side."
 | [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption and foreign pending-multi-tap flush before the current press proceeds. |
 | [`press.c`](../users/noah/lib/key/runtime/press.c), [`release.c`](../users/noah/lib/key/runtime/release.c), [`scan.c`](../users/noah/lib/key/runtime/scan.c) | Thin press/release/scan orchestration around reducer-owned effect plans. |
 | [`transition.c`](../users/noah/lib/key/runtime/transition.c), [`transition.h`](../users/noah/lib/key/runtime/transition.h) | Effect-plan transport and execution seam. This is the last shared transport layer between reducer decisions and concrete effect projection. |
-| [`slot/release_resolver.h`](../users/noah/lib/key/runtime/slot/release_resolver.h) | Shared stateless release decision contract reused by the v2 release adapters. |
+| [`slot/release_resolver.h`](../users/noah/lib/key/runtime/slot/release_resolver.h) | Shared stateless release decision contract reused by the core release adapters. |
 | [`effects/effect.h`](../users/noah/lib/key/runtime/effects/effect.h) | Shared runtime effect vocabulary. |
 | [`held_action.c`](../users/noah/lib/key/ownership/held_action.c), [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c), [`layer_ownership.c`](../users/noah/lib/state/ownership/layer_ownership.c), [`keyboard_mod_ownership.c`](../users/noah/lib/state/ownership/keyboard_mod_ownership.c) | External ownership registries projected by runtime effects. |
 | [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h), [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h) | Public debug, reset, and tracing seams used by host tests and runtime diagnostics. |
 
 ## Reducer-Owned State
 
-`runtime_v2` owns these runtime shapes:
+`key_runtime_core` owns these runtime shapes:
 
 - `press_token_t`: immutable press identity plus live phase, authored
   interaction contract, and release-time facts for one physical key.
@@ -85,10 +86,10 @@ layer," not "old runtime plus new runtime running side by side."
   such as layer locks, pd-mode locks, and pointer toggles.
 - `pending_release_t`: deferred release dispatches that must drain in authored
   order after blockers clear.
-- `runtime_v2_shadow_projection_t`: reducer-owned projected view used by
+- `key_runtime_core_shadow_projection_t`: reducer-owned projected view used by
   blocking queries, debug snapshots, and overlap reasoning.
 
-If a future change needs new runtime state, it belongs in `runtime_v2` unless
+If a future change needs new runtime state, it belongs in `key_runtime_core` unless
 it is purely an external ownership registry or a stateless authored-behavior
 helper.
 
@@ -97,7 +98,7 @@ helper.
 ### 1. Physical key event entry
 
 [`process.c`](../users/noah/lib/key/runtime/process.c)
-observes every physical event into `runtime_v2` first.
+observes every physical event into `key_runtime_core` first.
 
 That observation step gives the reducer position-stable press/release identity
 before any QMK path, macro path, or pd-mode path narrows the event.
@@ -114,7 +115,7 @@ does the cross-key work that must happen before the current press resolves:
 ### 3. Press routing
 
 Handled presses go through [`press.c`](../users/noah/lib/key/runtime/press.c),
-which asks `runtime_v2` for a press effect plan and executes it through
+which asks `key_runtime_core` for a press effect plan and executes it through
 [`transition.c`](../users/noah/lib/key/runtime/transition.c).
 
 The reducer owns:
@@ -142,12 +143,12 @@ The release path now owns:
 Non-handled releases still pass through the shared process flow, but
 `process.c` now finalizes any reducer-owned observed state for
 those keys too. That keeps raw ownership keys such as `MO()`/modifier/pd-mode
-keys from leaving stale v2 leases behind.
+keys from leaving stale core leases behind.
 
 ### 5. Scan
 
 [`scan.c`](../users/noah/lib/key/runtime/scan.c) asks
-`runtime_v2` for the current scan plan and then drains pending release
+`key_runtime_core` for the current scan plan and then drains pending release
 dispatches.
 
 The reducer scan path owns:
@@ -158,19 +159,19 @@ The reducer scan path owns:
 
 ## Debugging Expectations
 
-When you inspect runtime state, prefer the v2 debug surface:
+When you inspect runtime state, prefer the core debug surface:
 
-- `runtime_v2_press_token_at(...)`
-- `runtime_v2_tap_series_at(...)`
-- `runtime_v2_projection_snapshot_capture()`
-- `runtime_v2_shadow_projection()`
+- `key_runtime_core_press_token_at(...)`
+- `key_runtime_core_tap_series_at(...)`
+- `key_runtime_core_projection_snapshot_capture()`
+- `key_runtime_core_shadow_projection()`
 
 Do not reintroduce slot/index mirrors for debug convenience. If a debug view is
-missing, add it to the v2 surface.
+missing, add it to the core surface.
 
 ## Verification
 
-Use the current runners that match the v2-only runtime:
+Use the current runners that match the current core-owned runtime:
 
 - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
 - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`

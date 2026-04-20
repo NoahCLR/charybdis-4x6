@@ -14,5 +14,5 @@
 
 typedef struct {
     pd_mode_runtime_shared_state_t pd;
-    runtime_v2_state_t             v2;
+    key_runtime_core_state_t      core;
 } runtime_shared_state_t;
