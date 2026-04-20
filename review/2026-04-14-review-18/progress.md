@@ -1,5 +1,29 @@
 # Progress
 
+## 2026-04-20 Runtime Folder Role Wording Cleanup
+
+- Reconciled stale maintainer-facing wording that still described a mid-cutover
+  runtime shape even though the thread is already closed as single-authority.
+- Updated `users/noah/lib/runtime_v2/runtime_v2.h` to describe the current
+  production ownership split accurately:
+  - `runtime_v2/` is the reducer/state-owner layer, and
+  - `users/noah/lib/key/runtime/` is the QMK-facing orchestration and effect
+    projection layer around it.
+- Updated `users/noah/lib/runtime_v2/runtime_v2_trace.h` so the trace comment
+  no longer claims events are recorded before they hit a separate legacy
+  runtime.
+- Extended `docs/KEY_RUNTIME.md` with one explicit "Why Two Folders Still
+  Exist" section so maintainers do not have to infer the directory split from
+  file names alone.
+- Verification completed for this wording-only pass:
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Next steps:
+  - keep future architecture comments aligned with the closed single-authority
+    design, and
+  - if the integration layer is ever renamed, update `docs/KEY_RUNTIME.md`
+    alongside the code move so this confusion does not recur.
+
 ## 2026-04-20 Closure Verification Review
 
 - Used `prompts/closure-verification-review.md` for a clean close/no-close pass

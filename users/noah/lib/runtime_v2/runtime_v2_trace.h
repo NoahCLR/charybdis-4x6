@@ -2,10 +2,11 @@
 // Runtime V2 Trace
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Shared normalized input/output trace helpers used by the shadow reducer
-// harness. Input events are recorded before they hit the legacy runtime, then
-// projection checkpoints are emitted after each event so replay can compare
-// both externally visible output traces and quiescent end state.
+// Shared normalized input/output trace helpers for the reducer-owned runtime.
+// Input events are recorded as the QMK-facing orchestration layer feeds them
+// into runtime_v2, and projection checkpoints are emitted after each event so
+// replay can compare both externally visible output traces and quiescent end
+// state.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

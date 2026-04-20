@@ -2,11 +2,12 @@
 // Runtime V2 Foundation
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Single-authority runtime scaffolding for the authored interaction redesign.
-// This first landing pass adds the canonical v2 state model, immutable input
-// event shape, and projection snapshot contract used by the shadow-parity
-// harness. The legacy runtime still owns behavior today; v2 currently stores
-// structure and captures projections without driving production semantics.
+// Single-authority handled-key runtime state and reducer surface.
+// runtime_v2 owns the canonical press/tap/lease/pending-release state plus
+// the effect-plan APIs consumed by the QMK-facing orchestration layer under
+// users/noah/lib/key/runtime/. That orchestration layer feeds physical events
+// into runtime_v2, then projects the returned effects into the existing
+// ownership registries and QMK hook seams.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

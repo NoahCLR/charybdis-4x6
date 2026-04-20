@@ -22,6 +22,24 @@ The key runtime is now a `runtime_v2`-owned system.
 The legacy slot reducers, slot result transport, slot/index shared state, and
 stub-backed mixed-runtime host surfaces were removed during the full cutover.
 
+## Why Two Folders Still Exist
+
+The folder split is architectural, not a sign that two runtimes still share
+authority.
+
+- [`users/noah/lib/runtime_v2/`](../users/noah/lib/runtime_v2/) is the
+  reducer/state-owner layer. It holds the canonical runtime state, plans
+  effects, and exposes the debug/projection surface.
+- [`users/noah/lib/key/runtime/`](../users/noah/lib/key/runtime/) is the
+  QMK-facing integration layer. It owns process/scan entry flow, preflight,
+  effect-plan transport, trace/debug adapters, and effect projection.
+- The old slot/index runtime is no longer a live production subsystem. The
+  only remaining `slot/` file in the production tree is the stateless release
+  resolver helper used by the v2 adapters.
+
+So when you see both folders, read that as "decision layer plus integration
+layer," not "old runtime plus new runtime running side by side."
+
 ## Design Rules
 
 - Runtime authority is by physical key position, not by the keycode currently
