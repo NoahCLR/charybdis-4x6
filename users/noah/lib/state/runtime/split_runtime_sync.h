@@ -39,6 +39,7 @@ extern split_runtime_sync_packet_t split_runtime_sync_remote;
 void split_runtime_sync_init(void);
 void split_runtime_sync_tick(void);
 void split_runtime_sync_elapsed(uint16_t raw_elapsed);
+void split_runtime_sync_request(void);
 void split_runtime_sync(void);
 
 #else
@@ -50,6 +51,7 @@ static inline void split_runtime_sync_tick(void) {}
 static inline void split_runtime_sync_elapsed(uint16_t raw_elapsed) {
     (void)raw_elapsed;
 }
+static inline void split_runtime_sync_request(void) {}
 static inline void split_runtime_sync(void) {}
 
 #endif // defined(SPLIT_TRANSACTION_IDS_USER)

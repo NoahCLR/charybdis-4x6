@@ -1,30 +1,18 @@
 // ────────────────────────────────────────────────────────────────────────────
 // Key Runtime Process Flow
 // ────────────────────────────────────────────────────────────────────────────
-//
-// Press/release handling and process_record_user integration.
-// ────────────────────────────────────────────────────────────────────────────
 
 #include "../interaction/handled_key.h"
 #include "key_runtime_process_internal.h"
-#include "key_runtime_internal.h"
 #include "key_runtime_trace.h"
 #include "noah_runtime.h"
 #include "../../macro/macro_dispatch.h"
 #include "../../pointing/defs/pd_modes.h"
 #include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"
+#include "../../runtime_v2/runtime_v2.h"
 #include "../../action/synthetic_record.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/runtime/keyboard_mod_state.h"
-
-__attribute__((weak)) uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
-    return 0;
-}
-
-__attribute__((weak)) void runtime_v2_observe_process_record_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-}
 
 #ifdef NOAH_HOST_TEST_ENV
 bool key_runtime_integration_userspace_feeds_runtime_v2_key_events(void) {
@@ -49,7 +37,6 @@ struct key_runtime_process_ctx_t {
     uint16_t                 keycode;
     uint16_t                 runtime_keycode;
     keyrecord_t             *record;
-    active_key_state_t      *release_slot;
     handled_key_resolution_t resolution;
     bool                     resolution_loaded;
 };
@@ -63,48 +50,44 @@ static keyboard_mod_state_t key_runtime_keyboard_mod_state_current(void) {
     };
 }
 
-static key_runtime_keyboard_event_mask_state_t *key_runtime_keyboard_event_mask_state(void) {
-    return &key_runtime_shared_state()->keyboard_event_mask;
-}
-
 static void key_runtime_process_end_keyboard_event_mod_mask(void) {
-    key_runtime_keyboard_event_mask_state_t *mask_state = key_runtime_keyboard_event_mask_state();
+    runtime_v2_state_t  *state    = runtime_v2_state();
     keyboard_mod_state_t restored;
 
-    if (!mask_state->active) {
+    if (!(state && state->keyboard_event_mask_active)) {
         return;
     }
 
     restored      = key_runtime_keyboard_mod_state_current();
-    restored.real = (uint8_t)(restored.real | keyboard_mod_ownership_managed_only_mask(mask_state->masked_real_mods));
+    restored.real = (uint8_t)(restored.real | keyboard_mod_ownership_managed_only_mask(state->keyboard_event_masked_real_mods));
     keyboard_mod_state_apply(restored);
-    mask_state->active           = false;
-    mask_state->masked_real_mods = 0;
+    state->keyboard_event_mask_active      = false;
+    state->keyboard_event_masked_real_mods = 0u;
 }
 
 static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
-    key_runtime_keyboard_event_mask_state_t *mask_state = key_runtime_keyboard_event_mask_state();
+    runtime_v2_state_t  *state = runtime_v2_state();
     keyboard_mod_state_t filtered;
-    uint8_t masked_real_mods;
+    uint8_t              masked_real_mods;
 
-    if (mask_state->active) {
+    if (!(state && !state->keyboard_event_mask_active)) {
         return;
     }
 
     masked_real_mods = pd_mode_active_keyboard_event_masked_real_mods();
-    if (masked_real_mods == 0) {
+    if (masked_real_mods == 0u) {
         return;
     }
 
     filtered = key_runtime_keyboard_mod_state_current();
-    if ((filtered.real & masked_real_mods) == 0) {
+    if ((filtered.real & masked_real_mods) == 0u) {
         return;
     }
 
     filtered.real &= (uint8_t)~masked_real_mods;
     keyboard_mod_state_apply(filtered);
-    mask_state->masked_real_mods = masked_real_mods;
-    mask_state->active           = true;
+    state->keyboard_event_masked_real_mods = masked_real_mods;
+    state->keyboard_event_mask_active      = true;
 }
 
 static handled_key_resolution_t key_runtime_process_resolution(key_runtime_process_ctx_t *ctx) {
@@ -134,13 +117,15 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_preflight(k
 }
 
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_release_slot_keycode(key_runtime_process_ctx_t *ctx) {
+    const press_token_t *token;
+
     if (ctx->record->event.pressed) {
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
-    ctx->release_slot = key_runtime_slot_for_position(ctx->record->event.key);
-    if (key_runtime_slot_active(ctx->release_slot)) {
-        ctx->runtime_keycode = ctx->release_slot->owner.keycode;
+    token = runtime_v2_press_token_at(ctx->record->event.key);
+    if (token && token->resolved_keycode != KC_NO) {
+        ctx->runtime_keycode = token->resolved_keycode;
     }
 
     return KEY_RUNTIME_PROCESS_NEXT;
@@ -163,9 +148,26 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
-    handled = ctx->record->event.pressed ? key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record, resolution) : key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
+    handled = ctx->record->event.pressed ? key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record, resolution)
+                                         : key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
     key_runtime_trace_bool_result("process:handled_key", ctx->runtime_keycode, ctx->record, handled);
     return handled ? KEY_RUNTIME_PROCESS_RETURN_FALSE : KEY_RUNTIME_PROCESS_NEXT;
+}
+
+static key_runtime_process_stage_outcome_t key_runtime_process_stage_non_handled_release_cleanup(key_runtime_process_ctx_t *ctx) {
+    if (ctx->record->event.pressed) {
+        return KEY_RUNTIME_PROCESS_NEXT;
+    }
+
+    if (handled_key_resolution_is_handled(key_runtime_process_resolution(ctx))) {
+        return KEY_RUNTIME_PROCESS_NEXT;
+    }
+
+    if (runtime_v2_finalize_non_handled_release(ctx->record->event.key)) {
+        key_runtime_trace_message("process:non_handled_release_cleanup", "finalized v2-owned release state for non-handled key");
+    }
+
+    return KEY_RUNTIME_PROCESS_NEXT;
 }
 
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_direct_action(key_runtime_process_ctx_t *ctx) {
@@ -208,7 +210,14 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "macro_dispatch", .handler = key_runtime_process_stage_macro_dispatch},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough},
+        {.name = "preflight", .handler = key_runtime_process_stage_preflight},
+        {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode},
+        {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode},
+        {.name = "handled_key", .handler = key_runtime_process_stage_handled_key},
+        {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup},
+        {.name = "direct_action", .handler = key_runtime_process_stage_direct_action},
+        {.name = "macro_dispatch", .handler = key_runtime_process_stage_macro_dispatch},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,

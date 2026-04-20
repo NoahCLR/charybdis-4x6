@@ -35,7 +35,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/pd_runtime_test.c" \
-    "$ROOT/tests/host/runtime_v2_observer_stub.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_runtime.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
@@ -44,6 +43,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
+    "$ROOT/tests/host/runtime_v2_state_unit_stub.c" \
     -o "$BIN"
 
 "$BIN"

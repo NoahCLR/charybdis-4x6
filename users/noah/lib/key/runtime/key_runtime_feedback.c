@@ -2,13 +2,10 @@
 // Key Runtime Feedback
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_internal.h"
 #include "key_runtime_feedback.h"
-#include "key_runtime_index_internal.h"
-#include "../interaction/handled_key_policy.h"
-#include "../../pointing/defs/pd_modes.h"
 
-#define key_feedback_pulse (key_runtime_shared_state()->feedback)
+#include "../interaction/handled_key_policy.h"
+#include "../../runtime_v2/runtime_v2.h"
 
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
 #    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
@@ -17,43 +14,42 @@
 #endif
 
 void key_feedback_pulse_arm(bool long_hold_level) {
-    key_feedback_pulse = (key_runtime_feedback_state_t){
-        .timer           = timer_read(),
-        .active          = true,
-        .long_hold_level = long_hold_level,
-    };
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    if (!state) {
+        return;
+    }
+
+    state->feedback_pulse_timer           = timer_read();
+    state->feedback_pulse_active          = true;
+    state->feedback_pulse_long_hold_level = long_hold_level;
 }
 
 static bool key_feedback_pulse_active(void) {
-    if (!key_feedback_pulse.active) {
+    runtime_v2_state_t *state = runtime_v2_state();
+
+    if (!(state && state->feedback_pulse_active)) {
         return false;
     }
 
-    if (timer_elapsed(key_feedback_pulse.timer) < KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) {
+    if (timer_elapsed(state->feedback_pulse_timer) < KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) {
         return true;
     }
 
-    key_feedback_pulse.active = false;
+    state->feedback_pulse_active = false;
     return false;
 }
 
-static uint8_t key_feedback_preview_layer_for_slot(const active_key_state_t *slot) {
-    if (!key_runtime_slot_active(slot) || key_runtime_slot_uses_implicit_hold(slot) || key_runtime_slot_uses_fallback_hold(slot)) {
-        return UINT8_MAX;
-    }
+static bool key_feedback_token_allows_tap_release(const press_token_t *token) {
+    return token && token->active && (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW);
+}
 
-    if (slot->lifecycle.held_action_keycode != KC_NO) {
-        // Once a held action is actually registered, the preview window is
-        // over. Held momentary layers should render only through layer_state
-        // so active MO() and locked layers compose identically in RGB.
-        return UINT8_MAX;
-    }
+static bool key_feedback_token_uses_implicit_hold(const press_token_t *token) {
+    return token && token->handled_key && key_runtime_slot_interaction_uses_implicit_hold(token->interaction);
+}
 
-    if (!key_runtime_slot_allows_tap_release(slot)) {
-        return UINT8_MAX;
-    }
-
-    return key_runtime_slot_preview_layer_hint(slot);
+static bool key_feedback_token_uses_fallback_hold(const press_token_t *token) {
+    return token && token->handled_key && key_runtime_slot_interaction_uses_fallback_hold(token->interaction);
 }
 
 static handled_key_hold_semantics_t key_feedback_registered_hold_contract(key_runtime_slot_interaction_t interaction, uint16_t held_action, bool long_hold_reached) {
@@ -74,48 +70,54 @@ static bool key_feedback_hold_contract_uses_preview_layer(handled_key_hold_seman
     return semantics.preview_layer != UINT8_MAX;
 }
 
-uint8_t key_feedback_preview_layer(void) {
-    return key_feedback_preview_layer_for_slot(key_runtime_preview_owner_slot());
+static uint8_t key_feedback_preview_layer_for_token(const press_token_t *token) {
+    if (!(token && token->active && token->handled_key) || key_feedback_token_uses_implicit_hold(token) || key_feedback_token_uses_fallback_hold(token)) {
+        return UINT8_MAX;
+    }
+
+    if (runtime_v2_held_action_keycode_at(token->key_pos) != KC_NO || runtime_v2_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE ||
+        runtime_v2_slot_phase_at(token->key_pos) == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE || !key_feedback_token_allows_tap_release(token)) {
+        return UINT8_MAX;
+    }
+
+    return token->interaction.contract.hold.preview_layer;
 }
 
-static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
-    uint8_t                        flags = 0;
-    key_runtime_slot_interaction_t interaction;
+uint8_t key_feedback_preview_layer(void) {
+    keypos_t key_pos;
 
-    if (!key_runtime_slot_active(slot)) {
-        return flags;
+    if (!runtime_v2_preview_owner_key_pos(&key_pos)) {
+        return UINT8_MAX;
     }
 
-    interaction                = key_runtime_slot_cached_interaction(slot);
-    uint16_t elapsed           = timer_elapsed(slot->timer);
-    bool     long_hold_reached = interaction.binding.long_hold.present && elapsed >= interaction.binding.longer_hold_term;
+    return key_feedback_preview_layer_for_token(runtime_v2_press_token_at(key_pos));
+}
 
-    if (key_runtime_slot_uses_implicit_hold(slot)) {
-        return flags;
+static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
+    uint8_t  flags = 0u;
+    uint16_t held_action;
+
+    if (!(token && token->active && token->handled_key)) {
+        return 0u;
     }
 
-    // Fallback base holds are internal runtime glue for "tap override, normal
-    // hold" semantics. They are not authored hold surfaces, so keep RGB quiet.
-    if (key_runtime_slot_uses_fallback_hold(slot)) {
-        return flags;
+    if (key_feedback_token_uses_implicit_hold(token) || key_feedback_token_uses_fallback_hold(token)) {
+        return 0u;
     }
 
-    if (slot->lifecycle.held_action_keycode != KC_NO) {
-        handled_key_hold_semantics_t active_contract = key_feedback_registered_hold_contract(interaction, slot->lifecycle.held_action_keycode, long_hold_reached);
+    held_action = runtime_v2_held_action_keycode_at(token->key_pos);
+    bool long_hold_reached = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.longer_hold_term;
 
-        // Held layer and pd-mode actions do not keep a hold overlay once they
-        // are active; the layer or pd-mode color itself is the feedback.
+    if (held_action != KC_NO) {
+        handled_key_hold_semantics_t active_contract = key_feedback_registered_hold_contract(token->interaction, held_action, long_hold_reached);
+
         if (!active_contract.keeps_registered_feedback) {
-            return flags;
+            return 0u;
         }
 
-        // PRESS_AND_HOLD_UNTIL_RELEASE stays visibly active while registered.
-        // Pack the current flash phase so both halves flash in lockstep — the
-        // slave reads this bit from the sync packet instead of computing phase
-        // from its own independent clock.
         flags |= KEY_FEEDBACK_FLAG_LEVEL_FLASH;
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
-        if (((timer_read() / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0) {
+        if (((timer_read() / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0u) {
             flags |= KEY_FEEDBACK_FLAG_FLASH_PHASE;
         }
         if (long_hold_reached) {
@@ -124,10 +126,10 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
         return flags;
     }
 
-    if (slot->lifecycle.repeat_binding_active) {
+    if (runtime_v2_repeat_active_at(token->key_pos)) {
         flags |= KEY_FEEDBACK_FLAG_LEVEL_FLASH;
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
-        if (((timer_read() / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0) {
+        if (((timer_read() / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0u) {
             flags |= KEY_FEEDBACK_FLAG_FLASH_PHASE;
         }
         if (long_hold_reached) {
@@ -136,24 +138,20 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
         return flags;
     }
 
-    if (long_hold_reached && interaction.contract.long_hold.keeps_pending_feedback) {
-        // TAP_ON_RELEASE_AFTER_HOLD keeps feedback visible because the action
-        // is still pending until release.
+    if (long_hold_reached && token->interaction.contract.long_hold.keeps_pending_feedback) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
         flags |= KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE;
         return flags;
     }
 
-    if (!long_hold_reached && key_runtime_slot_has_pending_release_hold(slot) && !key_feedback_hold_contract_uses_preview_layer(interaction.contract.hold)) {
+    if (!long_hold_reached && token->slot_phase == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING && !key_feedback_hold_contract_uses_preview_layer(token->interaction.contract.hold)) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
         return flags;
     }
 
-    // One-shot threshold actions are complete as soon as they fire, so they do
-    // not keep a hold color latched after the threshold. Only an authored
-    // normal hold tier keeps the pending hold color before it resolves;
-    // long-hold-only surfaces stay quiet until the long-hold tier commits.
-    if (!key_feedback_hold_contract_uses_preview_layer(interaction.contract.hold) && key_runtime_slot_allows_tap_release(slot) && elapsed >= interaction.binding.tap_hold_term && (handled_key_hold_contract_fires_at_threshold(interaction.contract.hold) || interaction.contract.hold.keeps_pending_feedback)) {
+    if (!key_feedback_hold_contract_uses_preview_layer(token->interaction.contract.hold) && key_feedback_token_allows_tap_release(token) &&
+        timer_elapsed(token->pressed_at) >= token->interaction.binding.tap_hold_term &&
+        (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.hold) || token->interaction.contract.hold.keeps_pending_feedback)) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_PENDING;
     }
 
@@ -161,35 +159,33 @@ static uint8_t key_feedback_pack_for_slot(const active_key_state_t *slot) {
 }
 
 uint8_t key_feedback_pack(void) {
-    uint8_t flags = 0;
+    uint8_t            flags = 0u;
+    runtime_v2_state_t *state = runtime_v2_state();
 
     if (key_feedback_pulse_active()) {
         flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
-        if (key_feedback_pulse.long_hold_level) {
+        if (state && state->feedback_pulse_long_hold_level) {
             flags |= KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE;
         }
         return flags;
     }
 
-    // Multi-tap pending: at least one slot still has an open tap window that
-    // has not crossed into a pending hold.
-    for (uint8_t index = 0; index < key_runtime_pending_multi_tap_slot_count(); index++) {
-        active_key_state_t *slot = key_runtime_pending_multi_tap_slot_by_order(index);
-        if (key_runtime_slot_has_pending_multi_tap(slot) && !key_runtime_slot_pending_multi_tap_pending_hold(slot)) {
+    for (uint16_t index = 0; state && index < RUNTIME_V2_TAP_SERIES_CAPACITY; index++) {
+        if (state->tap_series[index].active && !state->tap_series[index].pending_hold) {
             flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
             break;
         }
     }
 
-    for (uint8_t index = 0; index < key_runtime_active_slot_count(); index++) {
-        uint8_t slot_flags = key_feedback_pack_for_slot(key_runtime_active_slot_by_order(index));
-        if (slot_flags != 0) {
-            return flags | slot_flags;
+    for (uint16_t index = 0; state && index < RUNTIME_V2_PRESS_TOKEN_CAPACITY; index++) {
+        uint8_t token_flags = key_feedback_pack_for_token(&state->press_tokens[index]);
+
+        if (token_flags != 0u) {
+            return flags | token_flags;
         }
     }
 
     return flags;
 }
 
-#undef key_feedback_pulse
 #undef KEY_FEEDBACK_FLASH_HALF_PERIOD_MS

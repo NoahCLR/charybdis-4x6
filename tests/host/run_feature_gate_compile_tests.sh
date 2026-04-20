@@ -119,53 +119,33 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    if repo_owned_code_includes '#include ".*key_runtime_(state|process|index)\.h"' >/dev/null; then
-        echo "repo-owned code must not include removed key-runtime aggregate/index headers" >&2
-        repo_owned_code_includes '#include ".*key_runtime_(state|process|index)\.h"' >&2
+    if repo_owned_code_includes '#include ".*key_runtime_(state|process|index|admission)\.h"' >/dev/null; then
+        echo "repo-owned code must not include removed key-runtime aggregate/index/admission headers" >&2
+        repo_owned_code_includes '#include ".*key_runtime_(state|process|index|admission)\.h"' >&2
         exit 1
     fi
 
-    key_runtime_internal_test_allowlist='^(tests/host/(key_runtime_feedback_test|key_runtime_index_test|key_runtime_preflight_test|key_runtime_slot_test|key_runtime_transition_test)\.c:|tests/host/key_runtime_admission_test\.c:)'
-    key_runtime_internal_test_violations="$(
-        host_test_includes '#include ".*(key_runtime_internal\.h|key_runtime_process_internal\.h|key_runtime_shared_state\.h)"' | grep -Ev "$key_runtime_internal_test_allowlist" || true
-    )"
-    if [ -n "$key_runtime_internal_test_violations" ]; then
-        echo "only low-level white-box host suites may include key-runtime internal headers" >&2
-        printf '%s\n' "$key_runtime_internal_test_violations" >&2
+    if repo_owned_code_includes '#include ".*(key_runtime_internal\.h|key_runtime_index_internal\.h|key_runtime_shared_state\.h)"' >/dev/null; then
+        echo "repo-owned code must not include deleted key-runtime internal/index/shared-state headers" >&2
+        repo_owned_code_includes '#include ".*(key_runtime_internal\.h|key_runtime_index_internal\.h|key_runtime_shared_state\.h)"' >&2
         exit 1
     fi
 
-    key_runtime_internal_prod_allowlist='^(users/noah/lib/key/runtime/|users/noah/lib/state/runtime/runtime_shared_state_internal\.h:)'
-    key_runtime_internal_prod_violations="$(
+    key_runtime_process_internal_prod_allowlist='^(users/noah/lib/key/runtime/)'
+    key_runtime_process_internal_prod_violations="$(
         repo_owned_production_include_violations \
-            '#include ".*(key_runtime_internal\.h|key_runtime_process_internal\.h|key_runtime_shared_state\.h)"' \
-            "$key_runtime_internal_prod_allowlist"
+            '#include ".*key_runtime_process_internal\.h"' \
+            "$key_runtime_process_internal_prod_allowlist"
     )"
-    if [ -n "$key_runtime_internal_prod_violations" ]; then
-        echo "only key-runtime owner modules and the aggregate runtime storage wrapper may include key-runtime internal headers in repo-owned production code" >&2
-        printf '%s\n' "$key_runtime_internal_prod_violations" >&2
+    if [ -n "$key_runtime_process_internal_prod_violations" ]; then
+        echo "only key-runtime owner modules may include key_runtime_process_internal.h in repo-owned production code" >&2
+        printf '%s\n' "$key_runtime_process_internal_prod_violations" >&2
         exit 1
     fi
 
-    key_runtime_index_internal_test_allowlist='^(tests/host/(key_runtime_admission_test|key_runtime_feedback_test|key_runtime_index_test|key_runtime_preflight_test|key_runtime_transition_test)\.c:)'
-    key_runtime_index_internal_test_violations="$(
-        host_test_includes '#include ".*key_runtime_index_internal\.h"' | grep -Ev "$key_runtime_index_internal_test_allowlist" || true
-    )"
-    if [ -n "$key_runtime_index_internal_test_violations" ]; then
-        echo "only low-level white-box host suites may include key_runtime_index_internal.h" >&2
-        printf '%s\n' "$key_runtime_index_internal_test_violations" >&2
-        exit 1
-    fi
-
-    key_runtime_index_internal_prod_allowlist='^(users/noah/lib/key/runtime/)'
-    key_runtime_index_internal_prod_violations="$(
-        repo_owned_production_include_violations \
-            '#include ".*key_runtime_index_internal\.h"' \
-            "$key_runtime_index_internal_prod_allowlist"
-    )"
-    if [ -n "$key_runtime_index_internal_prod_violations" ]; then
-        echo "only key-runtime owner modules may include key_runtime_index_internal.h in repo-owned production code" >&2
-        printf '%s\n' "$key_runtime_index_internal_prod_violations" >&2
+    if repo_owned_code_includes '#include ".*key_runtime_process_internal\.h"' | grep -Ev '^users/noah/lib/key/runtime/' >/dev/null; then
+        echo "repo-owned code outside key-runtime owner modules must not include key_runtime_process_internal.h" >&2
+        repo_owned_code_includes '#include ".*key_runtime_process_internal\.h"' | grep -Ev '^users/noah/lib/key/runtime/' >&2
         exit 1
     fi
 

@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "../key_runtime_internal.h"
+#include "../key_runtime_interaction.h"
 
 typedef enum {
     KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE = 0,
@@ -83,23 +83,6 @@ static inline key_runtime_slot_release_semantics_t key_runtime_slot_release_sema
         default:
             return (key_runtime_slot_release_semantics_t){0};
     }
-}
-
-static inline key_runtime_slot_release_query_t key_runtime_slot_release_query_from_slot(const active_key_state_t *slot, key_runtime_slot_release_semantics_t semantics, uint16_t elapsed) {
-    if (!slot) {
-        return (key_runtime_slot_release_query_t){0};
-    }
-
-    return (key_runtime_slot_release_query_t){
-        .interaction                       = key_runtime_slot_cached_interaction(slot),
-        .semantics                         = semantics,
-        .elapsed                           = elapsed,
-        .held_action_active                = slot->lifecycle.held_action_keycode != KC_NO,
-        .repeat_active                     = slot->lifecycle.repeat_binding_active,
-        .other_press_interrupted           = slot->lifecycle.other_press_interrupted,
-        .momentary_layer_tap_interrupted   = slot->lifecycle.momentary_layer_tap_interrupted,
-        .pd_mode_was_locked_on_press       = slot->lifecycle.pd_mode_was_locked_on_press,
-    };
 }
 
 static inline bool key_runtime_slot_release_query_momentary_layer_tap_suppresses_quick_tap(const key_runtime_slot_release_query_t *query) {

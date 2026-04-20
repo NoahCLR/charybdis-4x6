@@ -949,6 +949,11 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     (void)repeat_hz;
 }
 
+bool held_repeat_release_owned_by_key(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
 void held_repeat_tick(void) {}
 
 bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
@@ -970,6 +975,8 @@ uint8_t key_feedback_preview_layer(void) {
 }
 
 void split_runtime_sync(void) {}
+
+void split_runtime_sync_request(void) {}
 
 static void test_left_thumb_double_tap_hold_toggles_num_layer(void) {
     keypos_t key_pos      = test_left_thumb_pos();

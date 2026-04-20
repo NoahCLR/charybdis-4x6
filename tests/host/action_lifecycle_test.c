@@ -60,6 +60,7 @@ static const pd_mode_def_t test_pd_mode_def = {
 };
 
 void split_runtime_sync(void);
+void split_runtime_sync_request(void);
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -168,6 +169,10 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
 
 void split_runtime_sync(void) {
     split_sync_calls++;
+}
+
+void split_runtime_sync_request(void) {
+    split_runtime_sync();
 }
 
 void noah_dispatch_synthetic_tap(uint16_t keycode) {

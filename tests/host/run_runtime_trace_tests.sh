@@ -21,7 +21,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/runtime_trace_test.c" \
-    "$ROOT/tests/host/runtime_v2_observer_stub.c" \
     "$ROOT/users/noah/lib/key/runtime/key_runtime_trace.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
@@ -38,6 +37,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/state/runtime/runtime_trace.c" \
     "$ROOT/users/noah/lib/runtime_v2/runtime_v2_trace.c" \
     "$ROOT/users/noah/lib/state/runtime/split_runtime_sync.c" \
+    "$ROOT/tests/host/runtime_v2_state_unit_stub.c" \
     -o "$BIN"
 
 "$BIN"

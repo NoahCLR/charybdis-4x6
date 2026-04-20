@@ -28,6 +28,7 @@ static split_runtime_sync_packet_t split_runtime_sync_last_sent   = SPLIT_RUNTIM
 static bool                        split_runtime_sync_sent_once   = false;
 static bool                        split_runtime_sync_initialized = false;
 static uint32_t                    split_runtime_sync_last_send   = 0;
+static bool                        split_runtime_sync_force_pending = false;
 
 #    ifndef SPLIT_RUNTIME_SYNC_HEARTBEAT_MS
 #        define SPLIT_RUNTIME_SYNC_HEARTBEAT_MS 250
@@ -40,6 +41,8 @@ static void split_runtime_sync_log_packet_size_mismatch(uint8_t size) {
     (void)size;
 #    endif
 }
+
+static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force);
 
 static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_elapsed) {
     return (split_runtime_sync_packet_t){
@@ -111,6 +114,7 @@ void split_runtime_sync_init(void) {
     split_runtime_sync_sent_once   = false;
     split_runtime_sync_initialized = true;
     split_runtime_sync_last_send   = timer_read32();
+    split_runtime_sync_force_pending = false;
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_INIT, is_keyboard_master() ? 1u : 0u, 0u);
 
     if (is_keyboard_master()) {
@@ -125,7 +129,8 @@ void split_runtime_sync_tick(void) {
     raw_elapsed = noah_qmk_contract_auto_mouse_elapsed();
 #    endif
 
-    split_runtime_sync_elapsed(raw_elapsed);
+    split_runtime_sync_elapsed_internal(raw_elapsed, split_runtime_sync_force_pending);
+    split_runtime_sync_force_pending = false;
 }
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force) {
@@ -138,6 +143,10 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
 
 void split_runtime_sync_elapsed(uint16_t raw_elapsed) {
     split_runtime_sync_elapsed_internal(raw_elapsed, false);
+}
+
+void split_runtime_sync_request(void) {
+    split_runtime_sync_force_pending = true;
 }
 
 void split_runtime_sync(void) {

@@ -24,7 +24,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/key_runtime_modifier_hold_integration_test.c" \
-    "$ROOT/tests/host/runtime_v2_observer_stub.c" \
     $MODIFIER_HOLD_SUPPORT_SOURCES \
     -o "$BIN"
 

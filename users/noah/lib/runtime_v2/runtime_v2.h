@@ -16,6 +16,7 @@
 #include <stdint.h>
 
 #include "../key/interaction/handled_key.h"
+#include "../key/runtime/effects/key_runtime_effect_queue.h"
 #include "../key/runtime/key_runtime_interaction.h"
 #include "../pointing/defs/pd_mode_flags.h"
 #include "../state/runtime/keyboard_mod_state.h"
@@ -26,6 +27,7 @@
 #define RUNTIME_V2_PENDING_RELEASE_CAPACITY ((uint16_t)(RUNTIME_V2_PRESS_TOKEN_CAPACITY * 2u))
 #define RUNTIME_V2_DEFERRED_RELEASE_BLOCKER_CAPACITY RUNTIME_V2_PRESS_TOKEN_CAPACITY
 #define RUNTIME_V2_PERSISTENT_INTENT_CAPACITY 16u
+#define RUNTIME_V2_EFFECT_PLAN_CAPACITY 16u
 
 typedef enum {
     RUNTIME_EVENT_KIND_KEY_DOWN = 0,
@@ -115,7 +117,12 @@ typedef struct {
     uint16_t last_action;
     uint16_t last_tap_at;
     uint16_t tap_term_ms;
+    keyboard_mod_state_t saved_mod_state;
 } tap_series_t;
+
+typedef struct {
+    KEY_RUNTIME_EFFECT_QUEUE_FIELDS(RUNTIME_V2_EFFECT_PLAN_CAPACITY);
+} runtime_v2_effect_plan_t;
 
 typedef struct {
     bool                active;
@@ -270,13 +277,27 @@ typedef struct {
     uint8_t             release_keycode_mismatch_count;
     uint8_t             orphan_release_count;
     uint8_t             cancelled_press_count;
+    uint16_t            feedback_pulse_timer;
+    bool                feedback_pulse_active;
+    bool                feedback_pulse_long_hold_level;
+    uint8_t             keyboard_event_masked_real_mods;
+    bool                keyboard_event_mask_active;
     bool                input_stream_observed;
 } runtime_v2_state_t;
 
 runtime_v2_state_t  *runtime_v2_state(void);
+void                 runtime_v2_effect_plan_init(runtime_v2_effect_plan_t *plan);
 void                 runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time);
 void                 runtime_v2_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
 void                 runtime_v2_observe_scan_cycle(uint16_t now);
+void                 runtime_v2_interrupt_active_keys_on_other_press(keypos_t key_pos, runtime_v2_effect_plan_t *plan);
+void                 runtime_v2_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, runtime_v2_effect_plan_t *plan);
+void                 runtime_v2_flush_multi_tap(runtime_v2_effect_plan_t *plan);
+void                 runtime_v2_flush_active_keys_except(keypos_t key_pos, runtime_v2_effect_plan_t *plan);
+bool                 runtime_v2_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, runtime_v2_effect_plan_t *plan);
+bool                 runtime_v2_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, keyboard_mod_state_t keyboard_mod_state, runtime_v2_effect_plan_t *plan);
+void                 runtime_v2_scan(runtime_v2_effect_plan_t *plan, uint16_t now);
+bool                 runtime_v2_settle_pending_fallback_hold(runtime_v2_effect_plan_t *plan);
 bool                 runtime_v2_blocker_queries_authoritative(void);
 bool                 runtime_v2_has_any_deferred_release_blocker(void);
 bool                 runtime_v2_has_foreign_deferred_release_blocker_except(keypos_t key_pos);
@@ -284,6 +305,8 @@ uint8_t              runtime_v2_pending_release_count(void);
 bool                 runtime_v2_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
 bool                 runtime_v2_pending_release_at_order(uint8_t order, pending_release_t *out);
 uint8_t              runtime_v2_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity);
+void                 runtime_v2_project_effect(const key_runtime_effect_t *effect);
+void                 runtime_v2_project_pending_release_dispatch(const pending_release_t *pending);
 bool                 runtime_v2_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *action, uint8_t *repeat_count);
 bool                 runtime_v2_reset_pending_multi_tap(keypos_t key_pos);
 bool                 runtime_v2_retire_press_token(keypos_t key_pos);
@@ -291,8 +314,29 @@ void                 runtime_v2_observe_held_action_register(keypos_t key_pos, u
 void                 runtime_v2_observe_held_action_unregister(keypos_t key_pos, uint16_t action);
 void                 runtime_v2_observe_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz);
 bool                 runtime_v2_release_owned_state_by_key(keypos_t key_pos);
+bool                 runtime_v2_finalize_non_handled_release(keypos_t key_pos);
 const press_token_t *runtime_v2_press_token_at(keypos_t key_pos);
 const tap_series_t  *runtime_v2_tap_series_at(keypos_t key_pos);
+uint8_t              runtime_v2_active_press_token_count(void);
+bool                 runtime_v2_active_press_token_key_pos(uint8_t order, keypos_t *out);
+uint8_t              runtime_v2_pending_multi_tap_count(void);
+bool                 runtime_v2_pending_multi_tap_key_pos(uint8_t order, keypos_t *out);
+bool                 runtime_v2_has_other_active_press_token(keypos_t key_pos);
+bool                 runtime_v2_has_foreign_pending_multi_tap(uint16_t keycode, keypos_t key_pos);
+uint16_t             runtime_v2_owner_keycode_at(keypos_t key_pos);
+uint16_t             runtime_v2_tap_action_at(keypos_t key_pos);
+uint16_t             runtime_v2_held_action_keycode_at(keypos_t key_pos);
+bool                 runtime_v2_repeat_active_at(keypos_t key_pos);
+key_runtime_slot_phase_t runtime_v2_slot_phase_at(keypos_t key_pos);
+bool                 runtime_v2_momentary_layer_tap_interrupted_at(keypos_t key_pos);
+uint8_t              runtime_v2_pending_multi_tap_tap_count_at(keypos_t key_pos);
+bool                 runtime_v2_pending_multi_tap_holding_at(keypos_t key_pos);
+bool                 runtime_v2_has_pending_multi_tap_at(keypos_t key_pos);
+bool                 runtime_v2_hold_is_complete_at(keypos_t key_pos);
+uint8_t              runtime_v2_deferred_release_blocker_count(void);
+uint8_t              runtime_v2_deferred_release_timed_blocker_count(void);
+bool                 runtime_v2_preview_owner_key_pos(keypos_t *out);
+bool                 runtime_v2_pending_fallback_key_pos(keypos_t *out);
 const runtime_v2_shadow_projection_t *runtime_v2_shadow_projection(void);
 uint8_t              runtime_v2_pending_release_count_for_keypos(keypos_t key_pos);
 uint8_t              runtime_v2_deferred_release_blocker_count_for_keypos(keypos_t key_pos);

@@ -8,8 +8,12 @@
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/runtime/key_runtime_api.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
+#include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
+#include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_reset.h"
+#include "users/noah/lib/runtime_v2/runtime_v2.h"
 #include "users/noah/noah_runtime.h"
 
 enum {
@@ -206,10 +210,22 @@ void key_runtime_scenario_define_pd_mode_key(uint16_t keycode, pd_mode_mask_t mo
     key_runtime_scenario_add_pd_mode(keycode, mode);
     if (locked) {
         key_runtime_scenario_pd_locked_modes |= mode;
+        runtime_v2_pd_mode_lock_set(mode, true);
     }
 }
 
 void key_runtime_scenario_set_pd_locked_modes(pd_mode_mask_t modes) {
+    pd_mode_mask_t changed = key_runtime_scenario_pd_locked_modes ^ modes;
+
+    for (pd_mode_mask_t bit = 1u; changed != 0u; bit <<= 1u) {
+        if ((changed & bit) == 0u) {
+            continue;
+        }
+
+        runtime_v2_pd_mode_lock_set(bit, (modes & bit) != 0u);
+        changed &= (pd_mode_mask_t)~bit;
+    }
+
     key_runtime_scenario_pd_locked_modes = modes;
 }
 
@@ -400,6 +416,7 @@ bool is_pd_mode_lock_action(uint16_t action) {
 
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     key_runtime_scenario_pd_locked_modes ^= mode;
+    runtime_v2_pd_mode_lock_set(mode, (key_runtime_scenario_pd_locked_modes & mode) != 0u);
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
         .data.pd_mode = mode,
@@ -419,6 +436,32 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
 
 bool pd_mode_local_locked(pd_mode_mask_t mode) {
     return (key_runtime_scenario_pd_locked_modes & mode) != 0;
+}
+
+uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
+    return 0u;
+}
+
+pd_mode_mask_t pd_mode_local_active_snapshot(void) {
+    return 0u;
+}
+
+pd_mode_mask_t pd_mode_local_locked_snapshot(void) {
+    return key_runtime_scenario_pd_locked_modes;
+}
+
+pd_mode_mask_t pd_mode_display_active_snapshot(void) {
+    return 0u;
+}
+
+pd_mode_mask_t pd_mode_display_locked_snapshot(void) {
+    return key_runtime_scenario_pd_locked_modes;
+}
+
+bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
+    (void)mode;
+    (void)trait;
+    return false;
 }
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
@@ -528,6 +571,11 @@ bool held_action_release_owned_by_key(keypos_t key_pos) {
     return true;
 }
 
+bool held_repeat_release_owned_by_key(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
 bool held_modifier_release_owned_by_key(keypos_t key_pos) {
     (void)key_pos;
     return false;
@@ -552,6 +600,33 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return true;
 }
 
+void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    memset(out, 0, sizeof(*out));
+    out->applied_layer_state = layer_state;
+}
+
+void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    memset(out, 0, sizeof(*out));
+}
+
+void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_policy_debug_snapshot_t *out) {
+    (void)state;
+
+    if (!out) {
+        return;
+    }
+
+    memset(out, 0, sizeof(*out));
+}
+
 void key_feedback_pulse_arm(bool long_hold_level) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind                 = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
@@ -561,4 +636,8 @@ void key_feedback_pulse_arm(bool long_hold_level) {
 
 void split_runtime_sync(void) {
     key_runtime_scenario_split_sync_count_value++;
+}
+
+void split_runtime_sync_request(void) {
+    split_runtime_sync();
 }

@@ -304,6 +304,8 @@ bool pd_mode_local_locked(pd_mode_mask_t mode) {
 
 void split_runtime_sync(void) {}
 
+void split_runtime_sync_request(void) {}
+
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
@@ -350,6 +352,11 @@ bool held_action_release_owned_by_key(keypos_t key_pos) {
 }
 
 bool held_modifier_release_owned_by_key(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+bool held_repeat_release_owned_by_key(keypos_t key_pos) {
     (void)key_pos;
     return false;
 }

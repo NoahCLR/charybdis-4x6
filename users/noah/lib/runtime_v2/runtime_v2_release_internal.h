@@ -67,6 +67,7 @@ typedef struct {
     bool     active;
     uint16_t keycode;
     keypos_t key_pos;
+    uint8_t  tap_count;
     uint16_t tap_action;
     uint8_t  tap_repeat_count;
     uint16_t tap_hold_term;

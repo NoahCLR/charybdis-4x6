@@ -178,6 +178,23 @@ static void test_force_sync_sends_even_when_packet_is_unchanged(void) {
     CHECK(rpc_send_count == 1);
 }
 
+static void test_request_force_sync_defers_send_until_tick(void) {
+    test_reset_stubs();
+
+    split_runtime_sync_init();
+    rpc_send_count = 0;
+
+    split_runtime_sync_request();
+    CHECK(rpc_send_count == 0);
+
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count == 1);
+
+    rpc_send_count = 0;
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count == 0);
+}
+
 static void test_locked_pd_mode_zeroes_automouse_progress(void) {
     test_reset_stubs();
     fake_any_mode_locked = true;
@@ -302,6 +319,7 @@ int main(void) {
     test_init_registers_rpc_without_sending_on_slave();
     test_elapsed_skips_unchanged_packet_until_heartbeat();
     test_force_sync_sends_even_when_packet_is_unchanged();
+    test_request_force_sync_defers_send_until_tick();
     test_locked_pd_mode_zeroes_automouse_progress();
     test_inactive_automouse_keeps_timeout_window_progress();
     test_timeout_end_inactive_automouse_keeps_max_progress();

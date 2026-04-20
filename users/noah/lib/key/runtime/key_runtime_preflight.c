@@ -1,35 +1,21 @@
 // ────────────────────────────────────────────────────────────────────────────
 // Key Runtime Preflight
 // ────────────────────────────────────────────────────────────────────────────
-//
-// Physical-event preflight before the handled-key press/release state machine
-// runs.
-// ────────────────────────────────────────────────────────────────────────────
 
 #include "key_runtime_process_internal.h"
 #include "../interaction/handled_key.h"
-#include "key_runtime_admission.h"
-#include "key_runtime_index_internal.h"
-#include "key_runtime_internal.h"
 #include "key_runtime_trace.h"
 #include "key_runtime_transition.h"
 #include "../../action/action_dispatch.h"
-#include "../../pointing/defs/pd_modes.h"
+#include "../../runtime_v2/runtime_v2.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
-    active_key_state_t      *slot              = key_runtime_find_slot_by_position(record->event.key);
-    handled_key_resolution_t handled_key       = handled_key_lookup(keycode);
-    bool                     other_slot_active = false;
-    bool                     flush_multi_taps  = false;
+    handled_key_resolution_t handled_key = handled_key_lookup(keycode);
+    const press_token_t     *token       = runtime_v2_press_token_at(record->event.key);
 
     if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
-        // Managed modifier releases normally suppress the raw QMK path, but a
-        // handled key still needs its own release event so the custom runtime
-        // can unregister the held action and clear feedback. That remains true
-        // even after another handled key flushes the runtime slot, because the older
-        // key's owned held action is still released by physical key position.
-        if (!record->event.pressed && (key_runtime_slot_matches(slot, keycode, record->event.key) || handled_key_resolution_is_handled(handled_key))) {
+        if (!record->event.pressed && ((token && token->resolved_keycode != KC_NO) || handled_key_resolution_is_handled(handled_key))) {
             // Let the handled-key release path run.
         } else {
             key_runtime_trace_message("preflight:suppress_default", "default QMK path suppressed before handled-key runtime");
@@ -37,40 +23,18 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    if (record->event.pressed) {
-        for (uint8_t index = 0; index < key_runtime_active_slot_count(); index++) {
-            active_key_state_t *candidate = key_runtime_active_slot_by_order(index);
-
-            if (!candidate || key_runtime_keypos_equal(candidate->owner.key_pos, record->event.key)) {
-                continue;
-            }
-
-            other_slot_active = true;
-            break;
-        }
-    }
-
-    if (other_slot_active) {
+    if (record->event.pressed && runtime_v2_has_other_active_press_token(record->event.key)) {
         key_runtime_transition_plan_t plan;
+
         key_runtime_transition_plan_init(&plan);
         key_runtime_transition_interrupt_active_keys_on_other_press(record->event.key, &plan);
         key_runtime_trace_plan("preflight:interrupt_active_key", &plan);
         key_runtime_transition_execute_plan(&plan);
     }
 
-    if (record->event.pressed) {
-        for (uint8_t index = 0; index < key_runtime_pending_multi_tap_slot_count(); index++) {
-            active_key_state_t *candidate = key_runtime_pending_multi_tap_slot_by_order(index);
-
-            if (candidate && !key_runtime_slot_pending_multi_tap_matches(candidate, keycode, record->event.key)) {
-                flush_multi_taps = true;
-                break;
-            }
-        }
-    }
-
-    if (flush_multi_taps) {
+    if (record->event.pressed && runtime_v2_has_foreign_pending_multi_tap(keycode, record->event.key)) {
         key_runtime_transition_plan_t plan;
+
         key_runtime_transition_plan_init(&plan);
         key_runtime_transition_flush_foreign_multi_tap(keycode, record->event.key, &plan);
         key_runtime_trace_plan("preflight:flush_multi_tap", &plan);

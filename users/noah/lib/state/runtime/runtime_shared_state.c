@@ -7,8 +7,12 @@
 #include "runtime_context_internal.h"
 
 static noah_runtime_context_t noah_runtime_singleton = {
-    .shared.key.index.preview_owner_slot    = UINT8_MAX,
-    .shared.key.index.pending_fallback_slot = UINT8_MAX,
+    .shared = {
+        .v2 = {
+            .next_token_id                 = 1u,
+            .next_pending_release_sequence = 1u,
+        },
+    },
 };
 
 noah_runtime_context_t *noah_runtime_context(void) {
@@ -17,10 +21,6 @@ noah_runtime_context_t *noah_runtime_context(void) {
 
 pd_mode_runtime_shared_state_t *pd_mode_runtime_shared_state(void) {
     return &noah_runtime_context()->shared.pd;
-}
-
-key_runtime_shared_state_t *key_runtime_shared_state(void) {
-    return &noah_runtime_context()->shared.key;
 }
 
 runtime_v2_state_t *runtime_v2_state(void) {
@@ -33,7 +33,6 @@ static void runtime_shared_state_reset(runtime_shared_state_t *state) {
     }
 
     *state = (runtime_shared_state_t){0};
-    key_runtime_shared_state_reset(&state->key);
     runtime_v2_state_reset(&state->v2);
 }
 

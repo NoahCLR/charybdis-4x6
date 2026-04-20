@@ -11,6 +11,7 @@
 #include "users/noah/lib/key/interaction/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/runtime_v2/runtime_v2.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_reset.h"
 #include "users/noah/noah_runtime.h"
@@ -588,6 +589,10 @@ void split_runtime_sync(void) {
     split_sync_count++;
 }
 
+void split_runtime_sync_request(void) {
+    split_runtime_sync();
+}
+
 bool get_auto_mouse_toggle(void) {
     return auto_mouse_toggled;
 }
@@ -772,6 +777,8 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
     CHECK(split_sync_count >= 1);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
+    const press_token_t *release_token = runtime_v2_press_token_at(key_pos);
+
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(!pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);
@@ -1091,13 +1098,18 @@ static void test_authored_hold_action_activates_pd_mode_while_held(void) {
 }
 
 static void test_authored_double_tap_lock_locks_pd_mode(void) {
-    const key_runtime_integration_step_t scenario[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+    const key_runtime_integration_step_t setup[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
     };
+    const key_runtime_integration_step_t release[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+    };
+    keypos_t key_pos = test_keypos(1, 2);
 
     test_reset_state();
 
-    key_runtime_integration_run(&fake_time, scenario, ARRAY_SIZE(scenario));
+    key_runtime_integration_run(&fake_time, setup, ARRAY_SIZE(setup));
+    key_runtime_integration_run(&fake_time, release, ARRAY_SIZE(release));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
@@ -1317,7 +1329,6 @@ static void test_pinch_single_tap_masks_mode_owned_gui_from_delayed_replay(void)
     CHECK(!pd_mode_local_active(PD_MODE_PINCH));
     CHECK(fake_mods == MOD_BIT(KC_LEFT_SHIFT));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
-
     key_runtime_integration_run(&fake_time, flush_steps, ARRAY_SIZE(flush_steps));
     CHECK(delayed_action_count == 1);
     CHECK(last_delayed_action == KC_J);

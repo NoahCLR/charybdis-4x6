@@ -1,5 +1,10 @@
 #include "key_runtime_integration_harness.h"
 
+#include <string.h>
+
+#include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
+#include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
+#include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/runtime_v2/runtime_v2_trace.h"
 #include "users/noah/lib/key/runtime/key_runtime_api.h"
@@ -51,6 +56,67 @@ __attribute__((weak)) report_mouse_t noah_pointing_device_task_user(report_mouse
 __attribute__((weak)) void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
     (void)active_flags;
     (void)locked_flags;
+}
+
+__attribute__((weak)) uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
+    return 0u;
+}
+
+__attribute__((weak)) pd_mode_mask_t pd_mode_local_active_snapshot(void) {
+    return 0u;
+}
+
+__attribute__((weak)) pd_mode_mask_t pd_mode_local_locked_snapshot(void) {
+    return 0u;
+}
+
+__attribute__((weak)) pd_mode_mask_t pd_mode_display_active_snapshot(void) {
+    return 0u;
+}
+
+__attribute__((weak)) pd_mode_mask_t pd_mode_display_locked_snapshot(void) {
+    return 0u;
+}
+
+__attribute__((weak)) bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
+    (void)mode;
+    (void)trait;
+    return false;
+}
+
+__attribute__((weak)) void keyboard_mod_ownership_register(uint16_t keycode) {
+    (void)keycode;
+}
+
+__attribute__((weak)) void keyboard_mod_ownership_unregister(uint16_t keycode) {
+    (void)keycode;
+}
+
+__attribute__((weak)) void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    memset(out, 0, sizeof(*out));
+}
+
+__attribute__((weak)) void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+
+    memset(out, 0, sizeof(*out));
+    out->applied_layer_state = layer_state;
+}
+
+__attribute__((weak)) void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_policy_debug_snapshot_t *out) {
+    (void)state;
+
+    if (!out) {
+        return;
+    }
+
+    memset(out, 0, sizeof(*out));
 }
 
 __attribute__((weak)) bool key_runtime_integration_pre_userspace_record(uint16_t keycode, keyrecord_t *record) {

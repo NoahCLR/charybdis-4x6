@@ -154,6 +154,8 @@ bool layer_ownership_toggle_lock_state(uint8_t layer) {
 
 void split_runtime_sync(void) {}
 
+void split_runtime_sync_request(void) {}
+
 void noah_dispatch_synthetic_tap(uint16_t keycode) {
     (void)keycode;
     CHECK(false);

@@ -248,6 +248,8 @@ void key_feedback_pulse_arm(bool long_hold_level) {
 
 void split_runtime_sync(void) {}
 
+void split_runtime_sync_request(void) {}
+
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     (void)key_pos;
     (void)layer;

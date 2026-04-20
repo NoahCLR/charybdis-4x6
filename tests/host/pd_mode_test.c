@@ -115,6 +115,10 @@ void split_runtime_sync(void) {
     split_sync_count++;
 }
 
+void split_runtime_sync_request(void) {
+    split_runtime_sync();
+}
+
 bool charybdis_get_pointer_dragscroll_enabled(void) {
     return false;
 }

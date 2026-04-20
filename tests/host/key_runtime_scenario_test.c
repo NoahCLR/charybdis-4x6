@@ -1,9 +1,9 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "key_runtime_scenario_harness.h"
+#include "users/noah/lib/runtime_v2/runtime_v2.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/noah_keymap_ids.h"
 
@@ -262,7 +262,7 @@ static void test_other_press_does_not_flush_active_same_key_multi_tap_chain(void
     key_runtime_scenario_run(setup, ARRAY_SIZE(setup));
 
     CHECK(noah_runtime_debug_active_slot_count() == 1);
-    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == TEST_MULTI_TAP_KEY);
     CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
 
@@ -271,7 +271,7 @@ static void test_other_press_does_not_flush_active_same_key_multi_tap_chain(void
 
     CHECK(key_runtime_scenario_effect_count() == 0);
     CHECK(noah_runtime_debug_active_slot_count() == 2);
-    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == TEST_MULTI_TAP_KEY);
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 3)) == TEST_HOLD_KEY_TWO);
     CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
@@ -342,13 +342,18 @@ static void test_immediate_hold_promotes_long_hold_after_registration(void) {
 }
 
 static void test_threshold_hold_then_long_hold_with_intermediate_scans_promotes_once(void) {
-    static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 0, 4), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_HOLD_KEY_TWO, 0, 4),
+    static const key_runtime_scenario_step_t press_and_scans[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 0, 4), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_SCAN(),
     };
-
+    static const key_runtime_scenario_step_t release[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_HOLD_KEY_TWO, 0, 4),
+    };
     key_runtime_scenario_reset();
     test_configure_threshold_then_long_hold_key(TEST_HOLD_KEY_TWO, TEST_HOLD_ACTION_TWO, TEST_ALT_ACTION);
-    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
+    key_runtime_scenario_run(press_and_scans, ARRAY_SIZE(press_and_scans));
+
+    key_runtime_scenario_run(release, ARRAY_SIZE(release));
 
     CHECK(key_runtime_scenario_effect_count() == 4);
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);

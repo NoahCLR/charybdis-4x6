@@ -22,16 +22,6 @@ NOAH_COMMON_SOURCES := \
     lib/key/interaction/key_behavior_lookup.c \
     lib/key/interaction/keymap_validation.c \
     lib/key/runtime/key_runtime.c \
-    lib/key/runtime/key_runtime_admission.c \
-    lib/key/runtime/key_runtime_index.c \
-    lib/key/runtime/slot/key_runtime_slot_policy.c \
-    lib/key/runtime/slot/key_runtime_slot_press_reduce.c \
-    lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.c \
-    lib/key/runtime/slot/key_runtime_slot_release_active.c \
-    lib/key/runtime/slot/key_runtime_slot_release_reduce.c \
-    lib/key/runtime/slot/key_runtime_slot_result.c \
-    lib/key/runtime/slot/key_runtime_slot_scan_reduce.c \
-    lib/key/runtime/slot/key_runtime_slot.c \
     lib/key/runtime/key_runtime_preflight.c \
     lib/key/runtime/key_runtime_process.c \
     lib/key/runtime/key_runtime_press.c \

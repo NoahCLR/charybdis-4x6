@@ -3,6 +3,14 @@
 Date: 2026-04-19  
 Status: open hardware-visible regression
 
+## Reconciliation Note
+
+This document is an audit-time regression snapshot. The current production tree
+now runs the `runtime_v2` reducer as the only key-runtime authority, and the
+legacy slot/index files referenced later in this note were deleted during the
+2026-04-20 cutover. Treat those legacy file references as historical context,
+not as descriptions of the live runtime surface.
+
 ## Summary
 
 A regression introduced between `fdc2d77` and `29156345db90973cfc4422de1384c1a684aa94e2` causes the keyboard to enter a stuck or "wedged" state when certain authored key-behavior keys interact with momentary layers, pd modes, and multi-tap modifier holds.

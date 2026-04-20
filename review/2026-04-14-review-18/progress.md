@@ -1,5 +1,42 @@
 # Progress
 
+## 2026-04-20 Runtime V2 Authored-Key Freeze Mitigation Pass
+
+- Investigated a hardware-visible regression where pressing authored-behavior keys could stall the board even though the reducer and authored-profile host suites were green.
+- The highest-confidence production-only choke point was synchronous split RPC on handled-key press/release and pd-mode transition paths:
+  - those calls execute inside key-event handling on real hardware,
+  - the host runners stub the split transport out, so they do not exercise the blocking path directly, and
+  - the repo already documents that failed split transactions can block the main loop.
+- Mitigation landed by deferring runtime split sync requests onto the existing scan heartbeat:
+  - `users/noah/lib/state/runtime/split_runtime_sync.c` and `.h` now expose `split_runtime_sync_request()`,
+  - handled key press/release in `users/noah/lib/key/runtime/key_runtime_press.c` and `key_runtime_release.c` now request sync instead of sending RPC immediately,
+  - pd-mode state transitions in `users/noah/lib/pointing/runtime/pd_mode_state.c` now request sync instead of sending immediately, and
+  - `KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP` in `users/noah/lib/runtime_v2/runtime_v2.c` now does the same.
+- The runtime behavior stays the same at the protocol level:
+  - the next matrix-scan tick still sends the full packet when runtime-visible state changed, and
+  - explicit force-send still exists for init-time and other direct callers that intentionally need immediate broadcast.
+- Reconciled the runtime debug / host stub surface to match the current live-vs-shadow boundaries after the cutover:
+  - `tests/host/runtime_debug_test.c` now exercises live layer ownership and handled-key release cleanup through the correct surfaces,
+  - host-only split-sync stubs now provide `split_runtime_sync_request()` anywhere `split_runtime_sync()` was already stubbed, and
+  - `tests/host/split_runtime_sync_test.c` now covers deferred force-sync request behavior.
+- Verification completed after the mitigation:
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_split_runtime_sync_tests.sh`
+  - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+  - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_pd_mode_tests.sh`
+  - `sh tests/host/run_action_lifecycle_tests.sh`
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Next steps:
+  - validate on physical hardware that authored-behavior press no longer stalls the split main loop, and
+  - if any residual stall remains, capture whether it is still transport-bound or whether the next suspect is a specific authored action path rather than the generic handled-key path.
+
 ## 2026-04-20 Runtime V2 Slot-Step Build Surface Reduction Pass
 
 - Removed `users/noah/lib/key/runtime/slot/key_runtime_slot_step.c` from `users/noah/source_manifest.mk` because it is no longer a production dependency.
@@ -857,18 +894,63 @@
   - removed the pd-mode lock authoring alias from `users/noah/noah_keymap_ids.h` and switched the remaining repo-owned authored/test surfaces to explicit generated `*_LOCK` keycodes
   - regenerated `docs/KEYMAP-OVERVIEW.md` with `python3 tools/profile_introspect.py --write`, so the right-alt and dragscroll rows now match the current authored keymap
   - reconciled the stale arrow-lock note in `review/2026-04-14-review-18/userspace-architecture-review.md` so the active review folder no longer contradicts the current runtime path
-- Current full-suite status on `review-after-arrowmode`:
-  - `python3 tools/profile_introspect.py --check` passes
-  - `sh tests/host/run_real_profile_validation_tests.sh` passes
-  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh` passes
-  - `sh tests/host/run_feature_gate_compile_tests.sh` passes
-  - `sh tests/host/run_all_host_tests.sh` passes
-  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes
+- Runtime-v2 full cutover completion on `codex/authored-key-wedge-debug`:
+  - removed the remaining legacy key-runtime sources:
+    - `users/noah/lib/key/runtime/key_runtime_admission.c`
+    - `users/noah/lib/key/runtime/key_runtime_admission.h`
+    - `users/noah/lib/key/runtime/key_runtime_index.c`
+    - `users/noah/lib/key/runtime/key_runtime_index_internal.h`
+    - `users/noah/lib/key/runtime/key_runtime_internal.h`
+    - `users/noah/lib/key/runtime/key_runtime_shared_state.h`
+    - the deleted slot reducer/result subtree under `users/noah/lib/key/runtime/slot/`
+  - removed the matching legacy white-box host suites and runners:
+    - `tests/host/key_runtime_admission_test.c`
+    - `tests/host/key_runtime_feedback_test.c`
+    - `tests/host/key_runtime_index_test.c`
+    - `tests/host/key_runtime_preflight_test.c`
+    - `tests/host/key_runtime_slot_test.c`
+    - `tests/host/key_runtime_transition_test.c`
+    - `tests/host/run_key_runtime_admission_tests.sh`
+    - `tests/host/run_key_runtime_feedback_tests.sh`
+    - `tests/host/run_key_runtime_index_tests.sh`
+    - `tests/host/run_key_runtime_preflight_tests.sh`
+    - `tests/host/run_key_runtime_slot_tests.sh`
+    - `tests/host/run_key_runtime_transition_tests.sh`
+    - `tests/host/runtime_v2_observer_stub.c`
+  - moved the production runtime entirely onto reducer-owned press/release/scan/fallback-hold transport:
+    - `users/noah/lib/key/runtime/key_runtime_press.c`
+    - `users/noah/lib/key/runtime/key_runtime_release.c`
+    - `users/noah/lib/key/runtime/key_runtime_scan.c`
+    - `users/noah/lib/key/runtime/key_runtime_preflight.c`
+    - `users/noah/lib/key/runtime/key_runtime.c`
+    - `users/noah/lib/key/runtime/key_runtime_process.c`
+    - `users/noah/lib/key/runtime/key_runtime_transition.c`
+  - made `runtime_v2` the only runtime authority for blocker queries, release planning, tap-series lifetime, reducer-owned lease cleanup, and non-handled ownership release finalization
+  - rewrote runtime debug/feedback around v2-owned queries and projection snapshots
+  - updated the host manifest, compile gate, and runner inventory to the v2-only tree
+  - reconciled the active review/docs surfaces so they now describe the live v2-only runtime instead of the deleted slot/index design
+- Current verification status for the full cutover on `codex/authored-key-wedge-debug`:
+  - targeted suites passed during the cutover:
+    - `sh tests/host/run_runtime_debug_tests.sh`
+    - `sh tests/host/run_runtime_trace_tests.sh`
+    - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+    - `sh tests/host/run_key_runtime_scenario_tests.sh`
+    - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+    - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+    - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+    - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - closure-bar verification now passes on the v2-only tree:
+    - `sh tests/host/run_all_host_tests.sh`
+    - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - the active review/docs were updated in the same pass:
+    - `docs/KEY_RUNTIME.md`
+    - `review/2026-04-14-review-18/userspace-architecture-review.md`
+    - `review/2026-04-14-review-18/runtime-v2-preservation-matrix.md`
+    - `review/2026-04-14-review-18/authored-key-overlap-wedge-regression.md`
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
-1. Capture on-device trace snapshots for the original wedge repro families and replay them through the new v2 shadow path.
-2. Decide whether the harness adapter should be enabled for additional integration suites once the next reducer domains are stable enough to justify the extra link surface.
-3. Move the remaining non-release transport/orchestration seams onto the reducer path so v2 owns not just release decision, effect selection, effect projection, authoritative release transport, and flush/interrupt transport, but also press/scan transport and deferred-release queue assembly end-to-end.
-4. Capture and replay on-device traces for the original wedge repros now that blocker gating, pending multi-tap lifecycle, explicit flush/reset, and handled-release effect planning all have reducer-owned visibility.
+1. Keep replaying the original hardware wedge families against the v2-only runtime until the thread is ready for closure.
+2. Run closure verification for the active review thread once the full host suite and firmware build are green on this cutover pass.
+3. If on-device traces still expose a wedge, treat it as a v2 runtime bug now; do not reopen slot/index fallback infrastructure.

@@ -301,7 +301,7 @@ bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
     }
 
     if (result.split_sync_required) {
-        split_runtime_sync();
+        split_runtime_sync_request();
     }
 
     return result.local_state_changed;
@@ -318,7 +318,7 @@ bool pd_mode_handle_keycode_press(uint16_t keycode) {
     });
 
     if (result.split_sync_required) {
-        split_runtime_sync();
+        split_runtime_sync_request();
     }
 
     return result.handled;
@@ -331,7 +331,7 @@ bool pd_mode_handle_keycode_release(uint16_t keycode) {
     });
 
     if (result.split_sync_required) {
-        split_runtime_sync();
+        split_runtime_sync_request();
     }
 
     return result.handled;

@@ -8,12 +8,9 @@
 #include "users/noah/lib/key/interaction/handled_key.h"
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/ownership/held_repeat.h"
-#include "users/noah/lib/key/runtime/key_runtime_admission.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/key_runtime_feedback.h"
 #include "users/noah/lib/key/runtime/key_runtime_transition.h"
-#include "users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.h"
-#include "users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
 #include "users/noah/lib/runtime_v2/runtime_v2.h"
@@ -367,6 +364,10 @@ const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
     return NULL;
 }
 
+uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
+    return 0;
+}
+
 bool is_pd_mode_lock_action(uint16_t action) {
     return pd_mode_lock_action_lookup(action) != NULL;
 }
@@ -459,6 +460,10 @@ bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
 
 void split_runtime_sync(void) {
     split_runtime_sync_count++;
+}
+
+void split_runtime_sync_request(void) {
+    split_runtime_sync();
 }
 
 static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
@@ -840,26 +845,35 @@ static void test_runtime_v2_active_release_effect_plan_releases_layer_and_taps(v
 }
 
 static void test_runtime_v2_direct_active_release_helper_seeds_pending_multi_tap(void) {
-    runtime_v2_release_effect_plan_t plan;
-    active_key_state_t              *slot;
-    keypos_t                         key_pos = test_keypos(6, 6);
+    runtime_v2_effect_plan_t plan;
+    const press_token_t     *token;
+    const tap_series_t      *series;
+    keypos_t                 key_pos = test_keypos(6, 6);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
     test_stage_active_slot(TEST_PENDING_MULTI_TAP_KEY, key_pos);
-    slot = key_runtime_find_slot_by_position(key_pos);
-    CHECK(slot != NULL);
-    CHECK(slot->owner.keycode == TEST_PENDING_MULTI_TAP_KEY);
+    token = runtime_v2_press_token_at(key_pos);
+    CHECK(token != NULL);
+    CHECK(token->active);
+    CHECK(token->resolved_keycode == TEST_PENDING_MULTI_TAP_KEY);
 
     fake_time = (uint16_t)(fake_time + 20u);
     test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
-    CHECK(key_runtime_slot_take_v2_active_release_plan(slot, TEST_PENDING_MULTI_TAP_KEY, &plan));
+    CHECK(runtime_v2_handle_handled_key_release(TEST_PENDING_MULTI_TAP_KEY, key_pos, test_handled_key_resolution(TEST_PENDING_MULTI_TAP_KEY, 1u), (keyboard_mod_state_t){0}, &plan));
     CHECK(plan.count == 0u);
-    CHECK(plan.pending_multi_tap_seed.active);
-    CHECK(slot->owner.keycode == KC_NO);
-    CHECK(slot->pending_multi_tap.keycode == TEST_PENDING_MULTI_TAP_KEY);
-    CHECK(slot->pending_multi_tap.count == 1u);
+    series = runtime_v2_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->keycode == TEST_PENDING_MULTI_TAP_KEY);
+    CHECK(series->tap_count == 1u);
+    CHECK(!series->pending_hold);
+
+    token = runtime_v2_press_token_at(key_pos);
+    CHECK(token != NULL);
+    CHECK(!token->active);
+    CHECK(token->observed_release_keycode == KC_NO);
 }
 
 static void test_runtime_v2_pending_multi_tap_release_resolution_preserves_chain(void) {
@@ -940,9 +954,11 @@ static void test_runtime_v2_pending_multi_tap_release_effect_plan_delays_action(
 }
 
 static void test_runtime_v2_direct_pending_multi_tap_release_helper_resets_slot(void) {
-    runtime_v2_release_effect_plan_t plan;
-    active_key_state_t              *slot;
-    keypos_t                         key_pos = test_keypos(6, 7);
+    runtime_v2_pending_multi_tap_release_resolution_t resolution;
+    runtime_v2_release_effect_plan_t                  plan;
+    const press_token_t                              *token;
+    const tap_series_t                               *series;
+    keypos_t                                          key_pos = test_keypos(6, 7);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -953,19 +969,28 @@ static void test_runtime_v2_direct_pending_multi_tap_release_helper_resets_slot(
     fake_time = (uint16_t)(fake_time + 20u);
     CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, true));
 
-    slot = key_runtime_find_slot_by_position(key_pos);
-    CHECK(slot != NULL);
-    CHECK(slot->owner.keycode == TEST_PENDING_MULTI_TAP_KEY);
-    CHECK(slot->pending_multi_tap.pending_hold);
+    token = runtime_v2_press_token_at(key_pos);
+    series = runtime_v2_tap_series_at(key_pos);
+    CHECK(token != NULL);
+    CHECK(token->active);
+    CHECK(token->resolved_keycode == TEST_PENDING_MULTI_TAP_KEY);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->pending_hold);
 
     fake_time = (uint16_t)(fake_time + 120u);
     test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
-    CHECK(key_runtime_slot_take_v2_pending_multi_tap_release_plan(slot, TEST_PENDING_MULTI_TAP_KEY, timer_elapsed(slot->timer), &plan));
+    CHECK(runtime_v2_resolve_pending_multi_tap_release(key_pos, TEST_ACTION, 1u, true, &resolution));
+    CHECK(runtime_v2_plan_pending_multi_tap_release_effects(key_pos, false, &resolution, (delayed_action_mods_t){0}, &plan));
     CHECK(plan.count == 1u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
-    CHECK(slot->owner.keycode == KC_NO);
-    CHECK(slot->pending_multi_tap.keycode == KC_NO);
+    CHECK(!runtime_v2_has_pending_multi_tap_at(key_pos));
+
+    token = runtime_v2_press_token_at(key_pos);
+    CHECK(token != NULL);
+    CHECK(!token->active);
+    CHECK(token->observed_release_keycode == TEST_PENDING_MULTI_TAP_KEY);
 }
 
 static void test_runtime_v2_pending_multi_tap_scan_resolution_promotes_hold_threshold(void) {
@@ -1120,6 +1145,7 @@ static void test_runtime_v2_tap_series_state_stays_independent_from_active_token
     const press_token_t    *token;
     const tap_series_t     *series;
     projection_snapshot_t   snapshot;
+    runtime_v2_pending_multi_tap_scan_resolution_t resolution;
     runtime_event_t         advance = {
                 .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
                 .data.timer_advance =
@@ -1134,26 +1160,28 @@ static void test_runtime_v2_tap_series_state_stays_independent_from_active_token
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, key_pos, fake_time);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
     fake_time = (uint16_t)(fake_time + 10u);
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, key_pos, fake_time);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
 
     series = runtime_v2_tap_series_at(key_pos);
     CHECK(series != NULL);
     CHECK(series->active);
-    CHECK(series->keycode == KC_C);
+    CHECK(series->keycode == TEST_PENDING_MULTI_TAP_KEY);
     CHECK(series->tap_count == 1u);
     CHECK(!series->pending_hold);
 
     fake_time = (uint16_t)(fake_time + 20u);
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, key_pos, fake_time);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
     token = runtime_v2_press_token_at(key_pos);
     series = runtime_v2_tap_series_at(key_pos);
     CHECK(token != NULL);
     CHECK(token->active);
+    CHECK(token->interaction.selection.tap_count == 2u);
     CHECK(series != NULL);
     CHECK(series->active);
-    CHECK(!series->pending_hold);
+    CHECK(series->tap_count == 1u);
+    CHECK(series->pending_hold);
 
     runtime_v2_apply_event(&advance, fake_time);
     fake_time = (uint16_t)(fake_time + advance.data.timer_advance.advance_ms);
@@ -1164,13 +1192,33 @@ static void test_runtime_v2_tap_series_state_stays_independent_from_active_token
     CHECK(token->active);
     CHECK(token->phase == PRESS_TOKEN_PHASE_HELD);
 
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, key_pos, fake_time);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
 
     token = runtime_v2_press_token_at(key_pos);
     series = runtime_v2_tap_series_at(key_pos);
     CHECK(token != NULL);
     CHECK(!token->active);
     CHECK(token->phase == PRESS_TOKEN_PHASE_RELEASED);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->tap_count == 1u);
+    CHECK(!series->pending_hold);
+
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.v2_press_token_count == 0u);
+    CHECK(snapshot.v2_tap_series_count == 1u);
+
+    advance.data.timer_advance.advance_ms = 181u;
+    runtime_v2_apply_event(&advance, fake_time);
+    fake_time = (uint16_t)(fake_time + advance.data.timer_advance.advance_ms);
+    runtime_v2_apply_event(&scan, fake_time);
+
+    CHECK(runtime_v2_resolve_pending_multi_tap_scan(key_pos, &resolution));
+    CHECK(resolution.outcome == RUNTIME_V2_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH);
+    CHECK(resolution.action == TEST_ACTION);
+    CHECK(resolution.repeat_count == 1u);
+
+    series = runtime_v2_tap_series_at(key_pos);
     CHECK(series != NULL);
     CHECK(!series->active);
 
@@ -1193,20 +1241,20 @@ static void test_runtime_v2_layer_lock_observes_live_layer_ownership_state(void)
     CHECK(shadow->locked_layer_mask == ((layer_state_t)1u << 3));
     CHECK(shadow->layer_state == ((layer_state_t)1u << 3));
 
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, MO(2), key_pos, fake_time);
+    layer_ownership_momentary_press(key_pos, 2);
 
     shadow = runtime_v2_shadow_projection();
     CHECK(shadow->locked_layer_mask == ((layer_state_t)1u << 3));
-    CHECK(shadow->layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
+    CHECK(shadow->layer_state == ((layer_state_t)1u << 3));
 
     snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
     CHECK(snapshot.v2_shadow_locked_layer_mask == ((layer_state_t)1u << 3));
-    CHECK(snapshot.v2_shadow_layer_state == (((layer_state_t)1u << 2) | ((layer_state_t)1u << 3)));
-    CHECK(snapshot.v2_lease_count == 1u);
+    CHECK(snapshot.v2_shadow_layer_state == ((layer_state_t)1u << 3));
+    CHECK(snapshot.v2_lease_count == 0u);
     CHECK(snapshot.v2_persistent_intent_count == 1u);
 
-    fake_time = (uint16_t)(fake_time + 5u);
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, MO(2), key_pos, fake_time);
+    CHECK(layer_ownership_momentary_release(key_pos));
 
     shadow = runtime_v2_shadow_projection();
     CHECK(shadow->locked_layer_mask == ((layer_state_t)1u << 3));
@@ -1225,7 +1273,6 @@ static void test_runtime_v2_layer_lock_observes_live_layer_ownership_state(void)
 }
 
 static void test_runtime_v2_layer_tap_hold_creates_and_retires_layer_lease(void) {
-    const runtime_v2_shadow_projection_t *shadow;
     projection_snapshot_t                 snapshot;
     keypos_t                              key_pos = test_keypos(2, 4);
     runtime_event_t                       advance = {
@@ -1242,32 +1289,30 @@ static void test_runtime_v2_layer_tap_hold_creates_and_retires_layer_lease(void)
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, LT(2, KC_V), key_pos, fake_time);
-    shadow = runtime_v2_shadow_projection();
-    CHECK(shadow != NULL);
-    CHECK(shadow->layer_state == 0u);
+    CHECK(!test_process_record(LT(2, KC_V), key_pos, true));
+    snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.layer_state == ((layer_state_t)1u << 2));
+    CHECK(snapshot.v2_shadow_layer_state == 0u);
+    CHECK(snapshot.v2_lease_count == 0u);
 
     runtime_v2_apply_event(&advance, fake_time);
     fake_time = (uint16_t)(fake_time + advance.data.timer_advance.advance_ms);
     runtime_v2_apply_event(&scan, fake_time);
 
-    shadow = runtime_v2_shadow_projection();
-    CHECK(shadow->layer_state == ((layer_state_t)1u << 2));
     snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.layer_state == ((layer_state_t)1u << 2));
     CHECK(snapshot.v2_shadow_layer_state == ((layer_state_t)1u << 2));
     CHECK(snapshot.v2_lease_count == 1u);
 
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, LT(2, KC_V), key_pos, fake_time);
-    shadow = runtime_v2_shadow_projection();
-    CHECK(shadow->layer_state == 0u);
+    CHECK(!test_process_record(LT(2, KC_V), key_pos, false));
     snapshot = runtime_v2_projection_snapshot_capture();
+    CHECK(snapshot.layer_state == 0u);
     CHECK(snapshot.v2_shadow_layer_state == 0u);
     CHECK(snapshot.v2_lease_count == 0u);
 }
 
 static void test_runtime_v2_modifier_leases_keep_physical_and_managed_masks_separate(void) {
     const runtime_v2_shadow_projection_t *shadow;
-    projection_snapshot_t                 snapshot;
     keypos_t                              physical_pos = test_keypos(3, 3);
     keypos_t                              mod_tap_pos  = test_keypos(3, 4);
     runtime_event_t                       advance = {
@@ -1284,17 +1329,17 @@ static void test_runtime_v2_modifier_leases_keep_physical_and_managed_masks_sepa
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_LEFT_SHIFT, physical_pos, fake_time);
+    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_RIGHT_SHIFT, physical_pos, fake_time);
     shadow = runtime_v2_shadow_projection();
     CHECK(shadow != NULL);
-    CHECK(shadow->keyboard_mod_state.real == MOD_BIT(KC_LEFT_SHIFT));
-    CHECK(shadow->keyboard_physical_mod_mask == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(shadow->keyboard_mod_state.real == MOD_BIT(KC_RIGHT_SHIFT));
+    CHECK(shadow->keyboard_physical_mod_mask == MOD_BIT(KC_RIGHT_SHIFT));
     CHECK(shadow->keyboard_managed_mod_mask == 0u);
 
     test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, MT(MOD_LALT, KC_C), mod_tap_pos, fake_time);
     shadow = runtime_v2_shadow_projection();
-    CHECK(shadow->keyboard_mod_state.real == MOD_BIT(KC_LEFT_SHIFT));
-    CHECK(shadow->keyboard_physical_mod_mask == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(shadow->keyboard_mod_state.real == MOD_BIT(KC_RIGHT_SHIFT));
+    CHECK(shadow->keyboard_physical_mod_mask == MOD_BIT(KC_RIGHT_SHIFT));
     CHECK(shadow->keyboard_managed_mod_mask == 0u);
 
     runtime_v2_apply_event(&advance, fake_time);
@@ -1302,27 +1347,9 @@ static void test_runtime_v2_modifier_leases_keep_physical_and_managed_masks_sepa
     runtime_v2_apply_event(&scan, fake_time);
 
     shadow = runtime_v2_shadow_projection();
-    CHECK(shadow->keyboard_mod_state.real == (uint8_t)(MOD_BIT(KC_LEFT_SHIFT) | MOD_LALT));
-    CHECK(shadow->keyboard_physical_mod_mask == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(shadow->keyboard_mod_state.real == (uint8_t)(MOD_BIT(KC_RIGHT_SHIFT) | MOD_LALT));
+    CHECK(shadow->keyboard_physical_mod_mask == MOD_BIT(KC_RIGHT_SHIFT));
     CHECK(shadow->keyboard_managed_mod_mask == MOD_LALT);
-
-    fake_time = (uint16_t)(fake_time + 5u);
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_LEFT_SHIFT, physical_pos, fake_time);
-    shadow = runtime_v2_shadow_projection();
-    CHECK(shadow->keyboard_mod_state.real == MOD_LALT);
-    CHECK(shadow->keyboard_physical_mod_mask == 0u);
-    CHECK(shadow->keyboard_managed_mod_mask == MOD_LALT);
-
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, MT(MOD_LALT, KC_C), mod_tap_pos, fake_time);
-    shadow = runtime_v2_shadow_projection();
-    CHECK(shadow->keyboard_mod_state.real == 0u);
-    CHECK(shadow->keyboard_physical_mod_mask == 0u);
-    CHECK(shadow->keyboard_managed_mod_mask == 0u);
-
-    snapshot = runtime_v2_projection_snapshot_capture();
-    CHECK(snapshot.v2_shadow_keyboard_mod_state.real == 0u);
-    CHECK(snapshot.v2_shadow_keyboard_physical_mod_mask == 0u);
-    CHECK(snapshot.v2_shadow_keyboard_managed_mod_mask == 0u);
 }
 
 static void test_runtime_v2_replacing_a_live_token_cleans_up_owned_leases(void) {
@@ -1374,7 +1401,7 @@ static void test_runtime_v2_pd_mode_press_creates_active_mode_and_pointer_anchor
     CHECK(snapshot.v2_lease_count == 2u);
 
     fake_time = (uint16_t)(fake_time + 10u);
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, VOLUME_MODE, key_pos, fake_time);
+    CHECK(!test_process_record(VOLUME_MODE, key_pos, false));
     shadow = runtime_v2_shadow_projection();
     CHECK(shadow->pd_mode_local_active == 0);
     CHECK(!shadow->pointer_anchor_active);
@@ -1473,7 +1500,7 @@ static void test_runtime_v2_activating_new_pd_mode_clears_foreign_mode_leases(vo
     CHECK(snapshot.v2_lease_count == 1u);
 
     fake_time = (uint16_t)(fake_time + 5u);
-    test_runtime_v2_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, VOLUME_MODE, volume_pos, fake_time);
+    CHECK(!test_process_record(VOLUME_MODE, volume_pos, false));
     shadow = runtime_v2_shadow_projection();
     CHECK(shadow->pd_mode_local_active == PD_MODE_ARROW);
     CHECK(shadow->pointer_prefers_typing_layer);
@@ -1515,7 +1542,7 @@ static void test_runtime_v2_production_hooks_feed_blocker_queries(void) {
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    CHECK(!runtime_v2_blocker_queries_authoritative());
+    CHECK(runtime_v2_blocker_queries_authoritative());
     CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, true));
     CHECK(runtime_v2_blocker_queries_authoritative());
     CHECK(runtime_v2_has_any_deferred_release_blocker());
