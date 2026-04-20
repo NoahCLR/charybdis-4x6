@@ -79,6 +79,19 @@ One practical consequence is that a single tap on a multi-tap key is delayed by
 one multi-tap window so the firmware can tell whether you meant one tap or
 more.
 
+Those pending multi-tap windows are tracked per physical key. Pressing a
+different key does not flush an unrelated pending tap series by itself, so
+independent keys can keep separate tap counts and timing windows alive at the
+same time.
+
+Behavior change note: this per-key pending-series retention became the intended
+contract on `2026-04-20`. Older runtime policy flushed an unrelated pending
+multi-tap series as soon as a different key was pressed. If independent
+simultaneous tap sequences stop working again, treat that as a regression
+against this document and re-run
+`sh tests/host/run_key_runtime_scenario_tests.sh` plus
+`sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`.
+
 One important nuance: inside `key_behaviors[]`, an omitted `.tap_hold_term`
 inherits `TAPPING_TERM` for `LT()` rows, but `CUSTOM_TAP_HOLD_TERM` for other
 custom rows.

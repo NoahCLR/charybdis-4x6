@@ -429,8 +429,8 @@ This is the actual control path for pd modes:
 1. [`users/noah/lib/key/runtime/process.c`](../users/noah/lib/key/runtime/process.c) orchestrates custom key events.
    Press and release wrappers live in [`press.c`](../users/noah/lib/key/runtime/press.c) and
    [`release.c`](../users/noah/lib/key/runtime/release.c), but the shared transition planning now lives in
-   [`transition.c`](../users/noah/lib/key/runtime/transition.c). Preflight checks such as multi-tap flush and
-   layer-interrupt flagging live in [`preflight.c`](../users/noah/lib/key/runtime/preflight.c).
+   [`transition.c`](../users/noah/lib/key/runtime/transition.c). Preflight checks such as active-key interruption,
+   pending-series retention, and layer-interrupt flagging live in [`preflight.c`](../users/noah/lib/key/runtime/preflight.c).
 2. [`users/noah/lib/key/ownership/held_action.c`](../users/noah/lib/key/ownership/held_action.c) manages per-key held-action ownership.
    Held pd-mode keycodes flow through [`users/noah/lib/action/action_lifecycle.c`](../users/noah/lib/action/action_lifecycle.c),
    which routes them to `pd_mode_handle_keycode_press()` and

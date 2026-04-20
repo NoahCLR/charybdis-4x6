@@ -24,11 +24,14 @@
 
 layer_state_t layer_state = 0;
 
+#define TEST_DELAYED_ACTION_LOG_CAPACITY 8u
+
 static uint16_t fake_time;
 static uint16_t test_tap_code16_count;
 static uint16_t test_last_tap_code16;
 static uint16_t test_delayed_action_count;
 static uint16_t test_last_delayed_action;
+static uint16_t test_delayed_actions[TEST_DELAYED_ACTION_LOG_CAPACITY];
 static uint16_t test_pressed_keycodes[MATRIX_ROWS][MATRIX_COLS];
 static uint16_t current_cpi;
 static uint8_t  fake_mods;
@@ -284,6 +287,7 @@ static void test_reset_state(void) {
     test_last_tap_code16       = KC_NO;
     test_delayed_action_count  = 0;
     test_last_delayed_action   = KC_NO;
+    memset(test_delayed_actions, 0, sizeof(test_delayed_actions));
     current_cpi                = 0;
     fake_mods                  = 0;
     fake_weak_mods             = 0;
@@ -898,6 +902,9 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     test_delayed_action_count++;
     test_last_delayed_action = action;
+    if (test_delayed_action_count <= ARRAY_SIZE(test_delayed_actions)) {
+        test_delayed_actions[test_delayed_action_count - 1u] = action;
+    }
     (void)mods;
 }
 
@@ -1038,6 +1045,31 @@ static void test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_
     test_run_double_tap_hold_cycle_with_intermediate_scan(key_pos, 120, 281);
     CHECK(!test_layer_locked(LAYER_NUM));
     CHECK(!test_layer_active(LAYER_NUM));
+}
+
+static void test_left_and_right_thumb_single_taps_keep_independent_pending_chains(void) {
+    keypos_t left_thumb_pos  = test_left_thumb_pos();
+    keypos_t right_thumb_pos = test_right_thumb_pos();
+
+    test_reset_state();
+
+    test_run_quick_tap(left_thumb_pos);
+    test_advance_thumb_multi_tap_gap();
+    test_run_quick_tap(right_thumb_pos);
+
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 2);
+    CHECK(noah_runtime_debug_slot_has_pending_multi_tap(left_thumb_pos));
+    CHECK(noah_runtime_debug_slot_has_pending_multi_tap(right_thumb_pos));
+    CHECK(test_delayed_action_count == 0);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+    key_runtime_integration_scan();
+
+    CHECK(test_delayed_action_count == 2);
+    CHECK(test_delayed_actions[0] == LOCK_LAYER(LAYER_SYM));
+    CHECK(test_delayed_actions[1] == LOCK_LAYER(LAYER_NAV));
+    test_assert_thumb_runtime_quiescent(left_thumb_pos);
+    test_assert_thumb_runtime_quiescent(right_thumb_pos);
 }
 
 static void test_right_thumb_triple_tap_flushes_next_track_after_timeout(void) {
@@ -2156,6 +2188,7 @@ int main(void) {
     test_left_thumb_double_tap_hold_toggles_num_layer();
     test_right_thumb_double_tap_hold_toggles_num_layer();
     test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle();
+    test_left_and_right_thumb_single_taps_keep_independent_pending_chains();
     test_right_thumb_triple_tap_flushes_next_track_after_timeout();
     test_right_thumb_triple_tap_long_hold_registers_next_track_hold();
     test_right_thumb_quadruple_tap_dispatches_previous_track();

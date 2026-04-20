@@ -64,7 +64,7 @@ layer," not "old runtime plus new runtime running side by side."
 | [`interaction.h`](../users/noah/lib/key/runtime/interaction.h) | Shared interaction contract used by the reducer and release resolver. |
 | [`core/runtime.h`](../users/noah/lib/key/runtime/core/runtime.h), [`core/runtime.c`](../users/noah/lib/key/runtime/core/runtime.c), [`core/projection.h`](../users/noah/lib/key/runtime/core/projection.h) | Single-authority runtime state, reducer entry points, release planning, pending multi-tap state, leases, persistent intents, pending release transport, and projection/debug capture. |
 | [`process.c`](../users/noah/lib/key/runtime/process.c) | `process_record_user()` entry flow, preflight ordering, release-keycode recovery, and non-handled release finalization. |
-| [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption and foreign pending-multi-tap flush before the current press proceeds. |
+| [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption and default-suppression work before the current press proceeds, while unrelated pending multi-tap chains stay position-owned until timeout or same-key reuse. |
 | [`press.c`](../users/noah/lib/key/runtime/press.c), [`release.c`](../users/noah/lib/key/runtime/release.c), [`scan.c`](../users/noah/lib/key/runtime/scan.c) | Thin press/release/scan orchestration around reducer-owned effect plans. |
 | [`transition.c`](../users/noah/lib/key/runtime/transition.c), [`transition.h`](../users/noah/lib/key/runtime/transition.h) | Effect-plan transport and execution seam. This is the last shared transport layer between reducer decisions and concrete effect projection. |
 | [`slot/release_resolver.h`](../users/noah/lib/key/runtime/slot/release_resolver.h) | Shared stateless release decision contract reused by the core release adapters. |
@@ -110,7 +110,16 @@ does the cross-key work that must happen before the current press resolves:
 
 - suppress default modifier handling when ownership requires it
 - interrupt other active handled keys on foreign press
-- flush foreign pending multi-tap chains before a different key continues
+- leave unrelated pending multi-tap chains live until their own timeout or
+  same-key continuation resolves them
+
+Behavior change note: the preflight path changed on `2026-04-20`. Before that
+change, a foreign press explicitly flushed unrelated pending multi-tap chains.
+The current runtime intentionally keeps those chains position-owned until they
+resolve themselves. If that behavior changes later, treat it as a regression
+unless the tests and docs are updated together; the locking checks are
+`sh tests/host/run_key_runtime_scenario_tests.sh` and
+`sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`.
 
 ### 3. Press routing
 
@@ -123,7 +132,7 @@ The reducer owns:
 - press-token creation and replacement
 - same-key multi-tap reuse
 - foreign active-key interruption
-- foreign pending-multi-tap flush
+- independent pending-multi-tap retention across foreign presses
 - press-time lease activation
 
 ### 4. Release routing

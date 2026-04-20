@@ -20,6 +20,9 @@ enum {
     TEST_HOLD_ACTION_TWO   = SAFE_RANGE + 0x77,
     TEST_HOLD_ACTION_THREE = SAFE_RANGE + 0x78,
     TEST_PD_MODE_KEY       = SAFE_RANGE + 0x79,
+    TEST_MULTI_TAP_KEY_TWO = SAFE_RANGE + 0x7A,
+    TEST_TAP_ACTION_TWO    = SAFE_RANGE + 0x7B,
+    TEST_ALT_ACTION_TWO    = SAFE_RANGE + 0x7C,
     TEST_NUM_LAYER         = 1,
     TEST_OTHER_LAYER       = 2,
 };
@@ -67,6 +70,24 @@ static void test_configure_multi_tap_key(void) {
 
     behavior.has_multi_tap = true;
     behavior.single.tap    = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
+    key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
+}
+
+static void test_configure_multi_tap_key_two(void) {
+    static const key_runtime_scenario_multi_tap_entry_t entries[] = {
+        {
+            .tap_count = 2,
+            .step =
+                {
+                    .tap = TAP_SENDS(TEST_ALT_ACTION_TWO),
+                },
+        },
+    };
+
+    key_behavior_view_t behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY_TWO);
+
+    behavior.has_multi_tap = true;
+    behavior.single.tap    = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION_TWO);
     key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
 }
 
@@ -222,13 +243,17 @@ static void test_threshold_hold_registers_and_releases_owned_state(void) {
     CHECK(key_runtime_scenario_effect_at(1)->data.key_pos.col == 3);
 }
 
-static void test_press_on_other_handled_position_flushes_foreign_pending_multi_tap(void) {
+static void test_press_on_other_handled_position_keeps_foreign_pending_multi_tap_until_timeout(void) {
     static const key_runtime_scenario_step_t setup[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 1, 1),
     };
     static const key_runtime_scenario_step_t overlap_press[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 1, 3),
+    };
+    static const key_runtime_scenario_step_t timeout_and_scan[] = {
+        KEY_RUNTIME_SCENARIO_ADVANCE(121),
+        KEY_RUNTIME_SCENARIO_SCAN(),
     };
 
     key_runtime_scenario_reset();
@@ -237,6 +262,13 @@ static void test_press_on_other_handled_position_flushes_foreign_pending_multi_t
     key_runtime_scenario_run(setup, ARRAY_SIZE(setup));
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(overlap_press, ARRAY_SIZE(overlap_press));
+
+    CHECK(key_runtime_scenario_effect_count() == 0);
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 3)) == TEST_HOLD_KEY_TWO);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(timeout_and_scan, ARRAY_SIZE(timeout_and_scan));
 
     CHECK(key_runtime_scenario_effect_count() == 1);
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
@@ -275,6 +307,39 @@ static void test_other_press_does_not_flush_active_same_key_multi_tap_chain(void
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == TEST_MULTI_TAP_KEY);
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 3)) == TEST_HOLD_KEY_TWO);
     CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+}
+
+static void test_independent_pending_multi_tap_chains_can_coexist_and_flush_independently(void) {
+    static const key_runtime_scenario_step_t setup[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY_TWO, 1, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY_TWO, 1, 3),
+    };
+    static const key_runtime_scenario_step_t timeout_and_scan[] = {
+        KEY_RUNTIME_SCENARIO_ADVANCE(121),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_multi_tap_key();
+    test_configure_multi_tap_key_two();
+    key_runtime_scenario_run(setup, ARRAY_SIZE(setup));
+
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 2);
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 3)));
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(timeout_and_scan, ARRAY_SIZE(timeout_and_scan));
+
+    CHECK(key_runtime_scenario_effect_count() == 2);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_TAP_ACTION);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(key_runtime_scenario_effect_at(1)->data.delayed_action.action == TEST_TAP_ACTION_TWO);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
 }
 
 static void test_interrupt_other_press_activates_fallback_hold(void) {
@@ -502,8 +567,9 @@ int main(void) {
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();
-    test_press_on_other_handled_position_flushes_foreign_pending_multi_tap();
+    test_press_on_other_handled_position_keeps_foreign_pending_multi_tap_until_timeout();
     test_other_press_does_not_flush_active_same_key_multi_tap_chain();
+    test_independent_pending_multi_tap_chains_can_coexist_and_flush_independently();
     test_interrupt_other_press_activates_fallback_hold();
     test_interrupted_layer_tap_with_intermediate_scan_releases_without_tap();
     test_immediate_hold_promotes_long_hold_after_registration();

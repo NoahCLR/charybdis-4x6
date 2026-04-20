@@ -49,7 +49,10 @@ to understand and easy to change:
   locks, supported QMK behavior keycodes like `OSM()` or `MT()`, owned
   momentary layer holds such as `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))`,
   repeat holds such as `REPEAT_WHILE_HELD(KC_LEFT, 100)`, or keymap-local
-  custom keycodes
+  custom keycodes. Pending multi-tap windows are tracked per physical key, so
+  unrelated keys can keep independent tap sequences alive at the same time.
+  This changed on `2026-04-20`: older runtime policy flushed an unrelated
+  pending tap series as soon as a different key was pressed
 - pointer modes are a core part of what makes this userspace different: the
   trackball can become dragscroll, pinch, zoom, arrows, volume, or brightness,
   with plain mode keycodes working as default momentary holds and

@@ -1,5 +1,46 @@
 # Progress
 
+## 2026-04-20 Concurrent Pending Multi-Tap Windows
+
+- Relaxed the handled-key preflight policy so unrelated pending multi-tap
+  chains no longer get flushed just because a different key started its own
+  press.
+- Kept the existing active-key overlap rules in place:
+  - foreign presses still interrupt live active keys,
+  - momentary-layer quick taps are still canceled by active-key interruption,
+    and
+  - deferred release blockers still serialize authored release dispatch when
+    a live active tap-release sibling is present.
+- Added focused regression coverage for the new contract:
+  - `tests/host/key_runtime_scenario_test.c` now proves a foreign press keeps a
+    pending multi-tap chain alive until its own timeout, and that two
+    independent pending chains can coexist and flush separately.
+  - `tests/host/real_profile_thumb_layer_lock_integration_test.c` now proves
+    left and right thumb single taps can keep independent pending chains alive
+    at the same time and flush their own delayed actions independently.
+- Updated the runtime and interaction docs to match the new behavior:
+  - `README.md`
+  - `docs/INTERACTION_MODEL.md`
+  - `docs/KEY_RUNTIME.md`
+  - `docs/ADDING_PD_MODE.md`
+  - `review/2026-04-14-review-18/runtime-v2-preservation-matrix.md`
+  - `review/2026-04-14-review-18/userspace-architecture-review.md`
+- Verification completed for this policy change:
+  - `sh tests/host/run_key_runtime_scenario_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Next steps:
+  - decide separately whether active-key interruption should also become more
+    permissive for some authored families, because this pass only removed the
+    global foreign pending-chain flush, and
+  - if that broader relaxation is desired, add new focused overlap tests first
+    so the repo distinguishes “independent pending chains” from “active
+    momentary-layer or immediate-hold overlap rules.”
+
 ## 2026-04-20 Key Runtime Core Symbol Cleanup
 
 - Renamed the reducer-owned symbol family from migration-history names to

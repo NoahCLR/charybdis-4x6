@@ -92,6 +92,10 @@ Scope: `users/noah/` runtime ownership, key-runtime architecture, host/build enf
 - The original wedge repro families are no longer only “believed fixed”.
   The current integration suites exercise those overlap families directly and
   assert runtime quiescence after release.
+- Pending multi-tap lifetime is now position-owned even across unrelated
+  foreign presses. The overlap policy remains conservative for active-key
+  interruption and release blockers, but pending tap-series state is no longer
+  globally collapsed just because another key started its own tap window.
 - The build/test surface matches the current architecture. The source manifest,
   compile gate, authored-profile validation, runtime-debug suite, integration
   suites, full host suite, and firmware build all target the current
