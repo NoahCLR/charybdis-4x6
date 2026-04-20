@@ -393,5 +393,7 @@ simply personal shortcuts rather than standard macOS conventions.
 - [INTERACTION_MODEL.md](./INTERACTION_MODEL.md): shared interaction semantics
 - [POINTER_MODES.md](./POINTER_MODES.md): raw pointing-device behavior after a
   mode is active
-- [VIA_TO_QMK.md](./VIA_TO_QMK.md): VIA export round-trip workflow for the
-  current keymap source
+- [tooling/VIA_TO_QMK.md](./tooling/VIA_TO_QMK.md): VIA export round-trip
+  workflow for the current keymap source
+- [tooling/PROFILE_INTROSPECT.md](./tooling/PROFILE_INTROSPECT.md): generated
+  profile report and asset workflow for the current authored profile

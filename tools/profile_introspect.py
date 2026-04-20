@@ -24,17 +24,18 @@ PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "def
 
 DOCS_DIR = REPO_ROOT / "docs"
 MEDIA_DIR = DOCS_DIR / "media"
-LEGACY_OUTPUT_DIR = DOCS_DIR / "generated"
 MARKDOWN_OUTPUT = DOCS_DIR / "KEYMAP-OVERVIEW.md"
 ASSET_OUTPUT_DIR = MEDIA_DIR / "profile-introspection"
-LEGACY_MARKDOWN_OUTPUT = LEGACY_OUTPUT_DIR / "KEYMAP-OVERVIEW.md"
-LEGACY_ASSET_OUTPUT_DIR = LEGACY_OUTPUT_DIR / "profile-introspection-assets"
+RETIRED_OUTPUT_DIRS = [
+    MEDIA_DIR / "generated",
+    DOCS_DIR / "generated",
+]
+RETIRED_MARKDOWN_OUTPUTS = [output_dir / "KEYMAP-OVERVIEW.md" for output_dir in RETIRED_OUTPUT_DIRS]
+RETIRED_ASSET_OUTPUT_DIRS = [output_dir / "profile-introspection-assets" for output_dir in RETIRED_OUTPUT_DIRS]
 LAYER_IMAGE_PREFIX = "profile-layer-"
 COLOR_SWATCH_PREFIX = "profile-color-swatch-"
-LEGACY_JSON_OUTPUTS = [
-    LEGACY_OUTPUT_DIR / "profile-summary.json",
-    LEGACY_ASSET_OUTPUT_DIR / "profile-summary.json",
-]
+RETIRED_JSON_OUTPUTS = [output_dir / "profile-summary.json" for output_dir in RETIRED_OUTPUT_DIRS]
+RETIRED_JSON_OUTPUTS.extend(asset_dir / "profile-summary.json" for asset_dir in RETIRED_ASSET_OUTPUT_DIRS)
 
 MARKDOWN_HEADER = "<!-- Generated file. Do not edit by hand. -->\n"
 
@@ -2072,11 +2073,14 @@ def render_generated_assets_section() -> str:
 
 def managed_generated_artifact_paths(assets: dict[Path, str]) -> set[Path]:
     managed_paths = set(assets)
-    managed_paths.update(LEGACY_JSON_OUTPUTS)
-    managed_paths.add(LEGACY_MARKDOWN_OUTPUT)
+    managed_paths.update(RETIRED_JSON_OUTPUTS)
+    managed_paths.update(RETIRED_MARKDOWN_OUTPUTS)
 
-    for path in LEGACY_OUTPUT_DIR.glob(f"{LAYER_IMAGE_PREFIX}*.svg"):
-        managed_paths.add(path)
+    for retired_output_dir in RETIRED_OUTPUT_DIRS:
+        for path in retired_output_dir.glob(f"{LAYER_IMAGE_PREFIX}*.svg"):
+            managed_paths.add(path)
+        for path in retired_output_dir.glob(f"{COLOR_SWATCH_PREFIX}*.svg"):
+            managed_paths.add(path)
 
     for path in ASSET_OUTPUT_DIR.glob(f"{LAYER_IMAGE_PREFIX}*.svg"):
         managed_paths.add(path)
@@ -2084,11 +2088,11 @@ def managed_generated_artifact_paths(assets: dict[Path, str]) -> set[Path]:
     for path in ASSET_OUTPUT_DIR.glob(f"{COLOR_SWATCH_PREFIX}*.svg"):
         managed_paths.add(path)
 
-    for path in LEGACY_ASSET_OUTPUT_DIR.glob(f"{LAYER_IMAGE_PREFIX}*.svg"):
-        managed_paths.add(path)
-
-    for path in LEGACY_ASSET_OUTPUT_DIR.glob(f"{COLOR_SWATCH_PREFIX}*.svg"):
-        managed_paths.add(path)
+    for retired_asset_dir in RETIRED_ASSET_OUTPUT_DIRS:
+        for path in retired_asset_dir.glob(f"{LAYER_IMAGE_PREFIX}*.svg"):
+            managed_paths.add(path)
+        for path in retired_asset_dir.glob(f"{COLOR_SWATCH_PREFIX}*.svg"):
+            managed_paths.add(path)
 
     return managed_paths
 
@@ -2096,6 +2100,14 @@ def managed_generated_artifact_paths(assets: dict[Path, str]) -> set[Path]:
 def stale_generated_paths(assets: dict[Path, str]) -> list[Path]:
     expected_paths = set(assets)
     return sorted(path for path in managed_generated_artifact_paths(assets) if path.exists() and path not in expected_paths)
+
+
+def stale_generated_directories() -> list[Path]:
+    stale_dirs: list[Path] = []
+    for path in sorted(RETIRED_ASSET_OUTPUT_DIRS + RETIRED_OUTPUT_DIRS, key=lambda directory: len(directory.parts), reverse=True):
+        if path.exists() and path.is_dir() and not any(path.iterdir()):
+            stale_dirs.append(path)
+    return stale_dirs
 
 
 def write_outputs(assets: dict[Path, str]) -> None:
@@ -2107,6 +2119,13 @@ def write_outputs(assets: dict[Path, str]) -> None:
 
     for stale_path in stale_generated_paths(assets):
         stale_path.unlink()
+
+    while True:
+        stale_dirs = stale_generated_directories()
+        if not stale_dirs:
+            break
+        for stale_dir in stale_dirs:
+            stale_dir.rmdir()
 
 
 def check_outputs(assets: dict[Path, str]) -> int:
@@ -2130,6 +2149,9 @@ def check_outputs(assets: dict[Path, str]) -> int:
 
     for stale_path in stale_generated_paths(assets):
         failures.append(f"stale generated file should be removed: {stale_path}")
+
+    for stale_dir in stale_generated_directories():
+        failures.append(f"stale generated directory should be removed: {stale_dir}")
 
     if failures:
         for failure in failures:

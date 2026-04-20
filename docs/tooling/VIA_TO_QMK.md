@@ -1,11 +1,11 @@
 # VIA To QMK Workflow
 
 This doc explains the VIA bridge script in
-[`via layouts/via_to_qmk_layout.py`](<../via layouts/via_to_qmk_layout.py>).
+[`tools/via_to_qmk_layout.py`](../../tools/via_to_qmk_layout.py).
 
 Use it when you want to experiment in VIA, export the result, and then bring
 the VIA-owned parts of the layout back into the source-controlled
-[`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+[`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 
 ## What The Script Does
 
@@ -15,7 +15,7 @@ The script reads a VIA export JSON and renders:
 - `keymaps[][]`
 
 In `--write` mode, it can rewrite either or both of those sections in
-[`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+[`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 
 It does not rewrite:
 
@@ -47,31 +47,31 @@ Run from the repo root with Python 3.
 Preview generated output:
 
 ```sh
-python3 'via layouts/via_to_qmk_layout.py' --print
+python3 tools/via_to_qmk_layout.py --print
 ```
 
 Preview a specific export:
 
 ```sh
-python3 'via layouts/via_to_qmk_layout.py' --print --via-json /path/to/export.json
+python3 tools/via_to_qmk_layout.py --print --via-json /path/to/export.json
 ```
 
 Run the default interactive write flow:
 
 ```sh
-python3 'via layouts/via_to_qmk_layout.py'
+python3 tools/via_to_qmk_layout.py
 ```
 
 Write back into `keymap.c`:
 
 ```sh
-python3 'via layouts/via_to_qmk_layout.py' --write
+python3 tools/via_to_qmk_layout.py --write
 ```
 
 Write from a specific export:
 
 ```sh
-python3 'via layouts/via_to_qmk_layout.py' --write --via-json /path/to/export.json
+python3 tools/via_to_qmk_layout.py --write --via-json /path/to/export.json
 ```
 
 When you use `--write`, the script asks two separate questions:
@@ -84,7 +84,7 @@ So you can sync macros only, layers only, or both.
 ## If You Omit `--via-json`
 
 If you do not pass `--via-json`, the script uses the only JSON export in
-`via layouts/` automatically when there is just one. If there are multiple
+`tools/` automatically when there is just one. If there are multiple
 exports, it interactively asks you to choose one.
 
 ## Token Mapping
@@ -99,9 +99,9 @@ Important cases:
   `S_D_RMOD`
 - `CUSTOM(64 + n)` maps into this userspace custom-keycode range
 - shared pd-mode keycodes are loaded from
-  [`pd_mode_manifest.h`](../users/noah/lib/pointing/defs/pd_mode_manifest.h)
+  [`pd_mode_manifest.h`](../../users/noah/lib/pointing/defs/pd_mode_manifest.h)
 - keymap-local custom keycodes are loaded from
-  [`enum keymap_custom_keycodes`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
+  [`enum keymap_custom_keycodes`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - layer wrappers such as `MO(3)` or `LT(3,KC_F)` are rewritten back to the
   named layer enum symbols from this keymap
 
@@ -115,7 +115,7 @@ If you run the script in `--write` mode and confirm a rewrite, the selected VIA
 export becomes authoritative for the rewritten section.
 
 If you do not run the script, the firmware builds exactly from what is already
-authored in [`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+authored in [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 
 ## What To Check After A Rewrite
 
@@ -153,3 +153,9 @@ defaults in source.
 - changing hardcoded firmware macros
 
 Those still belong in the normal source files and docs.
+
+## Related Docs
+
+- [PROFILE_INTROSPECT.md](./PROFILE_INTROSPECT.md): generated profile report
+  and SVG asset workflow
+- [KEYMAP.md](../KEYMAP.md): current authored profile choices and layer intent

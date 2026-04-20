@@ -74,10 +74,6 @@ to understand and easy to change:
 - `split_runtime_sync` syncs active and locked pointing-device mode ids,
   auto-mouse progress, key-feedback flags, and preview-layer state from master
   to slave so both halves render consistently
-- RP2040 builds also carry a master-side runtime freeze diagnostic: the
-  watchdog is only petted from housekeeping, the current outer runtime stage is
-  mirrored into watchdog scratch, and RGB can show the latched reboot stage on
-  the next boot
 
 The README is intentionally capability-focused. It explains what the shared
 runtime supports and how the pieces fit together. If you want one concrete
@@ -90,14 +86,14 @@ If you want the maintainer-facing runtime map for the handled-key engine,
 start with [`docs/KEY_RUNTIME.md`](./docs/KEY_RUNTIME.md).
 
 There is also a small VIA bridge in
-[`via layouts/via_to_qmk_layout.py`](<./via layouts/via_to_qmk_layout.py>).
+[`tools/via_to_qmk_layout.py`](./tools/via_to_qmk_layout.py).
 If you want the browser config UI, start with [VIA](https://usevia.app/).
 That script is useful when you want to experiment quickly in VIA without
 giving up a readable, source-controlled
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c): it
 converts VIA exports back into the authored tables this repo uses.
 For the full round-trip workflow, see
-[`docs/VIA_TO_QMK.md`](./docs/VIA_TO_QMK.md).
+[`docs/tooling/VIA_TO_QMK.md`](./docs/tooling/VIA_TO_QMK.md).
 
 There is also an authored-profile introspector in
 [`tools/profile_introspect.py`](./tools/profile_introspect.py). It reads the
@@ -123,13 +119,13 @@ generates:
 
 Practical usage:
 
-- `python3 'via layouts/via_to_qmk_layout.py' --print` previews rewritten
+- `python3 tools/via_to_qmk_layout.py --print` previews rewritten
   `VIA_MACROS(MACRO)` and `keymaps[][]`
-- `python3 'via layouts/via_to_qmk_layout.py' --write` rewrites those VIA-owned
+- `python3 tools/via_to_qmk_layout.py --write` rewrites those VIA-owned
   sections in
   [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
-- `python3 'via layouts/via_to_qmk_layout.py' --via-json path/to/export.json`
-  uses a specific VIA export instead of choosing one from `via layouts/`
+- `python3 tools/via_to_qmk_layout.py --via-json path/to/export.json`
+  uses a specific VIA export instead of choosing one from `tools/`
 - `python3 tools/profile_introspect.py --write` regenerates the authored
   profile report at [`docs/KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md) and the SVG
   assets under
@@ -138,6 +134,9 @@ Practical usage:
   artifacts are current
 - `python3 tools/profile_introspect.py --print-markdown` previews the rendered
   report without rewriting files
+
+For the full authored-profile report workflow and output breakdown, see
+[`docs/tooling/PROFILE_INTROSPECT.md`](./docs/tooling/PROFILE_INTROSPECT.md).
 
 ## Where To Change Things
 
@@ -148,24 +147,13 @@ If you want to adapt this userspace, these are the main files to touch first:
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | physical layout, combos, keymap-local custom keycodes, `VIA_MACROS(MACRO)`, `HARDCODED_MACROS(MACRO)`, and the authored `key_behaviors[]` table |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pointer-mode colors, LED groups, auto-mouse gradient endpoints, and key-behavior feedback colors |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | tap/hold timing, multi-tap timing, RGB overlay toggles (`RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE`), auto-mouse target layer and timeout, auto-sniping, dragscroll DPI, and other keymap-facing behavior |
-| [`users/noah/noah_keymap_ids.h`](./users/noah/noah_keymap_ids.h) | shared layer ids, hardcoded macro keycodes, generated pd-mode and layer-lock keycode ranges, and the `NOAH_KEYMAP_SAFE_RANGE` boundary for keymap-local keycodes |
-| [`users/noah/lib/pointing/defs/pd_mode_manifest.h`](./users/noah/lib/pointing/defs/pd_mode_manifest.h) | shared pd-mode definitions: mode keycodes, generated lock keycodes, handlers, DPI metadata, and manifest traits |
-| [`users/noah/lib/pointing/runtime/`](./users/noah/lib/pointing/runtime/) | shared pd-mode runtime machinery: registry materialization, lifecycle transitions, active/locked state, and runtime dispatch |
-| [`users/noah/lib/pointing/policy/`](./users/noah/lib/pointing/policy/) | pointer-policy glue that keeps layer ownership aligned with pd-mode state |
-| [`users/noah/lib/pointing/modes/`](./users/noah/lib/pointing/modes/) | mode-owned pointing behavior: motion transforms, key interception, shared mode helpers, and mode-specific lifecycle glue such as `PINCH_MODE` |
-| [`users/noah/source_manifest.mk`](./users/noah/source_manifest.mk) | canonical userspace source inventory for firmware builds and host compile gates; add new shared translation units here |
-| [`users/noah/config.h`](./users/noah/config.h) | split transport settings, RGB geometry, pointing-device polling, idle-noise suppression, sensor/report settings, local dragscroll tuning, and low-level QMK overrides |
 
 In other words:
 
 - if you want to change what a key does, start in [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - if you want to change how the board looks, start in [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - if you want to change how the keyboard feels, start in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
-- if you want to add a layer, update the layer enum in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h); `LAYER_COUNT` is the sentinel last value and should stay last
-- if you want to add a shared custom keycode surface, start in [`noah_keymap_ids.h`](./users/noah/noah_keymap_ids.h)
-- if you want to add a shared pointing-device mode, start in [`pd_mode_manifest.h`](./users/noah/lib/pointing/defs/pd_mode_manifest.h) and the matching mode-owned files under [`users/noah/lib/pointing/modes/`](./users/noah/lib/pointing/modes/)
-- if you add a new shared userspace `.c` file, wire it into [`users/noah/source_manifest.mk`](./users/noah/source_manifest.mk) in the same pass
-- if you want to change board plumbing, start in [`users/noah/config.h`](./users/noah/config.h)
+- if you want to add a layer, update the layer enum in the keymap [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h); `LAYER_COUNT` is the sentinel last value and should stay last.
 
 ## Build Wiring And Boundaries
 
@@ -184,18 +172,7 @@ The shared userspace build surface is centered on
   declarative blocks in
   [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
   into the runtime symbols consumed by the macro system, combo output checks,
-  and key-behavior lookup
-
-One important compile-gated boundary in this repo:
-
-- runtime modules under [`users/noah/`](./users/noah/) must not include
-  [`noah_keymap.h`](./users/noah/noah_keymap.h) directly
-- keymap-owned translation units under
-  [`keyboards/.../keymaps/noah/`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/)
-  must not include [`noah_runtime.h`](./users/noah/noah_runtime.h) directly
-
-That boundary, plus several internal-runtime sealing rules, is enforced by
-[`sh tests/host/run_feature_gate_compile_tests.sh`](./tests/host/run_feature_gate_compile_tests.sh).
+  and key-behavior lookup.
 
 ## Layer Model And VIA
 
@@ -216,8 +193,8 @@ In other words, the runtime is layer-aware, but the keymap decides which layers
 exist and what they are for.
 
 If you change the layout in VIA and want to bring it back into source, use
-[`via_to_qmk_layout.py`](<./via layouts/via_to_qmk_layout.py>) in
-[`via layouts`](<./via layouts>). It round-trips VIA layer data, macro slots,
+[`via_to_qmk_layout.py`](./tools/via_to_qmk_layout.py) in
+[`tools/`](./tools/). It round-trips VIA layer data, macro slots,
 and supported custom keycodes back into the authored tables in
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 
@@ -248,10 +225,6 @@ The hardcoded macro payload surface is richer than plain text. It can express:
 The same payload language is used for source-authored defaults, and the repo
 can seed VIA's macro EEPROM defaults from those authored values on first init
 and supported reset paths.
-
-This repo also sets `TAP_CODE_DELAY` to `10` in
-[`users/noah/config.h`](./users/noah/config.h) so synthetic taps used by
-macro chords stay registered long enough to land reliably on the host.
 
 ## Combos
 
@@ -484,8 +457,12 @@ These docs are the next place to look:
   raw trackball mode behavior
 - [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB colors, key-behavior
   feedback, LED groups, and auto-mouse gradient configuration
-- [`docs/VIA_TO_QMK.md`](./docs/VIA_TO_QMK.md): how the VIA export bridge
+- [`docs/tooling/VIA_TO_QMK.md`](./docs/tooling/VIA_TO_QMK.md): how the VIA
+  export bridge
   rewrites `VIA_MACROS(MACRO)` and `keymaps[][]` back into `keymap.c`
+- [`docs/tooling/PROFILE_INTROSPECT.md`](./docs/tooling/PROFILE_INTROSPECT.md):
+  how the authored-profile introspector regenerates
+  `docs/KEYMAP-OVERVIEW.md` and the preview SVG assets
 - [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md): how the weak-hook
   model works and how to override QMK hooks without silently dropping shared
   behavior
