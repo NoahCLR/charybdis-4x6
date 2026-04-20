@@ -320,7 +320,7 @@ const key_behavior_t
             {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
             {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(ARROW_MODE_LOCK)}}},
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
-            {.keycode = KC_LEFT_GUI, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}}},
+            {.keycode = KC_LEFT_GUI, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}, [2] = {.tap = TAP_SENDS(OSM(MOD_LSFT))}}},
 
             // ─── Layer-Tap Keys ──────────────────────────────────────────────────────────────
             {.keycode = LT(LAYER_NAV, KC_SLSH), .tap_hold_term = 100, .tap_counts = {[1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))}}},
