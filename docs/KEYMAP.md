@@ -1,17 +1,18 @@
 # Current Keymap
 
-This document is the personal profile doc for the current `noah` Charybdis 4x6
-keymap.
+This is the prose profile doc for the current `noah` Charybdis 4x6 keymap.
 
-The top-level [README](../README.md) and
-[INTERACTION_MODEL.md](./INTERACTION_MODEL.md) explain what the shared
-userspace can do. This file shows what I currently do with it.
+If you want the fastest visual snapshot, start with
+[KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md). The top-level [README](../README.md)
+and [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) explain what the shared
+userspace can do; this file explains how the current profile uses those
+capabilities.
 
-These are current choices, not guarantees of the shared runtime.
+These are current profile choices, not guarantees of the shared runtime.
 
-This keymap was made for my personal macOS use. Many current choices assume
-Command-based shortcuts, macOS system conventions, and a Mac-first editing and
-window-management workflow rather than a cross-platform default.
+This profile is tuned for my personal macOS workflow. Many choices assume
+Command-based shortcuts, macOS system conventions, and Mac-first editing and
+window-management habits rather than a cross-platform default.
 
 ## Profile Shape
 
@@ -28,9 +29,9 @@ extra behavior into a few consistent places:
 In practice, this means typing stays fairly normal, while editing, media, and
 trackball control get packed into the right side and the thumbs.
 
-## Current Layer Stack
+## Layer Stack
 
-| Layer | Current role | Current highlights |
+| Layer | Role | Highlights |
 | --- | --- | --- |
 | `LAYER_BASE` | default typing layer | QWERTY, home-row layer access, custom thumbs, number-row symbol holds, signature `Esc`, `Enter`, `Shift`, and `Right Alt` behaviors |
 | `LAYER_NUM` | right-hand numpad layer | numpad on the right half, `MO(LAYER_NAV)` retained on the left side for fast access back into navigation |
@@ -38,7 +39,7 @@ trackball control get packed into the right side and the thumbs.
 | `LAYER_NAV` | navigation, media, system control, mouse buttons | arrow cluster, media, volume, brightness, direct macOS shortcuts, mouse buttons, `DRAGSCROLL`, and current auto-sniping |
 | `LAYER_POINTER` | auto-mouse pointer surface | `BRIGHTNESS_MODE`, `PINCH_MODE`, `VOLUME_MODE`, `DRAGSCROLL`, mouse buttons, and `LT(LAYER_NUM, KC_SPC)` on the thumb cluster |
 
-The current keymap config sets:
+The keymap currently sets:
 
 - `LAYER_NAV` as the auto-sniping layer
 - `LAYER_POINTER` as the auto-mouse target layer
@@ -46,9 +47,9 @@ The current keymap config sets:
 Those settings live in
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
-## Current Timing Defaults
+## Timing Defaults
 
-The current keymap sets these defaults in
+The keymap currently sets these defaults in
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
 
 - `TAPPING_TERM = 200`
@@ -344,7 +345,7 @@ In practice, the profile is set up so those shortcuts are quick to reach from
 the base layer. `LT(LAYER_NAV, KC_F)` is one of the main access points, and
 `LT(LAYER_NAV, KC_SLSH)` provides a second nav entry on the right side.
 
-Current direct macOS-standard shortcuts bound in layers include:
+Direct macOS-standard shortcuts bound in layers include:
 
 | Binding | Standard macOS meaning | Current layer |
 | --- | --- | --- |
@@ -360,7 +361,7 @@ Current direct macOS-standard shortcuts bound in layers include:
 The VIA defaults are a smaller mixed set. Some are standard macOS shortcuts,
 while others are just my current app-launcher or utility bindings:
 
-| Slot | Current payload | Current meaning |
+| Slot | Payload | Meaning |
 | --- | --- | --- |
 | `VIA_MACRO_0` | `{KC_LGUI,KC_SPC}` | standard macOS Spotlight shortcut |
 | `VIA_MACRO_1` | `{KC_LALT,KC_SPC}` | current launcher shortcut for Claude or ChatGPT |
@@ -384,6 +385,8 @@ simply personal shortcuts rather than standard macOS conventions.
 
 ## Related Files
 
+- [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md): generated visual snapshot of the
+  current profile
 - [`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c):
   current authored layout, combos, macros, and `key_behaviors[]`
 - [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
@@ -395,5 +398,5 @@ simply personal shortcuts rather than standard macOS conventions.
   mode is active
 - [tooling/VIA_TO_QMK.md](./tooling/VIA_TO_QMK.md): VIA export round-trip
   workflow for the current keymap source
-- [tooling/PROFILE_INTROSPECT.md](./tooling/PROFILE_INTROSPECT.md): generated
-  profile report and asset workflow for the current authored profile
+- [tooling/PROFILE_INTROSPECT.md](./tooling/PROFILE_INTROSPECT.md): how the
+  generated overview and SVG assets are refreshed and verified

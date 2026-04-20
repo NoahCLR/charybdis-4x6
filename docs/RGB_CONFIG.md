@@ -1,9 +1,14 @@
 # RGB Configuration
 
-This userspace keeps most RGB authoring in
+Most authored RGB configuration in this repo lives in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 
-That file is the main RGB configuration surface:
+Use this doc when you want to change colors, LED groups, auto-mouse fade
+visuals, or key-behavior feedback colors. If you only want to see what the
+current profile looks like, start with
+[KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md).
+
+`rgb_config.c` is the main authored RGB surface:
 
 - layer colors
 - pointing-device mode colors

@@ -3,8 +3,8 @@
 This doc explains the VIA bridge script in
 [`tools/via_to_qmk_layout.py`](../../tools/via_to_qmk_layout.py).
 
-Use it when you want to experiment in VIA, export the result, and then bring
-the VIA-owned parts of the layout back into the source-controlled
+Use it when you want to experiment in VIA, export the result, and then sync the
+VIA-owned parts of the layout back into the source-controlled
 [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 
 ## What The Script Does
@@ -156,6 +156,6 @@ Those still belong in the normal source files and docs.
 
 ## Related Docs
 
-- [PROFILE_INTROSPECT.md](./PROFILE_INTROSPECT.md): generated profile report
-  and SVG asset workflow
+- [PROFILE_INTROSPECT.md](./PROFILE_INTROSPECT.md): generated overview and SVG
+  asset workflow
 - [KEYMAP.md](../KEYMAP.md): current authored profile choices and layer intent

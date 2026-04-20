@@ -2,6 +2,18 @@
 # Profile Introspection
 This report is generated from the authored profile files [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c), [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h), and [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). The renderer is board-specific to the Charybdis 4x6 and derives the current `LAYOUT()` slot order directly from [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 PD mode names and bindings in this report stay in sync with the shared definitions in [pd_mode_manifest.h](../users/noah/lib/pointing/defs/pd_mode_manifest.h).
+## Quick Legend
+
+| Where | Marker | Meaning |
+| --- | --- | --- |
+| Layer image | `C1`, `C2`, ... | Combo badge. Match the badge id to the layer-local combo table below the image. |
+| Layer image | `tap / multi-tap` dot <img alt="Tap or multi-tap indicator color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> | This key has authored tap or multi-tap handling. The image does not show which tap tier fired; use the behavior table below for `single`, `double`, `triple`, and higher tap counts. |
+| Layer image | `hold` dot <img alt="Hold indicator color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> | This key has an authored hold tier. |
+| Layer image | `long hold` dot <img alt="Long hold indicator color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> | This key has an authored long-hold tier. |
+| Behavior table | `single`, `double`, `triple`, `quadruple`, `quintuple` | Tap tiers for the same physical key: 1 tap, 2 taps, 3 taps, 4 taps, 5 taps. |
+| Behavior table | repeated rows for one key | The same physical key exposes different actions at different tap tiers. |
+| Behavior table | `Tap` / `Hold` / `Long Hold` | Actions that fire for that tap tier on tap, hold, or deeper long hold. |
+
 ## Layer Images
 
 These previews are generated as SVG image assets under [docs/media/profile-introspection/](media/profile-introspection). The renderer uses the authored `layer_colors[]` config from [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and the current `LAYOUT()` slot order from [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c):

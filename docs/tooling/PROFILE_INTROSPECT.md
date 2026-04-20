@@ -3,7 +3,7 @@
 This doc explains the authored-profile introspector in
 [`tools/profile_introspect.py`](../../tools/profile_introspect.py).
 
-Use it when you want to regenerate or verify the rendered profile report that
+Use it when you want to regenerate or verify the visual profile report that
 this repo derives from the authored keymap and RGB sources.
 
 ## What The Script Reads
@@ -40,8 +40,8 @@ be removed.
 
 ## What The Generated Report Includes
 
-The report is meant to be a maintainer-facing snapshot of the current authored
-profile. It includes:
+The report is meant to be a visual snapshot of the current authored profile. It
+includes:
 
 - per-layer visual previews with authored layer colors
 - transparent-key visibility for partial layers

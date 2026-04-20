@@ -1,13 +1,13 @@
 # Pointer Modes
 
-This file explains the raw behavior of the pointing-device modes after a mode
-is active, regardless of how that mode was entered.
+This doc explains what the pointing-device modes do after a mode is active,
+regardless of how that mode was entered.
 
-It does not describe the current keymap's physical placement, tap / hold
-gestures, or profile-specific double-tap actions. For Noah's current authored
-choices, see [KEYMAP.md](./KEYMAP.md). For the shared tap / hold / multi-tap
-model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the top-level
-[README](../README.md).
+It is about shared mode behavior, not the current keymap's physical placement,
+tap / hold gestures, or profile-specific double-tap actions. For the current
+authored choices, see [KEYMAP.md](./KEYMAP.md). For the shared tap / hold /
+multi-tap model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the
+top-level [README](../README.md).
 
 ## Shared Rules
 
@@ -16,7 +16,8 @@ Across the current pd-mode runtime:
 - an active mode can transform trackball motion
 - some modes also intercept key events while active
 - unlocked modes are exclusive while held: the newest active mode wins
-- locked modes are exclusive: activating or locking a different mode clears the previous lock
+- locked modes are exclusive: activating or locking a different mode clears the
+  previous lock
 - active modes can render a mode-specific RGB overlay
 
 One important non-rule:

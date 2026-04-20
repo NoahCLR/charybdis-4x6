@@ -1208,6 +1208,7 @@ def render_markdown(profile: dict[str, object]) -> str:
         "",
         f"PD mode names and bindings in this report stay in sync with the shared definitions in {pd_manifest_link}.",
         "",
+        render_quick_legend_section(profile),
         render_layer_maps_section(profile),
         render_key_behavior_feedback_section(profile),
         render_macro_section(profile),
@@ -1217,6 +1218,32 @@ def render_markdown(profile: dict[str, object]) -> str:
         render_generated_assets_section(),
     ]
     return "\n".join(section for section in sections if section)
+
+
+def render_quick_legend_section(profile: dict[str, object]) -> str:
+    indicator_colors = resolve_behavior_indicator_preview_colors(profile)
+
+    def indicator_preview(kind: str, alt_text: str) -> str:
+        color = indicator_colors[kind]
+        if color is None:
+            return "`not configured`"
+        return markdown_color_swatch(color, alt_text)
+
+    lines = [
+        "## Quick Legend",
+        "",
+        "| Where | Marker | Meaning |",
+        "| --- | --- | --- |",
+        "| Layer image | `C1`, `C2`, ... | Combo badge. Match the badge id to the layer-local combo table below the image. |",
+        f"| Layer image | `tap / multi-tap` dot {indicator_preview('tap', 'Tap or multi-tap indicator color')} | This key has authored tap or multi-tap handling. The image does not show which tap tier fired; use the behavior table below for `single`, `double`, `triple`, and higher tap counts. |",
+        f"| Layer image | `hold` dot {indicator_preview('hold', 'Hold indicator color')} | This key has an authored hold tier. |",
+        f"| Layer image | `long hold` dot {indicator_preview('long_hold', 'Long hold indicator color')} | This key has an authored long-hold tier. |",
+        "| Behavior table | `single`, `double`, `triple`, `quadruple`, `quintuple` | Tap tiers for the same physical key: 1 tap, 2 taps, 3 taps, 4 taps, 5 taps. |",
+        "| Behavior table | repeated rows for one key | The same physical key exposes different actions at different tap tiers. |",
+        "| Behavior table | `Tap` / `Hold` / `Long Hold` | Actions that fire for that tap tier on tap, hold, or deeper long hold. |",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def render_reference_section(profile: dict[str, object]) -> str:
@@ -1642,25 +1669,37 @@ def build_layer_combo_badge_map(layer: dict[str, object], profile: dict[str, obj
     return badge_map
 
 
-def build_behavior_indicator_map(profile: dict[str, object]) -> dict[str, list[str]]:
+def resolve_behavior_indicator_preview_colors(profile: dict[str, object]) -> dict[str, dict[str, object] | None]:
     feedback_rows = [
         row
         for row in profile["rgb"]["key_behavior_feedback_colors"]
         if row["preview_color"] is not None
     ]
-    indicator_map: dict[str, list[str]] = {}
 
-    def feedback_preview_color(required_tokens: set[str], forbidden_tokens: set[str] | None = None) -> str | None:
+    def feedback_preview_color(
+        required_tokens: set[str],
+        forbidden_tokens: set[str] | None = None,
+    ) -> dict[str, object] | None:
         blocked = forbidden_tokens or set()
         for row in feedback_rows:
             field_tokens = set(row["field"].removesuffix("_color").split("_"))
             if required_tokens.issubset(field_tokens) and field_tokens.isdisjoint(blocked):
-                return row["preview_color"]["hex"]
+                return row["preview_color"]
         return None
 
-    tap_color = feedback_preview_color({"multi", "tap"})
-    hold_color = feedback_preview_color({"hold"}, {"long"})
-    long_hold_color = feedback_preview_color({"long", "hold"})
+    return {
+        "tap": feedback_preview_color({"multi", "tap"}),
+        "hold": feedback_preview_color({"hold"}, {"long"}),
+        "long_hold": feedback_preview_color({"long", "hold"}),
+    }
+
+
+def build_behavior_indicator_map(profile: dict[str, object]) -> dict[str, list[str]]:
+    indicator_map: dict[str, list[str]] = {}
+    indicator_colors = resolve_behavior_indicator_preview_colors(profile)
+    tap_color = indicator_colors["tap"]["hex"] if indicator_colors["tap"] is not None else None
+    hold_color = indicator_colors["hold"]["hex"] if indicator_colors["hold"] is not None else None
+    long_hold_color = indicator_colors["long_hold"]["hex"] if indicator_colors["long_hold"] is not None else None
 
     for behavior in profile["key_behaviors"]:
         has_tap = any(step["tap"] is not None for step in behavior["steps"]) or len(behavior["steps"]) > 1

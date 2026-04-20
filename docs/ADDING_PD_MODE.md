@@ -1,6 +1,7 @@
 # Adding A Pointing-Device Mode
 
-Use this guide when adding a new pointing-device mode to the `noah` userspace.
+This is a maintainer-facing guide for adding a new pointing-device mode to the
+`noah` userspace.
 
 This repo already has a generic pd-mode runtime. Most new modes should fit into
 that runtime without changing the engine. The main risk is breaking one of the
