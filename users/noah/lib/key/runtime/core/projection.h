@@ -1,19 +1,15 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Key Runtime Effect Queue Vocabulary
+// Runtime V2 Projection Helpers
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Shared field layout for effect-bearing handled-key runtime surfaces. Slot
-// reducers and transition planning still use different capacities, but they
-// should expose one consistent queue vocabulary to callers and tests.
+// Reducer-owned projector surface for applying authored runtime effects to
+// QMK-facing state. Transition/release orchestration may still transport
+// effect queues, but effect execution should flow through this one seam.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include <stdbool.h>
-#include <stdint.h>
+#include "../effects/effect.h"
+#include "runtime.h"
 
-#include "key_runtime_effect.h"
-
-#define KEY_RUNTIME_EFFECT_QUEUE_FIELDS(capacity) \
-    uint8_t              count;                   \
-    bool                 overflowed;              \
-    key_runtime_effect_t items[(capacity)]
+void runtime_v2_project_effect(const key_runtime_effect_t *effect);
+void runtime_v2_project_pending_release_dispatch(const pending_release_t *pending);

@@ -9,35 +9,38 @@ Use this when you are changing runtime behavior. For user-facing semantics, see
 
 ## Current Shape
 
-The key runtime is now a `runtime_v2`-owned system.
+The key runtime is now a single-authority reducer-owned system.
 
 - Authored behavior resolution still starts in `interaction/`.
-- Reducer-owned state now lives in `runtime_v2/`, not in legacy slot/index
+- Reducer-owned state now lives in `key/runtime/core/`, not in legacy slot/index
   storage.
 - `users/noah/lib/key/runtime/` is now thin orchestration around reducer entry
   points, effect transport, and QMK hook integration.
 - Long-lived external ownership still lives in the dedicated registries under
   `state/ownership/` and `key/ownership/`.
+- The `runtime_v2_*` symbol family is still in place for now; this pass only
+  normalized the directory and file names.
 
 The legacy slot reducers, slot result transport, slot/index shared state, and
 stub-backed mixed-runtime host surfaces were removed during the full cutover.
 
-## Why Two Folders Still Exist
+## Core vs Integration
 
-The folder split is architectural, not a sign that two runtimes still share
-authority.
+The key runtime now lives under one permanent tree, but that tree still has
+two architectural layers.
 
-- [`users/noah/lib/runtime_v2/`](../users/noah/lib/runtime_v2/) is the
-  reducer/state-owner layer. It holds the canonical runtime state, plans
+- [`users/noah/lib/key/runtime/core/`](../users/noah/lib/key/runtime/core/) is
+  the reducer/state-owner layer. It holds the canonical runtime state, plans
   effects, and exposes the debug/projection surface.
-- [`users/noah/lib/key/runtime/`](../users/noah/lib/key/runtime/) is the
-  QMK-facing integration layer. It owns process/scan entry flow, preflight,
+- The top-level files in
+  [`users/noah/lib/key/runtime/`](../users/noah/lib/key/runtime/) are the
+  QMK-facing integration layer. They own process/scan entry flow, preflight,
   effect-plan transport, trace/debug adapters, and effect projection.
 - The old slot/index runtime is no longer a live production subsystem. The
   only remaining `slot/` file in the production tree is the stateless release
   resolver helper used by the v2 adapters.
 
-So when you see both folders, read that as "decision layer plus integration
+So when you see both layers, read that as "decision layer plus integration
 layer," not "old runtime plus new runtime running side by side."
 
 ## Design Rules
@@ -57,14 +60,14 @@ layer," not "old runtime plus new runtime running side by side."
 | File | Responsibility |
 | --- | --- |
 | [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h), [`handled_key_lookup.c`](../users/noah/lib/key/interaction/handled_key_lookup.c), [`handled_key_materialize.c`](../users/noah/lib/key/interaction/handled_key_materialize.c) | Resolve authored behavior into `handled_key_resolution_t` and materialize it into runtime interaction contracts. |
-| [`key_runtime_interaction.h`](../users/noah/lib/key/runtime/key_runtime_interaction.h) | Shared interaction contract used by the reducer and release resolver. |
-| [`runtime_v2.h`](../users/noah/lib/runtime_v2/runtime_v2.h), [`runtime_v2.c`](../users/noah/lib/runtime_v2/runtime_v2.c), [`runtime_v2_projection.h`](../users/noah/lib/runtime_v2/runtime_v2_projection.h) | Single-authority runtime state, reducer entry points, release planning, pending multi-tap state, leases, persistent intents, pending release transport, and projection/debug capture. |
-| [`key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c) | `process_record_user()` entry flow, preflight ordering, release-keycode recovery, and non-handled release finalization. |
-| [`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c) | Cross-key interruption and foreign pending-multi-tap flush before the current press proceeds. |
-| [`key_runtime_press.c`](../users/noah/lib/key/runtime/key_runtime_press.c), [`key_runtime_release.c`](../users/noah/lib/key/runtime/key_runtime_release.c), [`key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c) | Thin press/release/scan orchestration around reducer-owned effect plans. |
-| [`key_runtime_transition.c`](../users/noah/lib/key/runtime/key_runtime_transition.c), [`key_runtime_transition.h`](../users/noah/lib/key/runtime/key_runtime_transition.h) | Effect-plan transport and execution seam. This is the last shared transport layer between reducer decisions and concrete effect projection. |
-| [`key_runtime_slot_release_resolver.h`](../users/noah/lib/key/runtime/slot/key_runtime_slot_release_resolver.h) | Shared stateless release decision contract reused by the v2 release adapters. |
-| [`key_runtime_effect.h`](../users/noah/lib/key/runtime/effects/key_runtime_effect.h) | Shared runtime effect vocabulary. |
+| [`interaction.h`](../users/noah/lib/key/runtime/interaction.h) | Shared interaction contract used by the reducer and release resolver. |
+| [`core/runtime.h`](../users/noah/lib/key/runtime/core/runtime.h), [`core/runtime.c`](../users/noah/lib/key/runtime/core/runtime.c), [`core/projection.h`](../users/noah/lib/key/runtime/core/projection.h) | Single-authority runtime state, reducer entry points, release planning, pending multi-tap state, leases, persistent intents, pending release transport, and projection/debug capture. |
+| [`process.c`](../users/noah/lib/key/runtime/process.c) | `process_record_user()` entry flow, preflight ordering, release-keycode recovery, and non-handled release finalization. |
+| [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption and foreign pending-multi-tap flush before the current press proceeds. |
+| [`press.c`](../users/noah/lib/key/runtime/press.c), [`release.c`](../users/noah/lib/key/runtime/release.c), [`scan.c`](../users/noah/lib/key/runtime/scan.c) | Thin press/release/scan orchestration around reducer-owned effect plans. |
+| [`transition.c`](../users/noah/lib/key/runtime/transition.c), [`transition.h`](../users/noah/lib/key/runtime/transition.h) | Effect-plan transport and execution seam. This is the last shared transport layer between reducer decisions and concrete effect projection. |
+| [`slot/release_resolver.h`](../users/noah/lib/key/runtime/slot/release_resolver.h) | Shared stateless release decision contract reused by the v2 release adapters. |
+| [`effects/effect.h`](../users/noah/lib/key/runtime/effects/effect.h) | Shared runtime effect vocabulary. |
 | [`held_action.c`](../users/noah/lib/key/ownership/held_action.c), [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c), [`layer_ownership.c`](../users/noah/lib/state/ownership/layer_ownership.c), [`keyboard_mod_ownership.c`](../users/noah/lib/state/ownership/keyboard_mod_ownership.c) | External ownership registries projected by runtime effects. |
 | [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h), [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h) | Public debug, reset, and tracing seams used by host tests and runtime diagnostics. |
 
@@ -93,7 +96,7 @@ helper.
 
 ### 1. Physical key event entry
 
-[`key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c)
+[`process.c`](../users/noah/lib/key/runtime/process.c)
 observes every physical event into `runtime_v2` first.
 
 That observation step gives the reducer position-stable press/release identity
@@ -101,7 +104,7 @@ before any QMK path, macro path, or pd-mode path narrows the event.
 
 ### 2. Preflight
 
-[`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c)
+[`preflight.c`](../users/noah/lib/key/runtime/preflight.c)
 does the cross-key work that must happen before the current press resolves:
 
 - suppress default modifier handling when ownership requires it
@@ -110,9 +113,9 @@ does the cross-key work that must happen before the current press resolves:
 
 ### 3. Press routing
 
-Handled presses go through [`key_runtime_press.c`](../users/noah/lib/key/runtime/key_runtime_press.c),
+Handled presses go through [`press.c`](../users/noah/lib/key/runtime/press.c),
 which asks `runtime_v2` for a press effect plan and executes it through
-[`key_runtime_transition.c`](../users/noah/lib/key/runtime/key_runtime_transition.c).
+[`transition.c`](../users/noah/lib/key/runtime/transition.c).
 
 The reducer owns:
 
@@ -124,7 +127,7 @@ The reducer owns:
 
 ### 4. Release routing
 
-Handled releases go through [`key_runtime_release.c`](../users/noah/lib/key/runtime/key_runtime_release.c).
+Handled releases go through [`release.c`](../users/noah/lib/key/runtime/release.c).
 The reducer resolves release by physical key position, not by the raw release
 keycode currently visible to QMK.
 
@@ -137,13 +140,13 @@ The release path now owns:
 - token retirement and pending-series seeding
 
 Non-handled releases still pass through the shared process flow, but
-`key_runtime_process.c` now finalizes any reducer-owned observed state for
+`process.c` now finalizes any reducer-owned observed state for
 those keys too. That keeps raw ownership keys such as `MO()`/modifier/pd-mode
 keys from leaving stale v2 leases behind.
 
 ### 5. Scan
 
-[`key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c) asks
+[`scan.c`](../users/noah/lib/key/runtime/scan.c) asks
 `runtime_v2` for the current scan plan and then drains pending release
 dispatches.
 

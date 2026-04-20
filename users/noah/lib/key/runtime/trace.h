@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "key_runtime_transition.h"
+#include "transition.h"
 
 typedef enum {
     KEY_RUNTIME_TRACE_RELEASE_OUTCOME_NONE = 0,

@@ -6,8 +6,8 @@
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/runtime_v2/runtime_v2_trace.h"
-#include "users/noah/lib/key/runtime/key_runtime_api.h"
+#include "users/noah/lib/key/runtime/core/trace.h"
+#include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/noah_runtime.h"
 
 __attribute__((weak)) layer_state_t layer_state;

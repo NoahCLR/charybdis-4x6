@@ -5,7 +5,7 @@
 
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/interaction/key_behavior_lookup.h"
-#include "users/noah/lib/key/runtime/effects/key_runtime_effect.h"
+#include "users/noah/lib/key/runtime/effects/effect.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 
 typedef key_runtime_effect_t key_runtime_scenario_effect_t;

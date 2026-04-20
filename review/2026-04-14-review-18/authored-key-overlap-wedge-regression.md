@@ -15,7 +15,7 @@ not as descriptions of the live runtime surface.
 
 The current tree no longer treats this regression as open:
 
-- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` are now the sole
+- `users/noah/lib/key/runtime/core/runtime.h` and `.c` are now the sole
   authoritative key-runtime state surface.
 - `tests/host/pd_mode_key_runtime_integration_test.c` and
   `tests/host/real_profile_thumb_layer_lock_integration_test.c` now exercise
@@ -113,8 +113,8 @@ One or more of these is probably left live when it should be cleared:
 
 ## Most Likely Affected Seams
 
-- `users/noah/lib/key/runtime/key_runtime_process.c`
-- `users/noah/lib/key/runtime/key_runtime_transition.c`
+- `users/noah/lib/key/runtime/process.c`
+- `users/noah/lib/key/runtime/transition.c`
 - `users/noah/lib/key/runtime/key_runtime_slot_release_active.c`
 - `users/noah/lib/pointing/runtime/pointer_layer_policy.c`
 - `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`

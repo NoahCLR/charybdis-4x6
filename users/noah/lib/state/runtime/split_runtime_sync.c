@@ -10,7 +10,7 @@
 #        include "print.h"
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-#        include "../../key/runtime/key_runtime_feedback.h"
+#        include "../../key/runtime/feedback.h"
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
 #        include "../../pointing/defs/pd_modes.h"

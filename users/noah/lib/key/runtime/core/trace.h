@@ -10,9 +10,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "runtime_v2.h"
+#include "runtime.h"
 
-#include "../state/runtime/runtime_trace.h"
+#include "../../../state/runtime/runtime_trace.h"
 
 #if defined(NOAH_RUNTIME_TRACE_ENABLE)
 

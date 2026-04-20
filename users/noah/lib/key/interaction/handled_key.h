@@ -10,7 +10,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "../../pointing/defs/pd_mode_flags.h"
-#include "../runtime/key_runtime_types.h"
+#include "../runtime/types.h"
 #include "key_behavior.h"
 
 typedef struct {

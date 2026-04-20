@@ -6,7 +6,7 @@
 
 #include "action_lifecycle.h"
 #include "synthetic_record.h"
-#include "../key/runtime/key_runtime_api.h"
+#include "../key/runtime/api.h"
 #include "../state/runtime/keyboard_mod_state.h"
 #include "action_dispatch.h"
 

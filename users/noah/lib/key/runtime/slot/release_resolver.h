@@ -8,7 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "../key_runtime_interaction.h"
+#include "../interaction.h"
 
 typedef enum {
     KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE = 0,

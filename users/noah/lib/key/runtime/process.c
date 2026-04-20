@@ -3,13 +3,13 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "../interaction/handled_key.h"
-#include "key_runtime_process_internal.h"
-#include "key_runtime_trace.h"
+#include "process_internal.h"
+#include "trace.h"
 #include "noah_runtime.h"
 #include "../../macro/macro_dispatch.h"
 #include "../../pointing/defs/pd_modes.h"
 #include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"
-#include "../../runtime_v2/runtime_v2.h"
+#include "core/runtime.h"
 #include "../../action/synthetic_record.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/runtime/runtime_diag.h"

@@ -2,12 +2,12 @@
 // Key Runtime Preflight
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_process_internal.h"
+#include "process_internal.h"
 #include "../interaction/handled_key.h"
-#include "key_runtime_trace.h"
-#include "key_runtime_transition.h"
+#include "trace.h"
+#include "transition.h"
 #include "../../action/action_dispatch.h"
-#include "../../runtime_v2/runtime_v2.h"
+#include "core/runtime.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {

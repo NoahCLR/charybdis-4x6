@@ -37,11 +37,11 @@ Scope: `users/noah/` runtime ownership, key-runtime architecture, host/build enf
   `users/noah/lib/key/runtime/key_runtime_internal.h`,
   `users/noah/lib/key/runtime/key_runtime_index_internal.h`, and
   `users/noah/lib/key/runtime/key_runtime_shared_state.h` are replaced by the
-  reducer-owned surface in `users/noah/lib/runtime_v2/runtime_v2.h` and the
-  thin orchestration layer in `users/noah/lib/key/runtime/key_runtime_process.c`,
-  `users/noah/lib/key/runtime/key_runtime_release.c`,
-  `users/noah/lib/key/runtime/key_runtime_scan.c`, and
-  `users/noah/lib/key/runtime/key_runtime_transition.c`. Enforcement comes from
+  reducer-owned surface in `users/noah/lib/key/runtime/core/runtime.h` and the
+  thin orchestration layer in `users/noah/lib/key/runtime/process.c`,
+  `users/noah/lib/key/runtime/release.c`,
+  `users/noah/lib/key/runtime/scan.c`, and
+  `users/noah/lib/key/runtime/transition.c`. Enforcement comes from
   `tests/host/run_feature_gate_compile_tests.sh`, the v2-focused host suites,
   the full host suite, and the firmware build. Verified with:
   `sh tests/host/run_feature_gate_compile_tests.sh`,
@@ -51,7 +51,7 @@ Scope: `users/noah/` runtime ownership, key-runtime architecture, host/build enf
 
 - `resolved`: the authored-key overlap wedge is now mechanically covered in the
   current tree. The production runtime is single-authority under
-  `users/noah/lib/runtime_v2/runtime_v2.h` and `.c`, and the original overlap
+  `users/noah/lib/key/runtime/core/runtime.h` and `.c`, and the original overlap
   repro families now have regression-specific coverage in
   `tests/host/pd_mode_key_runtime_integration_test.c`,
   `tests/host/real_profile_thumb_layer_lock_integration_test.c`, and
@@ -85,9 +85,10 @@ Scope: `users/noah/` runtime ownership, key-runtime architecture, host/build enf
 - The key runtime now has one authority. `runtime_v2` owns press identity,
   multi-tap lifetime, reducer-owned leases, persistent intents, pending
   release transport, and debug/projection snapshots.
-- The production runtime path is narrower, not broader. `users/noah/lib/key/runtime/`
-  is now orchestration and effect transport around reducer entry points instead
-  of parallel state mutation.
+- The production runtime path is narrower, not broader. The permanent runtime
+  tree now lives under `users/noah/lib/key/runtime/`, with reducer authority in
+  `users/noah/lib/key/runtime/core/` and orchestration/effect transport in the
+  surrounding integration files instead of parallel state mutation.
 - The original wedge repro families are no longer only “believed fixed”.
   The current integration suites exercise those overlap families directly and
   assert runtime quiescence after release.

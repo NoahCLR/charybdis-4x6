@@ -43,8 +43,8 @@ If you want to change what authored RGB data is considered valid, also look at:
 If you want to change what the key-behavior overlay means instead of how it is
 painted, also look at:
 
-- [`users/noah/lib/key/runtime/key_runtime_feedback.c`](../users/noah/lib/key/runtime/key_runtime_feedback.c)
-- [`users/noah/lib/key/runtime/key_runtime_scan.c`](../users/noah/lib/key/runtime/key_runtime_scan.c)
+- [`users/noah/lib/key/runtime/feedback.c`](../users/noah/lib/key/runtime/feedback.c)
+- [`users/noah/lib/key/runtime/scan.c`](../users/noah/lib/key/runtime/scan.c)
 
 ## HSV Quick Reference
 

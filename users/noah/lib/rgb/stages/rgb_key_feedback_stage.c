@@ -7,7 +7,7 @@
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
 
 #    include "../core/rgb_helpers.h"
-#    include "../../key/runtime/key_runtime_feedback.h"
+#    include "../../key/runtime/feedback.h"
 #    include "../../state/runtime/split_runtime_sync.h"
 
 extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;

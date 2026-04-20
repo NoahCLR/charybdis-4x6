@@ -11,7 +11,7 @@
 #include "noah_runtime.h"
 
 #include "lib/key/ownership/held_repeat.h"
-#include "lib/key/runtime/key_runtime_api.h"
+#include "lib/key/runtime/api.h"
 #include "lib/key/interaction/keymap_validation.h"
 #include "lib/macro/macro_dispatch.h"
 #include "lib/macro/via_macro_defaults.h"

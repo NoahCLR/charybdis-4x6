@@ -4,10 +4,10 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "key_runtime_transition.h"
+#include "transition.h"
 
-#include "key_runtime_trace.h"
-#include "../../runtime_v2/runtime_v2.h"
+#include "trace.h"
+#include "core/runtime.h"
 
 static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan, key_runtime_effect_t effect) {
     if (!plan) {

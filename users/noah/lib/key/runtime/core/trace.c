@@ -2,7 +2,7 @@
 // Runtime V2 Trace
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "runtime_v2_trace.h"
+#include "trace.h"
 
 #if defined(NOAH_RUNTIME_TRACE_ENABLE)
 

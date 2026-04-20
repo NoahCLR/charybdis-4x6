@@ -108,7 +108,7 @@ Files you usually do not need to touch:
 - [`users/noah/lib/pointing/defs/pd_modes.h`](../users/noah/lib/pointing/defs/pd_modes.h)
 - [`users/noah/lib/pointing/runtime/pd_mode_registry.c`](../users/noah/lib/pointing/runtime/pd_mode_registry.c)
 - [`users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`](../users/noah/lib/pointing/runtime/pd_mode_lifecycle.c)
-- [`users/noah/lib/key/runtime/key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c)
+- [`users/noah/lib/key/runtime/process.c`](../users/noah/lib/key/runtime/process.c)
 - [`users/noah/lib/key/ownership/held_action.c`](../users/noah/lib/key/ownership/held_action.c)
 - [`users/noah/lib/pointing/runtime/pd_mode_state.c`](../users/noah/lib/pointing/runtime/pd_mode_state.c)
 - [`users/noah/lib/pointing/runtime/pd_runtime.c`](../users/noah/lib/pointing/runtime/pd_runtime.c)
@@ -426,11 +426,11 @@ not part of the normal add-mode path.
 
 This is the actual control path for pd modes:
 
-1. [`users/noah/lib/key/runtime/key_runtime_process.c`](../users/noah/lib/key/runtime/key_runtime_process.c) orchestrates custom key events.
-   Press and release wrappers live in [`key_runtime_press.c`](../users/noah/lib/key/runtime/key_runtime_press.c) and
-   [`key_runtime_release.c`](../users/noah/lib/key/runtime/key_runtime_release.c), but the shared transition planning now lives in
-   [`key_runtime_transition.c`](../users/noah/lib/key/runtime/key_runtime_transition.c). Preflight checks such as multi-tap flush and
-   layer-interrupt flagging live in [`key_runtime_preflight.c`](../users/noah/lib/key/runtime/key_runtime_preflight.c).
+1. [`users/noah/lib/key/runtime/process.c`](../users/noah/lib/key/runtime/process.c) orchestrates custom key events.
+   Press and release wrappers live in [`press.c`](../users/noah/lib/key/runtime/press.c) and
+   [`release.c`](../users/noah/lib/key/runtime/release.c), but the shared transition planning now lives in
+   [`transition.c`](../users/noah/lib/key/runtime/transition.c). Preflight checks such as multi-tap flush and
+   layer-interrupt flagging live in [`preflight.c`](../users/noah/lib/key/runtime/preflight.c).
 2. [`users/noah/lib/key/ownership/held_action.c`](../users/noah/lib/key/ownership/held_action.c) manages per-key held-action ownership.
    Held pd-mode keycodes flow through [`users/noah/lib/action/action_lifecycle.c`](../users/noah/lib/action/action_lifecycle.c),
    which routes them to `pd_mode_handle_keycode_press()` and

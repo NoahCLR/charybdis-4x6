@@ -11,7 +11,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../../key/runtime/key_runtime_types.h"
+#include "../../key/runtime/types.h"
 
 bool                     noah_runtime_debug_feedback_active(void);
 uint16_t                 noah_runtime_debug_slot_owner_keycode(keypos_t key_pos);

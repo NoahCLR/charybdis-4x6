@@ -7,10 +7,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "runtime_v2.h"
+#include "runtime.h"
 
-#include "../key/runtime/effects/key_runtime_effect_queue.h"
-#include "../key/runtime/slot/key_runtime_slot_release_resolver.h"
+#include "../effects/effect_queue.h"
+#include "../slot/release_resolver.h"
 
 #define RUNTIME_V2_RELEASE_EFFECT_PLAN_CAPACITY 6u
 

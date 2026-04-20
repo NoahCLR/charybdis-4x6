@@ -47,16 +47,16 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/interaction/handled_key_materialize.c" \
     "$ROOT/users/noah/lib/key/interaction/key_behavior_lookup.c" \
     "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \
-    "$ROOT/users/noah/lib/key/runtime/key_runtime.c" \
-    "$ROOT/users/noah/lib/key/runtime/key_runtime_debug.c" \
-    "$ROOT/users/noah/lib/key/runtime/key_runtime_preflight.c" \
-    "$ROOT/users/noah/lib/key/runtime/key_runtime_press.c" \
-    "$ROOT/users/noah/lib/key/runtime/key_runtime_process.c" \
-    "$ROOT/users/noah/lib/key/runtime/key_runtime_release.c" \
-    "$ROOT/users/noah/lib/key/runtime/key_runtime_scan.c" \
-    "$ROOT/users/noah/lib/key/runtime/key_runtime_trace.c" \
-    "$ROOT/users/noah/lib/key/runtime/key_runtime_transition.c" \
-    "$ROOT/users/noah/lib/runtime_v2/runtime_v2.c" \
+    "$ROOT/users/noah/lib/key/runtime/api.c" \
+    "$ROOT/users/noah/lib/key/runtime/debug.c" \
+    "$ROOT/users/noah/lib/key/runtime/preflight.c" \
+    "$ROOT/users/noah/lib/key/runtime/press.c" \
+    "$ROOT/users/noah/lib/key/runtime/process.c" \
+    "$ROOT/users/noah/lib/key/runtime/release.c" \
+    "$ROOT/users/noah/lib/key/runtime/scan.c" \
+    "$ROOT/users/noah/lib/key/runtime/trace.c" \
+    "$ROOT/users/noah/lib/key/runtime/transition.c" \
+    "$ROOT/users/noah/lib/key/runtime/core/runtime.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
@@ -68,7 +68,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_trace.c" \
-    "$ROOT/users/noah/lib/runtime_v2/runtime_v2_trace.c" \
+    "$ROOT/users/noah/lib/key/runtime/core/trace.c" \
     -o "$BIN"
 
 "$BIN"

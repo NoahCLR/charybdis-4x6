@@ -7,7 +7,7 @@
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
 
 #    include "rgb_layer_stage.h"
-#    include "../../key/runtime/key_runtime_feedback.h"
+#    include "../../key/runtime/feedback.h"
 #    include "../../state/runtime/split_runtime_sync.h"
 
 extern const layer_led_group_t *const layer_led_groups;

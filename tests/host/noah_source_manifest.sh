@@ -68,15 +68,15 @@ lib/key/interaction/handled_key_materialize.c
 lib/key/interaction/handled_key_resolution_accessors.c
 lib/key/interaction/handled_key_transparency.c
 lib/key/interaction/multi_tap_engine.c
-lib/key/runtime/key_runtime_debug.c
-lib/key/runtime/key_runtime_preflight.c
-lib/key/runtime/key_runtime_press.c
-lib/key/runtime/key_runtime_process.c
-lib/key/runtime/key_runtime_release.c
-lib/key/runtime/key_runtime_scan.c
-lib/key/runtime/key_runtime_trace.c
-lib/key/runtime/key_runtime_transition.c
-lib/runtime_v2/runtime_v2.c
+lib/key/runtime/debug.c
+lib/key/runtime/preflight.c
+lib/key/runtime/press.c
+lib/key/runtime/process.c
+lib/key/runtime/release.c
+lib/key/runtime/scan.c
+lib/key/runtime/trace.c
+lib/key/runtime/transition.c
+lib/key/runtime/core/runtime.c
 lib/state/runtime/runtime_diag.c
 lib/state/runtime/keyboard_mod_state.c
 lib/state/runtime/runtime_shared_state.c
@@ -89,8 +89,8 @@ noah_host_runtime_debug_support_paths() {
     common_additions='
 lib/key/ownership/held_action.c
 lib/key/ownership/held_repeat.c
-lib/key/runtime/key_runtime_feedback.c
-lib/runtime_v2/runtime_v2_trace.c
+lib/key/runtime/feedback.c
+lib/key/runtime/core/trace.c
 lib/state/ownership/keyboard_mod_ownership.c
 lib/state/ownership/layer_ownership.c
 lib/state/runtime/runtime_trace.c'
@@ -113,7 +113,7 @@ lib/action/owned_keycode.c
 lib/key/interaction/handled_key_lookup.c
 lib/key/ownership/held_action.c
 lib/key/ownership/held_repeat.c
-lib/key/runtime/key_runtime.c
+lib/key/runtime/api.c
 lib/state/ownership/keyboard_mod_ownership.c'
     base_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$base_sources")"
     common_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$common_additions")"
@@ -126,7 +126,7 @@ noah_host_key_runtime_scenario_support_paths() {
     base_sources="$(noah_host_public_key_runtime_base_sources)"
     common_additions='
 lib/key/interaction/handled_key_lookup.c
-lib/key/runtime/key_runtime.c
+lib/key/runtime/api.c
 lib/state/runtime/runtime_trace.c'
     base_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$base_sources")"
     common_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$common_additions")"

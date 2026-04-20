@@ -2,7 +2,7 @@
 // Key Runtime Trace
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_trace.h"
+#include "trace.h"
 
 #include <string.h>
 

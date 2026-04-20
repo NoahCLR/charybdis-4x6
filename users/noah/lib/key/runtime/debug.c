@@ -4,7 +4,7 @@
 
 #include "../../state/runtime/runtime_debug.h"
 
-#include "../../runtime_v2/runtime_v2.h"
+#include "core/runtime.h"
 
 static bool noah_runtime_debug_key_pos_valid(keypos_t key_pos) {
     return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;

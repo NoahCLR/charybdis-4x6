@@ -134,18 +134,18 @@ check_runtime_sealing_boundaries() {
     key_runtime_process_internal_prod_allowlist='^(users/noah/lib/key/runtime/)'
     key_runtime_process_internal_prod_violations="$(
         repo_owned_production_include_violations \
-            '#include ".*key_runtime_process_internal\.h"' \
+            '#include ".*process_internal\.h"' \
             "$key_runtime_process_internal_prod_allowlist"
     )"
     if [ -n "$key_runtime_process_internal_prod_violations" ]; then
-        echo "only key-runtime owner modules may include key_runtime_process_internal.h in repo-owned production code" >&2
+        echo "only key-runtime owner modules may include process_internal.h in repo-owned production code" >&2
         printf '%s\n' "$key_runtime_process_internal_prod_violations" >&2
         exit 1
     fi
 
-    if repo_owned_code_includes '#include ".*key_runtime_process_internal\.h"' | grep -Ev '^users/noah/lib/key/runtime/' >/dev/null; then
-        echo "repo-owned code outside key-runtime owner modules must not include key_runtime_process_internal.h" >&2
-        repo_owned_code_includes '#include ".*key_runtime_process_internal\.h"' | grep -Ev '^users/noah/lib/key/runtime/' >&2
+    if repo_owned_code_includes '#include ".*process_internal\.h"' | grep -Ev '^users/noah/lib/key/runtime/' >/dev/null; then
+        echo "repo-owned code outside key-runtime owner modules must not include process_internal.h" >&2
+        repo_owned_code_includes '#include ".*process_internal\.h"' | grep -Ev '^users/noah/lib/key/runtime/' >&2
         exit 1
     fi
 
@@ -181,14 +181,14 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    pd_mode_keyboard_event_internal_prod_allowlist='^(users/noah/lib/pointing/runtime/|users/noah/lib/key/runtime/key_runtime_process\.c:)'
+    pd_mode_keyboard_event_internal_prod_allowlist='^(users/noah/lib/pointing/runtime/|users/noah/lib/key/runtime/process\.c:)'
     pd_mode_keyboard_event_internal_prod_violations="$(
         repo_owned_production_include_violations \
             '#include ".*pd_mode_keyboard_event_internal\.h"' \
             "$pd_mode_keyboard_event_internal_prod_allowlist"
     )"
     if [ -n "$pd_mode_keyboard_event_internal_prod_violations" ]; then
-        echo "only pd runtime owner modules and key_runtime_process.c may include pd_mode_keyboard_event_internal.h in repo-owned production code" >&2
+        echo "only pd runtime owner modules and process.c may include pd_mode_keyboard_event_internal.h in repo-owned production code" >&2
         printf '%s\n' "$pd_mode_keyboard_event_internal_prod_violations" >&2
         exit 1
     fi
@@ -215,7 +215,7 @@ compile_variant() {
 }
 
 compile_variant "tests/host/include/noah_compile_config.h" "" "$COMMON_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DCONSOLE_ENABLE -DNOAH_KEY_RUNTIME_TRACE_ENABLE -DNOAH_RUNTIME_TRACE_ENABLE" "$COMMON_SOURCES users/noah/lib/key/runtime/key_runtime_process.c users/noah/lib/key/runtime/key_runtime_preflight.c users/noah/lib/key/runtime/key_runtime_press.c users/noah/lib/key/runtime/key_runtime_release.c users/noah/lib/key/runtime/key_runtime_scan.c users/noah/lib/key/runtime/key_runtime_transition.c"
+compile_variant "tests/host/include/noah_compile_config.h" "-DCONSOLE_ENABLE -DNOAH_KEY_RUNTIME_TRACE_ENABLE -DNOAH_RUNTIME_TRACE_ENABLE" "$COMMON_SOURCES users/noah/lib/key/runtime/process.c users/noah/lib/key/runtime/preflight.c users/noah/lib/key/runtime/press.c users/noah/lib/key/runtime/release.c users/noah/lib/key/runtime/scan.c users/noah/lib/key/runtime/transition.c"
 compile_variant "tests/host/include/noah_compile_config_no_rgb_feedback.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "-DNOAH_RUNTIME_TRACE_ENABLE $POINTING_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES"

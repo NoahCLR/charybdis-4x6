@@ -2,27 +2,27 @@
 // Runtime V2 Foundation
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "runtime_v2.h"
-#include "runtime_v2_release_internal.h"
+#include "runtime.h"
+#include "release_internal.h"
 
 #include <string.h>
 
-#include "../pointing/defs/pd_modes.h"
-#include "../pointing/policy/pd_mode_policy.h"
-#include "../pointing/policy/pointer_layer_policy.h"
-#include "../action/action_dispatch.h"
-#include "../action/action_lifecycle.h"
-#include "../key/interaction/handled_key_internal.h"
-#include "../key/interaction/handled_key_policy.h"
-#include "../key/interaction/key_behavior_lookup.h"
-#include "../key/ownership/held_action.h"
-#include "../key/ownership/held_repeat.h"
-#include "../key/runtime/key_runtime_feedback.h"
-#include "../state/ownership/keyboard_mod_ownership.h"
-#include "../state/ownership/layer_ownership.h"
-#include "../state/runtime/runtime_debug.h"
-#include "../state/runtime/split_runtime_sync.h"
-#include "runtime_v2_trace.h"
+#include "../../../pointing/defs/pd_modes.h"
+#include "../../../pointing/policy/pd_mode_policy.h"
+#include "../../../pointing/policy/pointer_layer_policy.h"
+#include "../../../action/action_dispatch.h"
+#include "../../../action/action_lifecycle.h"
+#include "../../interaction/handled_key_internal.h"
+#include "../../interaction/handled_key_policy.h"
+#include "../../interaction/key_behavior_lookup.h"
+#include "../../ownership/held_action.h"
+#include "../../ownership/held_repeat.h"
+#include "../feedback.h"
+#include "../../../state/ownership/keyboard_mod_ownership.h"
+#include "../../../state/ownership/layer_ownership.h"
+#include "../../../state/runtime/runtime_debug.h"
+#include "../../../state/runtime/split_runtime_sync.h"
+#include "trace.h"
 
 __attribute__((weak)) const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
     (void)action;

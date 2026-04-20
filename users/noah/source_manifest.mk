@@ -21,14 +21,14 @@ NOAH_COMMON_SOURCES := \
     lib/key/interaction/handled_key_materialize.c \
     lib/key/interaction/key_behavior_lookup.c \
     lib/key/interaction/keymap_validation.c \
-    lib/key/runtime/key_runtime.c \
-    lib/key/runtime/key_runtime_preflight.c \
-    lib/key/runtime/key_runtime_process.c \
-    lib/key/runtime/key_runtime_press.c \
-    lib/key/runtime/key_runtime_release.c \
-    lib/key/runtime/key_runtime_scan.c \
-    lib/key/runtime/key_runtime_transition.c \
-    lib/key/runtime/key_runtime_trace.c \
+    lib/key/runtime/api.c \
+    lib/key/runtime/preflight.c \
+    lib/key/runtime/process.c \
+    lib/key/runtime/press.c \
+    lib/key/runtime/release.c \
+    lib/key/runtime/scan.c \
+    lib/key/runtime/transition.c \
+    lib/key/runtime/trace.c \
     lib/key/runtime/delayed_action.c \
     lib/key/ownership/held_action.c \
     lib/key/ownership/held_repeat.c \
@@ -45,17 +45,17 @@ NOAH_COMMON_SOURCES := \
     lib/macro/via_macro_provider.c \
     lib/macro/via_macro_defaults.c \
     lib/key/interaction/multi_tap_engine.c \
-    lib/key/runtime/key_runtime_feedback.c \
+    lib/key/runtime/feedback.c \
     lib/state/runtime/keyboard_mod_state.c \
     lib/state/runtime/runtime_diag.c \
     lib/state/ownership/keyboard_mod_ownership.c \
     lib/state/ownership/layer_ownership.c \
-    lib/key/runtime/key_runtime_debug.c \
+    lib/key/runtime/debug.c \
     lib/state/runtime/runtime_trace.c \
     lib/state/runtime/runtime_shared_state.c \
     lib/state/runtime/split_runtime_sync.c \
-    lib/runtime_v2/runtime_v2.c \
-    lib/runtime_v2/runtime_v2_trace.c \
+    lib/key/runtime/core/runtime.c \
+    lib/key/runtime/core/trace.c \
     lib/rgb/core/rgb_runtime.c \
     lib/rgb/stages/rgb_key_feedback_stage.c \
     lib/rgb/stages/rgb_layer_stage.c \

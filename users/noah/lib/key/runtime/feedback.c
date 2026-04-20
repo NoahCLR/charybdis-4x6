@@ -2,10 +2,10 @@
 // Key Runtime Feedback
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_feedback.h"
+#include "feedback.h"
 
 #include "../interaction/handled_key_policy.h"
-#include "../../runtime_v2/runtime_v2.h"
+#include "core/runtime.h"
 
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
 #    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS

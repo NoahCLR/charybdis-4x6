@@ -2,9 +2,9 @@
 // Key Runtime
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "key_runtime_api.h"
-#include "key_runtime_transition.h"
-#include "../../runtime_v2/runtime_v2.h"
+#include "api.h"
+#include "transition.h"
+#include "core/runtime.h"
 
 bool noah_key_runtime_settle_pending_fallback_hold(void) {
     runtime_v2_effect_plan_t v2_plan;

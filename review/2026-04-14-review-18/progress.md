@@ -1,20 +1,62 @@
 # Progress
 
+## 2026-04-20 Unified Key Runtime Tree Rename
+
+- Collapsed the handled-key runtime onto one permanent subtree rooted at
+  `users/noah/lib/key/runtime/`.
+- Moved the reducer-owned runtime files into
+  `users/noah/lib/key/runtime/core/` and renamed the QMK-facing runtime files
+  to short basenames:
+  - `api.c`, `process.c`, `preflight.c`, `press.c`, `release.c`, `scan.c`,
+    `transition.c`, `trace.c`, `feedback.c`, and `debug.c`
+  - `api.h`, `process_internal.h`, `interaction.h`, `types.h`
+  - `effects/effect.h`, `effects/effect_queue.h`
+  - `slot/release_resolver.h`
+- Kept the exported symbol families unchanged for this pass:
+  - `runtime_v2_*`
+  - `key_runtime_*`
+  - `noah_key_runtime_*`
+- Updated relative includes, `users/noah/source_manifest.mk`, host source
+  manifests, compile-gate path allowlists, docs, and live review references so
+  the file tree now matches the architecture directly.
+- Fixed rename-exposed implementation drift while verifying the move:
+  - `press.c`, `release.c`, and `transition.c` now consistently use the
+    declared `key_runtime_transition_*` functions, and
+  - `trace.c` now consistently uses the declared
+    `key_runtime_trace_hold_policy_*` types/functions.
+- Historical entries below may still mention pre-rename basenames when
+  describing audit-time snapshots, but current live-tree references now point
+  at the unified `key/runtime/` layout.
+- Verification completed for this structural rename pass:
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_split_runtime_sync_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- Next steps:
+  - keep symbol-family cleanup as a separate follow-up now that the directory
+    and file naming is stable, and
+  - use the current `key/runtime/` paths in any future review notes unless a
+    note is intentionally describing a pre-rename snapshot.
+
 ## 2026-04-20 Runtime Folder Role Wording Cleanup
 
 - Reconciled stale maintainer-facing wording that still described a mid-cutover
   runtime shape even though the thread is already closed as single-authority.
-- Updated `users/noah/lib/runtime_v2/runtime_v2.h` to describe the current
+- Updated `users/noah/lib/key/runtime/core/runtime.h` to describe the current
   production ownership split accurately:
-  - `runtime_v2/` is the reducer/state-owner layer, and
-  - `users/noah/lib/key/runtime/` is the QMK-facing orchestration and effect
-    projection layer around it.
-- Updated `users/noah/lib/runtime_v2/runtime_v2_trace.h` so the trace comment
+  - `users/noah/lib/key/runtime/core/` is the reducer/state-owner layer, and
+  - the surrounding `users/noah/lib/key/runtime/` files are the QMK-facing
+    orchestration and effect projection layer around it.
+- Updated `users/noah/lib/key/runtime/core/trace.h` so the trace comment
   no longer claims events are recorded before they hit a separate legacy
   runtime.
-- Extended `docs/KEY_RUNTIME.md` with one explicit "Why Two Folders Still
-  Exist" section so maintainers do not have to infer the directory split from
-  file names alone.
+- Extended `docs/KEY_RUNTIME.md` with one explicit "Core vs Integration"
+  section so maintainers do not have to infer the directory split from file
+  names alone.
 - Verification completed for this wording-only pass:
   - `sh tests/host/run_all_host_tests.sh`
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
@@ -63,7 +105,7 @@
   - `WATCHDOG_TEST_PROCESS_RECORD` is gone from `users/noah/noah_keymap_ids.h`,
   - the temporary `KC_ESC + LEFT_THUMB + RIGHT_THUMB` combo was removed from
     `keymap.c`, and
-  - `users/noah/lib/key/runtime/key_runtime_process.c` no longer carries a
+  - `users/noah/lib/key/runtime/process.c` no longer carries a
     maintenance-only hard-freeze branch in normal `process_record` flow.
 - Simplified `runtime_diag` back to production-only breadcrumb handling:
   - the temporary deliberate-fault trigger API and host-only fault bookkeeping
@@ -90,7 +132,7 @@
 - Added one deliberate hardware watchdog trigger for validating the diagnostic
   on-device from a non-idle runtime stage:
   - `WATCHDOG_TEST_PROCESS_RECORD` is now a shared userspace keycode in `users/noah/noah_keymap_ids.h`,
-  - `users/noah/lib/key/runtime/key_runtime_process.c` consumes that key on press and freezes immediately from inside `NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD`, and
+  - `users/noah/lib/key/runtime/process.c` consumes that key on press and freezes immediately from inside `NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD`, and
   - the current profile exposes it only through a deliberate combo chord in `keymap.c`: `KC_ESC + LEFT_THUMB + RIGHT_THUMB`.
 - Kept the injector narrow and host-testable:
   - `users/noah/lib/state/runtime/runtime_diag.h` and `.c` now expose `noah_runtime_diag_trigger_test_fault(...)`,
@@ -121,7 +163,7 @@
   - a latched reboot stage is exposed as a short-lived runtime indicator on the next boot.
 - Wired the diagnostic into the master-heavy userspace paths most likely to explain the physical freeze report:
   - `users/noah/runtime_init.c` now brackets via-default scan, key-runtime scan, split sync, housekeeping, and post-init stages,
-  - `users/noah/lib/key/runtime/key_runtime_process.c` now brackets `process_record` and finalize flow,
+  - `users/noah/lib/key/runtime/process.c` now brackets `process_record` and finalize flow,
   - `users/noah/lib/pointing/runtime/pd_runtime.c` now brackets pointing-task and layer-state-set hooks, and
   - `users/noah/lib/rgb/core/rgb_runtime.c` now renders a full-board diagnostic color when a watchdog reboot latched a stage.
 - Kept the diagnostic inert on non-RP2040 / non-test-backend host runners:
@@ -161,9 +203,9 @@
   - the repo already documents that failed split transactions can block the main loop.
 - Mitigation landed by deferring runtime split sync requests onto the existing scan heartbeat:
   - `users/noah/lib/state/runtime/split_runtime_sync.c` and `.h` now expose `split_runtime_sync_request()`,
-  - handled key press/release in `users/noah/lib/key/runtime/key_runtime_press.c` and `key_runtime_release.c` now request sync instead of sending RPC immediately,
+  - handled key press/release in `users/noah/lib/key/runtime/press.c` and `key_runtime_release.c` now request sync instead of sending RPC immediately,
   - pd-mode state transitions in `users/noah/lib/pointing/runtime/pd_mode_state.c` now request sync instead of sending immediately, and
-  - `KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP` in `users/noah/lib/runtime_v2/runtime_v2.c` now does the same.
+  - `KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP` in `users/noah/lib/key/runtime/core/runtime.c` now does the same.
 - The runtime behavior stays the same at the protocol level:
   - the next matrix-scan tick still sends the full packet when runtime-visible state changed, and
   - explicit force-send still exists for init-time and other direct callers that intentionally need immediate broadcast.
@@ -203,7 +245,7 @@
 ## 2026-04-20 Runtime V2 Release Fallback Shim Reduction Pass
 
 - Removed the last production transition-layer dependency on `key_runtime_slot_step(...)`:
-  - non-authoritative handled-release fallback in `users/noah/lib/key/runtime/key_runtime_transition.c` now calls `key_runtime_slot_reduce_handled_release(...)` directly instead of routing through a synthetic slot-step event.
+  - non-authoritative handled-release fallback in `users/noah/lib/key/runtime/transition.c` now calls `key_runtime_slot_reduce_handled_release(...)` directly instead of routing through a synthetic slot-step event.
 - The same file also now uses `key_runtime_slot_direct_plan_builder_has_effect(...)` for transition-layer builder checks, so the production transition path no longer depends on `key_runtime_slot_result_internal.h` just to answer “does this builder emit anything?”
 - This keeps the cut narrow:
   - slot-step itself still exists as a compatibility wrapper for focused slot/unit callers and tests,
@@ -215,14 +257,14 @@
 - Moved the remaining production deferred-release orchestration seam onto the authoritative reducer path:
   - deferred dispatch assembly on handled release now queues directly into `runtime_v2` when the normalized input stream is authoritative, and
   - deferred dispatch drain now drains directly from `runtime_v2` instead of using the legacy shared queue as the source of truth.
-- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now expose:
+- `users/noah/lib/key/runtime/core/runtime.h` and `.c` now expose:
   - `runtime_v2_queue_pending_release_dispatch(...)`, which appends one pending release directly into reducer-owned state, and
   - `runtime_v2_pending_release_at_order(...)`, which exposes reducer-owned pending releases in sequence order for debug/readback without draining them.
-- `users/noah/lib/key/runtime/key_runtime_release.c` now uses that new queue API in `key_runtime_release_plan_defer_dispatch_actions(...)` when runtime-v2 is authoritative:
+- `users/noah/lib/key/runtime/release.c` now uses that new queue API in `key_runtime_release_plan_defer_dispatch_actions(...)` when runtime-v2 is authoritative:
   - handled-release tap actions that must defer are removed from the live transition plan and queued directly into reducer-owned pending-release state,
   - the legacy shared deferred-release queue is now fallback-only for non-authoritative surfaces, and
   - `key_runtime_release_drain_deferred_dispatches()` now drains from runtime-v2 directly whenever the authoritative reducer path is live.
-- `users/noah/lib/key/runtime/key_runtime_debug.c` now reports deferred-release count, key position, and action from reducer-owned pending-release state whenever the authoritative runtime-v2 path is live, preserving the public debug contract while the legacy queue stops being the default source of truth.
+- `users/noah/lib/key/runtime/debug.c` now reports deferred-release count, key position, and action from reducer-owned pending-release state whenever the authoritative runtime-v2 path is live, preserving the public debug contract while the legacy queue stops being the default source of truth.
 - `tests/host/runtime_debug_test.c` now includes dedicated coverage proving:
   - reducer-owned deferred releases are visible through the public debug surface in sequence order, and
   - the reducer-owned queue APIs expose the same pending release ordering that the drain path consumes.
@@ -241,7 +283,7 @@
 - `users/noah/lib/key/runtime/slot/key_runtime_slot_direct_plan.h` now also covers the remaining press-only effect shapes needed by that reducer:
   - direct dispatch-action emission, and
   - direct layer-press emission.
-- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses that direct press helper in `key_runtime_transition_handled_key_press(...)`, so the default press path no longer depends on slot-step/result transport.
+- `users/noah/lib/key/runtime/transition.c` now uses that direct press helper in `key_runtime_transition_handled_key_press(...)`, so the default press path no longer depends on slot-step/result transport.
 - This keeps the cut narrow:
   - `key_runtime_slot_step(...)` still exists as the compatibility wrapper for focused slot tests and any narrowed callers,
   - press-state mutation is unchanged,
@@ -263,7 +305,7 @@
   - reducer-owned pending-hold promotion,
   - long-hold promotion, and
   - expired pending-chain flush.
-- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses those direct scan helpers in `key_runtime_transition_scan(...)`:
+- `users/noah/lib/key/runtime/transition.c` now uses those direct scan helpers in `key_runtime_transition_scan(...)`:
   - active slots append their direct scan effects straight into the transition plan,
   - active slots with live pending multi-tap state append that second direct scan plan immediately after the active scan plan, and
   - independent pending-only slots append their pending multi-tap scan plan directly as well.
@@ -279,7 +321,7 @@
 ## 2026-04-20 Runtime V2 Flush And Interrupt Transport Pass
 
 - Moved the next non-release transport seams off `key_runtime_slot_result_t`: pending-chain flush and active-key interrupt/flush no longer round-trip through slot-step result wrappers before effects reach the transition plan.
-- `users/noah/lib/key/runtime/key_runtime_transition.c` now:
+- `users/noah/lib/key/runtime/transition.c` now:
   - translates `key_runtime_slot_pending_multi_tap_flush_t` directly into delayed-action effects for:
     - `key_runtime_transition_flush_multi_tap(...)`, and
     - `key_runtime_transition_flush_foreign_multi_tap(...)`,
@@ -307,7 +349,7 @@
   - seeds pending multi-tap state when needed, and
   - returns the reducer-owned effect plan without routing through `key_runtime_slot_result_t`.
 - `users/noah/lib/key/runtime/slot/key_runtime_slot_pending_multi_tap.h` and `.c` now expose `key_runtime_slot_take_v2_pending_multi_tap_release_plan(...)`, which does the same for pending multi-tap release, including preserve-chain settlement and delayed-action / held-lifecycle planning.
-- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses those direct helpers when runtime-v2 has authoritative normalized input:
+- `users/noah/lib/key/runtime/transition.c` now uses those direct helpers when runtime-v2 has authoritative normalized input:
   - active and pending-multi-tap handled releases bypass `key_runtime_slot_step(...)` and `key_runtime_slot_reduce_handled_release(...)`,
   - reducer-owned effect plans append directly into `key_runtime_transition_plan_t`, and
   - unmatched handled releases now append their layer-release / owned-state cleanup effects directly into the transition plan instead of round-tripping through slot-result transport.
@@ -323,10 +365,10 @@
 ## 2026-04-19 Runtime V2 Effect Projection Pass
 
 - Moved the world-application seam for handled-key runtime effects onto runtime-v2-owned projector helpers: transition and release orchestration no longer own the direct QMK-side effect switch for authored runtime effects.
-- Added `users/noah/lib/runtime_v2/runtime_v2_projection.h` as the reducer-owned projector surface for:
+- Added `users/noah/lib/key/runtime/core/projection.h` as the reducer-owned projector surface for:
   - `runtime_v2_project_effect(...)`, which applies one `key_runtime_effect_t`, and
   - `runtime_v2_project_pending_release_dispatch(...)`, which applies one drained deferred-release dispatch.
-- `users/noah/lib/runtime_v2/runtime_v2.c` now owns the effect projector implementation for:
+- `users/noah/lib/key/runtime/core/runtime.c` now owns the effect projector implementation for:
   - action taps,
   - held-action register/unregister,
   - release-owned-state cleanup,
@@ -335,10 +377,10 @@
   - feedback pulse,
   - pd-mode lock tap, and
   - delayed-action repeats.
-- `users/noah/lib/key/runtime/key_runtime_transition.c` now reduces `key_runtime_transition_execute_plan(...)` to:
+- `users/noah/lib/key/runtime/transition.c` now reduces `key_runtime_transition_execute_plan(...)` to:
   - trace the effect, then
   - hand it to `runtime_v2_project_effect(...)`.
-- `users/noah/lib/key/runtime/key_runtime_release.c` now routes both:
+- `users/noah/lib/key/runtime/release.c` now routes both:
   - reducer-owned drained pending releases, and
   - legacy deferred-release queue fallback dispatches,
   through `runtime_v2_project_pending_release_dispatch(...)` instead of calling delayed-action execution directly.
@@ -353,12 +395,12 @@
 ## 2026-04-19 Runtime V2 Release Effect Planning Pass
 
 - Moved handled-release effect selection onto the reducer-owned path: once runtime-v2 decides active or pending multi-tap release outcome, the default release callers no longer re-map that decision into effects locally.
-- `users/noah/lib/runtime_v2/runtime_v2_release_internal.h` now defines:
+- `users/noah/lib/key/runtime/core/release_internal.h` now defines:
   - `runtime_v2_release_effect_plan_t`,
   - `runtime_v2_pending_multi_tap_seed_t`,
   - reducer-owned slot-settlement instructions, and
   - planning APIs for active and pending multi-tap release.
-- `users/noah/lib/runtime_v2/runtime_v2.c` now exposes:
+- `users/noah/lib/key/runtime/core/runtime.c` now exposes:
   - `runtime_v2_plan_active_release_effects(...)`, which maps reducer-owned active-release decisions into:
     - concrete effect queue items,
     - pending multi-tap seed payload, and
@@ -379,7 +421,7 @@
 ## 2026-04-19 Runtime V2 Slot Retirement And Explicit Multi-Tap Flush Pass
 
 - Moved the next mixed-ownership cleanup seam into the reducer-aware path: explicit pending-multi-tap flush/reset and forced active-slot retirement no longer leave `runtime_v2` state live after the legacy slot world has been cleared.
-- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now expose:
+- `users/noah/lib/key/runtime/core/runtime.h` and `.c` now expose:
   - `runtime_v2_take_pending_multi_tap_flush(...)` to resolve and clear reducer-owned tap-series state during explicit flush,
   - `runtime_v2_reset_pending_multi_tap(...)` to clear reducer-owned tap-series state when legacy slot storage is reset directly, and
   - `runtime_v2_retire_press_token(...)` to cancel an active reducer-owned press token when the legacy slot is forcibly flushed/reset before physical key-up.
@@ -398,13 +440,13 @@
 ## 2026-04-19 Runtime V2 Pending Multi-Tap Lifecycle Pass
 
 - Moved the next multi-tap lifecycle seam into the reducer-owned shadow path: scan-time pending-hold promotion and chain-expiry flush now resolve from runtime-v2 token/tap-series state instead of only from slot-local timer state.
-- `users/noah/lib/runtime_v2/runtime_v2.h` now keeps richer tap-series records:
+- `users/noah/lib/key/runtime/core/runtime.h` now keeps richer tap-series records:
   - first-tap action,
   - current tap action/repeat payload,
   - authored hold/long-hold contract for the current tap count,
   - per-series tap-hold term, and
   - the per-series multi-tap term.
-- `users/noah/lib/runtime_v2/runtime_v2.c` now:
+- `users/noah/lib/key/runtime/core/runtime.c` now:
   - keeps authored multi-tap chains alive past generic time refresh until the dedicated pending-multi-tap scan resolver settles them,
   - exposes `runtime_v2_resolve_pending_multi_tap_scan(...)`,
   - resolves scan-time hold-threshold promotion, long-hold promotion, and expired-chain flush from reducer-owned token/tap-series state, and
@@ -413,7 +455,7 @@
   - build the actual hold/long-hold effect,
   - carry the saved delayed-action mod snapshot, and
   - reset legacy pending-multi-tap storage after the decision.
-- `users/noah/lib/key/runtime/key_runtime_trace.h` and `.c` now distinguish reducer-owned pending-multi-tap scan decisions for:
+- `users/noah/lib/key/runtime/trace.h` and `.c` now distinguish reducer-owned pending-multi-tap scan decisions for:
   - hold-threshold promotion,
   - long-hold promotion, and
   - expired-chain flush.
@@ -426,7 +468,7 @@
 ## 2026-04-19 Runtime V2 Pending Multi-Tap Release Settlement Pass
 
 - Moved the second handled-release caller onto the reducer-owned release planner: pending multi-tap release no longer decides tap-vs-hold-vs-long-hold by rebuilding semantics only from the live slot world.
-- `users/noah/lib/runtime_v2/runtime_v2_release_internal.h` and `users/noah/lib/runtime_v2/runtime_v2.c` now expose `runtime_v2_resolve_pending_multi_tap_release(...)`, which resolves pending multi-tap release outcome from:
+- `users/noah/lib/key/runtime/core/release_internal.h` and `users/noah/lib/key/runtime/core/runtime.c` now expose `runtime_v2_resolve_pending_multi_tap_release(...)`, which resolves pending multi-tap release outcome from:
   - the released press token's immutable interaction snapshot,
   - the reducer-owned release timestamp / elapsed interval,
   - the resolved tap payload returned by `multi_tap_resolve_hold(...)`, and
@@ -443,11 +485,11 @@
 ## 2026-04-19 Runtime V2 Active Release Settlement Pass
 
 - Moved the active-slot release decision onto reducer-owned press-token state while keeping pending multi-tap release settlement on the legacy shared resolver for this pass.
-- `users/noah/lib/runtime_v2/runtime_v2.h` now stores the immutable press-resolved `key_runtime_slot_interaction_t` on each press token, plus a reducer-owned `slot_phase` that tracks release semantics separately from the generic token lifecycle phase.
-- `users/noah/lib/runtime_v2/runtime_v2.c` now:
+- `users/noah/lib/key/runtime/core/runtime.h` now stores the immutable press-resolved `key_runtime_slot_interaction_t` on each press token, plus a reducer-owned `slot_phase` that tracks release semantics separately from the generic token lifecycle phase.
+- `users/noah/lib/key/runtime/core/runtime.c` now:
   - updates reducer-owned release phase only from scan/effect progression instead of reinterpreting phase on key-up,
   - keeps held-action/repeat leases alive across physical key-up until `RELEASE_OWNED_STATE_BY_KEY` unwinds them,
-  - exposes `runtime_v2_resolve_active_release(...)` through `runtime_v2_release_internal.h`, and
+  - exposes `runtime_v2_resolve_active_release(...)` through `core/release_internal.h`, and
   - resolves active release outcome from the immutable token interaction snapshot plus reducer-owned held/repeat leases.
 - `users/noah/lib/key/runtime/slot/key_runtime_slot_release_active.c` now uses that v2 release-resolution path when the normalized runtime-v2 stream is authoritative, and falls back to the legacy slot-owned resolver otherwise.
 - This production cut keeps the old effect mapping and pending multi-tap reducer in place, but active release settlement for the default hook path no longer depends on mutable live slot interaction being re-derived at release time.
@@ -458,12 +500,12 @@
 ## 2026-04-19 Runtime V2 Owned-State Lease Observation Pass
 
 - Moved held-action and held-repeat ownership into reducer-observed lease state so the remaining release/unwind path is no longer guessing about owned runtime state.
-- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now:
+- `users/noah/lib/key/runtime/core/runtime.h` and `.c` now:
   - track `LEASE_KIND_HELD_ACTION` and `LEASE_KIND_REPEAT` by physical key position,
   - expose observer hooks for held-action register/unregister and repeat start, and
   - expose `runtime_v2_release_owned_state_by_key(...)` so reducer-owned held/repeat leases can be cleared by the production release/unwind seam.
 - `runtime_v2_press_token_owned_state_active(...)` now consults reducer-observed held/repeat leases before falling back to threshold-based inference, tightening blocker semantics around real owned state.
-- `users/noah/lib/key/runtime/key_runtime_transition.c` now feeds the production effect executor through those reducer observers:
+- `users/noah/lib/key/runtime/transition.c` now feeds the production effect executor through those reducer observers:
   - `KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER`
   - `KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER`
   - `KEY_RUNTIME_EFFECT_REPEAT_START`
@@ -477,10 +519,10 @@
 ## 2026-04-19 Runtime V2 Pending Release Drain Ownership Pass
 
 - Moved the next release-cleanup seam out of pure observer mode and into reducer-owned state management.
-- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now give each pending release a stable sequence number and expose:
+- `users/noah/lib/key/runtime/core/runtime.h` and `.c` now give each pending release a stable sequence number and expose:
   - total pending-release count, and
   - `runtime_v2_take_pending_release_dispatches(...)`, which drains pending releases in enqueue order and clears the owning token's `pending_release_emission` / release-pending phase inside the reducer.
-- `users/noah/lib/key/runtime/key_runtime_release.c` now uses that reducer-owned take path when:
+- `users/noah/lib/key/runtime/release.c` now uses that reducer-owned take path when:
   - runtime-v2 has observed the real normalized input stream, and
   - the mirrored legacy queue count matches the reducer-owned pending-release count.
 - In that authoritative path, the legacy deferred-release queue is now transport-only mirror state; the reducer owns pending-release ordering and cleanup, while `key_runtime_release.c` only executes the drained actions.
@@ -491,22 +533,22 @@
 ## 2026-04-19 Runtime V2 Production Blocker Query Bridge Pass
 
 - Moved the blocker migration one step out of pure shadow mode and into the real production path.
-- `users/noah/lib/key/runtime/key_runtime_process.c` now feeds normalized physical key down/up events into `runtime_v2` from the real `noah_process_record_user(...)` path for non-synthetic records.
-- `users/noah/lib/key/runtime/key_runtime_scan.c` now feeds normalized scan events into `runtime_v2` from the real key-runtime scan path, so shadow blocker timing advances under the same scan cadence as production hold promotion and deferred-release drain.
-- `users/noah/lib/runtime_v2/runtime_v2.c` and `.h` now expose:
+- `users/noah/lib/key/runtime/process.c` now feeds normalized physical key down/up events into `runtime_v2` from the real `noah_process_record_user(...)` path for non-synthetic records.
+- `users/noah/lib/key/runtime/scan.c` now feeds normalized scan events into `runtime_v2` from the real key-runtime scan path, so shadow blocker timing advances under the same scan cadence as production hold promotion and deferred-release drain.
+- `users/noah/lib/key/runtime/core/runtime.c` and `.h` now expose:
   - production-facing key/scan observer entry points,
   - an `input_stream_observed` authority latch, and
   - native blocker query helpers for:
     - any blocker
     - foreign blocker except a key position
-- `users/noah/lib/key/runtime/key_runtime_transition.c` now uses the v2 blocker queries when the normalized runtime-v2 input stream is authoritative, and falls back to the legacy index blocker queries in low-level slot/unit surfaces that still mutate legacy state directly without feeding v2.
+- `users/noah/lib/key/runtime/transition.c` now uses the v2 blocker queries when the normalized runtime-v2 input stream is authoritative, and falls back to the legacy index blocker queries in low-level slot/unit surfaces that still mutate legacy state directly without feeding v2.
 - `tests/host/key_runtime_integration_harness.c` now avoids double-feeding key/scan events into runtime-v2 when the linked real userspace already does that itself, while still keeping manual v2 injection for standalone timer/pointer/remote replay events.
 - `tests/host/runtime_debug_test.c` now proves the production process hook feeds blocker queries and that the scan observer clears the quick-tap blocker once hold ownership settles.
 
 ## 2026-04-19 Runtime V2 Native Blocker Derivation Pass
 
 - Replaced the shadow reducer's observer-fed deferred-release blocker semantics with native blocker derivation from authored token state.
-- `users/noah/lib/runtime_v2/runtime_v2.c` now derives blocker truth from:
+- `users/noah/lib/key/runtime/core/runtime.c` now derives blocker truth from:
   - immutable press-token identity,
   - handled-key materialization resolved at press time against shadow layer state,
   - token-owned interruption latches,
@@ -523,13 +565,13 @@
 ## 2026-04-19 Runtime V2 Blocker Observation Pass
 
 - Extended the shadow reducer into deferred-release blocker ownership so blocker state is now visible in `runtime_v2` and the parity snapshot surface instead of staying entirely trapped in legacy slot/index storage.
-- `users/noah/lib/runtime_v2/runtime_v2.h` and `.c` now keep one blocker record per physical key position, owned by the current press token id for that key position.
+- `users/noah/lib/key/runtime/core/runtime.h` and `.c` now keep one blocker record per physical key position, owned by the current press token id for that key position.
 - The v2 blocker record stores the same timed profile shape as the legacy blocker owner:
   - blocks before `tap_hold_term`
   - blocks after `tap_hold_term`
 - `runtime_v2` now evaluates the time-boundary locally from the owning press token's `pressed_at` and `hold_term_ms`, so the shadow path no longer depends on legacy scan-time blocker refresh to know whether a timed blocker is currently active.
 - `users/noah/lib/key/runtime/key_runtime_index.c` now feeds that profile into `runtime_v2_observe_deferred_release_blocker_profile(...)` from the real blocker owner seam, and the v2 observer binds the blocker record to the currently active press token on the same physical key.
-- `users/noah/lib/state/runtime/runtime_debug.h` and `users/noah/lib/key/runtime/key_runtime_debug.c` now expose legacy blocker counts for projection capture, and `runtime_v2_projection_snapshot_capture()` now records both:
+- `users/noah/lib/state/runtime/runtime_debug.h` and `users/noah/lib/key/runtime/debug.c` now expose legacy blocker counts for projection capture, and `runtime_v2_projection_snapshot_capture()` now records both:
   - legacy blocker counts
   - v2 shadow blocker counts
 - `tests/host/runtime_debug_test.c` now proves both timed blocker directions in the shadow reducer:
@@ -563,10 +605,10 @@
 
 - Moved the next release-path seam away from anonymous shared state by adding explicit owner identity to deferred release dispatches and shadowing them as owned v2 pending-release records.
 - `users/noah/lib/key/runtime/key_runtime_shared_state.h` now stores `key_pos` alongside each deferred release action/mod snapshot, so the legacy queue no longer drops the physical-key owner identity.
-- `users/noah/lib/key/runtime/key_runtime_release.c` now records that owner key position when deferring release actions and notifies runtime-v2 on both enqueue and drain, so the shadow reducer sees real production deferral/drain events instead of synthetic test-only calls.
-- `users/noah/lib/runtime_v2/runtime_v2.c` and `.h` now track `pending_release_t` records separately from active press tokens, including a dedicated `v2_pending_release_count` snapshot field and a `runtime_v2_pending_release_count_for_keypos(...)` debug query.
+- `users/noah/lib/key/runtime/release.c` now records that owner key position when deferring release actions and notifies runtime-v2 on both enqueue and drain, so the shadow reducer sees real production deferral/drain events instead of synthetic test-only calls.
+- `users/noah/lib/key/runtime/core/runtime.c` and `.h` now track `pending_release_t` records separately from active press tokens, including a dedicated `v2_pending_release_count` snapshot field and a `runtime_v2_pending_release_count_for_keypos(...)` debug query.
 - This keeps a deferred release bound to the releasing physical key even if that key position is pressed again before the deferred action drains, which is the exact ownership property the old anonymous queue could not represent.
-- `users/noah/lib/state/runtime/runtime_debug.h` and `users/noah/lib/key/runtime/key_runtime_debug.c` now expose deferred-release owner key position and action for host assertions.
+- `users/noah/lib/state/runtime/runtime_debug.h` and `users/noah/lib/key/runtime/debug.c` now expose deferred-release owner key position and action for host assertions.
 - `tests/host/key_runtime_release_matrix_test.c` now proves the legacy deferred release queue retains the releasing key position, and `tests/host/runtime_debug_test.c` now proves the v2 pending-release record survives same-key slot reuse until it is explicitly drained.
 
 ## 2026-04-19 Runtime V2 Live Lock Mutation Observation Pass
@@ -581,7 +623,7 @@
 ## 2026-04-19 Runtime V2 Pd-Mode And Pointer Ownership Shadow Pass
 
 - Extended the shadow reducer into the first wedge-prone overlap domain: pd-mode ownership and pointer anchoring.
-- `users/noah/lib/runtime_v2/runtime_v2.c` now:
+- `users/noah/lib/key/runtime/core/runtime.c` now:
   - creates token-owned active pd-mode leases for raw pd-mode keys,
   - creates token-owned pointer-anchor leases for momentary anchored pd modes,
   - owns persistent pd-mode lock intents,
@@ -598,7 +640,7 @@
 ## 2026-04-19 Runtime V2 Layer And Modifier Lease Shadow Pass
 
 - Extended the shadow reducer from identity-only state into real lease-backed ownership for the first shared domains: layers and modifiers.
-- `users/noah/lib/runtime_v2/runtime_v2.c` now:
+- `users/noah/lib/key/runtime/core/runtime.c` now:
   - creates token-owned layer leases for raw `MO(layer)` presses,
   - promotes raw `LT(layer, key)` into a layer lease only after hold timing settles,
   - creates physical modifier leases for raw modifier key presses, and
@@ -620,7 +662,7 @@
   - release-by-position surviving release-keycode mismatch,
   - timer/scan hold promotion preserving immutable press identity, and
   - tap-series state remaining separate from active press-token storage.
-- Tightened the new reducer in `users/noah/lib/runtime_v2/runtime_v2.c` so a same-key pending-hold tap series cannot expire just because tap-term time elapsed while its owning second press is still physically active. That was a real shadow-runtime bug and exactly the kind of cross-state corruption the redesign is meant to eliminate.
+- Tightened the new reducer in `users/noah/lib/key/runtime/core/runtime.c` so a same-key pending-hold tap series cannot expire just because tap-term time elapsed while its owning second press is still physically active. That was a real shadow-runtime bug and exactly the kind of cross-state corruption the redesign is meant to eliminate.
 - Extended the runtime-debug host support manifest so the new reducer, v2 trace helpers, and pointer-layer policy debug surface are linked together coherently in white-box test builds.
 - Wired the real-profile shadow replay suite onto the reducer-backed harness path with `tests/host/key_runtime_integration_runtime_v2_adapter.c`, so the existing nav/dragscroll and GUI-alt/nav overlap parity scenarios now replay against live press-token/tap-series state instead of trace encoding alone.
 - This pass still does not cut over production hooks. It does move the active review from "trace substrate only" to "shadow reducer with mechanical invariants," which is the first real step toward deleting release-time reinterpretation from the architecture.
@@ -629,7 +671,7 @@
 
 - Landed the first implementation pass of the single-authority runtime redesign without cutting over production behavior yet.
 - Added the preservation contract in `runtime-v2-preservation-matrix.md`, tying the redesign acceptance bar to `docs/INTERACTION_MODEL.md`, `docs/KEYMAP.md`, and the real-profile integration scenarios instead of legacy slot-model white-box behavior.
-- Added the new internal `users/noah/lib/runtime_v2/` subtree with the typed v2 foundation:
+- Added the new internal reducer subtree, now located at `users/noah/lib/key/runtime/core/`, with the typed v2 foundation:
   - `runtime_event_t`
   - `press_token_t`
   - `tap_series_t`
@@ -770,7 +812,7 @@
   - `key_runtime_slot_policy.c` now sets that latch only for true momentary-layer tap paths, while immediate-hold quick-release taps and pd-mode quick-lock taps keep their own release contracts,
   - `key_runtime_transition.c` no longer infers deferred-release blockers by running the generic release resolver over live slots; blocker classification is now a separate phase/ownership helper that ignores slots once they have committed held or repeat ownership,
   - `key_runtime_transition.c` now also excludes active slots that are still carrying a pending multi-tap hold from deferred-release blocker classification, so a pending modifier-hold does not queue unrelated authored child taps behind a phantom sibling release window,
-  - `key_runtime_shared_state.h`, `key_runtime_slot_policy.c`, and `key_runtime_slot_release_resolver.h` now also track foreign-key overlap for immediate-hold paths explicitly, separate from momentary-layer tap cancellation, so a used immediate hold cannot reopen its quick-release tap or preserve a first-tap multi-tap chain on release,
+  - `key_runtime_shared_state.h`, `key_runtime_slot_policy.c`, and `slot/release_resolver.h` now also track foreign-key overlap for immediate-hold paths explicitly, separate from momentary-layer tap cancellation, so a used immediate hold cannot reopen its quick-release tap or preserve a first-tap multi-tap chain on release,
   - the public runtime-debug surface now exposes slot phase and momentary-layer interrupt state so host tests can assert runtime invariants directly instead of inferring them only from output effects,
   - the overlap integration coverage now exercises `KC_LEFT_GUI` double-tap-hold against raw `LT(...)`, authored nav holds, and an authored pd-mode hold while asserting quiescent runtime state after every release-order permutation,
   - host coverage now also locks the pending-multi-tap blocker contract in two places: `tests/host/key_runtime_modifier_hold_integration_test.c` proves a pending multi-tap modifier hold does not defer a processed child, and `tests/host/real_profile_thumb_layer_lock_integration_test.c` proves the raw right-side `LT(LAYER_NAV, KC_SLSH)` path keeps nav-arrow and dragscroll children immediate even while `KC_LEFT_GUI` is still in its second-tap pending-hold window,
@@ -1070,13 +1112,13 @@
     - `tests/host/run_key_runtime_transition_tests.sh`
     - `tests/host/runtime_v2_observer_stub.c`
   - moved the production runtime entirely onto reducer-owned press/release/scan/fallback-hold transport:
-    - `users/noah/lib/key/runtime/key_runtime_press.c`
-    - `users/noah/lib/key/runtime/key_runtime_release.c`
-    - `users/noah/lib/key/runtime/key_runtime_scan.c`
-    - `users/noah/lib/key/runtime/key_runtime_preflight.c`
-    - `users/noah/lib/key/runtime/key_runtime.c`
-    - `users/noah/lib/key/runtime/key_runtime_process.c`
-    - `users/noah/lib/key/runtime/key_runtime_transition.c`
+    - `users/noah/lib/key/runtime/press.c`
+    - `users/noah/lib/key/runtime/release.c`
+    - `users/noah/lib/key/runtime/scan.c`
+    - `users/noah/lib/key/runtime/preflight.c`
+    - `users/noah/lib/key/runtime/api.c`
+    - `users/noah/lib/key/runtime/process.c`
+    - `users/noah/lib/key/runtime/transition.c`
   - made `runtime_v2` the only runtime authority for blocker queries, release planning, tap-series lifetime, reducer-owned lease cleanup, and non-handled ownership release finalization
   - rewrote runtime debug/feedback around v2-owned queries and projection snapshots
   - updated the host manifest, compile gate, and runner inventory to the v2-only tree
@@ -1107,7 +1149,7 @@
   - added reducer-owned pending DPI sync state and serviced it from the normal scan path:
     - `users/noah/lib/pointing/runtime/pd_mode_runtime_shared_state_internal.h`
     - `users/noah/lib/pointing/defs/pd_modes.h`
-    - `users/noah/lib/key/runtime/key_runtime_scan.c`
+    - `users/noah/lib/key/runtime/scan.c`
   - kept direct `pd_mode_apply_active_dpi()` for explicit apply logic/tests, but normal authored activation now queues the request and lets scan perform the hardware write
   - updated host coverage to assert the new contract:
     - `tests/host/pd_mode_test.c`
@@ -1134,10 +1176,10 @@
 - RP2040 runtime-budget reduction on `codex/rp2040-runtime-budget`:
   - kept the user’s local `users/noah/rules.mk` LTO experiment intact and cut SRAM from always-live userspace state instead of changing build flags
   - removed duplicated release-contract storage from `key_runtime_slot_interaction_t`; release contracts are now rebuilt from the interaction payload on demand:
-    - `users/noah/lib/key/runtime/key_runtime_interaction.h`
+    - `users/noah/lib/key/runtime/interaction.h`
   - removed duplicated handled-key contract storage from `press_token_t` and switched v2 reducer queries over to the canonical `token->interaction.contract` path:
-    - `users/noah/lib/runtime_v2/runtime_v2.h`
-    - `users/noah/lib/runtime_v2/runtime_v2.c`
+    - `users/noah/lib/key/runtime/core/runtime.h`
+    - `users/noah/lib/key/runtime/core/runtime.c`
   - deleted dead v2 singleton fields that were written but never read:
     - `projection_snapshot_t last_projection`
     - `input_stream_observed`

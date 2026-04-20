@@ -16,11 +16,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../key/interaction/handled_key.h"
-#include "../key/runtime/effects/key_runtime_effect_queue.h"
-#include "../key/runtime/key_runtime_interaction.h"
-#include "../pointing/defs/pd_mode_flags.h"
-#include "../state/runtime/keyboard_mod_state.h"
+#include "../../interaction/handled_key.h"
+#include "../effects/effect_queue.h"
+#include "../interaction.h"
+#include "../../../pointing/defs/pd_mode_flags.h"
+#include "../../../state/runtime/keyboard_mod_state.h"
 
 #define RUNTIME_V2_PRESS_TOKEN_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 #define RUNTIME_V2_TAP_SERIES_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))

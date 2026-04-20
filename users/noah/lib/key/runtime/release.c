@@ -3,10 +3,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "../interaction/handled_key.h"
-#include "key_runtime_process_internal.h"
-#include "key_runtime_trace.h"
-#include "key_runtime_transition.h"
-#include "../../runtime_v2/runtime_v2.h"
+#include "process_internal.h"
+#include "trace.h"
+#include "transition.h"
+#include "core/runtime.h"
 #include "../../state/runtime/split_runtime_sync.h"
 
 static keyboard_mod_state_t key_runtime_release_keyboard_mod_state_current(void) {
