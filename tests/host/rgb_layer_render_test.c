@@ -50,14 +50,15 @@ static pd_mode_mask_t fake_pd_locked_mode = 0;
 static rgb_t test_runtime_diag_stage_rgb(noah_runtime_diag_stage_t stage) {
     switch (stage) {
         case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD:
-        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE:
             return (rgb_t){.r = 255u, .g = 24u, .b = 24u};
+        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE:
+            return (rgb_t){.r = 255u, .g = 64u, .b = 96u};
         case NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET:
             return (rgb_t){.r = 255u, .g = 128u, .b = 0u};
         case NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK:
             return (rgb_t){.r = 0u, .g = 120u, .b = 255u};
         case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS:
-            return (rgb_t){.r = 255u, .g = 255u, .b = 255u};
+            return (rgb_t){.r = 0u, .g = 255u, .b = 0u};
         case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME:
             return (rgb_t){.r = 255u, .g = 0u, .b = 196u};
         case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC:
@@ -70,7 +71,7 @@ static rgb_t test_runtime_diag_stage_rgb(noah_runtime_diag_stage_t stage) {
             return (rgb_t){.r = 160u, .g = 80u, .b = 255u};
         case NOAH_RUNTIME_DIAG_STAGE_IDLE:
         default:
-            return (rgb_t){.r = 255u, .g = 255u, .b = 255u};
+            return (rgb_t){.r = 160u, .g = 160u, .b = 160u};
     }
 }
 
@@ -338,6 +339,10 @@ static void check_led(uint8_t index, rgb_t expected) {
     CHECK(led_output[index].b == expected.b);
 }
 
+static bool rgb_equal(rgb_t lhs, rgb_t rhs) {
+    return lhs.r == rhs.r && lhs.g == rhs.g && lhs.b == rhs.b;
+}
+
 static bool render_output(void) {
     for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
         led_output[i] = rgb_from_ws2812(ws2812_leds[i]);
@@ -559,6 +564,42 @@ static void test_runtime_diag_overlay_overrides_scene(void) {
 
     for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
         check_led(led, test_runtime_diag_stage_rgb(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK));
+    }
+}
+
+static void test_runtime_diag_stage_palette_is_unique(void) {
+    static const noah_runtime_diag_stage_t stages[] = {
+        NOAH_RUNTIME_DIAG_STAGE_IDLE,
+        NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD,
+        NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE,
+        NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET,
+        NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK,
+        NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS,
+        NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME,
+        NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC,
+        NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER,
+        NOAH_RUNTIME_DIAG_STAGE_HOUSEKEEPING,
+        NOAH_RUNTIME_DIAG_STAGE_POST_INIT,
+    };
+    const uint8_t stage_count = (uint8_t)(sizeof(stages) / sizeof(stages[0]));
+
+    for (uint8_t lhs_index = 0; lhs_index < stage_count; lhs_index++) {
+        for (uint8_t rhs_index = (uint8_t)(lhs_index + 1u); rhs_index < stage_count; rhs_index++) {
+            rgb_t lhs = test_runtime_diag_stage_rgb(stages[lhs_index]);
+            rgb_t rhs = test_runtime_diag_stage_rgb(stages[rhs_index]);
+
+            if (rgb_equal(lhs, rhs)) {
+                fprintf(stderr,
+                        "duplicate watchdog stage colors for %u and %u: (%u,%u,%u)\n",
+                        (unsigned int)stages[lhs_index],
+                        (unsigned int)stages[rhs_index],
+                        (unsigned int)lhs.r,
+                        (unsigned int)lhs.g,
+                        (unsigned int)lhs.b);
+            }
+
+            CHECK(!rgb_equal(lhs, rhs));
+        }
     }
 }
 
@@ -976,6 +1017,7 @@ int main(void) {
     test_render_order_preview_then_pd_mode_then_pd_group();
     test_render_order_base_then_preview_then_pd_mode_then_feedback();
     test_runtime_diag_overlay_overrides_scene();
+    test_runtime_diag_stage_palette_is_unique();
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();
     test_hold_pending_feedback_overrides_preview_and_pd_mode();
     test_pointer_mode_overlay_paints_right_half_and_groups();
