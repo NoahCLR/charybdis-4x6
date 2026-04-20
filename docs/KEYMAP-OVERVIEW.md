@@ -10,6 +10,7 @@ These previews are generated as SVG image assets under [docs/media/profile-intro
 - `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys
 - `LAYER_BASE` falls back to the default RGB color from [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) when its authored layer color is `HSV(0, 0, 0)`
 - Keys with authored `key_behaviors[]` rows in [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers
+- Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer
 - Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer
 
 Timing legend for the layer-local behavior tables:
@@ -24,6 +25,7 @@ Timing legend for the layer-local behavior tables:
 - RGB matrix render mode: `ALL_KEYS`
 - Authored layer color: `HSV(0, 0, 0)`
 - Preview color: <img alt="LAYER_BASE preview color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" />
+- Combo badges on this layer: `C1`
 
 ![LAYER_BASE](media/profile-introspection/profile-layer-LAYER_BASE.svg)
 
@@ -75,9 +77,9 @@ Timing legend for the layer-local behavior tables:
 
 #### Combos Available On This Layer
 
-| Inputs On This Layer | Output |
-| --- | --- |
-| `D` + `LT[NAV]/F` | `TAB` (`KC_TAB`) |
+| Combo | Inputs On This Layer | Output |
+| --- | --- | --- |
+| `C1` | `D` + `LT[NAV]/F` | `TAB` (`KC_TAB`) |
 
 ### `LAYER_NUM`
 
@@ -142,6 +144,7 @@ No authored combos resolve entirely from keys on this layer.
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(180, 255, 200)`
 - Preview color: <img alt="LAYER_NAV preview color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" />
+- Combo badges on this layer: `C1`
 
 ![LAYER_NAV](media/profile-introspection/profile-layer-LAYER_NAV.svg)
 
@@ -163,15 +166,16 @@ No authored combos resolve entirely from keys on this layer.
 
 #### Combos Available On This Layer
 
-| Inputs On This Layer | Output |
-| --- | --- |
-| `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
+| Combo | Inputs On This Layer | Output |
+| --- | --- | --- |
+| `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
 
 ### `LAYER_POINTER`
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(0, 0, 150)`
 - Preview color: <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" />
+- Combo badges on this layer: `C1`
 
 ![LAYER_POINTER](media/profile-introspection/profile-layer-LAYER_POINTER.svg)
 
@@ -199,9 +203,9 @@ No authored combos resolve entirely from keys on this layer.
 
 #### Combos Available On This Layer
 
-| Inputs On This Layer | Output |
-| --- | --- |
-| `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
+| Combo | Inputs On This Layer | Output |
+| --- | --- | --- |
+| `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
 
 ## Key-Behavior Feedback LEDs
 

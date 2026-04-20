@@ -1302,6 +1302,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "- `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys",
         f"- `LAYER_BASE` falls back to the default RGB color from {config_link} when its authored layer color is `HSV(0, 0, 0)`",
         f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap or multi-tap handling, orange for authored hold tiers, and cyan for authored long-hold tiers",
+        "- Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer",
         "- Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer",
         "",
         "Timing legend for the layer-local behavior tables:",
@@ -1316,11 +1317,14 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         color_config = layer_color_map[layer["name"]]
         image_name = layer_image_name(layer["name"])
         preview_swatch = markdown_color_swatch(color_config["preview_color"], f"{layer['name']} preview color")
+        combo_badge_map = build_layer_combo_badge_map(layer, profile)
         lines.append(f"### `{layer['name']}`")
         lines.append("")
         lines.append(f"- RGB matrix render mode: `{color_config['mode']}`")
         lines.append(f"- Authored layer color: `HSV({color_config['color']['h']}, {color_config['color']['s']}, {color_config['color']['v']})`")
         lines.append(f"- Preview color: {preview_swatch}")
+        if combo_badge_map:
+            lines.append(f"- Combo badges on this layer: {', '.join(f'`{badge}`' for badge in sorted({badge for badges in combo_badge_map.values() for badge in badges}))}")
         lines.append("")
         lines.append(f"![{layer['name']}]({markdown_relative_path(ASSET_OUTPUT_DIR / image_name)})")
         lines.append("")
@@ -1588,11 +1592,7 @@ def render_layer_local_pd_modes(layer: dict[str, object], profile: dict[str, obj
 
 def render_layer_local_combos(layer: dict[str, object], profile: dict[str, object]) -> list[str]:
     positions_by_keycode = layer_positions_by_raw_keycode(layer)
-    rows: list[dict[str, object]] = []
-
-    for combo in profile["combos"]:
-        if all(input_key in positions_by_keycode for input_key in combo["inputs"]):
-            rows.append(combo)
+    rows = collect_layer_local_combos(layer, profile)
 
     lines = ["#### Combos Available On This Layer", ""]
     if not rows:
@@ -1601,15 +1601,44 @@ def render_layer_local_combos(layer: dict[str, object], profile: dict[str, objec
 
     lines.extend(
         [
-            "| Inputs On This Layer | Output |",
-            "| --- | --- |",
+            "| Combo | Inputs On This Layer | Output |",
+            "| --- | --- | --- |",
         ]
     )
     for combo in rows:
         input_instances = " + ".join(format_layer_key_instances(positions_by_keycode[input_key]) for input_key in combo["inputs"])
-        lines.append(f"| {input_instances} | {format_token_with_raw(combo['output'])} |")
+        lines.append(f"| `{combo['badge']}` | {input_instances} | {format_token_with_raw(combo['output'])} |")
     lines.append("")
     return lines
+
+
+def collect_layer_local_combos(layer: dict[str, object], profile: dict[str, object]) -> list[dict[str, object]]:
+    positions_by_keycode = layer_positions_by_raw_keycode(layer)
+    rows: list[dict[str, object]] = []
+
+    for combo in profile["combos"]:
+        if all(input_key in positions_by_keycode for input_key in combo["inputs"]):
+            rows.append(
+                {
+                    "badge": f"C{len(rows) + 1}",
+                    "output": combo["output"],
+                    "inputs": combo["inputs"],
+                }
+            )
+
+    return rows
+
+
+def build_layer_combo_badge_map(layer: dict[str, object], profile: dict[str, object]) -> dict[str, list[str]]:
+    badge_map: dict[str, list[str]] = {}
+
+    for combo in collect_layer_local_combos(layer, profile):
+        for input_key in combo["inputs"]:
+            badges = badge_map.setdefault(input_key, [])
+            if combo["badge"] not in badges:
+                badges.append(combo["badge"])
+
+    return badge_map
 
 
 def build_behavior_indicator_map(profile: dict[str, object]) -> dict[str, list[str]]:
@@ -1661,7 +1690,8 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     behavior_indicator_map = build_behavior_indicator_map(profile)
     for layer in profile["layers"]:
         image_path = ASSET_OUTPUT_DIR / layer_image_name(layer["name"])
-        assets[image_path] = render_layer_svg(layer, layer_color_map[layer["name"]], behavior_indicator_map)
+        combo_badge_map = build_layer_combo_badge_map(layer, profile)
+        assets[image_path] = render_layer_svg(layer, layer_color_map[layer["name"]], behavior_indicator_map, combo_badge_map)
 
     swatch_colors: set[str] = set()
     for row in profile["rgb"]["layer_colors"]:
@@ -1681,12 +1711,17 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     return assets
 
 
-def render_layer_svg(layer: dict[str, object], color_config: dict[str, object], behavior_indicator_map: dict[str, list[str]]) -> str:
+def render_layer_svg(
+    layer: dict[str, object],
+    color_config: dict[str, object],
+    behavior_indicator_map: dict[str, list[str]],
+    combo_badge_map: dict[str, list[str]],
+) -> str:
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{SVG_CANVAS_WIDTH}" height="{SVG_CANVAS_HEIGHT}" viewBox="0 0 {SVG_CANVAS_WIDTH} {SVG_CANVAS_HEIGHT}" role="img" aria-labelledby="title desc">',
         f"  <title id=\"title\">{layer['name']} layout preview</title>",
-        f"  <desc id=\"desc\">Generated layer preview for {layer['name']} using authored RGB layer color, mapped-key render mode, and activity dots for keys with key_behaviors[] rows.</desc>",
+        f"  <desc id=\"desc\">Generated layer preview for {layer['name']} using authored RGB layer color, mapped-key render mode, activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>",
         "  <defs>",
         "    <filter id=\"shadow\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\">",
         "      <feDropShadow dx=\"0\" dy=\"5\" stdDeviation=\"4\" flood-color=\"#000000\" flood-opacity=\"0.22\"/>",
@@ -1702,7 +1737,8 @@ def render_layer_svg(layer: dict[str, object], color_config: dict[str, object], 
         style = layer_key_style(position, color_config)
         label = visual_label_for_position(position, style["variant"])
         behavior_dot_colors = behavior_indicator_map.get(behavior_lookup_key(position["keycode"])) if position["has_key_behavior"] else None
-        parts.extend(render_svg_key(geometry, label, style, behavior_dot_colors))
+        combo_badges = combo_badge_map.get(position["keycode"])
+        parts.extend(render_svg_key(geometry, label, style, behavior_dot_colors, combo_badges))
 
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
@@ -1783,7 +1819,13 @@ def visual_label_for_position(position: dict[str, object], variant: str) -> str:
     return position["display"]
 
 
-def render_svg_key(geometry: dict[str, float], label: str, style: dict[str, object], behavior_dot_colors: list[str] | None = None) -> list[str]:
+def render_svg_key(
+    geometry: dict[str, float],
+    label: str,
+    style: dict[str, object],
+    behavior_dot_colors: list[str] | None = None,
+    combo_badges: list[str] | None = None,
+) -> list[str]:
     x = geometry["x"]
     y = geometry["y"]
     angle = geometry["angle"]
@@ -1805,6 +1847,21 @@ def render_svg_key(geometry: dict[str, float], label: str, style: dict[str, obje
             parts.append(
                 f'    <circle cx="{start_x + (index * 12):.1f}" cy="{y + 10:.1f}" r="5.5" fill="{behavior_dot_color}" stroke="{style["text"]}" stroke-width="1.5"/>'
             )
+    if combo_badges:
+        badge_height = 12
+        badge_spacing = 3
+        badge_widths = [max(15, 7 + (len(badge) * 4)) for badge in combo_badges]
+        total_width = sum(badge_widths) + (badge_spacing * (len(badge_widths) - 1))
+        badge_x = x + ((KEY_WIDTH - total_width) / 2)
+        badge_y = y + KEY_HEIGHT - badge_height - 5
+        for badge, badge_width in zip(combo_badges, badge_widths, strict=False):
+            parts.append(
+                f'    <rect x="{badge_x:.1f}" y="{badge_y:.1f}" width="{badge_width}" height="{badge_height}" rx="5" fill="#141714" fill-opacity="0.94" stroke="#f5f5f3" stroke-width="1"/>'
+            )
+            parts.append(
+                f'    <text x="{badge_x + (badge_width / 2):.1f}" y="{badge_y + 8.4:.1f}" fill="#f5f5f3" font-size="7.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700">{escape_xml(badge)}</text>'
+            )
+            badge_x += badge_width + badge_spacing
     parts.append("  </g>")
     return parts
 

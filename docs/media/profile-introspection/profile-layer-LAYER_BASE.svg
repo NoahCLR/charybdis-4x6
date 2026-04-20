@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620" role="img" aria-labelledby="title desc">
   <title id="title">LAYER_BASE layout preview</title>
-  <desc id="desc">Generated layer preview for LAYER_BASE using authored RGB layer color, mapped-key render mode, and activity dots for keys with key_behaviors[] rows.</desc>
+  <desc id="desc">Generated layer preview for LAYER_BASE using authored RGB layer color, mapped-key render mode, activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.22"/>
@@ -139,10 +139,14 @@
   <g transform="rotate(0 263.0 265.0)">
     <rect x="234.0" y="236.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="263.0" y="269.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">D</text>
+    <rect x="255.5" y="277.0" width="15" height="12" rx="5" fill="#141714" fill-opacity="0.94" stroke="#f5f5f3" stroke-width="1"/>
+    <text x="263.0" y="285.4" fill="#f5f5f3" font-size="7.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700">C1</text>
   </g>
   <g transform="rotate(0 329.0 289.0)">
     <rect x="300.0" y="260.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="329.0" y="293.0" fill="#f7f7f4" fill-opacity="1.0" font-size="9" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LT[NAV]/F</text>
+    <rect x="321.5" y="301.0" width="15" height="12" rx="5" fill="#141714" fill-opacity="0.94" stroke="#f5f5f3" stroke-width="1"/>
+    <text x="329.0" y="309.4" fill="#f5f5f3" font-size="7.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700">C1</text>
   </g>
   <g transform="rotate(0 395.0 289.0)">
     <rect x="366.0" y="260.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
