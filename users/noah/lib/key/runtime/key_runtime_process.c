@@ -12,6 +12,7 @@
 #include "../../runtime_v2/runtime_v2.h"
 #include "../../action/synthetic_record.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
+#include "../../state/runtime/runtime_diag.h"
 #include "../../state/runtime/keyboard_mod_state.h"
 
 #ifdef NOAH_HOST_TEST_ENV
@@ -190,6 +191,7 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_macro_dispa
 
 static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep_processing) {
     (void)ctx;
+    noah_runtime_diag_scope_leave();
     return keep_processing;
 }
 
@@ -224,6 +226,8 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
         .runtime_keycode = keycode,
         .record          = record,
     };
+
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
 
     if (!noah_synthetic_record_active()) {
         runtime_v2_observe_process_record_event(keycode, record);
@@ -262,8 +266,10 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE);
     key_runtime_process_end_keyboard_event_mod_mask();
     key_runtime_trace_bool_result("process:return", keycode, record, keep_processing);
+    noah_runtime_diag_scope_leave();
 }
 
 void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {

@@ -16,6 +16,7 @@ trap cleanup EXIT INT TERM
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
     -DPOINTING_DEVICE_ENABLE \
@@ -46,12 +47,14 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
+    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
     -o "$BIN"
 
 "$BIN"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
     -DPOINTING_DEVICE_ENABLE \
@@ -83,12 +86,14 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
+    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
     -o "$BIN_END_FILL_UNPAINTED"
 
 "$BIN_END_FILL_UNPAINTED"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
     -DPOINTING_DEVICE_ENABLE \
@@ -120,6 +125,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
+    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
     -o "$BIN_END_OVERRIDE"
 
 "$BIN_END_OVERRIDE"

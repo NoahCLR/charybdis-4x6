@@ -100,6 +100,10 @@ uint32_t timer_elapsed32(uint32_t last) {
     return (uint32_t)(fake_time - last);
 }
 
+bool is_keyboard_master(void) {
+    return true;
+}
+
 uint8_t get_mods(void) {
     return 0;
 }

@@ -7,7 +7,6 @@
 #ifdef VIA_ENABLE
 
 #    include "noah_keymap_ids.h"
-#    include "macro_slot_provider.h"
 #    include "macro_payload.h"
 #    include "via_macro_provider.h"
 #    include "../compat/qmk_via_storage_contract.h"
@@ -30,7 +29,6 @@ typedef struct {
 
 static bool               via_macro_seed_post_init_pending = false;
 static bool               via_macro_seed_scan_pending      = false;
-static macro_slot_cache_t via_macro_slots[VIA_MACRO_SLOT_COUNT];
 
 static bool via_macro_defaults_lookup_payload(uint8_t slot, const char **payload, void *context) {
     (void)context;
@@ -60,12 +58,6 @@ static bool via_macro_defaults_load_ir(uint8_t slot, macro_payload_ir_t *ir, voi
     return macro_payload_compile(payload, ir);
 }
 
-static const macro_slot_provider_t via_macro_defaults_provider = {
-    .slot_count     = VIA_MACRO_SLOT_COUNT,
-    .load_ir        = via_macro_defaults_load_ir,
-    .lookup_payload = via_macro_defaults_lookup_payload,
-};
-
 static void log_invalid_via_macro_payload(uint8_t slot, const char *payload) {
 #    ifdef CONSOLE_ENABLE
     uprintf("Invalid VIA default macro payload for VIA_MACRO_%u: %s\n", (unsigned int)slot, payload);
@@ -76,17 +68,14 @@ static void log_invalid_via_macro_payload(uint8_t slot, const char *payload) {
 }
 
 static bool via_macro_payload_slot_is_valid(uint8_t slot) {
-    const char              *payload = via_macro_payloads[slot];
-    macro_slot_cache_state_t before  = via_macro_slots[slot].state;
+    const char         *payload = via_macro_payloads[slot];
+    macro_payload_ir_t ir       = {0};
 
-    if (macro_slot_provider_load(&via_macro_defaults_provider, via_macro_slots, slot)) {
+    if (via_macro_defaults_load_ir(slot, &ir, NULL)) {
         return true;
     }
 
-    if (before != MACRO_SLOT_CACHE_INVALID) {
-        log_invalid_via_macro_payload(slot, payload);
-    }
-
+    log_invalid_via_macro_payload(slot, payload);
     return false;
 }
 
@@ -132,11 +121,17 @@ static bool seed_via_default_macros(uint16_t capacity, uint16_t *written) {
     };
 
     for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
+        macro_payload_ir_t ir = {0};
+
         if (!via_macro_payload_slot_is_valid(slot)) {
             goto terminate_slot;
         }
 
-        if (!macro_slot_provider_encode_write(&via_macro_defaults_provider, via_macro_slots, slot, via_macro_seed_writer_write_byte, &writer, NULL)) {
+        if (!via_macro_defaults_load_ir(slot, &ir, NULL)) {
+            goto terminate_slot;
+        }
+
+        if (ir.length != 0 && !macro_payload_encode_ir_write(&ir, via_macro_seed_writer_write_byte, &writer, NULL)) {
             return false;
         }
 

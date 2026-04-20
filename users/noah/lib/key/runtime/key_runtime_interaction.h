@@ -64,7 +64,6 @@ typedef struct {
     pd_mode_mask_t                      pd_mode;
     uint16_t                            flags;
     handled_key_behavior_contract_t     contract;
-    key_runtime_slot_release_contract_t release;
 } key_runtime_slot_interaction_t;
 
 static inline key_runtime_slot_selection_t key_runtime_slot_selection_from_resolution(handled_key_resolution_t resolution) {
@@ -153,7 +152,7 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
 }
 
 static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_materialized(handled_key_materialized_t materialized) {
-    key_runtime_slot_interaction_t interaction = {
+    return (key_runtime_slot_interaction_t){
         .selection     = key_runtime_slot_selection_from_resolution(materialized.authored),
         .binding       = key_runtime_slot_binding_from_materialized(materialized),
         .hold_strategy = materialized.hold_strategy,
@@ -162,9 +161,6 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_m
         .flags         = materialized.flags,
         .contract      = materialized.contract,
     };
-
-    interaction.release = key_runtime_slot_release_contract_build(interaction);
-    return interaction;
 }
 
 static inline bool key_runtime_slot_interaction_uses_implicit_hold(key_runtime_slot_interaction_t interaction) {
@@ -180,7 +176,7 @@ static inline bool key_runtime_slot_interaction_is_momentary_layer(key_runtime_s
 }
 
 static inline key_runtime_slot_release_contract_t key_runtime_slot_release_contract(key_runtime_slot_interaction_t interaction) {
-    return interaction.release;
+    return key_runtime_slot_release_contract_build(interaction);
 }
 
 static inline bool key_runtime_slot_release_hold_contract_has_primary_action(key_runtime_slot_release_hold_contract_t contract) {

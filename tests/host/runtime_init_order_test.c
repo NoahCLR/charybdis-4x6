@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/state/runtime/runtime_diag.h"
 #include "users/noah/noah_runtime.h"
 
 enum {
@@ -92,6 +93,16 @@ void noah_rgb_runtime_post_init(void) {
 void split_runtime_sync_init(void) {
     test_log_stage("split_runtime_sync_init");
 }
+
+void noah_runtime_diag_post_init(void) {}
+
+void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
+    (void)stage;
+}
+
+void noah_runtime_diag_scope_leave(void) {}
+
+void noah_runtime_diag_heartbeat(void) {}
 
 static void test_eeconfig_init_order(void) {
     static const char *const expected[] = {

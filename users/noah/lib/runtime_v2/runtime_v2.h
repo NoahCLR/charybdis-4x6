@@ -88,7 +88,6 @@ typedef struct {
     uint16_t            hold_term_ms;
     uint16_t            longer_hold_term_ms;
     press_token_phase_t phase;
-    handled_key_behavior_contract_t behavior_contract;
     bool                handled_key;
     bool                tap_outcome_available;
     bool                pd_mode_was_locked_on_press;
@@ -263,7 +262,6 @@ typedef struct {
     deferred_release_blocker_t deferred_release_blockers[RUNTIME_V2_DEFERRED_RELEASE_BLOCKER_CAPACITY];
     persistent_intent_t persistent_intents[RUNTIME_V2_PERSISTENT_INTENT_CAPACITY];
     runtime_v2_shadow_projection_t shadow_projection;
-    projection_snapshot_t last_projection;
     uint16_t            current_time;
     uint16_t            next_token_id;
     uint16_t            next_pending_release_sequence;
@@ -282,7 +280,6 @@ typedef struct {
     bool                feedback_pulse_long_hold_level;
     uint8_t             keyboard_event_masked_real_mods;
     bool                keyboard_event_mask_active;
-    bool                input_stream_observed;
 } runtime_v2_state_t;
 
 runtime_v2_state_t  *runtime_v2_state(void);

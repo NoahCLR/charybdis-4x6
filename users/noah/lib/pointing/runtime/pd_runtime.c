@@ -8,6 +8,7 @@
 #include "../policy/pointer_layer_policy.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../compat/qmk_pointing_contract.h"
+#include "../../state/runtime/runtime_diag.h"
 
 #if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
 #    if !defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS)
@@ -82,6 +83,9 @@ bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 #endif // defined(POINTING_DEVICE_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 
 report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
+    report_mouse_t output = mouse_report;
+
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK);
 #ifdef POINTING_DEVICE_ENABLE
     pd_mode_snapshot_t   snapshot    = pd_mode_snapshot();
     const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
@@ -95,21 +99,30 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
     }
 
     if (snapshot.local.active_mode == 0 && mouse_report.buttons == 0 && has_motion && last_input_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS && pd_runtime_idle_noise_any_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ARM_IDLE_MS && abs_total <= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
-        return (report_mouse_t){0};
+        output = (report_mouse_t){0};
+        goto done;
     }
 #    endif
 
     if (active_mode && active_mode->handler) {
-        return active_mode->handler(mouse_report);
+        output = active_mode->handler(mouse_report);
+        goto done;
     }
 
-    return mouse_report;
+    output = mouse_report;
 #else
-    return mouse_report;
+    output = mouse_report;
 #endif
+
+done:
+    noah_runtime_diag_scope_leave();
+    return output;
 }
 
 layer_state_t noah_layer_state_set_user(layer_state_t state) {
+    layer_state_t result = state;
+
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET);
 #ifdef POINTING_DEVICE_ENABLE
 #    if defined(CHARYBDIS_AUTO_SNIPING_ENABLE)
     noah_qmk_contract_pointer_set_sniping_enabled(layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER));
@@ -120,8 +133,10 @@ layer_state_t noah_layer_state_set_user(layer_state_t state) {
     // pd-mode DPI policy after the layer-owned sniping state changes. Service
     // the actual hardware write on scan instead of from this layer hook.
     pd_mode_request_active_dpi_sync();
-    return pointer_layer_policy_apply(state);
+    result = pointer_layer_policy_apply(state);
 #else
-    return state;
+    result = state;
 #endif
+    noah_runtime_diag_scope_leave();
+    return result;
 }

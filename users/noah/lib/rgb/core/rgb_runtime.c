@@ -8,6 +8,7 @@
 #include "../stages/rgb_layer_stage.h"
 #include "../stages/rgb_pd_mode_stage.h"
 #include "../stages/rgb_preview_stage.h"
+#include "../../state/runtime/runtime_diag.h"
 #include "rgb_validation.h"
 
 #ifdef RGB_MATRIX_ENABLE
@@ -15,6 +16,42 @@ static rgb_runtime_frame_t rgb_runtime_frame_primary;
 
 typedef void (*rgb_runtime_stage_fn_t)(void);
 typedef bool (*rgb_runtime_render_stage_fn_t)(uint8_t led_min, uint8_t led_max);
+
+static rgb_t rgb_runtime_diag_stage_color(noah_runtime_diag_stage_t stage) {
+    switch (stage) {
+        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD:
+        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE:
+            return (rgb_t){.r = 255u, .g = 24u, .b = 24u};
+        case NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET:
+            return (rgb_t){.r = 255u, .g = 128u, .b = 0u};
+        case NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK:
+            return (rgb_t){.r = 0u, .g = 120u, .b = 255u};
+        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS:
+            return (rgb_t){.r = 255u, .g = 255u, .b = 255u};
+        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME:
+            return (rgb_t){.r = 255u, .g = 0u, .b = 196u};
+        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC:
+            return (rgb_t){.r = 0u, .g = 255u, .b = 255u};
+        case NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER:
+            return (rgb_t){.r = 255u, .g = 255u, .b = 0u};
+        case NOAH_RUNTIME_DIAG_STAGE_HOUSEKEEPING:
+            return (rgb_t){.r = 0u, .g = 255u, .b = 96u};
+        case NOAH_RUNTIME_DIAG_STAGE_POST_INIT:
+            return (rgb_t){.r = 160u, .g = 80u, .b = 255u};
+        case NOAH_RUNTIME_DIAG_STAGE_IDLE:
+        default:
+            return (rgb_t){.r = 255u, .g = 255u, .b = 255u};
+    }
+}
+
+static bool rgb_runtime_render_runtime_diag_stage(uint8_t led_min, uint8_t led_max) {
+    if (!noah_runtime_diag_indicator_active()) {
+        return false;
+    }
+
+    rgb_set_both_halves(rgb_runtime_diag_stage_color(noah_runtime_diag_watchdog_stage()), led_min, led_max);
+    return true;
+}
 
 static bool rgb_runtime_render_layer_base_stage(uint8_t led_min, uint8_t led_max) {
     rgb_runtime_layer_stage_render_frame(&rgb_runtime_frame_primary, layer_state, led_min, led_max);
@@ -78,12 +115,19 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     };
     bool painted = false;
 
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER);
+    if (rgb_runtime_render_runtime_diag_stage(led_min, led_max)) {
+        noah_runtime_diag_scope_leave();
+        return true;
+    }
+
     painted |= rgb_runtime_render_base_stage(led_min, led_max);
 
     for (uint8_t index = 0; index < ARRAY_SIZE(overlay_stages); index++) {
         painted |= overlay_stages[index](led_min, led_max);
     }
 
+    noah_runtime_diag_scope_leave();
     return painted;
 }
 #else

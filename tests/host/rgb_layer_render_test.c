@@ -11,6 +11,7 @@
 #include "users/noah/lib/rgb/automouse/rgb_automouse.h"
 #include "users/noah/lib/rgb/core/rgb_config_helpers.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
+#include "users/noah/lib/state/runtime/runtime_diag.h"
 #include "users/noah/lib/rgb/core/rgb_runtime.h"
 #include "users/noah/lib/rgb/core/rgb_helpers.h"
 #include "ws2812.h"
@@ -45,6 +46,33 @@ static host_runtime_fixture_t runtime_fixture         = HOST_RUNTIME_FIXTURE_INI
 static uint8_t        fake_feedback_flags = 0;
 static pd_mode_mask_t fake_pd_active_mode = 0;
 static pd_mode_mask_t fake_pd_locked_mode = 0;
+
+static rgb_t test_runtime_diag_stage_rgb(noah_runtime_diag_stage_t stage) {
+    switch (stage) {
+        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD:
+        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE:
+            return (rgb_t){.r = 255u, .g = 24u, .b = 24u};
+        case NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET:
+            return (rgb_t){.r = 255u, .g = 128u, .b = 0u};
+        case NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK:
+            return (rgb_t){.r = 0u, .g = 120u, .b = 255u};
+        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS:
+            return (rgb_t){.r = 255u, .g = 255u, .b = 255u};
+        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME:
+            return (rgb_t){.r = 255u, .g = 0u, .b = 196u};
+        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC:
+            return (rgb_t){.r = 0u, .g = 255u, .b = 255u};
+        case NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER:
+            return (rgb_t){.r = 255u, .g = 255u, .b = 0u};
+        case NOAH_RUNTIME_DIAG_STAGE_HOUSEKEEPING:
+            return (rgb_t){.r = 0u, .g = 255u, .b = 96u};
+        case NOAH_RUNTIME_DIAG_STAGE_POST_INIT:
+            return (rgb_t){.r = 160u, .g = 80u, .b = 255u};
+        case NOAH_RUNTIME_DIAG_STAGE_IDLE:
+        default:
+            return (rgb_t){.r = 255u, .g = 255u, .b = 255u};
+    }
+}
 
 ws2812_led_t                ws2812_leds[WS2812_LED_COUNT];
 split_runtime_sync_packet_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
@@ -160,6 +188,7 @@ static uint8_t automouse_blend_amount_from_elapsed(uint16_t elapsed) {
 
 static void test_reset(void) {
     host_runtime_fixture_reset(&runtime_fixture);
+    noah_runtime_diag_reset_for_test();
     memset(test_keymap, 0, sizeof(test_keymap));
     memset(led_output, 0, sizeof(led_output));
     memset(ws2812_leds, 0, sizeof(ws2812_leds));
@@ -511,6 +540,26 @@ static void test_render_order_base_then_preview_then_pd_mode_then_feedback(void)
     check_led(2, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
     check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
     check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+}
+
+static void test_runtime_diag_overlay_overrides_scene(void) {
+    test_reset();
+
+    test_keymap[LAYER_NUM][0][0] = 0x0020u;
+    test_keymap[LAYER_NUM][1][0] = 0x0021u;
+    layer_state                  = (layer_state_t)1u << LAYER_SYM;
+    fake_preview_layer           = LAYER_NUM;
+    fake_feedback_flags          = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+    fake_pd_active_mode          = PD_MODE_VOLUME;
+
+    noah_runtime_diag_test_backend_seed_watchdog_reboot(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK, 0u);
+    noah_runtime_diag_post_init();
+
+    CHECK(render_output());
+
+    for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
+        check_led(led, test_runtime_diag_stage_rgb(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK));
+    }
 }
 
 static void test_multi_tap_pending_feedback_overrides_preview_and_pd_mode(void) {
@@ -926,6 +975,7 @@ int main(void) {
     test_slave_full_scene_feedback_overrides_remote_preview_and_locked_pd_mode();
     test_render_order_preview_then_pd_mode_then_pd_group();
     test_render_order_base_then_preview_then_pd_mode_then_feedback();
+    test_runtime_diag_overlay_overrides_scene();
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();
     test_hold_pending_feedback_overrides_preview_and_pd_mode();
     test_pointer_mode_overlay_paints_right_half_and_groups();

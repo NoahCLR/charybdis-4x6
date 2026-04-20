@@ -16,6 +16,7 @@
 #include "lib/macro/macro_dispatch.h"
 #include "lib/macro/via_macro_defaults.h"
 #include "lib/rgb/core/rgb_runtime.h"
+#include "lib/state/runtime/runtime_diag.h"
 #include "lib/state/runtime/split_runtime_sync.h"
 
 typedef void (*noah_runtime_init_stage_fn_t)(void);
@@ -38,25 +39,24 @@ void noah_eeconfig_init_user(void) {
 }
 
 void noah_matrix_scan_user(void) {
-    static const noah_runtime_init_stage_fn_t stages[] = {
-        noah_via_macro_defaults_matrix_scan,
-        noah_key_runtime_scan,
-        split_runtime_sync_tick,
-    };
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS);
+    noah_via_macro_defaults_matrix_scan();
+    noah_runtime_diag_scope_leave();
 
-    for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {
-        stages[index]();
-    }
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME);
+    noah_key_runtime_scan();
+    noah_runtime_diag_scope_leave();
+
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC);
+    split_runtime_sync_tick();
+    noah_runtime_diag_scope_leave();
 }
 
 void noah_housekeeping_task_user(void) {
-    static const noah_runtime_init_stage_fn_t stages[] = {
-        held_repeat_tick,
-    };
-
-    for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {
-        stages[index]();
-    }
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_HOUSEKEEPING);
+    held_repeat_tick();
+    noah_runtime_diag_scope_leave();
+    noah_runtime_diag_heartbeat();
 }
 
 void noah_keyboard_post_init_user(void) {
@@ -64,7 +64,10 @@ void noah_keyboard_post_init_user(void) {
         macro_dispatch_validate_all, noah_keymap_validate, noah_via_macro_defaults_keyboard_post_init, noah_rgb_runtime_post_init, split_runtime_sync_init,
     };
 
+    noah_runtime_diag_post_init();
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_POST_INIT);
     for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {
         stages[index]();
     }
+    noah_runtime_diag_scope_leave();
 }

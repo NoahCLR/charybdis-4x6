@@ -1,5 +1,45 @@
 # Progress
 
+## 2026-04-20 Runtime Freeze Watchdog Breadcrumb Pass
+
+- Added a master-side freeze diagnostic surface in `users/noah/lib/state/runtime/runtime_diag.h` and `.c`:
+  - the runtime now tracks the outer userspace stage currently in flight,
+  - RP2040 builds arm a watchdog after boot and only pet it from housekeeping,
+  - watchdog scratch registers persist the last in-flight stage across a forced reboot, and
+  - a latched reboot stage is exposed as a short-lived runtime indicator on the next boot.
+- Wired the diagnostic into the master-heavy userspace paths most likely to explain the physical freeze report:
+  - `users/noah/runtime_init.c` now brackets via-default scan, key-runtime scan, split sync, housekeeping, and post-init stages,
+  - `users/noah/lib/key/runtime/key_runtime_process.c` now brackets `process_record` and finalize flow,
+  - `users/noah/lib/pointing/runtime/pd_runtime.c` now brackets pointing-task and layer-state-set hooks, and
+  - `users/noah/lib/rgb/core/rgb_runtime.c` now renders a full-board diagnostic color when a watchdog reboot latched a stage.
+- Kept the diagnostic inert on non-RP2040 / non-test-backend host runners:
+  - `runtime_diag.c` now hides `timer_read32()`, `timer_elapsed32()`, and `is_keyboard_master()` behind backend wrappers so lean host runners do not pick up new stub requirements just by linking runtime state.
+- Updated reset and host build surfaces to match:
+  - `users/noah/lib/state/runtime/runtime_shared_state.c` now clears diagnostic state during `noah_runtime_reset_for_test()`,
+  - `users/noah/source_manifest.mk` and `tests/host/noah_source_manifest.sh` include `runtime_diag.c`,
+  - direct-link host runners that compile `runtime_init.c`, `key_runtime_process.c`, `pd_runtime.c`, `rgb_runtime.c`, or `runtime_shared_state.c` now either link `runtime_diag.c` or stub the diagnostic hooks explicitly.
+- Added focused coverage for the new surface:
+  - `tests/host/runtime_diag_test.c` and `run_runtime_diag_tests.sh` cover watchdog arming, stage stack restore, heartbeat petting, reboot latch, and indicator expiry through the test backend, and
+  - `tests/host/rgb_layer_render_test.c` now proves the watchdog stage overlay preempts the normal RGB scene.
+- Verification completed for this pass:
+  - `sh tests/host/run_runtime_diag_tests.sh`
+  - `sh tests/host/run_runtime_init_order_tests.sh`
+  - `sh tests/host/run_runtime_debug_tests.sh`
+  - `sh tests/host/run_pd_runtime_tests.sh`
+  - `sh tests/host/run_pd_mode_tests.sh`
+  - `sh tests/host/run_layer_ownership_tests.sh`
+  - `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+  - `sh tests/host/run_held_action_tests.sh`
+  - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_runtime_trace_tests.sh`
+  - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+  - `sh tests/host/run_rgb_layer_render_tests.sh`
+  - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+- Next steps:
+  - run the full host suite and firmware compile against the landed diagnostic wiring, and
+  - flash the build and capture the first watchdog color/stage if the master still hard-freezes on hardware.
+
 ## 2026-04-20 Runtime V2 Authored-Key Freeze Mitigation Pass
 
 - Investigated a hardware-visible regression where pressing authored-behavior keys could stall the board even though the reducer and authored-profile host suites were green.
@@ -979,10 +1019,42 @@
     - `sh tests/host/run_split_runtime_sync_tests.sh`
     - `sh tests/host/run_all_host_tests.sh`
     - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- RP2040 runtime-budget reduction on `codex/rp2040-runtime-budget`:
+  - kept the user’s local `users/noah/rules.mk` LTO experiment intact and cut SRAM from always-live userspace state instead of changing build flags
+  - removed duplicated release-contract storage from `key_runtime_slot_interaction_t`; release contracts are now rebuilt from the interaction payload on demand:
+    - `users/noah/lib/key/runtime/key_runtime_interaction.h`
+  - removed duplicated handled-key contract storage from `press_token_t` and switched v2 reducer queries over to the canonical `token->interaction.contract` path:
+    - `users/noah/lib/runtime_v2/runtime_v2.h`
+    - `users/noah/lib/runtime_v2/runtime_v2.c`
+  - deleted dead v2 singleton fields that were written but never read:
+    - `projection_snapshot_t last_projection`
+    - `input_stream_observed`
+  - removed the persistent authored-VIA-defaults IR cache and compile defaults on demand during validation/seeding, which keeps the live EEPROM macro cache but drops the boot-only duplicate cache:
+    - `users/noah/lib/macro/via_macro_defaults.c`
+  - direct compile-probe size reductions after this pass:
+    - `press_token_t`: `172 -> 122` bytes
+    - `key_runtime_slot_interaction_t`: `108 -> 90` bytes
+    - `runtime_v2_state_t`: `17,590 -> 14,534` bytes
+    - `noah_runtime_context_t`: `19,394 -> 16,338` bytes
+  - current dirty-tree firmware compile with the user’s local non-LTO setting still links cleanly:
+    - `text=137,600`
+    - `bss=248,080`
+  - verification that passed for this budget-reduction pass:
+    - `sh tests/host/run_via_macro_defaults_tests.sh`
+    - `sh tests/host/run_runtime_debug_tests.sh`
+    - `sh tests/host/run_runtime_trace_tests.sh`
+    - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+    - `sh tests/host/run_key_runtime_scenario_tests.sh`
+    - `sh tests/host/run_feature_gate_compile_tests.sh`
+    - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+    - `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+    - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+    - `sh tests/host/run_all_host_tests.sh`
+    - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - Sibling workspace folders touched: none
 
 ## Next Steps
 
-1. Flash this build and verify that pd-mode activation no longer wedges the board before any pointer movement occurs.
-2. Keep replaying the original hardware wedge families against the v2-only runtime until the thread is ready for closure.
-3. If on-device traces still expose a wedge, treat it as a v2 runtime bug now; do not reopen slot/index fallback infrastructure.
+1. Flash this build and check whether the smaller v2 live state plus non-LTO build wiring improves master-half boot stability and authored-key responsiveness on hardware.
+2. If more SRAM headroom is needed, target the next highest-yield always-live structures: hardcoded macro IR cache, held-action snapshots, layer-ownership snapshots, and any v2 arrays that still scale to unused matrix positions.
+3. If master-half instability remains after state reduction, move from memory trimming to scan-loop load trimming by gating or deferring master-only work such as RGB automouse rendering and split sync frequency.

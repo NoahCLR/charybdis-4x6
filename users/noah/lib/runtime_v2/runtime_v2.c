@@ -511,11 +511,11 @@ static bool runtime_v2_hold_semantics_owns_state_at_threshold(handled_key_hold_s
 }
 
 static bool runtime_v2_press_token_quick_tap_suppressed(const press_token_t *token) {
-    return token && token->behavior_contract.suppress_tap_on_layer_interrupt && token->momentary_layer_tap_interrupted;
+    return token && token->interaction.contract.suppress_tap_on_layer_interrupt && token->momentary_layer_tap_interrupted;
 }
 
 static bool runtime_v2_press_token_has_pd_mode_quick_lock_candidate(const press_token_t *token) {
-    return token && token->behavior_contract.quick_tap_pd_mode_lock != 0 && token->pd_mode_was_locked_on_press &&
+    return token && token->interaction.contract.quick_tap_pd_mode_lock != 0 && token->pd_mode_was_locked_on_press &&
            !runtime_v2_press_token_quick_tap_suppressed(token);
 }
 
@@ -531,7 +531,7 @@ static bool runtime_v2_press_token_owned_state_active(const runtime_v2_state_t *
         return true;
     }
 
-    if (token->behavior_contract.quick_release_of_immediate_hold_dispatches_tap && !handled_key_hold_semantics_fires_at_threshold(token->behavior_contract.hold)) {
+    if (token->interaction.contract.quick_release_of_immediate_hold_dispatches_tap && !handled_key_hold_semantics_fires_at_threshold(token->interaction.contract.hold)) {
         return true;
     }
 
@@ -539,7 +539,7 @@ static bool runtime_v2_press_token_owned_state_active(const runtime_v2_state_t *
         return false;
     }
 
-    return runtime_v2_hold_semantics_owns_state_at_threshold(token->behavior_contract.hold);
+    return runtime_v2_hold_semantics_owns_state_at_threshold(token->interaction.contract.hold);
 }
 
 static void runtime_v2_press_token_commit_hold_phase(press_token_t *token, bool completes_hold) {
@@ -622,7 +622,7 @@ static void runtime_v2_press_token_deferred_release_profile(const runtime_v2_sta
         goto done;
     }
 
-    if (token->behavior_contract.buffered_base_tap_dispatches_tap) {
+    if (token->interaction.contract.buffered_base_tap_dispatches_tap) {
         before = true;
         after  = true;
         goto done;
@@ -632,7 +632,7 @@ static void runtime_v2_press_token_deferred_release_profile(const runtime_v2_sta
         before = token->tap_outcome_available || runtime_v2_press_token_has_pd_mode_quick_lock_candidate(token);
     }
 
-    after = token->behavior_contract.nonquick_release_dispatches_tap;
+    after = token->interaction.contract.nonquick_release_dispatches_tap;
 
 done:
     if (before_tap_term) {
@@ -1617,7 +1617,7 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
         }
 
         other->other_press_interrupted = true;
-        if (other->behavior_contract.suppress_tap_on_layer_interrupt) {
+        if (other->interaction.contract.suppress_tap_on_layer_interrupt) {
             other->momentary_layer_tap_interrupted = true;
         }
     }
@@ -1632,13 +1632,12 @@ static void runtime_v2_press_token_begin(runtime_v2_state_t *state, const runtim
         .pressed_at               = now,
         .hold_term_ms             = hold_term_ms,
         .longer_hold_term_ms      = longer_hold_term_ms,
-        .phase                    = PRESS_TOKEN_PHASE_PRESSED,
-        .behavior_contract        = materialized.contract,
-        .handled_key              = handled,
-        .tap_outcome_available    = tap_outcome_available,
+        .phase                       = PRESS_TOKEN_PHASE_PRESSED,
+        .handled_key                 = handled,
+        .tap_outcome_available       = tap_outcome_available,
         .pd_mode_was_locked_on_press = pd_mode_was_locked_on_press,
-        .interaction               = interaction,
-        .slot_phase                = slot_phase,
+        .interaction                  = interaction,
+        .slot_phase                   = slot_phase,
     };
     state->press_token_count++;
     runtime_v2_press_token_attach_press_leases(state, token);
@@ -1879,8 +1878,6 @@ void runtime_v2_apply_event(const runtime_event_t *event, uint16_t event_time) {
     if (!(state && event)) {
         return;
     }
-
-    state->input_stream_observed = true;
 
     switch (event->kind) {
         case RUNTIME_EVENT_KIND_KEY_DOWN:
@@ -2880,7 +2877,7 @@ void runtime_v2_interrupt_active_keys_on_other_press(keypos_t key_pos, runtime_v
 
         runtime_v2_plan_fallback_hold_activation(state, token, plan);
         token->other_press_interrupted = true;
-        if (token->behavior_contract.suppress_tap_on_layer_interrupt) {
+        if (token->interaction.contract.suppress_tap_on_layer_interrupt) {
             token->momentary_layer_tap_interrupted = true;
         }
     }
@@ -3490,7 +3487,6 @@ projection_snapshot_t runtime_v2_projection_snapshot_capture(void) {
         snapshot.v2_release_keycode_mismatch_count = state->release_keycode_mismatch_count;
         snapshot.v2_orphan_release_count = state->orphan_release_count;
         snapshot.v2_cancelled_press_count = state->cancelled_press_count;
-        state->last_projection            = snapshot;
     }
 
     return snapshot;

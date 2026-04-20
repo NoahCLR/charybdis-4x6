@@ -77,6 +77,7 @@ lib/key/runtime/key_runtime_scan.c
 lib/key/runtime/key_runtime_trace.c
 lib/key/runtime/key_runtime_transition.c
 lib/runtime_v2/runtime_v2.c
+lib/state/runtime/runtime_diag.c
 lib/state/runtime/keyboard_mod_state.c
 lib/state/runtime/runtime_shared_state.c
 EOF

@@ -212,6 +212,14 @@ uint16_t timer_elapsed(uint16_t last) {
     return (uint16_t)(fake_time - last);
 }
 
+uint32_t timer_read32(void) {
+    return fake_time;
+}
+
+uint32_t timer_elapsed32(uint32_t last) {
+    return timer_read32() - last;
+}
+
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
     return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
 }

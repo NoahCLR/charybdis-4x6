@@ -47,6 +47,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/interaction/multi_tap_engine.c \
     lib/key/runtime/key_runtime_feedback.c \
     lib/state/runtime/keyboard_mod_state.c \
+    lib/state/runtime/runtime_diag.c \
     lib/state/ownership/keyboard_mod_ownership.c \
     lib/state/ownership/layer_ownership.c \
     lib/key/runtime/key_runtime_debug.c \
