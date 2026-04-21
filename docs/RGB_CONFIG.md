@@ -11,11 +11,11 @@ current profile looks like, start with
 `rgb_config.c` is the main authored RGB surface:
 
 - layer colors
-- pointing-device mode colors
 - per-layer LED highlights
+- the auto-mouse timeout gradient
+- pointing-device mode colors
 - per-mode LED highlights
 - key-behavior feedback colors
-- the auto-mouse timeout gradient
 
 If you want to change how the current profile looks, start there.
 
@@ -60,6 +60,12 @@ quick reference when picking hue values:
 
 ## What `rgb_config.c` Controls
 
+The file reads best in render order:
+
+1. base layer render surfaces
+2. the auto-mouse base-stage transition
+3. later overlay surfaces
+
 ### `layer_colors[]`
 
 `layer_colors[]` is indexed by the layer enum values from the active keymap
@@ -90,27 +96,6 @@ useful for:
 
 - `LAYER_BASE`, which should fall through to the normal RGB Matrix effect
 - any layer you intentionally want to stay colorless in the layer stack
-
-### `pd_mode_colors[]`
-
-`pd_mode_colors[]` defines the right-half overlay color for each active
-pointing-device mode.
-
-In `rgb_config.c`, declare `pd_mode_colors[]` and `pd_mode_color_count`
-directly.
-
-Each row is keyed by a `PD_MODE_*` flag rather than by array index. That means
-the color mapping follows the pointing mode itself, not the order of
-`pd_modes[]`.
-
-Use rows like:
-
-```c
-{ .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },
-```
-
-Use this table when you want `ARROW_MODE`, `VOLUME_MODE`, `PINCH_MODE`, and the
-other pd modes to have distinct overlay colors.
 
 ### `layer_led_groups`
 
@@ -146,27 +131,6 @@ This is useful for things like:
 The LED map comment in [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) is the reference for the standard matrix
 indices on this board.
 
-### `pd_mode_led_groups`
-
-`pd_mode_led_groups` is the same idea as `layer_led_groups`, but keyed by
-pointing-device mode instead of layer.
-
-Use this when one mode should highlight a very specific LED or cluster, such as
-the trackball LED or one side of the board.
-
-As above, use:
-
-- leave the section commented out when no per-mode LED groups are enabled
-- declare `pd_mode_led_groups_data` and then export it with
-  `EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data)` when you want one or
-  more authored rows
-
-Use rows like:
-
-```c
-{ .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = trackball_led, .count = ARRAY_SIZE(trackball_led) },
-```
-
 ### `automouse_fade_end_config`
 
 `automouse_fade_end_config` defines only the auto-mouse fade destination.
@@ -195,6 +159,48 @@ trackball is still actively being used.
 The configured destination is not a persistent board state. Once the automouse
 renderer stops, the next frame falls back to ordinary layer rendering and then
 later overlays such as pd-mode color or key feedback still paint on top.
+
+### `pd_mode_colors[]`
+
+`pd_mode_colors[]` defines the right-half overlay color for each active
+pointing-device mode.
+
+In `rgb_config.c`, declare `pd_mode_colors[]` and `pd_mode_color_count`
+directly.
+
+Each row is keyed by a `PD_MODE_*` flag rather than by array index. That means
+the color mapping follows the pointing mode itself, not the order of
+`pd_modes[]`.
+
+Use rows like:
+
+```c
+{ .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },
+```
+
+Use this table when you want `ARROW_MODE`, `VOLUME_MODE`, `PINCH_MODE`, and the
+other pd modes to have distinct overlay colors.
+
+### `pd_mode_led_groups`
+
+`pd_mode_led_groups` is the same idea as `layer_led_groups`, but keyed by
+pointing-device mode instead of layer.
+
+Use this when one mode should highlight a very specific LED or cluster, such as
+the trackball LED or one side of the board.
+
+As above, use:
+
+- leave the section commented out when no per-mode LED groups are enabled
+- declare `pd_mode_led_groups_data` and then export it with
+  `EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data)` when you want one or
+  more authored rows
+
+Use rows like:
+
+```c
+{ .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = trackball_led, .count = ARRAY_SIZE(trackball_led) },
+```
 
 ### `key_behavior_feedback_colors`
 
