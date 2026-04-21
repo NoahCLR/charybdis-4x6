@@ -39,9 +39,10 @@
 #    endif
 #    define SPLIT_ACTIVITY_ENABLE
 
-// Register the custom split runtime sync RPC for active/locked pd-mode ids,
-// auto-mouse RGB progress, key-feedback flags, and preview-layer state.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_SYNC
+// Register the custom split RPCs for runtime-visible state plus mirrored VIA
+// dynamic-keymap writes so both halves render layer-owned RGB from the same
+// EEPROM-backed keymap data.
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_SYNC, PUT_VIA_KEYMAP_SYNC
 
 #endif // SPLIT_KEYBOARD
 

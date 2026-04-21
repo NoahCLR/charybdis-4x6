@@ -94,6 +94,10 @@ void split_runtime_sync_init(void) {
     test_log_stage("split_runtime_sync_init");
 }
 
+void noah_qmk_via_split_sync_init(void) {
+    test_log_stage("qmk_via_split_sync_init");
+}
+
 void noah_runtime_diag_post_init(void) {}
 
 void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
@@ -129,7 +133,7 @@ static void test_matrix_scan_order(void) {
 
 static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
-        "macro_dispatch_validate_all", "keymap_validate", "via_macro_defaults_keyboard_post_init", "rgb_runtime_post_init", "split_runtime_sync_init",
+        "macro_dispatch_validate_all", "keymap_validate", "via_macro_defaults_keyboard_post_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init",
     };
 
     test_log_reset();

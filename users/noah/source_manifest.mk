@@ -9,6 +9,7 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_contract.c \
     lib/compat/qmk_mod_contract.c \
     lib/compat/qmk_via_contract.c \
+    lib/compat/qmk_via_split_sync.c \
     lib/action/action_kind.c \
     lib/action/action_kind_dispatch.c \
     lib/action/action_lifecycle.c \

@@ -9,6 +9,7 @@
 #    include "noah_keymap_ids.h"
 #    include "macro_payload.h"
 #    include "via_macro_provider.h"
+#    include "../compat/qmk_via_split_sync.h"
 #    include "../compat/qmk_via_storage_contract.h"
 #    include "../rgb/core/rgb_runtime.h"
 
@@ -200,6 +201,9 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
     }
     if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB) {
         noah_rgb_runtime_invalidate_layer_maps();
+    }
+    if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR) {
+        noah_qmk_via_split_sync_command(data, length);
     }
 
     return false;

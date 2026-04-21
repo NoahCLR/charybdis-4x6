@@ -63,12 +63,14 @@ uint8_t noah_qmk_via_command_effects(uint8_t command_id) {
     switch (command_id) {
 #    ifdef VIA_EEPROM_ALLOW_RESET
         case id_eeprom_reset:
-            return NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS;
+            return NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR;
 #    endif
         case id_dynamic_keymap_set_keycode:
         case id_dynamic_keymap_set_buffer:
         case id_dynamic_keymap_reset:
-            return NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB;
+            return NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR;
+        case id_dynamic_keymap_set_encoder:
+            return NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR;
         case id_dynamic_keymap_macro_reset:
             return NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS;
         default:
