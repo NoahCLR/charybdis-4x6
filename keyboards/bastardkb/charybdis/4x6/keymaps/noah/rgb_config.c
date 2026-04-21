@@ -15,6 +15,7 @@
 //
 // ────────────────────────────────────────────────────────────────────────────
 
+#include "lib/rgb/core/rgb_helpers.h"
 #include "noah_keymap.h" // layer enum, PD_MODE_* constants, hsv_t, rgb config types, RGB config helpers
 
 #if defined(RGB_MATRIX_ENABLE)
@@ -199,8 +200,10 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 //     halves
 //   - KEY_FEEDBACK_MODE_KEY_HALF = paint only the half that owns the key or
 //     tap series currently driving the feedback state
+//   - KEY_FEEDBACK_MODE_KEY = paint only the key currently driving the
+//     feedback state
 // This profile uses KEY_FEEDBACK_MODE_KEY_HALF so hold / multi-tap feedback
-// stays local to the key that caused it.
+// stays local to the half that caused it without becoming too subtle.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     // Neutral white while the engine is still resolving the active tap index.

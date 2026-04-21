@@ -73,7 +73,7 @@ static void rgb_validation_log_invalid_layer_led_index(const char *group_kind, u
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_log_invalid_key_behavior_feedback_mode(uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors.mode %u; expected KEY_FEEDBACK_MODE_BOTH_HALVES (0) or KEY_FEEDBACK_MODE_KEY_HALF (1)\n", (unsigned int)mode);
+    uprintf("Invalid key_behavior_feedback_colors.mode %u; expected KEY_FEEDBACK_MODE_BOTH_HALVES (0), KEY_FEEDBACK_MODE_KEY_HALF (1), or KEY_FEEDBACK_MODE_KEY (2)\n", (unsigned int)mode);
 #        else
     (void)mode;
 #        endif
@@ -135,7 +135,7 @@ static void rgb_validation_validate_layer_led_groups(void) {
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_validate_key_behavior_feedback_config(void) {
-    if (key_behavior_feedback_colors.mode > KEY_FEEDBACK_MODE_KEY_HALF) {
+    if (key_behavior_feedback_colors.mode > KEY_FEEDBACK_MODE_KEY) {
         rgb_validation_log_invalid_key_behavior_feedback_mode((uint8_t)key_behavior_feedback_colors.mode);
     }
 }

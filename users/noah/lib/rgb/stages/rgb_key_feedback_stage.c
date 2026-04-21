@@ -30,15 +30,54 @@ static bool rgb_runtime_key_feedback_stage_led_range_intersects(uint8_t from, ui
     return from < led_max && to > led_min;
 }
 
-static uint8_t rgb_runtime_key_feedback_stage_current_side(void) {
-    return is_keyboard_master() ? key_feedback_side() : split_runtime_sync_remote.key_feedback_side;
+static uint8_t rgb_runtime_key_feedback_stage_current_key(void) {
+    return is_keyboard_master() ? key_feedback_key() : split_runtime_sync_remote.key_feedback_key;
+}
+
+static bool rgb_runtime_key_feedback_stage_unpack_key(uint8_t packed_key, keypos_t *key_pos) {
+    if (!(key_pos && packed_key != KEY_FEEDBACK_KEY_NONE)) {
+        return false;
+    }
+
+    key_pos->row = packed_key / MATRIX_COLS;
+    key_pos->col = packed_key % MATRIX_COLS;
+    return key_pos->row < MATRIX_ROWS && key_pos->col < MATRIX_COLS;
+}
+
+static bool rgb_runtime_key_feedback_stage_paint_key(rgb_t color, keypos_t key_pos, uint8_t led_min, uint8_t led_max) {
+    uint8_t leds[RGB_MATRIX_LED_COUNT];
+    uint8_t led_count = rgb_matrix_map_row_column_to_led(key_pos.row, key_pos.col, leds);
+    bool    painted   = false;
+
+    for (uint8_t i = 0; i < led_count; i++) {
+        uint8_t led = leds[i];
+
+        if (led >= led_min && led < led_max) {
+            rgb_set_led_color(led, led_min, led_max, color);
+            painted = true;
+        }
+    }
+
+    return painted;
 }
 
 static bool rgb_runtime_key_feedback_stage_paint(rgb_t color, uint8_t led_min, uint8_t led_max) {
-    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY_HALF) {
-        uint8_t side = rgb_runtime_key_feedback_stage_current_side();
+    keypos_t key_pos;
 
-        if (side == KEY_FEEDBACK_SIDE_LEFT) {
+    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY) {
+        if (!rgb_runtime_key_feedback_stage_unpack_key(rgb_runtime_key_feedback_stage_current_key(), &key_pos)) {
+            return false;
+        }
+
+        return rgb_runtime_key_feedback_stage_paint_key(color, key_pos, led_min, led_max);
+    }
+
+    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY_HALF) {
+        if (!rgb_runtime_key_feedback_stage_unpack_key(rgb_runtime_key_feedback_stage_current_key(), &key_pos)) {
+            return false;
+        }
+
+        if (key_pos.row < (MATRIX_ROWS / 2u)) {
             if (!rgb_runtime_key_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
                 return false;
             }
@@ -47,14 +86,12 @@ static bool rgb_runtime_key_feedback_stage_paint(rgb_t color, uint8_t led_min, u
             return true;
         }
 
-        if (side == KEY_FEEDBACK_SIDE_RIGHT) {
-            if (!rgb_runtime_key_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
-                return false;
-            }
-
-            rgb_set_right_half(color, led_min, led_max);
-            return true;
+        if (!rgb_runtime_key_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
+            return false;
         }
+
+        rgb_set_right_half(color, led_min, led_max);
+        return true;
     }
 
     rgb_set_both_halves(color, led_min, led_max);

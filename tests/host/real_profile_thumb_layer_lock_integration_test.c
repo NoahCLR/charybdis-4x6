@@ -988,6 +988,10 @@ uint8_t key_feedback_pack(void) {
     return 0;
 }
 
+uint8_t key_feedback_key(void) {
+    return UINT8_MAX;
+}
+
 uint8_t key_feedback_preview_layer(void) {
     return UINT8_MAX;
 }

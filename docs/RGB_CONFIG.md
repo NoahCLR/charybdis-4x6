@@ -222,6 +222,7 @@ The `mode` field controls where the overlay paints:
 - `KEY_FEEDBACK_MODE_BOTH_HALVES`: repaint both halves
 - `KEY_FEEDBACK_MODE_KEY_HALF`: repaint only the half that owns the
   feedback-driving key or active tap series
+- `KEY_FEEDBACK_MODE_KEY`: repaint only the feedback-driving key itself
 
 In the shared runtime, those colors are used for these categories:
 
@@ -261,8 +262,8 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keyma
 The master half computes the semantic feedback flags. On split boards, the
 slave receives those packed flags through
 [`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c), including
-the flash-phase bit and relevant-half side hint used to keep both halves in
-sync.
+the flash-phase bit and packed owner key used to keep the selected feedback
+target in sync.
 
 ## Render Order
 
@@ -278,7 +279,8 @@ sync.
    nonzero solid color
 4. the active pointing-device mode color on the right half
 5. per-mode LED groups
-6. the key-behavior feedback overlay on both halves or only the relevant half
+6. the key-behavior feedback overlay on both halves, only the key half, or
+   only the specific key
 
 That order matters.
 
@@ -287,8 +289,8 @@ Examples:
 - a per-layer LED group can sit on top of a solid layer color
 - a pd-mode overlay can repaint the right half after the layer and group pass
 - a pd-mode LED group can then repaint selected LEDs on top of the mode overlay
-- the key-behavior overlay can temporarily repaint both halves last, or only
-  the key half if `mode` is set that way
+- the key-behavior overlay can temporarily repaint both halves last, only the
+  key half, or only the key itself depending on `mode`
 
 ## The Helper Types
 

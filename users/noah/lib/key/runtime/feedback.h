@@ -6,21 +6,15 @@
 // Avoids exposing the rest of the key engine's private runtime surface.
 //
 // The full snapshot is computed on the master half. For split sync, the RGB-
-// relevant semantic state is packed into a single flags byte so the slave can
-// render the same feedback categories without access to the key engine
-// globals. Time-based effects such as flashing may still compute phase
-// locally.
+// relevant semantic state is mirrored as packed flags plus one packed owner
+// key so the slave can render the same feedback categories without access to
+// the key engine globals. Time-based effects such as flashing may still
+// compute phase locally.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
-
-typedef enum {
-    KEY_FEEDBACK_SIDE_NONE = 0,
-    KEY_FEEDBACK_SIDE_LEFT,
-    KEY_FEEDBACK_SIDE_RIGHT,
-} key_feedback_side_t;
 
 // ─── Packed flags for split sync ────────────────────────────────────────────
 //
@@ -68,8 +62,10 @@ static inline bool key_feedback_flags_flash_phase(uint8_t flags) {
     return (flags & KEY_FEEDBACK_FLAG_FLASH_PHASE) != 0;
 }
 
+#define KEY_FEEDBACK_KEY_NONE UINT8_MAX
+
 // Compute packed flags from the master-side key engine state.
 uint8_t key_feedback_pack(void);
-uint8_t key_feedback_side(void);
+uint8_t key_feedback_key(void);
 uint8_t key_feedback_preview_layer(void);
 void    key_feedback_pulse_arm(bool long_hold_level);

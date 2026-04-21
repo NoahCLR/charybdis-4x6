@@ -22,8 +22,14 @@
 #ifndef RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
 #    define RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED 0
 #endif
-#ifndef RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
-#    define RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF 0
+#ifndef RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
+#    define RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF 0
+#endif
+#ifndef RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
+#    define RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY 0
+#endif
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
+#    error "Only one key-feedback render test mode variant may be enabled at a time"
 #endif
 
 enum test_layers {
@@ -41,7 +47,7 @@ HOST_RUNTIME_FIXTURE_DEFINE_LAYER_STUBS()
 static uint16_t               test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static rgb_t                  led_output[RGB_MATRIX_LED_COUNT];
 static uint8_t                fake_preview_layer      = UINT8_MAX;
-static uint8_t                fake_feedback_side      = KEY_FEEDBACK_SIDE_LEFT;
+static uint8_t                fake_feedback_key       = KEY_FEEDBACK_KEY_NONE;
 static uint8_t                fake_auto_mouse_layer   = LAYER_POINTER;
 static uint16_t               fake_auto_mouse_elapsed = 0;
 static bool                   fake_auto_mouse_active  = true;
@@ -136,7 +142,9 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(1, 2, 3),
     .hold_active_color       = HSV(4, 5, 6),
     .long_hold_active_color  = HSV(7, 8, 9),
-#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
+    .mode                    = KEY_FEEDBACK_MODE_KEY,
+#elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
     .mode                    = KEY_FEEDBACK_MODE_KEY_HALF,
 #else
     .mode                    = KEY_FEEDBACK_MODE_BOTH_HALVES,
@@ -164,6 +172,10 @@ static rgb_t rgb_from_hsv(hsv_t hsv) {
 
 static rgb_t rgb_from_ws2812(ws2812_led_t led) {
     return (rgb_t){.r = led.r, .g = led.g, .b = led.b};
+}
+
+static uint8_t test_feedback_key(uint8_t row, uint8_t col) {
+    return (uint8_t)((uint16_t)row * MATRIX_COLS + col);
 }
 
 static rgb_t rgb_blend(rgb_t start, rgb_t end, uint8_t amount) {
@@ -204,7 +216,7 @@ static void test_reset(void) {
     memset(ws2812_leds, 0, sizeof(ws2812_leds));
     layer_state               = 0;
     fake_preview_layer        = UINT8_MAX;
-    fake_feedback_side        = KEY_FEEDBACK_SIDE_LEFT;
+    fake_feedback_key         = test_feedback_key(0, 0);
     fake_auto_mouse_layer     = LAYER_POINTER;
     fake_auto_mouse_elapsed   = 0;
     fake_auto_mouse_active    = true;
@@ -230,6 +242,10 @@ static void test_reset(void) {
     g_led_config.matrix_co[1][1] = 5;
     g_led_config.matrix_co[1][2] = 6;
     g_led_config.matrix_co[1][3] = 7;
+    g_led_config.matrix_co[4][0] = 4;
+    g_led_config.matrix_co[4][1] = 5;
+    g_led_config.matrix_co[4][2] = 6;
+    g_led_config.matrix_co[4][3] = 7;
 
     noah_rgb_runtime_post_init();
 }
@@ -260,8 +276,8 @@ uint8_t key_feedback_pack(void) {
     return fake_feedback_flags;
 }
 
-uint8_t key_feedback_side(void) {
-    return fake_feedback_side;
+uint8_t key_feedback_key(void) {
+    return fake_feedback_key;
 }
 
 uint8_t key_feedback_preview_layer(void) {
@@ -459,7 +475,7 @@ static void test_slave_feedback_uses_remote_flags_and_flash_phase(void) {
     fake_is_master                               = false;
     layer_state                                  = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_feedback_flags = KEY_FEEDBACK_FLAG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LEVEL_FLASH;
-    split_runtime_sync_remote.key_feedback_side  = KEY_FEEDBACK_SIDE_LEFT;
+    split_runtime_sync_remote.key_feedback_key   = test_feedback_key(0, 0);
 
     CHECK(render_output());
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
@@ -470,20 +486,23 @@ static void test_slave_feedback_uses_remote_flags_and_flash_phase(void) {
 
     CHECK(render_output());
     check_led(0, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
-#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF || RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
+#    if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+#    endif
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 #else
     check_led(7, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
 #endif
 }
 
-#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
-static void test_relevant_half_feedback_paints_only_master_side(void) {
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
+static void test_key_half_feedback_paints_only_master_half(void) {
     test_reset();
 
     layer_state         = (1UL << LAYER_SYM);
     fake_feedback_flags = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
-    fake_feedback_side  = KEY_FEEDBACK_SIDE_LEFT;
+    fake_feedback_key   = test_feedback_key(0, 0);
 
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
 
@@ -493,13 +512,13 @@ static void test_relevant_half_feedback_paints_only_master_side(void) {
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
-static void test_relevant_half_feedback_paints_only_slave_side_from_remote_snapshot(void) {
+static void test_key_half_feedback_paints_only_slave_half_from_remote_snapshot(void) {
     test_reset();
 
     layer_state                                  = (1UL << LAYER_SYM);
     fake_is_master                               = false;
     split_runtime_sync_remote.key_feedback_flags = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
-    split_runtime_sync_remote.key_feedback_side  = KEY_FEEDBACK_SIDE_RIGHT;
+    split_runtime_sync_remote.key_feedback_key   = test_feedback_key(4, 0);
 
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
 
@@ -507,6 +526,41 @@ static void test_relevant_half_feedback_paints_only_slave_side_from_remote_snaps
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
     check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+}
+#endif
+
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
+static void test_key_feedback_paints_only_master_key(void) {
+    test_reset();
+
+    layer_state         = (1UL << LAYER_SYM);
+    fake_feedback_flags = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+    fake_feedback_key   = test_feedback_key(0, 1);
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(1, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
+static void test_key_feedback_paints_only_slave_key_from_remote_snapshot(void) {
+    test_reset();
+
+    layer_state                                  = (1UL << LAYER_SYM);
+    fake_is_master                               = false;
+    split_runtime_sync_remote.key_feedback_flags = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+    split_runtime_sync_remote.key_feedback_key   = test_feedback_key(4, 2);
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(5, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 #endif
 
@@ -532,7 +586,7 @@ static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_wh
     check_led(7, rgb_from_hsv(pd_mode_colors[1].color));
 }
 
-#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
 static void test_slave_full_scene_feedback_overrides_remote_preview_and_locked_pd_mode(void) {
     test_reset();
 
@@ -574,7 +628,7 @@ static void test_render_order_preview_then_pd_mode_then_pd_group(void) {
     check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
 }
 
-#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
 static void test_render_order_base_then_preview_then_pd_mode_then_feedback(void) {
     test_reset();
 
@@ -643,7 +697,7 @@ static void test_runtime_diag_stage_palette_is_unique(void) {
     }
 }
 
-#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
 static void test_multi_tap_pending_feedback_overrides_preview_and_pd_mode(void) {
     test_reset();
 
@@ -664,7 +718,7 @@ static void test_multi_tap_pending_feedback_overrides_preview_and_pd_mode(void) 
 }
 #endif
 
-#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
 static void test_hold_pending_feedback_overrides_preview_and_pd_mode(void) {
     test_reset();
 
@@ -1056,21 +1110,25 @@ int main(void) {
     test_preview_layer_overlays_existing_active_layers();
     test_slave_preview_layer_uses_remote_sync_state();
     test_slave_feedback_uses_remote_flags_and_flash_phase();
-#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
-    test_relevant_half_feedback_paints_only_master_side();
-    test_relevant_half_feedback_paints_only_slave_side_from_remote_snapshot();
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
+    test_key_half_feedback_paints_only_master_half();
+    test_key_half_feedback_paints_only_slave_half_from_remote_snapshot();
+#endif
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
+    test_key_feedback_paints_only_master_key();
+    test_key_feedback_paints_only_slave_key_from_remote_snapshot();
 #endif
     test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_when_feedback_flash_is_hidden();
-#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
     test_slave_full_scene_feedback_overrides_remote_preview_and_locked_pd_mode();
 #endif
     test_render_order_preview_then_pd_mode_then_pd_group();
-#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
     test_render_order_base_then_preview_then_pd_mode_then_feedback();
 #endif
     test_runtime_diag_overlay_overrides_scene();
     test_runtime_diag_stage_palette_is_unique();
-#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();
     test_hold_pending_feedback_overrides_preview_and_pd_mode();
 #endif
