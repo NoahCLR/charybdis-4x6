@@ -705,6 +705,14 @@ def resolve_preview_color(
     return dict(authored_color)
 
 
+def layer_color_mode_description(mode: str) -> str:
+    descriptions = {
+        "ALL_KEYS": "Tint every physical key with the authored layer color.",
+        "KEYS_MAPPED_ON_THIS_LAYER_ONLY": "Tint only keys with a real mapping on that layer; transparent positions stay neutral so lower layers remain visible underneath.",
+    }
+    return descriptions.get(mode, "Unknown layer RGB render mode.")
+
+
 def parse_layer_colors(text: str, known_values: dict[str, str]) -> list[dict[str, object]]:
     body = extract_initializer_body(text, r"layer_colors\[LAYER_COUNT\]\s*=")
     colors: list[dict[str, object]] = []
@@ -733,6 +741,38 @@ def parse_layer_colors(text: str, known_values: dict[str, str]) -> list[dict[str
         die("no layer colors parsed from rgb_config.c")
 
     return colors
+
+
+def automouse_fade_end_mode_description(mode: str) -> str:
+    descriptions = {
+        "FOLLOW_REAL_DESTINATION": "Fade to the real rendered board state that remains after the auto-mouse layer drops out.",
+        "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW": "Keep the real destination where layers still paint, but use `end_color` where the base RGB effect would otherwise show through.",
+        "END_COLOR_ON_ALL_KEYS": "Use `end_color` as the fade destination on every key while the automouse renderer is active.",
+    }
+    return descriptions.get(mode, "Unknown auto-mouse fade destination mode.")
+
+
+def parse_automouse_fade_end_config(raw_text: str, known_values: dict[str, str]) -> dict[str, object] | None:
+    try:
+        body = extract_initializer_body(raw_text, r"automouse_fade_end_config\s*=")
+    except SystemExit:
+        return None
+
+    fields = parse_designated_fields(strip_comments(body))
+    mode = fields.get(".mode")
+    end_color = fields.get(".end_color")
+    if mode is None or end_color is None:
+        return None
+
+    normalized_mode = normalize_expr(mode)
+    parsed_end_color = parse_hsv_expr(end_color, known_values)
+    return {
+        "mode": normalized_mode,
+        "label": humanize_identifier(normalized_mode),
+        "meaning": automouse_fade_end_mode_description(normalized_mode),
+        "end_color": parsed_end_color,
+        "preview_color": dict(parsed_end_color),
+    }
 
 
 def parse_key_behavior_feedback_colors(
@@ -1160,6 +1200,8 @@ def build_profile_model() -> dict[str, object]:
 
     layers = parse_config_layers(config_text)
     config_macros = parse_config_macros(config_text)
+    rgb_automouse_gradient_enabled = "RGB_AUTOMOUSE_GRADIENT_ENABLE" in config_macros
+    rgb_key_behavior_feedback_enabled = "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE" in config_macros
     timing_defaults = resolve_behavior_timing_defaults(config_macros)
     layer_colors = finalize_layer_colors(parse_layer_colors(rgb_config_text, config_macros), resolve_rgb_default_color(config_macros))
     keymap_custom_keycodes = parse_keymap_custom_keycodes(keymap_text)
@@ -1175,8 +1217,17 @@ def build_profile_model() -> dict[str, object]:
         for row in pd_mode_colors
         if row["comment_color_name"] is not None
     }
-    key_behavior_feedback_colors = parse_key_behavior_feedback_colors(rgb_config_raw_text, config_macros, pd_mode_color_anchors)
-    key_behavior_feedback_mode = parse_key_behavior_feedback_mode(rgb_config_raw_text)
+    automouse_fade_end_config = (
+        parse_automouse_fade_end_config(rgb_config_raw_text, config_macros) if rgb_automouse_gradient_enabled else None
+    )
+    key_behavior_feedback_colors = (
+        parse_key_behavior_feedback_colors(rgb_config_raw_text, config_macros, pd_mode_color_anchors)
+        if rgb_key_behavior_feedback_enabled
+        else []
+    )
+    key_behavior_feedback_mode = (
+        parse_key_behavior_feedback_mode(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
+    )
 
     macro_usages = collect_macro_usages(parsed_layers, behaviors, combos, via_macros + hardcoded_macros)
 
@@ -1209,10 +1260,15 @@ def build_profile_model() -> dict[str, object]:
     return {
         "summary": summary,
         "config": {"layers": layers, "macros": config_macros, "timing_defaults": timing_defaults},
+        "features": {
+            "rgb_automouse_gradient_enabled": rgb_automouse_gradient_enabled,
+            "rgb_key_behavior_feedback_enabled": rgb_key_behavior_feedback_enabled,
+        },
         "pd_modes": pd_modes,
         "rgb": {
             "layer_colors": layer_colors,
             "pd_mode_colors": pd_mode_colors,
+            "automouse_fade_end_config": automouse_fade_end_config,
             "key_behavior_feedback_mode": key_behavior_feedback_mode,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
         },
@@ -1240,18 +1296,26 @@ def render_markdown(profile: dict[str, object]) -> str:
         "",
         render_quick_legend_section(profile),
         render_layer_maps_section(profile),
-        render_key_behavior_feedback_section(profile),
-        render_macro_section(profile),
-        render_reference_section(profile),
-        render_summary_section(profile),
-        render_config_defines_section(profile),
-        render_generated_assets_section(),
     ]
+    if profile["features"]["rgb_automouse_gradient_enabled"]:
+        sections.append(render_automouse_fade_section(profile))
+    if profile["features"]["rgb_key_behavior_feedback_enabled"]:
+        sections.append(render_key_behavior_feedback_section(profile))
+    sections.extend(
+        [
+            render_macro_section(profile),
+            render_reference_section(profile),
+            render_summary_section(profile),
+            render_config_defines_section(profile),
+            render_generated_assets_section(),
+        ]
+    )
     return "\n".join(section for section in sections if section)
 
 
 def render_quick_legend_section(profile: dict[str, object]) -> str:
     indicator_colors = resolve_behavior_indicator_preview_colors(profile)
+    show_behavior_indicator_rows = any(color is not None for color in indicator_colors.values())
 
     def indicator_preview(kind: str, alt_text: str) -> str:
         color = indicator_colors[kind]
@@ -1265,24 +1329,34 @@ def render_quick_legend_section(profile: dict[str, object]) -> str:
         "| Where | Marker | Meaning |",
         "| --- | --- | --- |",
         "| Layer image | `C1`, `C2`, ... | Combo badge. Match the badge id to the layer-local combo table below the image. |",
-        f"| Layer image | `tap` dot {indicator_preview('tap', 'Tap indicator color')} with optional count | This key has authored tap actions. A plain dot means one authored tap action; a numbered dot means multiple tap tiers on that key define a tap action. Use the behavior table below for `single`, `double`, `triple`, and higher tap counts. |",
-        f"| Layer image | `hold` dot {indicator_preview('hold', 'Hold indicator color')} with optional count | This key has authored hold tiers. A plain dot means one hold tier; a numbered dot means multiple tap tiers on that key define a hold action. |",
-        f"| Layer image | `long hold` dot {indicator_preview('long_hold', 'Long hold indicator color')} with optional count | This key has authored long-hold tiers. A plain dot means one long-hold tier; a numbered dot means multiple tap tiers on that key define a long-hold action. |",
         "| Behavior table | `single`, `double`, `triple`, `quadruple`, `quintuple` | Tap tiers for the same physical key: 1 tap, 2 taps, 3 taps, 4 taps, 5 taps. |",
         "| Behavior table | repeated rows for one key | The same physical key exposes different actions at different tap tiers. |",
         "| Behavior table | `Tap` / `Hold` / `Long Hold` | Actions that fire for that tap tier on tap, hold, or deeper long hold. |",
         "",
     ]
+    if show_behavior_indicator_rows:
+        lines[5:5] = [
+            f"| Layer image | `tap` dot {indicator_preview('tap', 'Tap indicator color')} with optional count | This key has authored tap actions. A plain dot means one authored tap action; a numbered dot means multiple tap tiers on that key define a tap action. Use the behavior table below for `single`, `double`, `triple`, and higher tap counts. |",
+            f"| Layer image | `hold` dot {indicator_preview('hold', 'Hold indicator color')} with optional count | This key has authored hold tiers. A plain dot means one hold tier; a numbered dot means multiple tap tiers on that key define a hold action. |",
+            f"| Layer image | `long hold` dot {indicator_preview('long_hold', 'Long hold indicator color')} with optional count | This key has authored long-hold tiers. A plain dot means one long-hold tier; a numbered dot means multiple tap tiers on that key define a long-hold action. |",
+        ]
     return "\n".join(lines)
 
 
 def render_reference_section(profile: dict[str, object]) -> str:
     config = profile["config"]
+    features = profile["features"]
     rgb = profile["rgb"]
+    automouse_fade_end_config = rgb["automouse_fade_end_config"]
     feedback_mode = rgb["key_behavior_feedback_mode"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
+    rgb_authored_surfaces = ["layer colors", "pd-mode colors"]
+    if features["rgb_automouse_gradient_enabled"]:
+        rgb_authored_surfaces.append("auto-mouse fade config")
+    if features["rgb_key_behavior_feedback_enabled"]:
+        rgb_authored_surfaces.append("key-behavior feedback colors")
     lines = [
         "## Reference",
         "",
@@ -1292,20 +1366,35 @@ def render_reference_section(profile: dict[str, object]) -> str:
         "| --- | --- |",
         f"| {keymap_link} | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |",
         f"| {config_link} | layer enum, timing, RGB defaults, and keymap-facing feature config |",
-        f"| {rgb_link} | layer colors, pd-mode colors, and key-behavior feedback colors |",
+        f"| {rgb_link} | {', '.join(rgb_authored_surfaces)} |",
         "",
         "### Shared Keycode Surfaces",
         "",
         f"- Layers: {', '.join(f'`{layer}`' for layer in config['layers'])}",
         f"- Keymap-local custom keycodes: {', '.join(f'`{name}`' for name in profile['keymap_custom_keycodes']) or '`none`'}",
         f"- PD color overlays: {', '.join(f'`{row['pointing_mode']}`' for row in rgb['pd_mode_colors']) or '`none`'}",
-        f"- Key-behavior feedback paint mode: `{feedback_mode['mode']}`" if feedback_mode is not None else "- Key-behavior feedback paint mode: `not authored`",
-        "",
-        "### Layer RGB Config",
-        "",
-        "| Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |",
-        "| --- | --- | --- | --- |",
     ]
+    if features["rgb_automouse_gradient_enabled"]:
+        lines.append(
+            f"- Auto-mouse fade destination mode: `{automouse_fade_end_config['mode']}`"
+            if automouse_fade_end_config is not None
+            else "- Auto-mouse fade destination mode: `not authored`",
+        )
+    if features["rgb_key_behavior_feedback_enabled"]:
+        lines.append(
+            f"- Key-behavior feedback paint mode: `{feedback_mode['mode']}`"
+            if feedback_mode is not None
+            else "- Key-behavior feedback paint mode: `not authored`",
+        )
+    lines.extend(
+        [
+            "",
+            "### Layer RGB Config",
+            "",
+            "| Layer | RGB Matrix Render Mode | Authored HSV | Preview Color |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
     for row in rgb["layer_colors"]:
         color = row["color"]
         preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['layer']} preview color")
@@ -1348,6 +1437,7 @@ def render_config_defines_section(profile: dict[str, object]) -> str:
 
 
 def render_layer_maps_section(profile: dict[str, object]) -> str:
+    features = profile["features"]
     layer_color_map = {row["layer"]: row for row in profile["rgb"]["layer_colors"]}
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
@@ -1358,10 +1448,12 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "",
         f"These previews are generated as SVG image assets under {asset_dir_link}. The renderer uses the authored `layer_colors[]` config from {rgb_link} and the current `LAYOUT()` slot order from {keymap_link}:",
         "",
-        "- `ALL_KEYS`: tint every physical key with the layer color",
-        "- `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys",
+        "| Available Layer RGB Mode | Meaning |",
+        "| --- | --- |",
+        f"| `ALL_KEYS` | {layer_color_mode_description('ALL_KEYS')} |",
+        f"| `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | {layer_color_mode_description('KEYS_MAPPED_ON_THIS_LAYER_ONLY')} |",
+        "",
         f"- `LAYER_BASE` falls back to the default RGB color from {config_link} when its authored layer color is `HSV(0, 0, 0)`",
-        f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show numbered activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap actions, orange for authored hold tiers, and cyan for authored long-hold tiers",
         "- Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer",
         "- Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer",
         "",
@@ -1373,6 +1465,11 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "- Timing is shown per tap count, so each row lists only the timings that matter for that behavior",
         "",
     ]
+    if features["rgb_key_behavior_feedback_enabled"] and profile["rgb"]["key_behavior_feedback_colors"]:
+        lines.insert(
+            10,
+            f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show numbered activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap actions, orange for authored hold tiers, and cyan for authored long-hold tiers",
+        )
     for layer in profile["layers"]:
         color_config = layer_color_map[layer["name"]]
         image_name = layer_image_name(layer["name"])
@@ -1428,6 +1525,48 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
         )
 
     lines.append("")
+    return "\n".join(lines)
+
+
+def render_automouse_fade_section(profile: dict[str, object]) -> str:
+    automouse_fade_end_config = profile["rgb"]["automouse_fade_end_config"]
+    rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
+    lines = [
+        "## Auto-mouse Fade",
+        "",
+    ]
+
+    if automouse_fade_end_config is None:
+        lines.extend(
+            [
+                f"No authored `automouse_fade_end_config` block was found in {rgb_link}.",
+                "",
+            ]
+        )
+        return "\n".join(lines)
+
+    end_color = automouse_fade_end_config["end_color"]
+    preview_swatch = markdown_color_swatch(automouse_fade_end_config["preview_color"], "Auto-mouse end color")
+    lines.extend(
+        [
+            f"This fade destination comes from `automouse_fade_end_config` in {rgb_link}. The mode chooses where the timeout fade lands after the auto-mouse layer starts dropping out.",
+            "",
+            f"Current authored auto-mouse fade mode: `{automouse_fade_end_config['mode']}`.",
+            "",
+            "| Available Mode | Meaning |",
+            "| --- | --- |",
+            f"| `FOLLOW_REAL_DESTINATION` | {automouse_fade_end_mode_description('FOLLOW_REAL_DESTINATION')} |",
+            f"| `END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW` | {automouse_fade_end_mode_description('END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW')} |",
+            f"| `END_COLOR_ON_ALL_KEYS` | {automouse_fade_end_mode_description('END_COLOR_ON_ALL_KEYS')} |",
+            "",
+            f"Authored `end_color`: `HSV({end_color['h']}, {end_color['s']}, {end_color['v']})`.",
+            "",
+            f"Preview color: {preview_swatch}",
+            "",
+            "`end_color` is only visible in the two `END_COLOR_*` modes above; `FOLLOW_REAL_DESTINATION` ignores it and lands on the real rendered board state instead.",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -1777,6 +1916,10 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
 
     for row in profile["rgb"]["pd_mode_colors"]:
         swatch_colors.add(row["preview_color"]["hex"])
+
+    automouse_fade_end_config = profile["rgb"]["automouse_fade_end_config"]
+    if automouse_fade_end_config is not None:
+        swatch_colors.add(automouse_fade_end_config["preview_color"]["hex"])
 
     for row in profile["rgb"]["key_behavior_feedback_colors"]:
         swatch_colors.add(row["preview_color"]["hex"])

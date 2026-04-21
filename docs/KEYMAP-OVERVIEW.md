@@ -18,8 +18,11 @@ PD mode names and bindings in this report stay in sync with the shared definitio
 
 These previews are generated as SVG image assets under [docs/media/profile-introspection/](media/profile-introspection). The renderer uses the authored `layer_colors[]` config from [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and the current `LAYOUT()` slot order from [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c):
 
-- `ALL_KEYS`: tint every physical key with the layer color
-- `KEYS_MAPPED_ON_THIS_LAYER_ONLY`: tint only keys with an authored mapping on that layer; transparent `TRNS` positions stay neutral and explicitly labeled as passthrough keys
+| Available Layer RGB Mode | Meaning |
+| --- | --- |
+| `ALL_KEYS` | Tint every physical key with the authored layer color. |
+| `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | Tint only keys with a real mapping on that layer; transparent positions stay neutral so lower layers remain visible underneath. |
+
 - `LAYER_BASE` falls back to the default RGB color from [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) when its authored layer color is `HSV(0, 0, 0)`
 - Keys with authored `key_behaviors[]` rows in [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show numbered activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): white for authored tap actions, orange for authored hold tiers, and cyan for authored long-hold tiers
 - Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer
@@ -219,6 +222,24 @@ No authored combos resolve entirely from keys on this layer.
 | --- | --- | --- |
 | `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
 
+## Auto-mouse Fade
+
+This fade destination comes from `automouse_fade_end_config` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). The mode chooses where the timeout fade lands after the auto-mouse layer starts dropping out.
+
+Current authored auto-mouse fade mode: `FOLLOW_REAL_DESTINATION`.
+
+| Available Mode | Meaning |
+| --- | --- |
+| `FOLLOW_REAL_DESTINATION` | Fade to the real rendered board state that remains after the auto-mouse layer drops out. |
+| `END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW` | Keep the real destination where layers still paint, but use `end_color` where the base RGB effect would otherwise show through. |
+| `END_COLOR_ON_ALL_KEYS` | Use `end_color` as the fade destination on every key while the automouse renderer is active. |
+
+Authored `end_color`: `HSV(0, 255, 200)`.
+
+Preview color: <img alt="Auto-mouse end color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" />
+
+`end_color` is only visible in the two `END_COLOR_*` modes above; `FOLLOW_REAL_DESTINATION` ignores it and lands on the real rendered board state instead.
+
 ## Key-Behavior Feedback LEDs
 
 These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer and any pd-mode overlay.
@@ -266,13 +287,14 @@ No filled hardcoded macro slots.
 | --- | --- |
 | [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |
 | [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
-| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pd-mode colors, and key-behavior feedback colors |
+| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pd-mode colors, auto-mouse fade config, key-behavior feedback colors |
 
 ### Shared Keycode Surfaces
 
 - Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`
 - Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
+- Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback paint mode: `KEY_FEEDBACK_MODE_KEY_HALF`
 
 ### Layer RGB Config
