@@ -164,14 +164,18 @@ static void key_runtime_core_effect_plan_push_layer_release(key_runtime_core_eff
                                             });
 }
 
-static void key_runtime_core_effect_plan_push_feedback_pulse(key_runtime_core_effect_plan_t *plan, bool long_hold_level) {
+static void key_runtime_core_effect_plan_push_feedback_pulse(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, bool long_hold_level) {
     if (!plan) {
         return;
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                                .kind                 = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-                                                .data.long_hold_level = long_hold_level,
+                                                .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
+                                                .data.feedback_pulse =
+                                                    {
+                                                        .key_pos          = key_pos,
+                                                        .long_hold_level  = long_hold_level,
+                                                    },
                                             });
 }
 
@@ -325,9 +329,10 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             if (key_runtime_core_state()) {
                 key_runtime_core_state()->feedback_pulse_timer           = timer_read();
                 key_runtime_core_state()->feedback_pulse_active          = true;
-                key_runtime_core_state()->feedback_pulse_long_hold_level = effect->data.long_hold_level;
+                key_runtime_core_state()->feedback_pulse_long_hold_level = effect->data.feedback_pulse.long_hold_level;
+                key_runtime_core_state()->feedback_pulse_key_pos         = effect->data.feedback_pulse.key_pos;
             }
-            key_feedback_pulse_arm(effect->data.long_hold_level);
+            key_feedback_pulse_arm(effect->data.feedback_pulse.long_hold_level);
             return;
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
             if (pd_mode_toggle_lock_state(effect->data.pd_mode)) {
@@ -2762,19 +2767,19 @@ static void key_runtime_core_plan_threshold_hold_effects(key_runtime_core_state_
     switch (semantics.threshold) {
         case HANDLED_KEY_HOLD_THRESHOLD_DISPATCH:
             key_runtime_core_effect_plan_push_dispatch_action(plan, hold.action);
-            key_runtime_core_effect_plan_push_feedback_pulse(plan, long_hold_level);
+            key_runtime_core_effect_plan_push_feedback_pulse(plan, token->key_pos, long_hold_level);
             key_runtime_core_press_token_commit_hold_phase(token, completes_hold);
             return;
         case HANDLED_KEY_HOLD_THRESHOLD_REGISTER_HELD:
             key_runtime_core_effect_plan_push_held_action(plan, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, token->key_pos, hold.action);
             if (key_runtime_core_hold_activation_needs_pulse(hold, semantics, false)) {
-                key_runtime_core_effect_plan_push_feedback_pulse(plan, long_hold_level);
+                key_runtime_core_effect_plan_push_feedback_pulse(plan, token->key_pos, long_hold_level);
             }
             key_runtime_core_press_token_commit_hold_phase(token, completes_hold);
             return;
         case HANDLED_KEY_HOLD_THRESHOLD_REPEAT:
             key_runtime_core_effect_plan_push_repeat_start(plan, token->key_pos, hold.action, hold.repeat_hz);
-            key_runtime_core_effect_plan_push_feedback_pulse(plan, long_hold_level);
+            key_runtime_core_effect_plan_push_feedback_pulse(plan, token->key_pos, long_hold_level);
             key_runtime_core_press_token_commit_hold_phase(token, completes_hold);
             return;
         case HANDLED_KEY_HOLD_THRESHOLD_NONE:
@@ -2853,7 +2858,7 @@ static void key_runtime_core_plan_active_scan_for_token(key_runtime_core_state_t
         case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
             if (elapsed >= token->interaction.binding.tap_hold_term) {
                 if (!key_runtime_core_press_token_uses_implicit_hold(token)) {
-                    key_runtime_core_effect_plan_push_feedback_pulse(plan, false);
+                    key_runtime_core_effect_plan_push_feedback_pulse(plan, token->key_pos, false);
                 }
                 key_runtime_core_press_token_commit_hold_phase(token, !token->interaction.binding.long_hold.present);
             }

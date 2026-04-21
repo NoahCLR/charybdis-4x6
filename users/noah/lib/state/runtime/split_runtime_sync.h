@@ -18,6 +18,7 @@ typedef struct __attribute__((packed)) {
     pd_mode_id_t active_mode_id;
     pd_mode_id_t locked_mode_id;
     uint8_t      key_feedback_flags;
+    uint8_t      key_feedback_side;
     uint8_t      key_preview_layer;
 } split_runtime_sync_packet_t;
 
@@ -27,6 +28,7 @@ typedef struct __attribute__((packed)) {
         .active_mode_id     = PD_MODE_ID_NONE, \
         .locked_mode_id     = PD_MODE_ID_NONE, \
         .key_feedback_flags = 0,               \
+        .key_feedback_side  = 0,               \
         .key_preview_layer  = UINT8_MAX,       \
     }
 

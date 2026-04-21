@@ -216,7 +216,7 @@ The runtime supports:
 - per-mode right-half colors
 - per-mode LED group highlights
 - optional auto-mouse countdown gradient feedback
-- optional key-behavior state feedback
+- optional key-behavior state feedback on both halves or only the relevant half
 
 That means RGB is not just there to look nice. It tells you what layer is
 active, which pointing mode is live, and when the key-behavior engine is

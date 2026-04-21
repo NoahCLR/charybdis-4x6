@@ -47,7 +47,10 @@ typedef struct {
             keypos_t key_pos;
             uint8_t  layer;
         } layer_press;
-        bool           long_hold_level;
+        struct {
+            keypos_t key_pos;
+            bool     long_hold_level;
+        } feedback_pulse;
         pd_mode_mask_t pd_mode;
         struct {
             uint16_t              action;

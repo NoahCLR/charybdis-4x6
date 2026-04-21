@@ -627,8 +627,11 @@ void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_poli
 
 void key_feedback_pulse_arm(bool long_hold_level) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind                 = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-        .data.long_hold_level = long_hold_level,
+        .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
+        .data.feedback_pulse =
+            {
+                .long_hold_level = long_hold_level,
+            },
     });
 }
 

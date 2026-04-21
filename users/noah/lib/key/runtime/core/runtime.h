@@ -279,6 +279,7 @@ typedef struct {
     uint16_t                             feedback_pulse_timer;
     bool                                 feedback_pulse_active;
     bool                                 feedback_pulse_long_hold_level;
+    keypos_t                             feedback_pulse_key_pos;
     uint8_t                              keyboard_event_masked_real_mods;
     bool                                 keyboard_event_mask_active;
 } key_runtime_core_state_t;

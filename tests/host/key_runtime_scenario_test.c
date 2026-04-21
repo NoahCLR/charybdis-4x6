@@ -390,14 +390,14 @@ static void test_immediate_hold_promotes_long_hold_after_registration(void) {
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
     CHECK(key_runtime_scenario_effect_at(0)->data.held_action.action == TEST_HOLD_ACTION);
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(!key_runtime_scenario_effect_at(1)->data.long_hold_level);
+    CHECK(!key_runtime_scenario_effect_at(1)->data.feedback_pulse.long_hold_level);
     CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
     CHECK(key_runtime_scenario_effect_at(2)->data.key_pos.row == 0);
     CHECK(key_runtime_scenario_effect_at(2)->data.key_pos.col == 3);
     CHECK(key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK(key_runtime_scenario_effect_at(3)->data.action == TEST_ALT_ACTION);
     CHECK(key_runtime_scenario_effect_at(4)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(key_runtime_scenario_effect_at(4)->data.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(4)->data.feedback_pulse.long_hold_level);
     CHECK(key_runtime_scenario_slot_hold_is_complete(test_keypos(0, 3)));
     CHECK(key_runtime_scenario_slot_held_action_keycode(test_keypos(0, 3)) == KC_NO);
 }
@@ -424,7 +424,7 @@ static void test_threshold_hold_then_long_hold_with_intermediate_scans_promotes_
     CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK(key_runtime_scenario_effect_at(2)->data.action == TEST_ALT_ACTION);
     CHECK(key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(key_runtime_scenario_effect_at(3)->data.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(3)->data.feedback_pulse.long_hold_level);
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(0, 4)) == KC_NO);
     CHECK(key_runtime_scenario_slot_held_action_keycode(test_keypos(0, 4)) == KC_NO);
 }
@@ -467,11 +467,11 @@ static void test_double_tap_hold_can_toggle_same_layer_lock_twice(void) {
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK(key_runtime_scenario_effect_at(0)->data.action == LOCK_LAYER(TEST_NUM_LAYER));
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(key_runtime_scenario_effect_at(1)->data.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.long_hold_level);
     CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK(key_runtime_scenario_effect_at(2)->data.action == LOCK_LAYER(TEST_NUM_LAYER));
     CHECK(key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(key_runtime_scenario_effect_at(3)->data.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(3)->data.feedback_pulse.long_hold_level);
     CHECK(!key_runtime_scenario_layer_locked(TEST_NUM_LAYER));
     CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(4, 2)));
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(4, 2)) == KC_NO);
@@ -511,7 +511,7 @@ static void test_repeat_hold_with_intermediate_scans_starts_once_and_releases_on
     CHECK(key_runtime_scenario_effect_at(0)->data.repeat.key_pos.row == 6);
     CHECK(key_runtime_scenario_effect_at(0)->data.repeat.key_pos.col == 0);
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(!key_runtime_scenario_effect_at(1)->data.long_hold_level);
+    CHECK(!key_runtime_scenario_effect_at(1)->data.feedback_pulse.long_hold_level);
     CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
     CHECK(key_runtime_scenario_effect_at(2)->data.key_pos.row == 6);
     CHECK(key_runtime_scenario_effect_at(2)->data.key_pos.col == 0);

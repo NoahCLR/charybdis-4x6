@@ -20,6 +20,7 @@ static bool           fake_any_mode_locked;
 static pd_mode_mask_t fake_pd_active_flags;
 static pd_mode_mask_t fake_pd_locked_flags;
 static uint8_t        fake_key_feedback_flags;
+static uint8_t        fake_key_feedback_side;
 static uint8_t        fake_key_preview_layer;
 
 static uint8_t                     rpc_register_count;
@@ -55,6 +56,7 @@ static void test_reset_stubs(void) {
     fake_pd_active_flags        = PD_MODE_ZOOM;
     fake_pd_locked_flags        = 0;
     fake_key_feedback_flags     = KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
+    fake_key_feedback_side      = KEY_FEEDBACK_SIDE_RIGHT;
     fake_key_preview_layer      = 3u;
     rpc_register_count          = 0;
     rpc_registered_id           = -1;
@@ -95,6 +97,10 @@ uint8_t key_feedback_pack(void) {
     return fake_key_feedback_flags;
 }
 
+uint8_t key_feedback_side(void) {
+    return fake_key_feedback_side;
+}
+
 uint8_t key_feedback_preview_layer(void) {
     return fake_key_preview_layer;
 }
@@ -133,6 +139,7 @@ static void test_init_registers_rpc_and_sends_initial_packet_on_master(void) {
     CHECK(rpc_last_packet.active_mode_id == pd_mode_id_from_mask(fake_pd_active_flags));
     CHECK(rpc_last_packet.locked_mode_id == pd_mode_id_from_mask(fake_pd_locked_flags));
     CHECK(rpc_last_packet.key_feedback_flags == fake_key_feedback_flags);
+    CHECK(rpc_last_packet.key_feedback_side == fake_key_feedback_side);
     CHECK(rpc_last_packet.key_preview_layer == fake_key_preview_layer);
     CHECK(split_runtime_sync_remote.key_preview_layer == UINT8_MAX);
 }
@@ -274,6 +281,7 @@ static void test_slave_rpc_applies_exact_packet_and_snapshot(void) {
         .active_mode_id     = pd_mode_id_from_mask(PD_MODE_ARROW),
         .locked_mode_id     = pd_mode_id_from_mask(PD_MODE_VOLUME),
         .key_feedback_flags = KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE,
+        .key_feedback_side  = KEY_FEEDBACK_SIDE_LEFT,
         .key_preview_layer  = 6u,
     };
 
@@ -289,6 +297,7 @@ static void test_slave_rpc_applies_exact_packet_and_snapshot(void) {
     CHECK(split_runtime_sync_remote.active_mode_id == packet.active_mode_id);
     CHECK(split_runtime_sync_remote.locked_mode_id == packet.locked_mode_id);
     CHECK(split_runtime_sync_remote.key_feedback_flags == packet.key_feedback_flags);
+    CHECK(split_runtime_sync_remote.key_feedback_side == packet.key_feedback_side);
     CHECK(split_runtime_sync_remote.key_preview_layer == packet.key_preview_layer);
     CHECK(remote_snapshot_apply_count == 1);
     CHECK(remote_snapshot_active == pd_mode_mask_from_id(packet.active_mode_id));

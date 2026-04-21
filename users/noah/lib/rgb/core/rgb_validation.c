@@ -15,6 +15,10 @@
 extern const layer_led_group_t *const layer_led_groups;
 extern const uint8_t                  layer_led_group_count;
 
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
+#    endif
+
 #    ifdef POINTING_DEVICE_ENABLE
 #        include "../../pointing/defs/pd_modes.h"
 
@@ -65,6 +69,16 @@ static void rgb_validation_log_invalid_layer_led_index(const char *group_kind, u
     (void)led;
 #    endif
 }
+
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+static void rgb_validation_log_invalid_key_behavior_feedback_mode(uint8_t mode) {
+#        ifdef CONSOLE_ENABLE
+    uprintf("Invalid key_behavior_feedback_colors.mode %u; expected KEY_FEEDBACK_MODE_BOTH_HALVES (0) or KEY_FEEDBACK_MODE_KEY_HALF (1)\n", (unsigned int)mode);
+#        else
+    (void)mode;
+#        endif
+}
+#    endif
 
 #    ifdef POINTING_DEVICE_ENABLE
 static void rgb_validation_log_unknown_pd_mode_color(uint8_t color_index, pd_mode_mask_t mode) {
@@ -119,6 +133,14 @@ static void rgb_validation_validate_layer_led_groups(void) {
     }
 }
 
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+static void rgb_validation_validate_key_behavior_feedback_config(void) {
+    if (key_behavior_feedback_colors.mode > KEY_FEEDBACK_MODE_KEY_HALF) {
+        rgb_validation_log_invalid_key_behavior_feedback_mode((uint8_t)key_behavior_feedback_colors.mode);
+    }
+}
+#    endif
+
 #    ifdef POINTING_DEVICE_ENABLE
 static void rgb_validation_validate_pd_mode_colors(void) {
     for (uint8_t color_index = 0; color_index < pd_mode_color_count; color_index++) {
@@ -159,6 +181,10 @@ static void rgb_validation_validate_pd_mode_led_groups(void) {
 
 void noah_rgb_validate_config(void) {
     rgb_validation_validate_layer_led_groups();
+
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+    rgb_validation_validate_key_behavior_feedback_config();
+#    endif
 
 #    ifdef POINTING_DEVICE_ENABLE
     rgb_validation_validate_pd_mode_colors();

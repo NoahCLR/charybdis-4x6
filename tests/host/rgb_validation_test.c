@@ -33,6 +33,12 @@ const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = (pd_mode_mask_t)0x4000u, .color = HSV(30, 30, 30)},
 };
 const uint8_t pd_mode_color_count = (uint8_t)ARRAY_SIZE(pd_mode_colors);
+const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
+    .multi_tap_pending_color = HSV(0, 0, 1),
+    .hold_active_color       = HSV(0, 0, 2),
+    .long_hold_active_color  = HSV(0, 0, 3),
+    .mode                    = (key_behavior_feedback_mode_t)0xFFu,
+};
 
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
     [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL, .keycode = DRAGSCROLL}, [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME, .keycode = VOLUME_MODE}, [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS, .keycode = BRIGHTNESS_MODE}, [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM, .keycode = ZOOM_MODE}, [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW, .keycode = ARROW_MODE}, [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH, .keycode = PINCH_MODE},
@@ -69,6 +75,7 @@ int main(void) {
     CHECK(strstr(log_buffer, "Missing pd_mode_colors entry") != NULL);
     CHECK(strstr(log_buffer, "Unknown pd_mode_led_groups") != NULL);
     CHECK(strstr(log_buffer, "Invalid pd_mode_led_groups") != NULL);
+    CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.mode") != NULL);
 
     puts("rgb_validation host tests passed");
     return 0;

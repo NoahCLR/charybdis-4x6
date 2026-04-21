@@ -16,6 +16,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef enum {
+    KEY_FEEDBACK_SIDE_NONE = 0,
+    KEY_FEEDBACK_SIDE_LEFT,
+    KEY_FEEDBACK_SIDE_RIGHT,
+} key_feedback_side_t;
+
 // ─── Packed flags for split sync ────────────────────────────────────────────
 //
 // One byte encodes the feedback state the RGB renderer needs.
@@ -64,5 +70,6 @@ static inline bool key_feedback_flags_flash_phase(uint8_t flags) {
 
 // Compute packed flags from the master-side key engine state.
 uint8_t key_feedback_pack(void);
+uint8_t key_feedback_side(void);
 uint8_t key_feedback_preview_layer(void);
 void    key_feedback_pulse_arm(bool long_hold_level);

@@ -13,6 +13,21 @@
 #    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS 200
 #endif
 
+typedef struct {
+    uint8_t flags;
+    uint8_t side;
+} key_feedback_snapshot_t;
+
+static uint8_t key_feedback_pack_for_token(const press_token_t *token);
+
+static uint8_t key_feedback_side_for_keypos(keypos_t key_pos) {
+    if (key_pos.row >= MATRIX_ROWS || key_pos.col >= MATRIX_COLS) {
+        return KEY_FEEDBACK_SIDE_NONE;
+    }
+
+    return key_pos.row < (MATRIX_ROWS / 2u) ? KEY_FEEDBACK_SIDE_LEFT : KEY_FEEDBACK_SIDE_RIGHT;
+}
+
 void key_feedback_pulse_arm(bool long_hold_level) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 
@@ -38,6 +53,42 @@ static bool key_feedback_pulse_active(void) {
 
     state->feedback_pulse_active = false;
     return false;
+}
+
+static key_feedback_snapshot_t key_feedback_snapshot(void) {
+    key_feedback_snapshot_t     snapshot = {0};
+    key_runtime_core_state_t   *state    = key_runtime_core_state();
+
+    if (key_feedback_pulse_active()) {
+        snapshot.flags = KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
+        snapshot.side  = state ? key_feedback_side_for_keypos(state->feedback_pulse_key_pos) : KEY_FEEDBACK_SIDE_NONE;
+        if (state && state->feedback_pulse_long_hold_level) {
+            snapshot.flags |= KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE;
+        }
+        return snapshot;
+    }
+
+    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
+        if (state->tap_series[index].active && !state->tap_series[index].pending_hold) {
+            snapshot.flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+            snapshot.side = key_feedback_side_for_keypos(state->tap_series[index].key_pos);
+            break;
+        }
+    }
+
+    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
+        uint8_t token_flags = key_feedback_pack_for_token(&state->press_tokens[index]);
+
+        if (token_flags != 0u) {
+            snapshot.flags |= token_flags;
+            if (snapshot.side == KEY_FEEDBACK_SIDE_NONE) {
+                snapshot.side = key_feedback_side_for_keypos(state->press_tokens[index].key_pos);
+            }
+            return snapshot;
+        }
+    }
+
+    return snapshot;
 }
 
 static bool key_feedback_token_allows_tap_release(const press_token_t *token) {
@@ -156,33 +207,11 @@ static uint8_t key_feedback_pack_for_token(const press_token_t *token) {
 }
 
 uint8_t key_feedback_pack(void) {
-    uint8_t                   flags = 0u;
-    key_runtime_core_state_t *state = key_runtime_core_state();
+    return key_feedback_snapshot().flags;
+}
 
-    if (key_feedback_pulse_active()) {
-        flags |= KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
-        if (state && state->feedback_pulse_long_hold_level) {
-            flags |= KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE;
-        }
-        return flags;
-    }
-
-    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
-        if (state->tap_series[index].active && !state->tap_series[index].pending_hold) {
-            flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
-            break;
-        }
-    }
-
-    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
-        uint8_t token_flags = key_feedback_pack_for_token(&state->press_tokens[index]);
-
-        if (token_flags != 0u) {
-            return flags | token_flags;
-        }
-    }
-
-    return flags;
+uint8_t key_feedback_side(void) {
+    return key_feedback_snapshot().side;
 }
 
 #undef KEY_FEEDBACK_FLASH_HALF_PERIOD_MS

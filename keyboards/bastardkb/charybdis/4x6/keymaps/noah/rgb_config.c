@@ -194,9 +194,13 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 //   - PRESS_AND_HOLD_UNTIL_RELEASE(...) and REPEAT_WHILE_HELD(...) flash while
 //     that tier stays active
 //
-// These paint both halves last, on top of the current layer and any pd-mode
-// overlay, so authored tier feedback stays visible even on the trackball half
-// while a mode color is active.
+// Mode decides where the overlay paints:
+//   - KEY_FEEDBACK_MODE_BOTH_HALVES = mirror the feedback color across both
+//     halves
+//   - KEY_FEEDBACK_MODE_KEY_HALF = paint only the half that owns the key or
+//     tap series currently driving the feedback state
+// This profile uses KEY_FEEDBACK_MODE_KEY_HALF so hold / multi-tap feedback
+// stays local to the key that caused it.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     // Neutral white while the engine is still resolving the active tap index.
@@ -209,6 +213,9 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     // Icy cyan for authored long-hold-tier active states and long-hold-tier
     // commit pulses.
     .long_hold_active_color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+
+    // Keep feedback on the half that owns the current key / tap series.
+    .mode = KEY_FEEDBACK_MODE_KEY_HALF,
 };
 #    endif
 

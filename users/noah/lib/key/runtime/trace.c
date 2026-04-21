@@ -221,7 +221,12 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
                 uprintf("  [%u] %s key=(%u,%u) layer=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.layer_press.key_pos.row, (unsigned int)effect->data.layer_press.key_pos.col, (unsigned int)effect->data.layer_press.layer);
                 break;
             case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
-                uprintf("  [%u] %s long=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), effect->data.long_hold_level ? 1u : 0u);
+                uprintf("  [%u] %s key=(%u,%u) long=%u\n",
+                        (unsigned int)i,
+                        key_runtime_trace_effect_name(effect->kind),
+                        (unsigned int)effect->data.feedback_pulse.key_pos.row,
+                        (unsigned int)effect->data.feedback_pulse.key_pos.col,
+                        effect->data.feedback_pulse.long_hold_level ? 1u : 0u);
                 break;
             case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
                 uprintf("  [%u] %s mode=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pd_mode);

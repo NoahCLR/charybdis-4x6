@@ -205,6 +205,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(0, 0, 150),
     .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .mode                    = KEY_FEEDBACK_MODE_KEY_HALF,
 };
 ```
 
@@ -214,6 +215,13 @@ Those rows populate the shared
 - `multi_tap_pending_color`
 - `hold_active_color`
 - `long_hold_active_color`
+- `mode`
+
+The `mode` field controls where the overlay paints:
+
+- `KEY_FEEDBACK_MODE_BOTH_HALVES`: repaint both halves
+- `KEY_FEEDBACK_MODE_KEY_HALF`: repaint only the half that owns the
+  feedback-driving key or active tap series
 
 In the shared runtime, those colors are used for these categories:
 
@@ -253,7 +261,8 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keyma
 The master half computes the semantic feedback flags. On split boards, the
 slave receives those packed flags through
 [`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c), including
-the flash-phase bit used to keep both halves in sync.
+the flash-phase bit and relevant-half side hint used to keep both halves in
+sync.
 
 ## Render Order
 
@@ -269,7 +278,7 @@ the flash-phase bit used to keep both halves in sync.
    nonzero solid color
 4. the active pointing-device mode color on the right half
 5. per-mode LED groups
-6. the key-behavior feedback overlay on both halves
+6. the key-behavior feedback overlay on both halves or only the relevant half
 
 That order matters.
 
@@ -278,7 +287,8 @@ Examples:
 - a per-layer LED group can sit on top of a solid layer color
 - a pd-mode overlay can repaint the right half after the layer and group pass
 - a pd-mode LED group can then repaint selected LEDs on top of the mode overlay
-- the key-behavior overlay can temporarily repaint both halves last
+- the key-behavior overlay can temporarily repaint both halves last, or only
+  the key half if `mode` is set that way
 
 ## The Helper Types
 

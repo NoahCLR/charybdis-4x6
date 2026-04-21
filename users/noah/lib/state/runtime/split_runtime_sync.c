@@ -60,9 +60,11 @@ static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
         .key_feedback_flags = key_feedback_pack(),
+        .key_feedback_side  = key_feedback_side(),
         .key_preview_layer  = key_feedback_preview_layer(),
 #    else
         .key_feedback_flags = 0,
+        .key_feedback_side  = 0,
         .key_preview_layer  = UINT8_MAX,
 #    endif
     };

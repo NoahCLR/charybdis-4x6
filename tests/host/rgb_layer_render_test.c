@@ -22,6 +22,9 @@
 #ifndef RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
 #    define RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED 0
 #endif
+#ifndef RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+#    define RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF 0
+#endif
 
 enum test_layers {
     LAYER_BASE = 0,
@@ -38,6 +41,7 @@ HOST_RUNTIME_FIXTURE_DEFINE_LAYER_STUBS()
 static uint16_t               test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static rgb_t                  led_output[RGB_MATRIX_LED_COUNT];
 static uint8_t                fake_preview_layer      = UINT8_MAX;
+static uint8_t                fake_feedback_side      = KEY_FEEDBACK_SIDE_LEFT;
 static uint8_t                fake_auto_mouse_layer   = LAYER_POINTER;
 static uint16_t               fake_auto_mouse_elapsed = 0;
 static bool                   fake_auto_mouse_active  = true;
@@ -132,6 +136,11 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(1, 2, 3),
     .hold_active_color       = HSV(4, 5, 6),
     .long_hold_active_color  = HSV(7, 8, 9),
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+    .mode                    = KEY_FEEDBACK_MODE_KEY_HALF,
+#else
+    .mode                    = KEY_FEEDBACK_MODE_BOTH_HALVES,
+#endif
 };
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
     [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL}, [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME}, [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS}, [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM}, [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW}, [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH},
@@ -195,6 +204,7 @@ static void test_reset(void) {
     memset(ws2812_leds, 0, sizeof(ws2812_leds));
     layer_state               = 0;
     fake_preview_layer        = UINT8_MAX;
+    fake_feedback_side        = KEY_FEEDBACK_SIDE_LEFT;
     fake_auto_mouse_layer     = LAYER_POINTER;
     fake_auto_mouse_elapsed   = 0;
     fake_auto_mouse_active    = true;
@@ -248,6 +258,10 @@ uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t colu
 
 uint8_t key_feedback_pack(void) {
     return fake_feedback_flags;
+}
+
+uint8_t key_feedback_side(void) {
+    return fake_feedback_side;
 }
 
 uint8_t key_feedback_preview_layer(void) {
@@ -445,6 +459,7 @@ static void test_slave_feedback_uses_remote_flags_and_flash_phase(void) {
     fake_is_master                               = false;
     layer_state                                  = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_feedback_flags = KEY_FEEDBACK_FLAG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE | KEY_FEEDBACK_FLAG_LEVEL_FLASH;
+    split_runtime_sync_remote.key_feedback_side  = KEY_FEEDBACK_SIDE_LEFT;
 
     CHECK(render_output());
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
@@ -455,8 +470,45 @@ static void test_slave_feedback_uses_remote_flags_and_flash_phase(void) {
 
     CHECK(render_output());
     check_led(0, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+#else
     check_led(7, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
+#endif
 }
+
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+static void test_relevant_half_feedback_paints_only_master_side(void) {
+    test_reset();
+
+    layer_state         = (1UL << LAYER_SYM);
+    fake_feedback_flags = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+    fake_feedback_side  = KEY_FEEDBACK_SIDE_LEFT;
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
+static void test_relevant_half_feedback_paints_only_slave_side_from_remote_snapshot(void) {
+    test_reset();
+
+    layer_state                                  = (1UL << LAYER_SYM);
+    fake_is_master                               = false;
+    split_runtime_sync_remote.key_feedback_flags = KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
+    split_runtime_sync_remote.key_feedback_side  = KEY_FEEDBACK_SIDE_RIGHT;
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+}
+#endif
 
 static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_when_feedback_flash_is_hidden(void) {
     test_reset();
@@ -480,6 +532,7 @@ static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_wh
     check_led(7, rgb_from_hsv(pd_mode_colors[1].color));
 }
 
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
 static void test_slave_full_scene_feedback_overrides_remote_preview_and_locked_pd_mode(void) {
     test_reset();
 
@@ -501,6 +554,7 @@ static void test_slave_full_scene_feedback_overrides_remote_preview_and_locked_p
     check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
     check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
 }
+#endif
 
 static void test_render_order_preview_then_pd_mode_then_pd_group(void) {
     test_reset();
@@ -520,6 +574,7 @@ static void test_render_order_preview_then_pd_mode_then_pd_group(void) {
     check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
 }
 
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
 static void test_render_order_base_then_preview_then_pd_mode_then_feedback(void) {
     test_reset();
 
@@ -546,6 +601,7 @@ static void test_render_order_base_then_preview_then_pd_mode_then_feedback(void)
     check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
     check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
 }
+#endif
 
 static void test_runtime_diag_overlay_overrides_scene(void) {
     test_reset();
@@ -587,6 +643,7 @@ static void test_runtime_diag_stage_palette_is_unique(void) {
     }
 }
 
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
 static void test_multi_tap_pending_feedback_overrides_preview_and_pd_mode(void) {
     test_reset();
 
@@ -605,7 +662,9 @@ static void test_multi_tap_pending_feedback_overrides_preview_and_pd_mode(void) 
     check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
     check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
 }
+#endif
 
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
 static void test_hold_pending_feedback_overrides_preview_and_pd_mode(void) {
     test_reset();
 
@@ -624,6 +683,7 @@ static void test_hold_pending_feedback_overrides_preview_and_pd_mode(void) {
     check_led(4, rgb_from_hsv(key_behavior_feedback_colors.hold_active_color));
     check_led(6, rgb_from_hsv(key_behavior_feedback_colors.hold_active_color));
 }
+#endif
 
 static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
     test_reset();
@@ -996,14 +1056,24 @@ int main(void) {
     test_preview_layer_overlays_existing_active_layers();
     test_slave_preview_layer_uses_remote_sync_state();
     test_slave_feedback_uses_remote_flags_and_flash_phase();
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
+    test_relevant_half_feedback_paints_only_master_side();
+    test_relevant_half_feedback_paints_only_slave_side_from_remote_snapshot();
+#endif
     test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_when_feedback_flash_is_hidden();
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
     test_slave_full_scene_feedback_overrides_remote_preview_and_locked_pd_mode();
+#endif
     test_render_order_preview_then_pd_mode_then_pd_group();
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
     test_render_order_base_then_preview_then_pd_mode_then_feedback();
+#endif
     test_runtime_diag_overlay_overrides_scene();
     test_runtime_diag_stage_palette_is_unique();
+#if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RELEVANT_HALF
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();
     test_hold_pending_feedback_overrides_preview_and_pd_mode();
+#endif
     test_pointer_mode_overlay_paints_right_half_and_groups();
     test_slave_pointer_mode_overlay_uses_remote_display_state();
     test_automouse_uses_configured_target_layer();
