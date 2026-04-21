@@ -773,6 +773,34 @@ def parse_key_behavior_feedback_colors(
     return colors
 
 
+def key_behavior_feedback_mode_description(mode: str) -> str:
+    descriptions = {
+        "KEY_FEEDBACK_MODE_BOTH_HALVES": "Repaint both halves whenever a key-behavior feedback state is active.",
+        "KEY_FEEDBACK_MODE_KEY_HALF": "Repaint only the half that owns the key or tap series currently driving the feedback state.",
+        "KEY_FEEDBACK_MODE_KEY": "Repaint only the specific key currently driving the feedback state.",
+    }
+    return descriptions.get(mode, "Unknown key-behavior feedback paint mode.")
+
+
+def parse_key_behavior_feedback_mode(raw_text: str) -> dict[str, object] | None:
+    try:
+        body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
+    except SystemExit:
+        return None
+
+    fields = parse_designated_fields(strip_comments(body))
+    mode = fields.get(".mode")
+    if mode is None:
+        return None
+
+    normalized_mode = normalize_expr(mode)
+    return {
+        "mode": normalized_mode,
+        "label": humanize_identifier(normalized_mode.removeprefix("KEY_FEEDBACK_MODE_")),
+        "meaning": key_behavior_feedback_mode_description(normalized_mode),
+    }
+
+
 def resolve_rgb_default_color(known_values: dict[str, str]) -> dict[str, object]:
     return {
         "h": eval_numeric_expr(known_values["RGB_MATRIX_DEFAULT_HUE"], known_values),
@@ -1148,6 +1176,7 @@ def build_profile_model() -> dict[str, object]:
         if row["comment_color_name"] is not None
     }
     key_behavior_feedback_colors = parse_key_behavior_feedback_colors(rgb_config_raw_text, config_macros, pd_mode_color_anchors)
+    key_behavior_feedback_mode = parse_key_behavior_feedback_mode(rgb_config_raw_text)
 
     macro_usages = collect_macro_usages(parsed_layers, behaviors, combos, via_macros + hardcoded_macros)
 
@@ -1184,6 +1213,7 @@ def build_profile_model() -> dict[str, object]:
         "rgb": {
             "layer_colors": layer_colors,
             "pd_mode_colors": pd_mode_colors,
+            "key_behavior_feedback_mode": key_behavior_feedback_mode,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
         },
         "keymap_custom_keycodes": keymap_custom_keycodes,
@@ -1249,6 +1279,7 @@ def render_quick_legend_section(profile: dict[str, object]) -> str:
 def render_reference_section(profile: dict[str, object]) -> str:
     config = profile["config"]
     rgb = profile["rgb"]
+    feedback_mode = rgb["key_behavior_feedback_mode"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
@@ -1268,6 +1299,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
         f"- Layers: {', '.join(f'`{layer}`' for layer in config['layers'])}",
         f"- Keymap-local custom keycodes: {', '.join(f'`{name}`' for name in profile['keymap_custom_keycodes']) or '`none`'}",
         f"- PD color overlays: {', '.join(f'`{row['pointing_mode']}`' for row in rgb['pd_mode_colors']) or '`none`'}",
+        f"- Key-behavior feedback paint mode: `{feedback_mode['mode']}`" if feedback_mode is not None else "- Key-behavior feedback paint mode: `not authored`",
         "",
         "### Layer RGB Config",
         "",
@@ -1998,6 +2030,7 @@ def render_key_behavior_section(profile: dict[str, object]) -> str:
 
 def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
     feedback_colors = profile["rgb"]["key_behavior_feedback_colors"]
+    feedback_mode = profile["rgb"]["key_behavior_feedback_mode"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     lines = [
         "## Key-Behavior Feedback LEDs",
@@ -2017,6 +2050,25 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
         [
             f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer and any pd-mode overlay.",
             "",
+        ]
+    )
+
+    if feedback_mode is not None:
+        lines.extend(
+            [
+                f"Current authored feedback paint mode: `{feedback_mode['mode']}`.",
+                "",
+                "| Available Mode | Meaning |",
+                "| --- | --- |",
+                f"| `KEY_FEEDBACK_MODE_BOTH_HALVES` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_BOTH_HALVES')} |",
+                f"| `KEY_FEEDBACK_MODE_KEY_HALF` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_KEY_HALF')} |",
+                f"| `KEY_FEEDBACK_MODE_KEY` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_KEY')} |",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
             "| State | Meaning | Authored HSV | Preview Color |",
             "| --- | --- | --- | --- |",
         ]

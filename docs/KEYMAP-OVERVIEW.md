@@ -223,6 +223,14 @@ No authored combos resolve entirely from keys on this layer.
 
 These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer and any pd-mode overlay.
 
+Current authored feedback paint mode: `KEY_FEEDBACK_MODE_KEY_HALF`.
+
+| Available Mode | Meaning |
+| --- | --- |
+| `KEY_FEEDBACK_MODE_BOTH_HALVES` | Repaint both halves whenever a key-behavior feedback state is active. |
+| `KEY_FEEDBACK_MODE_KEY_HALF` | Repaint only the half that owns the key or tap series currently driving the feedback state. |
+| `KEY_FEEDBACK_MODE_KEY` | Repaint only the specific key currently driving the feedback state. |
+
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
 | `Multi Tap Pending` | Neutral white while the engine is still resolving the active tap index. | `HSV(0, 0, 150)` | <img alt="Multi Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
@@ -265,6 +273,7 @@ No filled hardcoded macro slots.
 - Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`
 - Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
+- Key-behavior feedback paint mode: `KEY_FEEDBACK_MODE_KEY_HALF`
 
 ### Layer RGB Config
 
