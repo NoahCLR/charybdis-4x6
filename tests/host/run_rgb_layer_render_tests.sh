@@ -5,6 +5,7 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
 BIN="$BUILD_DIR/rgb_layer_render_test"
+BIN_BASE_UNDERLAY="$BUILD_DIR/rgb_base_underlay_test"
 BIN_END_FILL_UNPAINTED="$BUILD_DIR/rgb_layer_render_test_end_fill_unpainted"
 BIN_END_OVERRIDE="$BUILD_DIR/rgb_layer_render_test_end_override"
 BIN_KEY_HALF="$BUILD_DIR/rgb_layer_render_test_key_half"
@@ -15,6 +16,21 @@ cleanup() {
 }
 
 trap cleanup EXIT INT TERM
+
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+    -DLAYER_COUNT=3 \
+    -DRGB_MATRIX_ENABLE \
+    -DRGB_MATRIX_LED_COUNT=4 \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/rgb_base_underlay_test.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
+    -o "$BIN_BASE_UNDERLAY"
+
+"$BIN_BASE_UNDERLAY"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \

@@ -25,10 +25,12 @@
 // ─── Layer colors ───────────────────────────────────────────────────────────
 //
 // Layer indicator colors and render modes, indexed by layer enum.
-// HSV(0, 0, 0) means "no solid color" — LAYER_BASE falls through to the
-// default RGB matrix effect. The configured auto-mouse target layer uses its
-// authored layer color as the timeout fade start state. In this keymap, that
-// target defaults to LAYER_POINTER.
+// LAYER_BASE is the persistent layer underlay for this scene: if it has a
+// non-black color, it paints below higher layers; if it stays HSV(0, 0, 0),
+// the base scene falls through to the default RGB matrix effect. The
+// configured auto-mouse target layer uses its authored layer color as the
+// timeout fade start state. In this keymap, that target defaults to
+// LAYER_POINTER.
 // .mode:
 //   - ALL_KEYS = paint the whole layer color wash
 //   - KEYS_MAPPED_ON_THIS_LAYER_ONLY = paint only keys that have a real key
@@ -66,7 +68,10 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // ─── Layer LED Groups ───────────────────────────────────────────────────────
 //
 // Paint specific LEDs a different color when a layer is active. Define an LED
-// index array, then add a row to the table.
+// index array, then add a row to the table. Rows keyed to LAYER_BASE act as
+// persistent underlay accents for the layer scene, following the same
+// "always below higher layers unless repainted later" rule as the base layer
+// color above.
 //
 // ╭────────────────────────╮                 ╭────────────────────────╮
 //    0   7   8  15  16  20                     49  45  44  37  36  29

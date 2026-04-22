@@ -87,20 +87,27 @@ The available modes are:
   non-`KC_TRNS`, non-`KC_NO` keycode on that layer
 
 Mapped-only layers compose cleanly with overlap: lower active colored layers
-stay visible wherever the higher layer is transparent. The runtime resolves
-that against the effective keymap, so VIA dynamic keymap edits are reflected
-after the runtime refreshes its cached LED coverage.
+stay visible wherever the higher layer is transparent. `LAYER_BASE` is treated
+as the persistent underlay for the layer scene, so a non-black base color
+paints both when no higher layer is active and underneath higher mapped-only
+layers. The runtime resolves that against the effective keymap, so VIA dynamic
+keymap edits are reflected after the runtime refreshes its cached LED
+coverage.
 
 `HSV(0, 0, 0)` means "do not paint a solid layer color here." That is
 useful for:
 
-- `LAYER_BASE`, which should fall through to the normal RGB Matrix effect
+- `LAYER_BASE`, when you want the base scene to fall through to the normal RGB Matrix effect
 - any layer you intentionally want to stay colorless in the layer stack
 
 ### `layer_led_groups`
 
 `layer_led_groups` lets a layer highlight specific LEDs instead of, or in
 addition to, a full-board color.
+
+Rows keyed to `LAYER_BASE` follow the same persistent-underlay rule as the
+base layer color: they are treated as base-scene accents unless a later layer
+or later overlay repaints those LEDs.
 
 In `rgb_config.c`, use one of these helper forms:
 

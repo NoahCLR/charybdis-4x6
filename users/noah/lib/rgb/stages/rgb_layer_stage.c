@@ -22,6 +22,10 @@ static bool rgb_runtime_layer_stage_paints_only_keys_present_on_this_layer(uint8
     return layer_colors[layer].mode == KEYS_MAPPED_ON_THIS_LAYER_ONLY;
 }
 
+static bool rgb_runtime_layer_stage_layer_is_effectively_active(layer_state_t state, uint8_t layer) {
+    return layer == 0u || layer_state_cmp(state, layer);
+}
+
 static bool rgb_runtime_layer_stage_keycode_is_mapped(uint16_t keycode) {
     return keycode != KC_NO && keycode != KC_TRNS;
 }
@@ -138,8 +142,8 @@ bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_stat
 
     bool painted = false;
 
-    for (uint8_t layer = 1; layer < LAYER_COUNT; layer++) {
-        if (!layer_state_cmp(state, layer)) {
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+        if (!rgb_runtime_layer_stage_layer_is_effectively_active(state, layer)) {
             continue;
         }
         if (!rgb_runtime_layer_stage_has_solid_color(layer)) {
@@ -150,7 +154,7 @@ bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_stat
     }
 
     for (uint8_t group = 0; group < layer_led_group_count; group++) {
-        if (!layer_state_cmp(state, layer_led_groups[group].layer)) {
+        if (!rgb_runtime_layer_stage_layer_is_effectively_active(state, layer_led_groups[group].layer)) {
             continue;
         }
 
