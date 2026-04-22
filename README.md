@@ -225,12 +225,13 @@ The runtime supports:
 - per-layer LED group highlights
 - per-mode left/right/both/trigger-half colors
 - per-mode LED group highlights
+- steady combo feedback that can sit above or below preview / PD depending on live ownership
 - optional auto-mouse countdown gradient feedback
-- optional key-behavior state feedback on both halves, only the key half, or only the key itself
+- optional truthful key-behavior state feedback on both halves, only the key half, or only the key itself
 
 That means RGB is not just there to look nice. It tells you what layer is
-active, which pointing mode is live, and when the key-behavior engine is
-waiting, previewing, or actively holding.
+active, which pointing mode is live, which combos are currently held, and when
+the key-behavior engine is waiting, previewing, or actively holding.
 
 For the full RGB authoring model, see
 [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md).
@@ -243,7 +244,7 @@ If you want to change the current profile, start here:
 | --- | --- |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | physical layout, combos, keymap-local custom keycodes, `VIA_MACROS(MACRO)`, `HARDCODED_MACROS(MACRO)`, and the authored `key_behaviors[]` table |
 | [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, auto-mouse settings, sniping, dragscroll DPI, and keymap-facing feature config |
-| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pointing-mode colors, LED groups, and key-behavior feedback colors |
+| [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pointing-mode colors, combo feedback, LED groups, and key-behavior feedback colors |
 
 ## Tooling
 

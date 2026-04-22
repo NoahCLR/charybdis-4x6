@@ -429,6 +429,37 @@ void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *recor
     }
 }
 
+void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
+    if (out_underlay_bitmap) {
+        key_origin_bitmap_clear(out_underlay_bitmap);
+    }
+
+    if (out_overlay_bitmap) {
+        key_origin_bitmap_clear(out_overlay_bitmap);
+    }
+
+    if (!(out_underlay_bitmap && out_overlay_bitmap)) {
+        return;
+    }
+
+    for (uint8_t index = 0; index < ARRAY_SIZE(combo_active_cache); index++) {
+        combo_origin_active_cache_entry_t *entry = &combo_active_cache[index];
+        bool                               underlay_owner;
+
+        if (!entry->active) {
+            continue;
+        }
+
+        underlay_owner = (key_origin_keypos_valid(preview_owner_key_pos) && key_origin_keypos_valid(entry->owner_key_pos) && entry->owner_key_pos.row == preview_owner_key_pos.row && entry->owner_key_pos.col == preview_owner_key_pos.col) || (key_origin_keypos_valid(pd_owner_key_pos) && key_origin_keypos_valid(entry->owner_key_pos) && entry->owner_key_pos.row == pd_owner_key_pos.row && entry->owner_key_pos.col == pd_owner_key_pos.col);
+
+        if (underlay_owner) {
+            key_origin_bitmap_or_inplace(out_underlay_bitmap, entry->bitmap);
+        } else {
+            key_origin_bitmap_or_inplace(out_overlay_bitmap, entry->bitmap);
+        }
+    }
+}
+
 bool noah_qmk_combo_origin_event_owner_keypos(const keyrecord_t *record, keypos_t *out) {
     if (out) {
         *out = (keypos_t){0};
@@ -473,6 +504,16 @@ void noah_qmk_combo_origin_observe_physical_key_event(uint16_t keycode, keyrecor
 void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
+}
+void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
+    (void)preview_owner_key_pos;
+    (void)pd_owner_key_pos;
+    if (out_underlay_bitmap) {
+        key_origin_bitmap_clear(out_underlay_bitmap);
+    }
+    if (out_overlay_bitmap) {
+        key_origin_bitmap_clear(out_overlay_bitmap);
+    }
 }
 bool noah_qmk_combo_origin_event_owner_keypos(const keyrecord_t *record, keypos_t *out) {
     (void)record;

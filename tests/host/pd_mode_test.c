@@ -55,7 +55,7 @@ static uint8_t reset_brightness_count;
 static uint8_t reset_zoom_count;
 static uint8_t reset_arrow_count;
 
-split_runtime_sync_packet_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
+split_runtime_sync_remote_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -105,7 +105,7 @@ static void test_reset_stubs(void) {
     reset_brightness_count               = 0;
     reset_zoom_count                     = 0;
     reset_arrow_count                    = 0;
-    split_runtime_sync_remote            = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
+    split_runtime_sync_remote            = (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
 }
 
 void split_runtime_sync_init(void) {}

@@ -9,8 +9,8 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/state/runtime/split_runtime_sync.h"
 
-static inline split_runtime_sync_packet_t host_runtime_fixture_split_remote_init(void) {
-    return (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
+static inline split_runtime_sync_remote_t host_runtime_fixture_split_remote_init(void) {
+    return (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
 }
 
 static inline uint8_t host_runtime_fixture_pd_mode_index(const pd_mode_def_t *defs, uint8_t count, pd_mode_mask_t mode) {
@@ -41,13 +41,13 @@ static inline pd_mode_mask_t host_runtime_fixture_first_mode(const pd_mode_def_t
     return 0;
 }
 
-static inline pd_mode_mask_t host_runtime_fixture_display_locked_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_locked, split_runtime_sync_packet_t remote) {
+static inline pd_mode_mask_t host_runtime_fixture_display_locked_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_locked, split_runtime_sync_remote_t remote) {
     (void)defs;
     (void)count;
     return is_master ? local_locked : pd_mode_mask_from_id(remote.locked_mode_id);
 }
 
-static inline pd_mode_mask_t host_runtime_fixture_display_active_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active, pd_mode_mask_t local_locked, split_runtime_sync_packet_t remote) {
+static inline pd_mode_mask_t host_runtime_fixture_display_active_mode(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active, pd_mode_mask_t local_locked, split_runtime_sync_remote_t remote) {
     (void)defs;
     (void)count;
 
@@ -59,7 +59,7 @@ static inline pd_mode_mask_t host_runtime_fixture_display_active_mode(const pd_m
     return locked_mode ? locked_mode : pd_mode_mask_from_id(remote.active_mode_id);
 }
 
-static inline split_side_mask_t host_runtime_fixture_display_owner_sides(bool is_master, split_side_mask_t local_owner_sides, split_runtime_sync_packet_t remote) {
+static inline split_side_mask_t host_runtime_fixture_display_owner_sides(bool is_master, split_side_mask_t local_owner_sides, split_runtime_sync_remote_t remote) {
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     return is_master ? local_owner_sides : remote.pd_mode_owner_sides;
 #else
@@ -85,7 +85,7 @@ static inline pd_mode_snapshot_view_t host_runtime_fixture_pd_mode_view(const pd
     return view;
 }
 
-static inline pd_mode_snapshot_t host_runtime_fixture_pd_mode_snapshot(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active, pd_mode_mask_t local_locked, split_side_mask_t local_owner_sides, split_runtime_sync_packet_t remote) {
+static inline pd_mode_snapshot_t host_runtime_fixture_pd_mode_snapshot(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active, pd_mode_mask_t local_locked, split_side_mask_t local_owner_sides, split_runtime_sync_remote_t remote) {
     pd_mode_mask_t    display_locked      = host_runtime_fixture_display_locked_mode(defs, count, is_master, local_locked, remote);
     pd_mode_mask_t    display_active      = host_runtime_fixture_display_active_mode(defs, count, is_master, local_active, local_locked, remote);
     split_side_mask_t display_owner_sides = host_runtime_fixture_display_owner_sides(is_master, local_owner_sides, remote);

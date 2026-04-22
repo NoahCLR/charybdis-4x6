@@ -107,6 +107,34 @@
 - Net result: phase 2 recovered another `2304` bytes from
   `key_runtime_core_state_t`.
 
+### Truthful RGB Feedback Layers
+
+- Replaced the old single feedback snapshot with a truthful per-key semantic
+  model in `users/noah/lib/key/runtime/feedback.c`.
+- Added a persistent steady combo RGB layer with explicit underlay / overlay
+  routing:
+  - combos that own preview and/or PD state now sync through a combo underlay
+  - unrelated held combos now sync through a combo overlay
+- Split runtime sync into three packets in
+  `users/noah/lib/state/runtime/split_runtime_sync.c`:
+  - base runtime sync
+  - combo feedback sync
+  - key-semantic feedback sync
+- Added `users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c` and inserted it
+  into the RGB runtime order around preview and PD.
+- Updated `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c` to render from
+  the packed semantic map instead of the old flags + owner snapshot.
+- Added authored combo feedback config in
+  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`.
+- Updated host harnesses for the split packet contract and the new semantic-map
+  feedback surface.
+- Added RGB host coverage for:
+  - combo overlay above preview / PD
+  - combo underlay below preview / PD
+  - exact combo-key rendering
+  - independent per-half semantic priority
+  - global multi-tap priority over flashing held states
+
 ### Verification
 
 Passed:

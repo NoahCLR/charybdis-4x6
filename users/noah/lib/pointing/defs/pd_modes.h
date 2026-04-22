@@ -61,6 +61,7 @@ typedef struct {
     pd_mode_id_t           active_mode_id;
     pd_mode_id_t           locked_mode_id;
     split_side_mask_t      owner_sides;
+    keypos_t               owner_key_pos;
 } pd_mode_command_t;
 
 typedef struct {
@@ -88,6 +89,7 @@ bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked);
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode);
 bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos);
 bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos);
+bool pd_mode_local_owner_key_pos_snapshot(keypos_t *out);
 bool pd_mode_handle_keycode_press(uint16_t keycode);
 bool pd_mode_handle_keycode_release(uint16_t keycode);
 bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos);

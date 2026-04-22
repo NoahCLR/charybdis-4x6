@@ -4,7 +4,7 @@ Most authored RGB configuration in this repo lives in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 
 Use this doc when you want to change colors, LED groups, auto-mouse fade
-visuals, or key-behavior feedback colors. If you only want to see what the
+visuals, combo feedback, or key-behavior feedback colors. If you only want to see what the
 current profile looks like, start with
 [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md).
 
@@ -15,6 +15,7 @@ current profile looks like, start with
 - the auto-mouse timeout gradient
 - pointing-device mode colors
 - per-mode LED highlights
+- combo feedback color
 - key-behavior feedback colors
 
 If you want to change how the current profile looks, start there.
@@ -26,6 +27,7 @@ If you want to change how RGB is rendered, look at:
 - [`users/noah/lib/rgb/automouse/rgb_automouse_stage.c`](../users/noah/lib/rgb/automouse/rgb_automouse_stage.c)
 - [`users/noah/lib/rgb/stages/rgb_preview_stage.c`](../users/noah/lib/rgb/stages/rgb_preview_stage.c)
 - [`users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/stages/rgb_pd_mode_stage.c)
+- [`users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c`](../users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c)
 - [`users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`](../users/noah/lib/rgb/stages/rgb_key_feedback_stage.c)
 - [`users/noah/lib/rgb/automouse/rgb_automouse.c`](../users/noah/lib/rgb/automouse/rgb_automouse.c)
 - [`users/noah/lib/rgb/core/rgb_helpers.h`](../users/noah/lib/rgb/core/rgb_helpers.h)
@@ -64,7 +66,8 @@ The file reads best in render order:
 
 1. base layer render surfaces
 2. the auto-mouse base-stage transition
-3. later overlay surfaces
+3. later overlay surfaces, in order:
+   pd-mode colors, combo feedback, then key-behavior feedback
 
 ### `layer_colors[]`
 
@@ -220,6 +223,38 @@ Use rows like:
 { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = trackball_led, .count = ARRAY_SIZE(trackball_led) },
 ```
 
+### `combo_feedback_colors`
+
+In `rgb_config.c`, declare `combo_feedback_colors` directly:
+
+```c
+const combo_feedback_color_config_t combo_feedback_colors = {
+    .held_color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .mode       = COMBO_FEEDBACK_MODE_COMBO_KEYS,
+};
+```
+
+This is a persistent combo identity layer:
+
+- if a combo chord is held, its combo color stays active
+- key-behavior feedback can still repaint above it
+- combos that currently own preview or PD state are routed underneath those
+  state indicators
+- unrelated combos stay above preview and PD
+
+The `mode` field controls where the combo layer paints:
+
+- `COMBO_FEEDBACK_MODE_BOTH_HALVES`: repaint both halves while any combo is active
+- `COMBO_FEEDBACK_MODE_COMBO_HALF`: repaint the half or halves touched by the
+  live combo footprint
+- `COMBO_FEEDBACK_MODE_COMBO_KEYS`: repaint only the exact combo keys
+- `COMBO_FEEDBACK_MODE_LEFT_HALF`: always repaint the left half
+- `COMBO_FEEDBACK_MODE_RIGHT_HALF`: always repaint the right half
+
+This layer is intentionally steady while held. That keeps combo identity
+visible underneath later flashing key-behavior overlays instead of competing
+with them.
+
 ### `key_behavior_feedback_colors`
 
 In `rgb_config.c`, declare `key_behavior_feedback_colors` directly:
@@ -288,11 +323,10 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keyma
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h). Its flash cadence is controlled by
 `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
 
-The master half computes the semantic feedback flags. On split boards, the
-slave receives those packed flags through
-[`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c), including
-the flash-phase bit and packed owner key used to keep the selected feedback
-target in sync.
+The runtime now keeps truthful per-key semantic state and only broadens that
+truth at paint time when the authored `mode` asks for it. On split boards, the
+slave receives that packed semantic map and shared flash metadata through
+[`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c).
 
 ## Render Order
 
@@ -303,12 +337,14 @@ target in sync.
    only the LEDs owned by that layer's non-transparent keys
 2. if the auto-mouse layer is active, that layer stage is blended toward its
    destination state instead of being painted as a fixed separate gradient
-3. per-layer preview overlay for a pending momentary-layer hold, if
+3. combo underlay for combos that currently own preview and/or PD state
+4. per-layer preview overlay for a pending momentary-layer hold, if
    `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on and that previewed layer has a
    nonzero solid color
-4. the active pointing-device mode color using the authored PD paint mode
-5. per-mode LED groups
-6. the key-behavior feedback overlay on both halves, only the key half, or
+5. the active pointing-device mode color using the authored PD paint mode
+6. per-mode LED groups
+7. combo overlay for all other active combos
+8. the key-behavior feedback overlay on both halves, only the key half, or
    only the specific key
 
 That order matters.
@@ -316,11 +352,14 @@ That order matters.
 Examples:
 
 - a per-layer LED group can sit on top of a solid layer color
+- a preview- or PD-owning combo can stay underneath the preview or PD overlay
+- an unrelated held combo can repaint above preview or PD if it uses the
+  combo overlay path
 - a pd-mode overlay can repaint the authored half or both halves after the
-  layer and group pass
+  base scene and any combo underlay
 - a pd-mode LED group can then repaint selected LEDs on top of the mode overlay
-- the key-behavior overlay can temporarily repaint both halves last, only the
-  key half, or only the key itself depending on `mode`
+- the key-behavior overlay can still repaint last, either on both halves, only
+  the key half, or only the specific key footprint depending on `mode`
 
 ## The Helper Types
 
@@ -330,6 +369,7 @@ Examples:
 - `pd_mode_color_t`
 - `layer_color_config_t`
 - `automouse_fade_end_config_t`
+- `combo_feedback_color_config_t`
 - `layer_led_group_t`
 - `pd_mode_led_group_t`
 

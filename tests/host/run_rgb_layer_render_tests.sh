@@ -37,6 +37,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
+    -DCOMBO_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
@@ -59,6 +60,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
@@ -76,6 +78,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
+    -DCOMBO_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
@@ -99,6 +102,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
@@ -116,6 +120,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
+    -DCOMBO_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
@@ -139,6 +144,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
@@ -156,6 +162,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
+    -DCOMBO_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
@@ -179,6 +186,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
@@ -196,6 +204,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
+    -DCOMBO_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
@@ -219,6 +228,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \

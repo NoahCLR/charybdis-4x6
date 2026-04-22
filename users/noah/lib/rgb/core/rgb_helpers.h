@@ -62,6 +62,19 @@ typedef struct {
 } automouse_fade_end_config_t;
 
 typedef enum {
+    COMBO_FEEDBACK_MODE_BOTH_HALVES = 0,
+    COMBO_FEEDBACK_MODE_COMBO_HALF,
+    COMBO_FEEDBACK_MODE_COMBO_KEYS,
+    COMBO_FEEDBACK_MODE_LEFT_HALF,
+    COMBO_FEEDBACK_MODE_RIGHT_HALF,
+} combo_feedback_mode_t;
+
+typedef struct {
+    hsv_t                 held_color;
+    combo_feedback_mode_t mode;
+} combo_feedback_color_config_t;
+
+typedef enum {
     KEY_FEEDBACK_MODE_BOTH_HALVES = 0,
     KEY_FEEDBACK_MODE_KEY_HALF,
     KEY_FEEDBACK_MODE_KEY,

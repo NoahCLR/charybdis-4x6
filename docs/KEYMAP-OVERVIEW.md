@@ -261,9 +261,27 @@ Preview color: <img alt="Auto-mouse end color" src="media/profile-introspection/
 
 `end_color` is only visible in the two `END_COLOR_*` modes above; `FOLLOW_REAL_DESTINATION` ignores it and lands on the real rendered board state instead.
 
+## Combo Feedback LEDs
+
+This steady combo layer comes from `combo_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). It stays visible while a combo chord is active, sits underneath preview and pd-mode indicators when that combo owns those states, and otherwise repaints above preview and pd-mode overlays but below key-behavior feedback.
+
+Current authored combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_KEYS`.
+
+| Available Mode | Meaning |
+| --- | --- |
+| `COMBO_FEEDBACK_MODE_BOTH_HALVES` | Mirror the steady combo color across both halves while any combo is active. |
+| `COMBO_FEEDBACK_MODE_COMBO_HALF` | Paint the half or halves touched by the live combo footprint. |
+| `COMBO_FEEDBACK_MODE_COMBO_KEYS` | Paint only the exact keys that formed the currently active combo footprint. |
+| `COMBO_FEEDBACK_MODE_LEFT_HALF` | Always paint the left half for active combos. |
+| `COMBO_FEEDBACK_MODE_RIGHT_HALF` | Always paint the right half for active combos. |
+
+| State | Meaning | Authored HSV | Preview Color |
+| --- | --- | --- | --- |
+| `Held Combo` | Steady combo layer color while a combo chord stays active. Preview- or PD-owning combos can be routed underneath those state indicators, while unrelated combos remain above them. | `HSV(191, 255, 200)` | <img alt="Held combo color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
+
 ## Key-Behavior Feedback LEDs
 
-These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer and any pd-mode overlay.
+These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored paint modes intentionally collapse that truth to a half or full-board presentation.
 
 Current authored feedback paint mode: `KEY_FEEDBACK_MODE_KEY_HALF`.
 
@@ -308,7 +326,7 @@ No filled hardcoded macro slots.
 | --- | --- |
 | [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |
 | [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
-| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pd-mode colors, auto-mouse fade config, key-behavior feedback colors |
+| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pd-mode colors, auto-mouse fade config, combo feedback color, key-behavior feedback colors |
 
 ### Shared Keycode Surfaces
 
@@ -317,6 +335,7 @@ No filled hardcoded macro slots.
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback paint mode: `KEY_FEEDBACK_MODE_KEY_HALF`
+- Combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_KEYS`
 
 ### Layer RGB Config
 
@@ -344,6 +363,7 @@ No filled hardcoded macro slots.
 | `keymap_custom_keycode_count` | `3` |
 | `pd_mode_count` | `6` |
 | `pd_mode_color_count` | `6` |
+| `combo_feedback_configured` | `1` |
 
 ## Config Defines
 
@@ -354,7 +374,7 @@ These values come from the keymap config and the shared userspace config. When t
 | `SERIAL_USART_TIMEOUT` | `5` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_LAYER_STATE_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_ACTIVITY_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
-| `SPLIT_TRANSACTION_IDS_USER` | `PUT_SPLIT_RUNTIME_SYNC,PUT_VIA_KEYMAP_SYNC` | [users/noah/config.h](../users/noah/config.h) |
+| `SPLIT_TRANSACTION_IDS_USER` | `PUT_SPLIT_RUNTIME_BASE_SYNC,PUT_SPLIT_COMBO_FEEDBACK_SYNC,PUT_SPLIT_KEY_FEEDBACK_SYNC,PUT_VIA_KEYMAP_SYNC` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_PD_MODE_ACTIVE_HALF_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_MATRIX_LED_COUNT` | `58` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_MATRIX_SPLIT` | `{29,29}` | [users/noah/config.h](../users/noah/config.h) |

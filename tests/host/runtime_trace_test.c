@@ -22,10 +22,11 @@ static bool     fake_sniping_enabled;
 static uint16_t fake_default_dpi;
 static uint16_t fake_last_cpi;
 
-static int8_t                      rpc_registered_id;
-static slave_callback_t            rpc_registered_callback;
-static uint8_t                     rpc_send_count;
-static split_runtime_sync_packet_t rpc_last_packet;
+static uint8_t                        rpc_register_count;
+static int8_t                         rpc_registered_ids[3];
+static slave_callback_t               rpc_registered_callbacks[3];
+static uint8_t                        rpc_send_count;
+static split_runtime_base_sync_packet_t rpc_last_base_packet;
 
 layer_state_t layer_state;
 
@@ -59,10 +60,11 @@ static void test_reset_stubs(void) {
     fake_sniping_enabled    = false;
     fake_default_dpi        = 800u;
     fake_last_cpi           = 0u;
-    rpc_registered_id       = -1;
-    rpc_registered_callback = NULL;
+    rpc_register_count      = 0u;
+    memset(rpc_registered_ids, -1, sizeof(rpc_registered_ids));
+    memset(rpc_registered_callbacks, 0, sizeof(rpc_registered_callbacks));
     rpc_send_count          = 0u;
-    rpc_last_packet         = (split_runtime_sync_packet_t){0};
+    rpc_last_base_packet    = (split_runtime_base_sync_packet_t){0};
     layer_state             = 0;
 
     host_runtime_fixture_reset_userspace_runtime();
@@ -142,6 +144,26 @@ void keyboard_mod_state_apply(keyboard_mod_state_t state) {
     (void)state;
 }
 
+uint8_t key_feedback_preview_layer(void) {
+    return UINT8_MAX;
+}
+
+uint8_t key_feedback_flash_meta(void) {
+    return 0u;
+}
+
+void key_feedback_semantic_map(uint8_t *out_map) {
+    key_feedback_semantic_map_clear(out_map);
+}
+
+void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
+    key_origin_bitmap_clear(out_bitmap);
+}
+
+void combo_feedback_overlay_bitmap(uint8_t *out_bitmap) {
+    key_origin_bitmap_clear(out_bitmap);
+}
+
 void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
     (void)keycode;
     (void)policy;
@@ -158,17 +180,43 @@ void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
     (void)policy;
 }
 
+static slave_callback_t test_registered_callback(int8_t transaction_id) {
+    for (uint8_t index = 0; index < rpc_register_count; index++) {
+        if (rpc_registered_ids[index] == transaction_id) {
+            return rpc_registered_callbacks[index];
+        }
+    }
+
+    return NULL;
+}
+
 void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) {
-    rpc_registered_id       = transaction_id;
-    rpc_registered_callback = callback;
+    CHECK(rpc_register_count < 3u);
+    rpc_registered_ids[rpc_register_count]       = transaction_id;
+    rpc_registered_callbacks[rpc_register_count] = callback;
+    rpc_register_count++;
 }
 
 bool transaction_rpc_send(int8_t transaction_id, uint8_t initiator2target_buffer_size, const void *initiator2target_buffer) {
-    CHECK(transaction_id == PUT_SPLIT_RUNTIME_SYNC);
-    CHECK(initiator2target_buffer_size == sizeof(split_runtime_sync_packet_t));
-
     rpc_send_count++;
-    memcpy(&rpc_last_packet, initiator2target_buffer, sizeof(rpc_last_packet));
+
+    if (transaction_id == PUT_SPLIT_RUNTIME_BASE_SYNC) {
+        CHECK(initiator2target_buffer_size == sizeof(split_runtime_base_sync_packet_t));
+        memcpy(&rpc_last_base_packet, initiator2target_buffer, sizeof(rpc_last_base_packet));
+        return true;
+    }
+
+    if (transaction_id == PUT_SPLIT_COMBO_FEEDBACK_SYNC) {
+        CHECK(initiator2target_buffer_size == sizeof(split_runtime_combo_feedback_packet_t));
+        return true;
+    }
+
+    if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_SYNC) {
+        CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_packet_t));
+        return true;
+    }
+
+    CHECK(false);
     return true;
 }
 
@@ -250,7 +298,7 @@ static void test_key_runtime_and_layer_ownership_share_one_trace_buffer(void) {
 
 static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     noah_runtime_trace_snapshot_t snapshot;
-    split_runtime_sync_packet_t   packet = {
+    split_runtime_base_sync_packet_t packet = {
         .active_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),
         .locked_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),
         .key_preview_layer = UINT8_MAX,
@@ -264,13 +312,15 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     pd_mode_apply_remote_snapshot(PD_MODE_ARROW, PD_MODE_ARROW);
 
     split_runtime_sync_init();
-    CHECK(rpc_registered_id == PUT_SPLIT_RUNTIME_SYNC);
-    CHECK(rpc_registered_callback != NULL);
-    CHECK(rpc_send_count == 1u);
-    CHECK(rpc_last_packet.active_mode_id == PD_MODE_ID_NONE);
-    CHECK(rpc_last_packet.locked_mode_id == PD_MODE_ID_NONE);
+    CHECK(rpc_register_count == 3u);
+    CHECK(test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC) != NULL);
+    CHECK(test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC) != NULL);
+    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SYNC) != NULL);
+    CHECK(rpc_send_count == 3u);
+    CHECK(rpc_last_base_packet.active_mode_id == PD_MODE_ID_NONE);
+    CHECK(rpc_last_base_packet.locked_mode_id == PD_MODE_ID_NONE);
 
-    rpc_registered_callback(sizeof(packet), &packet, 0u, NULL);
+    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)(sizeof(packet), &packet, 0u, NULL);
 
     snapshot = test_trace_snapshot();
 

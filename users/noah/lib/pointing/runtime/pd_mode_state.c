@@ -20,6 +20,8 @@ static pd_mode_runtime_shared_state_t *pd_mode_shared_state(void) {
 #define PD_MODE_LOCAL_LOCKED_MODE (pd_mode_shared_state()->local_locked_mode)
 #define PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE (pd_mode_shared_state()->remote_display_active_mode)
 #define PD_MODE_REMOTE_DISPLAY_LOCKED_MODE (pd_mode_shared_state()->remote_display_locked_mode)
+#define PD_MODE_LOCAL_OWNER_KEY_POS_VALID (pd_mode_shared_state()->local_owner_key_pos_valid)
+#define PD_MODE_LOCAL_OWNER_KEY_POS (pd_mode_shared_state()->local_owner_key_pos)
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 #    define PD_MODE_LOCAL_OWNER_SIDES (pd_mode_shared_state()->local_owner_sides)
 #    define PD_MODE_REMOTE_DISPLAY_OWNER_SIDES (pd_mode_shared_state()->remote_display_owner_sides)
@@ -38,7 +40,14 @@ static split_side_mask_t pd_mode_command_owner_sides(pd_mode_command_t command) 
 #endif
 }
 
-static void pd_mode_sync_local_owner_sides(split_side_mask_t owner_sides) {
+static keypos_t pd_mode_command_owner_key_pos(pd_mode_command_t command) {
+    return command.owner_key_pos;
+}
+
+static void pd_mode_sync_local_owner_state(keypos_t owner_key_pos, split_side_mask_t owner_sides) {
+    PD_MODE_LOCAL_OWNER_KEY_POS_VALID = key_origin_keypos_valid(owner_key_pos);
+    PD_MODE_LOCAL_OWNER_KEY_POS       = owner_key_pos;
+
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     PD_MODE_LOCAL_OWNER_SIDES = owner_sides;
 #else
@@ -205,6 +214,19 @@ split_side_mask_t pd_mode_display_owner_sides_snapshot(void) {
     return pd_mode_snapshot().display.owner_sides;
 }
 
+bool pd_mode_local_owner_key_pos_snapshot(keypos_t *out) {
+    if (out) {
+        *out = (keypos_t){0};
+    }
+
+    if (!(out && PD_MODE_LOCAL_OWNER_KEY_POS_VALID)) {
+        return false;
+    }
+
+    *out = PD_MODE_LOCAL_OWNER_KEY_POS;
+    return true;
+}
+
 bool pd_mode_local_active(pd_mode_mask_t mode) {
     return mode != 0 && PD_MODE_LOCAL_ACTIVE_MODE == mode;
 }
@@ -247,28 +269,28 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             result.handled      = mode != 0;
             split_sync_required = pd_mode_apply_activate_mode(mode);
             if (split_sync_required) {
-                pd_mode_sync_local_owner_sides(pd_mode_command_owner_sides(command));
+                pd_mode_sync_local_owner_state(pd_mode_command_owner_key_pos(command), pd_mode_command_owner_sides(command));
             }
             break;
         case PD_MODE_COMMAND_DEACTIVATE:
             result.handled      = mode != 0;
             split_sync_required = pd_mode_apply_deactivate_mode(mode);
             if (split_sync_required) {
-                pd_mode_sync_local_owner_sides(SPLIT_SIDE_MASK_NONE);
+                pd_mode_sync_local_owner_state((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, SPLIT_SIDE_MASK_NONE);
             }
             break;
         case PD_MODE_COMMAND_LOCK:
             result.handled      = mode != 0;
             split_sync_required = pd_mode_apply_lock_mode(mode);
             if (split_sync_required) {
-                pd_mode_sync_local_owner_sides(pd_mode_command_owner_sides(command));
+                pd_mode_sync_local_owner_state(pd_mode_command_owner_key_pos(command), pd_mode_command_owner_sides(command));
             }
             break;
         case PD_MODE_COMMAND_UNLOCK:
             result.handled      = mode != 0;
             split_sync_required = pd_mode_apply_unlock_mode(mode);
             if (split_sync_required) {
-                pd_mode_sync_local_owner_sides(SPLIT_SIDE_MASK_NONE);
+                pd_mode_sync_local_owner_state((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, SPLIT_SIDE_MASK_NONE);
             }
             break;
         case PD_MODE_COMMAND_KEY_PRESS:
@@ -277,7 +299,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             if (mode != 0) {
                 split_sync_required = pd_mode_apply_activate_mode(mode);
                 if (split_sync_required) {
-                    pd_mode_sync_local_owner_sides(pd_mode_command_owner_sides(command));
+                    pd_mode_sync_local_owner_state(pd_mode_command_owner_key_pos(command), pd_mode_command_owner_sides(command));
                 }
             }
             break;
@@ -287,7 +309,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             if (mode != 0 && pd_mode_local_active(mode) && !pd_mode_local_locked(mode)) {
                 split_sync_required = pd_mode_apply_deactivate_mode(mode);
                 if (split_sync_required) {
-                    pd_mode_sync_local_owner_sides(SPLIT_SIDE_MASK_NONE);
+                    pd_mode_sync_local_owner_state((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, SPLIT_SIDE_MASK_NONE);
                 }
             }
             break;
@@ -306,29 +328,33 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
 
 void pd_mode_activate(pd_mode_mask_t mode) {
     (void)pd_mode_apply_command((pd_mode_command_t){
-        .kind = PD_MODE_COMMAND_ACTIVATE,
-        .mode = mode,
+        .kind          = PD_MODE_COMMAND_ACTIVATE,
+        .mode          = mode,
+        .owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
     });
 }
 
 void pd_mode_deactivate(pd_mode_mask_t mode) {
     (void)pd_mode_apply_command((pd_mode_command_t){
-        .kind = PD_MODE_COMMAND_DEACTIVATE,
-        .mode = mode,
+        .kind          = PD_MODE_COMMAND_DEACTIVATE,
+        .mode          = mode,
+        .owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
     });
 }
 
 void pd_mode_lock(pd_mode_mask_t mode) {
     (void)pd_mode_apply_command((pd_mode_command_t){
-        .kind = PD_MODE_COMMAND_LOCK,
-        .mode = mode,
+        .kind          = PD_MODE_COMMAND_LOCK,
+        .mode          = mode,
+        .owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
     });
 }
 
 void pd_mode_unlock(pd_mode_mask_t mode) {
     (void)pd_mode_apply_command((pd_mode_command_t){
-        .kind = PD_MODE_COMMAND_UNLOCK,
-        .mode = mode,
+        .kind          = PD_MODE_COMMAND_UNLOCK,
+        .mode          = mode,
+        .owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
     });
 }
 
@@ -338,6 +364,7 @@ void pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t loc
         .active_mode_id = active_mode_id,
         .locked_mode_id = locked_mode_id,
         .owner_sides    = owner_sides,
+        .owner_key_pos  = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
     });
 }
 
@@ -354,9 +381,10 @@ bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
 
 bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
     pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
-        .kind        = locked ? PD_MODE_COMMAND_LOCK : PD_MODE_COMMAND_UNLOCK,
-        .mode        = mode,
-        .owner_sides = key_origin_registry_side_mask(key_pos),
+        .kind          = locked ? PD_MODE_COMMAND_LOCK : PD_MODE_COMMAND_UNLOCK,
+        .mode          = mode,
+        .owner_sides   = key_origin_registry_side_mask(key_pos),
+        .owner_key_pos = key_pos,
     });
 
     if (result.local_state_changed) {
@@ -384,9 +412,10 @@ bool pd_mode_handle_keycode_press(uint16_t keycode) {
 
 bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
     pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
-        .kind        = PD_MODE_COMMAND_KEY_PRESS,
-        .keycode     = keycode,
-        .owner_sides = key_origin_registry_side_mask(key_pos),
+        .kind          = PD_MODE_COMMAND_KEY_PRESS,
+        .keycode       = keycode,
+        .owner_sides   = key_origin_registry_side_mask(key_pos),
+        .owner_key_pos = key_pos,
     });
 
     if (result.split_sync_required) {
@@ -402,9 +431,10 @@ bool pd_mode_handle_keycode_release(uint16_t keycode) {
 
 bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
     pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
-        .kind        = PD_MODE_COMMAND_KEY_RELEASE,
-        .keycode     = keycode,
-        .owner_sides = key_origin_registry_side_mask(key_pos),
+        .kind          = PD_MODE_COMMAND_KEY_RELEASE,
+        .keycode       = keycode,
+        .owner_sides   = key_origin_registry_side_mask(key_pos),
+        .owner_key_pos = key_pos,
     });
 
     if (result.split_sync_required) {
@@ -420,6 +450,8 @@ bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
 #undef PD_MODE_LOCAL_LOCKED_MODE
 #undef PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE
 #undef PD_MODE_REMOTE_DISPLAY_LOCKED_MODE
+#undef PD_MODE_LOCAL_OWNER_KEY_POS_VALID
+#undef PD_MODE_LOCAL_OWNER_KEY_POS
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 #    undef PD_MODE_LOCAL_OWNER_SIDES
 #    undef PD_MODE_REMOTE_DISPLAY_OWNER_SIDES

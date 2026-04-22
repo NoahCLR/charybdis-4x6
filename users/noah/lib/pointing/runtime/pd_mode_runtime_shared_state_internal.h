@@ -16,6 +16,8 @@ typedef struct {
     pd_mode_mask_t local_locked_mode;
     pd_mode_mask_t remote_display_active_mode;
     pd_mode_mask_t remote_display_locked_mode;
+    bool           local_owner_key_pos_valid;
+    keypos_t       local_owner_key_pos;
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     split_side_mask_t local_owner_sides;
     split_side_mask_t remote_display_owner_sides;

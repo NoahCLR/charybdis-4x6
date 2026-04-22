@@ -60,6 +60,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/core/runtime.c \
     lib/key/runtime/core/trace.c \
     lib/rgb/core/rgb_runtime.c \
+    lib/rgb/stages/rgb_combo_feedback_stage.c \
     lib/rgb/stages/rgb_key_feedback_stage.c \
     lib/rgb/stages/rgb_layer_stage.c \
     lib/rgb/automouse/rgb_automouse_stage.c \

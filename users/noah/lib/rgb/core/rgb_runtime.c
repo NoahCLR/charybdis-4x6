@@ -4,6 +4,7 @@
 
 #include "rgb_runtime.h"
 #include "../automouse/rgb_automouse_stage.h"
+#include "../stages/rgb_combo_feedback_stage.h"
 #include "../stages/rgb_key_feedback_stage.h"
 #include "../stages/rgb_layer_stage.h"
 #include "../stages/rgb_pd_mode_stage.h"
@@ -86,6 +87,14 @@ static bool rgb_runtime_render_pd_mode_stage(uint8_t led_min, uint8_t led_max) {
     return rgb_runtime_pd_mode_stage_render(led_min, led_max);
 }
 
+static bool rgb_runtime_render_combo_underlay_stage(uint8_t led_min, uint8_t led_max) {
+    return rgb_runtime_combo_feedback_stage_render_underlay(led_min, led_max);
+}
+
+static bool rgb_runtime_render_combo_overlay_stage(uint8_t led_min, uint8_t led_max) {
+    return rgb_runtime_combo_feedback_stage_render_overlay(led_min, led_max);
+}
+
 static bool rgb_runtime_render_key_feedback_stage(uint8_t led_min, uint8_t led_max) {
     return rgb_runtime_key_feedback_stage_render(led_min, led_max);
 }
@@ -100,7 +109,7 @@ void noah_rgb_runtime_invalidate_layer_maps(void) {
 void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
     static const rgb_runtime_stage_fn_t stages[] = {
-        noah_rgb_validate_config, rgb_runtime_layer_stage_post_init, rgb_runtime_automouse_stage_post_init, rgb_runtime_pd_mode_stage_post_init, rgb_runtime_key_feedback_stage_post_init,
+        noah_rgb_validate_config, rgb_runtime_layer_stage_post_init, rgb_runtime_automouse_stage_post_init, rgb_runtime_pd_mode_stage_post_init, rgb_runtime_combo_feedback_stage_post_init, rgb_runtime_key_feedback_stage_post_init,
     };
 
     for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {
@@ -111,9 +120,11 @@ void noah_rgb_runtime_post_init(void) {
 
 #ifdef RGB_MATRIX_ENABLE
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    static const rgb_runtime_render_stage_fn_t overlay_stages[] = {
+    static const rgb_runtime_render_stage_fn_t underlay_stages[] = {
+        rgb_runtime_render_combo_underlay_stage,
         rgb_runtime_render_preview_stage,
         rgb_runtime_render_pd_mode_stage,
+        rgb_runtime_render_combo_overlay_stage,
         rgb_runtime_render_key_feedback_stage,
     };
     bool painted = false;
@@ -126,8 +137,8 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 
     painted |= rgb_runtime_render_base_stage(led_min, led_max);
 
-    for (uint8_t index = 0; index < ARRAY_SIZE(overlay_stages); index++) {
-        painted |= overlay_stages[index](led_min, led_max);
+    for (uint8_t index = 0; index < ARRAY_SIZE(underlay_stages); index++) {
+        painted |= underlay_stages[index](led_min, led_max);
     }
 
     noah_runtime_diag_scope_leave();

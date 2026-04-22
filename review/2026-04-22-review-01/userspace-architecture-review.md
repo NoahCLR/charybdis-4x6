@@ -10,7 +10,11 @@ stack-backed transition plans to grow too large on hardware. It now also
 covers the narrow phase-1 key-runtime core compaction that removed redundant
 stored key positions from the slot-indexed core arrays, plus the phase-2
 persistent runtime compaction that packed the remaining non-slot ownership and
-pending-release storage.
+pending-release storage. It now also covers the truthful RGB feedback-layer
+follow-up that added a persistent combo layer, truthful per-key key-behavior
+semantics, explicit combo underlay / overlay routing around preview and PD
+state, and split runtime sync broken into base, combo, and key-semantic
+packets.
 
 ## Decisions
 
@@ -31,6 +35,17 @@ and PD rendering semantics.
 
 This removed the need for duplicated side/key tracking in higher layers.
 
+### Combo identity is now its own RGB layer
+
+- Any active combo gets a steady combo color layer.
+- Combos that currently own preview or PD state are routed into a combo
+  underlay so those state indicators can repaint above them.
+- Unrelated active combos stay in a combo overlay above preview and PD.
+- Authored key-behavior feedback still renders last above both combo layers.
+
+This keeps combo-ness visible even when the combo output also drives other
+stateful overlays.
+
 ### QMK combo normalization stays userspace-local
 
 - `qmk_combo_origin.c` shadows the live physical combo press stream.
@@ -45,14 +60,30 @@ This removed the need for duplicated side/key tracking in higher layers.
 
 This avoids repo-crossing patches into `../bastardkb-qmk`.
 
-### Split sync stays semantic, not engine-level
+### Split sync now mirrors the render surfaces directly
 
-- Key-feedback sync now ships a compact key bitmap instead of a single packed
-  key.
-- PD mode sync now ships a side mask instead of a single owner half.
+- Base runtime sync carries only automouse, PD ids / trigger sides, and preview
+  layer.
+- Combo feedback sync carries separate underlay and overlay bitmaps.
+- Key-feedback sync carries packed per-key semantic truth plus shared flash
+  metadata.
 
-The packet remains comfortably below the QMK RPC limit while matching the new
-locality contract.
+The slave no longer reconstructs feedback from a single “current feedback
+snapshot”; it renders the same layer inputs the master uses.
+
+### Key-behavior feedback is now truthful per key
+
+- The runtime no longer picks one active feedback source by matrix order.
+- It builds a compact per-key semantic map across all active authored sources.
+- `KEY_FEEDBACK_MODE_KEY` paints exact per-key truth.
+- `KEY_FEEDBACK_MODE_KEY_HALF` and `KEY_FEEDBACK_MODE_BOTH_HALVES` broaden from
+  that truthful map only at render time.
+- `MULTI_TAP_PENDING` is the highest semantic priority and stays visible above
+  held / flashing semantics when broadened modes need to collapse multiple
+  states.
+
+This fixes the old inconsistency where two simultaneous held keys on different
+sides could only show one side by matrix-order accident.
 
 ### Hot replay paths keep origin semantics in packed form
 
@@ -106,10 +137,15 @@ rule while still shrinking the persistent non-slot state.
 - Packed non-slot persistent storage for `leases[]` and `pending_releases[]`
   also lives in `users/noah/lib/key/runtime/core/runtime.h` and
   `users/noah/lib/key/runtime/core/runtime.c`.
-- Key-feedback locality renders from the synced bitmap in
-  `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`.
+- Key-feedback semantics are produced in
+  `users/noah/lib/key/runtime/feedback.c` and rendered from the synced
+  semantic map in `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`.
+- Combo feedback rendering and underlay / overlay routing live in
+  `users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c`.
 - PD trigger-side rendering derives from the synced side mask in
   `users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`.
+- Split runtime transport for the three RGB-facing surfaces lives in
+  `users/noah/lib/state/runtime/split_runtime_sync.c`.
 - Validation for authored combo member ambiguity lives in
   `users/noah/lib/key/interaction/keymap_validation.c`.
 
@@ -121,6 +157,15 @@ rule while still shrinking the persistent non-slot state.
 - When multiple active combos with the same output are in play, locality is
   intentionally broadened to the union footprint instead of pretending a single
   side or key.
+- Combo feedback is now a persistent layer, which is truer to runtime state but
+  does increase visual complexity compared to the older “only show authored
+  key-behavior feedback” model.
+- The truthful key-semantic model is exact internally, but broadened paint
+  modes (`KEY_HALF`, `BOTH_HALVES`) are still intentionally lossy presentation
+  choices.
+- Split runtime sync now uses more than one packet. That is a better fit for
+  the truthful model, but it is a wider wire contract than the previous
+  all-in-one snapshot packet.
 - A combo row must not repeat the same member keycode within that one row,
   because the footprint tracker cannot disambiguate that authored shape.
 - Hot replay effect payloads are intentionally size-constrained. Carrying full
@@ -136,8 +181,14 @@ rule while still shrinking the persistent non-slot state.
 
 - A physical key always has at least a single-key footprint.
 - A combo output never falls back to fake key `(0,0)` for userspace locality.
+- Every active combo may also paint a steady combo layer independent of whether
+  its output drives authored key-behavior feedback, preview, or PD state.
+- Preview-owning and PD-owning combos must route to the combo underlay; all
+  other combos must stay in the combo overlay.
 - `KEY_FEEDBACK_MODE_KEY_HALF` may broaden to both halves for cross-half combos.
 - `KEY_FEEDBACK_MODE_KEY` paints every combo key in the footprint.
+- `MULTI_TAP_PENDING` is the top key-feedback semantic priority when a
+  broadened mode needs to collapse multiple simultaneous states.
 - `PD_COLOR_MODE_TRIGGER_HALF` may broaden to both halves for cross-half
   combo-triggered modes.
 - `key_runtime_effect_t` must stay small enough that transition plans do not

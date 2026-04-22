@@ -39,10 +39,13 @@
 #    endif
 #    define SPLIT_ACTIVITY_ENABLE
 
-// Register the custom split RPCs for runtime-visible state plus mirrored VIA
-// dynamic-keymap writes so both halves render layer-owned RGB from the same
-// EEPROM-backed keymap data.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_SYNC, PUT_VIA_KEYMAP_SYNC
+// Register the custom split RPCs for:
+// - base runtime-visible state (automouse / pd / preview)
+// - combo feedback locality
+// - truthful key-feedback semantics
+// - mirrored VIA dynamic-keymap writes
+// so both halves render layer-owned RGB from the same runtime and keymap data.
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SYNC, PUT_VIA_KEYMAP_SYNC
 
 // Dynamic trigger-half placement for PD-mode RGB overlays.
 // Required only when a pd_mode_colors[] row uses PD_COLOR_MODE_TRIGGER_HALF.

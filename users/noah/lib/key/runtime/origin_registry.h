@@ -46,6 +46,16 @@ static inline void key_origin_bitmap_copy(uint8_t *dest, const uint8_t *src) {
     }
 }
 
+static inline void key_origin_bitmap_or_inplace(uint8_t *dest, const uint8_t *src) {
+    if (!(dest && src)) {
+        return;
+    }
+
+    for (uint8_t index = 0; index < KEY_ORIGIN_BITMAP_SIZE; index++) {
+        dest[index] |= src[index];
+    }
+}
+
 static inline void key_origin_bitmap_add_keypos(uint8_t *bitmap, keypos_t key_pos) {
     uint16_t key_index;
 

@@ -6,11 +6,10 @@
 
 #if defined(SPLIT_TRANSACTION_IDS_USER)
 
+#    include <string.h>
+
 #    ifdef CONSOLE_ENABLE
 #        include "print.h"
-#    endif
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-#        include "../../key/runtime/feedback.h"
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
 #        include "../../pointing/defs/pd_modes.h"
@@ -19,33 +18,42 @@
 #        include "../../rgb/automouse/rgb_automouse.h"
 #    endif
 #    include "../../compat/qmk_auto_mouse_contract.h"
+#    include "../../key/runtime/feedback.h"
 #    include "runtime_trace.h"
 #    include "split_runtime_sync.h"
 #    include "transactions.h" // QMK
 
-split_runtime_sync_packet_t        split_runtime_sync_remote        = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
-static split_runtime_sync_packet_t split_runtime_sync_last_sent     = SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
-static bool                        split_runtime_sync_sent_once     = false;
-static bool                        split_runtime_sync_initialized   = false;
-static uint32_t                    split_runtime_sync_last_send     = 0;
-static bool                        split_runtime_sync_force_pending = false;
+split_runtime_sync_remote_t         split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
+static split_runtime_base_sync_packet_t split_runtime_base_last_sent = {0};
+static split_runtime_combo_feedback_packet_t split_runtime_combo_last_sent = {0};
+static split_runtime_key_feedback_packet_t split_runtime_key_feedback_last_sent = {0};
+static bool                         split_runtime_base_sent_once = false;
+static bool                         split_runtime_combo_sent_once = false;
+static bool                         split_runtime_key_feedback_sent_once = false;
+static bool                         split_runtime_sync_initialized = false;
+static uint32_t                     split_runtime_base_last_send = 0;
+static uint32_t                     split_runtime_combo_last_send = 0;
+static uint32_t                     split_runtime_key_feedback_last_send = 0;
+static bool                         split_runtime_sync_force_pending = false;
 
 #    ifndef SPLIT_RUNTIME_SYNC_HEARTBEAT_MS
 #        define SPLIT_RUNTIME_SYNC_HEARTBEAT_MS 250
 #    endif
 
-static void split_runtime_sync_log_packet_size_mismatch(uint8_t size) {
+static void split_runtime_sync_log_packet_size_mismatch(const char *packet_name, uint8_t size, uint8_t expected) {
 #    ifdef CONSOLE_ENABLE
-    uprintf("Split runtime sync packet size mismatch: received %u bytes, expected %u bytes\n", (unsigned int)size, (unsigned int)sizeof(split_runtime_sync_packet_t));
+    uprintf("Split runtime %s packet size mismatch: received %u bytes, expected %u bytes\n", packet_name, (unsigned int)size, (unsigned int)expected);
 #    else
+    (void)packet_name;
     (void)size;
+    (void)expected;
 #    endif
 }
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force);
 
-static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_elapsed) {
-    split_runtime_sync_packet_t packet = {
+static split_runtime_base_sync_packet_t split_runtime_sync_build_base_packet(uint16_t raw_elapsed) {
+    split_runtime_base_sync_packet_t packet = {
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
         .automouse_progress = pd_any_local_mode_locked() ? 0 : automouse_rgb_quantize_progress(raw_elapsed),
 #    else
@@ -64,79 +72,168 @@ static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_
         .pd_mode_owner_sides = SPLIT_SIDE_MASK_NONE,
 #        endif
 #    endif
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-        .key_feedback_flags = key_feedback_pack(),
-        .key_preview_layer  = key_feedback_preview_layer(),
-#    else
-        .key_feedback_flags = 0,
-        .key_preview_layer  = UINT8_MAX,
-#    endif
+        .key_preview_layer = key_feedback_preview_layer(),
     };
-
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    key_feedback_bitmap(packet.key_feedback_bitmap);
-#    else
-    key_origin_bitmap_clear(packet.key_feedback_bitmap);
-#    endif
 
     return packet;
 }
 
-static bool split_runtime_sync_heartbeat_due(void) {
-    return !split_runtime_sync_sent_once || timer_elapsed32(split_runtime_sync_last_send) >= SPLIT_RUNTIME_SYNC_HEARTBEAT_MS;
+static split_runtime_combo_feedback_packet_t split_runtime_sync_build_combo_packet(void) {
+    split_runtime_combo_feedback_packet_t packet = {0};
+
+    combo_feedback_underlay_bitmap(packet.combo_underlay_bitmap);
+    combo_feedback_overlay_bitmap(packet.combo_overlay_bitmap);
+
+    return packet;
 }
 
-static void split_runtime_sync_broadcast(const split_runtime_sync_packet_t *pkt, bool force) {
-    bool unchanged = split_runtime_sync_sent_once && memcmp(&split_runtime_sync_last_sent, pkt, sizeof(split_runtime_sync_packet_t)) == 0;
+static split_runtime_key_feedback_packet_t split_runtime_sync_build_key_feedback_packet(void) {
+    split_runtime_key_feedback_packet_t packet = {0};
 
-    if (!force && unchanged && !split_runtime_sync_heartbeat_due()) {
+    packet.key_feedback_flash_meta = key_feedback_flash_meta();
+    key_feedback_semantic_map(packet.key_feedback_semantic_map);
+
+    return packet;
+}
+
+static bool split_runtime_sync_heartbeat_due(bool sent_once, uint32_t last_send) {
+    return !sent_once || timer_elapsed32(last_send) >= SPLIT_RUNTIME_SYNC_HEARTBEAT_MS;
+}
+
+static void split_runtime_sync_broadcast_base(const split_runtime_base_sync_packet_t *pkt, bool force) {
+    bool unchanged = split_runtime_base_sent_once && memcmp(&split_runtime_base_last_sent, pkt, sizeof(*pkt)) == 0;
+
+    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_base_sent_once, split_runtime_base_last_send)) {
         return;
     }
 
-    if (transaction_rpc_send(PUT_SPLIT_RUNTIME_SYNC, sizeof(*pkt), pkt)) {
-        split_runtime_sync_last_sent = *pkt;
-        split_runtime_sync_sent_once = true;
-        split_runtime_sync_last_send = timer_read32();
+    if (transaction_rpc_send(PUT_SPLIT_RUNTIME_BASE_SYNC, sizeof(*pkt), pkt)) {
+        split_runtime_base_last_sent = *pkt;
+        split_runtime_base_sent_once = true;
+        split_runtime_base_last_send = timer_read32();
         noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, pd_mode_mask_from_id(pkt->active_mode_id), pd_mode_mask_from_id(pkt->locked_mode_id));
     }
 }
 
-static void split_runtime_sync_slave_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
-    (void)target2initiator_buffer_size;
-    (void)target2initiator_buffer;
+static void split_runtime_sync_broadcast_combo(const split_runtime_combo_feedback_packet_t *pkt, bool force) {
+    bool unchanged = split_runtime_combo_sent_once && memcmp(&split_runtime_combo_last_sent, pkt, sizeof(*pkt)) == 0;
 
-    if (initiator2target_buffer_size < sizeof(split_runtime_sync_packet_t)) {
-        split_runtime_sync_log_packet_size_mismatch(initiator2target_buffer_size);
+    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_combo_sent_once, split_runtime_combo_last_send)) {
         return;
     }
 
-    if (initiator2target_buffer_size != sizeof(split_runtime_sync_packet_t)) {
-        split_runtime_sync_log_packet_size_mismatch(initiator2target_buffer_size);
+    if (transaction_rpc_send(PUT_SPLIT_COMBO_FEEDBACK_SYNC, sizeof(*pkt), pkt)) {
+        split_runtime_combo_last_sent = *pkt;
+        split_runtime_combo_sent_once = true;
+        split_runtime_combo_last_send = timer_read32();
+    }
+}
+
+static void split_runtime_sync_broadcast_key_feedback(const split_runtime_key_feedback_packet_t *pkt, bool force) {
+    bool unchanged = split_runtime_key_feedback_sent_once && memcmp(&split_runtime_key_feedback_last_sent, pkt, sizeof(*pkt)) == 0;
+
+    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_key_feedback_sent_once, split_runtime_key_feedback_last_send)) {
+        return;
     }
 
-    memcpy(&split_runtime_sync_remote, initiator2target_buffer, sizeof(split_runtime_sync_packet_t));
-    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pd_mode_mask_from_id(split_runtime_sync_remote.active_mode_id), pd_mode_mask_from_id(split_runtime_sync_remote.locked_mode_id));
-#    ifdef POINTING_DEVICE_ENABLE
+    if (transaction_rpc_send(PUT_SPLIT_KEY_FEEDBACK_SYNC, sizeof(*pkt), pkt)) {
+        split_runtime_key_feedback_last_sent = *pkt;
+        split_runtime_key_feedback_sent_once = true;
+        split_runtime_key_feedback_last_send = timer_read32();
+    }
+}
+
+static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
+    const split_runtime_base_sync_packet_t *packet = initiator2target_buffer;
+
+    (void)target2initiator_buffer_size;
+    (void)target2initiator_buffer;
+
+    if (initiator2target_buffer_size < sizeof(split_runtime_base_sync_packet_t)) {
+        split_runtime_sync_log_packet_size_mismatch("base", initiator2target_buffer_size, sizeof(split_runtime_base_sync_packet_t));
+        return;
+    }
+
+    if (initiator2target_buffer_size != sizeof(split_runtime_base_sync_packet_t)) {
+        split_runtime_sync_log_packet_size_mismatch("base", initiator2target_buffer_size, sizeof(split_runtime_base_sync_packet_t));
+    }
+
+    split_runtime_sync_remote.automouse_progress = packet->automouse_progress;
+    split_runtime_sync_remote.active_mode_id     = packet->active_mode_id;
+    split_runtime_sync_remote.locked_mode_id     = packet->locked_mode_id;
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    split_runtime_sync_remote.pd_mode_owner_sides = packet->pd_mode_owner_sides;
+#endif
+    split_runtime_sync_remote.key_preview_layer  = packet->key_preview_layer;
+
+    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pd_mode_mask_from_id(packet->active_mode_id), pd_mode_mask_from_id(packet->locked_mode_id));
+#ifdef POINTING_DEVICE_ENABLE
     pd_mode_apply_remote_mode_ids(
-        split_runtime_sync_remote.active_mode_id,
-        split_runtime_sync_remote.locked_mode_id,
-#        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-        split_runtime_sync_remote.pd_mode_owner_sides
-#        else
+        packet->active_mode_id,
+        packet->locked_mode_id,
+#    ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+        packet->pd_mode_owner_sides
+#    else
         SPLIT_SIDE_MASK_NONE
-#        endif
-    );
 #    endif
+    );
+#endif
+}
+
+static void split_runtime_sync_slave_combo_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
+    const split_runtime_combo_feedback_packet_t *packet = initiator2target_buffer;
+
+    (void)target2initiator_buffer_size;
+    (void)target2initiator_buffer;
+
+    if (initiator2target_buffer_size < sizeof(split_runtime_combo_feedback_packet_t)) {
+        split_runtime_sync_log_packet_size_mismatch("combo", initiator2target_buffer_size, sizeof(split_runtime_combo_feedback_packet_t));
+        return;
+    }
+
+    if (initiator2target_buffer_size != sizeof(split_runtime_combo_feedback_packet_t)) {
+        split_runtime_sync_log_packet_size_mismatch("combo", initiator2target_buffer_size, sizeof(split_runtime_combo_feedback_packet_t));
+    }
+
+    key_origin_bitmap_copy(split_runtime_sync_remote.combo_underlay_bitmap, packet->combo_underlay_bitmap);
+    key_origin_bitmap_copy(split_runtime_sync_remote.combo_overlay_bitmap, packet->combo_overlay_bitmap);
+}
+
+static void split_runtime_sync_slave_key_feedback_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
+    const split_runtime_key_feedback_packet_t *packet = initiator2target_buffer;
+
+    (void)target2initiator_buffer_size;
+    (void)target2initiator_buffer;
+
+    if (initiator2target_buffer_size < sizeof(split_runtime_key_feedback_packet_t)) {
+        split_runtime_sync_log_packet_size_mismatch("key-feedback", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_packet_t));
+        return;
+    }
+
+    if (initiator2target_buffer_size != sizeof(split_runtime_key_feedback_packet_t)) {
+        split_runtime_sync_log_packet_size_mismatch("key-feedback", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_packet_t));
+    }
+
+    split_runtime_sync_remote.key_feedback_flash_meta = packet->key_feedback_flash_meta;
+    memcpy(split_runtime_sync_remote.key_feedback_semantic_map, packet->key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
 }
 
 void split_runtime_sync_init(void) {
-    transaction_register_rpc(PUT_SPLIT_RUNTIME_SYNC, split_runtime_sync_slave_rpc);
-    split_runtime_sync_remote        = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
-    split_runtime_sync_last_sent     = (split_runtime_sync_packet_t)SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT;
-    split_runtime_sync_sent_once     = false;
-    split_runtime_sync_initialized   = true;
-    split_runtime_sync_last_send     = timer_read32();
-    split_runtime_sync_force_pending = false;
+    transaction_register_rpc(PUT_SPLIT_RUNTIME_BASE_SYNC, split_runtime_sync_slave_base_rpc);
+    transaction_register_rpc(PUT_SPLIT_COMBO_FEEDBACK_SYNC, split_runtime_sync_slave_combo_rpc);
+    transaction_register_rpc(PUT_SPLIT_KEY_FEEDBACK_SYNC, split_runtime_sync_slave_key_feedback_rpc);
+    split_runtime_sync_remote          = (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
+    split_runtime_base_last_sent       = (split_runtime_base_sync_packet_t){0};
+    split_runtime_combo_last_sent      = (split_runtime_combo_feedback_packet_t){0};
+    split_runtime_key_feedback_last_sent = (split_runtime_key_feedback_packet_t){0};
+    split_runtime_base_sent_once       = false;
+    split_runtime_combo_sent_once      = false;
+    split_runtime_key_feedback_sent_once = false;
+    split_runtime_sync_initialized     = true;
+    split_runtime_base_last_send       = timer_read32();
+    split_runtime_combo_last_send      = split_runtime_base_last_send;
+    split_runtime_key_feedback_last_send = split_runtime_base_last_send;
+    split_runtime_sync_force_pending   = false;
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_INIT, is_keyboard_master() ? 1u : 0u, 0u);
 
     if (is_keyboard_master()) {
@@ -156,11 +253,21 @@ void split_runtime_sync_tick(void) {
 }
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force) {
-    if (!split_runtime_sync_initialized || !is_keyboard_master()) return;
+    split_runtime_base_sync_packet_t         base_packet;
+    split_runtime_combo_feedback_packet_t    combo_packet;
+    split_runtime_key_feedback_packet_t      key_feedback_packet;
 
-    split_runtime_sync_packet_t pkt = split_runtime_sync_build_packet(raw_elapsed);
+    if (!split_runtime_sync_initialized || !is_keyboard_master()) {
+        return;
+    }
 
-    split_runtime_sync_broadcast(&pkt, force);
+    base_packet         = split_runtime_sync_build_base_packet(raw_elapsed);
+    combo_packet        = split_runtime_sync_build_combo_packet();
+    key_feedback_packet = split_runtime_sync_build_key_feedback_packet();
+
+    split_runtime_sync_broadcast_base(&base_packet, force);
+    split_runtime_sync_broadcast_combo(&combo_packet, force);
+    split_runtime_sync_broadcast_key_feedback(&key_feedback_packet, force);
 }
 
 void split_runtime_sync_elapsed(uint16_t raw_elapsed) {

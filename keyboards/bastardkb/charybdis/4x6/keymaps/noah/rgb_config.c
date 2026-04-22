@@ -198,6 +198,39 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 // };
 // EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data);
 //
+// ─── Combo feedback ────────────────────────────────────────────────────────
+//
+// Visual identity for any currently active combo chord.
+//
+// This is a persistent combo layer:
+//   - if a combo is held, its combo color stays active
+//   - combo-owned preview / PD state can route that combo underneath those
+//     state indicators
+//   - authored key-behavior feedback can still repaint above the combo color
+//     on the same keys
+//
+// Mode decides where the combo layer paints:
+//   - COMBO_FEEDBACK_MODE_BOTH_HALVES = mirror the combo color across both
+//     halves
+//   - COMBO_FEEDBACK_MODE_COMBO_HALF = paint the half or halves touched by the
+//     live combo footprint
+//   - COMBO_FEEDBACK_MODE_COMBO_KEYS = paint the exact combo keys
+//   - COMBO_FEEDBACK_MODE_LEFT_HALF = always paint the left half
+//   - COMBO_FEEDBACK_MODE_RIGHT_HALF = always paint the right half
+//
+// This profile uses COMBO_FEEDBACK_MODE_COMBO_KEYS so held combos show their
+// exact live footprint without broadening across the board.
+#    ifdef COMBO_ENABLE
+const combo_feedback_color_config_t combo_feedback_colors = {
+    // Strong blue so the combo layer stays distinct from white/orange/cyan
+    // authored key-behavior semantics.
+    .held_color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+
+    // Keep combo identity on the exact keys that formed the chord.
+    .mode = COMBO_FEEDBACK_MODE_COMBO_KEYS,
+};
+#    endif
+
 //
 // ─── Key behavior feedback ──────────────────────────────────────────────────
 //

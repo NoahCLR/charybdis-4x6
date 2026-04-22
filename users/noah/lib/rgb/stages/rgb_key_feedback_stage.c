@@ -6,6 +6,8 @@
 
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
 
+#    include <string.h>
+
 #    include "../core/rgb_helpers.h"
 #    include "../../key/runtime/feedback.h"
 #    include "../../state/runtime/split_runtime_sync.h"
@@ -30,17 +32,50 @@ static bool rgb_runtime_key_feedback_stage_led_range_intersects(uint8_t from, ui
     return from < led_max && to > led_min;
 }
 
-static void rgb_runtime_key_feedback_stage_current_bitmap(uint8_t *out_bitmap) {
-    if (!out_bitmap) {
+static void rgb_runtime_key_feedback_stage_current_semantic_map(uint8_t *out_map) {
+    if (!out_map) {
         return;
     }
 
     if (is_keyboard_master()) {
-        key_feedback_bitmap(out_bitmap);
+        key_feedback_semantic_map(out_map);
         return;
     }
 
-    key_origin_bitmap_copy(out_bitmap, split_runtime_sync_remote.key_feedback_bitmap);
+    memcpy(out_map, split_runtime_sync_remote.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
+}
+
+static uint8_t rgb_runtime_key_feedback_stage_current_flash_meta(void) {
+    return is_keyboard_master() ? key_feedback_flash_meta() : split_runtime_sync_remote.key_feedback_flash_meta;
+}
+
+static bool rgb_runtime_key_feedback_stage_semantic_color(key_feedback_semantic_t semantic, rgb_t *out_color) {
+    if (!out_color) {
+        return false;
+    }
+
+    switch (semantic) {
+        case KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING:
+            *out_color = key_behavior_feedback_multi_tap_pending_rgb;
+            return true;
+        case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
+        case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY:
+        case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
+            *out_color = key_behavior_feedback_hold_active_rgb;
+            return true;
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY:
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING:
+            *out_color = key_behavior_feedback_long_hold_active_rgb;
+            return true;
+        case KEY_FEEDBACK_SEMANTIC_NONE:
+        default:
+            *out_color = (rgb_t){0};
+            return false;
+    }
+}
+
+static bool rgb_runtime_key_feedback_stage_semantic_visible(key_feedback_semantic_t semantic, uint8_t flash_meta) {
+    return !key_feedback_semantic_is_flashing(semantic) || key_feedback_flash_meta_phase(flash_meta);
 }
 
 static bool rgb_runtime_key_feedback_stage_paint_key(rgb_t color, keypos_t key_pos, uint8_t led_min, uint8_t led_max) {
@@ -60,18 +95,20 @@ static bool rgb_runtime_key_feedback_stage_paint_key(rgb_t color, keypos_t key_p
     return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_paint_bitmap_keys(rgb_t color, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_render_key_mode(const uint8_t *semantic_map, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
-    if (!bitmap) {
+    if (!semantic_map) {
         return false;
     }
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            keypos_t key_pos = {.row = row, .col = col};
+            keypos_t                 key_pos   = {.row = row, .col = col};
+            key_feedback_semantic_t  semantic  = key_feedback_semantic_map_get(semantic_map, key_pos);
+            rgb_t                    color;
 
-            if (!key_origin_bitmap_has_keypos(bitmap, key_pos)) {
+            if (!rgb_runtime_key_feedback_stage_semantic_color(semantic, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(semantic, flash_meta)) {
                 continue;
             }
 
@@ -82,40 +119,106 @@ static bool rgb_runtime_key_feedback_stage_paint_bitmap_keys(rgb_t color, const 
     return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_paint(rgb_t color, uint8_t led_min, uint8_t led_max) {
-    uint8_t           bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    split_side_mask_t sides;
+static key_feedback_semantic_t rgb_runtime_key_feedback_stage_half_semantic(const uint8_t *semantic_map, bool right_half) {
+    key_feedback_semantic_t best = KEY_FEEDBACK_SEMANTIC_NONE;
 
-    rgb_runtime_key_feedback_stage_current_bitmap(bitmap);
+    if (!semantic_map) {
+        return KEY_FEEDBACK_SEMANTIC_NONE;
+    }
 
-    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY) {
-        if (!key_origin_bitmap_has_any(bitmap)) {
-            rgb_set_both_halves(color, led_min, led_max);
-            return led_min < led_max;
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            keypos_t                key_pos   = {.row = row, .col = col};
+            key_feedback_semantic_t semantic;
+            split_half_t            half;
+
+            half = split_half_from_keypos(key_pos);
+            if ((right_half && half != SPLIT_HALF_RIGHT) || (!right_half && half != SPLIT_HALF_LEFT)) {
+                continue;
+            }
+
+            semantic = key_feedback_semantic_map_get(semantic_map, key_pos);
+            if (semantic > best) {
+                best = semantic;
+            }
+        }
+    }
+
+    return best;
+}
+
+static key_feedback_semantic_t rgb_runtime_key_feedback_stage_global_semantic(const uint8_t *semantic_map) {
+    key_feedback_semantic_t best = KEY_FEEDBACK_SEMANTIC_NONE;
+
+    if (!semantic_map) {
+        return KEY_FEEDBACK_SEMANTIC_NONE;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            key_feedback_semantic_t semantic = key_feedback_semantic_map_get(semantic_map, (keypos_t){.row = row, .col = col});
+
+            if (semantic > best) {
+                best = semantic;
+            }
+        }
+    }
+
+    return best;
+}
+
+static bool rgb_runtime_key_feedback_stage_paint_half(bool right_half, key_feedback_semantic_t semantic, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
+    rgb_t color;
+
+    if (!rgb_runtime_key_feedback_stage_semantic_color(semantic, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(semantic, flash_meta)) {
+        return false;
+    }
+
+    if (right_half) {
+        if (!rgb_runtime_key_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
+            return false;
         }
 
-        return rgb_runtime_key_feedback_stage_paint_bitmap_keys(color, bitmap, led_min, led_max);
+        rgb_set_right_half(color, led_min, led_max);
+        return true;
+    }
+
+    if (!rgb_runtime_key_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
+        return false;
+    }
+
+    rgb_set_left_half(color, led_min, led_max);
+    return true;
+}
+
+static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t led_max) {
+    uint8_t                semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t                flash_meta;
+    key_feedback_semantic_t left_semantic;
+    key_feedback_semantic_t right_semantic;
+    key_feedback_semantic_t global_semantic;
+    rgb_t                  color;
+
+    rgb_runtime_key_feedback_stage_current_semantic_map(semantic_map);
+    flash_meta = rgb_runtime_key_feedback_stage_current_flash_meta();
+
+    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY) {
+        return rgb_runtime_key_feedback_stage_render_key_mode(semantic_map, flash_meta, led_min, led_max);
     }
 
     if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY_HALF) {
-        sides = key_origin_bitmap_side_mask(bitmap);
-        if (sides == SPLIT_SIDE_MASK_LEFT) {
-            if (!rgb_runtime_key_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
-                return false;
-            }
+        bool painted = false;
 
-            rgb_set_left_half(color, led_min, led_max);
-            return true;
-        }
+        left_semantic  = rgb_runtime_key_feedback_stage_half_semantic(semantic_map, false);
+        right_semantic = rgb_runtime_key_feedback_stage_half_semantic(semantic_map, true);
+        painted |= rgb_runtime_key_feedback_stage_paint_half(false, left_semantic, flash_meta, led_min, led_max);
+        painted |= rgb_runtime_key_feedback_stage_paint_half(true, right_semantic, flash_meta, led_min, led_max);
+        return painted;
+    }
 
-        if (sides == SPLIT_SIDE_MASK_RIGHT) {
-            if (!rgb_runtime_key_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
-                return false;
-            }
-
-            rgb_set_right_half(color, led_min, led_max);
-            return true;
-        }
+    global_semantic = rgb_runtime_key_feedback_stage_global_semantic(semantic_map);
+    if (!rgb_runtime_key_feedback_stage_semantic_color(global_semantic, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(global_semantic, flash_meta)) {
+        return false;
     }
 
     rgb_set_both_halves(color, led_min, led_max);
@@ -123,29 +226,7 @@ static bool rgb_runtime_key_feedback_stage_paint(rgb_t color, uint8_t led_min, u
 }
 
 bool rgb_runtime_key_feedback_stage_render(uint8_t led_min, uint8_t led_max) {
-    uint8_t fb = is_keyboard_master() ? key_feedback_pack() : split_runtime_sync_remote.key_feedback_flags;
-
-    if (key_feedback_flags_multi_tap_pending(fb)) {
-        return rgb_runtime_key_feedback_stage_paint(key_behavior_feedback_multi_tap_pending_rgb, led_min, led_max);
-    }
-
-    if (key_feedback_flags_hold_active(fb)) {
-        if (!key_feedback_flags_level_flash(fb) || key_feedback_flags_flash_phase(fb)) {
-            if (key_feedback_flags_long_hold_active(fb)) {
-                return rgb_runtime_key_feedback_stage_paint(key_behavior_feedback_long_hold_active_rgb, led_min, led_max);
-            } else {
-                return rgb_runtime_key_feedback_stage_paint(key_behavior_feedback_hold_active_rgb, led_min, led_max);
-            }
-        }
-
-        return false;
-    }
-
-    if (key_feedback_flags_hold_pending(fb)) {
-        return rgb_runtime_key_feedback_stage_paint(key_behavior_feedback_hold_active_rgb, led_min, led_max);
-    }
-
-    return false;
+    return rgb_runtime_key_feedback_stage_render_impl(led_min, led_max);
 }
 
 #endif

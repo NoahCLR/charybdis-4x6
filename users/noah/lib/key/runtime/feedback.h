@@ -2,14 +2,16 @@
 // Key Runtime Feedback
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Read-only snapshot of key runtime state for RGB and other feedback modules.
-// Avoids exposing the rest of the key engine's private runtime surface.
+// Read-only runtime-visible feedback surfaces for RGB and split sync.
 //
-// The full snapshot is computed on the master half. For split sync, the RGB-
-// relevant semantic state is mirrored as packed flags plus one locality
-// footprint bitmap so the slave can render the same feedback categories
-// without access to the key engine globals. Time-based effects such as
-// flashing may still compute phase locally.
+// This module now exposes three distinct surfaces:
+// - preview layer ownership
+// - combo RGB locality (underlay vs overlay)
+// - authored key-behavior semantic state as a packed per-key map
+//
+// Exact per-key truth is produced on the master half. Split sync mirrors the
+// already-computed combo locality bitmaps plus the packed semantic map so the
+// slave renders the same scene without direct access to the key runtime.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -18,54 +20,90 @@
 
 #include "origin_registry.h"
 
-// ─── Packed flags for split sync ────────────────────────────────────────────
-//
-// One byte encodes the feedback state the RGB renderer needs.
-// Consumers should use key_feedback_flags_*() helpers, not raw bits.
+#define KEY_FEEDBACK_SEMANTIC_BITS      3u
+#define KEY_FEEDBACK_SEMANTIC_MAP_SIZE ((((MATRIX_ROWS * MATRIX_COLS) * KEY_FEEDBACK_SEMANTIC_BITS) + 7u) / 8u)
 
-// Sequence pending: a multi-tap window is still resolving the winning tap
-// index.
-#define KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING (1 << 0)
-// Hold-tier or long-hold-tier feedback is currently active.
-#define KEY_FEEDBACK_FLAG_HOLD_ACTIVE (1 << 1)
-// The active feedback state belongs to the long-hold tier rather than the
-// normal hold tier.
-#define KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE (1 << 2)
-// An authored hold tier exists on the current tap index and is pending
-// resolution; long-hold-only surfaces stay quiet until the long-hold tier
-// commits.
-#define KEY_FEEDBACK_FLAG_HOLD_PENDING (1 << 3)
-#define KEY_FEEDBACK_FLAG_LEVEL_FLASH (1 << 4)
-// Current flash phase, computed on the master and synced to the slave so both
-// halves flash in lockstep despite having independent clocks.
-#define KEY_FEEDBACK_FLAG_FLASH_PHASE (1 << 5)
+typedef enum {
+    KEY_FEEDBACK_SEMANTIC_NONE = 0,
+    KEY_FEEDBACK_SEMANTIC_HOLD_PENDING,
+    KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY,
+    KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING,
+    KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY,
+    KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING,
+    KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING,
+} key_feedback_semantic_t;
 
-static inline bool key_feedback_flags_multi_tap_pending(uint8_t flags) {
-    return (flags & KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING) != 0;
+#define KEY_FEEDBACK_FLASH_META_PHASE (1u << 0)
+
+static inline bool key_feedback_flash_meta_phase(uint8_t meta) {
+    return (meta & KEY_FEEDBACK_FLASH_META_PHASE) != 0u;
 }
 
-static inline bool key_feedback_flags_hold_active(uint8_t flags) {
-    return (flags & KEY_FEEDBACK_FLAG_HOLD_ACTIVE) != 0;
+static inline bool key_feedback_semantic_is_flashing(key_feedback_semantic_t semantic) {
+    return semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING || semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING;
 }
 
-static inline bool key_feedback_flags_long_hold_active(uint8_t flags) {
-    return (flags & KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE) != 0;
+static inline void key_feedback_semantic_map_clear(uint8_t *map) {
+    if (!map) {
+        return;
+    }
+
+    for (uint8_t index = 0; index < KEY_FEEDBACK_SEMANTIC_MAP_SIZE; index++) {
+        map[index] = 0u;
+    }
 }
 
-static inline bool key_feedback_flags_hold_pending(uint8_t flags) {
-    return (flags & KEY_FEEDBACK_FLAG_HOLD_PENDING) != 0;
+static inline key_feedback_semantic_t key_feedback_semantic_map_get(const uint8_t *map, keypos_t key_pos) {
+    uint16_t bit_index;
+    uint16_t byte_index;
+    uint8_t  shift;
+    uint16_t packed;
+
+    if (!(map && key_origin_keypos_valid(key_pos))) {
+        return KEY_FEEDBACK_SEMANTIC_NONE;
+    }
+
+    bit_index  = (uint16_t)(key_origin_keypos_index(key_pos) * KEY_FEEDBACK_SEMANTIC_BITS);
+    byte_index = (uint16_t)(bit_index / 8u);
+    shift      = (uint8_t)(bit_index % 8u);
+    packed     = map[byte_index];
+    if ((byte_index + 1u) < KEY_FEEDBACK_SEMANTIC_MAP_SIZE) {
+        packed |= (uint16_t)((uint16_t)map[byte_index + 1u] << 8u);
+    }
+
+    return (key_feedback_semantic_t)((packed >> shift) & 0x7u);
 }
 
-static inline bool key_feedback_flags_level_flash(uint8_t flags) {
-    return (flags & KEY_FEEDBACK_FLAG_LEVEL_FLASH) != 0;
+static inline void key_feedback_semantic_map_set(uint8_t *map, keypos_t key_pos, key_feedback_semantic_t semantic) {
+    uint16_t bit_index;
+    uint16_t byte_index;
+    uint8_t  shift;
+    uint16_t packed;
+
+    if (!(map && key_origin_keypos_valid(key_pos))) {
+        return;
+    }
+
+    bit_index  = (uint16_t)(key_origin_keypos_index(key_pos) * KEY_FEEDBACK_SEMANTIC_BITS);
+    byte_index = (uint16_t)(bit_index / 8u);
+    shift      = (uint8_t)(bit_index % 8u);
+    packed     = map[byte_index];
+    if ((byte_index + 1u) < KEY_FEEDBACK_SEMANTIC_MAP_SIZE) {
+        packed |= (uint16_t)((uint16_t)map[byte_index + 1u] << 8u);
+    }
+
+    packed &= (uint16_t)~((uint16_t)0x7u << shift);
+    packed |= (uint16_t)(((uint16_t)semantic & 0x7u) << shift);
+
+    map[byte_index] = (uint8_t)(packed & 0xFFu);
+    if ((byte_index + 1u) < KEY_FEEDBACK_SEMANTIC_MAP_SIZE) {
+        map[byte_index + 1u] = (uint8_t)(packed >> 8u);
+    }
 }
 
-static inline bool key_feedback_flags_flash_phase(uint8_t flags) {
-    return (flags & KEY_FEEDBACK_FLAG_FLASH_PHASE) != 0;
-}
-
-// Compute packed flags from the master-side key engine state.
-uint8_t key_feedback_pack(void);
-void    key_feedback_bitmap(uint8_t *out_bitmap);
+uint8_t key_feedback_flash_meta(void);
+void    key_feedback_semantic_map(uint8_t *out_map);
 uint8_t key_feedback_preview_layer(void);
+void    combo_feedback_underlay_bitmap(uint8_t *out_bitmap);
+void    combo_feedback_overlay_bitmap(uint8_t *out_bitmap);
 void    key_feedback_pulse_arm(bool long_hold_level);

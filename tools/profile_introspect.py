@@ -774,6 +774,17 @@ def pd_color_mode_description(mode: str) -> str:
     return descriptions.get(mode, "Unknown PD-mode paint mode.")
 
 
+def combo_feedback_mode_description(mode: str) -> str:
+    descriptions = {
+        "COMBO_FEEDBACK_MODE_BOTH_HALVES": "Mirror the steady combo color across both halves while any combo is active.",
+        "COMBO_FEEDBACK_MODE_COMBO_HALF": "Paint the half or halves touched by the live combo footprint.",
+        "COMBO_FEEDBACK_MODE_COMBO_KEYS": "Paint only the exact keys that formed the currently active combo footprint.",
+        "COMBO_FEEDBACK_MODE_LEFT_HALF": "Always paint the left half for active combos.",
+        "COMBO_FEEDBACK_MODE_RIGHT_HALF": "Always paint the right half for active combos.",
+    }
+    return descriptions.get(mode, "Unknown combo feedback paint mode.")
+
+
 def parse_automouse_fade_end_config(raw_text: str, known_values: dict[str, str]) -> dict[str, object] | None:
     try:
         body = extract_initializer_body(raw_text, r"automouse_fade_end_config\s*=")
@@ -833,6 +844,46 @@ def parse_key_behavior_feedback_colors(
         )
 
     return colors
+
+
+def parse_combo_feedback_color(raw_text: str, known_values: dict[str, str]) -> dict[str, object] | None:
+    try:
+        body = extract_initializer_body(raw_text, r"combo_feedback_colors\s*=")
+    except SystemExit:
+        return None
+
+    fields = parse_designated_fields(strip_comments(body))
+    held_color = fields.get(".held_color")
+    if held_color is None:
+        return None
+
+    authored_color = parse_hsv_expr(held_color, known_values)
+    return {
+        "field": "held_color",
+        "label": "Held Combo",
+        "meaning": "Steady combo layer color while a combo chord stays active. Preview- or PD-owning combos can be routed underneath those state indicators, while unrelated combos remain above them.",
+        "color": authored_color,
+        "preview_color": dict(authored_color),
+    }
+
+
+def parse_combo_feedback_mode(raw_text: str) -> dict[str, object] | None:
+    try:
+        body = extract_initializer_body(raw_text, r"combo_feedback_colors\s*=")
+    except SystemExit:
+        return None
+
+    fields = parse_designated_fields(strip_comments(body))
+    mode = fields.get(".mode")
+    if mode is None:
+        return None
+
+    normalized_mode = normalize_expr(mode)
+    return {
+        "mode": normalized_mode,
+        "label": humanize_identifier(normalized_mode.removeprefix("COMBO_FEEDBACK_MODE_")),
+        "meaning": combo_feedback_mode_description(normalized_mode),
+    }
 
 
 def key_behavior_feedback_mode_description(mode: str) -> str:
@@ -1243,6 +1294,8 @@ def build_profile_model() -> dict[str, object]:
         for row in pd_mode_colors
         if row["comment_color_name"] is not None
     }
+    combo_feedback_color = parse_combo_feedback_color(rgb_config_raw_text, config_macros)
+    combo_feedback_mode = parse_combo_feedback_mode(rgb_config_raw_text)
     automouse_fade_end_config = (
         parse_automouse_fade_end_config(rgb_config_raw_text, config_macros) if rgb_automouse_gradient_enabled else None
     )
@@ -1281,6 +1334,7 @@ def build_profile_model() -> dict[str, object]:
         "keymap_custom_keycode_count": len(keymap_custom_keycodes),
         "pd_mode_count": len(pd_modes),
         "pd_mode_color_count": len(pd_mode_colors),
+        "combo_feedback_configured": int(combo_feedback_color is not None),
     }
 
     return {
@@ -1301,6 +1355,8 @@ def build_profile_model() -> dict[str, object]:
         "rgb": {
             "layer_colors": layer_colors,
             "pd_mode_colors": pd_mode_colors,
+            "combo_feedback_color": combo_feedback_color,
+            "combo_feedback_mode": combo_feedback_mode,
             "automouse_fade_end_config": automouse_fade_end_config,
             "key_behavior_feedback_mode": key_behavior_feedback_mode,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
@@ -1334,6 +1390,8 @@ def render_markdown(profile: dict[str, object]) -> str:
     ]
     if profile["features"]["rgb_automouse_gradient_enabled"]:
         sections.append(render_automouse_fade_section(profile))
+    if profile["rgb"]["combo_feedback_color"] is not None:
+        sections.append(render_combo_feedback_section(profile))
     if profile["features"]["rgb_key_behavior_feedback_enabled"]:
         sections.append(render_key_behavior_feedback_section(profile))
     sections.extend(
@@ -1383,6 +1441,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
     features = profile["features"]
     rgb = profile["rgb"]
     automouse_fade_end_config = rgb["automouse_fade_end_config"]
+    combo_feedback_mode = rgb["combo_feedback_mode"]
     feedback_mode = rgb["key_behavior_feedback_mode"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
@@ -1390,6 +1449,8 @@ def render_reference_section(profile: dict[str, object]) -> str:
     rgb_authored_surfaces = ["layer colors", "pd-mode colors"]
     if features["rgb_automouse_gradient_enabled"]:
         rgb_authored_surfaces.append("auto-mouse fade config")
+    if rgb["combo_feedback_color"] is not None:
+        rgb_authored_surfaces.append("combo feedback color")
     if features["rgb_key_behavior_feedback_enabled"]:
         rgb_authored_surfaces.append("key-behavior feedback colors")
     lines = [
@@ -1420,6 +1481,12 @@ def render_reference_section(profile: dict[str, object]) -> str:
             f"- Key-behavior feedback paint mode: `{feedback_mode['mode']}`"
             if feedback_mode is not None
             else "- Key-behavior feedback paint mode: `not authored`",
+        )
+    if rgb["combo_feedback_color"] is not None:
+        lines.append(
+            f"- Combo feedback paint mode: `{combo_feedback_mode['mode']}`"
+            if combo_feedback_mode is not None
+            else "- Combo feedback paint mode: `not authored`",
         )
     lines.extend(
         [
@@ -2244,7 +2311,7 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
 
     lines.extend(
         [
-            f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer and any pd-mode overlay.",
+            f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored paint modes intentionally collapse that truth to a half or full-board presentation.",
             "",
         ]
     )
@@ -2279,6 +2346,60 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
         )
 
     lines.append("")
+    return "\n".join(lines)
+
+
+def render_combo_feedback_section(profile: dict[str, object]) -> str:
+    combo_feedback_color = profile["rgb"]["combo_feedback_color"]
+    combo_feedback_mode = profile["rgb"]["combo_feedback_mode"]
+    rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
+    lines = [
+        "## Combo Feedback LEDs",
+        "",
+    ]
+
+    if combo_feedback_color is None:
+        lines.extend(
+            [
+                f"No authored combo feedback color was found in {rgb_link}.",
+                "",
+            ]
+        )
+        return "\n".join(lines)
+
+    lines.extend(
+        [
+            f"This steady combo layer comes from `combo_feedback_colors` in {rgb_link}. It stays visible while a combo chord is active, sits underneath preview and pd-mode indicators when that combo owns those states, and otherwise repaints above preview and pd-mode overlays but below key-behavior feedback.",
+            "",
+        ]
+    )
+
+    if combo_feedback_mode is not None:
+        lines.extend(
+            [
+                f"Current authored combo feedback paint mode: `{combo_feedback_mode['mode']}`.",
+                "",
+                "| Available Mode | Meaning |",
+                "| --- | --- |",
+                f"| `COMBO_FEEDBACK_MODE_BOTH_HALVES` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_BOTH_HALVES')} |",
+                f"| `COMBO_FEEDBACK_MODE_COMBO_HALF` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_COMBO_HALF')} |",
+                f"| `COMBO_FEEDBACK_MODE_COMBO_KEYS` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_COMBO_KEYS')} |",
+                f"| `COMBO_FEEDBACK_MODE_LEFT_HALF` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_LEFT_HALF')} |",
+                f"| `COMBO_FEEDBACK_MODE_RIGHT_HALF` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_RIGHT_HALF')} |",
+                "",
+            ]
+        )
+
+    color = combo_feedback_color["color"]
+    preview_swatch = markdown_color_swatch(combo_feedback_color["preview_color"], "Held combo color")
+    lines.extend(
+        [
+            "| State | Meaning | Authored HSV | Preview Color |",
+            "| --- | --- | --- | --- |",
+            f"| `{combo_feedback_color['label']}` | {combo_feedback_color['meaning']} | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 

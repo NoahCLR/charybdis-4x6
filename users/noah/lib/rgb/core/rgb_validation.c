@@ -20,6 +20,10 @@ extern const uint8_t                  layer_led_group_count;
 extern const automouse_fade_end_config_t automouse_fade_end_config;
 #    endif
 
+#    ifdef COMBO_ENABLE
+extern const combo_feedback_color_config_t combo_feedback_colors;
+#    endif
+
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
 #    endif
@@ -88,6 +92,17 @@ static void rgb_validation_log_invalid_layer_color_mode(uint8_t layer, uint8_t m
 static void rgb_validation_log_invalid_automouse_fade_end_mode(uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
     uprintf("Invalid automouse_fade_end_config.mode %u; expected FOLLOW_REAL_DESTINATION (0), END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW (1), or END_COLOR_ON_ALL_KEYS (2)\n", (unsigned int)mode);
+#        else
+    (void)mode;
+#        endif
+}
+#    endif
+
+#    ifdef COMBO_ENABLE
+static void rgb_validation_log_invalid_combo_feedback_mode(uint8_t mode) {
+#        ifdef CONSOLE_ENABLE
+    uprintf("Invalid combo_feedback_colors.mode %u; expected COMBO_FEEDBACK_MODE_BOTH_HALVES (0), COMBO_FEEDBACK_MODE_COMBO_HALF (1), COMBO_FEEDBACK_MODE_COMBO_KEYS (2), COMBO_FEEDBACK_MODE_LEFT_HALF (3), or COMBO_FEEDBACK_MODE_RIGHT_HALF (4)\n",
+            (unsigned int)mode);
 #        else
     (void)mode;
 #        endif
@@ -195,6 +210,14 @@ static void rgb_validation_validate_automouse_fade_end_config(void) {
 }
 #    endif
 
+#    ifdef COMBO_ENABLE
+static void rgb_validation_validate_combo_feedback_config(void) {
+    if (combo_feedback_colors.mode > COMBO_FEEDBACK_MODE_RIGHT_HALF) {
+        rgb_validation_log_invalid_combo_feedback_mode((uint8_t)combo_feedback_colors.mode);
+    }
+}
+#    endif
+
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_validate_key_behavior_feedback_config(void) {
     if (key_behavior_feedback_colors.mode > KEY_FEEDBACK_MODE_KEY) {
@@ -259,6 +282,10 @@ void noah_rgb_validate_config(void) {
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
     rgb_validation_validate_automouse_fade_end_config();
+#    endif
+
+#    ifdef COMBO_ENABLE
+    rgb_validation_validate_combo_feedback_config();
 #    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
