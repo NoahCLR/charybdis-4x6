@@ -218,15 +218,16 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 //   - COMBO_FEEDBACK_MODE_LEFT_HALF = always paint the left half
 //   - COMBO_FEEDBACK_MODE_RIGHT_HALF = always paint the right half
 //
-// This profile uses COMBO_FEEDBACK_MODE_COMBO_KEYS so held combos show their
-// exact live footprint without broadening across the board.
+// This profile uses COMBO_FEEDBACK_MODE_COMBO_HALF so held combos stay local
+// to the half or halves that formed the chord without narrowing to individual
+// keys or broadening across the board.
 #    ifdef COMBO_ENABLE
 const combo_feedback_color_config_t combo_feedback_colors = {
     // Strong blue so the combo layer stays distinct from white/orange/cyan
     // authored key-behavior semantics.
     .held_color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
-    // Keep combo identity on the exact keys that formed the chord.
+    // Keep combo identity on the half or halves touched by the live combo.
     .mode = COMBO_FEEDBACK_MODE_COMBO_HALF,
 };
 #    endif

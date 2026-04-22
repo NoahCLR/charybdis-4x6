@@ -860,7 +860,7 @@ def parse_combo_feedback_color(raw_text: str, known_values: dict[str, str]) -> d
     authored_color = parse_hsv_expr(held_color, known_values)
     return {
         "field": "held_color",
-        "label": "Held Combo",
+        "label": "Active Combo",
         "meaning": "Steady combo layer color while a combo chord stays active. Preview- or PD-owning combos can be routed underneath those state indicators, while unrelated combos remain above them.",
         "color": authored_color,
         "preview_color": dict(authored_color),
@@ -2041,6 +2041,10 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     if automouse_fade_end_config is not None:
         swatch_colors.add(automouse_fade_end_config["preview_color"]["hex"])
 
+    combo_feedback_color = profile["rgb"]["combo_feedback_color"]
+    if combo_feedback_color is not None:
+        swatch_colors.add(combo_feedback_color["preview_color"]["hex"])
+
     for row in profile["rgb"]["key_behavior_feedback_colors"]:
         swatch_colors.add(row["preview_color"]["hex"])
 
@@ -2391,7 +2395,7 @@ def render_combo_feedback_section(profile: dict[str, object]) -> str:
         )
 
     color = combo_feedback_color["color"]
-    preview_swatch = markdown_color_swatch(combo_feedback_color["preview_color"], "Held combo color")
+    preview_swatch = markdown_color_swatch(combo_feedback_color["preview_color"], "Active combo color")
     lines.extend(
         [
             "| State | Meaning | Authored HSV | Preview Color |",

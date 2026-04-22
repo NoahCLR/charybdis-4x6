@@ -265,7 +265,7 @@ Preview color: <img alt="Auto-mouse end color" src="media/profile-introspection/
 
 This steady combo layer comes from `combo_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). It stays visible while a combo chord is active, sits underneath preview and pd-mode indicators when that combo owns those states, and otherwise repaints above preview and pd-mode overlays but below key-behavior feedback.
 
-Current authored combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_KEYS`.
+Current authored combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_HALF`.
 
 | Available Mode | Meaning |
 | --- | --- |
@@ -277,7 +277,7 @@ Current authored combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_KEYS`.
 
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
-| `Held Combo` | Steady combo layer color while a combo chord stays active. Preview- or PD-owning combos can be routed underneath those state indicators, while unrelated combos remain above them. | `HSV(191, 255, 200)` | <img alt="Held combo color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
+| `Active Combo` | Steady combo layer color while a combo chord stays active. Preview- or PD-owning combos can be routed underneath those state indicators, while unrelated combos remain above them. | `HSV(191, 255, 200)` | <img alt="Active combo color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
 
 ## Key-Behavior Feedback LEDs
 
@@ -335,7 +335,7 @@ No filled hardcoded macro slots.
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback paint mode: `KEY_FEEDBACK_MODE_KEY_HALF`
-- Combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_KEYS`
+- Combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_HALF`
 
 ### Layer RGB Config
 
