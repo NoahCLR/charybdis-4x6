@@ -44,6 +44,9 @@ static uint8_t macro_dispatch_calls;
 static uint8_t pd_toggle_calls;
 static uint8_t pd_press_calls;
 static uint8_t pd_release_calls;
+static keypos_t pd_toggle_key_pos;
+static keypos_t pd_press_key_pos;
+static keypos_t pd_release_key_pos;
 static uint8_t split_sync_calls;
 
 static bool macro_dispatch_result;
@@ -101,6 +104,9 @@ static void test_reset_stubs(void) {
     pd_toggle_calls           = 0;
     pd_press_calls            = 0;
     pd_release_calls          = 0;
+    pd_toggle_key_pos         = (keypos_t){0};
+    pd_press_key_pos          = (keypos_t){0};
+    pd_release_key_pos        = (keypos_t){0};
     split_sync_calls          = 0;
     macro_dispatch_result     = false;
     pd_toggle_result          = false;
@@ -136,6 +142,11 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     return pd_toggle_result;
 }
 
+bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+    pd_toggle_key_pos = key_pos;
+    return pd_mode_toggle_lock_state(mode);
+}
+
 bool pd_mode_handle_keycode_press(uint16_t keycode) {
     if (keycode == ARROW_MODE) {
         pd_press_calls++;
@@ -144,12 +155,22 @@ bool pd_mode_handle_keycode_press(uint16_t keycode) {
     return false;
 }
 
+bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
+    pd_press_key_pos = key_pos;
+    return pd_mode_handle_keycode_press(keycode);
+}
+
 bool pd_mode_handle_keycode_release(uint16_t keycode) {
     if (keycode == ARROW_MODE) {
         pd_release_calls++;
         return pd_release_result;
     }
     return false;
+}
+
+bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
+    pd_release_key_pos = key_pos;
+    return pd_mode_handle_keycode_release(keycode);
 }
 
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
@@ -288,6 +309,8 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     noah_action_tap(ARROW_MODE_LOCK);
     CHECK(macro_dispatch_calls == 0);
     CHECK(pd_toggle_calls == 1);
+    CHECK(pd_toggle_key_pos.row == MATRIX_ROWS);
+    CHECK(pd_toggle_key_pos.col == MATRIX_COLS);
     CHECK(split_sync_calls == 1);
     CHECK(tap_code16_call.keycode == KC_NO);
 
@@ -359,6 +382,8 @@ static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
     noah_action_press(key_pos, ARROW_MODE);
     CHECK(macro_dispatch_calls == 1);
     CHECK(pd_press_calls == 1);
+    CHECK(pd_press_key_pos.row == key_pos.row);
+    CHECK(pd_press_key_pos.col == key_pos.col);
     CHECK(layer_press_call.layer == 0);
     CHECK(register_code16_call.keycode == KC_NO);
 
@@ -434,6 +459,8 @@ static void test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plai
 
     noah_action_release(key_pos, ARROW_MODE);
     CHECK(pd_release_calls == 1);
+    CHECK(pd_release_key_pos.row == key_pos.row);
+    CHECK(pd_release_key_pos.col == key_pos.col);
     CHECK(layer_release_call.key_pos.row == 0);
     CHECK(unregister_code16_call.keycode == KC_NO);
 

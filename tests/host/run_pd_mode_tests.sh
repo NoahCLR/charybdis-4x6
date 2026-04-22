@@ -16,6 +16,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
+    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DPD_MODE_VOLUME_DPI=1400 \
     -DPD_MODE_BRIGHTNESS_DPI=1500 \

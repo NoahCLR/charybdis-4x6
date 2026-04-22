@@ -160,6 +160,11 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     return false;
 }
 
+bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+    (void)key_pos;
+    return pd_mode_toggle_lock_state(mode);
+}
+
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;

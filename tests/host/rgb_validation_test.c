@@ -35,9 +35,10 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 };
 
 const pd_mode_color_t pd_mode_colors[] = {
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(10, 10, 10)},
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(20, 20, 20)},
-    {.pointing_mode = (pd_mode_mask_t)0x4000u, .color = HSV(30, 30, 30)},
+    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(10, 10, 10), .mode = PD_COLOR_MODE_RIGHT_HALF},
+    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(20, 20, 20), .mode = (pd_color_mode_t)0xFFu},
+    {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(30, 30, 30), .mode = PD_COLOR_MODE_TRIGGER_HALF},
+    {.pointing_mode = (pd_mode_mask_t)0x4000u, .color = HSV(40, 40, 40), .mode = PD_COLOR_MODE_LEFT_HALF},
 };
 const uint8_t pd_mode_color_count = (uint8_t)ARRAY_SIZE(pd_mode_colors);
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
@@ -80,6 +81,10 @@ int main(void) {
     CHECK(strstr(log_buffer, "Invalid layer_led_groups") != NULL);
     CHECK(strstr(log_buffer, "Invalid automouse_fade_end_config.mode") != NULL);
     CHECK(strstr(log_buffer, "Unknown pd_mode_colors") != NULL);
+    CHECK(strstr(log_buffer, "Invalid pd_mode_colors[1].mode") != NULL);
+#ifndef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    CHECK(strstr(log_buffer, "RGB_PD_MODE_ACTIVE_HALF_ENABLE is disabled") != NULL);
+#endif
     CHECK(strstr(log_buffer, "Duplicate pd_mode_colors entries") != NULL);
     CHECK(strstr(log_buffer, "Missing pd_mode_colors entry") != NULL);
     CHECK(strstr(log_buffer, "Unknown pd_mode_led_groups") != NULL);

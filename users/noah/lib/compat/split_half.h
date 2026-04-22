@@ -1,27 +1,28 @@
 // ────────────────────────────────────────────────────────────────────────────
-// PD Mode Runtime Shared State Internals
+// Split Half Helpers
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Concrete pd-mode runtime storage owned by the userspace runtime context.
-// This layout is internal to the pd/runtime owner layer.
+// Shared split-keyboard half vocabulary plus helpers for resolving a physical
+// matrix position to a left/right half.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../defs/pd_mode_flags.h"
+#include <stdint.h>
 
-typedef struct {
-    pd_mode_mask_t local_active_mode;
-    pd_mode_mask_t local_locked_mode;
-    pd_mode_mask_t remote_display_active_mode;
-    pd_mode_mask_t remote_display_locked_mode;
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    split_half_t   local_owner_half;
-    split_half_t   remote_display_owner_half;
-#endif
-    bool           synthetic_auto_mouse_anchor_active;
-    bool           active_dpi_sync_pending;
-} pd_mode_runtime_shared_state_t;
+typedef uint8_t split_half_t;
 
-pd_mode_runtime_shared_state_t *pd_mode_runtime_shared_state(void);
+enum {
+    SPLIT_HALF_NONE = 0,
+    SPLIT_HALF_LEFT,
+    SPLIT_HALF_RIGHT,
+};
+
+static inline split_half_t split_half_from_keypos(keypos_t key_pos) {
+    if (key_pos.row >= MATRIX_ROWS || key_pos.col >= MATRIX_COLS) {
+        return SPLIT_HALF_NONE;
+    }
+
+    return key_pos.row < (MATRIX_ROWS / 2u) ? SPLIT_HALF_LEFT : SPLIT_HALF_RIGHT;
+}

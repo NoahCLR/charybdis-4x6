@@ -98,10 +98,10 @@ static void noah_action_toggle_layer_lock(noah_action_desc_t desc) {
     (void)layer_ownership_toggle_lock_state(desc.layer);
 }
 
-static void noah_action_toggle_pd_mode_lock(noah_action_desc_t desc) {
+static void noah_action_toggle_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
     const pd_mode_def_t *def = pd_mode_lock_action_lookup(desc.action);
     if (def) {
-        (void)pd_mode_toggle_lock_state(def->mode_flag);
+        (void)pd_mode_toggle_lock_state_at(def->mode_flag, key_pos);
     }
 }
 
@@ -115,12 +115,11 @@ static void noah_action_press_layer_lock(noah_action_desc_t desc, keypos_t key_p
 }
 
 static void noah_action_tap_pd_mode_lock(noah_action_desc_t desc) {
-    noah_action_toggle_pd_mode_lock(desc);
+    noah_action_toggle_pd_mode_lock(desc, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS});
 }
 
 static void noah_action_press_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
-    (void)key_pos;
-    noah_action_toggle_pd_mode_lock(desc);
+    noah_action_toggle_pd_mode_lock(desc, key_pos);
 }
 
 static void noah_action_press_owned_momentary_layer(noah_action_desc_t desc, keypos_t key_pos) {

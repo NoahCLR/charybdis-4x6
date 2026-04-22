@@ -1856,8 +1856,8 @@ static void test_key_runtime_core_projector_executes_effects_and_pending_dispatc
     CHECK(last_emitted_action == TEST_ACTION);
 
     key_runtime_core_project_effect(&(key_runtime_effect_t){
-        .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
-        .data.pd_mode = PD_MODE_ARROW,
+        .kind                  = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+        .data.pd_mode_lock_tap = {.pd_mode = PD_MODE_ARROW, .key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS}},
     });
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
 

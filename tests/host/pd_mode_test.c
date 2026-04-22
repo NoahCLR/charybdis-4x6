@@ -362,6 +362,49 @@ static void test_apply_remote_snapshot_keeps_only_one_effective_mode(void) {
     CHECK((snapshot.display.active_traits & PD_MODE_TRAIT_PREFER_TYPING_LAYER) != 0);
 }
 
+static void test_keycode_press_at_tracks_trigger_half(void) {
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(VOLUME_MODE, (keypos_t){.row = 0, .col = 0}));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(split_sync_count == 1);
+
+    CHECK(pd_mode_handle_keycode_press_at(ARROW_MODE, (keypos_t){.row = 4, .col = 0}));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_RIGHT);
+    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_RIGHT);
+}
+
+static void test_lock_state_at_tracks_trigger_half_and_clears_on_unlock(void) {
+    test_reset_stubs();
+
+    CHECK(pd_mode_set_lock_state_at(PD_MODE_VOLUME, true, (keypos_t){.row = 4, .col = 1}));
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_RIGHT);
+
+    CHECK(pd_mode_set_lock_state_at(PD_MODE_VOLUME, false, (keypos_t){.row = 4, .col = 1}));
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_NONE);
+}
+
+static void test_apply_remote_mode_ids_tracks_display_owner_half(void) {
+    pd_mode_snapshot_t snapshot;
+
+    test_reset_stubs();
+    fake_is_master = false;
+
+    pd_mode_apply_remote_mode_ids(pd_mode_id_from_mask(PD_MODE_ZOOM), pd_mode_id_from_mask(PD_MODE_ZOOM), SPLIT_HALF_LEFT);
+    snapshot = pd_mode_snapshot();
+
+    CHECK(snapshot.display.active_mode == PD_MODE_ZOOM);
+    CHECK(snapshot.display.locked_mode == PD_MODE_ZOOM);
+    CHECK(snapshot.display.owner_half == SPLIT_HALF_LEFT);
+    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+}
+
 static void test_set_lock_state_switches_to_single_locked_mode(void) {
     test_reset_stubs();
 
@@ -700,6 +743,9 @@ int main(void) {
     test_registry_metadata_matches_manifest();
     test_trait_queries_match_manifest_policy();
     test_apply_remote_snapshot_keeps_only_one_effective_mode();
+    test_keycode_press_at_tracks_trigger_half();
+    test_lock_state_at_tracks_trigger_half_and_clears_on_unlock();
+    test_apply_remote_mode_ids_tracks_display_owner_half();
     test_set_lock_state_switches_to_single_locked_mode();
     test_activate_switches_to_single_unlocked_mode();
     test_apply_command_reports_before_after_and_sync_intent_for_key_press();

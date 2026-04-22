@@ -229,7 +229,12 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
                         effect->data.feedback_pulse.long_hold_level ? 1u : 0u);
                 break;
             case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
-                uprintf("  [%u] %s mode=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pd_mode);
+                uprintf("  [%u] %s key=(%u,%u) mode=0x%04X\n",
+                        (unsigned int)i,
+                        key_runtime_trace_effect_name(effect->kind),
+                        (unsigned int)effect->data.pd_mode_lock_tap.key_pos.row,
+                        (unsigned int)effect->data.pd_mode_lock_tap.key_pos.col,
+                        (unsigned int)effect->data.pd_mode_lock_tap.pd_mode);
                 break;
             case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
                 uprintf("  [%u] %s action=0x%04X repeat=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.delayed_action.action, (unsigned int)effect->data.delayed_action.repeat_count);

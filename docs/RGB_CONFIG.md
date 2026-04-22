@@ -169,7 +169,7 @@ later overlays such as pd-mode color or key feedback still paint on top.
 
 ### `pd_mode_colors[]`
 
-`pd_mode_colors[]` defines the right-half overlay color for each active
+`pd_mode_colors[]` defines the overlay color and paint mode for each active
 pointing-device mode.
 
 In `rgb_config.c`, declare `pd_mode_colors[]` and `pd_mode_color_count`
@@ -179,14 +179,23 @@ Each row is keyed by a `PD_MODE_*` flag rather than by array index. That means
 the color mapping follows the pointing mode itself, not the order of
 `pd_modes[]`.
 
+Each row also chooses where the overlay paints:
+
+- `PD_COLOR_MODE_RIGHT_HALF`: always paint the right half
+- `PD_COLOR_MODE_LEFT_HALF`: always paint the left half
+- `PD_COLOR_MODE_BOTH_HALVES`: mirror the overlay across both halves
+- `PD_COLOR_MODE_TRIGGER_HALF`: paint the half that triggered the currently
+  effective PD mode; this requires `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in
+  [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+
 Use rows like:
 
 ```c
-{ .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },
+{ .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .mode = PD_COLOR_MODE_TRIGGER_HALF },
 ```
 
 Use this table when you want `ARROW_MODE`, `VOLUME_MODE`, `PINCH_MODE`, and the
-other pd modes to have distinct overlay colors.
+other pd modes to have distinct overlay colors and placement.
 
 ### `pd_mode_led_groups`
 
@@ -290,7 +299,7 @@ target in sync.
 3. per-layer preview overlay for a pending momentary-layer hold, if
    `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on and that previewed layer has a
    nonzero solid color
-4. the active pointing-device mode color on the right half
+4. the active pointing-device mode color using the authored PD paint mode
 5. per-mode LED groups
 6. the key-behavior feedback overlay on both halves, only the key half, or
    only the specific key
@@ -300,7 +309,8 @@ That order matters.
 Examples:
 
 - a per-layer LED group can sit on top of a solid layer color
-- a pd-mode overlay can repaint the right half after the layer and group pass
+- a pd-mode overlay can repaint the authored half or both halves after the
+  layer and group pass
 - a pd-mode LED group can then repaint selected LEDs on top of the mode overlay
 - the key-behavior overlay can temporarily repaint both halves last, only the
   key half, or only the key itself depending on `mode`
@@ -344,6 +354,10 @@ Edit the relevant row in `layer_colors[]`.
 ### Change a pd-mode overlay color
 
 Edit the matching row in `pd_mode_colors[]`.
+
+### Change where a pd-mode overlay paints
+
+Edit the matching row in `pd_mode_colors[]` and change its `.mode`.
 
 ### Add a small highlight to one layer
 

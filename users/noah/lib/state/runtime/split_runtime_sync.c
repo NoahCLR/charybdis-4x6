@@ -54,9 +54,15 @@ static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_
 #    ifdef POINTING_DEVICE_ENABLE
         .active_mode_id = pd_mode_id_from_mask(pd_mode_local_active_snapshot()),
         .locked_mode_id = pd_mode_id_from_mask(pd_mode_local_locked_snapshot()),
+#        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+        .pd_mode_owner_half = pd_mode_local_owner_half_snapshot(),
+#        endif
 #    else
         .active_mode_id = PD_MODE_ID_NONE,
         .locked_mode_id = PD_MODE_ID_NONE,
+#        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+        .pd_mode_owner_half = SPLIT_HALF_NONE,
+#        endif
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
         .key_feedback_flags = key_feedback_pack(),
@@ -105,7 +111,15 @@ static void split_runtime_sync_slave_rpc(uint8_t initiator2target_buffer_size, c
     memcpy(&split_runtime_sync_remote, initiator2target_buffer, sizeof(split_runtime_sync_packet_t));
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pd_mode_mask_from_id(split_runtime_sync_remote.active_mode_id), pd_mode_mask_from_id(split_runtime_sync_remote.locked_mode_id));
 #    ifdef POINTING_DEVICE_ENABLE
-    pd_mode_apply_remote_mode_ids(split_runtime_sync_remote.active_mode_id, split_runtime_sync_remote.locked_mode_id);
+    pd_mode_apply_remote_mode_ids(
+        split_runtime_sync_remote.active_mode_id,
+        split_runtime_sync_remote.locked_mode_id,
+#        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+        split_runtime_sync_remote.pd_mode_owner_half
+#        else
+        SPLIT_HALF_NONE
+#        endif
+    );
 #    endif
 }
 

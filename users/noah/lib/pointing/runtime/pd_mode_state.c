@@ -19,9 +19,37 @@ static pd_mode_runtime_shared_state_t *pd_mode_shared_state(void) {
 #define PD_MODE_LOCAL_LOCKED_MODE (pd_mode_shared_state()->local_locked_mode)
 #define PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE (pd_mode_shared_state()->remote_display_active_mode)
 #define PD_MODE_REMOTE_DISPLAY_LOCKED_MODE (pd_mode_shared_state()->remote_display_locked_mode)
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#    define PD_MODE_LOCAL_OWNER_HALF (pd_mode_shared_state()->local_owner_half)
+#    define PD_MODE_REMOTE_DISPLAY_OWNER_HALF (pd_mode_shared_state()->remote_display_owner_half)
+#endif
 
 static bool pd_mode_snapshot_view_changed(pd_mode_snapshot_view_t before, pd_mode_snapshot_view_t after) {
-    return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode;
+    return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode || before.owner_half != after.owner_half;
+}
+
+static split_half_t pd_mode_command_owner_half(pd_mode_command_t command) {
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    return command.owner_half;
+#else
+    (void)command;
+    return SPLIT_HALF_NONE;
+#endif
+}
+
+static void pd_mode_sync_local_owner_half(split_half_t owner_half) {
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    if (owner_half != SPLIT_HALF_NONE) {
+        PD_MODE_LOCAL_OWNER_HALF = owner_half;
+        return;
+    }
+
+    if (PD_MODE_LOCAL_LOCKED_MODE == 0 && PD_MODE_LOCAL_ACTIVE_MODE == 0) {
+        PD_MODE_LOCAL_OWNER_HALF = SPLIT_HALF_NONE;
+    }
+#else
+    (void)owner_half;
+#endif
 }
 
 static bool pd_mode_apply_unlock_other_locks(pd_mode_mask_t keep_mode) {
@@ -100,15 +128,24 @@ static bool pd_mode_apply_unlock_mode(pd_mode_mask_t mode) {
     return true;
 }
 
-static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode) {
+static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode, split_half_t owner_half) {
     // Remote sync only mirrors mode state for the non-master half's policy/UI.
     // Do not replay local side effects such as dragscroll or auto-mouse
     // ownership changes from this path. Keep only one effective mode so the
     // mirrored UI matches the local exclusivity invariant.
     bool changed = PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE != active_mode || PD_MODE_REMOTE_DISPLAY_LOCKED_MODE != locked_mode;
 
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    changed |= PD_MODE_REMOTE_DISPLAY_OWNER_HALF != owner_half;
+#else
+    (void)owner_half;
+#endif
+
     PD_MODE_REMOTE_DISPLAY_LOCKED_MODE = locked_mode;
     PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE = active_mode;
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    PD_MODE_REMOTE_DISPLAY_OWNER_HALF  = owner_half;
+#endif
     noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT, active_mode, locked_mode);
     return changed;
 }
@@ -166,6 +203,14 @@ pd_mode_mask_t pd_mode_display_locked_snapshot(void) {
     return pd_mode_snapshot().display.locked_mode;
 }
 
+split_half_t pd_mode_local_owner_half_snapshot(void) {
+    return pd_mode_snapshot().local.owner_half;
+}
+
+split_half_t pd_mode_display_owner_half_snapshot(void) {
+    return pd_mode_snapshot().display.owner_half;
+}
+
 bool pd_mode_local_active(pd_mode_mask_t mode) {
     return mode != 0 && PD_MODE_LOCAL_ACTIVE_MODE == mode;
 }
@@ -207,24 +252,39 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
         case PD_MODE_COMMAND_ACTIVATE:
             result.handled      = mode != 0;
             split_sync_required = pd_mode_apply_activate_mode(mode);
+            if (split_sync_required) {
+                pd_mode_sync_local_owner_half(pd_mode_command_owner_half(command));
+            }
             break;
         case PD_MODE_COMMAND_DEACTIVATE:
             result.handled      = mode != 0;
             split_sync_required = pd_mode_apply_deactivate_mode(mode);
+            if (split_sync_required) {
+                pd_mode_sync_local_owner_half(SPLIT_HALF_NONE);
+            }
             break;
         case PD_MODE_COMMAND_LOCK:
             result.handled      = mode != 0;
             split_sync_required = pd_mode_apply_lock_mode(mode);
+            if (split_sync_required) {
+                pd_mode_sync_local_owner_half(pd_mode_command_owner_half(command));
+            }
             break;
         case PD_MODE_COMMAND_UNLOCK:
             result.handled      = mode != 0;
             split_sync_required = pd_mode_apply_unlock_mode(mode);
+            if (split_sync_required) {
+                pd_mode_sync_local_owner_half(SPLIT_HALF_NONE);
+            }
             break;
         case PD_MODE_COMMAND_KEY_PRESS:
             mode           = pd_mode_for_keycode(command.keycode);
             result.handled = mode != 0;
             if (mode != 0) {
                 split_sync_required = pd_mode_apply_activate_mode(mode);
+                if (split_sync_required) {
+                    pd_mode_sync_local_owner_half(pd_mode_command_owner_half(command));
+                }
             }
             break;
         case PD_MODE_COMMAND_KEY_RELEASE:
@@ -232,11 +292,14 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             result.handled = mode != 0;
             if (mode != 0 && pd_mode_local_active(mode) && !pd_mode_local_locked(mode)) {
                 split_sync_required = pd_mode_apply_deactivate_mode(mode);
+                if (split_sync_required) {
+                    pd_mode_sync_local_owner_half(SPLIT_HALF_NONE);
+                }
             }
             break;
         case PD_MODE_COMMAND_REMOTE_SNAPSHOT:
             result.handled = true;
-            (void)pd_mode_apply_remote_display_snapshot(pd_mode_mask_from_id(command.active_mode_id), pd_mode_mask_from_id(command.locked_mode_id));
+            (void)pd_mode_apply_remote_display_snapshot(pd_mode_mask_from_id(command.active_mode_id), pd_mode_mask_from_id(command.locked_mode_id), command.owner_half);
             break;
         case PD_MODE_COMMAND_NONE:
         default:
@@ -275,11 +338,12 @@ void pd_mode_unlock(pd_mode_mask_t mode) {
     });
 }
 
-void pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id) {
+void pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_half_t owner_half) {
     (void)pd_mode_apply_command((pd_mode_command_t){
         .kind           = PD_MODE_COMMAND_REMOTE_SNAPSHOT,
         .active_mode_id = active_mode_id,
         .locked_mode_id = locked_mode_id,
+        .owner_half     = owner_half,
     });
 }
 
@@ -287,13 +351,18 @@ void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t l
     pd_mode_mask_t locked_mode = locked_flags != 0 ? locked_flags : 0;
     pd_mode_mask_t active_mode = locked_mode != 0 ? locked_mode : active_flags;
 
-    pd_mode_apply_remote_mode_ids(pd_mode_id_from_mask(active_mode), pd_mode_id_from_mask(locked_mode));
+    pd_mode_apply_remote_mode_ids(pd_mode_id_from_mask(active_mode), pd_mode_id_from_mask(locked_mode), SPLIT_HALF_NONE);
 }
 
 bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
+    return pd_mode_set_lock_state_at(mode, locked, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS});
+}
+
+bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
     pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
-        .kind = locked ? PD_MODE_COMMAND_LOCK : PD_MODE_COMMAND_UNLOCK,
-        .mode = mode,
+        .kind       = locked ? PD_MODE_COMMAND_LOCK : PD_MODE_COMMAND_UNLOCK,
+        .mode       = mode,
+        .owner_half = split_half_from_keypos(key_pos),
     });
 
     if (result.local_state_changed) {
@@ -308,13 +377,22 @@ bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
 }
 
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
-    return pd_mode_set_lock_state(mode, !pd_mode_local_locked(mode));
+    return pd_mode_toggle_lock_state_at(mode, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS});
+}
+
+bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+    return pd_mode_set_lock_state_at(mode, !pd_mode_local_locked(mode), key_pos);
 }
 
 bool pd_mode_handle_keycode_press(uint16_t keycode) {
+    return pd_mode_handle_keycode_press_at(keycode, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS});
+}
+
+bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
     pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
-        .kind    = PD_MODE_COMMAND_KEY_PRESS,
-        .keycode = keycode,
+        .kind       = PD_MODE_COMMAND_KEY_PRESS,
+        .keycode    = keycode,
+        .owner_half = split_half_from_keypos(key_pos),
     });
 
     if (result.split_sync_required) {
@@ -325,9 +403,14 @@ bool pd_mode_handle_keycode_press(uint16_t keycode) {
 }
 
 bool pd_mode_handle_keycode_release(uint16_t keycode) {
+    return pd_mode_handle_keycode_release_at(keycode, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS});
+}
+
+bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
     pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
-        .kind    = PD_MODE_COMMAND_KEY_RELEASE,
-        .keycode = keycode,
+        .kind       = PD_MODE_COMMAND_KEY_RELEASE,
+        .keycode    = keycode,
+        .owner_half = split_half_from_keypos(key_pos),
     });
 
     if (result.split_sync_required) {
@@ -343,3 +426,7 @@ bool pd_mode_handle_keycode_release(uint16_t keycode) {
 #undef PD_MODE_LOCAL_LOCKED_MODE
 #undef PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE
 #undef PD_MODE_REMOTE_DISPLAY_LOCKED_MODE
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#    undef PD_MODE_LOCAL_OWNER_HALF
+#    undef PD_MODE_REMOTE_DISPLAY_OWNER_HALF
+#endif

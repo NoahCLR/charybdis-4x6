@@ -56,6 +56,7 @@ static host_runtime_fixture_t runtime_fixture         = HOST_RUNTIME_FIXTURE_INI
 static uint8_t        fake_feedback_flags = 0;
 static pd_mode_mask_t fake_pd_active_mode = 0;
 static pd_mode_mask_t fake_pd_locked_mode = 0;
+static split_half_t   fake_pd_owner_half  = SPLIT_HALF_NONE;
 
 static rgb_t test_runtime_diag_stage_rgb(noah_runtime_diag_stage_t stage) {
     switch (stage) {
@@ -119,8 +120,10 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 };
 
 const pd_mode_color_t pd_mode_colors[] = {
-    {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212)},
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222)},
+    {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .mode = PD_COLOR_MODE_RIGHT_HALF},
+    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .mode = PD_COLOR_MODE_LEFT_HALF},
+    {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .mode = PD_COLOR_MODE_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .mode = PD_COLOR_MODE_TRIGGER_HALF},
 };
 const uint8_t                    pd_mode_color_count       = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 static const uint8_t             volume_mode_group_leds[]  = {1, 6};
@@ -223,6 +226,7 @@ static void test_reset(void) {
     fake_feedback_flags       = 0;
     fake_pd_active_mode       = 0;
     fake_pd_locked_mode       = 0;
+    fake_pd_owner_half        = SPLIT_HALF_NONE;
     split_runtime_sync_remote = host_runtime_fixture_split_remote_init();
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
@@ -253,7 +257,7 @@ static void test_reset(void) {
 HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(runtime_fixture)
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {
-    return host_runtime_fixture_pd_mode_snapshot(pd_modes, PD_MODE_COUNT, fake_is_master, fake_pd_active_mode, fake_pd_locked_mode, split_runtime_sync_remote);
+    return host_runtime_fixture_pd_mode_snapshot(pd_modes, PD_MODE_COUNT, fake_is_master, fake_pd_active_mode, fake_pd_locked_mode, fake_pd_owner_half, split_runtime_sync_remote);
 }
 
 int rgb_matrix_led_index(int index) {
@@ -578,12 +582,12 @@ static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_wh
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+    check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
-    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(4, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_NUM].color));
     check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
-    check_led(7, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
 #if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
@@ -622,9 +626,9 @@ static void test_render_order_preview_then_pd_mode_then_pd_group(void) {
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
-    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(4, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_NUM].color));
     check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
 }
 
@@ -640,9 +644,9 @@ static void test_render_order_base_then_preview_then_pd_mode_then_feedback(void)
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
-    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(4, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
 
     memset(led_output, 0, sizeof(led_output));
@@ -739,7 +743,24 @@ static void test_hold_pending_feedback_overrides_preview_and_pd_mode(void) {
 }
 #endif
 
-static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
+static void test_pointer_mode_overlay_paints_right_half(void) {
+    test_reset();
+
+    layer_state         = (layer_state_t)1u << LAYER_SYM;
+    fake_pd_active_mode = PD_MODE_ARROW;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, rgb_from_hsv(pd_mode_colors[0].color));
+    check_led(5, rgb_from_hsv(pd_mode_colors[0].color));
+    check_led(6, rgb_from_hsv(pd_mode_colors[0].color));
+    check_led(7, rgb_from_hsv(pd_mode_colors[0].color));
+}
+
+static void test_pointer_mode_overlay_paints_left_half_and_groups(void) {
     test_reset();
 
     layer_state         = (layer_state_t)1u << LAYER_SYM;
@@ -747,33 +768,73 @@ static void test_pointer_mode_overlay_paints_right_half_and_groups(void) {
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
-    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(4, rgb_from_hsv(pd_mode_colors[1].color));
-    check_led(5, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(3, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(5, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
-    check_led(7, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
-static void test_slave_pointer_mode_overlay_uses_remote_display_state(void) {
+static void test_pointer_mode_overlay_paints_both_halves(void) {
     test_reset();
 
-    fake_is_master                           = false;
-    layer_state                              = (layer_state_t)1u << LAYER_SYM;
-    split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_VOLUME);
+    layer_state         = (layer_state_t)1u << LAYER_SYM;
+    fake_pd_active_mode = PD_MODE_BRIGHTNESS;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(pd_mode_colors[2].color));
+    check_led(2, rgb_from_hsv(pd_mode_colors[2].color));
+    check_led(4, rgb_from_hsv(pd_mode_colors[2].color));
+    check_led(7, rgb_from_hsv(pd_mode_colors[2].color));
+}
+
+static void test_pointer_mode_overlay_paints_trigger_half_on_master(void) {
+    test_reset();
+
+    layer_state         = (layer_state_t)1u << LAYER_SYM;
+    fake_pd_active_mode = PD_MODE_ZOOM;
+    fake_pd_owner_half  = SPLIT_HALF_LEFT;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(pd_mode_colors[3].color));
+    check_led(3, rgb_from_hsv(pd_mode_colors[3].color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
+static void test_pointer_mode_overlay_trigger_half_falls_back_right_without_owner(void) {
+    test_reset();
+
+    layer_state         = (layer_state_t)1u << LAYER_SYM;
+    fake_pd_active_mode = PD_MODE_ZOOM;
 
     CHECK(render_output());
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
-    check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(4, rgb_from_hsv(pd_mode_colors[1].color));
-    check_led(5, rgb_from_hsv(pd_mode_colors[1].color));
-    check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
-    check_led(7, rgb_from_hsv(pd_mode_colors[1].color));
+    check_led(4, rgb_from_hsv(pd_mode_colors[3].color));
+    check_led(7, rgb_from_hsv(pd_mode_colors[3].color));
+}
+
+static void test_slave_pointer_mode_overlay_uses_remote_display_state_and_trigger_half(void) {
+    test_reset();
+
+    fake_is_master                           = false;
+    layer_state                              = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_ZOOM);
+    split_runtime_sync_remote.pd_mode_owner_half = SPLIT_HALF_LEFT;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(pd_mode_colors[3].color));
+    check_led(3, rgb_from_hsv(pd_mode_colors[3].color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
 static void test_automouse_uses_configured_target_layer(void) {
@@ -932,9 +993,9 @@ static void test_slave_locked_pd_mode_clamps_remote_automouse_progress(void) {
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(layer_colors[LAYER_POINTER].color));
+    check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
-    check_led(2, (rgb_t){0, 0, 0});
+    check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
 }
 
 #if !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE && !RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED
@@ -1132,8 +1193,12 @@ int main(void) {
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();
     test_hold_pending_feedback_overrides_preview_and_pd_mode();
 #endif
-    test_pointer_mode_overlay_paints_right_half_and_groups();
-    test_slave_pointer_mode_overlay_uses_remote_display_state();
+    test_pointer_mode_overlay_paints_right_half();
+    test_pointer_mode_overlay_paints_left_half_and_groups();
+    test_pointer_mode_overlay_paints_both_halves();
+    test_pointer_mode_overlay_paints_trigger_half_on_master();
+    test_pointer_mode_overlay_trigger_half_falls_back_right_without_owner();
+    test_slave_pointer_mode_overlay_uses_remote_display_state_and_trigger_half();
     test_automouse_uses_configured_target_layer();
     test_timeout_end_keeps_automouse_at_destination_on_master();
     test_timeout_window_keeps_fading_after_auto_mouse_active_drops_on_master();

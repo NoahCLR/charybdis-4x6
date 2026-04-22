@@ -256,14 +256,14 @@ static void key_runtime_core_release_effect_plan_push_layer_release(key_runtime_
                                                     });
 }
 
-static void key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, pd_mode_mask_t mode) {
+static void key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, pd_mode_mask_t mode) {
     if (!(plan && mode != 0)) {
         return;
     }
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                        .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
-                                                        .data.pd_mode = mode,
+                                                        .kind                  = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+                                                        .data.pd_mode_lock_tap = {.pd_mode = mode, .key_pos = key_pos},
                                                     });
 }
 
@@ -283,11 +283,11 @@ static void key_runtime_core_release_effect_plan_push_delayed_action(key_runtime
                                                     });
 }
 
-static void key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, uint16_t action) {
+static void key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, uint16_t action) {
     const pd_mode_def_t *def = pd_mode_lock_action_lookup(action);
 
     if (def) {
-        key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(plan, def->mode_flag);
+        key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(plan, key_pos, def->mode_flag);
         return;
     }
 
@@ -335,7 +335,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             key_feedback_pulse_arm(effect->data.feedback_pulse.long_hold_level);
             return;
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
-            if (pd_mode_toggle_lock_state(effect->data.pd_mode)) {
+            if (pd_mode_toggle_lock_state_at(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos)) {
                 split_runtime_sync_request();
             }
             return;
@@ -2311,17 +2311,17 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
                     };
                     return true;
                 case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
-                    key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, contract.tap.action);
+                    key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, contract.tap.action);
                     return true;
                 case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE:
                 default:
                     return true;
             }
         case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION:
-            key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, resolution->decision.action);
+            key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, resolution->decision.action);
             return true;
         case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
-            key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(out, resolution->decision.pd_mode_lock_tap);
+            key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(out, key_pos, resolution->decision.pd_mode_lock_tap);
             return true;
         case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE:
         default:

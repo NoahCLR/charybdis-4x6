@@ -416,8 +416,18 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     key_runtime_scenario_pd_locked_modes ^= mode;
     key_runtime_core_pd_mode_lock_set(mode, (key_runtime_scenario_pd_locked_modes & mode) != 0u);
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind         = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
-        .data.pd_mode = mode,
+        .kind                  = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+        .data.pd_mode_lock_tap = {.pd_mode = mode, .key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS}},
+    });
+    return true;
+}
+
+bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+    key_runtime_scenario_pd_locked_modes ^= mode;
+    key_runtime_core_pd_mode_lock_set(mode, (key_runtime_scenario_pd_locked_modes & mode) != 0u);
+    key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
+        .kind                  = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+        .data.pd_mode_lock_tap = {.pd_mode = mode, .key_pos = key_pos},
     });
     return true;
 }

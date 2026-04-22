@@ -17,20 +17,36 @@ typedef struct __attribute__((packed)) {
     uint16_t     automouse_progress;
     pd_mode_id_t active_mode_id;
     pd_mode_id_t locked_mode_id;
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    uint8_t      pd_mode_owner_half;
+#endif
     uint8_t      key_feedback_flags;
     uint8_t      key_feedback_key;
     uint8_t      key_preview_layer;
 } split_runtime_sync_packet_t;
 
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 #define SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT   \
     {                                          \
         .automouse_progress = 0,               \
         .active_mode_id     = PD_MODE_ID_NONE, \
         .locked_mode_id     = PD_MODE_ID_NONE, \
+        .pd_mode_owner_half = SPLIT_HALF_NONE, \
         .key_feedback_flags = 0,               \
         .key_feedback_key   = UINT8_MAX,       \
         .key_preview_layer  = UINT8_MAX,       \
     }
+#else
+#    define SPLIT_RUNTIME_SYNC_PACKET_EMPTY_INIT \
+        {                                        \
+            .automouse_progress = 0,             \
+            .active_mode_id     = PD_MODE_ID_NONE, \
+            .locked_mode_id     = PD_MODE_ID_NONE, \
+            .key_feedback_flags = 0,             \
+            .key_feedback_key   = UINT8_MAX,     \
+            .key_preview_layer  = UINT8_MAX,     \
+        }
+#endif
 
 _Static_assert(sizeof(split_runtime_sync_packet_t) <= UINT8_MAX, "split_runtime_sync_packet_t must fit in the QMK RPC length field");
 

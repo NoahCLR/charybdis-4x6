@@ -213,7 +213,7 @@ The runtime supports:
 
 - per-layer colors
 - per-layer LED group highlights
-- per-mode right-half colors
+- per-mode left/right/both/trigger-half colors
 - per-mode LED group highlights
 - optional auto-mouse countdown gradient feedback
 - optional key-behavior state feedback on both halves, only the key half, or only the key itself

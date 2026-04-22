@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "../../compat/split_half.h"
 #include "pd_mode_manifest.h"
 
 // ─── Mode flag bit constants ────────────────────────────────────────────────
@@ -72,6 +73,7 @@ typedef struct {
     pd_mode_traits_t active_traits;
     uint8_t          active_index;
     uint8_t          locked_index;
+    split_half_t     owner_half;
 } pd_mode_snapshot_view_t;
 
 typedef struct {
@@ -94,3 +96,5 @@ bool pd_any_local_mode_active(void);
 bool pd_any_local_mode_locked(void);
 bool pd_any_display_mode_active(void);
 bool pd_any_display_mode_locked(void);
+split_half_t pd_mode_local_owner_half_snapshot(void);
+split_half_t pd_mode_display_owner_half_snapshot(void);

@@ -120,4 +120,12 @@ enum charybdis_keymap_layers {
 #        define AUTOMOUSE_RGB_DEAD_TIME (AUTO_MOUSE_TIME / 3)
 #    endif
 
+// Dynamic trigger-half placement for PD-mode RGB overlays.
+// Required only when a pd_mode_colors[] row uses PD_COLOR_MODE_TRIGGER_HALF.
+// Comment out RGB_PD_MODE_ACTIVE_HALF_ENABLE to keep the split runtime packet
+// smaller and limit PD overlays to fixed left/right/both placement modes.
+#    ifdef POINTING_DEVICE_ENABLE
+#        define RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#    endif
+
 #endif // RGB_MATRIX_ENABLE

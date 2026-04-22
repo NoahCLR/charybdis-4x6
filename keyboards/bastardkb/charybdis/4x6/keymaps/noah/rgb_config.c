@@ -130,34 +130,52 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 
 // ─── Pointing device mode colors ────────────────────────────────────────────
 //
-// Overlay colors for the right half when a trackball mode is active.
+// Overlay colors for the active trackball mode.
 // Each entry is tagged with its pointing mode so the order doesn't need to
 // match pd_modes[] — adding or reordering modes won't silently break colors.
-// { .pointing_mode = ..., .color = HSV(hue, sat, val) }
+//
+// Mode decides where the overlay paints:
+//   - PD_COLOR_MODE_RIGHT_HALF = always paint the right half
+//   - PD_COLOR_MODE_LEFT_HALF = always paint the left half
+//   - PD_COLOR_MODE_BOTH_HALVES = mirror the PD color across both halves
+//   - PD_COLOR_MODE_TRIGGER_HALF = paint the half that triggered the current
+//     effective PD mode; requires RGB_PD_MODE_ACTIVE_HALF_ENABLE
+//
+// This profile uses PD_COLOR_MODE_TRIGGER_HALF for every PD mode so the
+// overlay follows the half that activated or locked the current pointing
+// state.
+//
+// { .pointing_mode = ..., .color = HSV(hue, sat, val), .mode = ... }
 const pd_mode_color_t pd_mode_colors[] = {
     {
         .pointing_mode = PD_MODE_DRAGSCROLL,
         .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
     }, // orange
     {
         .pointing_mode = PD_MODE_VOLUME,
         .color         = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
     }, // yellow
     {
         .pointing_mode = PD_MODE_BRIGHTNESS,
         .color         = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
     }, // magenta
     {
         .pointing_mode = PD_MODE_ARROW,
         .color         = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
     }, // cyan
     {
         .pointing_mode = PD_MODE_PINCH,
         .color         = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
     }, // lime
     {
         .pointing_mode = PD_MODE_ZOOM,
         .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
     }, // light green
 };
 const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));

@@ -60,6 +60,7 @@ typedef struct {
     pd_mode_mask_t         mode;
     pd_mode_id_t           active_mode_id;
     pd_mode_id_t           locked_mode_id;
+    split_half_t           owner_half;
 } pd_mode_command_t;
 
 typedef struct {
@@ -74,7 +75,7 @@ typedef struct {
 extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];
 
 pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command);
-void                   pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id);
+void                   pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_half_t owner_half);
 void                   pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags);
 
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode);
@@ -85,8 +86,12 @@ bool                 pd_any_active_mode_has_trait(pd_mode_traits_t trait);
 
 bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked);
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode);
+bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos);
+bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos);
 bool pd_mode_handle_keycode_press(uint16_t keycode);
 bool pd_mode_handle_keycode_release(uint16_t keycode);
+bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos);
+bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos);
 
 bool           pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record);
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode);

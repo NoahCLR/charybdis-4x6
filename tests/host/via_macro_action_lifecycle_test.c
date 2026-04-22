@@ -139,14 +139,29 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     return false;
 }
 
+bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+    (void)key_pos;
+    return pd_mode_toggle_lock_state(mode);
+}
+
 bool pd_mode_handle_keycode_press(uint16_t keycode) {
     (void)keycode;
     return false;
 }
 
+bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
+    (void)key_pos;
+    return pd_mode_handle_keycode_press(keycode);
+}
+
 bool pd_mode_handle_keycode_release(uint16_t keycode) {
     (void)keycode;
     return false;
+}
+
+bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
+    (void)key_pos;
+    return pd_mode_handle_keycode_release(keycode);
 }
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {

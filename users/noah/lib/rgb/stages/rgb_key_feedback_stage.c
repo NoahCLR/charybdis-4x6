@@ -77,7 +77,7 @@ static bool rgb_runtime_key_feedback_stage_paint(rgb_t color, uint8_t led_min, u
             return false;
         }
 
-        if (key_pos.row < (MATRIX_ROWS / 2u)) {
+        if (split_half_from_keypos(key_pos) == SPLIT_HALF_LEFT) {
             if (!rgb_runtime_key_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
                 return false;
             }
@@ -86,7 +86,7 @@ static bool rgb_runtime_key_feedback_stage_paint(rgb_t color, uint8_t led_min, u
             return true;
         }
 
-        if (!rgb_runtime_key_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
+        if (split_half_from_keypos(key_pos) != SPLIT_HALF_RIGHT || !rgb_runtime_key_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
             return false;
         }
 

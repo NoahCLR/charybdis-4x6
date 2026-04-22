@@ -659,14 +659,18 @@ def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[di
 
     for match in entry_pattern.finditer(body):
         fields = parse_designated_fields(strip_comments(match.group("body")))
-        if ".pointing_mode" not in fields or ".color" not in fields:
+        if ".pointing_mode" not in fields or ".color" not in fields or ".mode" not in fields:
             continue
         pointing_mode = normalize_expr(fields[".pointing_mode"])
         color = parse_hsv_expr(fields[".color"], known_values)
+        mode = normalize_expr(fields[".mode"])
         rows.append(
             {
                 "pointing_mode": pointing_mode,
                 "color": color,
+                "mode": mode,
+                "mode_label": humanize_identifier(mode.removeprefix("PD_COLOR_MODE_")),
+                "mode_meaning": pd_color_mode_description(mode),
                 "preview_color": dict(color),
                 "comment_color_name": normalize_color_name(match.group("label")) or None,
             }
@@ -750,6 +754,16 @@ def automouse_fade_end_mode_description(mode: str) -> str:
         "END_COLOR_ON_ALL_KEYS": "Use `end_color` as the fade destination on every key while the automouse renderer is active.",
     }
     return descriptions.get(mode, "Unknown auto-mouse fade destination mode.")
+
+
+def pd_color_mode_description(mode: str) -> str:
+    descriptions = {
+        "PD_COLOR_MODE_RIGHT_HALF": "Paint the right half whenever the matching PD mode is active.",
+        "PD_COLOR_MODE_LEFT_HALF": "Paint the left half whenever the matching PD mode is active.",
+        "PD_COLOR_MODE_BOTH_HALVES": "Mirror the PD-mode overlay across both halves.",
+        "PD_COLOR_MODE_TRIGGER_HALF": "Paint the half that triggered the currently effective PD mode. This requires `RGB_PD_MODE_ACTIVE_HALF_ENABLE`.",
+    }
+    return descriptions.get(mode, "Unknown PD-mode paint mode.")
 
 
 def parse_automouse_fade_end_config(raw_text: str, known_values: dict[str, str]) -> dict[str, object] | None:
@@ -1202,6 +1216,7 @@ def build_profile_model() -> dict[str, object]:
     config_macros = parse_config_macros(config_text)
     rgb_automouse_gradient_enabled = "RGB_AUTOMOUSE_GRADIENT_ENABLE" in config_macros
     rgb_key_behavior_feedback_enabled = "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE" in config_macros
+    rgb_pd_mode_active_half_enabled = "RGB_PD_MODE_ACTIVE_HALF_ENABLE" in config_macros
     timing_defaults = resolve_behavior_timing_defaults(config_macros)
     layer_colors = finalize_layer_colors(parse_layer_colors(rgb_config_text, config_macros), resolve_rgb_default_color(config_macros))
     keymap_custom_keycodes = parse_keymap_custom_keycodes(keymap_text)
@@ -1263,6 +1278,7 @@ def build_profile_model() -> dict[str, object]:
         "features": {
             "rgb_automouse_gradient_enabled": rgb_automouse_gradient_enabled,
             "rgb_key_behavior_feedback_enabled": rgb_key_behavior_feedback_enabled,
+            "rgb_pd_mode_active_half_enabled": rgb_pd_mode_active_half_enabled,
         },
         "pd_modes": pd_modes,
         "rgb": {
@@ -1510,10 +1526,17 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
 
     lines.extend(
         [
-            f"These overlays come from `pd_mode_colors[]` in {rgb_link} and paint the right half while the matching pointing mode is active.",
+            f"These overlays come from `pd_mode_colors[]` in {rgb_link}. Each row chooses its own paint mode and color for the matching pointing mode.",
             "",
-            "| Pointing Mode | Authored HSV | Preview Color |",
-            "| --- | --- | --- |",
+            "| PD Paint Mode | Meaning |",
+            "| --- | --- |",
+            f"| `PD_COLOR_MODE_RIGHT_HALF` | {pd_color_mode_description('PD_COLOR_MODE_RIGHT_HALF')} |",
+            f"| `PD_COLOR_MODE_LEFT_HALF` | {pd_color_mode_description('PD_COLOR_MODE_LEFT_HALF')} |",
+            f"| `PD_COLOR_MODE_BOTH_HALVES` | {pd_color_mode_description('PD_COLOR_MODE_BOTH_HALVES')} |",
+            f"| `PD_COLOR_MODE_TRIGGER_HALF` | {pd_color_mode_description('PD_COLOR_MODE_TRIGGER_HALF')} |",
+            "",
+            "| Pointing Mode | Paint Mode | Authored HSV | Preview Color |",
+            "| --- | --- | --- | --- |",
         ]
     )
 
@@ -1521,7 +1544,7 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
         color = row["color"]
         preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['pointing_mode']} color")
         lines.append(
-            f"| `{row['pointing_mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
+            f"| `{row['pointing_mode']}` | `{row['mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
         )
 
     lines.append("")
@@ -1770,20 +1793,22 @@ def render_layer_local_pd_modes(layer: dict[str, object], profile: dict[str, obj
 
     lines.extend(
         [
-            "| Reachable Via | Mode Keycode | Pointing Mode | Authored HSV | Preview Color |",
-            "| --- | --- | --- | --- | --- |",
+            "| Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |",
+            "| --- | --- | --- | --- | --- | --- |",
         ]
     )
     for pd_mode, sources, color_row in rows:
         if color_row is None:
+            paint_mode = "`none`"
             authored_hsv = "`none`"
             preview_swatch = "no override"
         else:
             color = color_row["color"]
+            paint_mode = f"`{color_row['mode']}`"
             authored_hsv = f"`HSV({color['h']}, {color['s']}, {color['v']})`"
             preview_swatch = markdown_color_swatch(color_row["preview_color"], f"{pd_mode['pointing_mode']} color")
         lines.append(
-            f"| {'; '.join(sources)} | {format_token_with_raw(pd_mode['mode_keycode'])} | `{pd_mode['pointing_mode']}` | {authored_hsv} | {preview_swatch} |"
+            f"| {'; '.join(sources)} | {format_token_with_raw(pd_mode['mode_keycode'])} | `{pd_mode['pointing_mode']}` | {paint_mode} | {authored_hsv} | {preview_swatch} |"
         )
     lines.append("")
     return lines

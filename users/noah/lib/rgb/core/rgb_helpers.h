@@ -27,9 +27,17 @@
 
 // ─── RGB config types ───────────────────────────────────────────────────────
 
+typedef enum {
+    PD_COLOR_MODE_RIGHT_HALF = 0,
+    PD_COLOR_MODE_LEFT_HALF,
+    PD_COLOR_MODE_BOTH_HALVES,
+    PD_COLOR_MODE_TRIGGER_HALF,
+} pd_color_mode_t;
+
 typedef struct {
     pd_mode_mask_t pointing_mode;
     hsv_t          color;
+    pd_color_mode_t mode;
 } pd_mode_color_t;
 
 typedef enum {

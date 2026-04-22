@@ -886,7 +886,9 @@ static void test_release_with_interrupted_pd_mode_press_keeps_lock_tap_immediate
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.row == 1);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.col == 1);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.pd_mode == PD_MODE_VOLUME);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.pd_mode_lock_tap.pd_mode == PD_MODE_VOLUME);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.pd_mode_lock_tap.key_pos.row == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.pd_mode_lock_tap.key_pos.col == 1);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
 

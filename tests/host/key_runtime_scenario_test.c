@@ -537,7 +537,9 @@ static void test_pd_mode_quick_tap_with_intermediate_scan_toggles_once(void) {
     CHECK(key_runtime_scenario_effect_at(1)->data.key_pos.row == 6);
     CHECK(key_runtime_scenario_effect_at(1)->data.key_pos.col == 1);
     CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP);
-    CHECK(key_runtime_scenario_effect_at(2)->data.pd_mode == PD_MODE_VOLUME);
+    CHECK(key_runtime_scenario_effect_at(2)->data.pd_mode_lock_tap.pd_mode == PD_MODE_VOLUME);
+    CHECK(key_runtime_scenario_effect_at(2)->data.pd_mode_lock_tap.key_pos.row == 6);
+    CHECK(key_runtime_scenario_effect_at(2)->data.pd_mode_lock_tap.key_pos.col == 1);
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 1)) == KC_NO);
 }
 

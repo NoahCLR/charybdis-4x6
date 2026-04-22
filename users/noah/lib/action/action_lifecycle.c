@@ -34,7 +34,7 @@ void noah_action_press(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    if (noah_action_desc_intercepts_pd_mode_press(desc) && pd_mode_handle_keycode_press(action)) {
+    if (noah_action_desc_intercepts_pd_mode_press(desc) && pd_mode_handle_keycode_press_at(action, key_pos)) {
         return;
     }
 
@@ -44,7 +44,7 @@ void noah_action_press(keypos_t key_pos, uint16_t action) {
 void noah_action_release(keypos_t key_pos, uint16_t action) {
     noah_action_desc_t desc = noah_action_describe(action);
 
-    if (noah_action_desc_intercepts_pd_mode_release(desc) && pd_mode_handle_keycode_release(action)) {
+    if (noah_action_desc_intercepts_pd_mode_release(desc) && pd_mode_handle_keycode_release_at(action, key_pos)) {
         return;
     }
 

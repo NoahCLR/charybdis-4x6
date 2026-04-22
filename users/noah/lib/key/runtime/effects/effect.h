@@ -51,7 +51,10 @@ typedef struct {
             keypos_t key_pos;
             bool     long_hold_level;
         } feedback_pulse;
-        pd_mode_mask_t pd_mode;
+        struct {
+            pd_mode_mask_t pd_mode;
+            keypos_t       key_pos;
+        } pd_mode_lock_tap;
         struct {
             uint16_t              action;
             delayed_action_mods_t mods;
