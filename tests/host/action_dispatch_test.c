@@ -13,6 +13,8 @@ typedef struct {
     uint8_t  weak;
     uint8_t  oneshot;
     uint8_t  oneshot_locked;
+    uint8_t  row;
+    uint8_t  col;
 } tap_call_t;
 
 static uint8_t fake_mods;
@@ -82,6 +84,8 @@ static tap_call_t test_current_tap_call(uint16_t keycode) {
         .weak                 = fake_weak_mods,
         .oneshot              = fake_oneshot_mods,
         .oneshot_locked       = fake_oneshot_locked_mods,
+        .row                  = MATRIX_ROWS,
+        .col                  = MATRIX_COLS,
     };
 }
 
@@ -183,6 +187,13 @@ bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
 
 void noah_action_tap(uint16_t action) {
     action_tap_call = test_current_tap_call(action);
+    action_tap_call_count++;
+}
+
+void noah_action_tap_at(keypos_t key_pos, uint16_t action) {
+    action_tap_call      = test_current_tap_call(action);
+    action_tap_call.row  = key_pos.row;
+    action_tap_call.col  = key_pos.col;
     action_tap_call_count++;
 }
 
@@ -456,6 +467,19 @@ static void test_explicit_action_emit_can_skip_fallback_hold_settlement(void) {
     CHECK(!action_tap_call.fallback_hold_active);
 }
 
+static void test_explicit_action_emit_at_preserves_origin_key_pos(void) {
+    keypos_t key_pos = {.row = 2, .col = 3};
+
+    test_reset_stubs();
+
+    noah_emit_action_tap_at(key_pos, KC_LEFT, NOAH_EMIT_POLICY_NONE);
+
+    CHECK(action_tap_call_count == 1);
+    CHECK(action_tap_call.keycode == KC_LEFT);
+    CHECK(action_tap_call.row == key_pos.row);
+    CHECK(action_tap_call.col == key_pos.col);
+}
+
 static void test_synthetic_qmk_emit_settles_fallback_hold_without_touching_mod_state(void) {
     test_reset_stubs();
     fake_mods                = MOD_BIT(KC_LEFT_SHIFT);
@@ -527,6 +551,7 @@ int main(void) {
     test_action_descriptor_classifies_common_actions();
     test_action_dispatch_keeps_runtime_default_policy();
     test_explicit_action_emit_can_skip_fallback_hold_settlement();
+    test_explicit_action_emit_at_preserves_origin_key_pos();
     test_synthetic_qmk_emit_settles_fallback_hold_without_touching_mod_state();
     test_masked_synthetic_qmk_emit_settles_fallback_hold_and_restores_post_settlement_mod_state();
     test_literal_emit_can_suspend_and_restore_mods();

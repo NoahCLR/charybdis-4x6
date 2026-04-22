@@ -39,14 +39,7 @@ static split_half_t pd_mode_command_owner_half(pd_mode_command_t command) {
 
 static void pd_mode_sync_local_owner_half(split_half_t owner_half) {
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    if (owner_half != SPLIT_HALF_NONE) {
-        PD_MODE_LOCAL_OWNER_HALF = owner_half;
-        return;
-    }
-
-    if (PD_MODE_LOCAL_LOCKED_MODE == 0 && PD_MODE_LOCAL_ACTIVE_MODE == 0) {
-        PD_MODE_LOCAL_OWNER_HALF = SPLIT_HALF_NONE;
-    }
+    PD_MODE_LOCAL_OWNER_HALF = owner_half;
 #else
     (void)owner_half;
 #endif

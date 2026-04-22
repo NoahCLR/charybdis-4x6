@@ -16,4 +16,5 @@ typedef keyboard_mod_state_t delayed_action_mods_t;
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt);
 void                  dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods);
+void                  dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods);
 void                  dispatch_multi_tap_action(uint16_t action, const multi_tap_t *mt);

@@ -381,7 +381,7 @@ uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
     return 0;
 }
 
-void action_dispatch(uint16_t action) {
+static void action_dispatch_at(keypos_t key_pos, uint16_t action) {
     noah_action_desc_t desc = noah_action_describe(action);
 
     if (noah_action_desc_is_layer_lock(desc)) {
@@ -389,14 +389,22 @@ void action_dispatch(uint16_t action) {
     }
 
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
-        .data.action = action,
+        .kind                 = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+        .data.dispatch_action = {.action = action, .key_pos = key_pos},
     });
 }
 
+void action_dispatch(uint16_t action) {
+    action_dispatch_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action);
+}
+
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
+    noah_emit_action_tap_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action, policy);
+}
+
+void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
     (void)policy;
-    action_dispatch(action);
+    action_dispatch_at(key_pos, action);
 }
 
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
@@ -518,11 +526,16 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 }
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
+    dispatch_delayed_action_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action, mods);
+}
+
+void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
         .data.delayed_action =
             {
                 .action       = action,
+                .key_pos      = key_pos,
                 .mods         = mods,
                 .repeat_count = 1,
             },

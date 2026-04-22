@@ -16,7 +16,7 @@
 #include "../pointing/policy/pointer_layer_policy.h"
 #include "../state/ownership/layer_ownership.h"
 
-typedef void (*noah_action_tap_impl_t)(noah_action_desc_t desc);
+typedef void (*noah_action_tap_impl_t)(noah_action_desc_t desc, keypos_t key_pos);
 typedef void (*noah_action_press_impl_t)(noah_action_desc_t desc, keypos_t key_pos);
 typedef void (*noah_action_release_impl_t)(noah_action_desc_t desc, keypos_t key_pos);
 
@@ -26,8 +26,9 @@ typedef struct {
     noah_action_release_impl_t release;
 } noah_action_kind_dispatch_ops_t;
 
-static void noah_action_tap_noop(noah_action_desc_t desc) {
+static void noah_action_tap_noop(noah_action_desc_t desc, keypos_t key_pos) {
     (void)desc;
+    (void)key_pos;
 }
 
 static void noah_action_press_noop(noah_action_desc_t desc, keypos_t key_pos) {
@@ -54,7 +55,8 @@ static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
 #endif
 }
 
-static void noah_action_tap_literal(noah_action_desc_t desc) {
+static void noah_action_tap_literal(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
     pointer_layer_policy_note_action(desc.action, true);
     tap_code16(desc.action);
     pointer_layer_policy_note_action(desc.action, false);
@@ -80,7 +82,8 @@ static void noah_action_release_literal(noah_action_desc_t desc, keypos_t key_po
     unregister_code16(desc.action);
 }
 
-static void noah_action_tap_unsupported_layer(noah_action_desc_t desc) {
+static void noah_action_tap_unsupported_layer(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
     noah_action_log_unsupported_layer_action(desc);
 }
 
@@ -105,7 +108,8 @@ static void noah_action_toggle_pd_mode_lock(noah_action_desc_t desc, keypos_t ke
     }
 }
 
-static void noah_action_tap_layer_lock(noah_action_desc_t desc) {
+static void noah_action_tap_layer_lock(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
     noah_action_toggle_layer_lock(desc);
 }
 
@@ -114,8 +118,8 @@ static void noah_action_press_layer_lock(noah_action_desc_t desc, keypos_t key_p
     noah_action_toggle_layer_lock(desc);
 }
 
-static void noah_action_tap_pd_mode_lock(noah_action_desc_t desc) {
-    noah_action_toggle_pd_mode_lock(desc, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS});
+static void noah_action_tap_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
+    noah_action_toggle_pd_mode_lock(desc, key_pos);
 }
 
 static void noah_action_press_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
@@ -131,7 +135,8 @@ static void noah_action_release_owned_momentary_layer(noah_action_desc_t desc, k
     (void)layer_ownership_momentary_release(key_pos);
 }
 
-static void noah_action_tap_keymap_custom(noah_action_desc_t desc) {
+static void noah_action_tap_keymap_custom(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
     noah_dispatch_synthetic_tap(desc.action);
 }
 
@@ -145,7 +150,8 @@ static void noah_action_release_keymap_custom(noah_action_desc_t desc, keypos_t 
     noah_dispatch_synthetic_record(desc.action, false);
 }
 
-static void noah_action_tap_qmk_behavior(noah_action_desc_t desc) {
+static void noah_action_tap_qmk_behavior(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
     noah_dispatch_synthetic_qmk_tap(desc.action);
 }
 
@@ -209,9 +215,9 @@ static const noah_action_kind_dispatch_ops_t *noah_action_desc_dispatch_ops(noah
     return &noah_action_kind_dispatch_ops[desc.kind];
 }
 
-void noah_action_desc_tap_dispatch(noah_action_desc_t desc) {
+void noah_action_desc_tap_dispatch(noah_action_desc_t desc, keypos_t key_pos) {
     const noah_action_kind_dispatch_ops_t *ops = noah_action_desc_dispatch_ops(desc);
-    ops->tap(desc);
+    ops->tap(desc, key_pos);
 }
 
 void noah_action_desc_press_dispatch(noah_action_desc_t desc, keypos_t key_pos) {

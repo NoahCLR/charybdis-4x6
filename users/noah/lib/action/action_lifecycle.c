@@ -18,13 +18,17 @@ static bool noah_action_handle_macro_preflight(noah_action_desc_t desc) {
 }
 
 void noah_action_tap(uint16_t action) {
+    noah_action_tap_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action);
+}
+
+void noah_action_tap_at(keypos_t key_pos, uint16_t action) {
     noah_action_desc_t desc = noah_action_describe(action);
 
     if (noah_action_desc_dispatches_macro_preflight(desc) && noah_action_handle_macro_preflight(desc)) {
         return;
     }
 
-    noah_action_desc_tap_dispatch(desc);
+    noah_action_desc_tap_dispatch(desc, key_pos);
 }
 
 void noah_action_press(keypos_t key_pos, uint16_t action) {

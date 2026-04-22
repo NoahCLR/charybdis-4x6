@@ -908,6 +908,11 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     (void)mods;
 }
 
+void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
+    (void)key_pos;
+    dispatch_delayed_action(action, mods);
+}
+
 void held_action_register(keypos_t key_pos, uint16_t action) {
     int16_t slot = test_find_held_action_slot(key_pos);
 

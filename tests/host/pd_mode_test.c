@@ -390,6 +390,20 @@ static void test_lock_state_at_tracks_trigger_half_and_clears_on_unlock(void) {
     CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_NONE);
 }
 
+static void test_ownerless_mode_change_clears_previous_trigger_half(void) {
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(VOLUME_MODE, (keypos_t){.row = 0, .col = 0}));
+    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+
+    CHECK(pd_mode_set_lock_state(PD_MODE_ARROW, true));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_NONE);
+    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_NONE);
+}
+
 static void test_apply_remote_mode_ids_tracks_display_owner_half(void) {
     pd_mode_snapshot_t snapshot;
 
@@ -745,6 +759,7 @@ int main(void) {
     test_apply_remote_snapshot_keeps_only_one_effective_mode();
     test_keycode_press_at_tracks_trigger_half();
     test_lock_state_at_tracks_trigger_half_and_clears_on_unlock();
+    test_ownerless_mode_change_clears_previous_trigger_half();
     test_apply_remote_mode_ids_tracks_display_owner_half();
     test_set_lock_state_switches_to_single_locked_mode();
     test_activate_switches_to_single_unlocked_mode();

@@ -576,6 +576,11 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     action_dispatch(action);
 }
 
+void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
+    (void)key_pos;
+    dispatch_delayed_action(action, mods);
+}
+
 void key_feedback_pulse_arm(bool long_hold_level) {
     (void)long_hold_level;
 }
@@ -1168,6 +1173,31 @@ static void test_right_alt_single_tap_locks_arrow_mode_without_leaking_ralt_stat
     CHECK(key_runtime_integration_process_record(KC_C, test_keypos(0, 0), false));
 }
 
+static void test_right_alt_single_tap_uses_physical_trigger_half(void) {
+    keypos_t left_pos = test_keypos(0, 0);
+
+    test_reset_state();
+
+    CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, left_pos, true));
+    CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, left_pos, false));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+}
+
+static void test_direct_pd_lock_press_uses_physical_trigger_half(void) {
+    keypos_t left_pos = test_keypos(0, 1);
+
+    test_reset_state();
+
+    CHECK(!key_runtime_integration_process_record(ARROW_MODE_LOCK, left_pos, true));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+}
+
 static void test_gui_double_tap_hold_with_right_alt_lock_child_keeps_runtime_quiescent(void) {
     keypos_t gui_pos       = test_keypos(0, 0);
     keypos_t right_alt_pos = test_keypos(3, 5);
@@ -1480,6 +1510,8 @@ int main(void) {
     test_authored_double_tap_lock_locks_pd_mode();
     test_authored_second_press_hold_branches_into_other_pd_mode();
     test_right_alt_single_tap_locks_arrow_mode_without_leaking_ralt_state();
+    test_right_alt_single_tap_uses_physical_trigger_half();
+    test_direct_pd_lock_press_uses_physical_trigger_half();
     test_gui_double_tap_hold_with_right_alt_lock_child_keeps_runtime_quiescent();
     test_raw_lt_with_dragscroll_child_stays_quiescent();
     test_authored_layer_hold_with_dragscroll_child_stays_quiescent();

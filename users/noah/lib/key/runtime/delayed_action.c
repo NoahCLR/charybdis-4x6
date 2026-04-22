@@ -17,15 +17,24 @@ delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) 
 }
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
+    dispatch_delayed_action_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action, mods);
+}
+
+void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
     keyboard_mod_state_t saved = keyboard_mod_state_suspend();
 
     keyboard_mod_state_apply(mods);
 
-    noah_emit_action_tap(action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+    noah_emit_action_tap_at(key_pos, action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
 
     keyboard_mod_state_apply(saved);
 }
 
 void dispatch_multi_tap_action(uint16_t action, const multi_tap_t *mt) {
-    dispatch_delayed_action(action, delayed_action_mods_from_multi_tap(mt));
+    if (!mt) {
+        dispatch_delayed_action(action, (delayed_action_mods_t){0});
+        return;
+    }
+
+    dispatch_delayed_action_at(mt->key_pos, action, delayed_action_mods_from_multi_tap(mt));
 }

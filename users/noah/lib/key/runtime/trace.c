@@ -202,9 +202,14 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
     for (uint8_t i = 0; i < plan->count; i++) {
         const key_runtime_effect_t *effect = &plan->items[i];
 
-        switch (effect->kind) {
-            case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
-                uprintf("  [%u] %s action=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.action);
+            switch (effect->kind) {
+                case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
+                uprintf("  [%u] %s key=(%u,%u) action=0x%04X\n",
+                        (unsigned int)i,
+                        key_runtime_trace_effect_name(effect->kind),
+                        (unsigned int)effect->data.dispatch_action.key_pos.row,
+                        (unsigned int)effect->data.dispatch_action.key_pos.col,
+                        (unsigned int)effect->data.dispatch_action.action);
                 break;
             case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
             case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
@@ -237,7 +242,13 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
                         (unsigned int)effect->data.pd_mode_lock_tap.pd_mode);
                 break;
             case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
-                uprintf("  [%u] %s action=0x%04X repeat=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.delayed_action.action, (unsigned int)effect->data.delayed_action.repeat_count);
+                uprintf("  [%u] %s key=(%u,%u) action=0x%04X repeat=%u\n",
+                        (unsigned int)i,
+                        key_runtime_trace_effect_name(effect->kind),
+                        (unsigned int)effect->data.delayed_action.key_pos.row,
+                        (unsigned int)effect->data.delayed_action.key_pos.col,
+                        (unsigned int)effect->data.delayed_action.action,
+                        (unsigned int)effect->data.delayed_action.repeat_count);
                 break;
             case KEY_RUNTIME_EFFECT_NONE:
             default:

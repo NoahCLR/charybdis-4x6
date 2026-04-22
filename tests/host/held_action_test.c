@@ -24,6 +24,8 @@ typedef struct {
 
 typedef struct {
     uint16_t action;
+    uint8_t  row;
+    uint8_t  col;
 } tap_call_t;
 
 typedef struct {
@@ -119,6 +121,8 @@ void action_dispatch(uint16_t action) {
     CHECK(tap_call_count < ARRAY_SIZE(tap_calls));
     tap_calls[tap_call_count++] = (tap_call_t){
         .action = action,
+        .row    = MATRIX_ROWS,
+        .col    = MATRIX_COLS,
     };
 }
 
@@ -127,6 +131,18 @@ void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     CHECK(tap_call_count < ARRAY_SIZE(tap_calls));
     tap_calls[tap_call_count++] = (tap_call_t){
         .action = action,
+        .row    = MATRIX_ROWS,
+        .col    = MATRIX_COLS,
+    };
+}
+
+void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
+    (void)policy;
+    CHECK(tap_call_count < ARRAY_SIZE(tap_calls));
+    tap_calls[tap_call_count++] = (tap_call_t){
+        .action = action,
+        .row    = key_pos.row,
+        .col    = key_pos.col,
     };
 }
 
@@ -255,6 +271,8 @@ static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void)
 
     CHECK(tap_call_count == 1);
     CHECK(tap_calls[0].action == TEST_SHARED_ACTION);
+    CHECK(tap_calls[0].row == key_pos.row);
+    CHECK(tap_calls[0].col == key_pos.col);
     CHECK(pointer_action_call_count == 1);
     CHECK(pointer_action_calls[0].action == TEST_SHARED_ACTION);
     CHECK(pointer_action_calls[0].pressed);
@@ -267,6 +285,8 @@ static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void)
     held_repeat_tick();
     CHECK(tap_call_count == 2);
     CHECK(tap_calls[1].action == TEST_SHARED_ACTION);
+    CHECK(tap_calls[1].row == key_pos.row);
+    CHECK(tap_calls[1].col == key_pos.col);
 
     CHECK(held_repeat_release_owned_by_key(key_pos));
     CHECK(pointer_action_call_count == 2);
@@ -291,6 +311,8 @@ static void test_repeat_binding_drops_backlog_after_scan_gap(void) {
 
     CHECK(tap_call_count == 2);
     CHECK(tap_calls[1].action == TEST_SECOND_ACTION);
+    CHECK(tap_calls[1].row == key_pos.row);
+    CHECK(tap_calls[1].col == key_pos.col);
 
     fake_time = (uint16_t)(fake_time + 39);
     held_repeat_tick();
@@ -300,6 +322,8 @@ static void test_repeat_binding_drops_backlog_after_scan_gap(void) {
     held_repeat_tick();
     CHECK(tap_call_count == 3);
     CHECK(tap_calls[2].action == TEST_SECOND_ACTION);
+    CHECK(tap_calls[2].row == key_pos.row);
+    CHECK(tap_calls[2].col == key_pos.col);
 }
 
 static void test_repeat_binding_rejects_rates_above_supported_range(void) {

@@ -11,6 +11,7 @@
 #include "action_dispatch.h"
 
 typedef void (*noah_emit_tap_fn_t)(uint16_t keycode);
+typedef void (*noah_emit_tap_at_fn_t)(keypos_t key_pos, uint16_t keycode);
 
 static keyboard_mod_state_t keyboard_mod_state_without_mods(keyboard_mod_state_t state, uint8_t mods) {
     state.real &= (uint8_t)~mods;
@@ -38,8 +39,30 @@ static void noah_emit_run(uint16_t keycode, noah_emit_tap_fn_t emit, noah_emit_p
     }
 }
 
+static void noah_emit_run_at(keypos_t key_pos, uint16_t keycode, noah_emit_tap_at_fn_t emit, noah_emit_policy_t policy) {
+    keyboard_mod_state_t saved_mod_state = {0};
+
+    if (policy.settle_pending_fallback_holds) {
+        noah_key_runtime_settle_pending_fallback_hold();
+    }
+
+    if (policy.preserve_keyboard_mod_state) {
+        saved_mod_state = keyboard_mod_state_suspend();
+    }
+
+    emit(key_pos, keycode);
+
+    if (policy.preserve_keyboard_mod_state) {
+        keyboard_mod_state_apply(saved_mod_state);
+    }
+}
+
 void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     noah_emit_run(action, noah_action_tap, policy);
+}
+
+void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
+    noah_emit_run_at(key_pos, action, noah_action_tap_at, policy);
 }
 
 void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {

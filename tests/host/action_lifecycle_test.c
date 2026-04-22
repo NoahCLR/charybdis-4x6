@@ -323,6 +323,19 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     CHECK(split_sync_calls == 0);
 }
 
+static void test_tap_at_preserves_pd_lock_origin_key_pos(void) {
+    keypos_t key_pos = test_keypos(1, 2);
+
+    test_reset_stubs();
+    pd_toggle_result = true;
+
+    noah_action_tap_at(key_pos, ARROW_MODE_LOCK);
+    CHECK(pd_toggle_calls == 1);
+    CHECK(pd_toggle_key_pos.row == key_pos.row);
+    CHECK(pd_toggle_key_pos.col == key_pos.col);
+    CHECK(split_sync_calls == 1);
+}
+
 static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
     test_reset_stubs();
     macro_dispatch_result = true;
@@ -516,6 +529,7 @@ int main(void) {
     test_every_action_kind_has_metadata_and_dispatch_coverage();
     test_invalid_action_kind_is_rejected_consistently();
     test_tap_handles_layer_lock_and_pd_lock();
+    test_tap_at_preserves_pd_lock_origin_key_pos();
     test_tap_routes_macro_custom_qmk_and_plain_actions();
     test_tap_ignores_raw_layer_actions();
     test_press_routes_pd_mode_momentary_qmk_custom_and_plain();

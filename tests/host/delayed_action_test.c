@@ -19,6 +19,8 @@ typedef struct {
     uint8_t  weak;
     uint8_t  oneshot;
     uint8_t  oneshot_locked;
+    uint8_t  row;
+    uint8_t  col;
 } tap_call_t;
 
 static uint8_t fake_mods;
@@ -68,6 +70,8 @@ static tap_call_t test_current_tap_call(uint16_t keycode) {
         .weak           = fake_weak_mods,
         .oneshot        = fake_oneshot_mods,
         .oneshot_locked = fake_oneshot_locked_mods,
+        .row            = MATRIX_ROWS,
+        .col            = MATRIX_COLS,
     };
 }
 
@@ -177,6 +181,13 @@ bool is_pd_mode_lock_action(uint16_t action) {
 
 void noah_action_tap(uint16_t action) {
     tap_call = test_current_tap_call(action);
+    tap_call_count++;
+}
+
+void noah_action_tap_at(keypos_t key_pos, uint16_t action) {
+    tap_call     = test_current_tap_call(action);
+    tap_call.row = key_pos.row;
+    tap_call.col = key_pos.col;
     tap_call_count++;
 }
 
@@ -293,9 +304,29 @@ static void test_delayed_action_settles_fallback_holds_inside_replay_window(void
     CHECK(fake_oneshot_locked_mods == 0x08);
 }
 
+static void test_delayed_action_at_preserves_origin_key_pos(void) {
+    delayed_action_mods_t mods = {
+        .real           = 0x10,
+        .weak           = 0x20,
+        .oneshot        = 0x40,
+        .oneshot_locked = 0x80,
+    };
+    keypos_t key_pos = {.row = 4, .col = 5};
+
+    test_reset_stubs();
+
+    dispatch_delayed_action_at(key_pos, TEST_DELAYED_ACTION_A, mods);
+
+    CHECK(tap_call_count == 1);
+    CHECK(tap_call.keycode == TEST_DELAYED_ACTION_A);
+    CHECK(tap_call.row == key_pos.row);
+    CHECK(tap_call.col == key_pos.col);
+}
+
 int main(void) {
     test_delayed_action_restores_saved_mod_state_after_emit();
     test_delayed_action_settles_fallback_holds_inside_replay_window();
+    test_delayed_action_at_preserves_origin_key_pos();
     puts("delayed_action host tests passed");
     return 0;
 }

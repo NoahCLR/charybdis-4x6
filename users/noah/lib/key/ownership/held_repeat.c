@@ -96,7 +96,7 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
         return;
     }
 
-    noah_emit_action_tap(action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+    noah_emit_action_tap_at(key_pos, action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
 
     int16_t slot = held_repeat_find_slot_for_key(key_pos);
     if (slot < 0) {
@@ -135,7 +135,7 @@ void held_repeat_tick(void) {
         uint16_t now = timer_read();
         if (timer_elapsed(state->bindings[i].last_fire_time) >= state->bindings[i].interval_ms) {
             state->bindings[i].last_fire_time = now;
-            noah_emit_action_tap(state->bindings[i].action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+            noah_emit_action_tap_at(state->bindings[i].key_pos, state->bindings[i].action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
         }
     }
 }

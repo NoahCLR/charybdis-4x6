@@ -212,6 +212,11 @@ void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     (void)policy;
 }
 
+void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
+    (void)key_pos;
+    noah_emit_action_tap(action, policy);
+}
+
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
     return (delayed_action_mods_t){
         .real           = mt->saved_mods,
@@ -225,6 +230,11 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     delayed_action_count++;
     last_delayed_action = action;
     last_delayed_mods   = mods;
+}
+
+void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
+    (void)key_pos;
+    dispatch_delayed_action(action, mods);
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {

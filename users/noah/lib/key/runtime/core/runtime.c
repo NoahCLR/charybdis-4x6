@@ -85,14 +85,14 @@ static void key_runtime_core_effect_plan_push(key_runtime_core_effect_plan_t *pl
     plan->overflowed = true;
 }
 
-static void key_runtime_core_effect_plan_push_dispatch_action(key_runtime_core_effect_plan_t *plan, uint16_t action) {
+static void key_runtime_core_effect_plan_push_dispatch_action(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action) {
     if (!(plan && action != KC_NO)) {
         return;
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                                .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
-                                                .data.action = action,
+                                                .kind                 = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+                                                .data.dispatch_action = {.action = action, .key_pos = key_pos},
                                             });
 }
 
@@ -179,7 +179,7 @@ static void key_runtime_core_effect_plan_push_feedback_pulse(key_runtime_core_ef
                                             });
 }
 
-static void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_effect_plan_t *plan, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
+static void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
     if (!(plan && action != KC_NO && repeat_count != 0u)) {
         return;
     }
@@ -189,6 +189,7 @@ static void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_ef
                                                 .data.delayed_action =
                                                     {
                                                         .action       = action,
+                                                        .key_pos      = key_pos,
                                                         .mods         = mods,
                                                         .repeat_count = repeat_count,
                                                     },
@@ -208,14 +209,14 @@ static void key_runtime_core_release_effect_plan_push(key_runtime_core_release_e
     plan->overflowed = true;
 }
 
-static void key_runtime_core_release_effect_plan_push_dispatch_action(key_runtime_core_release_effect_plan_t *plan, uint16_t action) {
+static void key_runtime_core_release_effect_plan_push_dispatch_action(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, uint16_t action) {
     if (action == KC_NO) {
         return;
     }
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                        .kind        = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
-                                                        .data.action = action,
+                                                        .kind                 = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
+                                                        .data.dispatch_action = {.action = action, .key_pos = key_pos},
                                                     });
 }
 
@@ -267,7 +268,7 @@ static void key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(key_runti
                                                     });
 }
 
-static void key_runtime_core_release_effect_plan_push_delayed_action(key_runtime_core_release_effect_plan_t *plan, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
+static void key_runtime_core_release_effect_plan_push_delayed_action(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
     if (!(plan && action != KC_NO && repeat_count != 0u)) {
         return;
     }
@@ -277,6 +278,7 @@ static void key_runtime_core_release_effect_plan_push_delayed_action(key_runtime
                                                         .data.delayed_action =
                                                             {
                                                                 .action       = action,
+                                                                .key_pos      = key_pos,
                                                                 .mods         = mods,
                                                                 .repeat_count = repeat_count,
                                                             },
@@ -291,7 +293,7 @@ static void key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap
         return;
     }
 
-    key_runtime_core_release_effect_plan_push_dispatch_action(plan, action);
+    key_runtime_core_release_effect_plan_push_dispatch_action(plan, key_pos, action);
 }
 
 void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
@@ -301,7 +303,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
 
     switch (effect->kind) {
         case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
-            noah_emit_action_tap(effect->data.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+            noah_emit_action_tap_at(effect->data.dispatch_action.key_pos, effect->data.dispatch_action.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
             return;
         case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
             key_runtime_core_observe_held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
@@ -341,7 +343,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             return;
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
             for (uint8_t repeat = 0; repeat < effect->data.delayed_action.repeat_count; repeat++) {
-                dispatch_delayed_action(effect->data.delayed_action.action, effect->data.delayed_action.mods);
+                dispatch_delayed_action_at(effect->data.delayed_action.key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods);
             }
             return;
         case KEY_RUNTIME_EFFECT_NONE:
@@ -355,7 +357,7 @@ void key_runtime_core_project_pending_release_dispatch(const pending_release_t *
         return;
     }
 
-    dispatch_delayed_action(pending->action, pending->mods);
+    dispatch_delayed_action_at(pending->key_pos, pending->action, pending->mods);
 }
 
 static uint16_t key_runtime_core_default_hold_term(uint16_t keycode) {
@@ -2469,7 +2471,7 @@ bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, b
             key_runtime_core_release_effect_plan_push_held_action(out, KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER, key_pos, resolution->action);
             return true;
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION:
-            key_runtime_core_release_effect_plan_push_delayed_action(out, resolution->action, mods, resolution->repeat_count);
+            key_runtime_core_release_effect_plan_push_delayed_action(out, key_pos, resolution->action, mods, resolution->repeat_count);
             return true;
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN:
             out->settlement = KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_CLEAR_ACTIVE_PRESERVE_PENDING_MULTI_TAP;
@@ -2766,7 +2768,7 @@ static void key_runtime_core_plan_threshold_hold_effects(key_runtime_core_state_
 
     switch (semantics.threshold) {
         case HANDLED_KEY_HOLD_THRESHOLD_DISPATCH:
-            key_runtime_core_effect_plan_push_dispatch_action(plan, hold.action);
+            key_runtime_core_effect_plan_push_dispatch_action(plan, token->key_pos, hold.action);
             key_runtime_core_effect_plan_push_feedback_pulse(plan, token->key_pos, long_hold_level);
             key_runtime_core_press_token_commit_hold_phase(token, completes_hold);
             return;
@@ -2807,7 +2809,7 @@ static void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_cor
     token = key_runtime_core_press_token_state(state, key_pos);
     switch (resolution.outcome) {
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH:
-            key_runtime_core_effect_plan_push_delayed_action(plan, resolution.action, mods, resolution.repeat_count);
+            key_runtime_core_effect_plan_push_delayed_action(plan, key_pos, resolution.action, mods, resolution.repeat_count);
             return;
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD:
             key_runtime_core_plan_threshold_hold_effects(state, token, resolution.hold, resolution.semantics, resolution.completes_hold, false, plan);
@@ -2928,7 +2930,7 @@ void key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos
             continue;
         }
 
-        key_runtime_core_effect_plan_push_delayed_action(plan, action, mods, repeat_count);
+        key_runtime_core_effect_plan_push_delayed_action(plan, series->key_pos, action, mods, repeat_count);
         key_runtime_core_tap_series_clear(state, series);
     }
 }
@@ -2950,7 +2952,7 @@ void key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan) {
             continue;
         }
 
-        key_runtime_core_effect_plan_push_delayed_action(plan, action, mods, repeat_count);
+        key_runtime_core_effect_plan_push_delayed_action(plan, series->key_pos, action, mods, repeat_count);
         key_runtime_core_tap_series_clear(state, series);
     }
 }
@@ -2972,7 +2974,7 @@ void key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_cor
 
         held_action = key_runtime_core_key_pos_held_action_keycode(state, token->key_pos);
         if (key_runtime_core_press_token_allows_tap_release(token) && held_action == KC_NO && !key_runtime_core_key_pos_repeat_active(state, token->key_pos) && !is_layer_key(token->resolved_keycode) && token->interaction.binding.tap_action != KC_NO) {
-            key_runtime_core_effect_plan_push_dispatch_action(plan, token->interaction.binding.tap_action);
+            key_runtime_core_effect_plan_push_dispatch_action(plan, token->key_pos, token->interaction.binding.tap_action);
         } else if (held_action != KC_NO && !held_action_survives_flush(token->key_pos, held_action)) {
             key_runtime_core_effect_plan_push_held_action(plan, KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER, token->key_pos, held_action);
         } else if (key_runtime_core_key_pos_repeat_active(state, token->key_pos)) {
@@ -3004,7 +3006,7 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
 
     if (series && series->active && (series->keycode != keycode || key_runtime_core_elapsed(series->last_tap_at, state->current_time) > series->tap_term_ms)) {
         if (key_runtime_core_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
-            key_runtime_core_effect_plan_push_delayed_action(plan, action, mods, repeat_count);
+            key_runtime_core_effect_plan_push_delayed_action(plan, series->key_pos, action, mods, repeat_count);
         }
         key_runtime_core_tap_series_clear(state, series);
     }
@@ -3012,7 +3014,7 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
     if (series && series->active && series->keycode == keycode && key_runtime_core_elapsed(series->last_tap_at, state->current_time) <= series->tap_term_ms) {
         key_runtime_core_tap_series_update_for_press(state, series, token);
         if (token->interaction.binding.tap_resolves_on_press && !series->pending_hold) {
-            key_runtime_core_effect_plan_push_dispatch_action(plan, token->interaction.binding.tap_action);
+            key_runtime_core_effect_plan_push_dispatch_action(plan, token->key_pos, token->interaction.binding.tap_action);
             key_runtime_core_tap_series_clear(state, series);
         }
         if (key_runtime_slot_interaction_is_momentary_layer(token->interaction)) {

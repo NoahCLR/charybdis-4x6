@@ -448,9 +448,19 @@ void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     (void)policy;
 }
 
+void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
+    (void)key_pos;
+    noah_emit_action_tap(action, policy);
+}
+
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     last_delayed_action = action;
     last_delayed_mods   = mods;
+}
+
+void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
+    (void)key_pos;
+    dispatch_delayed_action(action, mods);
 }
 
 bool noah_synthetic_record_active(void) {
