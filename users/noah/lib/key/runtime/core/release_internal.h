@@ -81,6 +81,8 @@ typedef struct {
     KEY_RUNTIME_EFFECT_QUEUE_FIELDS(KEY_RUNTIME_CORE_RELEASE_EFFECT_PLAN_CAPACITY);
 } key_runtime_core_release_effect_plan_t;
 
+_Static_assert(sizeof(key_runtime_core_release_effect_plan_t) <= 196u, "key_runtime_core_release_effect_plan_t must stay within the approved stack budget");
+
 bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_active_release_resolution_t *out);
 bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t keycode, const key_runtime_core_active_release_resolution_t *resolution, key_runtime_core_release_effect_plan_t *out);
 bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, key_runtime_core_pending_multi_tap_release_resolution_t *out);

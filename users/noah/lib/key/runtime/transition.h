@@ -22,6 +22,8 @@ typedef struct {
     KEY_RUNTIME_EFFECT_QUEUE_FIELDS(KEY_RUNTIME_TRANSITION_PLAN_CAPACITY);
 } key_runtime_transition_plan_t;
 
+_Static_assert(sizeof(key_runtime_transition_plan_t) <= 196u, "key_runtime_transition_plan_t must stay within the approved stack budget");
+
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan);
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan);
 

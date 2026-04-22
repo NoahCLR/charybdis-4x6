@@ -6,7 +6,9 @@ This review covers the combo-origin footprint work that landed on
 2026-04-22. The goal was to stop treating QMK combo outputs as synthetic key
 position `(0,0)` for locality-sensitive userspace behavior, plus the follow-up
 runtime remediation needed after the later key-position replay widening caused
-stack-backed transition plans to grow too large on hardware.
+stack-backed transition plans to grow too large on hardware. It now also
+covers the narrow phase-1 key-runtime core compaction that removed redundant
+stored key positions from the slot-indexed core arrays.
 
 ## Decisions
 
@@ -62,6 +64,19 @@ locality contract.
 This keeps the newer trigger-origin behavior while avoiding another silent
 stack regression in the transition planners.
 
+### Slot-indexed core arrays now derive key positions instead of storing them
+
+- `press_tokens[]` and `tap_series[]` are indexed by physical matrix slot.
+- Their entries no longer store a duplicated `key_pos`.
+- Internal helpers derive `keypos_t` from the slot index when debug or runtime
+  logic needs a physical key again.
+- This rule is intentionally limited to slot-indexed arrays. Ownership tables
+  like `leases` or `pending_releases` still carry explicit `key_pos` because
+  their entries are not one-per-slot.
+
+This keeps the compaction local to the core layout and avoids accidental
+generalization onto non-slot surfaces that would break ownership semantics.
+
 ## Current Structure
 
 - Combo ingress and QMK-specific assumptions live in
@@ -70,6 +85,8 @@ stack regression in the transition planners.
   `users/noah/lib/key/runtime/origin_registry.c`.
 - Hot replay key-position packing lives in
   `users/noah/lib/key/runtime/keypos_codec.h`.
+- Slot-index key-position derivation for `press_tokens[]` and `tap_series[]`
+  lives in `users/noah/lib/key/runtime/core/runtime.c`.
 - Key-feedback locality renders from the synced bitmap in
   `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`.
 - PD trigger-side rendering derives from the synced side mask in
@@ -90,6 +107,9 @@ stack regression in the transition planners.
 - Hot replay effect payloads are intentionally size-constrained. Carrying full
   `keypos_t` through stack-backed transition plans is not acceptable for this
   firmware target.
+- Slot-index compaction is only valid when the slot identity already is the
+  physical key identity. That is true for `press_tokens[]` and `tap_series[]`
+  after combo normalization, but not for the non-slot ownership tables.
 
 ## Intended Invariants
 
@@ -101,4 +121,11 @@ stack regression in the transition planners.
   combo-triggered modes.
 - `key_runtime_effect_t` must stay small enough that transition plans do not
   materially expand the firmware stack footprint.
+- Stack-backed plan surfaces must stay mechanically size-guarded:
+  - `sizeof(key_runtime_effect_t) <= 12`
+  - `sizeof(key_runtime_transition_plan_t) <= 196`
+  - `sizeof(key_runtime_core_effect_plan_t) <= 196`
+  - `sizeof(key_runtime_core_release_effect_plan_t) <= 196`
+- `press_tokens[]` and `tap_series[]` may derive key position from slot index,
+  but non-slot arrays must not silently adopt that rule.
 - All of the above must stay green under host tests and the firmware compile.

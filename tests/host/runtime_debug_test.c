@@ -729,8 +729,8 @@ static void test_key_runtime_core_release_tracks_press_by_position_despite_keyco
 static void test_key_runtime_core_timer_and_scan_do_not_rewrite_press_identity(void) {
     const uint16_t       layer_tap_keycode = LT(2, KC_V);
     keypos_t             key_pos           = test_keypos(4, 1);
+    keypos_t             observed_key_pos;
     const press_token_t *token;
-    press_token_t        original;
     runtime_event_t      advance = {
         .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
         .data.timer_advance =
@@ -750,7 +750,6 @@ static void test_key_runtime_core_timer_and_scan_do_not_rewrite_press_identity(v
     CHECK(token != NULL);
     CHECK(token->active);
     CHECK(token->hold_term_ms == TAPPING_TERM);
-    original = *token;
 
     key_runtime_core_apply_event(&advance, fake_time);
     fake_time = (uint16_t)(fake_time + advance.data.timer_advance.advance_ms);
@@ -759,11 +758,12 @@ static void test_key_runtime_core_timer_and_scan_do_not_rewrite_press_identity(v
     token = key_runtime_core_press_token_at(key_pos);
     CHECK(token != NULL);
     CHECK(token->active);
-    CHECK(token->token_id == original.token_id);
-    CHECK(test_keypos_equal(token->key_pos, original.key_pos));
+    CHECK(token->token_id == 1u);
+    CHECK(key_runtime_core_press_token_key_pos(token, &observed_key_pos));
+    CHECK(test_keypos_equal(observed_key_pos, key_pos));
     CHECK(token->physical_keycode == layer_tap_keycode);
     CHECK(token->resolved_keycode == layer_tap_keycode);
-    CHECK(token->hold_term_ms == original.hold_term_ms);
+    CHECK(token->hold_term_ms == TAPPING_TERM);
     CHECK(token->phase == PRESS_TOKEN_PHASE_HELD);
 }
 

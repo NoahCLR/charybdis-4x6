@@ -80,7 +80,6 @@ typedef enum {
 typedef struct {
     bool                           active;
     uint16_t                       token_id;
-    keypos_t                       key_pos;
     uint16_t                       physical_keycode;
     uint16_t                       resolved_keycode;
     uint16_t                       observed_release_keycode;
@@ -103,7 +102,6 @@ typedef struct {
 
 typedef struct {
     bool                 active;
-    keypos_t             key_pos;
     uint16_t             keycode;
     uint8_t              tap_count;
     bool                 pending_hold;
@@ -123,6 +121,8 @@ typedef struct {
 typedef struct {
     KEY_RUNTIME_EFFECT_QUEUE_FIELDS(KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY);
 } key_runtime_core_effect_plan_t;
+
+_Static_assert(sizeof(key_runtime_core_effect_plan_t) <= 196u, "key_runtime_core_effect_plan_t must stay within the approved stack budget");
 
 typedef struct {
     bool                 active;
@@ -316,6 +316,8 @@ bool                                        key_runtime_core_release_owned_state
 bool                                        key_runtime_core_finalize_non_handled_release(keypos_t key_pos);
 const press_token_t                        *key_runtime_core_press_token_at(keypos_t key_pos);
 const tap_series_t                         *key_runtime_core_tap_series_at(keypos_t key_pos);
+bool                                        key_runtime_core_press_token_key_pos(const press_token_t *token, keypos_t *out);
+bool                                        key_runtime_core_tap_series_key_pos(const tap_series_t *series, keypos_t *out);
 uint8_t                                     key_runtime_core_active_press_token_count(void);
 bool                                        key_runtime_core_active_press_token_key_pos(uint8_t order, keypos_t *out);
 uint8_t                                     key_runtime_core_pending_multi_tap_count(void);

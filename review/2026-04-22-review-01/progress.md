@@ -44,6 +44,42 @@
   so `key_runtime_effect_t` cannot silently grow past the size that keeps the
   transition plans small enough for the firmware stack budget.
 
+### Phase 1 Key Runtime Core Memory Hardening
+
+- Removed the redundant stored `key_pos` field from the two slot-indexed core
+  arrays only:
+  - `press_token_t`
+  - `tap_series_t`
+- Added internal slot-index helpers in
+  `users/noah/lib/key/runtime/core/runtime.c` so those arrays now derive
+  physical key position from their matrix-slot index instead of storing it in
+  every entry.
+- Kept the external key-runtime API unchanged; callers still observe normal
+  `keypos_t` through debug and projection surfaces.
+- Kept combo behavior unchanged:
+  - `qmk_combo_origin` still rewrites `COMBO_EVENT` records to one
+    representative owner key before the core sees them
+  - the core still treats that normalized owner key as the slot identity
+  - the full combo footprint still lives in `origin_registry`, outside these
+    slot-indexed arrays
+- Explicitly did **not** generalize this derivation rule to non-slot arrays
+  such as `leases`, `pending_releases`, or `deferred_release_blockers`.
+- Added hard size guards for the stack-backed planner surfaces:
+  - `sizeof(key_runtime_effect_t) <= 12`
+  - `sizeof(key_runtime_transition_plan_t) <= 196`
+  - `sizeof(key_runtime_core_effect_plan_t) <= 196`
+  - `sizeof(key_runtime_core_release_effect_plan_t) <= 196`
+- Extended host coverage so the real-profile `MS_BTN1 + MS_BTN2 -> CLICK_SPAM`
+  combo now proves the normalized representative owner survives through the
+  handled-key runtime press and release path.
+- Measured host-probe size delta for this pass:
+  - `press_token_t`: `156 -> 156`
+  - `tap_series_t`: `52 -> 48`
+  - `key_runtime_core_state_t`: `19952 -> 19696`
+- Net result: the pass recovered `256` bytes from `key_runtime_core_state_t`.
+  `press_token_t` did not shrink because its remaining fields still land on
+  the same padded object size.
+
 ### Verification
 
 Passed:
@@ -82,6 +118,19 @@ Passed:
 - `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
 - `sh tests/host/run_runtime_debug_tests.sh`
 - `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_delayed_action_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_qmk_combo_origin_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
 ### Notes
 
@@ -95,11 +144,12 @@ Passed:
 
 ### Next Steps
 
-- Flash the packed-key runtime build onto hardware and retest the original
-  right-thumb slash and rapid punctuation repros to confirm the watchdog reset
-  was the stack growth from `9e8faca...`.
-- If hardware instability persists after this runtime shrink, instrument the
-  handled-key release/deferred-dispatch path on-device next; combo-origin is no
-  longer the leading suspect for that reboot.
+- Reassess whether phase 2 compaction is still worth it now that
+  `key_runtime_core_state_t` is down to `19696` bytes.
+- If more headroom is still justified, audit the non-slot arrays next:
+  `leases`, `pending_releases`, and `deferred_release_blockers`.
+- Keep the new size-guard discipline on all hot stack-backed runtime surfaces;
+  future key-position or ownership work should pack stored representations
+  first and only expand to full `keypos_t` at execution boundaries.
 - Overlapping active combos that share the same output keycode still deserve a
   dedicated release-path audit if that authored pattern becomes important.

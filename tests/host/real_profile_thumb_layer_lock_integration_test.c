@@ -10,6 +10,7 @@
 #include "transactions.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/synthetic_record.h"
+#include "users/noah/lib/compat/qmk_combo_origin.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/origin_registry.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
@@ -220,6 +221,61 @@ static void test_release_resolved(keypos_t key_pos) {
 
     CHECK(!key_runtime_integration_process_record(keycode, key_pos, false));
     test_clear_press_keycode(key_pos);
+}
+
+static int16_t test_find_combo_index_for_exact_keys(const uint16_t *keys, uint8_t key_count) {
+    if (!(keys && key_count != 0u)) {
+        return -1;
+    }
+
+    for (uint8_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
+        const combo_t *combo = &key_combos[combo_index];
+        bool           match = true;
+
+        for (uint8_t member_index = 0; member_index < key_count; member_index++) {
+            if (combo->keys[member_index] != keys[member_index]) {
+                match = false;
+                break;
+            }
+        }
+
+        if (!(match && combo->keys[key_count] == COMBO_END)) {
+            continue;
+        }
+
+        return (int16_t)combo_index;
+    }
+
+    return -1;
+}
+
+static void test_observe_combo_member(keypos_t key_pos, bool pressed) {
+    keyrecord_t record = {
+        .event =
+            {
+                .type    = KEY_EVENT,
+                .key     = key_pos,
+                .pressed = pressed,
+            },
+    };
+
+    noah_qmk_combo_origin_observe_physical_key_event(test_resolve_keycode(key_pos), &record);
+}
+
+static bool test_process_combo_output(uint16_t keycode, bool pressed) {
+    keyrecord_t record = {
+        .event = MAKE_COMBOEVENT(pressed),
+    };
+    bool keep_processing;
+
+    keep_processing = noah_process_record_user(keycode, &record);
+    if (!keep_processing) {
+        noah_process_record_user_finalize(keycode, &record, false);
+        return false;
+    }
+
+    noah_post_process_record_user(keycode, &record);
+    return true;
 }
 
 static void test_run_double_tap_hold_cycle(keypos_t key_pos, uint16_t hold_ms) {
@@ -1179,6 +1235,65 @@ static void test_pointer_pinch_double_tap_queues_via_macro_six(void) {
     CHECK(test_last_delayed_action == VIA_MACRO_6);
     CHECK(pd_mode_local_active_snapshot() == 0);
     test_assert_thumb_runtime_quiescent(pinch_pos);
+}
+
+static void test_click_spam_combo_uses_last_chord_key_as_runtime_owner(void) {
+    static const uint16_t click_spam_combo_keys[] = {
+        MS_BTN1,
+        MS_BTN2,
+    };
+
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    keypos_t active_slot_key_pos;
+    keypos_t btn1_pos;
+    keypos_t btn2_pos;
+    int16_t  combo_index;
+    uint16_t click_spam_keycode;
+
+    test_reset_state();
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_POINTER));
+
+    btn1_pos = test_find_keypos_on_layer(LAYER_POINTER, MS_BTN1);
+    btn2_pos = test_find_keypos_on_layer(LAYER_POINTER, MS_BTN2);
+
+    CHECK(test_keypos_valid(btn1_pos));
+    CHECK(test_keypos_valid(btn2_pos));
+    CHECK(test_resolve_keycode(btn1_pos) == MS_BTN1);
+    CHECK(test_resolve_keycode(btn2_pos) == MS_BTN2);
+
+    combo_index = test_find_combo_index_for_exact_keys(click_spam_combo_keys, ARRAY_SIZE(click_spam_combo_keys));
+    CHECK(combo_index >= 0);
+    click_spam_keycode = key_combos[combo_index].keycode;
+
+    test_observe_combo_member(btn1_pos, true);
+    test_observe_combo_member(btn2_pos, true);
+    key_combos[combo_index].active = true;
+
+    CHECK(!test_process_combo_output(click_spam_keycode, true));
+    CHECK(noah_runtime_debug_active_slot_count() == 1u);
+    CHECK(noah_runtime_debug_active_slot_key_pos(0u, &active_slot_key_pos));
+    CHECK(test_keypos_equal(active_slot_key_pos, btn2_pos));
+    CHECK(noah_runtime_debug_slot_owner_keycode(btn2_pos) == click_spam_keycode);
+    CHECK(key_origin_registry_get_bitmap(btn2_pos, bitmap));
+    CHECK(key_origin_bitmap_has_keypos(bitmap, btn1_pos));
+    CHECK(key_origin_bitmap_has_keypos(bitmap, btn2_pos));
+
+    key_runtime_integration_advance(&fake_time, 2u);
+    key_runtime_integration_scan();
+
+    CHECK(noah_runtime_debug_slot_owner_keycode(btn2_pos) == click_spam_keycode);
+    CHECK(test_tap_code16_count == 0u);
+
+    key_combos[combo_index].active = false;
+    test_observe_combo_member(btn2_pos, false);
+    test_observe_combo_member(btn1_pos, false);
+
+    CHECK(!test_process_combo_output(click_spam_keycode, false));
+    key_runtime_integration_scan();
+
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+    CHECK(noah_runtime_debug_slot_owner_keycode(btn2_pos) == KC_NO);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
 }
 
 static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
@@ -2203,6 +2318,7 @@ int main(void) {
     test_right_thumb_triple_tap_long_hold_registers_next_track_hold();
     test_right_thumb_quadruple_tap_dispatches_previous_track();
     test_pointer_pinch_double_tap_queues_via_macro_six();
+    test_click_spam_combo_uses_last_chord_key_as_runtime_owner();
     test_right_nav_layer_hold_dispatches_nav_taps_immediately();
     test_right_thumb_hold_dispatches_nav_taps_immediately();
     test_raw_nav_layer_hold_enters_dragscroll_mode_cleanly();
