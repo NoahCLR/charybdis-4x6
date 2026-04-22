@@ -578,6 +578,90 @@ static void test_combo_underlay_stays_below_pd_mode(void) {
     check_led(5, rgb_from_hsv(pd_mode_colors[0].color));
 }
 
+static void test_slave_combo_overlay_stays_visible_over_remote_preview(void) {
+    test_reset();
+
+    fake_is_master                            = false;
+    test_keymap[LAYER_NUM][0][0]              = 0x0020u;
+    layer_state                               = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
+    test_feedback_bitmap_set(split_runtime_sync_remote.combo_overlay_bitmap, 0, 0);
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_combo_feedback());
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
+static void test_slave_combo_underlay_stays_below_remote_preview(void) {
+    test_reset();
+
+    fake_is_master                            = false;
+    test_keymap[LAYER_NUM][0][0]              = 0x0020u;
+    layer_state                               = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
+    test_feedback_bitmap_set(split_runtime_sync_remote.combo_underlay_bitmap, 0, 0);
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
+static void test_slave_combo_overlay_stays_visible_over_remote_pd_mode(void) {
+    test_reset();
+
+    fake_is_master                          = false;
+    layer_state                             = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_ARROW);
+    test_feedback_bitmap_set(split_runtime_sync_remote.combo_overlay_bitmap, 4, 0);
+
+    CHECK(render_output());
+
+    check_led(4, rgb_from_combo_feedback());
+    check_led(5, rgb_from_hsv(pd_mode_colors[0].color));
+}
+
+static void test_slave_combo_underlay_stays_below_remote_pd_mode(void) {
+    test_reset();
+
+    fake_is_master                          = false;
+    layer_state                             = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_ARROW);
+    test_feedback_bitmap_set(split_runtime_sync_remote.combo_underlay_bitmap, 4, 0);
+
+    CHECK(render_output());
+
+    check_led(4, rgb_from_hsv(pd_mode_colors[0].color));
+    check_led(5, rgb_from_hsv(pd_mode_colors[0].color));
+}
+
+static void test_slave_multi_tap_pending_feedback_overrides_remote_combo_overlay(void) {
+    test_reset();
+
+    fake_is_master = false;
+    layer_state    = (layer_state_t)1u << LAYER_SYM;
+    test_feedback_bitmap_set(split_runtime_sync_remote.combo_overlay_bitmap, 0, 0);
+    test_remote_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+}
+
+static void test_slave_multi_tap_pending_feedback_overrides_remote_combo_underlay(void) {
+    test_reset();
+
+    fake_is_master = false;
+    layer_state    = (layer_state_t)1u << LAYER_SYM;
+    test_feedback_bitmap_set(split_runtime_sync_remote.combo_underlay_bitmap, 0, 0);
+    test_remote_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+}
+
 static void test_slave_feedback_uses_remote_semantics_and_flash_phase(void) {
     test_reset();
 
@@ -1374,6 +1458,12 @@ int main(void) {
     test_combo_underlay_stays_below_preview();
     test_combo_overlay_stays_visible_over_pd_mode();
     test_combo_underlay_stays_below_pd_mode();
+    test_slave_combo_overlay_stays_visible_over_remote_preview();
+    test_slave_combo_underlay_stays_below_remote_preview();
+    test_slave_combo_overlay_stays_visible_over_remote_pd_mode();
+    test_slave_combo_underlay_stays_below_remote_pd_mode();
+    test_slave_multi_tap_pending_feedback_overrides_remote_combo_overlay();
+    test_slave_multi_tap_pending_feedback_overrides_remote_combo_underlay();
     test_slave_feedback_uses_remote_semantics_and_flash_phase();
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
     test_key_half_feedback_paints_only_master_half();

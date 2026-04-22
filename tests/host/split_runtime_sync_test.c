@@ -320,6 +320,48 @@ static void test_tick_sends_only_base_packet_when_only_automouse_changes(void) {
     CHECK(rpc_last_base_packet.automouse_progress == 70u);
 }
 
+static void test_tick_sends_only_combo_packet_when_only_combo_feedback_changes(void) {
+    test_reset_stubs();
+
+    split_runtime_sync_init();
+    rpc_send_count = 0;
+    rpc_send_count_base = 0;
+    rpc_send_count_combo = 0;
+    rpc_send_count_key_feedback = 0;
+
+    fake_combo_underlay_bitmap[0] = 0x01u;
+
+    split_runtime_sync_tick();
+
+    CHECK(rpc_send_count == 1u);
+    CHECK(rpc_send_count_base == 0u);
+    CHECK(rpc_send_count_combo == 1u);
+    CHECK(rpc_send_count_key_feedback == 0u);
+    CHECK(rpc_last_send_id == PUT_SPLIT_COMBO_FEEDBACK_SYNC);
+    CHECK(rpc_last_combo_packet.combo_underlay_bitmap[0] == 0x01u);
+}
+
+static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_changes(void) {
+    test_reset_stubs();
+
+    split_runtime_sync_init();
+    rpc_send_count = 0;
+    rpc_send_count_base = 0;
+    rpc_send_count_combo = 0;
+    rpc_send_count_key_feedback = 0;
+
+    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+
+    split_runtime_sync_tick();
+
+    CHECK(rpc_send_count == 1u);
+    CHECK(rpc_send_count_base == 0u);
+    CHECK(rpc_send_count_combo == 0u);
+    CHECK(rpc_send_count_key_feedback == 1u);
+    CHECK(rpc_last_send_id == PUT_SPLIT_KEY_FEEDBACK_SYNC);
+    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+}
+
 static void test_slave_rpcs_apply_exact_remote_state(void) {
     split_runtime_base_sync_packet_t base_packet = {
         .automouse_progress = 42u,
@@ -395,6 +437,8 @@ int main(void) {
     test_request_force_sync_defers_send_until_tick();
     test_locked_pd_mode_zeroes_automouse_progress();
     test_tick_sends_only_base_packet_when_only_automouse_changes();
+    test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();
+    test_tick_sends_only_key_feedback_packet_when_only_key_feedback_changes();
     test_slave_rpcs_apply_exact_remote_state();
     test_slave_base_rpc_ignores_short_packets();
 
