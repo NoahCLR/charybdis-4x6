@@ -30,6 +30,10 @@ This removed the need for duplicated side/key tracking in higher layers.
 - `qmk_combo_origin.c` shadows the live physical combo press stream.
 - On `COMBO_EVENT`, it rewrites the representative owner key to the last chord
   key and stores the full footprint in the origin registry.
+- If combo identity cannot be reconstructed cleanly at normalize time, the
+  compat layer now falls back to the latest observed physical key plus an
+  explicit broad locality footprint, so userspace does not regress to fake key
+  `(0,0)`.
 - The shadow logic uses live resolved keycodes and combo-ref-layer behavior, so
   dynamic keymaps remain authoritative.
 
@@ -59,7 +63,9 @@ locality contract.
 
 ## Tradeoffs
 
-- Duplicate combo outputs across distinct combos remain allowed.
+- Duplicate combo outputs across distinct combos remain allowed, but overlapping
+  active combos that share the same output still have an ambiguous release path
+  because upstream `COMBO_EVENT` records do not expose combo identity.
 - When multiple active combos with the same output are in play, locality is
   intentionally broadened to the union footprint instead of pretending a single
   side or key.

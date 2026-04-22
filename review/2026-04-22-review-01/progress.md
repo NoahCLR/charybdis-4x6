@@ -22,6 +22,19 @@
 - Updated user-facing docs and authored comments to describe combo footprints,
   both-halves broadening, and trigger-half semantics.
 
+### Follow-up Remediation
+
+- Fixed combo-origin fallback semantics in
+  `users/noah/lib/compat/qmk_combo_origin.c` so an unresolved combo press no
+  longer leaks fake QMK key position `(0,0)` into userspace locality.
+- Unresolved combo presses now reuse the latest observed physical key as the
+  representative owner and install an explicit broad fallback footprint that
+  resolves to both halves.
+- Added cached release coverage for that unresolved fallback so combo release
+  follows the same representative owner instead of drifting back to `(0,0)`.
+- Fixed `noah_qmk_combo_origin_reset()` to clear the full combo cache state
+  instead of leaving stale `active`, `keycode`, or owner fields behind.
+
 ### Verification
 
 Passed:
@@ -43,6 +56,14 @@ Passed:
 - `sh tests/host/run_runtime_init_order_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_qmk_combo_origin_tests.sh`
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
 ### Notes
 
@@ -56,7 +77,8 @@ Passed:
 
 ### Next Steps
 
-- No immediate follow-up is required for closure.
-- If combo authoring grows more complex later, keep validating that each combo
-  row uses unique member keycodes and extend the combo-origin tests alongside
-  any new locality-sensitive behavior.
+- If hardware instability persists after this fallback/cache fix, instrument the
+  combo-origin path on-device next to confirm whether the failure is still in
+  combo normalization or elsewhere in runtime processing.
+- Overlapping active combos that share the same output keycode still deserve a
+  dedicated release-path audit if that authored pattern becomes important.

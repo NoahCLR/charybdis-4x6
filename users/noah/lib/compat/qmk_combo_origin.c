@@ -34,6 +34,7 @@ static combo_origin_physical_key_state_t physical_key_states[MATRIX_ROWS * MATRI
 
 static combo_origin_active_cache_entry_t combo_active_cache[COMBO_BUFFER_LENGTH];
 static uint32_t                          combo_origin_press_sequence = 0;
+static keypos_t                          combo_origin_last_pressed_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
 
 static uint16_t combo_origin_combo_keycode_for_record(keyrecord_t *record) {
     uint16_t keycode = get_record_keycode(record, true);
@@ -58,6 +59,19 @@ static combo_t *combo_origin_combo_get(uint16_t combo_index) {
     }
 
     return &key_combos[combo_index];
+}
+
+static void combo_origin_bitmap_fill_all_keys(uint8_t *out_bitmap) {
+    if (!out_bitmap) {
+        return;
+    }
+
+    key_origin_bitmap_clear(out_bitmap);
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            key_origin_bitmap_add_keypos(out_bitmap, (keypos_t){.row = row, .col = col});
+        }
+    }
 }
 
 static bool combo_origin_combo_is_active(const combo_t *combo) {
@@ -140,9 +154,17 @@ static bool combo_origin_combo_build_from_pressed_keys(uint16_t combo_index, uin
     return true;
 }
 
-static combo_origin_active_cache_entry_t *combo_origin_cache_entry_for_combo(uint16_t combo_index) {
+static combo_origin_active_cache_entry_t *combo_origin_cache_entry_for_store(uint16_t combo_index, uint16_t keycode) {
     for (uint8_t index = 0; index < ARRAY_SIZE(combo_active_cache); index++) {
-        if (combo_active_cache[index].active && combo_active_cache[index].combo_index == combo_index) {
+        if (!combo_active_cache[index].active) {
+            continue;
+        }
+
+        if (combo_index != UINT16_MAX && combo_active_cache[index].combo_index == combo_index) {
+            return &combo_active_cache[index];
+        }
+
+        if (combo_index == UINT16_MAX && combo_active_cache[index].combo_index == UINT16_MAX && combo_active_cache[index].keycode == keycode) {
             return &combo_active_cache[index];
         }
     }
@@ -157,7 +179,7 @@ static combo_origin_active_cache_entry_t *combo_origin_cache_entry_for_combo(uin
 }
 
 static void combo_origin_cache_store(uint16_t combo_index, uint16_t keycode, keypos_t owner_key_pos, const uint8_t *bitmap) {
-    combo_origin_active_cache_entry_t *entry = combo_origin_cache_entry_for_combo(combo_index);
+    combo_origin_active_cache_entry_t *entry = combo_origin_cache_entry_for_store(combo_index, keycode);
 
     if (!entry) {
         return;
@@ -170,20 +192,83 @@ static void combo_origin_cache_store(uint16_t combo_index, uint16_t keycode, key
     key_origin_bitmap_copy(entry->bitmap, bitmap);
 }
 
-static void combo_origin_cache_clear(uint16_t combo_index) {
-    combo_origin_active_cache_entry_t *entry = combo_origin_cache_entry_for_combo(combo_index);
+static void combo_origin_cache_clear(uint16_t combo_index, uint16_t keycode) {
+    for (uint8_t index = 0; index < ARRAY_SIZE(combo_active_cache); index++) {
+        combo_origin_active_cache_entry_t *entry = &combo_active_cache[index];
 
-    if (!entry) {
-        return;
-    }
+        if (!entry->active) {
+            continue;
+        }
 
-    if (entry->active && entry->combo_index == combo_index) {
+        if (combo_index != UINT16_MAX) {
+            if (entry->combo_index != combo_index) {
+                continue;
+            }
+        } else if (!(entry->combo_index == UINT16_MAX && entry->keycode == keycode)) {
+            continue;
+        }
+
         entry->active        = false;
         entry->combo_index   = UINT16_MAX;
         entry->keycode       = KC_NO;
-        entry->owner_key_pos = (keypos_t){0};
+        entry->owner_key_pos = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
         key_origin_bitmap_clear(entry->bitmap);
+        return;
     }
+}
+
+static bool combo_origin_latest_pressed_keypos(keypos_t *out_owner_key_pos) {
+    uint32_t latest_press_sequence = 0;
+    keypos_t latest_key_pos        = {0};
+    bool     found_any             = false;
+
+    if (out_owner_key_pos) {
+        *out_owner_key_pos = (keypos_t){0};
+    }
+
+    if (!out_owner_key_pos) {
+        return false;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            keypos_t                           key_pos      = {.row = row, .col = col};
+            combo_origin_physical_key_state_t *physical_key = &physical_key_states[key_origin_keypos_index(key_pos)];
+
+            if (!(physical_key->pressed && physical_key->press_sequence >= latest_press_sequence)) {
+                continue;
+            }
+
+            latest_press_sequence = physical_key->press_sequence;
+            latest_key_pos        = key_pos;
+            found_any             = true;
+        }
+    }
+
+    if (!found_any) {
+        return false;
+    }
+
+    *out_owner_key_pos = latest_key_pos;
+    return true;
+}
+
+static bool combo_origin_fallback_owner_keypos(keypos_t *out_owner_key_pos) {
+    if (!out_owner_key_pos) {
+        return false;
+    }
+
+    *out_owner_key_pos = (keypos_t){0};
+    if (combo_origin_latest_pressed_keypos(out_owner_key_pos)) {
+        return true;
+    }
+
+    if (key_origin_keypos_valid(combo_origin_last_pressed_key_pos)) {
+        *out_owner_key_pos = combo_origin_last_pressed_key_pos;
+        return true;
+    }
+
+    return false;
 }
 
 static bool combo_origin_collect_matching_active_combos(uint16_t keycode, uint16_t *primary_combo_index, keypos_t *primary_owner_key_pos, uint8_t *out_bitmap) {
@@ -266,13 +351,17 @@ static bool combo_origin_collect_matching_cached_combos(uint16_t keycode, uint16
 
 void noah_qmk_combo_origin_reset(void) {
     combo_origin_press_sequence = 0;
+    combo_origin_last_pressed_key_pos = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
 
     for (uint16_t index = 0; index < ARRAY_SIZE(physical_key_states); index++) {
         physical_key_states[index] = (combo_origin_physical_key_state_t){0};
     }
 
     for (uint8_t index = 0; index < ARRAY_SIZE(combo_active_cache); index++) {
-        combo_active_cache[index].combo_index = UINT16_MAX;
+        combo_active_cache[index].active        = false;
+        combo_active_cache[index].combo_index   = UINT16_MAX;
+        combo_active_cache[index].keycode       = KC_NO;
+        combo_active_cache[index].owner_key_pos = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
         key_origin_bitmap_clear(combo_active_cache[index].bitmap);
     }
 }
@@ -295,6 +384,7 @@ void noah_qmk_combo_origin_observe_physical_key_event(uint16_t keycode, keyrecor
         entry->pressed        = true;
         entry->combo_keycode  = combo_origin_combo_keycode_for_record(record);
         entry->press_sequence = ++combo_origin_press_sequence;
+        combo_origin_last_pressed_key_pos = record->event.key;
         return;
     }
 
@@ -320,6 +410,11 @@ void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *recor
             if (combo_index != UINT16_MAX) {
                 combo_origin_cache_store(combo_index, keycode, owner_key_pos, bitmap);
             }
+        } else if (combo_origin_fallback_owner_keypos(&owner_key_pos)) {
+            combo_origin_bitmap_fill_all_keys(bitmap);
+            record->event.key = owner_key_pos;
+            key_origin_registry_set_bitmap(owner_key_pos, bitmap);
+            combo_origin_cache_store(UINT16_MAX, keycode, owner_key_pos, bitmap);
         }
         return;
     }
@@ -329,8 +424,8 @@ void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *recor
         record->event.key = owner_key_pos;
         key_origin_registry_set_bitmap(owner_key_pos, key_origin_bitmap_has_any(bitmap) ? bitmap : NULL);
     }
-    if (combo_index != UINT16_MAX) {
-        combo_origin_cache_clear(combo_index);
+    if (matched) {
+        combo_origin_cache_clear(combo_index, keycode);
     }
 }
 
