@@ -134,7 +134,7 @@ static uint8_t key_feedback_preview_layer_for_token(const press_token_t *token) 
     return token->interaction.contract.hold.preview_layer;
 }
 
-uint8_t key_feedback_preview_layer(void) {
+static uint8_t key_feedback_semantic_preview_layer(void) {
     keypos_t key_pos;
 
     if (!key_runtime_core_preview_owner_key_pos(&key_pos)) {
@@ -142,6 +142,43 @@ uint8_t key_feedback_preview_layer(void) {
     }
 
     return key_feedback_preview_layer_for_token(key_runtime_core_press_token_at(key_pos));
+}
+
+uint8_t key_feedback_preview_layer(void) {
+    key_runtime_core_state_t *state          = key_runtime_core_state();
+    uint8_t                   semantic_layer = key_feedback_semantic_preview_layer();
+
+    if (!state) {
+        return semantic_layer;
+    }
+
+    if (semantic_layer < LAYER_COUNT) {
+        state->preview_display_last_semantic_layer = semantic_layer;
+        state->preview_display_bridge_active       = false;
+        state->preview_display_bridge_layer        = UINT8_MAX;
+        return semantic_layer;
+    }
+
+    if (!state->preview_display_bridge_active && state->preview_display_last_semantic_layer < LAYER_COUNT
+        && layer_state_cmp(layer_state, state->preview_display_last_semantic_layer)) {
+        state->preview_display_bridge_active       = true;
+        state->preview_display_bridge_layer        = state->preview_display_last_semantic_layer;
+        state->preview_display_bridge_started_at   = timer_read();
+    }
+
+    state->preview_display_last_semantic_layer = UINT8_MAX;
+
+    if (state->preview_display_bridge_active) {
+        if (state->preview_display_bridge_layer < LAYER_COUNT && layer_state_cmp(layer_state, state->preview_display_bridge_layer)
+            && timer_elapsed(state->preview_display_bridge_started_at) < KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS) {
+            return state->preview_display_bridge_layer;
+        }
+
+        state->preview_display_bridge_active = false;
+        state->preview_display_bridge_layer  = UINT8_MAX;
+    }
+
+    return UINT8_MAX;
 }
 
 static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token) {

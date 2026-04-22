@@ -291,6 +291,10 @@ typedef struct {
     bool                                 feedback_pulse_active;
     bool                                 feedback_pulse_long_hold_level;
     keypos_t                             feedback_pulse_key_pos;
+    uint16_t                             preview_display_bridge_started_at;
+    uint8_t                              preview_display_last_semantic_layer;
+    uint8_t                              preview_display_bridge_layer;
+    bool                                 preview_display_bridge_active;
     uint8_t                              keyboard_event_masked_real_mods;
     bool                                 keyboard_event_mask_active;
 } key_runtime_core_state_t;
@@ -368,4 +372,6 @@ static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state)
     *state                               = (key_runtime_core_state_t){0};
     state->next_token_id                 = 1u;
     state->next_pending_release_sequence = 1u;
+    state->preview_display_last_semantic_layer = UINT8_MAX;
+    state->preview_display_bridge_layer        = UINT8_MAX;
 }

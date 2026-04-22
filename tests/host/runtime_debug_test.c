@@ -10,6 +10,7 @@
 #include "users/noah/lib/key/ownership/held_repeat.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/feedback.h"
+#include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/lib/key/runtime/transition.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
@@ -688,6 +689,55 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(trace_snapshot.count == 0u);
     CHECK(!trace_snapshot.overflowed);
     CHECK(send_keyboard_report_count >= 2);
+}
+
+static void test_display_preview_bridges_momentary_layer_handoff_briefly(void) {
+    keypos_t key_pos     = test_keypos(0, 0);
+    keypos_t preview_pos = (keypos_t){0};
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, true));
+    CHECK(noah_runtime_debug_preview_owner_slot_key_pos(&preview_pos));
+    CHECK(test_keypos_equal(preview_pos, key_pos));
+    CHECK(key_feedback_preview_layer() == 2u);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 1u);
+    noah_key_runtime_scan();
+
+    CHECK(layer_state_cmp(layer_state, 2u));
+    CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&preview_pos));
+    CHECK(key_feedback_preview_layer() == 2u);
+
+    fake_time = (uint16_t)(fake_time + (KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS - 1u));
+    CHECK(key_feedback_preview_layer() == 2u);
+
+    fake_time = (uint16_t)(fake_time + 1u);
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+}
+
+static void test_display_preview_bridge_clears_immediately_when_layer_releases(void) {
+    keypos_t key_pos     = test_keypos(0, 0);
+    keypos_t preview_pos = (keypos_t){0};
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, true));
+    CHECK(noah_runtime_debug_preview_owner_slot_key_pos(&preview_pos));
+    CHECK(key_feedback_preview_layer() == 2u);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 1u);
+    noah_key_runtime_scan();
+
+    CHECK(layer_state_cmp(layer_state, 2u));
+    CHECK(key_feedback_preview_layer() == 2u);
+
+    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, false));
+    CHECK(!layer_state_cmp(layer_state, 2u));
+    CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&preview_pos));
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
 }
 
 static void test_key_runtime_core_release_tracks_press_by_position_despite_keycode_mismatch(void) {
@@ -1884,6 +1934,8 @@ int main(void) {
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
     test_reset_clears_all_runtime_surfaces();
+    test_display_preview_bridges_momentary_layer_handoff_briefly();
+    test_display_preview_bridge_clears_immediately_when_layer_releases();
     test_key_runtime_core_release_tracks_press_by_position_despite_keycode_mismatch();
     test_key_runtime_core_timer_and_scan_do_not_rewrite_press_identity();
     test_key_runtime_core_active_release_resolution_preserves_tap_window_without_scan();

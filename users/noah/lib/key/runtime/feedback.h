@@ -5,7 +5,7 @@
 // Read-only runtime-visible feedback surfaces for RGB and split sync.
 //
 // This module now exposes three distinct surfaces:
-// - preview layer ownership
+// - preview layer display state
 // - combo RGB locality (underlay vs overlay)
 // - authored key-behavior semantic state as a packed per-key map
 //
@@ -19,6 +19,10 @@
 #include <stdint.h>
 
 #include "origin_registry.h"
+
+#ifndef KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS
+#    define KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS 20
+#endif
 
 #define KEY_FEEDBACK_SEMANTIC_BITS      3u
 #define KEY_FEEDBACK_SEMANTIC_MAP_SIZE ((((MATRIX_ROWS * MATRIX_COLS) * KEY_FEEDBACK_SEMANTIC_BITS) + 7u) / 8u)

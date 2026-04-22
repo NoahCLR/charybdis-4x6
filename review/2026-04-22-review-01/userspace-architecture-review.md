@@ -78,6 +78,23 @@ This avoids repo-crossing patches into `../bastardkb-qmk`.
 The slave no longer reconstructs feedback from a single “current feedback
 snapshot”; it renders the same layer inputs the master uses.
 
+### Preview display now has a narrow split-only handoff bridge
+
+- Semantic preview ownership is still determined entirely by the handled-key
+  runtime.
+- The exported preview display surface may briefly keep showing the same layer
+  after semantic preview drops, but only when that layer is already really
+  active on the master.
+- This bridge exists to hide transport skew between:
+  - the custom preview field in split runtime sync
+  - the normal upstream split layer-state propagation
+- The bridge is display-only, clears immediately if the layer is no longer
+  active, and expires after a short fixed timeout.
+
+This keeps the slave from flashing the underlying layer color during
+`preview -> same real layer active` handoffs without redefining preview
+ownership semantics.
+
 ### Key-behavior feedback is now truthful per key
 
 - The runtime no longer picks one active feedback source by matrix order.
@@ -177,6 +194,10 @@ rule while still shrinking the persistent non-slot state.
   That keeps the runtime simpler than maintaining separate dirty-flag or
   request bookkeeping, but it means sync cadence depends on matrix-scan-driven
   packet rebuilds instead of immediate call-site forcing.
+- The preview handoff bridge is intentionally a display workaround, not a
+  semantic runtime change. It is cleaner than extending preview through the
+  whole hold, but it still exists because preview and real layer state reach
+  the slave through different transports.
 - A combo row must not repeat the same member keycode within that one row,
   because the footprint tracker cannot disambiguate that authored shape.
 - Hot replay effect payloads are intentionally size-constrained. Carrying full
@@ -196,6 +217,9 @@ rule while still shrinking the persistent non-slot state.
   its output drives authored key-behavior feedback, preview, or PD state.
 - Preview-owning and PD-owning combos must route to the combo underlay; all
   other combos must stay in the combo overlay.
+- Preview display may briefly bridge `preview -> same active layer` handoffs,
+  but preview ownership itself must still drop as soon as the handled-key
+  runtime says the preview is over.
 - `KEY_FEEDBACK_MODE_KEY_HALF` may broaden to both halves for cross-half combos.
 - `KEY_FEEDBACK_MODE_KEY` paints every combo key in the footprint.
 - `MULTI_TAP_PENDING` is the top key-feedback semantic priority when a

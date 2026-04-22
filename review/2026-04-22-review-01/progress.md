@@ -157,6 +157,28 @@
   - active-vs-idle heartbeat cadence
   - unchanged steady packets staying quiet across phase flips
 
+### Preview Handoff Smoothing
+
+- Added a narrow display-only preview bridge in
+  `users/noah/lib/key/runtime/feedback.c` for
+  `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))` handoffs.
+- When semantic preview drops because the hold has committed and the same layer
+  is already really active on the master, the display preview surface now
+  keeps returning that layer briefly instead of falling straight to
+  `UINT8_MAX`.
+- The bridge is intentionally short and conditional:
+  - it only starts on a real `preview -> same layer active` handoff
+  - it clears immediately if the layer is no longer active
+  - it expires after `KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS`
+- This keeps the slave from briefly flashing the underlying layer color while
+  the upstream split layer-state path catches up, without changing semantic
+  preview ownership or extending preview through the whole hold duration.
+- Added host coverage for:
+  - semantic preview dropping while the bridged display preview stays visible
+    briefly
+  - immediate bridge clear on release
+  - slave render continuity across remote preview-to-real-layer handoff
+
 ### Verification
 
 Passed:
@@ -168,6 +190,10 @@ Passed:
 - `sh tests/host/run_action_lifecycle_tests.sh`
 - `sh tests/host/run_pd_mode_tests.sh`
 - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
 - `sh tests/host/run_key_runtime_scenario_tests.sh`
 - `sh tests/host/run_rgb_layer_render_tests.sh`
 - `sh tests/host/run_split_runtime_sync_tests.sh`

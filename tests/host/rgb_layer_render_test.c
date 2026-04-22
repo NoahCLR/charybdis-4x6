@@ -509,6 +509,30 @@ static void test_slave_preview_layer_uses_remote_sync_state(void) {
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
+static void test_slave_preview_handoff_to_matching_remote_layer_stays_continuous(void) {
+    test_reset();
+
+    fake_is_master               = false;
+    test_keymap[LAYER_NUM][0][0] = 0x0020u;
+
+    layer_state                                 = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
+    CHECK(render_output());
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+
+    memset(led_output, 0, sizeof(led_output));
+    layer_state = ((layer_state_t)1u << LAYER_SYM) | ((layer_state_t)1u << LAYER_NUM);
+    split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
+    CHECK(render_output());
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+
+    memset(led_output, 0, sizeof(led_output));
+    layer_state                                 = (layer_state_t)1u << LAYER_NUM;
+    split_runtime_sync_remote.key_preview_layer = UINT8_MAX;
+    CHECK(render_output());
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+}
+
 static void test_combo_overlay_paints_exact_combo_keys(void) {
     test_reset();
 
@@ -1453,6 +1477,7 @@ int main(void) {
     test_invalidating_layer_map_refreshes_dynamic_keymap_coverage();
     test_preview_layer_overlays_existing_active_layers();
     test_slave_preview_layer_uses_remote_sync_state();
+    test_slave_preview_handoff_to_matching_remote_layer_stays_continuous();
     test_combo_overlay_paints_exact_combo_keys();
     test_combo_overlay_stays_visible_over_preview();
     test_combo_underlay_stays_below_preview();
