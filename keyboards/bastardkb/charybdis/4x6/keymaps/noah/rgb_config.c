@@ -227,7 +227,7 @@ const combo_feedback_color_config_t combo_feedback_colors = {
     .held_color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
     // Keep combo identity on the exact keys that formed the chord.
-    .mode = COMBO_FEEDBACK_MODE_COMBO_KEYS,
+    .mode = COMBO_FEEDBACK_MODE_COMBO_HALF,
 };
 #    endif
 
