@@ -80,6 +80,33 @@
   `press_token_t` did not shrink because its remaining fields still land on
   the same padded object size.
 
+### Phase 2 Persistent Runtime Compaction
+
+- Compacted the remaining non-slot persistent runtime surfaces instead of
+  trying to derive their key positions:
+  - `leases[]` now store one packed owner matrix index
+  - `pending_releases[]` now store one packed key position in an internal slot
+    struct while the public `pending_release_t` API stays semantic
+- Removed the stale `deferred_release_blockers[]` storage and the matching dead
+  state counters from `key_runtime_core_state_t`.
+  - Current blocker semantics are derived live from press tokens
+  - `key_runtime_core_observe_deferred_release_blocker_profile(...)` was
+    already a no-op, so this removed dead storage rather than live behavior
+- Kept the public pending-release surface unchanged:
+  - `key_runtime_core_pending_release_at_order(...)`
+  - `key_runtime_core_take_pending_release_dispatches(...)`
+  - `noah_runtime_debug_deferred_release_key_pos(...)`
+  still expose normal `keypos_t`
+- Added compactness guards for the packed persistent slot types:
+  - `sizeof(pending_release_slot_t) <= 12`
+  - `sizeof(lease_t) <= 12`
+- Measured host-probe size delta for this pass:
+  - `lease_t`: `16 -> 10`
+  - `pending_release_slot_t`: `14 -> 12`
+  - `key_runtime_core_state_t`: `19696 -> 17392`
+- Net result: phase 2 recovered another `2304` bytes from
+  `key_runtime_core_state_t`.
+
 ### Verification
 
 Passed:
@@ -131,6 +158,15 @@ Passed:
 - `sh tests/host/run_qmk_contract_checks.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_delayed_action_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
 
 ### Notes
 
@@ -144,10 +180,11 @@ Passed:
 
 ### Next Steps
 
-- Reassess whether phase 2 compaction is still worth it now that
-  `key_runtime_core_state_t` is down to `19696` bytes.
-- If more headroom is still justified, audit the non-slot arrays next:
-  `leases`, `pending_releases`, and `deferred_release_blockers`.
+- Reassess whether any phase-3 runtime compaction is still justified now that
+  `key_runtime_core_state_t` is down to `17392` bytes.
+- If more headroom is still needed, the next likely targets are structural
+  audits of persistent-intent storage and whether any remaining debug-only
+  counters should stay resident in the core state.
 - Keep the new size-guard discipline on all hot stack-backed runtime surfaces;
   future key-position or ownership work should pack stored representations
   first and only expand to full `keypos_t` at execution boundaries.

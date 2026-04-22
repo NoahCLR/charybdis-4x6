@@ -17,6 +17,7 @@
 #include <stdint.h>
 
 #include "../../interaction/handled_key.h"
+#include "../keypos_codec.h"
 #include "../effects/effect_queue.h"
 #include "../interaction.h"
 #include "../../../pointing/defs/pd_mode_flags.h"
@@ -126,6 +127,17 @@ _Static_assert(sizeof(key_runtime_core_effect_plan_t) <= 196u, "key_runtime_core
 
 typedef struct {
     bool                 active;
+    key_runtime_packed_keypos_t packed_key_pos;
+    uint16_t             owner_token_id;
+    uint16_t             sequence;
+    uint16_t             action;
+    keyboard_mod_state_t mods;
+} pending_release_slot_t;
+
+_Static_assert(sizeof(pending_release_slot_t) <= 12u, "pending_release_slot_t must stay compact");
+
+typedef struct {
+    bool                 active;
     uint16_t             owner_token_id;
     uint16_t             sequence;
     keypos_t             key_pos;
@@ -153,9 +165,9 @@ typedef enum {
 
 typedef struct {
     bool         active;
-    lease_kind_t kind;
+    uint8_t      kind;
     uint16_t     owner_token_id;
-    keypos_t     owner_key_pos;
+    key_runtime_packed_keypos_t owner_packed_key_pos;
     union {
         uint8_t layer;
         struct {
@@ -174,6 +186,8 @@ typedef struct {
         } pointer_anchor;
     } data;
 } lease_t;
+
+_Static_assert(sizeof(lease_t) <= 12u, "lease_t must stay compact");
 
 typedef enum {
     PERSISTENT_INTENT_KIND_NONE = 0,
@@ -259,8 +273,7 @@ typedef struct {
     press_token_t                        press_tokens[KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY];
     tap_series_t                         tap_series[KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY];
     lease_t                              leases[KEY_RUNTIME_CORE_LEASE_CAPACITY];
-    pending_release_t                    pending_releases[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
-    deferred_release_blocker_t           deferred_release_blockers[KEY_RUNTIME_CORE_DEFERRED_RELEASE_BLOCKER_CAPACITY];
+    pending_release_slot_t               pending_releases[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
     persistent_intent_t                  persistent_intents[KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY];
     key_runtime_core_shadow_projection_t shadow_projection;
     uint16_t                             current_time;
@@ -270,8 +283,6 @@ typedef struct {
     uint8_t                              tap_series_count;
     uint8_t                              lease_count;
     uint8_t                              pending_release_count;
-    uint8_t                              deferred_release_blocker_count;
-    uint8_t                              deferred_release_timed_blocker_count;
     uint8_t                              persistent_intent_count;
     uint8_t                              release_keycode_mismatch_count;
     uint8_t                              orphan_release_count;

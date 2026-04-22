@@ -139,6 +139,41 @@ static keypos_t key_runtime_core_tap_series_resolve_key_pos(const key_runtime_co
     return key_runtime_core_tap_series_slot_index(state, series, &index) ? key_runtime_core_keypos_from_slot_index(index) : key_runtime_core_invalid_keypos();
 }
 
+static keypos_t key_runtime_core_pending_release_slot_key_pos(const pending_release_slot_t *pending) {
+    return pending ? key_runtime_keypos_unpack(pending->packed_key_pos) : key_runtime_core_invalid_keypos();
+}
+
+static pending_release_t key_runtime_core_pending_release_slot_snapshot(const pending_release_slot_t *pending) {
+    if (!pending) {
+        return (pending_release_t){0};
+    }
+
+    return (pending_release_t){
+        .active         = pending->active,
+        .owner_token_id = pending->owner_token_id,
+        .sequence       = pending->sequence,
+        .key_pos        = key_runtime_core_pending_release_slot_key_pos(pending),
+        .action         = pending->action,
+        .mods           = pending->mods,
+    };
+}
+
+static bool key_runtime_core_pending_release_slot_matches(const pending_release_slot_t *pending, keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
+    return pending && pending->active && key_runtime_core_keypos_equal(key_runtime_core_pending_release_slot_key_pos(pending), key_pos) && pending->action == action && pending->mods.real == mods.real && pending->mods.weak == mods.weak && pending->mods.oneshot == mods.oneshot && pending->mods.oneshot_locked == mods.oneshot_locked;
+}
+
+static lease_kind_t key_runtime_core_lease_kind(const lease_t *lease) {
+    return lease ? (lease_kind_t)lease->kind : LEASE_KIND_NONE;
+}
+
+static keypos_t key_runtime_core_lease_owner_key_pos(const lease_t *lease) {
+    return lease ? key_runtime_keypos_unpack(lease->owner_packed_key_pos) : key_runtime_core_invalid_keypos();
+}
+
+static bool key_runtime_core_lease_owner_keypos_equal(const lease_t *lease, keypos_t key_pos) {
+    return lease && key_runtime_core_keypos_equal(key_runtime_core_lease_owner_key_pos(lease), key_pos);
+}
+
 void key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan) {
     if (!plan) {
         return;
@@ -474,16 +509,16 @@ static void key_runtime_core_tap_series_clear(key_runtime_core_state_t *state, t
     }
 }
 
-static pending_release_t *key_runtime_core_allocate_pending_release(key_runtime_core_state_t *state) {
+static pending_release_slot_t *key_runtime_core_allocate_pending_release(key_runtime_core_state_t *state) {
     if (!state) {
         return NULL;
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; index++) {
-        pending_release_t *pending = &state->pending_releases[index];
+        pending_release_slot_t *pending = &state->pending_releases[index];
 
         if (!pending->active) {
-            *pending        = (pending_release_t){0};
+            *pending        = (pending_release_slot_t){0};
             pending->active = true;
             state->pending_release_count++;
             return pending;
@@ -502,7 +537,7 @@ static int16_t key_runtime_core_oldest_pending_release_index(const key_runtime_c
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; index++) {
-        const pending_release_t *pending = &state->pending_releases[index];
+        const pending_release_slot_t *pending = &state->pending_releases[index];
 
         if (!pending->active || (selected >= 0 && pending->sequence >= sequence)) {
             continue;
@@ -527,7 +562,7 @@ static int16_t key_runtime_core_pending_release_index_for_order(const key_runtim
         uint16_t sequence = 0u;
 
         for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; index++) {
-            const pending_release_t *pending = &state->pending_releases[index];
+            const pending_release_slot_t *pending = &state->pending_releases[index];
 
             if (!(pending->active && pending->sequence > previous_sequence) || (selected >= 0 && pending->sequence >= sequence)) {
                 continue;
@@ -559,7 +594,7 @@ static uint8_t key_runtime_core_pending_release_count_for_owner_token(const key_
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; index++) {
-        const pending_release_t *pending = &state->pending_releases[index];
+        const pending_release_slot_t *pending = &state->pending_releases[index];
 
         if (pending->active && pending->owner_token_id == owner_token_id) {
             count++;
@@ -877,7 +912,7 @@ static lease_t *key_runtime_core_find_pd_mode_lease(key_runtime_core_state_t *st
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->kind == LEASE_KIND_PD_MODE && lease->owner_token_id == owner_token_id && lease->data.pd_mode == mode) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE && lease->owner_token_id == owner_token_id && lease->data.pd_mode == mode) {
             return lease;
         }
     }
@@ -893,7 +928,7 @@ static lease_t *key_runtime_core_find_pointer_anchor_lease(key_runtime_core_stat
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->kind == LEASE_KIND_POINTER_ANCHOR && lease->owner_token_id == owner_token_id) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTER_ANCHOR && lease->owner_token_id == owner_token_id) {
             return lease;
         }
     }
@@ -909,7 +944,7 @@ static lease_t *key_runtime_core_find_modifier_lease(key_runtime_core_state_t *s
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->kind == LEASE_KIND_MODIFIER && lease->owner_token_id == owner_token_id && lease->data.modifier.modifiers == modifiers && lease->data.modifier.physical == physical) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_MODIFIER && lease->owner_token_id == owner_token_id && lease->data.modifier.modifiers == modifiers && lease->data.modifier.physical == physical) {
             return lease;
         }
     }
@@ -925,7 +960,7 @@ static lease_t *key_runtime_core_find_layer_lease(key_runtime_core_state_t *stat
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->kind == LEASE_KIND_LAYER && lease->owner_token_id == owner_token_id && lease->data.layer == layer) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_LAYER && lease->owner_token_id == owner_token_id && lease->data.layer == layer) {
             return lease;
         }
     }
@@ -941,7 +976,7 @@ static lease_t *key_runtime_core_find_held_action_lease(key_runtime_core_state_t
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->kind == LEASE_KIND_HELD_ACTION && key_runtime_core_keypos_equal(lease->owner_key_pos, key_pos) && lease->data.action == action) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_HELD_ACTION && key_runtime_core_lease_owner_keypos_equal(lease, key_pos) && lease->data.action == action) {
             return lease;
         }
     }
@@ -957,7 +992,7 @@ static lease_t *key_runtime_core_find_repeat_lease(key_runtime_core_state_t *sta
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->kind == LEASE_KIND_REPEAT && key_runtime_core_keypos_equal(lease->owner_key_pos, key_pos) && lease->data.repeat.action == action) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_REPEAT && key_runtime_core_lease_owner_keypos_equal(lease, key_pos) && lease->data.repeat.action == action) {
             return lease;
         }
     }
@@ -1001,11 +1036,11 @@ static bool key_runtime_core_layer_lease_activate(key_runtime_core_state_t *stat
     }
 
     *lease = (lease_t){
-        .active         = true,
-        .kind           = LEASE_KIND_LAYER,
-        .owner_token_id = owner_token_id,
-        .owner_key_pos  = owner_key_pos,
-        .data.layer     = layer,
+        .active               = true,
+        .kind                 = LEASE_KIND_LAYER,
+        .owner_token_id       = owner_token_id,
+        .owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos),
+        .data.layer           = layer,
     };
     return true;
 }
@@ -1027,10 +1062,10 @@ static bool key_runtime_core_modifier_lease_activate(key_runtime_core_state_t *s
     }
 
     *lease = (lease_t){
-        .active         = true,
-        .kind           = LEASE_KIND_MODIFIER,
-        .owner_token_id = owner_token_id,
-        .owner_key_pos  = owner_key_pos,
+        .active               = true,
+        .kind                 = LEASE_KIND_MODIFIER,
+        .owner_token_id       = owner_token_id,
+        .owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos),
         .data.modifier =
             {
                 .modifiers = modifiers,
@@ -1057,11 +1092,11 @@ static bool key_runtime_core_pd_mode_lease_activate(key_runtime_core_state_t *st
     }
 
     *lease = (lease_t){
-        .active         = true,
-        .kind           = LEASE_KIND_PD_MODE,
-        .owner_token_id = owner_token_id,
-        .owner_key_pos  = owner_key_pos,
-        .data.pd_mode   = mode,
+        .active               = true,
+        .kind                 = LEASE_KIND_PD_MODE,
+        .owner_token_id       = owner_token_id,
+        .owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos),
+        .data.pd_mode         = mode,
     };
     return true;
 }
@@ -1083,10 +1118,10 @@ static bool key_runtime_core_pointer_anchor_lease_activate(key_runtime_core_stat
     }
 
     *lease = (lease_t){
-        .active         = true,
-        .kind           = LEASE_KIND_POINTER_ANCHOR,
-        .owner_token_id = owner_token_id,
-        .owner_key_pos  = owner_key_pos,
+        .active               = true,
+        .kind                 = LEASE_KIND_POINTER_ANCHOR,
+        .owner_token_id       = owner_token_id,
+        .owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos),
         .data.pointer_anchor =
             {
                 .layer               = key_runtime_core_default_pointer_layer(),
@@ -1113,11 +1148,11 @@ static bool key_runtime_core_held_action_lease_activate(key_runtime_core_state_t
     }
 
     *lease = (lease_t){
-        .active         = true,
-        .kind           = LEASE_KIND_HELD_ACTION,
-        .owner_token_id = owner_token_id,
-        .owner_key_pos  = owner_key_pos,
-        .data.action    = action,
+        .active               = true,
+        .kind                 = LEASE_KIND_HELD_ACTION,
+        .owner_token_id       = owner_token_id,
+        .owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos),
+        .data.action          = action,
     };
     return true;
 }
@@ -1139,10 +1174,10 @@ static bool key_runtime_core_repeat_lease_activate(key_runtime_core_state_t *sta
     }
 
     *lease = (lease_t){
-        .active         = true,
-        .kind           = LEASE_KIND_REPEAT,
-        .owner_token_id = owner_token_id,
-        .owner_key_pos  = owner_key_pos,
+        .active               = true,
+        .kind                 = LEASE_KIND_REPEAT,
+        .owner_token_id       = owner_token_id,
+        .owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos),
         .data.repeat =
             {
                 .action    = action,
@@ -1343,7 +1378,7 @@ static void key_runtime_core_release_leases_for_token(key_runtime_core_state_t *
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->owner_token_id == owner_token_id && lease->kind != LEASE_KIND_HELD_ACTION && lease->kind != LEASE_KIND_REPEAT) {
+        if (lease->active && lease->owner_token_id == owner_token_id && key_runtime_core_lease_kind(lease) != LEASE_KIND_HELD_ACTION && key_runtime_core_lease_kind(lease) != LEASE_KIND_REPEAT) {
             *lease = (lease_t){0};
             if (state->lease_count != 0u) {
                 state->lease_count--;
@@ -1360,7 +1395,7 @@ static bool key_runtime_core_owner_has_lease_kind(const key_runtime_core_state_t
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         const lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->owner_token_id == owner_token_id && lease->kind == kind) {
+        if (lease->active && lease->owner_token_id == owner_token_id && key_runtime_core_lease_kind(lease) == kind) {
             return true;
         }
     }
@@ -1382,11 +1417,11 @@ static bool key_runtime_core_release_runtime_owned_state_leases_for_key(key_runt
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (!lease->active || !key_runtime_core_keypos_equal(lease->owner_key_pos, key_pos)) {
+        if (!lease->active || !key_runtime_core_lease_owner_keypos_equal(lease, key_pos)) {
             continue;
         }
 
-        if (lease->kind == LEASE_KIND_HELD_ACTION || lease->kind == LEASE_KIND_REPEAT) {
+        if (key_runtime_core_lease_kind(lease) == LEASE_KIND_HELD_ACTION || key_runtime_core_lease_kind(lease) == LEASE_KIND_REPEAT) {
             *lease = (lease_t){0};
             if (state->lease_count != 0u) {
                 state->lease_count--;
@@ -1410,7 +1445,7 @@ static void key_runtime_core_release_pd_related_leases_for_token(key_runtime_cor
             continue;
         }
 
-        if (lease->kind == LEASE_KIND_PD_MODE || lease->kind == LEASE_KIND_POINTER_ANCHOR) {
+        if (key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE || key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTER_ANCHOR) {
             *lease = (lease_t){0};
             if (state->lease_count != 0u) {
                 state->lease_count--;
@@ -1434,7 +1469,7 @@ static void key_runtime_core_shadow_projection_recompute(key_runtime_core_state_
             continue;
         }
 
-        switch (lease->kind) {
+        switch (key_runtime_core_lease_kind(lease)) {
             case LEASE_KIND_LAYER:
                 projection.layer_state |= (layer_state_t)1u << lease->data.layer;
                 break;
@@ -1516,7 +1551,7 @@ static void key_runtime_core_press_token_attach_press_leases(key_runtime_core_st
         for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
             lease_t *lease = &state->leases[index];
 
-            if (lease->active && lease->kind == LEASE_KIND_PD_MODE && lease->data.pd_mode != mode) {
+            if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE && lease->data.pd_mode != mode) {
                 key_runtime_core_release_pd_related_leases_for_token(state, lease->owner_token_id);
                 changed = true;
             }
@@ -1908,8 +1943,8 @@ static bool key_runtime_core_pending_multi_tap_flush_resolution(const tap_series
     return true;
 }
 
-static bool key_runtime_core_pending_release_matches(const pending_release_t *pending, keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
-    return pending && pending->active && key_runtime_core_keypos_equal(pending->key_pos, key_pos) && pending->action == action && pending->mods.real == mods.real && pending->mods.weak == mods.weak && pending->mods.oneshot == mods.oneshot && pending->mods.oneshot_locked == mods.oneshot_locked;
+static bool key_runtime_core_pending_release_matches(const pending_release_slot_t *pending, keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
+    return key_runtime_core_pending_release_slot_matches(pending, key_pos, action, mods);
 }
 
 static void key_runtime_core_pending_release_mark_token(key_runtime_core_state_t *state, uint16_t owner_token_id) {
@@ -2062,7 +2097,7 @@ uint8_t key_runtime_core_pending_release_count(void) {
 bool key_runtime_core_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     press_token_t            *token;
-    pending_release_t        *pending;
+    pending_release_slot_t   *pending;
 
     if (!(state && action != KC_NO && key_runtime_core_keypos_valid(key_pos))) {
         return false;
@@ -2074,11 +2109,11 @@ bool key_runtime_core_queue_pending_release_dispatch(keypos_t key_pos, uint16_t 
     }
 
     token    = key_runtime_core_press_token_state(state, key_pos);
-    *pending = (pending_release_t){
+    *pending = (pending_release_slot_t){
         .active         = true,
         .owner_token_id = token ? token->token_id : 0u,
         .sequence       = state->next_pending_release_sequence++,
-        .key_pos        = key_pos,
+        .packed_key_pos = key_runtime_keypos_pack(key_pos),
         .action         = action,
         .mods           = mods,
     };
@@ -2103,7 +2138,7 @@ bool key_runtime_core_pending_release_at_order(uint8_t order, pending_release_t 
         return false;
     }
 
-    *out = state->pending_releases[index];
+    *out = key_runtime_core_pending_release_slot_snapshot(&state->pending_releases[index]);
     return true;
 }
 
@@ -2181,9 +2216,9 @@ uint8_t key_runtime_core_take_pending_release_dispatches(pending_release_t *out,
             break;
         }
 
-        pending                        = state->pending_releases[index];
+        pending                        = key_runtime_core_pending_release_slot_snapshot(&state->pending_releases[index]);
         out[count++]                   = pending;
-        state->pending_releases[index] = (pending_release_t){0};
+        state->pending_releases[index] = (pending_release_slot_t){0};
         if (state->pending_release_count != 0u) {
             state->pending_release_count--;
         }
@@ -2666,7 +2701,7 @@ static uint16_t key_runtime_core_key_pos_held_action_keycode(const key_runtime_c
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         const lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->kind == LEASE_KIND_HELD_ACTION && key_runtime_core_keypos_equal(lease->owner_key_pos, key_pos)) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_HELD_ACTION && key_runtime_core_lease_owner_keypos_equal(lease, key_pos)) {
             return lease->data.action;
         }
     }
@@ -2682,7 +2717,7 @@ static bool key_runtime_core_key_pos_repeat_active(const key_runtime_core_state_
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         const lease_t *lease = &state->leases[index];
 
-        if (lease->active && lease->kind == LEASE_KIND_REPEAT && key_runtime_core_keypos_equal(lease->owner_key_pos, key_pos)) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_REPEAT && key_runtime_core_lease_owner_keypos_equal(lease, key_pos)) {
             return true;
         }
     }
@@ -3512,9 +3547,9 @@ uint8_t key_runtime_core_pending_release_count_for_keypos(keypos_t key_pos) {
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; index++) {
-        const pending_release_t *pending = &state->pending_releases[index];
+        const pending_release_slot_t *pending = &state->pending_releases[index];
 
-        if (pending->active && key_runtime_core_keypos_equal(pending->key_pos, key_pos)) {
+        if (pending->active && key_runtime_core_keypos_equal(key_runtime_core_pending_release_slot_key_pos(pending), key_pos)) {
             count++;
         }
     }
@@ -3549,7 +3584,7 @@ void key_runtime_core_pd_mode_lock_set(pd_mode_mask_t mode, bool active) {
         for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
             lease_t *lease = &state->leases[index];
 
-            if (lease->active && lease->kind == LEASE_KIND_PD_MODE && lease->data.pd_mode != mode) {
+            if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE && lease->data.pd_mode != mode) {
                 key_runtime_core_release_pd_related_leases_for_token(state, lease->owner_token_id);
                 changed = true;
             }
@@ -3578,13 +3613,13 @@ void key_runtime_core_observe_release_dispatch_drained(keypos_t key_pos, uint16_
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; index++) {
-        pending_release_t pending = state->pending_releases[index];
+        pending_release_slot_t pending = state->pending_releases[index];
 
         if (!key_runtime_core_pending_release_matches(&pending, key_pos, action, mods)) {
             continue;
         }
 
-        state->pending_releases[index] = (pending_release_t){0};
+        state->pending_releases[index] = (pending_release_slot_t){0};
         if (state->pending_release_count != 0u) {
             state->pending_release_count--;
         }

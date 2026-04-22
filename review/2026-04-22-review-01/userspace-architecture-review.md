@@ -8,7 +8,9 @@ position `(0,0)` for locality-sensitive userspace behavior, plus the follow-up
 runtime remediation needed after the later key-position replay widening caused
 stack-backed transition plans to grow too large on hardware. It now also
 covers the narrow phase-1 key-runtime core compaction that removed redundant
-stored key positions from the slot-indexed core arrays.
+stored key positions from the slot-indexed core arrays, plus the phase-2
+persistent runtime compaction that packed the remaining non-slot ownership and
+pending-release storage.
 
 ## Decisions
 
@@ -77,6 +79,20 @@ stack regression in the transition planners.
 This keeps the compaction local to the core layout and avoids accidental
 generalization onto non-slot surfaces that would break ownership semantics.
 
+### Non-slot persistent surfaces now pack stored key positions
+
+- `leases[]` and `pending_releases[]` are not one-entry-per-slot, so they do
+  not derive position from array index.
+- Instead, they now store packed matrix indices internally and unpack back to
+  `keypos_t` only when a semantic surface needs to observe them.
+- The public pending-release API remains semantic even though the stored slot
+  representation is compact.
+- The old `deferred_release_blockers[]` storage was removed because the
+  current blocker contract is already derived live from press tokens.
+
+This preserves the “derive only when identity really comes from the index”
+rule while still shrinking the persistent non-slot state.
+
 ## Current Structure
 
 - Combo ingress and QMK-specific assumptions live in
@@ -87,6 +103,9 @@ generalization onto non-slot surfaces that would break ownership semantics.
   `users/noah/lib/key/runtime/keypos_codec.h`.
 - Slot-index key-position derivation for `press_tokens[]` and `tap_series[]`
   lives in `users/noah/lib/key/runtime/core/runtime.c`.
+- Packed non-slot persistent storage for `leases[]` and `pending_releases[]`
+  also lives in `users/noah/lib/key/runtime/core/runtime.h` and
+  `users/noah/lib/key/runtime/core/runtime.c`.
 - Key-feedback locality renders from the synced bitmap in
   `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`.
 - PD trigger-side rendering derives from the synced side mask in
@@ -110,6 +129,8 @@ generalization onto non-slot surfaces that would break ownership semantics.
 - Slot-index compaction is only valid when the slot identity already is the
   physical key identity. That is true for `press_tokens[]` and `tap_series[]`
   after combo normalization, but not for the non-slot ownership tables.
+- Packed non-slot storage is a better fit for ownership tables than exposing
+  internal slot layout. That keeps semantic APIs stable while reducing memory.
 
 ## Intended Invariants
 
@@ -128,4 +149,8 @@ generalization onto non-slot surfaces that would break ownership semantics.
   - `sizeof(key_runtime_core_release_effect_plan_t) <= 196`
 - `press_tokens[]` and `tap_series[]` may derive key position from slot index,
   but non-slot arrays must not silently adopt that rule.
+- Non-slot persistent arrays may pack key position internally, but public
+  semantic surfaces must continue to expose normal `keypos_t`.
+- Stale storage that is no longer authoritative should be removed instead of
+  being kept “just in case”; deferred release blockers are derived, not stored.
 - All of the above must stay green under host tests and the firmware compile.
