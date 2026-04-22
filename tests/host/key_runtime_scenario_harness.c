@@ -391,7 +391,7 @@ static void action_dispatch_at(keypos_t key_pos, uint16_t action) {
 
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind                 = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
-        .data.dispatch_action = {.action = action, .key_pos = key_pos},
+        .data.dispatch_action = {.action = action, .packed_key_pos = key_runtime_keypos_pack(key_pos)},
     });
 }
 
@@ -536,7 +536,7 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
         .data.delayed_action =
             {
                 .action       = action,
-                .key_pos      = key_pos,
+                .packed_key_pos = key_runtime_keypos_pack(key_pos),
                 .mods         = mods,
                 .repeat_count = 1,
             },

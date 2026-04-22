@@ -207,8 +207,8 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
                 uprintf("  [%u] %s key=(%u,%u) action=0x%04X\n",
                         (unsigned int)i,
                         key_runtime_trace_effect_name(effect->kind),
-                        (unsigned int)effect->data.dispatch_action.key_pos.row,
-                        (unsigned int)effect->data.dispatch_action.key_pos.col,
+                        (unsigned int)key_runtime_effect_dispatch_action_key_pos(effect).row,
+                        (unsigned int)key_runtime_effect_dispatch_action_key_pos(effect).col,
                         (unsigned int)effect->data.dispatch_action.action);
                 break;
             case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
@@ -245,8 +245,8 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
                 uprintf("  [%u] %s key=(%u,%u) action=0x%04X repeat=%u\n",
                         (unsigned int)i,
                         key_runtime_trace_effect_name(effect->kind),
-                        (unsigned int)effect->data.delayed_action.key_pos.row,
-                        (unsigned int)effect->data.delayed_action.key_pos.col,
+                        (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).row,
+                        (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).col,
                         (unsigned int)effect->data.delayed_action.action,
                         (unsigned int)effect->data.delayed_action.repeat_count);
                 break;

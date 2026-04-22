@@ -34,6 +34,15 @@
   follows the same representative owner instead of drifting back to `(0,0)`.
 - Fixed `noah_qmk_combo_origin_reset()` to clear the full combo cache state
   instead of leaving stale `active`, `keycode`, or owner fields behind.
+- Fixed the later `9e8faca44c481af53b76dc9e87293523a7eebb01` key-runtime
+  regression by shrinking the two hot replay payloads that had started carrying
+  full `keypos_t` values through stack-backed transition plans.
+- Added `users/noah/lib/key/runtime/keypos_codec.h` so dispatch and delayed
+  replay effects now store a packed matrix index instead of a full `keypos_t`
+  while keeping the same runtime semantics at projection time.
+- Added a compile-time guard in `users/noah/lib/key/runtime/effects/effect.h`
+  so `key_runtime_effect_t` cannot silently grow past the size that keeps the
+  transition plans small enough for the firmware stack budget.
 
 ### Verification
 
@@ -64,6 +73,15 @@ Passed:
 - `sh tests/host/run_rgb_layer_render_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_delayed_action_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_action_dispatch_tests.sh`
 
 ### Notes
 
@@ -77,8 +95,11 @@ Passed:
 
 ### Next Steps
 
-- If hardware instability persists after this fallback/cache fix, instrument the
-  combo-origin path on-device next to confirm whether the failure is still in
-  combo normalization or elsewhere in runtime processing.
+- Flash the packed-key runtime build onto hardware and retest the original
+  right-thumb slash and rapid punctuation repros to confirm the watchdog reset
+  was the stack growth from `9e8faca...`.
+- If hardware instability persists after this runtime shrink, instrument the
+  handled-key release/deferred-dispatch path on-device next; combo-origin is no
+  longer the leading suspect for that reboot.
 - Overlapping active combos that share the same output keycode still deserve a
   dedicated release-path audit if that authored pattern becomes important.

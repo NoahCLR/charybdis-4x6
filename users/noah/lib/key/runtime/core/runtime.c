@@ -92,7 +92,7 @@ static void key_runtime_core_effect_plan_push_dispatch_action(key_runtime_core_e
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
                                                 .kind                 = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
-                                                .data.dispatch_action = {.action = action, .key_pos = key_pos},
+                                                .data.dispatch_action = {.action = action, .packed_key_pos = key_runtime_keypos_pack(key_pos)},
                                             });
 }
 
@@ -189,7 +189,7 @@ static void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_ef
                                                 .data.delayed_action =
                                                     {
                                                         .action       = action,
-                                                        .key_pos      = key_pos,
+                                                        .packed_key_pos = key_runtime_keypos_pack(key_pos),
                                                         .mods         = mods,
                                                         .repeat_count = repeat_count,
                                                     },
@@ -216,7 +216,7 @@ static void key_runtime_core_release_effect_plan_push_dispatch_action(key_runtim
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
                                                         .kind                 = KEY_RUNTIME_EFFECT_DISPATCH_ACTION,
-                                                        .data.dispatch_action = {.action = action, .key_pos = key_pos},
+                                                        .data.dispatch_action = {.action = action, .packed_key_pos = key_runtime_keypos_pack(key_pos)},
                                                     });
 }
 
@@ -278,7 +278,7 @@ static void key_runtime_core_release_effect_plan_push_delayed_action(key_runtime
                                                         .data.delayed_action =
                                                             {
                                                                 .action       = action,
-                                                                .key_pos      = key_pos,
+                                                                .packed_key_pos = key_runtime_keypos_pack(key_pos),
                                                                 .mods         = mods,
                                                                 .repeat_count = repeat_count,
                                                             },
@@ -303,7 +303,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
 
     switch (effect->kind) {
         case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
-            noah_emit_action_tap_at(effect->data.dispatch_action.key_pos, effect->data.dispatch_action.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+            noah_emit_action_tap_at(key_runtime_effect_dispatch_action_key_pos(effect), effect->data.dispatch_action.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
             return;
         case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
             key_runtime_core_observe_held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
@@ -343,7 +343,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             return;
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
             for (uint8_t repeat = 0; repeat < effect->data.delayed_action.repeat_count; repeat++) {
-                dispatch_delayed_action_at(effect->data.delayed_action.key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods);
+                dispatch_delayed_action_at(key_runtime_effect_delayed_action_key_pos(effect), effect->data.delayed_action.action, effect->data.delayed_action.mods);
             }
             return;
         case KEY_RUNTIME_EFFECT_NONE:

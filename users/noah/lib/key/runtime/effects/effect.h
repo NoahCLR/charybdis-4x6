@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "../../../pointing/defs/pd_mode_flags.h"
+#include "../keypos_codec.h"
 #include "../delayed_action.h"
 
 typedef enum {
@@ -35,7 +36,7 @@ typedef struct {
         uint16_t action;
         struct {
             uint16_t action;
-            keypos_t key_pos;
+            key_runtime_packed_keypos_t packed_key_pos;
         } dispatch_action;
         struct {
             keypos_t key_pos;
@@ -61,9 +62,19 @@ typedef struct {
         } pd_mode_lock_tap;
         struct {
             uint16_t              action;
-            keypos_t              key_pos;
+            key_runtime_packed_keypos_t packed_key_pos;
             delayed_action_mods_t mods;
             uint8_t               repeat_count;
         } delayed_action;
     } data;
 } key_runtime_effect_t;
+
+_Static_assert(sizeof(key_runtime_effect_t) <= 12u, "key runtime effect payloads must stay small enough for stack-backed transition plans");
+
+static inline keypos_t key_runtime_effect_dispatch_action_key_pos(const key_runtime_effect_t *effect) {
+    return effect ? key_runtime_keypos_unpack(effect->data.dispatch_action.packed_key_pos) : (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
+}
+
+static inline keypos_t key_runtime_effect_delayed_action_key_pos(const key_runtime_effect_t *effect) {
+    return effect ? key_runtime_keypos_unpack(effect->data.delayed_action.packed_key_pos) : (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
+}

@@ -30,7 +30,7 @@ static void key_runtime_release_plan_defer_dispatch_actions(key_runtime_transiti
     for (uint8_t read_index = 0; read_index < plan->count; read_index++) {
         const key_runtime_effect_t effect = plan->items[read_index];
 
-        if (effect.kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION && key_runtime_core_queue_pending_release_dispatch(effect.data.dispatch_action.key_pos, effect.data.dispatch_action.action, mods)) {
+        if (effect.kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION && key_runtime_core_queue_pending_release_dispatch(key_runtime_effect_dispatch_action_key_pos(&effect), effect.data.dispatch_action.action, mods)) {
             continue;
         }
 

@@ -4,7 +4,9 @@
 
 This review covers the combo-origin footprint work that landed on
 2026-04-22. The goal was to stop treating QMK combo outputs as synthetic key
-position `(0,0)` for locality-sensitive userspace behavior.
+position `(0,0)` for locality-sensitive userspace behavior, plus the follow-up
+runtime remediation needed after the later key-position replay widening caused
+stack-backed transition plans to grow too large on hardware.
 
 ## Decisions
 
@@ -48,12 +50,26 @@ This avoids repo-crossing patches into `../bastardkb-qmk`.
 The packet remains comfortably below the QMK RPC limit while matching the new
 locality contract.
 
+### Hot replay paths keep origin semantics in packed form
+
+- The handled-key runtime still carries real physical origin through tap and
+  delayed replay paths.
+- The hot replay effect payloads now store that origin as a packed matrix index
+  instead of a full `keypos_t`.
+- Projection code unpacks back to `keypos_t` only at the point where the
+  action is emitted.
+
+This keeps the newer trigger-origin behavior while avoiding another silent
+stack regression in the transition planners.
+
 ## Current Structure
 
 - Combo ingress and QMK-specific assumptions live in
   `users/noah/lib/compat/qmk_combo_origin.c`.
 - Shared locality storage lives in
   `users/noah/lib/key/runtime/origin_registry.c`.
+- Hot replay key-position packing lives in
+  `users/noah/lib/key/runtime/keypos_codec.h`.
 - Key-feedback locality renders from the synced bitmap in
   `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`.
 - PD trigger-side rendering derives from the synced side mask in
@@ -71,6 +87,9 @@ locality contract.
   side or key.
 - A combo row must not repeat the same member keycode within that one row,
   because the footprint tracker cannot disambiguate that authored shape.
+- Hot replay effect payloads are intentionally size-constrained. Carrying full
+  `keypos_t` through stack-backed transition plans is not acceptable for this
+  firmware target.
 
 ## Intended Invariants
 
@@ -80,4 +99,6 @@ locality contract.
 - `KEY_FEEDBACK_MODE_KEY` paints every combo key in the footprint.
 - `PD_COLOR_MODE_TRIGGER_HALF` may broaden to both halves for cross-half
   combo-triggered modes.
+- `key_runtime_effect_t` must stay small enough that transition plans do not
+  materially expand the firmware stack footprint.
 - All of the above must stay green under host tests and the firmware compile.
