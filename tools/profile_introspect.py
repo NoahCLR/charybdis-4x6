@@ -19,6 +19,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 
 KEYMAP_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "keymap.c"
 CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "config.h"
+USER_CONFIG_FILE = REPO_ROOT / "users" / "noah" / "config.h"
 RGB_CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "rgb_config.c"
 PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "defs" / "pd_mode_manifest.h"
 
@@ -521,6 +522,13 @@ def parse_config_macros(text: str) -> dict[str, str]:
         value = match.group("value")
         values[name] = normalize_expr(value) if value is not None else "defined"
     return values
+
+
+def merge_config_macros(*macro_sets: dict[str, str]) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for macro_set in macro_sets:
+        merged.update(macro_set)
+    return merged
 
 
 def eval_numeric_expr(expr: str, known_values: dict[str, str]) -> int:
@@ -1206,14 +1214,17 @@ def collect_macro_usages(
 
 
 def build_profile_model() -> dict[str, object]:
-    config_text = strip_comments(read_text(CONFIG_FILE))
+    keymap_config_text = strip_comments(read_text(CONFIG_FILE))
+    userspace_config_text = strip_comments(read_text(USER_CONFIG_FILE))
     rgb_config_raw_text = read_text(RGB_CONFIG_FILE)
     rgb_config_text = strip_comments(rgb_config_raw_text)
     keymap_text = strip_comments(read_text(KEYMAP_FILE))
     pd_mode_manifest_text = read_text(PD_MODE_MANIFEST_FILE)
 
-    layers = parse_config_layers(config_text)
-    config_macros = parse_config_macros(config_text)
+    layers = parse_config_layers(keymap_config_text)
+    userspace_config_macros = parse_config_macros(userspace_config_text)
+    keymap_config_macros = parse_config_macros(keymap_config_text)
+    config_macros = merge_config_macros(userspace_config_macros, keymap_config_macros)
     rgb_automouse_gradient_enabled = "RGB_AUTOMOUSE_GRADIENT_ENABLE" in config_macros
     rgb_key_behavior_feedback_enabled = "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE" in config_macros
     rgb_pd_mode_active_half_enabled = "RGB_PD_MODE_ACTIVE_HALF_ENABLE" in config_macros
@@ -1274,7 +1285,13 @@ def build_profile_model() -> dict[str, object]:
 
     return {
         "summary": summary,
-        "config": {"layers": layers, "macros": config_macros, "timing_defaults": timing_defaults},
+        "config": {
+            "layers": layers,
+            "macros": config_macros,
+            "keymap_macros": keymap_config_macros,
+            "userspace_macros": userspace_config_macros,
+            "timing_defaults": timing_defaults,
+        },
         "features": {
             "rgb_automouse_gradient_enabled": rgb_automouse_gradient_enabled,
             "rgb_key_behavior_feedback_enabled": rgb_key_behavior_feedback_enabled,
@@ -1299,19 +1316,21 @@ def build_profile_model() -> dict[str, object]:
 
 def render_markdown(profile: dict[str, object]) -> str:
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
-    config_link = markdown_path_link(CONFIG_FILE, "config.h")
+    config_link = markdown_path_link(CONFIG_FILE, "keymap config.h")
+    user_config_link = markdown_path_link(USER_CONFIG_FILE, "users/noah/config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     pd_manifest_link = markdown_path_link(PD_MODE_MANIFEST_FILE, "pd_mode_manifest.h")
     sections = [
         MARKDOWN_HEADER.rstrip(),
         "# Profile Introspection",
         "",
-        f"This report is generated from the authored profile files {keymap_link}, {config_link}, and {rgb_link}. The renderer is board-specific to the Charybdis 4x6 and derives the current `LAYOUT()` slot order directly from {keymap_link}.",
+        f"This report is generated from the authored profile files {keymap_link}, {config_link}, {user_config_link}, and {rgb_link}. The renderer is board-specific to the Charybdis 4x6 and derives the current `LAYOUT()` slot order directly from {keymap_link}.",
         "",
         f"PD mode names and bindings in this report stay in sync with the shared definitions in {pd_manifest_link}.",
         "",
         render_quick_legend_section(profile),
         render_layer_maps_section(profile),
+        render_pd_mode_color_section(profile),
     ]
     if profile["features"]["rgb_automouse_gradient_enabled"]:
         sections.append(render_automouse_fade_section(profile))
@@ -1438,15 +1457,22 @@ def render_summary_section(profile: dict[str, object]) -> str:
 
 
 def render_config_defines_section(profile: dict[str, object]) -> str:
+    keymap_link = markdown_path_link(CONFIG_FILE, "keymap config.h")
+    user_config_link = markdown_path_link(USER_CONFIG_FILE, "users/noah/config.h")
     lines = [
         "## Config Defines",
         "",
-        "| Macro | Value |",
-        "| --- | --- |",
+        "These values come from the keymap config and the shared userspace config. When the same macro is defined in both, the merged evaluation used by this report follows QMK include order and lets the keymap config override the userspace config.",
+        "",
+        "| Macro | Value | Source |",
+        "| --- | --- | --- |",
     ]
 
-    for name, value in profile["config"]["macros"].items():
-        lines.append(f"| `{name}` | `{value}` |")
+    for name, value in profile["config"]["userspace_macros"].items():
+        lines.append(f"| `{name}` | `{value}` | {user_config_link} |")
+
+    for name, value in profile["config"]["keymap_macros"].items():
+        lines.append(f"| `{name}` | `{value}` | {keymap_link} |")
 
     lines.append("")
     return "\n".join(lines)
@@ -1510,6 +1536,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
 def render_pd_mode_color_section(profile: dict[str, object]) -> str:
     pd_mode_colors = profile["rgb"]["pd_mode_colors"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
+    user_config_link = markdown_path_link(USER_CONFIG_FILE, "users/noah/config.h")
     lines = [
         "## PD Mode Colors",
         "",
@@ -1527,6 +1554,7 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
     lines.extend(
         [
             f"These overlays come from `pd_mode_colors[]` in {rgb_link}. Each row chooses its own paint mode and color for the matching pointing mode.",
+            f"`PD_COLOR_MODE_TRIGGER_HALF` is gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in {user_config_link}; current state: `{ 'defined' if profile['features']['rgb_pd_mode_active_half_enabled'] else 'not defined' }`.",
             "",
             "| PD Paint Mode | Meaning |",
             "| --- | --- |",

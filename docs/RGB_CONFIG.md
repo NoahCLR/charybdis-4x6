@@ -186,7 +186,7 @@ Each row also chooses where the overlay paints:
 - `PD_COLOR_MODE_BOTH_HALVES`: mirror the overlay across both halves
 - `PD_COLOR_MODE_TRIGGER_HALF`: paint the half that triggered the currently
   effective PD mode; this requires `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in
-  [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+  [`users/noah/config.h`](../users/noah/config.h).
   If the triggering combo footprint spans both halves, the overlay paints both
   halves instead of guessing one side.
 

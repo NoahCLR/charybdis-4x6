@@ -15,6 +15,7 @@ trap cleanup EXIT INT TERM
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCONSOLE_ENABLE \
     -DCOMBO_ENABLE \
+    -DSPLIT_KEYBOARD \
     -DPOINTING_DEVICE_ENABLE \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
