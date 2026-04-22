@@ -771,7 +771,7 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
-    CHECK(split_sync_count >= 1);
+    CHECK(split_sync_count == 0);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
     const press_token_t *release_token = key_runtime_core_press_token_at(key_pos);

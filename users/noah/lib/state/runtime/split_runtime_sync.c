@@ -34,10 +34,13 @@ static bool                         split_runtime_sync_initialized = false;
 static uint32_t                     split_runtime_base_last_send = 0;
 static uint32_t                     split_runtime_combo_last_send = 0;
 static uint32_t                     split_runtime_key_feedback_last_send = 0;
-static bool                         split_runtime_sync_force_pending = false;
 
-#    ifndef SPLIT_RUNTIME_SYNC_HEARTBEAT_MS
-#        define SPLIT_RUNTIME_SYNC_HEARTBEAT_MS 250
+#    ifndef SPLIT_RUNTIME_SYNC_ACTIVE_HEARTBEAT_MS
+#        define SPLIT_RUNTIME_SYNC_ACTIVE_HEARTBEAT_MS 250
+#    endif
+
+#    ifndef SPLIT_RUNTIME_SYNC_IDLE_HEARTBEAT_MS
+#        define SPLIT_RUNTIME_SYNC_IDLE_HEARTBEAT_MS 1000
 #    endif
 
 static void split_runtime_sync_log_packet_size_mismatch(const char *packet_name, uint8_t size, uint8_t expected) {
@@ -90,20 +93,43 @@ static split_runtime_combo_feedback_packet_t split_runtime_sync_build_combo_pack
 static split_runtime_key_feedback_packet_t split_runtime_sync_build_key_feedback_packet(void) {
     split_runtime_key_feedback_packet_t packet = {0};
 
-    packet.key_feedback_flash_meta = key_feedback_flash_meta();
     key_feedback_semantic_map(packet.key_feedback_semantic_map);
+    packet.key_feedback_flash_meta = key_feedback_flash_meta_for_semantic_map(packet.key_feedback_semantic_map);
 
     return packet;
 }
 
-static bool split_runtime_sync_heartbeat_due(bool sent_once, uint32_t last_send) {
-    return !sent_once || timer_elapsed32(last_send) >= SPLIT_RUNTIME_SYNC_HEARTBEAT_MS;
+static bool split_runtime_base_packet_is_active(const split_runtime_base_sync_packet_t *pkt) {
+    if (!pkt) {
+        return false;
+    }
+
+    return pkt->automouse_progress != 0u || pkt->active_mode_id != PD_MODE_ID_NONE || pkt->locked_mode_id != PD_MODE_ID_NONE
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+           || pkt->pd_mode_owner_sides != SPLIT_SIDE_MASK_NONE
+#endif
+           || pkt->key_preview_layer != UINT8_MAX;
+}
+
+static bool split_runtime_combo_packet_is_active(const split_runtime_combo_feedback_packet_t *pkt) {
+    return pkt && (key_origin_bitmap_has_any(pkt->combo_underlay_bitmap) || key_origin_bitmap_has_any(pkt->combo_overlay_bitmap));
+}
+
+static bool split_runtime_key_feedback_packet_is_active(const split_runtime_key_feedback_packet_t *pkt) {
+    return pkt && (pkt->key_feedback_flash_meta != 0u || key_feedback_semantic_map_has_any(pkt->key_feedback_semantic_map));
+}
+
+static bool split_runtime_sync_heartbeat_due(bool sent_once, uint32_t last_send, bool active) {
+    uint32_t heartbeat_ms = active ? SPLIT_RUNTIME_SYNC_ACTIVE_HEARTBEAT_MS : SPLIT_RUNTIME_SYNC_IDLE_HEARTBEAT_MS;
+
+    return !sent_once || timer_elapsed32(last_send) >= heartbeat_ms;
 }
 
 static void split_runtime_sync_broadcast_base(const split_runtime_base_sync_packet_t *pkt, bool force) {
     bool unchanged = split_runtime_base_sent_once && memcmp(&split_runtime_base_last_sent, pkt, sizeof(*pkt)) == 0;
+    bool active    = split_runtime_base_packet_is_active(pkt);
 
-    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_base_sent_once, split_runtime_base_last_send)) {
+    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_base_sent_once, split_runtime_base_last_send, active)) {
         return;
     }
 
@@ -117,8 +143,9 @@ static void split_runtime_sync_broadcast_base(const split_runtime_base_sync_pack
 
 static void split_runtime_sync_broadcast_combo(const split_runtime_combo_feedback_packet_t *pkt, bool force) {
     bool unchanged = split_runtime_combo_sent_once && memcmp(&split_runtime_combo_last_sent, pkt, sizeof(*pkt)) == 0;
+    bool active    = split_runtime_combo_packet_is_active(pkt);
 
-    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_combo_sent_once, split_runtime_combo_last_send)) {
+    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_combo_sent_once, split_runtime_combo_last_send, active)) {
         return;
     }
 
@@ -131,8 +158,9 @@ static void split_runtime_sync_broadcast_combo(const split_runtime_combo_feedbac
 
 static void split_runtime_sync_broadcast_key_feedback(const split_runtime_key_feedback_packet_t *pkt, bool force) {
     bool unchanged = split_runtime_key_feedback_sent_once && memcmp(&split_runtime_key_feedback_last_sent, pkt, sizeof(*pkt)) == 0;
+    bool active    = split_runtime_key_feedback_packet_is_active(pkt);
 
-    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_key_feedback_sent_once, split_runtime_key_feedback_last_send)) {
+    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_key_feedback_sent_once, split_runtime_key_feedback_last_send, active)) {
         return;
     }
 
@@ -233,7 +261,6 @@ void split_runtime_sync_init(void) {
     split_runtime_base_last_send       = timer_read32();
     split_runtime_combo_last_send      = split_runtime_base_last_send;
     split_runtime_key_feedback_last_send = split_runtime_base_last_send;
-    split_runtime_sync_force_pending   = false;
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_INIT, is_keyboard_master() ? 1u : 0u, 0u);
 
     if (is_keyboard_master()) {
@@ -248,8 +275,7 @@ void split_runtime_sync_tick(void) {
     raw_elapsed = noah_qmk_contract_auto_mouse_elapsed();
 #    endif
 
-    split_runtime_sync_elapsed_internal(raw_elapsed, split_runtime_sync_force_pending);
-    split_runtime_sync_force_pending = false;
+    split_runtime_sync_elapsed_internal(raw_elapsed, false);
 }
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force) {
@@ -272,10 +298,6 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
 
 void split_runtime_sync_elapsed(uint16_t raw_elapsed) {
     split_runtime_sync_elapsed_internal(raw_elapsed, false);
-}
-
-void split_runtime_sync_request(void) {
-    split_runtime_sync_force_pending = true;
 }
 
 void split_runtime_sync(void) {

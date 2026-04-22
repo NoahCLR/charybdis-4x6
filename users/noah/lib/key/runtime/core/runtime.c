@@ -21,7 +21,6 @@
 #include "../../../state/ownership/keyboard_mod_ownership.h"
 #include "../../../state/ownership/layer_ownership.h"
 #include "../../../state/runtime/runtime_debug.h"
-#include "../../../state/runtime/split_runtime_sync.h"
 #include "trace.h"
 
 __attribute__((weak)) const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
@@ -447,9 +446,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             key_feedback_pulse_arm(effect->data.feedback_pulse.long_hold_level);
             return;
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
-            if (pd_mode_toggle_lock_state_at(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos)) {
-                split_runtime_sync_request();
-            }
+            (void)pd_mode_toggle_lock_state_at(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos);
             return;
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
             for (uint8_t repeat = 0; repeat < effect->data.delayed_action.repeat_count; repeat++) {

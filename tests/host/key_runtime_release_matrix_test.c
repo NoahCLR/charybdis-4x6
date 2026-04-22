@@ -561,7 +561,7 @@ static void test_release_with_live_tap_release_sibling_defers_dispatch(void) {
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
 
-    CHECK_CASE(case_name, key_runtime_scenario_split_sync_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_split_sync_count() == 0);
 }
 
 static void test_release_with_live_held_sibling_dispatches_immediately(void) {

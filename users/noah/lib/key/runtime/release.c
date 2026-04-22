@@ -7,7 +7,6 @@
 #include "trace.h"
 #include "transition.h"
 #include "core/runtime.h"
-#include "../../state/runtime/split_runtime_sync.h"
 
 static keyboard_mod_state_t key_runtime_release_keyboard_mod_state_current(void) {
     return (keyboard_mod_state_t){
@@ -53,7 +52,6 @@ bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *reco
     key_runtime_transition_execute_plan(&plan);
     if (handled) {
         key_runtime_release_drain_deferred_dispatches();
-        split_runtime_sync_request();
     }
     return handled;
 }

@@ -7,7 +7,6 @@
 #include "pd_mode_runtime_shared_state_internal.h"
 #include "../../key/runtime/core/runtime.h"
 #include "../../key/runtime/origin_registry.h"
-#include "../../state/runtime/split_runtime_sync.h"
 #include "../../state/runtime/runtime_trace.h"
 #include "../policy/pd_mode_policy.h"
 #include "pd_mode_internal.h"
@@ -391,10 +390,6 @@ bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_po
         key_runtime_core_pd_mode_lock_set(mode, locked);
     }
 
-    if (result.split_sync_required) {
-        split_runtime_sync_request();
-    }
-
     return result.local_state_changed;
 }
 
@@ -418,10 +413,6 @@ bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
         .owner_key_pos = key_pos,
     });
 
-    if (result.split_sync_required) {
-        split_runtime_sync_request();
-    }
-
     return result.handled;
 }
 
@@ -436,10 +427,6 @@ bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
         .owner_sides   = key_origin_registry_side_mask(key_pos),
         .owner_key_pos = key_pos,
     });
-
-    if (result.split_sync_required) {
-        split_runtime_sync_request();
-    }
 
     return result.handled;
 }

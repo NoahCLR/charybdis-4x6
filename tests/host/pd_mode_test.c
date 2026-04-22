@@ -371,7 +371,7 @@ static void test_keycode_press_at_tracks_trigger_half(void) {
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
     CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
-    CHECK(split_sync_count == 1);
+    CHECK(split_sync_count == 0);
 
     CHECK(pd_mode_handle_keycode_press_at(ARROW_MODE, (keypos_t){.row = 4, .col = 0}));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
@@ -555,13 +555,13 @@ static void test_handle_keycode_press_and_release_updates_state_and_syncs(void) 
     split_sync_count  = 0;
 
     CHECK(pd_mode_handle_keycode_press(BRIGHTNESS_MODE));
-    CHECK(split_sync_count == 1);
+    CHECK(split_sync_count == 0);
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_BRIGHTNESS);
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(reset_arrow_count == 1);
 
     CHECK(pd_mode_handle_keycode_release(BRIGHTNESS_MODE));
-    CHECK(split_sync_count == 2);
+    CHECK(split_sync_count == 0);
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(reset_brightness_count == 1);

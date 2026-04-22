@@ -67,6 +67,13 @@ This avoids repo-crossing patches into `../bastardkb-qmk`.
 - Combo feedback sync carries separate underlay and overlay bitmaps.
 - Key-feedback sync carries packed per-key semantic truth plus shared flash
   metadata.
+- Packet bytes are the authoritative sync contract. The runtime no longer has
+  a separate “request force-send on next tick” API for ordinary state changes.
+- The key-feedback phase byte is only meaningful when the synced semantic map
+  actually contains flashing semantics.
+- Heartbeat cadence is now per surface:
+  - active packets re-heartbeat quickly
+  - empty/default packets re-heartbeat more slowly
 
 The slave no longer reconstructs feedback from a single “current feedback
 snapshot”; it renders the same layer inputs the master uses.
@@ -166,6 +173,10 @@ rule while still shrinking the persistent non-slot state.
 - Split runtime sync now uses more than one packet. That is a better fit for
   the truthful model, but it is a wider wire contract than the previous
   all-in-one snapshot packet.
+- Packet-diff syncing is now the only correctness contract for RGB split sync.
+  That keeps the runtime simpler than maintaining separate dirty-flag or
+  request bookkeeping, but it means sync cadence depends on matrix-scan-driven
+  packet rebuilds instead of immediate call-site forcing.
 - A combo row must not repeat the same member keycode within that one row,
   because the footprint tracker cannot disambiguate that authored shape.
 - Hot replay effect payloads are intentionally size-constrained. Carrying full
@@ -189,6 +200,8 @@ rule while still shrinking the persistent non-slot state.
 - `KEY_FEEDBACK_MODE_KEY` paints every combo key in the footprint.
 - `MULTI_TAP_PENDING` is the top key-feedback semantic priority when a
   broadened mode needs to collapse multiple simultaneous states.
+- `key_feedback_flash_meta` must stay `0` whenever the synced semantic map has
+  no flashing semantics.
 - `PD_COLOR_MODE_TRIGGER_HALF` may broaden to both halves for cross-half
   combo-triggered modes.
 - `key_runtime_effect_t` must stay small enough that transition plans do not

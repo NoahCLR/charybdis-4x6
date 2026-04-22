@@ -275,21 +275,46 @@ static void test_force_sync_sends_all_packets_even_when_unchanged(void) {
     CHECK(rpc_send_count_key_feedback == 1u);
 }
 
-static void test_request_force_sync_defers_send_until_tick(void) {
+static void test_key_feedback_phase_is_ignored_without_flashing_semantics(void) {
+    test_reset_stubs();
+    key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
+    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    fake_key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+
+    split_runtime_sync_init();
+    CHECK(rpc_last_key_feedback_packet.key_feedback_flash_meta == 0u);
+
+    rpc_send_count = 0;
+    rpc_send_count_base = 0;
+    rpc_send_count_combo = 0;
+    rpc_send_count_key_feedback = 0;
+    fake_key_feedback_flash_meta = 0u;
+
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count == 0u);
+    CHECK(rpc_send_count_base == 0u);
+    CHECK(rpc_send_count_combo == 0u);
+    CHECK(rpc_send_count_key_feedback == 0u);
+}
+
+static void test_key_feedback_phase_changes_when_flashing_semantics_are_present(void) {
     test_reset_stubs();
 
     split_runtime_sync_init();
-    rpc_send_count = 0;
-
-    split_runtime_sync_request();
-    CHECK(rpc_send_count == 0u);
-
-    split_runtime_sync_tick();
-    CHECK(rpc_send_count == 3u);
+    CHECK(rpc_last_key_feedback_packet.key_feedback_flash_meta == KEY_FEEDBACK_FLASH_META_PHASE);
 
     rpc_send_count = 0;
+    rpc_send_count_base = 0;
+    rpc_send_count_combo = 0;
+    rpc_send_count_key_feedback = 0;
+    fake_key_feedback_flash_meta = 0u;
+
     split_runtime_sync_tick();
-    CHECK(rpc_send_count == 0u);
+    CHECK(rpc_send_count == 1u);
+    CHECK(rpc_send_count_base == 0u);
+    CHECK(rpc_send_count_combo == 0u);
+    CHECK(rpc_send_count_key_feedback == 1u);
+    CHECK(rpc_last_key_feedback_packet.key_feedback_flash_meta == 0u);
 }
 
 static void test_locked_pd_mode_zeroes_automouse_progress(void) {
@@ -360,6 +385,38 @@ static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_chan
     CHECK(rpc_send_count_key_feedback == 1u);
     CHECK(rpc_last_send_id == PUT_SPLIT_KEY_FEEDBACK_SYNC);
     CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+}
+
+static void test_idle_packets_use_idle_heartbeat(void) {
+    test_reset_stubs();
+    fake_auto_mouse_elapsed      = 0u;
+    fake_pd_active_flags         = 0;
+    fake_pd_locked_flags         = 0;
+    fake_pd_owner_sides          = SPLIT_SIDE_MASK_NONE;
+    fake_key_preview_layer       = UINT8_MAX;
+    fake_key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+    key_origin_bitmap_clear(fake_combo_underlay_bitmap);
+    key_origin_bitmap_clear(fake_combo_overlay_bitmap);
+    key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
+
+    split_runtime_sync_init();
+    CHECK(rpc_last_key_feedback_packet.key_feedback_flash_meta == 0u);
+
+    rpc_send_count = 0;
+    rpc_send_count_base = 0;
+    rpc_send_count_combo = 0;
+    rpc_send_count_key_feedback = 0;
+
+    fake_time32 += 999u;
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count == 0u);
+
+    fake_time32 += 1u;
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count == 3u);
+    CHECK(rpc_send_count_base == 1u);
+    CHECK(rpc_send_count_combo == 1u);
+    CHECK(rpc_send_count_key_feedback == 1u);
 }
 
 static void test_slave_rpcs_apply_exact_remote_state(void) {
@@ -434,11 +491,13 @@ int main(void) {
     test_init_registers_rpcs_without_sending_on_slave();
     test_elapsed_skips_unchanged_packets_until_heartbeat();
     test_force_sync_sends_all_packets_even_when_unchanged();
-    test_request_force_sync_defers_send_until_tick();
+    test_key_feedback_phase_is_ignored_without_flashing_semantics();
+    test_key_feedback_phase_changes_when_flashing_semantics_are_present();
     test_locked_pd_mode_zeroes_automouse_progress();
     test_tick_sends_only_base_packet_when_only_automouse_changes();
     test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();
     test_tick_sends_only_key_feedback_packet_when_only_key_feedback_changes();
+    test_idle_packets_use_idle_heartbeat();
     test_slave_rpcs_apply_exact_remote_state();
     test_slave_base_rpc_ignores_short_packets();
 

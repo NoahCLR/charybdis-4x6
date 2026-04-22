@@ -135,6 +135,28 @@
   - independent per-half semantic priority
   - global multi-tap priority over flashing held states
 
+### Split RPC Churn Reduction
+
+- Removed the old `split_runtime_sync_request()` force-send path from the
+  runtime sync contract. Ordinary key-runtime and PD-mode state changes now
+  rely on the next `split_runtime_sync_tick()` packet rebuild instead of
+  forcing all three surfaces to resend.
+- Kept `split_runtime_sync()` as the explicit “send all surfaces now” path for
+  init/manual recovery.
+- Tightened key-feedback sync so `key_feedback_flash_meta` is only non-zero
+  when the packed semantic map actually contains a flashing semantic.
+- Added per-surface active vs idle heartbeat cadence in
+  `users/noah/lib/state/runtime/split_runtime_sync.c`:
+  - active packets still heartbeat every `250 ms`
+  - empty/default packets now heartbeat every `1000 ms`
+- Updated host expectations that previously treated split-sync call counts as a
+  proxy for “state changed”; the contract is now packet-diff-on-tick rather
+  than immediate request-side forcing.
+- Added split-sync host coverage for:
+  - flashing-phase gating on the key-feedback packet
+  - active-vs-idle heartbeat cadence
+  - unchanged steady packets staying quiet across phase flips
+
 ### Verification
 
 Passed:

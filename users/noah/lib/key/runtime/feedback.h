@@ -102,6 +102,41 @@ static inline void key_feedback_semantic_map_set(uint8_t *map, keypos_t key_pos,
 }
 
 uint8_t key_feedback_flash_meta(void);
+
+static inline bool key_feedback_semantic_map_has_any(const uint8_t *map) {
+    if (!map) {
+        return false;
+    }
+
+    for (uint8_t index = 0; index < KEY_FEEDBACK_SEMANTIC_MAP_SIZE; index++) {
+        if (map[index] != 0u) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static inline bool key_feedback_semantic_map_has_flashing(const uint8_t *map) {
+    if (!key_feedback_semantic_map_has_any(map)) {
+        return false;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            if (key_feedback_semantic_is_flashing(key_feedback_semantic_map_get(map, (keypos_t){.row = row, .col = col}))) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static inline uint8_t key_feedback_flash_meta_for_semantic_map(const uint8_t *map) {
+    return key_feedback_semantic_map_has_flashing(map) ? key_feedback_flash_meta() : 0u;
+}
+
 void    key_feedback_semantic_map(uint8_t *out_map);
 uint8_t key_feedback_preview_layer(void);
 void    combo_feedback_underlay_bitmap(uint8_t *out_bitmap);
