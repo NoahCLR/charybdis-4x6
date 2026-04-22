@@ -21,6 +21,7 @@ static void qmk_contract_field_smoke(void) {
     (void)record.event.key.row;
     (void)record.event.key.col;
     (void)record.event.pressed;
+    (void)record.event.type;
 
     (void)report.buttons;
     (void)report.x;
@@ -33,6 +34,7 @@ int main(void) {
     qmk_contract_field_smoke();
 
     printf("SAFE_RANGE=0x%04X\n", (unsigned)SAFE_RANGE);
+    printf("COMBO_EVENT=%u\n", (unsigned)COMBO_EVENT);
     printf("QK_MODS=0x%04X\n", (unsigned)QK_MODS);
     printf("QK_RMODS_MIN=0x%04X\n", (unsigned)QK_RMODS_MIN);
     printf("QK_LAYER_TAP=0x%04X\n", (unsigned)QK_LAYER_TAP);

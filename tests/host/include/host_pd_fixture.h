@@ -59,14 +59,14 @@ static inline pd_mode_mask_t host_runtime_fixture_display_active_mode(const pd_m
     return locked_mode ? locked_mode : pd_mode_mask_from_id(remote.active_mode_id);
 }
 
-static inline split_half_t host_runtime_fixture_display_owner_half(bool is_master, split_half_t local_owner_half, split_runtime_sync_packet_t remote) {
+static inline split_side_mask_t host_runtime_fixture_display_owner_sides(bool is_master, split_side_mask_t local_owner_sides, split_runtime_sync_packet_t remote) {
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    return is_master ? local_owner_half : remote.pd_mode_owner_half;
+    return is_master ? local_owner_sides : remote.pd_mode_owner_sides;
 #else
     (void)is_master;
-    (void)local_owner_half;
+    (void)local_owner_sides;
     (void)remote;
-    return SPLIT_HALF_NONE;
+    return SPLIT_SIDE_MASK_NONE;
 #endif
 }
 
@@ -85,16 +85,16 @@ static inline pd_mode_snapshot_view_t host_runtime_fixture_pd_mode_view(const pd
     return view;
 }
 
-static inline pd_mode_snapshot_t host_runtime_fixture_pd_mode_snapshot(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active, pd_mode_mask_t local_locked, split_half_t local_owner_half, split_runtime_sync_packet_t remote) {
-    pd_mode_mask_t display_locked = host_runtime_fixture_display_locked_mode(defs, count, is_master, local_locked, remote);
-    pd_mode_mask_t display_active = host_runtime_fixture_display_active_mode(defs, count, is_master, local_active, local_locked, remote);
-    split_half_t   display_owner_half = host_runtime_fixture_display_owner_half(is_master, local_owner_half, remote);
+static inline pd_mode_snapshot_t host_runtime_fixture_pd_mode_snapshot(const pd_mode_def_t *defs, uint8_t count, bool is_master, pd_mode_mask_t local_active, pd_mode_mask_t local_locked, split_side_mask_t local_owner_sides, split_runtime_sync_packet_t remote) {
+    pd_mode_mask_t    display_locked      = host_runtime_fixture_display_locked_mode(defs, count, is_master, local_locked, remote);
+    pd_mode_mask_t    display_active      = host_runtime_fixture_display_active_mode(defs, count, is_master, local_active, local_locked, remote);
+    split_side_mask_t display_owner_sides = host_runtime_fixture_display_owner_sides(is_master, local_owner_sides, remote);
 
     pd_mode_snapshot_view_t local_view   = host_runtime_fixture_pd_mode_view(defs, count, local_active, local_locked);
     pd_mode_snapshot_view_t display_view = host_runtime_fixture_pd_mode_view(defs, count, display_active, display_locked);
 
-    local_view.owner_half   = local_owner_half;
-    display_view.owner_half = display_owner_half;
+    local_view.owner_sides   = local_owner_sides;
+    display_view.owner_sides = display_owner_sides;
 
     return (pd_mode_snapshot_t){
         .local   = local_view,

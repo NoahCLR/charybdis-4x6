@@ -12,6 +12,9 @@
 #define NOAH_HOST_TEST_ENV 1
 
 #define PROGMEM
+static inline uint16_t pgm_read_word(const void *addr_) {
+    return *(const uint16_t *)addr_;
+}
 
 #define ARRAY_SIZE(arr_) (sizeof(arr_) / sizeof((arr_)[0]))
 
@@ -158,8 +161,21 @@
 #define QK_MOD_TAP_GET_MODS(keycode_) ((uint8_t)(((keycode_) >> 8) & 0x001Fu))
 #define QK_MOD_TAP_GET_TAP_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
 
+typedef enum keyevent_type_t {
+    TICK_EVENT   = 0,
+    KEY_EVENT    = 1,
+    COMBO_EVENT  = 4,
+} keyevent_type_t;
+
 #define COMBO_END 0
-#define COMBO(keys_, result_) {0}
+#define COMBO(keys_, result_) \
+    {                         \
+        .keys     = (keys_),  \
+        .keycode  = (result_), \
+        .disabled = false,    \
+        .active   = false,    \
+        .state    = 0,        \
+    }
 
 typedef struct {
     uint8_t row;
@@ -169,6 +185,7 @@ typedef struct {
 typedef struct {
     keypos_t key;
     bool     pressed;
+    uint8_t  type;
 } keyevent_t;
 
 typedef struct {
@@ -185,9 +202,17 @@ typedef struct {
     ((keyevent_t){                                 \
         .key     = {.row = (row_), .col = (col_)}, \
         .pressed = (pressed_),                     \
+        .type    = KEY_EVENT,                      \
     })
 
-#define IS_NOEVENT(event_) (false)
+#define MAKE_COMBOEVENT(press_)                       \
+    ((keyevent_t){                                    \
+        .key     = {.row = 0, .col = 0},              \
+        .pressed = (press_),                          \
+        .type    = COMBO_EVENT,                       \
+    })
+
+#define IS_NOEVENT(event_) ((event_).type == TICK_EVENT)
 
 typedef struct {
     int8_t  x;
@@ -212,7 +237,11 @@ typedef struct {
 } hsv_t;
 
 typedef struct {
-    uint16_t dummy;
+    const uint16_t *keys;
+    uint16_t        keycode;
+    bool            disabled;
+    bool            active;
+    uint8_t         state;
 } combo_t;
 
 static inline void noah_host_test_fail_runtime_overflow(const char *surface, unsigned int kind, unsigned int capacity) {
@@ -235,9 +264,14 @@ action_t         action_for_keycode(uint16_t keycode);
 void             process_action(keyrecord_t *record, action_t action);
 
 extern layer_state_t layer_state;
+extern layer_state_t default_layer_state;
 bool                 layer_state_cmp(layer_state_t state, uint8_t layer);
 void                 layer_on(uint8_t layer);
 void                 layer_off(uint8_t layer);
+uint8_t              get_highest_layer(layer_state_t state);
+uint8_t              combo_ref_from_layer(uint8_t layer);
+uint16_t             keymap_key_to_keycode(uint8_t layer, keypos_t key);
+uint16_t             get_record_keycode(keyrecord_t *record, bool update_layer_cache);
 
 uint8_t get_mods(void);
 uint8_t get_weak_mods(void);

@@ -45,6 +45,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/key/ownership/held_repeat.c" \
     "$ROOT/users/noah/lib/key/runtime/api.c" \
     "$ROOT/users/noah/lib/key/runtime/debug.c" \
+    "$ROOT/users/noah/lib/key/runtime/origin_registry.c" \
     "$ROOT/users/noah/lib/key/runtime/preflight.c" \
     "$ROOT/users/noah/lib/key/runtime/press.c" \
     "$ROOT/users/noah/lib/key/runtime/process.c" \
@@ -53,6 +54,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/transition.c" \
     "$ROOT/users/noah/lib/key/runtime/core/runtime.c" \
+    "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \

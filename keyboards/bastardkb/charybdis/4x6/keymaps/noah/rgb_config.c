@@ -139,7 +139,9 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 //   - PD_COLOR_MODE_LEFT_HALF = always paint the left half
 //   - PD_COLOR_MODE_BOTH_HALVES = mirror the PD color across both halves
 //   - PD_COLOR_MODE_TRIGGER_HALF = paint the half that triggered the current
-//     effective PD mode; requires RGB_PD_MODE_ACTIVE_HALF_ENABLE
+//     effective PD mode; requires RGB_PD_MODE_ACTIVE_HALF_ENABLE. Combo-driven
+//     triggers broaden this to both halves when the combo footprint spans both
+//     sides.
 //
 // This profile uses PD_COLOR_MODE_TRIGGER_HALF for every PD mode so the
 // overlay follows the half that activated or locked the current pointing
@@ -224,9 +226,10 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 //   - KEY_FEEDBACK_MODE_BOTH_HALVES = mirror the feedback color across both
 //     halves
 //   - KEY_FEEDBACK_MODE_KEY_HALF = paint only the half that owns the key or
-//     tap series currently driving the feedback state
-//   - KEY_FEEDBACK_MODE_KEY = paint only the key currently driving the
-//     feedback state
+//     tap series currently driving the feedback state; combo-driven feedback
+//     can broaden this to both halves
+//   - KEY_FEEDBACK_MODE_KEY = paint only the key footprint currently driving
+//     the feedback state; combo-driven feedback paints every combo key
 // This profile uses KEY_FEEDBACK_MODE_KEY_HALF so hold / multi-tap feedback
 // stays local to the half that caused it without becoming too subtle.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE

@@ -11,6 +11,7 @@
 #include "users/noah/noah_runtime.h"
 
 __attribute__((weak)) layer_state_t layer_state;
+__attribute__((weak)) layer_state_t default_layer_state;
 
 __attribute__((weak)) uint16_t timer_read(void) {
     return 0u;
@@ -20,11 +21,42 @@ __attribute__((weak)) bool layer_state_cmp(layer_state_t state, uint8_t layer) {
     return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
 }
 
+__attribute__((weak)) uint8_t get_highest_layer(layer_state_t state) {
+    for (int8_t layer = (int8_t)(sizeof(layer_state_t) * 8 - 1); layer >= 0; layer--) {
+        if ((state & ((layer_state_t)1u << layer)) != 0) {
+            return (uint8_t)layer;
+        }
+    }
+
+    return 0u;
+}
+
+__attribute__((weak)) uint8_t combo_ref_from_layer(uint8_t layer) {
+    return layer;
+}
+
 __attribute__((weak)) uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
     (void)layer_num;
     (void)row;
     (void)column;
     return KC_TRNS;
+}
+
+__attribute__((weak)) uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
+}
+
+__attribute__((weak)) uint16_t get_record_keycode(keyrecord_t *record, bool update_layer_cache) {
+    uint8_t layer;
+
+    (void)update_layer_cache;
+
+    if (!record) {
+        return KC_NO;
+    }
+
+    layer = get_highest_layer(layer_state | default_layer_state);
+    return keymap_key_to_keycode(layer, record->event.key);
 }
 
 __attribute__((weak)) bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -144,6 +176,7 @@ static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed
     return (keyrecord_t){
         .event =
             {
+                .type    = KEY_EVENT,
                 .key     = key_pos,
                 .pressed = pressed,
             },

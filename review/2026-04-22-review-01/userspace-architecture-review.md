@@ -1,0 +1,77 @@
+# Userspace Architecture Review
+
+## Scope
+
+This review covers the combo-origin footprint work that landed on
+2026-04-22. The goal was to stop treating QMK combo outputs as synthetic key
+position `(0,0)` for locality-sensitive userspace behavior.
+
+## Decisions
+
+### Combos now have two runtime identities
+
+- Ownership paths still keep one representative owner key.
+- Locality-sensitive paths now also keep the full physical combo footprint.
+
+That split keeps existing ownership contracts small and stable while fixing RGB
+and PD rendering semantics.
+
+### Locality is derived from a shared bitmap primitive
+
+- `origin_registry` stores a bitmap per representative owner key.
+- Single physical keys default to a single-key bitmap.
+- Combo outputs overwrite that owner entry with the full combo bitmap.
+- `split_side_mask_t` derives `LEFT`, `RIGHT`, or `BOTH` from the bitmap.
+
+This removed the need for duplicated side/key tracking in higher layers.
+
+### QMK combo normalization stays userspace-local
+
+- `qmk_combo_origin.c` shadows the live physical combo press stream.
+- On `COMBO_EVENT`, it rewrites the representative owner key to the last chord
+  key and stores the full footprint in the origin registry.
+- The shadow logic uses live resolved keycodes and combo-ref-layer behavior, so
+  dynamic keymaps remain authoritative.
+
+This avoids repo-crossing patches into `../bastardkb-qmk`.
+
+### Split sync stays semantic, not engine-level
+
+- Key-feedback sync now ships a compact key bitmap instead of a single packed
+  key.
+- PD mode sync now ships a side mask instead of a single owner half.
+
+The packet remains comfortably below the QMK RPC limit while matching the new
+locality contract.
+
+## Current Structure
+
+- Combo ingress and QMK-specific assumptions live in
+  `users/noah/lib/compat/qmk_combo_origin.c`.
+- Shared locality storage lives in
+  `users/noah/lib/key/runtime/origin_registry.c`.
+- Key-feedback locality renders from the synced bitmap in
+  `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`.
+- PD trigger-side rendering derives from the synced side mask in
+  `users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`.
+- Validation for authored combo member ambiguity lives in
+  `users/noah/lib/key/interaction/keymap_validation.c`.
+
+## Tradeoffs
+
+- Duplicate combo outputs across distinct combos remain allowed.
+- When multiple active combos with the same output are in play, locality is
+  intentionally broadened to the union footprint instead of pretending a single
+  side or key.
+- A combo row must not repeat the same member keycode within that one row,
+  because the footprint tracker cannot disambiguate that authored shape.
+
+## Intended Invariants
+
+- A physical key always has at least a single-key footprint.
+- A combo output never falls back to fake key `(0,0)` for userspace locality.
+- `KEY_FEEDBACK_MODE_KEY_HALF` may broaden to both halves for cross-half combos.
+- `KEY_FEEDBACK_MODE_KEY` paints every combo key in the footprint.
+- `PD_COLOR_MODE_TRIGGER_HALF` may broaden to both halves for cross-half
+  combo-triggered modes.
+- All of the above must stay green under host tests and the firmware compile.

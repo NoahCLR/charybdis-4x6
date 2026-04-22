@@ -155,6 +155,16 @@ Combos are authored directly in
 are separate from the custom key-behavior engine: a combo is just a
 simultaneous chord that emits one keycode or action.
 
+At runtime, a combo still keeps one representative owner key for ownership and
+release matching, but the userspace now also tracks the full physical combo
+footprint for locality-sensitive features. That means combo-backed key
+feedback can stay on the relevant key or half, and `PD_COLOR_MODE_TRIGGER_HALF`
+can broaden to both halves when a combo spans both sides of the board.
+
+That footprint tracking follows the live resolved keycodes QMK sees, so dynamic
+keymap changes remain authoritative. It is not guessed from static comments or
+hardcoded layout assumptions.
+
 The current visual report marks combo input keys with badges in the layer
 images and lists their outputs in the combo tables, so you do not have to scan
 the raw combo arrays to understand where they live.

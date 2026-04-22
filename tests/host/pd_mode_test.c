@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/key/runtime/origin_registry.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_buffered_tap_internal.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_keyboard_event_internal.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
@@ -75,6 +76,7 @@ static void test_reset_runtime(void) {
 static void test_reset_stubs(void) {
     host_runtime_fixture_reset(&runtime_fixture);
     test_reset_runtime();
+    key_origin_registry_reset();
 
     current_cpi                          = 0;
     cpi_set_count                        = 0;
@@ -367,14 +369,14 @@ static void test_keycode_press_at_tracks_trigger_half(void) {
 
     CHECK(pd_mode_handle_keycode_press_at(VOLUME_MODE, (keypos_t){.row = 0, .col = 0}));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
-    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_LEFT);
-    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
+    CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
     CHECK(split_sync_count == 1);
 
     CHECK(pd_mode_handle_keycode_press_at(ARROW_MODE, (keypos_t){.row = 4, .col = 0}));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
-    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_RIGHT);
-    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_RIGHT);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_RIGHT);
+    CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_RIGHT);
 }
 
 static void test_lock_state_at_tracks_trigger_half_and_clears_on_unlock(void) {
@@ -382,26 +384,42 @@ static void test_lock_state_at_tracks_trigger_half_and_clears_on_unlock(void) {
 
     CHECK(pd_mode_set_lock_state_at(PD_MODE_VOLUME, true, (keypos_t){.row = 4, .col = 1}));
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
-    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_RIGHT);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_RIGHT);
 
     CHECK(pd_mode_set_lock_state_at(PD_MODE_VOLUME, false, (keypos_t){.row = 4, .col = 1}));
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(pd_mode_local_active_snapshot() == 0);
-    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_NONE);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_NONE);
 }
 
 static void test_ownerless_mode_change_clears_previous_trigger_half(void) {
     test_reset_stubs();
 
     CHECK(pd_mode_handle_keycode_press_at(VOLUME_MODE, (keypos_t){.row = 0, .col = 0}));
-    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_LEFT);
-    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
+    CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
 
     CHECK(pd_mode_set_lock_state(PD_MODE_ARROW, true));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
-    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_NONE);
-    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_NONE);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_NONE);
+    CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_NONE);
+}
+
+static void test_combo_origin_bitmap_promotes_trigger_half_to_both_sides(void) {
+    uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    keypos_t owner_key_pos = {.row = 0, .col = 0};
+
+    test_reset_stubs();
+
+    key_origin_bitmap_fill_single(bitmap, owner_key_pos);
+    key_origin_bitmap_add_keypos(bitmap, (keypos_t){.row = 4, .col = 0});
+    CHECK(key_origin_registry_set_bitmap(owner_key_pos, bitmap));
+
+    CHECK(pd_mode_handle_keycode_press_at(ZOOM_MODE, owner_key_pos));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_ZOOM);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_BOTH);
+    CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_BOTH);
 }
 
 static void test_apply_remote_mode_ids_tracks_display_owner_half(void) {
@@ -410,13 +428,13 @@ static void test_apply_remote_mode_ids_tracks_display_owner_half(void) {
     test_reset_stubs();
     fake_is_master = false;
 
-    pd_mode_apply_remote_mode_ids(pd_mode_id_from_mask(PD_MODE_ZOOM), pd_mode_id_from_mask(PD_MODE_ZOOM), SPLIT_HALF_LEFT);
+    pd_mode_apply_remote_mode_ids(pd_mode_id_from_mask(PD_MODE_ZOOM), pd_mode_id_from_mask(PD_MODE_ZOOM), SPLIT_SIDE_MASK_LEFT);
     snapshot = pd_mode_snapshot();
 
     CHECK(snapshot.display.active_mode == PD_MODE_ZOOM);
     CHECK(snapshot.display.locked_mode == PD_MODE_ZOOM);
-    CHECK(snapshot.display.owner_half == SPLIT_HALF_LEFT);
-    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(snapshot.display.owner_sides == SPLIT_SIDE_MASK_LEFT);
+    CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
 }
 
 static void test_set_lock_state_switches_to_single_locked_mode(void) {
@@ -737,6 +755,7 @@ static void test_active_key_handler_only_runs_for_active_modes(void) {
     keyrecord_t record = {
         .event =
             {
+                .type    = KEY_EVENT,
                 .key     = {.row = 1, .col = 2},
                 .pressed = true,
             },
@@ -760,6 +779,7 @@ int main(void) {
     test_keycode_press_at_tracks_trigger_half();
     test_lock_state_at_tracks_trigger_half_and_clears_on_unlock();
     test_ownerless_mode_change_clears_previous_trigger_half();
+    test_combo_origin_bitmap_promotes_trigger_half_to_both_sides();
     test_apply_remote_mode_ids_tracks_display_owner_half();
     test_set_lock_state_switches_to_single_locked_mode();
     test_activate_switches_to_single_unlocked_mode();

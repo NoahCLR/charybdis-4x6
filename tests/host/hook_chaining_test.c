@@ -304,6 +304,7 @@ static keyrecord_t test_record(uint8_t row, uint8_t col, bool pressed) {
     return (keyrecord_t){
         .event =
             {
+                .type    = KEY_EVENT,
                 .key     = {.row = row, .col = col},
                 .pressed = pressed,
             },

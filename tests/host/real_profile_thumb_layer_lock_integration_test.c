@@ -11,6 +11,7 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/runtime/origin_registry.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/key/runtime/core/runtime.h"
 #include "users/noah/lib/key/runtime/core/trace.h"
@@ -993,8 +994,8 @@ uint8_t key_feedback_pack(void) {
     return 0;
 }
 
-uint8_t key_feedback_key(void) {
-    return UINT8_MAX;
+void key_feedback_bitmap(uint8_t *out_bitmap) {
+    key_origin_bitmap_clear(out_bitmap);
 }
 
 uint8_t key_feedback_preview_layer(void) {

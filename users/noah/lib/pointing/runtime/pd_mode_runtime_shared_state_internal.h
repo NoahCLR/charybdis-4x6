@@ -17,8 +17,8 @@ typedef struct {
     pd_mode_mask_t remote_display_active_mode;
     pd_mode_mask_t remote_display_locked_mode;
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    split_half_t   local_owner_half;
-    split_half_t   remote_display_owner_half;
+    split_side_mask_t local_owner_sides;
+    split_side_mask_t remote_display_owner_sides;
 #endif
     bool           synthetic_auto_mouse_anchor_active;
     bool           active_dpi_sync_pending;

@@ -60,7 +60,7 @@ typedef struct {
     pd_mode_mask_t         mode;
     pd_mode_id_t           active_mode_id;
     pd_mode_id_t           locked_mode_id;
-    split_half_t           owner_half;
+    split_side_mask_t      owner_sides;
 } pd_mode_command_t;
 
 typedef struct {
@@ -75,7 +75,7 @@ typedef struct {
 extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];
 
 pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command);
-void                   pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_half_t owner_half);
+void                   pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_side_mask_t owner_sides);
 void                   pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags);
 
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode);

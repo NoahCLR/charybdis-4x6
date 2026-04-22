@@ -46,18 +46,18 @@ void rgb_runtime_pd_mode_stage_post_init(void) {
     }
 }
 
-static split_half_t rgb_runtime_pd_mode_stage_resolve_trigger_half(pd_mode_snapshot_t snapshot) {
-    split_half_t owner_half = snapshot.display.owner_half;
+static split_side_mask_t rgb_runtime_pd_mode_stage_resolve_trigger_sides(pd_mode_snapshot_t snapshot) {
+    split_side_mask_t owner_sides = snapshot.display.owner_sides;
 
-    if (owner_half == SPLIT_HALF_LEFT || owner_half == SPLIT_HALF_RIGHT) {
-        return owner_half;
+    if (owner_sides != SPLIT_SIDE_MASK_NONE) {
+        return owner_sides;
     }
 
-    return SPLIT_HALF_RIGHT;
+    return SPLIT_SIDE_MASK_BOTH;
 }
 
 static bool rgb_runtime_pd_mode_stage_paint_mode(rgb_t color, uint8_t mode, pd_mode_snapshot_t snapshot, uint8_t led_min, uint8_t led_max) {
-    split_half_t half = SPLIT_HALF_NONE;
+    split_side_mask_t sides = SPLIT_SIDE_MASK_NONE;
 
     switch (mode) {
         case PD_COLOR_MODE_LEFT_HALF:
@@ -70,15 +70,15 @@ static bool rgb_runtime_pd_mode_stage_paint_mode(rgb_t color, uint8_t mode, pd_m
             rgb_set_both_halves(color, led_min, led_max);
             return led_min < led_max;
         case PD_COLOR_MODE_TRIGGER_HALF:
-            half = rgb_runtime_pd_mode_stage_resolve_trigger_half(snapshot);
+            sides = rgb_runtime_pd_mode_stage_resolve_trigger_sides(snapshot);
             break;
         case PD_COLOR_MODE_RIGHT_HALF:
         default:
-            half = SPLIT_HALF_RIGHT;
+            sides = SPLIT_SIDE_MASK_RIGHT;
             break;
     }
 
-    if (half == SPLIT_HALF_LEFT) {
+    if (sides == SPLIT_SIDE_MASK_LEFT) {
         if (!rgb_runtime_pd_mode_stage_led_range_intersects(led_min, led_max, 0, RGB_LEFT_LED_COUNT)) {
             return false;
         }
@@ -86,12 +86,17 @@ static bool rgb_runtime_pd_mode_stage_paint_mode(rgb_t color, uint8_t mode, pd_m
         return true;
     }
 
-    if (!rgb_runtime_pd_mode_stage_led_range_intersects(led_min, led_max, RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT)) {
-        return false;
+    if (sides == SPLIT_SIDE_MASK_RIGHT) {
+        if (!rgb_runtime_pd_mode_stage_led_range_intersects(led_min, led_max, RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT)) {
+            return false;
+        }
+
+        rgb_set_right_half(color, led_min, led_max);
+        return true;
     }
 
-    rgb_set_right_half(color, led_min, led_max);
-    return true;
+    rgb_set_both_halves(color, led_min, led_max);
+    return led_min < led_max;
 }
 
 bool rgb_runtime_pd_mode_stage_render(uint8_t led_min, uint8_t led_max) {

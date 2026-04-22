@@ -11,9 +11,11 @@
 #include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"
 #include "core/runtime.h"
 #include "../../action/synthetic_record.h"
+#include "../../compat/qmk_combo_origin.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/runtime/runtime_diag.h"
 #include "../../state/runtime/keyboard_mod_state.h"
+#include "origin_registry.h"
 
 #ifdef NOAH_HOST_TEST_ENV
 bool key_runtime_integration_userspace_feeds_core_key_events(void) {
@@ -205,6 +207,11 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
         return true;
     }
 
+    if (key_origin_keypos_valid(record->event.key)) {
+        key_origin_registry_set_single(record->event.key);
+        noah_qmk_combo_origin_observe_physical_key_event(keycode, record);
+    }
+
     keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     return true;
 }
@@ -220,6 +227,8 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     };
 
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
+
+    noah_qmk_combo_origin_normalize_record(keycode, record);
 
     if (!noah_synthetic_record_active()) {
         key_runtime_core_observe_process_record_event(keycode, record);

@@ -73,7 +73,7 @@ typedef struct {
     pd_mode_traits_t active_traits;
     uint8_t          active_index;
     uint8_t          locked_index;
-    split_half_t     owner_half;
+    split_side_mask_t owner_sides;
 } pd_mode_snapshot_view_t;
 
 typedef struct {
@@ -96,5 +96,5 @@ bool pd_any_local_mode_active(void);
 bool pd_any_local_mode_locked(void);
 bool pd_any_display_mode_active(void);
 bool pd_any_display_mode_locked(void);
-split_half_t pd_mode_local_owner_half_snapshot(void);
-split_half_t pd_mode_display_owner_half_snapshot(void);
+split_side_mask_t pd_mode_local_owner_sides_snapshot(void);
+split_side_mask_t pd_mode_display_owner_sides_snapshot(void);

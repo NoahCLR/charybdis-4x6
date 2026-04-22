@@ -72,10 +72,12 @@ lib/key/runtime/debug.c
 lib/key/runtime/preflight.c
 lib/key/runtime/press.c
 lib/key/runtime/process.c
+lib/key/runtime/origin_registry.c
 lib/key/runtime/release.c
 lib/key/runtime/scan.c
 lib/key/runtime/trace.c
 lib/key/runtime/transition.c
+lib/compat/qmk_combo_origin.c
 lib/key/runtime/core/runtime.c
 lib/state/runtime/runtime_diag.c
 lib/state/runtime/keyboard_mod_state.c

@@ -266,6 +266,7 @@ static keyrecord_t test_record(keypos_t key_pos, bool pressed) {
     return (keyrecord_t){
         .event =
             {
+                .type    = KEY_EVENT,
                 .key     = key_pos,
                 .pressed = pressed,
             },
@@ -1182,8 +1183,8 @@ static void test_right_alt_single_tap_uses_physical_trigger_half(void) {
     CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, left_pos, false));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
-    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_LEFT);
-    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
+    CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
 }
 
 static void test_direct_pd_lock_press_uses_physical_trigger_half(void) {
@@ -1194,8 +1195,8 @@ static void test_direct_pd_lock_press_uses_physical_trigger_half(void) {
     CHECK(!key_runtime_integration_process_record(ARROW_MODE_LOCK, left_pos, true));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
-    CHECK(pd_mode_local_owner_half_snapshot() == SPLIT_HALF_LEFT);
-    CHECK(pd_mode_display_owner_half_snapshot() == SPLIT_HALF_LEFT);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
+    CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
 }
 
 static void test_gui_double_tap_hold_with_right_alt_lock_child_keeps_runtime_quiescent(void) {
@@ -1367,6 +1368,7 @@ static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_repla
     keyrecord_t gui_press = {
         .event =
             {
+                .type    = KEY_EVENT,
                 .key     = {.row = 0, .col = 0},
                 .pressed = true,
             },

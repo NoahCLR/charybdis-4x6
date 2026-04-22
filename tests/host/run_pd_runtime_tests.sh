@@ -36,6 +36,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/pd_runtime_test.c" \
+    "$ROOT/users/noah/lib/key/runtime/origin_registry.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_runtime.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \

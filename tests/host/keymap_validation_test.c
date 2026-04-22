@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "noah_real_profile_keyboard.h"
 #include "print.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/noah_keymap.h"
@@ -17,6 +18,7 @@ static char log_buffer[4096];
 enum {
     TEST_PRESENT_KEY = NOAH_KEYMAP_SAFE_RANGE,
     TEST_COMBO_KEY,
+    TEST_DUP_COMBO_KEY,
     TEST_DEAD_KEY,
     TEST_RAW_LAYER_ACTION = TO(LAYER_NUM),
 };
@@ -32,6 +34,25 @@ static const uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS] = {
 static const uint16_t combo_outputs[] = {
     TEST_COMBO_KEY,
     MO(LAYER_SYM),
+    TEST_DUP_COMBO_KEY,
+};
+
+static const uint16_t combo_keys_0[] = {
+    KC_A,
+    KC_B,
+    COMBO_END,
+};
+
+static const uint16_t combo_keys_1[] = {
+    KC_C,
+    KC_D,
+    COMBO_END,
+};
+
+static const uint16_t combo_keys_2[] = {
+    KC_Z,
+    KC_Z,
+    COMBO_END,
 };
 
 const key_behavior_t key_behaviors[] = {
@@ -40,7 +61,14 @@ const key_behavior_t key_behaviors[] = {
     {.keycode = TEST_DEAD_KEY},
 };
 
+combo_t key_combos[] = {
+    {.keys = combo_keys_0, .keycode = TEST_COMBO_KEY},
+    {.keys = combo_keys_1, .keycode = MO(LAYER_SYM)},
+    {.keys = combo_keys_2, .keycode = TEST_DUP_COMBO_KEY},
+};
+
 const uint8_t         key_behavior_count         = ARRAY_SIZE(key_behaviors);
+const uint8_t         noah_combo_count           = ARRAY_SIZE(key_combos);
 const uint16_t *const noah_combo_output_keycodes = combo_outputs;
 const uint8_t         noah_combo_output_count    = ARRAY_SIZE(combo_outputs);
 
@@ -167,6 +195,7 @@ int main(void) {
     noah_keymap_validate();
 
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][1] raw layer action") != NULL);
+    CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) input[2] duplicate member keycode") != NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) output[1] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unreachable key_behaviors[2].keycode") != NULL);
     CHECK(strstr(log_buffer, dead_key_hex) != NULL);

@@ -107,6 +107,10 @@ enum custom_keycodes {
 
 extern const char *const      via_macro_payloads[VIA_MACRO_SLOT_COUNT];
 extern const char *const      hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT];
+#ifdef COMBO_ENABLE
+extern combo_t                key_combos[];
+extern const uint8_t          noah_combo_count;
+#endif
 extern const uint16_t *const  noah_combo_output_keycodes;
 extern const uint8_t          noah_combo_output_count;
 extern const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS];

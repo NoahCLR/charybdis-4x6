@@ -129,6 +129,15 @@ enum keymap_custom_keycodes {
 // If a combo emits a keycode that also has a row in key_behaviors[],
 // that emitted key can reuse the same custom behavior handling.
 //
+// Runtime ownership still keeps one representative combo owner key for release
+// matching, but RGB feedback and PD trigger-side rendering use the full
+// physical combo footprint. Cross-half combos therefore broaden locality to
+// both halves instead of guessing one side.
+//
+// Combo origin tracking follows the live resolved keycodes QMK sees, so VIA /
+// dynamic keymap changes stay authoritative. Keep each combo row's member
+// keycodes unique so that footprint tracking can disambiguate the chord.
+//
 // Combo timing is tuned in config.h via COMBO_TERM.
 // Current default: COMBO_TERM = 50 ms.
 #define COMBOS(COMBO)                                \

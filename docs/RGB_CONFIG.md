@@ -186,7 +186,9 @@ Each row also chooses where the overlay paints:
 - `PD_COLOR_MODE_BOTH_HALVES`: mirror the overlay across both halves
 - `PD_COLOR_MODE_TRIGGER_HALF`: paint the half that triggered the currently
   effective PD mode; this requires `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in
-  [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+  [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+  If the triggering combo footprint spans both halves, the overlay paints both
+  halves instead of guessing one side.
 
 Use rows like:
 
@@ -243,8 +245,13 @@ The `mode` field controls where the overlay paints:
 
 - `KEY_FEEDBACK_MODE_BOTH_HALVES`: repaint both halves
 - `KEY_FEEDBACK_MODE_KEY_HALF`: repaint only the half that owns the
-  feedback-driving key or active tap series
-- `KEY_FEEDBACK_MODE_KEY`: repaint only the feedback-driving key itself
+  feedback-driving key or active tap series. Combo-driven feedback can expand
+  this to both halves when the combo footprint spans both sides.
+- `KEY_FEEDBACK_MODE_KEY`: repaint only the feedback-driving key footprint.
+  For combo outputs, that means every key that formed the combo.
+
+Like PD trigger-half placement, key-behavior feedback locality is driven from
+the live runtime footprint, not a static guess from authored combo comments.
 
 In the shared runtime, those colors are used for these categories:
 

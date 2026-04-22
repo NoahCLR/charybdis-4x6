@@ -94,6 +94,46 @@ static void validate_combo_outputs(void) {
     }
 }
 
+#ifdef COMBO_ENABLE
+static void log_ambiguous_combo_member(uint8_t combo_index, uint16_t keycode) {
+#    ifdef CONSOLE_ENABLE
+    uprintf("Unsupported COMBOS(COMBO) input[%u] duplicate member keycode 0x%04X; combo origin tracking needs unique member keycodes within one combo footprint\n", (unsigned int)combo_index, (unsigned int)keycode);
+#    else
+    (void)combo_index;
+    (void)keycode;
+#    endif
+}
+
+static void validate_combo_members(void) {
+    for (uint8_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
+        combo_t *combo = &key_combos[combo_index];
+
+        for (uint16_t member_index = 0;; member_index++) {
+            uint16_t member_keycode = pgm_read_word(&combo->keys[member_index]);
+
+            if (member_keycode == COMBO_END) {
+                break;
+            }
+
+            for (uint16_t later_index = (uint16_t)(member_index + 1u);; later_index++) {
+                uint16_t later_keycode = pgm_read_word(&combo->keys[later_index]);
+
+                if (later_keycode == COMBO_END) {
+                    break;
+                }
+
+                if (later_keycode == member_keycode) {
+                    log_ambiguous_combo_member(combo_index, member_keycode);
+                    break;
+                }
+            }
+        }
+    }
+}
+#else
+static void validate_combo_members(void) {}
+#endif
+
 static void validate_key_behavior_reachability(void) {
     for (uint8_t index = 0; index < key_behavior_count; index++) {
         uint16_t keycode = key_behaviors[index].keycode;
@@ -107,6 +147,7 @@ static void validate_key_behavior_reachability(void) {
 void noah_keymap_validate(void) {
     key_behavior_validate_all();
     validate_authored_keymap_layer_actions();
+    validate_combo_members();
     validate_combo_outputs();
     validate_key_behavior_reachability();
 }

@@ -85,6 +85,16 @@ The current combo set is intentionally small:
 That keeps the layout readable while still giving one easy chorded `Tab` and a
 single pointer-specific utility chord.
 
+Combo outputs now keep two runtime views at once:
+
+- one representative owner key for release matching and other ownership paths
+- one full physical combo footprint for RGB locality and PD trigger-side
+  placement
+
+If a combo spans both halves, localized RGB and `PD_COLOR_MODE_TRIGGER_HALF`
+broaden to both halves instead of pretending the combo came from only one
+side.
+
 ## Signature Behaviors
 
 ### Number Row And Punctuation
@@ -214,6 +224,11 @@ The current authored path is:
 So pressing both primary mouse buttons together on `LAYER_NAV` or
 `LAYER_POINTER` turns into a held repeat action that taps left click at `100 Hz`
 until release.
+
+Because `CLICK_SPAM` is combo-backed, localized key-feedback RGB follows the
+combo footprint rather than the fake QMK combo position `(0,0)`. In
+`KEY_FEEDBACK_MODE_KEY_HALF`, that means it can light both halves when a combo
+really spans both sides.
 
 That `100 Hz` setting is also the current authored maximum: `100` repeats per
 second.

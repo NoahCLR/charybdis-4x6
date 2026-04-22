@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 
+#include "../../key/runtime/origin_registry.h"
 #include "../../pointing/defs/pd_mode_flags.h"
 
 typedef struct __attribute__((packed)) {
@@ -18,10 +19,10 @@ typedef struct __attribute__((packed)) {
     pd_mode_id_t active_mode_id;
     pd_mode_id_t locked_mode_id;
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    uint8_t      pd_mode_owner_half;
+    uint8_t      pd_mode_owner_sides;
 #endif
     uint8_t      key_feedback_flags;
-    uint8_t      key_feedback_key;
+    uint8_t      key_feedback_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t      key_preview_layer;
 } split_runtime_sync_packet_t;
 
@@ -31,9 +32,9 @@ typedef struct __attribute__((packed)) {
         .automouse_progress = 0,               \
         .active_mode_id     = PD_MODE_ID_NONE, \
         .locked_mode_id     = PD_MODE_ID_NONE, \
-        .pd_mode_owner_half = SPLIT_HALF_NONE, \
+        .pd_mode_owner_sides = SPLIT_SIDE_MASK_NONE, \
         .key_feedback_flags = 0,               \
-        .key_feedback_key   = UINT8_MAX,       \
+        .key_feedback_bitmap = {0},            \
         .key_preview_layer  = UINT8_MAX,       \
     }
 #else
@@ -43,7 +44,7 @@ typedef struct __attribute__((packed)) {
             .active_mode_id     = PD_MODE_ID_NONE, \
             .locked_mode_id     = PD_MODE_ID_NONE, \
             .key_feedback_flags = 0,             \
-            .key_feedback_key   = UINT8_MAX,     \
+            .key_feedback_bitmap = {0},          \
             .key_preview_layer  = UINT8_MAX,     \
         }
 #endif

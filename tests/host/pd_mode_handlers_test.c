@@ -195,6 +195,7 @@ static keyrecord_t test_record(bool pressed) {
                         .row = 1,
                         .col = 2,
                     },
+                .type    = KEY_EVENT,
                 .pressed = pressed,
             },
     };

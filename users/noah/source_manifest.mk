@@ -25,12 +25,14 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/api.c \
     lib/key/runtime/preflight.c \
     lib/key/runtime/process.c \
+    lib/key/runtime/origin_registry.c \
     lib/key/runtime/press.c \
     lib/key/runtime/release.c \
     lib/key/runtime/scan.c \
     lib/key/runtime/transition.c \
     lib/key/runtime/trace.c \
     lib/key/runtime/delayed_action.c \
+    lib/compat/qmk_combo_origin.c \
     lib/key/ownership/held_action.c \
     lib/key/ownership/held_repeat.c \
     lib/action/action_dispatch.c \

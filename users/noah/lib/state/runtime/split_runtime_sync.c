@@ -45,7 +45,7 @@ static void split_runtime_sync_log_packet_size_mismatch(uint8_t size) {
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force);
 
 static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_elapsed) {
-    return (split_runtime_sync_packet_t){
+    split_runtime_sync_packet_t packet = {
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
         .automouse_progress = pd_any_local_mode_locked() ? 0 : automouse_rgb_quantize_progress(raw_elapsed),
 #    else
@@ -55,25 +55,31 @@ static split_runtime_sync_packet_t split_runtime_sync_build_packet(uint16_t raw_
         .active_mode_id = pd_mode_id_from_mask(pd_mode_local_active_snapshot()),
         .locked_mode_id = pd_mode_id_from_mask(pd_mode_local_locked_snapshot()),
 #        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-        .pd_mode_owner_half = pd_mode_local_owner_half_snapshot(),
+        .pd_mode_owner_sides = pd_mode_local_owner_sides_snapshot(),
 #        endif
 #    else
         .active_mode_id = PD_MODE_ID_NONE,
         .locked_mode_id = PD_MODE_ID_NONE,
 #        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-        .pd_mode_owner_half = SPLIT_HALF_NONE,
+        .pd_mode_owner_sides = SPLIT_SIDE_MASK_NONE,
 #        endif
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
         .key_feedback_flags = key_feedback_pack(),
-        .key_feedback_key   = key_feedback_key(),
         .key_preview_layer  = key_feedback_preview_layer(),
 #    else
         .key_feedback_flags = 0,
-        .key_feedback_key   = UINT8_MAX,
         .key_preview_layer  = UINT8_MAX,
 #    endif
     };
+
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+    key_feedback_bitmap(packet.key_feedback_bitmap);
+#    else
+    key_origin_bitmap_clear(packet.key_feedback_bitmap);
+#    endif
+
+    return packet;
 }
 
 static bool split_runtime_sync_heartbeat_due(void) {
@@ -115,9 +121,9 @@ static void split_runtime_sync_slave_rpc(uint8_t initiator2target_buffer_size, c
         split_runtime_sync_remote.active_mode_id,
         split_runtime_sync_remote.locked_mode_id,
 #        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-        split_runtime_sync_remote.pd_mode_owner_half
+        split_runtime_sync_remote.pd_mode_owner_sides
 #        else
-        SPLIT_HALF_NONE
+        SPLIT_SIDE_MASK_NONE
 #        endif
     );
 #    endif

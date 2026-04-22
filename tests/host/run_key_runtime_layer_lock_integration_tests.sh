@@ -32,6 +32,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/interaction/multi_tap_engine.c" \
     "$ROOT/users/noah/lib/key/runtime/api.c" \
     "$ROOT/users/noah/lib/key/runtime/debug.c" \
+    "$ROOT/users/noah/lib/key/runtime/origin_registry.c" \
     "$ROOT/users/noah/lib/key/runtime/preflight.c" \
     "$ROOT/users/noah/lib/key/runtime/press.c" \
     "$ROOT/users/noah/lib/key/runtime/process.c" \
@@ -40,6 +41,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/transition.c" \
     "$ROOT/users/noah/lib/key/runtime/core/runtime.c" \
+    "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/runtime/keyboard_mod_state.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \

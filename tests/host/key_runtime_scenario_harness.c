@@ -78,6 +78,7 @@ static keyrecord_t key_runtime_scenario_record(keypos_t key_pos, bool pressed) {
     return (keyrecord_t){
         .event =
             {
+                .type    = KEY_EVENT,
                 .key     = key_pos,
                 .pressed = pressed,
             },

@@ -15,24 +15,19 @@
 
 typedef struct {
     uint8_t flags;
-    uint8_t key;
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
 } key_feedback_snapshot_t;
 
 static uint8_t key_feedback_pack_for_token(const press_token_t *token);
 
-static uint8_t key_feedback_pack_keypos(keypos_t key_pos) {
-    uint16_t packed;
-
-    if (key_pos.row >= MATRIX_ROWS || key_pos.col >= MATRIX_COLS) {
-        return KEY_FEEDBACK_KEY_NONE;
+static void key_feedback_snapshot_set_bitmap_for_key(key_feedback_snapshot_t *snapshot, keypos_t key_pos) {
+    if (!snapshot) {
+        return;
     }
 
-    packed = (uint16_t)key_pos.row * MATRIX_COLS + key_pos.col;
-    if (packed >= KEY_FEEDBACK_KEY_NONE) {
-        return KEY_FEEDBACK_KEY_NONE;
+    if (!key_origin_registry_get_bitmap(key_pos, snapshot->bitmap)) {
+        key_origin_bitmap_clear(snapshot->bitmap);
     }
-
-    return (uint8_t)packed;
 }
 
 void key_feedback_pulse_arm(bool long_hold_level) {
@@ -63,12 +58,14 @@ static bool key_feedback_pulse_active(void) {
 }
 
 static key_feedback_snapshot_t key_feedback_snapshot(void) {
-    key_feedback_snapshot_t     snapshot = {.key = KEY_FEEDBACK_KEY_NONE};
+    key_feedback_snapshot_t     snapshot = {0};
     key_runtime_core_state_t   *state    = key_runtime_core_state();
 
     if (key_feedback_pulse_active()) {
         snapshot.flags = KEY_FEEDBACK_FLAG_HOLD_ACTIVE;
-        snapshot.key   = state ? key_feedback_pack_keypos(state->feedback_pulse_key_pos) : KEY_FEEDBACK_KEY_NONE;
+        if (state) {
+            key_feedback_snapshot_set_bitmap_for_key(&snapshot, state->feedback_pulse_key_pos);
+        }
         if (state && state->feedback_pulse_long_hold_level) {
             snapshot.flags |= KEY_FEEDBACK_FLAG_LONG_HOLD_ACTIVE;
         }
@@ -78,7 +75,7 @@ static key_feedback_snapshot_t key_feedback_snapshot(void) {
     for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
         if (state->tap_series[index].active && !state->tap_series[index].pending_hold) {
             snapshot.flags |= KEY_FEEDBACK_FLAG_MULTI_TAP_PENDING;
-            snapshot.key = key_feedback_pack_keypos(state->tap_series[index].key_pos);
+            key_feedback_snapshot_set_bitmap_for_key(&snapshot, state->tap_series[index].key_pos);
             break;
         }
     }
@@ -88,8 +85,8 @@ static key_feedback_snapshot_t key_feedback_snapshot(void) {
 
         if (token_flags != 0u) {
             snapshot.flags |= token_flags;
-            if (snapshot.key == KEY_FEEDBACK_KEY_NONE) {
-                snapshot.key = key_feedback_pack_keypos(state->press_tokens[index].key_pos);
+            if (!key_origin_bitmap_has_any(snapshot.bitmap)) {
+                key_feedback_snapshot_set_bitmap_for_key(&snapshot, state->press_tokens[index].key_pos);
             }
             return snapshot;
         }
@@ -217,8 +214,12 @@ uint8_t key_feedback_pack(void) {
     return key_feedback_snapshot().flags;
 }
 
-uint8_t key_feedback_key(void) {
-    return key_feedback_snapshot().key;
+void key_feedback_bitmap(uint8_t *out_bitmap) {
+    if (!out_bitmap) {
+        return;
+    }
+
+    key_origin_bitmap_copy(out_bitmap, key_feedback_snapshot().bitmap);
 }
 
 #undef KEY_FEEDBACK_FLASH_HALF_PERIOD_MS

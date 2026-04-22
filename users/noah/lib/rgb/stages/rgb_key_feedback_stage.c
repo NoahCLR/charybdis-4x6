@@ -30,18 +30,17 @@ static bool rgb_runtime_key_feedback_stage_led_range_intersects(uint8_t from, ui
     return from < led_max && to > led_min;
 }
 
-static uint8_t rgb_runtime_key_feedback_stage_current_key(void) {
-    return is_keyboard_master() ? key_feedback_key() : split_runtime_sync_remote.key_feedback_key;
-}
-
-static bool rgb_runtime_key_feedback_stage_unpack_key(uint8_t packed_key, keypos_t *key_pos) {
-    if (!(key_pos && packed_key != KEY_FEEDBACK_KEY_NONE)) {
-        return false;
+static void rgb_runtime_key_feedback_stage_current_bitmap(uint8_t *out_bitmap) {
+    if (!out_bitmap) {
+        return;
     }
 
-    key_pos->row = packed_key / MATRIX_COLS;
-    key_pos->col = packed_key % MATRIX_COLS;
-    return key_pos->row < MATRIX_ROWS && key_pos->col < MATRIX_COLS;
+    if (is_keyboard_master()) {
+        key_feedback_bitmap(out_bitmap);
+        return;
+    }
+
+    key_origin_bitmap_copy(out_bitmap, split_runtime_sync_remote.key_feedback_bitmap);
 }
 
 static bool rgb_runtime_key_feedback_stage_paint_key(rgb_t color, keypos_t key_pos, uint8_t led_min, uint8_t led_max) {
@@ -61,23 +60,46 @@ static bool rgb_runtime_key_feedback_stage_paint_key(rgb_t color, keypos_t key_p
     return painted;
 }
 
+static bool rgb_runtime_key_feedback_stage_paint_bitmap_keys(rgb_t color, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    bool painted = false;
+
+    if (!bitmap) {
+        return false;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            keypos_t key_pos = {.row = row, .col = col};
+
+            if (!key_origin_bitmap_has_keypos(bitmap, key_pos)) {
+                continue;
+            }
+
+            painted |= rgb_runtime_key_feedback_stage_paint_key(color, key_pos, led_min, led_max);
+        }
+    }
+
+    return painted;
+}
+
 static bool rgb_runtime_key_feedback_stage_paint(rgb_t color, uint8_t led_min, uint8_t led_max) {
-    keypos_t key_pos;
+    uint8_t           bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    split_side_mask_t sides;
+
+    rgb_runtime_key_feedback_stage_current_bitmap(bitmap);
 
     if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY) {
-        if (!rgb_runtime_key_feedback_stage_unpack_key(rgb_runtime_key_feedback_stage_current_key(), &key_pos)) {
-            return false;
+        if (!key_origin_bitmap_has_any(bitmap)) {
+            rgb_set_both_halves(color, led_min, led_max);
+            return led_min < led_max;
         }
 
-        return rgb_runtime_key_feedback_stage_paint_key(color, key_pos, led_min, led_max);
+        return rgb_runtime_key_feedback_stage_paint_bitmap_keys(color, bitmap, led_min, led_max);
     }
 
     if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY_HALF) {
-        if (!rgb_runtime_key_feedback_stage_unpack_key(rgb_runtime_key_feedback_stage_current_key(), &key_pos)) {
-            return false;
-        }
-
-        if (split_half_from_keypos(key_pos) == SPLIT_HALF_LEFT) {
+        sides = key_origin_bitmap_side_mask(bitmap);
+        if (sides == SPLIT_SIDE_MASK_LEFT) {
             if (!rgb_runtime_key_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
                 return false;
             }
@@ -86,12 +108,14 @@ static bool rgb_runtime_key_feedback_stage_paint(rgb_t color, uint8_t led_min, u
             return true;
         }
 
-        if (split_half_from_keypos(key_pos) != SPLIT_HALF_RIGHT || !rgb_runtime_key_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
-            return false;
-        }
+        if (sides == SPLIT_SIDE_MASK_RIGHT) {
+            if (!rgb_runtime_key_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
+                return false;
+            }
 
-        rgb_set_right_half(color, led_min, led_max);
-        return true;
+            rgb_set_right_half(color, led_min, led_max);
+            return true;
+        }
     }
 
     rgb_set_both_halves(color, led_min, led_max);

@@ -134,6 +134,7 @@ static void test_managed_only_mask_keeps_physically_held_gui_visible(void) {
     keyrecord_t press    = {
         .event =
             {
+                .type    = KEY_EVENT,
                 .key     = {.row = 0, .col = 0},
                 .pressed = true,
             },
@@ -141,6 +142,7 @@ static void test_managed_only_mask_keeps_physically_held_gui_visible(void) {
     keyrecord_t release = {
         .event =
             {
+                .type    = KEY_EVENT,
                 .key     = {.row = 0, .col = 0},
                 .pressed = false,
             },
