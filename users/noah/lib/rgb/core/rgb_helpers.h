@@ -70,7 +70,7 @@ typedef enum {
 } combo_feedback_mode_t;
 
 typedef struct {
-    hsv_t                 held_color;
+    hsv_t                 color;
     combo_feedback_mode_t mode;
 } combo_feedback_color_config_t;
 

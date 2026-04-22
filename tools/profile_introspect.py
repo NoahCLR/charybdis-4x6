@@ -853,13 +853,13 @@ def parse_combo_feedback_color(raw_text: str, known_values: dict[str, str]) -> d
         return None
 
     fields = parse_designated_fields(strip_comments(body))
-    held_color = fields.get(".held_color")
-    if held_color is None:
+    combo_color = fields.get(".color")
+    if combo_color is None:
         return None
 
-    authored_color = parse_hsv_expr(held_color, known_values)
+    authored_color = parse_hsv_expr(combo_color, known_values)
     return {
-        "field": "held_color",
+        "field": "color",
         "label": "Active Combo",
         "meaning": "Steady combo layer color while a combo chord stays active. Preview- or PD-owning combos can be routed underneath those state indicators, while unrelated combos remain above them.",
         "color": authored_color,

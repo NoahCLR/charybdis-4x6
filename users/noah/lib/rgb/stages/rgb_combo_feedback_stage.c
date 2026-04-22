@@ -12,10 +12,10 @@
 
 extern const combo_feedback_color_config_t combo_feedback_colors;
 
-static rgb_t combo_feedback_held_rgb;
+static rgb_t combo_feedback_active_rgb;
 
 void rgb_runtime_combo_feedback_stage_post_init(void) {
-    combo_feedback_held_rgb = hsv_to_rgb(combo_feedback_colors.held_color);
+    combo_feedback_active_rgb = hsv_to_rgb(combo_feedback_colors.color);
 }
 
 static bool rgb_runtime_combo_feedback_stage_led_range_intersects(uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
@@ -48,7 +48,7 @@ static bool rgb_runtime_combo_feedback_stage_paint_key(keypos_t key_pos, uint8_t
         uint8_t led = leds[index];
 
         if (led >= led_min && led < led_max) {
-            rgb_set_led_color(led, led_min, led_max, combo_feedback_held_rgb);
+            rgb_set_led_color(led, led_min, led_max, combo_feedback_active_rgb);
             painted = true;
         }
     }
@@ -94,13 +94,13 @@ static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_m
             if (!rgb_runtime_combo_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
                 return false;
             }
-            rgb_set_left_half(combo_feedback_held_rgb, led_min, led_max);
+            rgb_set_left_half(combo_feedback_active_rgb, led_min, led_max);
             return true;
         case COMBO_FEEDBACK_MODE_RIGHT_HALF:
             if (!rgb_runtime_combo_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
                 return false;
             }
-            rgb_set_right_half(combo_feedback_held_rgb, led_min, led_max);
+            rgb_set_right_half(combo_feedback_active_rgb, led_min, led_max);
             return true;
         case COMBO_FEEDBACK_MODE_COMBO_HALF:
             sides = key_origin_bitmap_side_mask(bitmap);
@@ -108,7 +108,7 @@ static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_m
                 if (!rgb_runtime_combo_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
                     return false;
                 }
-                rgb_set_left_half(combo_feedback_held_rgb, led_min, led_max);
+                rgb_set_left_half(combo_feedback_active_rgb, led_min, led_max);
                 return true;
             }
 
@@ -116,7 +116,7 @@ static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_m
                 if (!rgb_runtime_combo_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
                     return false;
                 }
-                rgb_set_right_half(combo_feedback_held_rgb, led_min, led_max);
+                rgb_set_right_half(combo_feedback_active_rgb, led_min, led_max);
                 return true;
             }
             break;
@@ -125,7 +125,7 @@ static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_m
             break;
     }
 
-    rgb_set_both_halves(combo_feedback_held_rgb, led_min, led_max);
+    rgb_set_both_halves(combo_feedback_active_rgb, led_min, led_max);
     return led_min < led_max;
 }
 

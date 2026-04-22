@@ -152,32 +152,32 @@ const pd_mode_color_t pd_mode_colors[] = {
     {
         .pointing_mode = PD_MODE_DRAGSCROLL,
         .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // orange
     {
         .pointing_mode = PD_MODE_VOLUME,
         .color         = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // yellow
     {
         .pointing_mode = PD_MODE_BRIGHTNESS,
         .color         = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // magenta
     {
         .pointing_mode = PD_MODE_ARROW,
         .color         = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // cyan
     {
         .pointing_mode = PD_MODE_PINCH,
         .color         = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // lime
     {
         .pointing_mode = PD_MODE_ZOOM,
         .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_HALF,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // light green
 };
 const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
@@ -218,14 +218,14 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 //   - COMBO_FEEDBACK_MODE_LEFT_HALF = always paint the left half
 //   - COMBO_FEEDBACK_MODE_RIGHT_HALF = always paint the right half
 //
-// This profile uses COMBO_FEEDBACK_MODE_COMBO_HALF so held combos stay local
+// This profile uses COMBO_FEEDBACK_MODE_COMBO_HALF so active combos stay local
 // to the half or halves that formed the chord without narrowing to individual
 // keys or broadening across the board.
 #    ifdef COMBO_ENABLE
 const combo_feedback_color_config_t combo_feedback_colors = {
     // Strong blue so the combo layer stays distinct from white/orange/cyan
     // authored key-behavior semantics.
-    .held_color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
     // Keep combo identity on the half or halves touched by the live combo.
     .mode = COMBO_FEEDBACK_MODE_COMBO_HALF,

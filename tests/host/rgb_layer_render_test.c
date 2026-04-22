@@ -144,7 +144,7 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
     .end_color = HSV(200, 210, 220),
 };
 const combo_feedback_color_config_t combo_feedback_colors = {
-    .held_color = HSV(150, 151, 152),
+    .color      = HSV(150, 151, 152),
     .mode       = COMBO_FEEDBACK_MODE_COMBO_KEYS,
 };
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
@@ -184,7 +184,7 @@ static rgb_t rgb_from_ws2812(ws2812_led_t led) {
 }
 
 static rgb_t rgb_from_combo_feedback(void) {
-    return rgb_from_hsv(combo_feedback_colors.held_color);
+    return rgb_from_hsv(combo_feedback_colors.color);
 }
 
 static __attribute__((unused)) void test_feedback_bitmap_set(uint8_t *bitmap, uint8_t row, uint8_t col) {

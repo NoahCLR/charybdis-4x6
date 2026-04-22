@@ -229,14 +229,14 @@ In `rgb_config.c`, declare `combo_feedback_colors` directly:
 
 ```c
 const combo_feedback_color_config_t combo_feedback_colors = {
-    .held_color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .color      = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .mode       = COMBO_FEEDBACK_MODE_COMBO_KEYS,
 };
 ```
 
 This is a persistent combo identity layer:
 
-- if a combo chord is held, its combo color stays active
+- if a combo chord is active, its combo color stays active
 - key-behavior feedback can still repaint above it
 - combos that currently own preview or PD state are routed underneath those
   state indicators
@@ -353,7 +353,7 @@ Examples:
 
 - a per-layer LED group can sit on top of a solid layer color
 - a preview- or PD-owning combo can stay underneath the preview or PD overlay
-- an unrelated held combo can repaint above preview or PD if it uses the
+- an unrelated active combo can repaint above preview or PD if it uses the
   combo overlay path
 - a pd-mode overlay can repaint the authored half or both halves after the
   base scene and any combo underlay
