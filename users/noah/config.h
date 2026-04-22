@@ -44,6 +44,14 @@
 // EEPROM-backed keymap data.
 #    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_SYNC, PUT_VIA_KEYMAP_SYNC
 
+// Dynamic trigger-half placement for PD-mode RGB overlays.
+// Required only when a pd_mode_colors[] row uses PD_COLOR_MODE_TRIGGER_HALF.
+// Comment out RGB_PD_MODE_ACTIVE_HALF_ENABLE to keep the split runtime packet
+// smaller and limit PD overlays to fixed left/right/both placement modes.
+#    ifdef POINTING_DEVICE_ENABLE
+#        define RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#    endif
+
 #endif // SPLIT_KEYBOARD
 
 // ─── RGB hardware geometry ──────────────────────────────────────────────────
