@@ -12,8 +12,13 @@
 
 #    include "rgb_helpers.h"
 
+extern const layer_color_config_t     layer_colors[];
 extern const layer_led_group_t *const layer_led_groups;
 extern const uint8_t                  layer_led_group_count;
+
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+extern const automouse_fade_end_config_t automouse_fade_end_config;
+#    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
@@ -70,6 +75,25 @@ static void rgb_validation_log_invalid_layer_led_index(const char *group_kind, u
 #    endif
 }
 
+static void rgb_validation_log_invalid_layer_color_mode(uint8_t layer, uint8_t mode) {
+#    ifdef CONSOLE_ENABLE
+    uprintf("Invalid layer_colors[%u].mode %u; expected ALL_KEYS (0) or KEYS_MAPPED_ON_THIS_LAYER_ONLY (1)\n", (unsigned int)layer, (unsigned int)mode);
+#    else
+    (void)layer;
+    (void)mode;
+#    endif
+}
+
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+static void rgb_validation_log_invalid_automouse_fade_end_mode(uint8_t mode) {
+#        ifdef CONSOLE_ENABLE
+    uprintf("Invalid automouse_fade_end_config.mode %u; expected FOLLOW_REAL_DESTINATION (0), END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW (1), or END_COLOR_ON_ALL_KEYS (2)\n", (unsigned int)mode);
+#        else
+    (void)mode;
+#        endif
+}
+#    endif
+
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_log_invalid_key_behavior_feedback_mode(uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
@@ -117,6 +141,14 @@ static void rgb_validation_log_unknown_pd_mode_led_group(uint8_t group_index, pd
 }
 #    endif
 
+static void rgb_validation_validate_layer_colors(void) {
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+        if (layer_colors[layer].mode > KEYS_MAPPED_ON_THIS_LAYER_ONLY) {
+            rgb_validation_log_invalid_layer_color_mode(layer, layer_colors[layer].mode);
+        }
+    }
+}
+
 static void rgb_validation_validate_layer_led_groups(void) {
     for (uint8_t group_index = 0; group_index < layer_led_group_count; group_index++) {
         const layer_led_group_t *group = &layer_led_groups[group_index];
@@ -132,6 +164,14 @@ static void rgb_validation_validate_layer_led_groups(void) {
         }
     }
 }
+
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+static void rgb_validation_validate_automouse_fade_end_config(void) {
+    if (automouse_fade_end_config.mode > END_COLOR_ON_ALL_KEYS) {
+        rgb_validation_log_invalid_automouse_fade_end_mode((uint8_t)automouse_fade_end_config.mode);
+    }
+}
+#    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_validate_key_behavior_feedback_config(void) {
@@ -180,7 +220,12 @@ static void rgb_validation_validate_pd_mode_led_groups(void) {
 #    endif
 
 void noah_rgb_validate_config(void) {
+    rgb_validation_validate_layer_colors();
     rgb_validation_validate_layer_led_groups();
+
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+    rgb_validation_validate_automouse_fade_end_config();
+#    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     rgb_validation_validate_key_behavior_feedback_config();

@@ -22,10 +22,17 @@ static const pd_mode_led_group_t pd_mode_groups[] = {
     {.pointing_mode = (pd_mode_mask_t)0x8000u, .color = HSV(2, 2, 2), .leds = unknown_mode_leds, .count = ARRAY_SIZE(unknown_mode_leds)},
 };
 
+const layer_color_config_t layer_colors[LAYER_COUNT] = {
+    [LAYER_BASE] = {.color = HSV(0, 0, 0), .mode = (uint8_t)0xFFu},
+};
 const layer_led_group_t *const   layer_led_groups        = layer_groups;
 const uint8_t                    layer_led_group_count   = (uint8_t)ARRAY_SIZE(layer_groups);
 const pd_mode_led_group_t *const pd_mode_led_groups      = pd_mode_groups;
 const uint8_t                    pd_mode_led_group_count = (uint8_t)ARRAY_SIZE(pd_mode_groups);
+const automouse_fade_end_config_t automouse_fade_end_config = {
+    .mode      = (automouse_fade_end_mode_t)0xFFu,
+    .end_color = HSV(3, 3, 3),
+};
 
 const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = PD_MODE_VOLUME, .color = HSV(10, 10, 10)},
@@ -69,7 +76,9 @@ int uprintf(const char *fmt, ...) {
 int main(void) {
     noah_rgb_validate_config();
 
+    CHECK(strstr(log_buffer, "Invalid layer_colors") != NULL);
     CHECK(strstr(log_buffer, "Invalid layer_led_groups") != NULL);
+    CHECK(strstr(log_buffer, "Invalid automouse_fade_end_config.mode") != NULL);
     CHECK(strstr(log_buffer, "Unknown pd_mode_colors") != NULL);
     CHECK(strstr(log_buffer, "Duplicate pd_mode_colors entries") != NULL);
     CHECK(strstr(log_buffer, "Missing pd_mode_colors entry") != NULL);
