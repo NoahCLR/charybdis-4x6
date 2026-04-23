@@ -74,14 +74,6 @@ void held_repeat_tick(void) {
     test_log_stage("held_repeat_tick");
 }
 
-void macro_dispatch_validate_all(void) {
-    test_log_stage("macro_dispatch_validate_all");
-}
-
-void noah_keymap_validate(void) {
-    test_log_stage("keymap_validate");
-}
-
 void noah_via_macro_defaults_keyboard_post_init(void) {
     test_log_stage("via_macro_defaults_keyboard_post_init");
 }
@@ -133,7 +125,7 @@ static void test_matrix_scan_order(void) {
 
 static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
-        "macro_dispatch_validate_all", "keymap_validate", "via_macro_defaults_keyboard_post_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init",
+        "via_macro_defaults_keyboard_post_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init",
     };
 
     test_log_reset();

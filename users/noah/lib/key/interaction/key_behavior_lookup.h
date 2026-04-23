@@ -25,4 +25,4 @@ typedef struct {
 key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count);
 bool                key_behavior_has_more_taps(uint16_t keycode, uint8_t count);
 key_behavior_view_t key_behavior_lookup(uint16_t keycode);
-void                key_behavior_validate_all(void);
+uint8_t             key_behavior_validate_all(void);

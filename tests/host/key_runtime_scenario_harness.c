@@ -515,7 +515,9 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return false;
 }
 
-void key_behavior_validate_all(void) {}
+uint8_t key_behavior_validate_all(void) {
+    return 0u;
+}
 
 delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
     return (delayed_action_mods_t){

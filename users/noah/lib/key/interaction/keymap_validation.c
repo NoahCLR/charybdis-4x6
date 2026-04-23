@@ -5,6 +5,8 @@
 #include "noah_keymap_ids.h"
 #include "keymap_introspection.h" // QMK
 
+#include <stdint.h>
+
 #ifdef CONSOLE_ENABLE
 #    include "print.h"
 #endif
@@ -12,6 +14,14 @@
 #include "../../action/action_dispatch.h"
 #include "key_behavior_lookup.h"
 #include "keymap_validation.h"
+
+static uint8_t keymap_validation_error_count_increment(uint8_t error_count) {
+    return error_count < UINT8_MAX ? (uint8_t)(error_count + 1u) : UINT8_MAX;
+}
+
+static uint8_t keymap_validation_error_count_add(uint8_t lhs, uint8_t rhs) {
+    return UINT8_MAX - lhs < rhs ? UINT8_MAX : (uint8_t)(lhs + rhs);
+}
 
 static bool keymap_layer_action_supported(uint16_t keycode) {
     return noah_action_desc_supported_as_behavior_keycode(noah_action_describe(keycode));
@@ -70,7 +80,9 @@ static bool keycode_present_in_combo_outputs(uint16_t keycode) {
     return false;
 }
 
-static void validate_authored_keymap_layer_actions(void) {
+static uint8_t validate_authored_keymap_layer_actions(void) {
+    uint8_t error_count = 0u;
+
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
             for (uint8_t col = 0; col < MATRIX_COLS; col++) {
@@ -78,20 +90,28 @@ static void validate_authored_keymap_layer_actions(void) {
 
                 if (!keymap_layer_action_supported(keycode)) {
                     log_invalid_keymap_layer_action(layer, row, col, keycode);
+                    error_count = keymap_validation_error_count_increment(error_count);
                 }
             }
         }
     }
+
+    return error_count;
 }
 
-static void validate_combo_outputs(void) {
+static uint8_t validate_combo_outputs(void) {
+    uint8_t error_count = 0u;
+
     for (uint8_t combo_index = 0; combo_index < noah_combo_output_count; combo_index++) {
         uint16_t keycode = noah_combo_output_keycodes[combo_index];
 
         if (noah_action_desc_is_raw_qmk_layer_action(noah_action_describe(keycode))) {
             log_invalid_combo_output(combo_index, keycode);
+            error_count = keymap_validation_error_count_increment(error_count);
         }
     }
+
+    return error_count;
 }
 
 #ifdef COMBO_ENABLE
@@ -104,7 +124,9 @@ static void log_ambiguous_combo_member(uint8_t combo_index, uint16_t keycode) {
 #    endif
 }
 
-static void validate_combo_members(void) {
+static uint8_t validate_combo_members(void) {
+    uint8_t error_count = 0u;
+
     for (uint8_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
         combo_t *combo = &key_combos[combo_index];
 
@@ -124,30 +146,43 @@ static void validate_combo_members(void) {
 
                 if (later_keycode == member_keycode) {
                     log_ambiguous_combo_member(combo_index, member_keycode);
+                    error_count = keymap_validation_error_count_increment(error_count);
                     break;
                 }
             }
         }
     }
+
+    return error_count;
 }
 #else
-static void validate_combo_members(void) {}
+static uint8_t validate_combo_members(void) {
+    return 0u;
+}
 #endif
 
-static void validate_key_behavior_reachability(void) {
+static uint8_t validate_key_behavior_reachability(void) {
+    uint8_t error_count = 0u;
+
     for (uint8_t index = 0; index < key_behavior_count; index++) {
         uint16_t keycode = key_behaviors[index].keycode;
 
         if (!keycode_present_in_keymaps(keycode) && !keycode_present_in_combo_outputs(keycode)) {
             log_unreachable_key_behavior(index, keycode);
+            error_count = keymap_validation_error_count_increment(error_count);
         }
     }
+
+    return error_count;
 }
 
-void noah_keymap_validate(void) {
-    key_behavior_validate_all();
-    validate_authored_keymap_layer_actions();
-    validate_combo_members();
-    validate_combo_outputs();
-    validate_key_behavior_reachability();
+uint8_t noah_keymap_validate(void) {
+    uint8_t error_count = key_behavior_validate_all();
+
+    error_count = keymap_validation_error_count_add(error_count, validate_authored_keymap_layer_actions());
+    error_count = keymap_validation_error_count_add(error_count, validate_combo_members());
+    error_count = keymap_validation_error_count_add(error_count, validate_combo_outputs());
+    error_count = keymap_validation_error_count_add(error_count, validate_key_behavior_reachability());
+
+    return error_count;
 }

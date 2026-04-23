@@ -1,5 +1,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include <stdint.h>
+
 #ifdef CONSOLE_ENABLE
 #    include "print.h"
 #endif
@@ -74,10 +76,16 @@ static void macro_dispatch_log_playback_failure(uint8_t slot) {
     macro_dispatch_log_invalid_payload(slot, payload);
 }
 
-void macro_dispatch_validate_all(void) {
+uint8_t macro_dispatch_validate_all(void) {
+    uint8_t error_count = 0u;
+
     for (uint8_t slot = 0; slot < HARDCODED_MACRO_SLOT_COUNT; slot++) {
-        (void)macro_dispatch_validate_slot(slot);
+        if (!macro_dispatch_validate_slot(slot) && error_count < UINT8_MAX) {
+            error_count++;
+        }
     }
+
+    return error_count;
 }
 
 bool macro_dispatch(uint16_t keycode) {

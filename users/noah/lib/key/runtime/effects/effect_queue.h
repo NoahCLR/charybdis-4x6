@@ -16,4 +16,5 @@
 #define KEY_RUNTIME_EFFECT_QUEUE_FIELDS(capacity) \
     uint8_t              count;                   \
     bool                 overflowed;              \
+    uint8_t              flags;                   \
     key_runtime_effect_t items[(capacity)]

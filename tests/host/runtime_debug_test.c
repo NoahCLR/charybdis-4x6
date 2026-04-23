@@ -43,6 +43,7 @@ static uint8_t               send_keyboard_report_count;
 static uint16_t              last_emitted_action;
 static uint16_t              last_delayed_action;
 static delayed_action_mods_t last_delayed_mods;
+static uint8_t               delayed_action_count;
 static uint8_t               split_runtime_sync_count;
 
 layer_state_t layer_state;
@@ -201,6 +202,7 @@ static void test_reset_stubs(void) {
     last_emitted_action        = KC_NO;
     last_delayed_action        = KC_NO;
     last_delayed_mods          = (delayed_action_mods_t){0};
+    delayed_action_count       = 0;
     split_runtime_sync_count   = 0;
     layer_state                = 0;
 }
@@ -457,6 +459,7 @@ void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     last_delayed_action = action;
     last_delayed_mods   = mods;
+    delayed_action_count++;
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
@@ -1182,6 +1185,45 @@ static void test_key_runtime_core_transition_flush_foreign_multi_tap_clears_shad
     series = key_runtime_core_tap_series_at(pending_key);
     CHECK(series != NULL);
     CHECK(!series->active);
+}
+
+static void test_key_runtime_transition_flush_multi_tap_chunks_without_dropping_effects(void) {
+    enum {
+        SERIES_COUNT = KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY + 5u,
+    };
+
+    key_runtime_transition_plan_t plan;
+    key_runtime_core_state_t     *state;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(SERIES_COUNT < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY);
+    state = key_runtime_core_state();
+    CHECK(state != NULL);
+
+    for (uint8_t index = 0; index < SERIES_COUNT; index++) {
+        CHECK(index / MATRIX_COLS < MATRIX_ROWS);
+        state->tap_series[index] = (tap_series_t){
+            .active           = true,
+            .keycode          = TEST_PENDING_MULTI_TAP_KEY,
+            .tap_count        = 1u,
+            .single_action    = TEST_ACTION,
+            .tap_action       = TEST_ACTION,
+            .tap_repeat_count = 1u,
+            .saved_mod_state  = {0},
+        };
+        state->tap_series_count++;
+    }
+
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_flush_multi_tap(&plan);
+    CHECK(!plan.overflowed);
+    CHECK(state->tap_series_count == 0u);
+
+    key_runtime_transition_execute_plan(&plan);
+    CHECK(delayed_action_count == SERIES_COUNT);
+    CHECK(last_delayed_action == TEST_ACTION);
 }
 
 static void test_key_runtime_core_transition_flush_active_keys_retires_shadow_token(void) {
@@ -1952,6 +1994,7 @@ int main(void) {
     test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_long_hold();
     test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expired_chain();
     test_key_runtime_core_transition_flush_foreign_multi_tap_clears_shadow_series();
+    test_key_runtime_transition_flush_multi_tap_chunks_without_dropping_effects();
     test_key_runtime_core_transition_flush_active_keys_retires_shadow_token();
     test_key_runtime_core_tap_series_state_stays_independent_from_active_token_storage();
     test_key_runtime_core_layer_lock_observes_live_layer_ownership_state();

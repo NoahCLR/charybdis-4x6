@@ -23,6 +23,17 @@ Review priorities:
 2. Mechanical Enforcement
    - Verify that boundary, API, and architecture claims are enforced by tests or compile gates where applicable.
    - Flag any claim that is documented as landed but not mechanically enforced.
+   - Do not add tests or compile gates whose only purpose is to assert that a
+     deleted historical symbol, file, or function name remains absent. For a
+     removed API, successful compilation of the current source lists and test
+     callers is usually the mechanical enforcement.
+   - Negative grep-style gates are appropriate only for active architecture
+     boundaries that should remain true for future code, such as forbidden
+     include directions or ownership-boundary imports. They should not encode
+     one-off historical cleanup decisions.
+   - If a deleted API has no current callers and the current build surfaces
+     compile without it, document that compile/link coverage as the enforcement
+     instead of inventing a brittle absence check.
 3. Documentation and Review Consistency
    - Check whether the active review folder, relevant docs, and the current code all describe the same state.
    - Identify stale claims, contradictory notes, or closure statements that are too strong.
@@ -59,6 +70,8 @@ Closure rules:
   - the current code matches the intended design
   - major findings are either resolved or consciously deferred as optional cleanup
   - tests or compile gates mechanically enforce the important claims where applicable
+  - mechanical enforcement is focused on active contracts and behavior, not on
+    preserving the absence of old symbol names
   - docs and the active review folder match the current tree
   - `sh tests/host/run_all_host_tests.sh` passed
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passed

@@ -7,6 +7,7 @@
 
 #include "print.h"
 #include "users/noah/lib/action/synthetic_record.h"
+#include "users/noah/lib/macro/macro_dispatch.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/key/interaction/keymap_validation.h"
@@ -119,6 +120,11 @@ bool owned_keycode_unregister(uint16_t keycode) {
     return false;
 }
 
+bool owned_keycode_tap(uint16_t keycode) {
+    (void)keycode;
+    return false;
+}
+
 void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     (void)action;
     (void)pressed;
@@ -136,6 +142,21 @@ void unregister_code16(uint16_t keycode) {
     (void)keycode;
 }
 
+void wait_ms(uint16_t ms) {
+    (void)ms;
+}
+
+void send_char(char ascii_code) {
+    (void)ascii_code;
+}
+
+void send_char_with_delay(char ascii_code, uint8_t interval) {
+    (void)ascii_code;
+    (void)interval;
+}
+
+void noah_runtime_diag_heartbeat(void) {}
+
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
     return keymaps[layer_num][row][column];
 }
@@ -145,7 +166,8 @@ int main(void) {
     CHECK(noah_combo_output_count > 0);
     CHECK(pd_mode_color_count == PD_MODE_COUNT);
 
-    noah_keymap_validate();
+    CHECK(noah_keymap_validate() == 0u);
+    CHECK(macro_dispatch_validate_all() == 0u);
     noah_rgb_validate_config();
 
     if (log_buffer[0] != '\0') {

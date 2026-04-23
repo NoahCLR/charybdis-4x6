@@ -11,6 +11,15 @@
 
 #include "../defs/pd_mode_flags.h"
 
+#define PD_MODE_OWNER_SLOT_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
+
+typedef struct {
+    bool              active;
+    pd_mode_mask_t    mode;
+    keypos_t          key_pos;
+    split_side_mask_t owner_sides;
+} pd_mode_owner_slot_t;
+
 typedef struct {
     pd_mode_mask_t local_active_mode;
     pd_mode_mask_t local_locked_mode;
@@ -22,6 +31,7 @@ typedef struct {
     split_side_mask_t local_owner_sides;
     split_side_mask_t remote_display_owner_sides;
 #endif
+    pd_mode_owner_slot_t local_key_owners[PD_MODE_OWNER_SLOT_CAPACITY];
     bool           synthetic_auto_mouse_anchor_active;
     bool           active_dpi_sync_pending;
 } pd_mode_runtime_shared_state_t;

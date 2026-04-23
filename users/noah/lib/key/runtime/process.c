@@ -5,7 +5,6 @@
 #include "../interaction/handled_key.h"
 #include "process_internal.h"
 #include "trace.h"
-#include "noah_runtime.h"
 #include "../../macro/macro_dispatch.h"
 #include "../../pointing/defs/pd_modes.h"
 #include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"

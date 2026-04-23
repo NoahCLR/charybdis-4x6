@@ -33,6 +33,17 @@ Review priorities:
    - Assess whether tests and compile gates now mechanically enforce the claims.
    - Identify missing regression coverage, weak assertions, or unguarded seams.
    - Check whether higher-level tests use the intended semantic seams.
+   - Do not add tests or compile gates whose only purpose is to assert that a
+     deleted historical symbol, file, or function name remains absent. For a
+     removed API, successful compilation of the current source lists and test
+     callers is usually the mechanical enforcement.
+   - Negative grep-style gates are appropriate only for active architecture
+     boundaries that should remain true for future code, such as forbidden
+     include directions or ownership-boundary imports. They should not encode
+     one-off historical cleanup decisions.
+   - If a deleted API has no current callers and the current build surfaces
+     compile without it, document that compile/link coverage as the enforcement
+     instead of inventing a brittle absence check.
 5. Maintainability & Code Organization
    - Review whether the file/module structure is easier to navigate now.
    - Call out complexity that was moved rather than removed.
@@ -69,6 +80,8 @@ Closure rules:
 - A finding is only resolved when:
   - the current code matches the intended design
   - tests or compile gates mechanically enforce the claim where applicable
+  - mechanical enforcement is focused on active contracts and behavior, not on
+    preserving the absence of old symbol names
   - docs and the active review note match the current tree
 - If a prior review folder mixes landed updates with stale findings, reconcile that before treating the thread as closed.
 

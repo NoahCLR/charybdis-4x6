@@ -29,7 +29,7 @@
 #define KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 2u))
 #define KEY_RUNTIME_CORE_DEFERRED_RELEASE_BLOCKER_CAPACITY KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY
 #define KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY 16u
-#define KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY 16u
+#define KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY 14u
 
 typedef enum {
     RUNTIME_EVENT_KIND_KEY_DOWN = 0,
@@ -121,6 +121,8 @@ typedef struct {
 
 typedef struct {
     KEY_RUNTIME_EFFECT_QUEUE_FIELDS(KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY);
+    void (*sink)(void *ctx, key_runtime_effect_t effect);
+    void *sink_ctx;
 } key_runtime_core_effect_plan_t;
 
 _Static_assert(sizeof(key_runtime_core_effect_plan_t) <= 196u, "key_runtime_core_effect_plan_t must stay within the approved stack budget");
@@ -301,6 +303,7 @@ typedef struct {
 
 key_runtime_core_state_t                   *key_runtime_core_state(void);
 void                                        key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan);
+void                                        key_runtime_core_effect_plan_init_with_sink(key_runtime_core_effect_plan_t *plan, void (*sink)(void *ctx, key_runtime_effect_t effect), void *sink_ctx);
 void                                        key_runtime_core_apply_event(const runtime_event_t *event, uint16_t event_time);
 void                                        key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
 void                                        key_runtime_core_observe_scan_cycle(uint16_t now);
@@ -360,7 +363,6 @@ void                                        key_runtime_core_layer_lock_set(uint
 void                                        key_runtime_core_pd_mode_lock_set(pd_mode_mask_t mode, bool active);
 void                                        key_runtime_core_observe_release_dispatch_deferred(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
 void                                        key_runtime_core_observe_release_dispatch_drained(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
-void                                        key_runtime_core_observe_deferred_release_blocker_profile(keypos_t key_pos, bool active, bool blocks_before_tap_term, bool blocks_after_tap_term);
 projection_snapshot_t                       key_runtime_core_projection_snapshot_capture(void);
 bool                                        key_runtime_core_projection_snapshot_equal(const projection_snapshot_t *lhs, const projection_snapshot_t *rhs);
 

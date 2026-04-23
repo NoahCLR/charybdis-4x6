@@ -7,4 +7,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-void noah_keymap_validate(void);
+#include <stdint.h>
+
+uint8_t noah_keymap_validate(void);

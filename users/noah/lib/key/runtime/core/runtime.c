@@ -181,8 +181,23 @@ void key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan) {
     *plan = (key_runtime_core_effect_plan_t){0};
 }
 
+void key_runtime_core_effect_plan_init_with_sink(key_runtime_core_effect_plan_t *plan, void (*sink)(void *ctx, key_runtime_effect_t effect), void *sink_ctx) {
+    key_runtime_core_effect_plan_init(plan);
+    if (!plan) {
+        return;
+    }
+
+    plan->sink     = sink;
+    plan->sink_ctx = sink_ctx;
+}
+
 static void key_runtime_core_effect_plan_push(key_runtime_core_effect_plan_t *plan, key_runtime_effect_t effect) {
     if (!plan) {
+        return;
+    }
+
+    if (plan->sink) {
+        plan->sink(plan->sink_ctx, effect);
         return;
     }
 
@@ -3623,13 +3638,6 @@ void key_runtime_core_observe_release_dispatch_drained(keypos_t key_pos, uint16_
         key_runtime_core_pending_release_clear_token(state, pending.owner_token_id);
         return;
     }
-}
-
-void key_runtime_core_observe_deferred_release_blocker_profile(keypos_t key_pos, bool active, bool blocks_before_tap_term, bool blocks_after_tap_term) {
-    (void)key_pos;
-    (void)active;
-    (void)blocks_before_tap_term;
-    (void)blocks_after_tap_term;
 }
 
 projection_snapshot_t key_runtime_core_projection_snapshot_capture(void) {

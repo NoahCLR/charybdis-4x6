@@ -66,6 +66,13 @@ check_header_boundaries() {
     fi
 }
 
+check_profile_build_validation_gate() {
+    if ! rg -n 'run_real_profile_validation_tests\.sh' "$ROOT/users/noah/rules.mk" >/dev/null; then
+        echo "users/noah/rules.mk must hard-fail firmware builds through real-profile validation" >&2
+        exit 1
+    fi
+}
+
 check_runtime_sealing_boundaries() {
     if host_test_includes '#include ".*host_runtime_fixture\.h"' >/dev/null; then
         echo "host tests must not include removed umbrella runtime fixture header" >&2
@@ -226,4 +233,5 @@ compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "-DSPLIT
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES $AUTOMOUSE_SOURCES"
 
 check_header_boundaries
+check_profile_build_validation_gate
 check_runtime_sealing_boundaries

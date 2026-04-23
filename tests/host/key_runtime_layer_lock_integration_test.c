@@ -214,7 +214,9 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 2;
 }
 
-void key_behavior_validate_all(void) {}
+uint8_t key_behavior_validate_all(void) {
+    return 0u;
+}
 
 bool macro_dispatch(uint16_t keycode) {
     (void)keycode;

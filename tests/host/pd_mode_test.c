@@ -379,6 +379,29 @@ static void test_keycode_press_at_tracks_trigger_half(void) {
     CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_RIGHT);
 }
 
+static void test_same_mode_key_owners_release_independently(void) {
+    keypos_t left_owner  = {.row = 0, .col = 0};
+    keypos_t right_owner = {.row = 4, .col = 0};
+
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(VOLUME_MODE, left_owner));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
+
+    CHECK(pd_mode_handle_keycode_press_at(VOLUME_MODE, right_owner));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_BOTH);
+
+    CHECK(pd_mode_handle_keycode_release_at(VOLUME_MODE, left_owner));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_RIGHT);
+
+    CHECK(pd_mode_handle_keycode_release_at(VOLUME_MODE, right_owner));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_NONE);
+}
+
 static void test_lock_state_at_tracks_trigger_half_and_clears_on_unlock(void) {
     test_reset_stubs();
 
@@ -777,6 +800,7 @@ int main(void) {
     test_trait_queries_match_manifest_policy();
     test_apply_remote_snapshot_keeps_only_one_effective_mode();
     test_keycode_press_at_tracks_trigger_half();
+    test_same_mode_key_owners_release_independently();
     test_lock_state_at_tracks_trigger_half_and_clears_on_unlock();
     test_ownerless_mode_change_clears_previous_trigger_half();
     test_combo_origin_bitmap_promotes_trigger_half_to_both_sides();

@@ -116,7 +116,7 @@ static void test_dispatch_skips_empty_payload_slots(void) {
 static void test_validate_all_compiles_each_non_empty_slot_once(void) {
     test_reset_state();
 
-    macro_dispatch_validate_all();
+    CHECK(macro_dispatch_validate_all() > 0u);
     CHECK(compile_call_count[0] == 1);
     CHECK(compile_call_count[1] == 1);
     CHECK(compile_call_count[2] == 0);
@@ -126,7 +126,7 @@ static void test_validate_all_compiles_each_non_empty_slot_once(void) {
     CHECK(compile_call_count[6] == 0);
     CHECK(play_call_count == 0);
 
-    macro_dispatch_validate_all();
+    CHECK(macro_dispatch_validate_all() > 0u);
     CHECK(compile_call_count[0] == 1);
     CHECK(compile_call_count[1] == 1);
     CHECK(compile_call_count[3] == 1);

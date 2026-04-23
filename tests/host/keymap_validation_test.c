@@ -192,7 +192,7 @@ int main(void) {
     snprintf(combo_key_hex, sizeof(combo_key_hex), "0x%04X", (unsigned int)TEST_COMBO_KEY);
     snprintf(dead_key_hex, sizeof(dead_key_hex), "0x%04X", (unsigned int)TEST_DEAD_KEY);
 
-    noah_keymap_validate();
+    CHECK(noah_keymap_validate() == 4u);
 
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][1] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) input[2] duplicate member keycode") != NULL);

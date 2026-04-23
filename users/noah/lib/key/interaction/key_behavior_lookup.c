@@ -99,14 +99,23 @@ static void key_behavior_log_duplicate_keycode(uint8_t first_index, uint8_t dupl
 #endif
 }
 
-static void key_behavior_validate_unique_keycodes(void) {
+static uint8_t key_behavior_error_count_increment(uint8_t error_count) {
+    return error_count < UINT8_MAX ? (uint8_t)(error_count + 1u) : UINT8_MAX;
+}
+
+static uint8_t key_behavior_validate_unique_keycodes(void) {
+    uint8_t error_count = 0u;
+
     for (uint8_t i = 0; i < key_behavior_count; i++) {
         for (uint8_t j = (uint8_t)(i + 1u); j < key_behavior_count; j++) {
             if (key_behaviors[i].keycode == key_behaviors[j].keycode) {
                 key_behavior_log_duplicate_keycode(i, j, key_behaviors[i].keycode);
+                error_count = key_behavior_error_count_increment(error_count);
             }
         }
     }
+
+    return error_count;
 }
 
 key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
@@ -146,14 +155,15 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     };
 }
 
-void key_behavior_validate_all(void) {
-    key_behavior_validate_unique_keycodes();
+uint8_t key_behavior_validate_all(void) {
+    uint8_t error_count = key_behavior_validate_unique_keycodes();
 
     for (uint8_t i = 0; i < key_behavior_count; i++) {
         const key_behavior_t *config = &key_behaviors[i];
 
         if (!key_behavior_keycode_supported(config->keycode)) {
             key_behavior_log_invalid_keycode(i, config->keycode);
+            error_count = key_behavior_error_count_increment(error_count);
         }
 
         for (uint8_t tap_index = 0; tap_index < KEY_BEHAVIOR_MAX_TAP_COUNT; tap_index++) {
@@ -161,21 +171,28 @@ void key_behavior_validate_all(void) {
 
             if (step.tap.present && !key_behavior_action_supported(step.tap.action, HOLD_BEHAVIOR_NONE)) {
                 key_behavior_log_invalid_action(i, tap_index, "tap", step.tap.action, HOLD_BEHAVIOR_NONE);
+                error_count = key_behavior_error_count_increment(error_count);
             }
 
             if (step.hold.present && !key_behavior_action_supported(step.hold.action, step.hold.mode)) {
                 key_behavior_log_invalid_action(i, tap_index, "hold", step.hold.action, step.hold.mode);
+                error_count = key_behavior_error_count_increment(error_count);
             }
             if (step.hold.present && step.hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && !hold_repeat_rate_valid(step.hold.repeat_hz)) {
                 key_behavior_log_invalid_repeat_rate(i, tap_index, "hold");
+                error_count = key_behavior_error_count_increment(error_count);
             }
 
             if (step.long_hold.present && !key_behavior_action_supported(step.long_hold.action, step.long_hold.mode)) {
                 key_behavior_log_invalid_action(i, tap_index, "long_hold", step.long_hold.action, step.long_hold.mode);
+                error_count = key_behavior_error_count_increment(error_count);
             }
             if (step.long_hold.present && step.long_hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && !hold_repeat_rate_valid(step.long_hold.repeat_hz)) {
                 key_behavior_log_invalid_repeat_rate(i, tap_index, "long_hold");
+                error_count = key_behavior_error_count_increment(error_count);
             }
         }
     }
+
+    return error_count;
 }

@@ -35,6 +35,12 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/key/interaction/key_behavior_lookup.c" \
     "$ROOT/users/noah/lib/key/interaction/keymap_validation.c" \
+    "$ROOT/users/noah/lib/macro/macro_dispatch.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+    "$ROOT/users/noah/lib/macro/macro_slot_provider.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     -o "$BIN"

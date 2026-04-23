@@ -88,7 +88,7 @@ Timing legend for the layer-local behavior tables:
 
 | Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -120,7 +120,7 @@ Timing legend for the layer-local behavior tables:
 
 | Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -177,7 +177,7 @@ No authored combos resolve entirely from keys on this layer.
 
 | Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -210,11 +210,11 @@ No authored combos resolve entirely from keys on this layer.
 
 | Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `VOLUME` directly on layer | `VOLUME` (`VOLUME_MODE`) | `PD_MODE_VOLUME` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
-| `BRIGHTNESS` directly on layer | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `PD_MODE_BRIGHTNESS` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
-| `PINCH` via `double hold` -> `ZOOM` (`ZOOM_MODE`) | `ZOOM` (`ZOOM_MODE`) | `PD_MODE_ZOOM` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
-| `PINCH` directly on layer | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
+| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `VOLUME` directly on layer | `VOLUME` (`VOLUME_MODE`) | `PD_MODE_VOLUME` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `BRIGHTNESS` directly on layer | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `PD_MODE_BRIGHTNESS` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `PINCH` via `double hold` -> `ZOOM` (`ZOOM_MODE`) | `ZOOM` (`ZOOM_MODE`) | `PD_MODE_ZOOM` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
+| `PINCH` directly on layer | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -236,12 +236,12 @@ These overlays come from `pd_mode_colors[]` in [rgb_config.c](../keyboards/basta
 
 | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
-| `PD_MODE_DRAGSCROLL` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `PD_MODE_VOLUME` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
-| `PD_MODE_BRIGHTNESS` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
-| `PD_MODE_ARROW` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
-| `PD_MODE_PINCH` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
-| `PD_MODE_ZOOM` | `PD_COLOR_MODE_TRIGGER_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
+| `PD_MODE_DRAGSCROLL` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `PD_MODE_VOLUME` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `PD_MODE_BRIGHTNESS` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `PD_MODE_ARROW` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `PD_MODE_PINCH` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
+| `PD_MODE_ZOOM` | `PD_COLOR_MODE_RIGHT_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
 
 ## Auto-mouse Fade
 

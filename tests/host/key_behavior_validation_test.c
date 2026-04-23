@@ -129,7 +129,7 @@ void unregister_code16(uint16_t keycode) {
 }
 
 int main(void) {
-    key_behavior_validate_all();
+    CHECK(key_behavior_validate_all() == 1u);
 
     CHECK(strstr(log_buffer, "Duplicate key_behaviors rows") != NULL);
     CHECK(strstr(log_buffer, "later rows are ignored by lookup") != NULL);
