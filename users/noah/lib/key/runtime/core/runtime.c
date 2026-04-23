@@ -2154,30 +2154,6 @@ bool key_runtime_core_pending_release_at_order(uint8_t order, pending_release_t 
     return true;
 }
 
-bool key_runtime_core_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *action, uint8_t *repeat_count) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-    tap_series_t             *series;
-
-    if (action) {
-        *action = KC_NO;
-    }
-    if (repeat_count) {
-        *repeat_count = 0u;
-    }
-
-    if (!(state && key_runtime_core_keypos_valid(key_pos))) {
-        return false;
-    }
-
-    series = key_runtime_core_tap_series_state(state, key_pos);
-    if (!key_runtime_core_pending_multi_tap_flush_resolution(series, action, repeat_count)) {
-        return false;
-    }
-
-    key_runtime_core_tap_series_clear(state, series);
-    return true;
-}
-
 bool key_runtime_core_reset_pending_multi_tap(keypos_t key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     tap_series_t             *series;
@@ -2192,23 +2168,6 @@ bool key_runtime_core_reset_pending_multi_tap(keypos_t key_pos) {
     }
 
     key_runtime_core_tap_series_clear(state, series);
-    return true;
-}
-
-bool key_runtime_core_retire_press_token(keypos_t key_pos) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-    press_token_t            *token;
-
-    if (!(state && key_runtime_core_keypos_valid(key_pos))) {
-        return false;
-    }
-
-    token = key_runtime_core_press_token_state(state, key_pos);
-    if (!(token && token->active)) {
-        return false;
-    }
-
-    key_runtime_core_press_token_cancel(state, token, state->current_time);
     return true;
 }
 
@@ -3407,26 +3366,6 @@ bool key_runtime_core_has_other_active_press_token(keypos_t key_pos) {
 
         token_key_pos = key_runtime_core_press_token_resolve_key_pos(state, token);
         if (token->active && !key_runtime_core_keypos_equal(token_key_pos, key_pos)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool key_runtime_core_has_foreign_pending_multi_tap(uint16_t keycode, keypos_t key_pos) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-
-    if (!state) {
-        return false;
-    }
-
-    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
-        const tap_series_t *series = &state->tap_series[index];
-        keypos_t            series_key_pos;
-
-        series_key_pos = key_runtime_core_tap_series_resolve_key_pos(state, series);
-        if (series->active && !(key_runtime_core_keypos_equal(series_key_pos, key_pos) && series->keycode == keycode)) {
             return true;
         }
     }

@@ -168,10 +168,6 @@ bool key_runtime_transition_has_foreign_tap_release_slot_except(keypos_t key_pos
     return key_runtime_core_has_foreign_deferred_release_blocker_except(key_pos);
 }
 
-bool key_runtime_transition_has_any_tap_release_slot(void) {
-    return key_runtime_core_has_any_deferred_release_blocker();
-}
-
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
     key_runtime_core_effect_plan_t core_plan;
     uint8_t                        previous_flags;
@@ -180,10 +176,6 @@ void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_po
     key_runtime_transition_core_plan_init_streaming(&core_plan, plan);
     key_runtime_core_interrupt_active_keys_on_other_press(key_pos, &core_plan);
     key_runtime_transition_end_auto_drain(plan, previous_flags, &core_plan);
-}
-
-void key_runtime_transition_interrupt_active_key_on_other_press(key_runtime_transition_plan_t *plan) {
-    key_runtime_transition_interrupt_active_keys_on_other_press((keypos_t){0xFF, 0xFF}, plan);
 }
 
 bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {

@@ -324,9 +324,7 @@ bool                                        key_runtime_core_pending_release_at_
 uint8_t                                     key_runtime_core_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity);
 void                                        key_runtime_core_project_effect(const key_runtime_effect_t *effect);
 void                                        key_runtime_core_project_pending_release_dispatch(const pending_release_t *pending);
-bool                                        key_runtime_core_take_pending_multi_tap_flush(keypos_t key_pos, uint16_t *action, uint8_t *repeat_count);
 bool                                        key_runtime_core_reset_pending_multi_tap(keypos_t key_pos);
-bool                                        key_runtime_core_retire_press_token(keypos_t key_pos);
 void                                        key_runtime_core_observe_held_action_register(keypos_t key_pos, uint16_t action);
 void                                        key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t action);
 void                                        key_runtime_core_observe_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz);
@@ -341,7 +339,6 @@ bool                                        key_runtime_core_active_press_token_
 uint8_t                                     key_runtime_core_pending_multi_tap_count(void);
 bool                                        key_runtime_core_pending_multi_tap_key_pos(uint8_t order, keypos_t *out);
 bool                                        key_runtime_core_has_other_active_press_token(keypos_t key_pos);
-bool                                        key_runtime_core_has_foreign_pending_multi_tap(uint16_t keycode, keypos_t key_pos);
 uint16_t                                    key_runtime_core_owner_keycode_at(keypos_t key_pos);
 uint16_t                                    key_runtime_core_tap_action_at(keypos_t key_pos);
 uint16_t                                    key_runtime_core_held_action_keycode_at(keypos_t key_pos);
