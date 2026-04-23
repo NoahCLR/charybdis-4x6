@@ -24,7 +24,6 @@ layer_state_t layer_state;
 
 typedef struct {
     unsigned eeconfig_calls;
-    unsigned hold_calls;
     unsigned pre_process_calls;
     unsigned process_calls;
     unsigned finalize_calls;
@@ -38,9 +37,6 @@ typedef struct {
     unsigned mouse_record_calls;
     unsigned rgb_calls;
 
-    uint16_t       hold_keycode;
-    keyrecord_t   *hold_record;
-    bool           hold_return_value;
     uint16_t       pre_process_keycode;
     keyrecord_t   *pre_process_record;
     bool           pre_process_return_value;
@@ -128,13 +124,6 @@ void noah_eeconfig_init_user(void) {
     noah_hook_stub_state.eeconfig_calls++;
 }
 
-bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    noah_hook_stub_state.hold_calls++;
-    noah_hook_stub_state.hold_keycode = keycode;
-    noah_hook_stub_state.hold_record  = record;
-    return noah_hook_stub_state.hold_return_value;
-}
-
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     noah_hook_stub_state.pre_process_calls++;
     noah_hook_stub_state.pre_process_keycode = keycode;
@@ -213,7 +202,9 @@ void eeconfig_init_user(void) {
 
 bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     hook_override_state.hold_calls++;
-    return noah_get_hold_on_other_key_press(keycode, record) || hook_override_state.hold_force_true;
+    (void)keycode;
+    (void)record;
+    return hook_override_state.hold_force_true;
 }
 
 bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -312,14 +303,13 @@ static keyrecord_t test_record(uint8_t row, uint8_t col, bool pressed) {
 }
 
 #ifndef HOOK_CHAINING_TEST_STRONG_OVERRIDE
-static void test_weak_defaults_delegate_to_noah_helpers(void) {
+static void test_weak_defaults_use_expected_shared_behavior(void) {
     test_reset();
 
     keyrecord_t    record       = test_record(1, 2, true);
     layer_state_t  input_state  = 0x00000012u;
     report_mouse_t input_report = {.x = 1, .y = -2, .h = 3, .v = -4, .buttons = 5};
 
-    noah_hook_stub_state.hold_return_value          = true;
     noah_hook_stub_state.pre_process_return_value   = true;
     noah_hook_stub_state.process_return_value       = false;
     noah_hook_stub_state.layer_state_return_value   = 0x00000034u;
@@ -330,10 +320,7 @@ static void test_weak_defaults_delegate_to_noah_helpers(void) {
     eeconfig_init_user();
     CHECK(noah_hook_stub_state.eeconfig_calls == 1);
 
-    CHECK(get_hold_on_other_key_press(0x1234u, &record));
-    CHECK(noah_hook_stub_state.hold_calls == 1);
-    CHECK(noah_hook_stub_state.hold_keycode == 0x1234u);
-    CHECK(noah_hook_stub_state.hold_record == &record);
+    CHECK(!get_hold_on_other_key_press(0x1234u, &record));
 
     CHECK(pre_process_record_user(0x2222u, &record));
     CHECK(noah_hook_stub_state.pre_process_calls == 1);
@@ -397,7 +384,6 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     layer_state_t  input_state  = 0x00000021u;
     report_mouse_t input_report = {.x = 10, .y = 11, .h = 12, .v = 13, .buttons = 14};
 
-    noah_hook_stub_state.hold_return_value          = false;
     noah_hook_stub_state.pre_process_return_value   = true;
     noah_hook_stub_state.process_return_value       = true;
     noah_hook_stub_state.layer_state_return_value   = 0x00000040u;
@@ -421,9 +407,6 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
 
     CHECK(get_hold_on_other_key_press(0x4567u, &record));
     CHECK(hook_override_state.hold_calls == 1);
-    CHECK(noah_hook_stub_state.hold_calls == 1);
-    CHECK(noah_hook_stub_state.hold_keycode == 0x4567u);
-    CHECK(noah_hook_stub_state.hold_record == &record);
 
     CHECK(!pre_process_record_user(0x5555u, &record));
     CHECK(hook_override_state.pre_process_calls == 1);
@@ -521,7 +504,7 @@ static void test_strong_override_passthrough_false_path_finalizes_without_post(v
 
 int main(void) {
 #ifndef HOOK_CHAINING_TEST_STRONG_OVERRIDE
-    test_weak_defaults_delegate_to_noah_helpers();
+    test_weak_defaults_use_expected_shared_behavior();
 #else
     test_strong_overrides_can_chain_to_noah_helpers();
     test_strong_override_passthrough_false_path_finalizes_without_post();

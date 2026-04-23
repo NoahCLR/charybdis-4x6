@@ -195,12 +195,6 @@ static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep
     return keep_processing;
 }
 
-bool noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
-}
-
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (noah_synthetic_record_active()) {
         return true;

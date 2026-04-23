@@ -18,7 +18,6 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 void           noah_eeconfig_init_user(void);
-bool           noah_get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
 bool           noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record);
 bool           noah_process_record_user(uint16_t keycode, keyrecord_t *record);
 void           noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing);

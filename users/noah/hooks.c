@@ -9,7 +9,9 @@ __attribute__((weak)) void eeconfig_init_user(void) {
 }
 
 __attribute__((weak)) bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    return noah_get_hold_on_other_key_press(keycode, record);
+    (void)keycode;
+    (void)record;
+    return false;
 }
 
 __attribute__((weak)) bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {

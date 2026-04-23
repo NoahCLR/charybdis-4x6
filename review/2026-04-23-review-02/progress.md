@@ -35,6 +35,9 @@
 - Narrowed `key_runtime_core_reset_pending_multi_tap()` from public core API to
   a file-local helper because it only serves release settlement inside
   `key_runtime_core`.
+- Removed the no-op `noah_get_hold_on_other_key_press()` helper. The weak QMK
+  hook now returns `false` directly, and custom hold preference belongs in a
+  keymap-owned `get_hold_on_other_key_press()` override.
 - Kept config-gated and QMK-owned surfaces that looked low-reference but are
   intentional contracts: `is_keyboard_master_impl()`, weak hook helpers, VIA
   hooks, action-kind matcher callbacks, and the symmetric PD display query API.
@@ -56,6 +59,7 @@ Passed:
 - `sh tests/host/run_via_macro_defaults_tests.sh`
 - `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
 - `sh tests/host/run_runtime_diag_tests.sh`
+- `sh tests/host/run_hook_chaining_tests.sh`
 - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`

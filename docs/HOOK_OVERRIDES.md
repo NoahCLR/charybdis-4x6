@@ -45,7 +45,9 @@ If you do nothing, the weak hooks in [`users/noah/hooks.c`](../users/noah/hooks.
 - `rgb_matrix_indicators_advanced_user()`
 
 If you override one of those in your keymap and do not call the matching
-`noah_*` helper, you fully replace the shared behavior for that hook.
+`noah_*` helper, you fully replace the shared behavior for that hook. The
+exception is `get_hold_on_other_key_press()`: the weak default returns `false`
+directly because the shared userspace has no hold-preference policy.
 
 ## Override Patterns
 
@@ -84,22 +86,17 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 ```
 
-For hold-preference decisions, return `true` as soon as the shared helper wants
+For hold-preference decisions, define the QMK hook directly when you want custom
 hold behavior:
 
 ```c
 bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    if (noah_get_hold_on_other_key_press(keycode, record)) {
-        return true;
-    }
-
     return keycode == MY_SPECIAL_MOD_TAP;
 }
 ```
 
-Right now, `noah_get_hold_on_other_key_press()` is effectively a no-op and
-returns `false`, so this pattern only matters if the shared userspace later
-gains hold-preference logic or if your keymap adds its own checks after it.
+There is no `noah_get_hold_on_other_key_press()` helper. The shared userspace
+does not own hold-preference behavior.
 
 For mouse-record classification, let the shared helper claim its keys first:
 
@@ -215,7 +212,7 @@ This pattern applies to:
 | QMK hook | Shared helper | What the helper currently owns |
 | --- | --- | --- |
 | `eeconfig_init_user()` | `noah_eeconfig_init_user()` | VIA macro seeding after EEPROM init |
-| `get_hold_on_other_key_press()` | `noah_get_hold_on_other_key_press()` | currently no shared behavior; keep the call-through if you want future shared hold-preference logic |
+| `get_hold_on_other_key_press()` | none | weak default returns `false`; define the QMK hook directly for keymap-specific hold preference |
 | `pre_process_record_user()` | `noah_pre_process_record_user()` | physical-key tracking for keyboard modifier ownership before the main process path |
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, non-handled release cleanup, direct actions, macros, and process-entry tracing |
 | `post_process_record_user()` | `noah_post_process_record_user()` | process-return finalization, including keyboard-event modifier-mask teardown and process trace result emission |

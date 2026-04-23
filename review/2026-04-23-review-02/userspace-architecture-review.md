@@ -30,6 +30,9 @@ in a new sortable review folder.
 - Public pending multi-tap reset helper: resolved. Resetting pending multi-tap
   state is release-settlement internals, so `key_runtime_core_reset_pending_multi_tap()`
   is now file-local.
+- No-op hold-preference helper: resolved. The shared userspace has no hold
+  preference policy, so `noah_get_hold_on_other_key_press()` was removed and
+  the weak QMK hook returns `false` directly.
 
 ## Current Architecture
 
@@ -44,6 +47,9 @@ instead of a separate sequencing engine.
 Macro payload playback uses the compiled IR path as the single execution
 surface. Deferred-release blocker counts remain token-derived rather than
 backed by a separate blocker table.
+
+Hold-preference behavior is not a shared userspace contract. Keymaps that need
+it should define QMK's `get_hold_on_other_key_press()` directly.
 
 ## Changes
 
@@ -61,6 +67,8 @@ backed by a separate blocker table.
 - Removed stale deferred-release blocker storage leftovers from
   `key_runtime_core`.
 - Made the pending multi-tap reset helper private to `key_runtime_core`.
+- Removed the no-op `noah_get_hold_on_other_key_press()` runtime helper and
+  documented direct QMK override as the hold-preference extension point.
 
 ## Verification
 
@@ -79,6 +87,7 @@ Passed:
 - `sh tests/host/run_via_macro_defaults_tests.sh`
 - `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
 - `sh tests/host/run_runtime_diag_tests.sh`
+- `sh tests/host/run_hook_chaining_tests.sh`
 - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
