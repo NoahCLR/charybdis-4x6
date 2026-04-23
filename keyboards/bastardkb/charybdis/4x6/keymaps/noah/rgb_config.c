@@ -139,13 +139,11 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 //   - PD_COLOR_MODE_LEFT_HALF = always paint the left half
 //   - PD_COLOR_MODE_BOTH_HALVES = mirror the PD color across both halves
 //   - PD_COLOR_MODE_TRIGGER_HALF = paint the half that triggered the current
-//     effective PD mode; requires RGB_PD_MODE_ACTIVE_HALF_ENABLE. Combo-driven
-//     triggers broaden this to both halves when the combo footprint spans both
-//     sides.
+//     effective PD mode. Combo-driven triggers broaden this to both halves
+//     when the combo footprint spans both sides.
 //
-// This profile uses PD_COLOR_MODE_TRIGGER_HALF for every PD mode so the
-// overlay follows the half that activated or locked the current pointing
-// state.
+// This profile uses PD_COLOR_MODE_RIGHT_HALF for every PD mode so pointing
+// state stays anchored to the pointer half.
 //
 // { .pointing_mode = ..., .color = HSV(hue, sat, val), .mode = ... }
 const pd_mode_color_t pd_mode_colors[] = {
