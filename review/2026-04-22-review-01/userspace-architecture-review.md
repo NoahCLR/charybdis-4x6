@@ -242,3 +242,67 @@ rule while still shrinking the persistent non-slot state.
 - Stale storage that is no longer authoritative should be removed instead of
   being kept “just in case”; deferred release blockers are derived, not stored.
 - All of the above must stay green under host tests and the firmware compile.
+
+## Closure Verification
+
+Closure was checked with `prompts/closure-verification-review.md` on
+2026-04-23.
+
+### Findings
+
+- No `must-fix` findings remain.
+- No `should-fix` findings remain.
+- Optional deferred audit: overlapping active combos that share the same output
+  keycode still deserve a release-path audit if that authored pattern becomes
+  important. This is consciously deferred because the current authored profile
+  and tests do not require that pattern, and locality already broadens rather
+  than falling back to fake `(0,0)`.
+
+### Prior Finding Status
+
+- Combo outputs using fake QMK position `(0,0)`: resolved. Code references:
+  `users/noah/lib/compat/qmk_combo_origin.c` and
+  `users/noah/lib/key/runtime/origin_registry.c`. Enforcement references:
+  combo-origin tests, real-profile thumb-layer-lock integration, RGB layer
+  render tests, full host suite, and firmware compile.
+- Key-runtime stack-backed replay growth: resolved. Code references:
+  `users/noah/lib/key/runtime/keypos_codec.h`,
+  `users/noah/lib/key/runtime/effects/effect.h`, and
+  `users/noah/lib/key/runtime/transition.c`. Enforcement references: size
+  guards, key-runtime scenario/release/modifier/layer-lock tests, full host
+  suite, and firmware compile.
+- Slot-indexed core storage duplication: resolved. Code references:
+  `users/noah/lib/key/runtime/core/runtime.c` and
+  `users/noah/lib/key/runtime/core/runtime.h`. Enforcement references:
+  key-runtime release matrix, runtime debug tests, full host suite, and
+  firmware compile.
+- Non-slot persistent storage compaction: resolved. Code references:
+  `users/noah/lib/key/runtime/core/runtime.c` and
+  `users/noah/lib/key/runtime/core/runtime.h`. Enforcement references:
+  pending-release/runtime debug coverage, key-runtime runners, full host suite,
+  and firmware compile.
+- Truthful RGB feedback layers: resolved. Code references:
+  `users/noah/lib/key/runtime/feedback.c`,
+  `users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c`,
+  `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`, and
+  `users/noah/lib/state/runtime/split_runtime_sync.c`. Enforcement references:
+  RGB layer render tests, split runtime sync tests, real-profile validation,
+  full host suite, and firmware compile.
+- Split RPC churn reduction: resolved. Code reference:
+  `users/noah/lib/state/runtime/split_runtime_sync.c`. Enforcement references:
+  split runtime sync tests, full host suite, and firmware compile.
+- Preview handoff smoothing: resolved. Code reference:
+  `users/noah/lib/key/runtime/feedback.c`. Enforcement references: RGB layer
+  render tests, split runtime sync tests, full host suite, and firmware compile.
+
+Passed verification for this closure pass:
+
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Closure Verdict: close thread.
+
+Remaining Open Findings: none. The duplicate-output combo release-path audit is
+deferred as optional future work, not an open blocker for this thread.

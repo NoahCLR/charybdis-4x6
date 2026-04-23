@@ -118,3 +118,42 @@ Passed verification:
 4. After each move, run the targeted key-runtime runners, the feature gate
    compile tests, the full host suite, and firmware compile before marking any
    boundary finding resolved.
+
+## Closure Verification
+
+Closure was checked with `prompts/closure-verification-review.md` on
+2026-04-23.
+
+### Findings
+
+- No `must-fix` findings remain.
+- No `should-fix` findings remain.
+- Optional deferred cleanup: `users/noah/lib/key/runtime/core/runtime.c` may be
+  split in future work, but the file is currently correctly named, correctly
+  placed, and covered. This is not a closure blocker.
+
+### Prior Finding Status
+
+- Exhaustive userspace file-map sanity pass: resolved. Code/review references:
+  `review/2026-04-23-review-03/userspace-file-map.md` maps all 160 scoped
+  `users/noah/**/*.c` and `users/noah/**/*.h` files; the architecture review
+  records naming, structure, build membership, dependency, and coverage checks.
+  Enforcement references: all 76 scoped `.c` files are represented in the
+  userspace source manifest, header-boundary usage is covered by feature gate
+  compile tests, and the full host suite plus firmware compile pass.
+- Key runtime core size/shape: optional cleanup, consciously deferred. Code
+  reference: `users/noah/lib/key/runtime/core/runtime.c`. Enforcement
+  references: key-runtime runners inside the full host suite and firmware
+  compile. The module remains coherent and does not require immediate split.
+
+Passed verification for this closure pass:
+
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Closure Verdict: close thread.
+
+Remaining Open Findings: none. The key-runtime core split is deferred optional
+future work, not an open blocker for this review type.

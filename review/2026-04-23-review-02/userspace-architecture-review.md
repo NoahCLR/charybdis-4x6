@@ -101,3 +101,54 @@ Passed:
 3. Continue treating low-reference QMK hooks, feature-gated code, and symmetric
    public query APIs as contracts unless a separate design pass intentionally
    removes the contract.
+
+## Closure Verification
+
+Closure was checked with `prompts/closure-verification-review.md` on
+2026-04-23.
+
+### Findings
+
+- No `must-fix` findings remain.
+- No `should-fix` findings remain.
+- No optional cleanup is required to close this legacy cleanup thread.
+
+### Prior Finding Status
+
+- Legacy standalone `multi_tap_engine`: resolved. Code references:
+  `users/noah/lib/key/runtime/core/runtime.c` and
+  `docs/KEY_RUNTIME.md`. Enforcement references: source manifest cleanup,
+  feature gate compile tests, key behavior lookup tests, key-runtime host
+  runners, full host suite, and firmware compile.
+- Macro payload visitor/direct-run path: resolved. Code references:
+  `users/noah/lib/macro/macro_payload.c`,
+  `users/noah/lib/macro/macro_payload_parse.c`, and
+  `users/noah/lib/macro/macro_payload_run.c`. Enforcement references: macro
+  payload tests, macro dispatch tests, VIA macro lifecycle tests, full host
+  suite, and firmware compile.
+- Deferred-release blocker storage leftovers: resolved. Code reference:
+  `users/noah/lib/key/runtime/core/runtime.c`. Enforcement references:
+  key-runtime release matrix, runtime debug tests, full host suite, and
+  firmware compile.
+- Runtime diagnostic test-backend setters: resolved. Code reference:
+  `users/noah/lib/state/runtime/runtime_diag.c`. Enforcement references:
+  runtime diag tests, full host suite, and firmware compile.
+- Public pending multi-tap reset helper: resolved. Code reference:
+  `users/noah/lib/key/runtime/core/runtime.c`. Enforcement references:
+  key-runtime release matrix and scenario tests, full host suite, and firmware
+  compile.
+- No-op hold-preference helper: resolved. Code references:
+  `users/noah/hooks.c` and `docs/HOOK_OVERRIDES.md`. Enforcement references:
+  hook chaining tests, feature gate compile tests, full host suite, and
+  firmware compile.
+
+Passed verification for this closure pass:
+
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Closure Verdict: close thread.
+
+Remaining Open Findings: none.

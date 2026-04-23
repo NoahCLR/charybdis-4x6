@@ -73,3 +73,15 @@ Passed:
 - Future legacy hunts should keep the same standard used here: exact caller
   tracing before deleting anything, and keep config-gated/QMK contract surfaces
   unless the contract itself is intentionally redesigned.
+
+### Closure Verification
+
+- Closure checked with `prompts/closure-verification-review.md` on 2026-04-23.
+- Closure verdict: close thread.
+- No `must-fix`, `should-fix`, or optional cleanup findings remain for this
+  legacy cleanup thread.
+- Closure verification passed:
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - `git diff --check`

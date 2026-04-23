@@ -266,3 +266,16 @@ Passed:
   first and only expand to full `keypos_t` at execution boundaries.
 - Overlapping active combos that share the same output keycode still deserve a
   dedicated release-path audit if that authored pattern becomes important.
+
+### Closure Verification
+
+- Closure checked with `prompts/closure-verification-review.md` on 2026-04-23.
+- Closure verdict: close thread.
+- No `must-fix` or `should-fix` findings remain.
+- Remaining duplicate-output combo release-path audit is deferred as optional
+  future work if that authored pattern becomes important.
+- Closure verification passed:
+  - `sh tests/host/run_feature_gate_compile_tests.sh`
+  - `sh tests/host/run_all_host_tests.sh`
+  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+  - `git diff --check`
