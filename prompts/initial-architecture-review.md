@@ -10,6 +10,10 @@ Before reviewing:
 - If the newest review folder is contradictory, reconcile it before using it as the source of truth.
 - If this work belongs to the active architecture thread, continue in that review folder instead of creating a same-day duplicate.
 - Only create a new review folder if this is a materially different architecture topic or the previous thread is explicitly closed.
+- Treat a review folder with a closure verdict as immutable history. Do not add
+  follow-up findings, cleanup notes, or new verification to a closed review
+  folder. If new work happens after closure, open the next sortable review
+  folder and state why the closed folder was not continued.
 
 Review priorities:
 1. Architecture & Separation of Concerns

@@ -519,15 +519,6 @@ uint8_t key_behavior_validate_all(void) {
     return 0u;
 }
 
-delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
-    return (delayed_action_mods_t){
-        .real           = mt->saved_mods,
-        .weak           = mt->saved_weak_mods,
-        .oneshot        = mt->saved_oneshot_mods,
-        .oneshot_locked = mt->saved_oneshot_locked_mods,
-    };
-}
-
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     dispatch_delayed_action_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action, mods);
 }

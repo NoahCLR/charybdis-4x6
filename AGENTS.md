@@ -13,10 +13,10 @@ Use this repo like production firmware, not a scratch keymap.
 - `README.md` and the files under `docs/` are the main human-facing documentation set for this repo.
 - For doc fixes, doc updates, doc audits, or user-facing explanation work, check `README.md` and the relevant files under `docs/` first.
 - Review folders under `review/` are internal architecture/planning notes, not the default target for normal documentation requests.
-- For refactors or runtime architecture work, read the newest review folder under `review/` first. The newest review folder is the primary source of truth for that architecture work.
+- For refactors or runtime architecture work, read the newest review folder under `review/` first. The newest open review folder is the primary source of truth for that architecture work; closed review folders are historical context unless you are checking closure history.
 - If the newest review folder is internally contradictory, reconcile it before using it as the source of truth for follow-up work on the same thread.
 - Name new review folders with a sortable ISO date prefix. For distinct reviews opened on the same day, append a zero-padded review sequence such as `review/2026-04-11-review-01/`, `review/2026-04-11-review-02/`, and `review/2026-04-11-review-03/` so "newest review" is unambiguous.
-- If work belongs to an existing review, continue in that folder instead of creating a same-day duplicate with a different naming pattern.
+- If work belongs to an existing open review, continue in that folder instead of creating a same-day duplicate with a different naming pattern. If the related review is closed, open the next sortable review folder instead.
 - Each new review lives in its own folder under `review/` and must include:
   - `userspace-architecture-review.md`: current architecture decisions, tradeoffs, and intended structure
   - `progress.md`: completed work, in-flight work, verification, and next steps
@@ -62,6 +62,18 @@ Required verification workflow:
 7. Run the firmware build only after all required host tests for that pass are green:
    `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Narrow verification exceptions:
+
+- Docs, prompt-template, review-note, or `AGENTS.md`-only changes may skip host
+  tests and firmware compile. Still run `git diff --check`, and explicitly
+  report that runtime/build behavior was not changed and those checks were
+  intentionally skipped.
+- Python-only tooling changes do not require `qmk compile` unless they alter
+  generated firmware inputs, source manifests, build wiring, or authored
+  profile data. Run the relevant Python/tool checks for the changed files, run
+  `git diff --check`, and explicitly report that firmware compile was skipped
+  under this exception.
+
 Required failure handling:
 
 - If a test fails, stop and find the root cause. Fix the code or wiring unless the test is genuinely asserting the wrong contract now.
@@ -82,7 +94,9 @@ Repo-specific guardrails:
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update `README.md` and the relevant files under `docs/` in the same pass.
 - If any authored input to `tools/profile_introspect.py` changes, regenerate the introspection outputs in the same pass with `python3 tools/profile_introspect.py --write` and verify them with `python3 tools/profile_introspect.py --check`. Current authored inputs are `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`, `users/noah/config.h`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`, and the shared pd-mode manifest `users/noah/lib/pointing/defs/pd_mode_manifest.h`.
-- If architectural work lands, update the active review folder's `progress.md` in the same pass.
+- If architectural work lands, update the active open review folder's
+  `progress.md` in the same pass. If the related review thread is closed, open
+  the next sortable review folder and update that new folder instead.
 - Keep `progress.md` structured so it reads as clear history.
 - Always include next steps.
 - If the intended structure or tradeoffs changed, update `userspace-architecture-review.md` in the same pass.
@@ -95,10 +109,19 @@ Repo-specific guardrails:
   - the architecture topic is materially different, or
   - the previous thread is explicitly closed and a new thread is starting.
 - If you create a new review folder, state in `progress.md` why the active folder was not continued.
+- Once a review folder records a closure verdict, treat that folder as immutable
+  history. Do not append follow-up findings, cleanup notes, new verification, or
+  post-closure remediation to it.
+- If architecture/refactor work happens after closure, open the next sortable
+  review folder and state in its `progress.md` why the closed folder was not
+  continued.
 
 ## Review Integrity Rules
 
 - A review folder must be internally coherent for the tree it describes.
+- A closed review folder must remain a coherent snapshot of the tree at closure.
+  Post-closure work belongs in a new review folder, even when it is related to
+  the closed thread.
 - If later remediation lands after an audit, either:
   - update the active review folder so its findings and landed state agree, or
   - add an explicit `Reconciliation Note` that labels older findings as audit-time snapshot only.
@@ -135,10 +158,15 @@ Repo-specific guardrails:
 - A seam/boundary/API finding is only resolved when:
   - the current code matches the intended design
   - compile gates or tests mechanically enforce the claim
-  - docs and the active review note match the current tree
+  - docs and the active open review note match the current tree
   - `sh tests/host/run_all_host_tests.sh` passes
   - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes
 
 ## Review Before New Review
 
-- If the newest review folder is contradictory, reconcile it before opening another follow-up review on the same thread.
+- If the newest open review folder is contradictory, reconcile it before
+  opening another follow-up review on the same thread.
+- If the newest review folder is closed and later work reveals a documentation
+  or review-history problem, do not edit the closed folder unless the user
+  explicitly asks to correct historical record. Open the next sortable review
+  folder for post-closure work and document the reason there.

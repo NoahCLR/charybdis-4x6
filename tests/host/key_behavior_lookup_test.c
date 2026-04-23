@@ -6,7 +6,6 @@
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/interaction/handled_key.h"
 #include "users/noah/lib/key/interaction/key_behavior_lookup.h"
-#include "users/noah/lib/key/interaction/multi_tap_engine.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 
@@ -411,50 +410,40 @@ static void test_transparent_tap_uses_current_tap_count_for_lower_handled_key(vo
 
 static void test_transparent_tap_inherits_lower_press_resolve_contract(void) {
     keypos_t                   key_pos = test_keypos(0, 6);
-    handled_key_materialized_t first_tap;
     handled_key_materialized_t second_tap;
-    multi_tap_t                chain = {0};
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_MULTI_TAP_KEY);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    first_tap  = test_materialize(handled_key_lookup(TEST_TRANSPARENT_PD_KEY), key_pos);
     second_tap = test_materialize(handled_key_lookup_tap_count(TEST_TRANSPARENT_PD_KEY, 2), key_pos);
 
     CHECK(!second_tap.tap_has_more_taps);
     CHECK(second_tap.tap_resolves_on_press);
-
-    multi_tap_begin(&chain, TEST_TRANSPARENT_PD_KEY, key_pos, first_tap.tap_action, first_tap.tap_repeat_count, first_tap.authored.tap_hold_term, first_tap.authored.multi_tap_term, first_tap.tap_has_more_taps);
-    CHECK(multi_tap_advance(&chain, second_tap.tap_action, second_tap.tap_repeat_count, second_tap.tap_has_more_taps, second_tap.tap_resolves_on_press, second_tap.hold, second_tap.long_hold) == TEST_TAP_ACTION);
-    CHECK(!multi_tap_active(&chain));
+    CHECK(second_tap.tap_action == TEST_TAP_ACTION);
+    CHECK(second_tap.tap_repeat_count == 1);
+    CHECK(second_tap.hold.present == false);
+    CHECK(second_tap.long_hold.present == false);
 }
 
 static void test_transparent_tap_inherits_lower_release_resolve_contract(void) {
     keypos_t                   key_pos = test_keypos(0, 7);
-    handled_key_materialized_t first_tap;
     handled_key_materialized_t second_tap;
-    multi_tap_t                chain = {0};
 
     test_reset_keymap();
     test_set_keymap_key(1, key_pos, TEST_CHAIN_MULTI_TAP_KEY);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
-    first_tap  = test_materialize(handled_key_lookup(TEST_TRANSPARENT_PD_KEY), key_pos);
     second_tap = test_materialize(handled_key_lookup_tap_count(TEST_TRANSPARENT_PD_KEY, 2), key_pos);
 
     CHECK(second_tap.tap_action == TEST_TAP_ACTION);
     CHECK(second_tap.tap_repeat_count == 1);
     CHECK(second_tap.tap_has_more_taps);
     CHECK(!second_tap.tap_resolves_on_press);
-
-    multi_tap_begin(&chain, TEST_TRANSPARENT_PD_KEY, key_pos, first_tap.tap_action, first_tap.tap_repeat_count, first_tap.authored.tap_hold_term, first_tap.authored.multi_tap_term, first_tap.tap_has_more_taps);
-    CHECK(multi_tap_advance(&chain, second_tap.tap_action, second_tap.tap_repeat_count, second_tap.tap_has_more_taps, second_tap.tap_resolves_on_press, second_tap.hold, second_tap.long_hold) == KC_NO);
-    CHECK(multi_tap_active(&chain));
-    CHECK(chain.count == 2);
-    CHECK(chain.has_more_taps);
+    CHECK(second_tap.hold.present == false);
+    CHECK(second_tap.long_hold.present == false);
 }
 
 static void test_transparent_hold_uses_lower_plain_key_normal_hold_behavior(void) {

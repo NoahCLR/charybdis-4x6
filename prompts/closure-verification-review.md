@@ -9,6 +9,11 @@ Before reviewing:
 - Read the newest review folder under `review/`.
 - If the newest review folder is contradictory, reconcile it before using it as the source of truth.
 - Do not create a new same-day review folder for routine closure verification on the same thread unless `AGENTS.md` explicitly requires it.
+- Treat a review folder with a closure verdict as immutable history after the
+  closure pass is complete. Do not add follow-up findings, cleanup notes, or new
+  verification to a closed review folder. If new work happens after closure,
+  open the next sortable review folder and state why the closed folder was not
+  continued.
 
 Your job:
 - Re-check every major finding from the active review thread.
@@ -37,6 +42,7 @@ Review priorities:
 3. Documentation and Review Consistency
    - Check whether the active review folder, relevant docs, and the current code all describe the same state.
    - Identify stale claims, contradictory notes, or closure statements that are too strong.
+   - Verify that post-closure work was not appended to a closed review folder.
 4. Final Verification Integrity
    - Confirm the exact verification commands that were run.
    - Flag any closure claim that is missing required host-suite or firmware-build evidence.

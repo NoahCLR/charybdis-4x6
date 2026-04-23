@@ -93,6 +93,10 @@ If a future change needs new runtime state, it belongs in `key_runtime_core` unl
 it is purely an external ownership registry or a stateless authored-behavior
 helper.
 
+Pending multi-tap behavior is owned by `tap_series_t` inside `key_runtime_core`.
+Do not add a second state machine for multi-tap sequencing; new behavior should
+extend the core reducer and its release/scan planning tests.
+
 ## End-To-End Flow
 
 ### 1. Physical key event entry

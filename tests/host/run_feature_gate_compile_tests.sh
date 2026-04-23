@@ -166,14 +166,14 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    pd_mode_buffered_tap_internal_prod_allowlist='^(users/noah/lib/pointing/runtime/|users/noah/lib/key/interaction/multi_tap_engine\.c:)'
+    pd_mode_buffered_tap_internal_prod_allowlist='^users/noah/lib/pointing/runtime/'
     pd_mode_buffered_tap_internal_prod_violations="$(
         repo_owned_production_include_violations \
             '#include ".*pd_mode_buffered_tap_internal\.h"' \
             "$pd_mode_buffered_tap_internal_prod_allowlist"
     )"
     if [ -n "$pd_mode_buffered_tap_internal_prod_violations" ]; then
-        echo "only pd runtime owner modules and multi_tap_engine.c may include pd_mode_buffered_tap_internal.h in repo-owned production code" >&2
+        echo "only pd runtime owner modules may include pd_mode_buffered_tap_internal.h in repo-owned production code" >&2
         printf '%s\n' "$pd_mode_buffered_tap_internal_prod_violations" >&2
         exit 1
     fi

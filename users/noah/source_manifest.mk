@@ -47,7 +47,6 @@ NOAH_COMMON_SOURCES := \
     lib/macro/macro_payload_encode.c \
     lib/macro/via_macro_provider.c \
     lib/macro/via_macro_defaults.c \
-    lib/key/interaction/multi_tap_engine.c \
     lib/key/runtime/feedback.c \
     lib/state/runtime/keyboard_mod_state.c \
     lib/state/runtime/runtime_diag.c \

@@ -7,15 +7,6 @@
 #include "delayed_action.h"
 #include "../../action/action_dispatch.h"
 
-delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
-    return (delayed_action_mods_t){
-        .real           = mt->saved_mods,
-        .weak           = mt->saved_weak_mods,
-        .oneshot        = mt->saved_oneshot_mods,
-        .oneshot_locked = mt->saved_oneshot_locked_mods,
-    };
-}
-
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     dispatch_delayed_action_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action, mods);
 }
@@ -28,13 +19,4 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
     noah_emit_action_tap_at(key_pos, action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
 
     keyboard_mod_state_apply(saved);
-}
-
-void dispatch_multi_tap_action(uint16_t action, const multi_tap_t *mt) {
-    if (!mt) {
-        dispatch_delayed_action(action, (delayed_action_mods_t){0});
-        return;
-    }
-
-    dispatch_delayed_action_at(mt->key_pos, action, delayed_action_mods_from_multi_tap(mt));
 }

@@ -67,7 +67,6 @@ lib/key/interaction/handled_key_defaults.c
 lib/key/interaction/handled_key_materialize.c
 lib/key/interaction/handled_key_resolution_accessors.c
 lib/key/interaction/handled_key_transparency.c
-lib/key/interaction/multi_tap_engine.c
 lib/key/runtime/debug.c
 lib/key/runtime/preflight.c
 lib/key/runtime/press.c

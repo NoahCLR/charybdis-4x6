@@ -343,15 +343,6 @@ uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
     return 0;
 }
 
-delayed_action_mods_t delayed_action_mods_from_multi_tap(const multi_tap_t *mt) {
-    return (delayed_action_mods_t){
-        .real           = mt->saved_mods,
-        .weak           = mt->saved_weak_mods,
-        .oneshot        = mt->saved_oneshot_mods,
-        .oneshot_locked = mt->saved_oneshot_locked_mods,
-    };
-}
-
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     (void)action;
     (void)mods;
