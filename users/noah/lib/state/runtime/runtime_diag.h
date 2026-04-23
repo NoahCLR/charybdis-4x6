@@ -41,8 +41,6 @@ void                      noah_runtime_diag_reset_for_test(void);
 #if defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
 void     noah_runtime_diag_test_backend_reset(void);
 void     noah_runtime_diag_test_backend_seed_watchdog_reboot(noah_runtime_diag_stage_t stage, uint8_t reboot_count);
-void     noah_runtime_diag_test_backend_set_watchdog_reboot(bool caused_reboot);
-void     noah_runtime_diag_test_backend_set_scratch(uint8_t index, uint32_t value);
 uint32_t noah_runtime_diag_test_backend_scratch(uint8_t index);
 bool     noah_runtime_diag_test_backend_watchdog_enabled(void);
 uint32_t noah_runtime_diag_test_backend_watchdog_enable_count(void);

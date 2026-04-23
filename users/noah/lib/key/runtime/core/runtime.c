@@ -2154,7 +2154,7 @@ bool key_runtime_core_pending_release_at_order(uint8_t order, pending_release_t 
     return true;
 }
 
-bool key_runtime_core_reset_pending_multi_tap(keypos_t key_pos) {
+static bool key_runtime_core_reset_pending_multi_tap(keypos_t key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     tap_series_t             *series;
 

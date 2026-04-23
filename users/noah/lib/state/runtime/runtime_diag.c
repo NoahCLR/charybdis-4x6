@@ -263,18 +263,6 @@ void noah_runtime_diag_test_backend_seed_watchdog_reboot(noah_runtime_diag_stage
     noah_runtime_diag_test_backend_scratch_regs[NOAH_RUNTIME_DIAG_SCRATCH_INDEX_REBOOT_COUNT] = reboot_count;
 }
 
-void noah_runtime_diag_test_backend_set_watchdog_reboot(bool caused_reboot) {
-    noah_runtime_diag_test_backend_watchdog_reboot_flag = caused_reboot;
-}
-
-void noah_runtime_diag_test_backend_set_scratch(uint8_t index, uint32_t value) {
-    if (index >= 8u) {
-        return;
-    }
-
-    noah_runtime_diag_test_backend_scratch_regs[index] = value;
-}
-
 uint32_t noah_runtime_diag_test_backend_scratch(uint8_t index) {
     return index < 8u ? noah_runtime_diag_test_backend_scratch_regs[index] : 0u;
 }

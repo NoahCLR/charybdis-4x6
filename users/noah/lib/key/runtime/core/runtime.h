@@ -27,7 +27,6 @@
 #define KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 #define KEY_RUNTIME_CORE_LEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 4u))
 #define KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 2u))
-#define KEY_RUNTIME_CORE_DEFERRED_RELEASE_BLOCKER_CAPACITY KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY
 #define KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY 16u
 #define KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY 14u
 
@@ -146,14 +145,6 @@ typedef struct {
     uint16_t             action;
     keyboard_mod_state_t mods;
 } pending_release_t;
-
-typedef struct {
-    bool     active;
-    uint16_t owner_token_id;
-    keypos_t key_pos;
-    bool     blocks_before_tap_term;
-    bool     blocks_after_tap_term;
-} deferred_release_blocker_t;
 
 typedef enum {
     LEASE_KIND_NONE = 0,
@@ -324,7 +315,6 @@ bool                                        key_runtime_core_pending_release_at_
 uint8_t                                     key_runtime_core_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity);
 void                                        key_runtime_core_project_effect(const key_runtime_effect_t *effect);
 void                                        key_runtime_core_project_pending_release_dispatch(const pending_release_t *pending);
-bool                                        key_runtime_core_reset_pending_multi_tap(keypos_t key_pos);
 void                                        key_runtime_core_observe_held_action_register(keypos_t key_pos, uint16_t action);
 void                                        key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t action);
 void                                        key_runtime_core_observe_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz);

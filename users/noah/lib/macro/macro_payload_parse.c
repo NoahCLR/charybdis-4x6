@@ -182,52 +182,6 @@ bool macro_payload_parse_command(const char *start, const char *end, macro_paylo
     return true;
 }
 
-bool macro_payload_visit(const char *payload, macro_payload_text_visitor_t visit_text, macro_payload_command_visitor_t visit_command, void *context) {
-    const char *cursor = payload;
-
-    if (!payload || !visit_text || !visit_command) {
-        return false;
-    }
-
-    while (*cursor) {
-        if (*cursor == '{') {
-            const char             *command_start = cursor + 1;
-            const char             *command_end   = command_start;
-            macro_payload_command_t command       = {0};
-
-            while (*command_end && *command_end != '}') {
-                command_end++;
-            }
-            if (*command_end != '}') {
-                return false;
-            }
-            if (!macro_payload_parse_command(command_start, command_end, &command)) {
-                return false;
-            }
-            if (!visit_command(&command, context)) {
-                return false;
-            }
-
-            cursor = command_end + 1;
-            continue;
-        }
-
-        if (*cursor == '}') {
-            return false;
-        }
-        if ((uint8_t)*cursor > 0x7F) {
-            return false;
-        }
-        if (!visit_text(*cursor, context)) {
-            return false;
-        }
-
-        cursor++;
-    }
-
-    return true;
-}
-
 bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
     const char *cursor     = payload;
     const char *text_start = payload;
