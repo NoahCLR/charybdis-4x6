@@ -344,7 +344,7 @@ const key_behavior_t
                 .keycode = PINCH_MODE,
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(KC_TRNS)},
+                        [0] = {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PINCH_MODE)},
                         [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
                     },
             },

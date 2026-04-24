@@ -25,13 +25,13 @@
 #include "users/noah/noah_runtime.h"
 
 enum {
-    TEST_ACTION                = SAFE_RANGE + 0x10,
-    TEST_SECOND_ACTION         = SAFE_RANGE + 0x11,
-    TEST_PENDING_MULTI_TAP_KEY = SAFE_RANGE + 0x12,
-    TEST_INTERRUPTED_LAYER_KEY = SAFE_RANGE + 0x13,
-    TEST_RELEASE_PRIMARY_KEY   = SAFE_RANGE + 0x14,
-    TEST_THRESHOLD_LONG_KEY    = SAFE_RANGE + 0x15,
-    TEST_PENDING_RELEASE_KEY   = SAFE_RANGE + 0x16,
+    TEST_ACTION                = NOAH_KEYMAP_SAFE_RANGE + 0x10,
+    TEST_SECOND_ACTION         = NOAH_KEYMAP_SAFE_RANGE + 0x11,
+    TEST_PENDING_MULTI_TAP_KEY = NOAH_KEYMAP_SAFE_RANGE + 0x12,
+    TEST_INTERRUPTED_LAYER_KEY = NOAH_KEYMAP_SAFE_RANGE + 0x13,
+    TEST_RELEASE_PRIMARY_KEY   = NOAH_KEYMAP_SAFE_RANGE + 0x14,
+    TEST_THRESHOLD_LONG_KEY    = NOAH_KEYMAP_SAFE_RANGE + 0x15,
+    TEST_PENDING_RELEASE_KEY   = NOAH_KEYMAP_SAFE_RANGE + 0x16,
 };
 
 static uint16_t              fake_time;
@@ -186,7 +186,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term   = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
         .layer            = layer,
-        .pd_mode          = 0,
+        .pd_mode          = pd_mode_for_keycode(keycode),
         .has_more_taps    = has_more_taps,
         .flags            = flags,
     };

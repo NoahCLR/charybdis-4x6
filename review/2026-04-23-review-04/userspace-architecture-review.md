@@ -66,6 +66,20 @@ None.
   `users/noah/lib/state/runtime/split_runtime_sync.c`,
   `users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`, and
   `tests/host/rgb_layer_render_test.c`.
+- The key-runtime PD projection now follows held-action PD branches instead of
+  assuming the physical keycode remains the active mode. This covers the actual
+  `PINCH_MODE` double-hold path to `ZOOM_MODE` and keeps the key-runtime shadow
+  coherent with the PD engine. Code references:
+  `users/noah/lib/key/runtime/core/runtime.c` and
+  `tests/host/pd_mode_key_runtime_integration_test.c`.
+- `PINCH_MODE` now makes its single-hold path explicit as
+  `PRESS_AND_HOLD_UNTIL_RELEASE(PINCH_MODE)` while keeping the double-hold
+  branch on `ZOOM_MODE`. This keeps quick Pinch tap/double-tap prefixes out of
+  the mode-owned GUI lifecycle and preserves `VIA_MACRO_6` as the authored
+  double-tap zoom chord. Code references:
+  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`,
+  `tests/host/pd_mode_key_runtime_integration_test.c`, and
+  `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
 
 ## Non-Findings
 
@@ -106,6 +120,11 @@ The RGB runtime is in good shape architecturally. It is staged, testable, and
 mostly data-driven. The tap-engine relationship is especially strong: RGB
 renders semantic state exported by the key runtime instead of duplicating tap,
 hold, longer-hold, multi-tap, combo-origin, or PD ownership logic.
+The PD projection exported by the key runtime now also tracks explicit
+held-action branches whose PD mode differs from the physical trigger key.
+The highest-frequency Pinch double-tap prefix no longer activates Pinch's
+mode-owned GUI lifecycle before the runtime knows whether the user is tapping
+or holding; Pinch itself now starts at the first hold threshold on that key.
 
 The current `.mode` authoring surface is coherent for the main feedback
 surfaces. PD, combo feedback, and key-behavior feedback all support fixed

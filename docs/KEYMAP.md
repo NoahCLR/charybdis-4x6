@@ -322,7 +322,7 @@ The currently placed mode keys behave like this:
 
 - `VOLUME_MODE`: single tap `N`, quick double tap `Mute`, hold for volume control
 - `BRIGHTNESS_MODE`: single tap `H`, hold for brightness control
-- `PINCH_MODE`: single tap `J`, second quick tap sends `VIA_MACRO_6`, second hold enters `ZOOM_MODE`
+- `PINCH_MODE`: single tap `J`, hold for pinch, second quick tap sends `VIA_MACRO_6`, second hold enters `ZOOM_MODE`
 - `DRAGSCROLL`: single tap `.`, hold for momentary scrolling, double-tap hold locks
 
 For the current macOS setup, `PINCH_MODE` is meant to be used with

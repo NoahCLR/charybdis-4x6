@@ -1203,7 +1203,7 @@ static void test_right_thumb_quadruple_tap_dispatches_previous_track(void) {
     test_assert_thumb_runtime_quiescent(key_pos);
 }
 
-static void test_pointer_pinch_double_tap_queues_via_macro_six(void) {
+static void test_pointer_pinch_double_tap_queues_zoom_chord(void) {
     keypos_t pinch_pos = test_find_keypos_on_layer(LAYER_POINTER, PINCH_MODE);
 
     CHECK(test_keypos_valid(pinch_pos));
@@ -1226,6 +1226,35 @@ static void test_pointer_pinch_double_tap_queues_via_macro_six(void) {
     CHECK(test_last_delayed_action == VIA_MACRO_6);
     CHECK(pd_mode_local_active_snapshot() == 0);
     test_assert_thumb_runtime_quiescent(pinch_pos);
+}
+
+static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) {
+    keypos_t pinch_pos = test_find_keypos_on_layer(LAYER_POINTER, PINCH_MODE);
+
+    CHECK(test_keypos_valid(pinch_pos));
+
+    test_reset_state();
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_POINTER));
+
+    for (uint8_t salvo = 0; salvo < 4; salvo++) {
+        test_run_quick_tap(pinch_pos);
+        test_advance_thumb_multi_tap_gap();
+        test_run_quick_tap(pinch_pos);
+
+        if (test_delayed_action_count == salvo) {
+            key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+            key_runtime_integration_scan();
+        }
+
+        CHECK(test_tap_code16_count == 0);
+        CHECK(test_delayed_action_count == (uint16_t)(salvo + 1u));
+        CHECK(test_last_delayed_action == VIA_MACRO_6);
+        CHECK(pd_mode_local_active_snapshot() == 0);
+        test_assert_thumb_runtime_quiescent(pinch_pos);
+
+        key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+        key_runtime_integration_scan();
+    }
 }
 
 static void test_click_spam_combo_uses_last_chord_key_as_runtime_owner(void) {
@@ -2308,7 +2337,8 @@ int main(void) {
     test_right_thumb_triple_tap_flushes_next_track_after_timeout();
     test_right_thumb_triple_tap_long_hold_registers_next_track_hold();
     test_right_thumb_quadruple_tap_dispatches_previous_track();
-    test_pointer_pinch_double_tap_queues_via_macro_six();
+    test_pointer_pinch_double_tap_queues_zoom_chord();
+    test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly();
     test_click_spam_combo_uses_last_chord_key_as_runtime_owner();
     test_right_nav_layer_hold_dispatches_nav_taps_immediately();
     test_right_thumb_hold_dispatches_nav_taps_immediately();

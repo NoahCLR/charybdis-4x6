@@ -143,3 +143,103 @@ Verification passed:
 - `git diff --check`
 
 No required checks were skipped.
+
+### PD Held-Action Projection Follow-Up
+
+- Reproduced the crash path as a key-runtime/PD projection mismatch, not split
+  sync: the physical `PINCH_MODE` key could project Pinch immediately while its
+  authored double-hold branch registered `ZOOM_MODE`.
+- Updated the key-runtime core so direct and implicit PD holds still attach PD
+  leases on press, while explicit held-action PD branches attach and release
+  their PD projection when the held action actually registers/unregisters.
+- Added focused host regressions for `PINCH_MODE` double-tap hold into
+  `ZOOM_MODE` and for the user-visible Volume -> Pinch/Zoom -> Volume
+  alternation.
+- Updated the runtime debug fixture so handled-key PD tests resolve
+  `pd_mode_for_keycode()` instead of treating PD keycodes as non-PD actions.
+- Regenerated `docs/KEYMAP-OVERVIEW.md` after the full host suite found stale
+  generated PD color rows from the previous trigger-key RGB follow-up.
+
+Verification passed:
+
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+### Next Steps
+
+1. Flash and try the Volume/Pinch/Zoom alternation on hardware.
+2. Keep explicit held-action PD branches covered as more `.mode` key behavior
+   options are added.
+
+### Pinch Double-Tap Salvo Follow-Up
+
+- After hardware testing narrowed the repro to repeated `PINCH_MODE`
+  double-tap salvos, tried moving the second-tap action off `VIA_MACRO_6` and
+  onto the equivalent direct `LAG(KC_8)` chord.
+- Hardware still froze with the direct chord, ruling out the VIA macro playback
+  path as the root cause. Restored `VIA_MACRO_6` on the double-tap path.
+- The same keymap shape was confirmed present at
+  `cd8050f3b5970dba0711d8503b5bccf1c1054d6e`, so the remaining hardware
+  failure is treated as a long-lived same-key PD lifecycle issue rather than a
+  regression introduced by the RGB/key-feedback work.
+- Changed the authored `PINCH_MODE` single-tap hold from implicit immediate
+  Pinch ownership to explicit `PRESS_AND_HOLD_UNTIL_RELEASE(PINCH_MODE)`.
+  Quick Pinch tap/double-tap prefixes no longer enter Pinch or take its
+  mode-owned GUI lifecycle; Pinch activates only after the first hold threshold
+  is crossed.
+- Added focused host coverage for repeated Pinch double-tap salvos in both the
+  PD/key-runtime fixture and the real authored-profile integration test, plus
+  coverage that quick Pinch taps defer the mode-owned GUI path while real Pinch
+  holds still mask mode-owned GUI during concurrent keyboard processing.
+- Updated `docs/KEYMAP.md`, `docs/ADDING_PD_MODE.md`, and regenerated
+  `docs/KEYMAP-OVERVIEW.md`.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_keymap_validation_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_macro_payload_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+### Next Steps
+
+1. Flash and hammer repeated `PINCH_MODE` double taps on hardware.
+2. If the freeze remains reproducible, inspect same-key PD ownership/lifecycle
+   transitions after the explicit Pinch-hold change.
