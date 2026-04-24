@@ -32,6 +32,7 @@ typedef enum {
     PD_COLOR_MODE_LEFT_HALF,
     PD_COLOR_MODE_BOTH_HALVES,
     PD_COLOR_MODE_TRIGGER_HALF,
+    PD_COLOR_MODE_TRIGGER_KEYS,
 } pd_color_mode_t;
 
 typedef struct {

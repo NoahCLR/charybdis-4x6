@@ -132,7 +132,7 @@ static void rgb_validation_log_unknown_pd_mode_color(uint8_t color_index, pd_mod
 
 static void rgb_validation_log_invalid_pd_mode_color_mode(uint8_t color_index, uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid pd_mode_colors[%u].mode %u; expected PD_COLOR_MODE_RIGHT_HALF (0), PD_COLOR_MODE_LEFT_HALF (1), PD_COLOR_MODE_BOTH_HALVES (2), or PD_COLOR_MODE_TRIGGER_HALF (3)\n",
+    uprintf("Invalid pd_mode_colors[%u].mode %u; expected PD_COLOR_MODE_RIGHT_HALF (0), PD_COLOR_MODE_LEFT_HALF (1), PD_COLOR_MODE_BOTH_HALVES (2), PD_COLOR_MODE_TRIGGER_HALF (3), or PD_COLOR_MODE_TRIGGER_KEYS (4)\n",
             (unsigned int)color_index,
             (unsigned int)mode);
 #        else
@@ -142,9 +142,9 @@ static void rgb_validation_log_invalid_pd_mode_color_mode(uint8_t color_index, u
 }
 
 #        ifndef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-static void rgb_validation_log_pd_mode_trigger_half_requires_feature(uint8_t color_index, pd_mode_mask_t mode) {
+static void rgb_validation_log_pd_mode_trigger_locality_requires_feature(uint8_t color_index, pd_mode_mask_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("pd_mode_colors[%u].mode uses PD_COLOR_MODE_TRIGGER_HALF for pd mode 0x%04X, but RGB_PD_MODE_ACTIVE_HALF_ENABLE is disabled\n", (unsigned int)color_index, (unsigned int)mode);
+    uprintf("pd_mode_colors[%u].mode uses trigger-local PD RGB placement for pd mode 0x%04X, but RGB_PD_MODE_ACTIVE_HALF_ENABLE is disabled\n", (unsigned int)color_index, (unsigned int)mode);
 #        else
     (void)color_index;
     (void)mode;
@@ -237,14 +237,14 @@ static void rgb_validation_validate_pd_mode_colors(void) {
             rgb_validation_log_unknown_pd_mode_color(color_index, mode);
         }
 
-        if (color_mode > PD_COLOR_MODE_TRIGGER_HALF) {
+        if (color_mode > PD_COLOR_MODE_TRIGGER_KEYS) {
             rgb_validation_log_invalid_pd_mode_color_mode(color_index, color_mode);
             continue;
         }
 
 #        ifndef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-        if (color_mode == PD_COLOR_MODE_TRIGGER_HALF) {
-            rgb_validation_log_pd_mode_trigger_half_requires_feature(color_index, mode);
+        if (color_mode == PD_COLOR_MODE_TRIGGER_HALF || color_mode == PD_COLOR_MODE_TRIGGER_KEYS) {
+            rgb_validation_log_pd_mode_trigger_locality_requires_feature(color_index, mode);
         }
 #        endif
     }

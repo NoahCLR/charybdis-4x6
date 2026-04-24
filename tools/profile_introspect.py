@@ -769,7 +769,8 @@ def pd_color_mode_description(mode: str) -> str:
         "PD_COLOR_MODE_RIGHT_HALF": "Paint the right half whenever the matching PD mode is active.",
         "PD_COLOR_MODE_LEFT_HALF": "Paint the left half whenever the matching PD mode is active.",
         "PD_COLOR_MODE_BOTH_HALVES": "Mirror the PD-mode overlay across both halves.",
-        "PD_COLOR_MODE_TRIGGER_HALF": "Paint the half that triggered the currently effective PD mode. This requires `RGB_PD_MODE_ACTIVE_HALF_ENABLE`.",
+        "PD_COLOR_MODE_TRIGGER_HALF": "Paint the half that triggered the currently effective PD mode.",
+        "PD_COLOR_MODE_TRIGGER_KEYS": "Paint the key footprint that triggered the currently effective PD mode.",
     }
     return descriptions.get(mode, "Unknown PD-mode paint mode.")
 
@@ -1623,7 +1624,7 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
     lines.extend(
         [
             f"These overlays come from `pd_mode_colors[]` in {rgb_link}. Each row chooses its own paint mode and color for the matching pointing mode.",
-            f"`PD_COLOR_MODE_TRIGGER_HALF` is gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in {user_config_link}; current state: `{ 'defined' if profile['features']['rgb_pd_mode_active_half_enabled'] else 'not defined' }`.",
+            f"Trigger-local PD paint modes are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in {user_config_link}; current state: `{ 'defined' if profile['features']['rgb_pd_mode_active_half_enabled'] else 'not defined' }`.",
             "",
             "| PD Paint Mode | Meaning |",
             "| --- | --- |",
@@ -1631,6 +1632,7 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
             f"| `PD_COLOR_MODE_LEFT_HALF` | {pd_color_mode_description('PD_COLOR_MODE_LEFT_HALF')} |",
             f"| `PD_COLOR_MODE_BOTH_HALVES` | {pd_color_mode_description('PD_COLOR_MODE_BOTH_HALVES')} |",
             f"| `PD_COLOR_MODE_TRIGGER_HALF` | {pd_color_mode_description('PD_COLOR_MODE_TRIGGER_HALF')} |",
+            f"| `PD_COLOR_MODE_TRIGGER_KEYS` | {pd_color_mode_description('PD_COLOR_MODE_TRIGGER_KEYS')} |",
             "",
             "| Pointing Mode | Paint Mode | Authored HSV | Preview Color |",
             "| --- | --- | --- | --- |",

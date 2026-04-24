@@ -9,6 +9,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "../../key/runtime/origin_registry.h"
 #include "../defs/pd_mode_flags.h"
 
 #define PD_MODE_OWNER_SLOT_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
@@ -30,6 +31,7 @@ typedef struct {
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     split_side_mask_t local_owner_sides;
     split_side_mask_t remote_display_owner_sides;
+    uint8_t           remote_display_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
     pd_mode_owner_slot_t local_key_owners[PD_MODE_OWNER_SLOT_CAPACITY];
     bool           synthetic_auto_mouse_anchor_active;

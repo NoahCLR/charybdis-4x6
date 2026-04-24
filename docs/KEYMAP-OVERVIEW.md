@@ -225,14 +225,15 @@ No authored combos resolve entirely from keys on this layer.
 ## PD Mode Colors
 
 These overlays come from `pd_mode_colors[]` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). Each row chooses its own paint mode and color for the matching pointing mode.
-`PD_COLOR_MODE_TRIGGER_HALF` is gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in [users/noah/config.h](../users/noah/config.h); current state: `defined`.
+Trigger-local PD paint modes are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in [users/noah/config.h](../users/noah/config.h); current state: `defined`.
 
 | PD Paint Mode | Meaning |
 | --- | --- |
 | `PD_COLOR_MODE_RIGHT_HALF` | Paint the right half whenever the matching PD mode is active. |
 | `PD_COLOR_MODE_LEFT_HALF` | Paint the left half whenever the matching PD mode is active. |
 | `PD_COLOR_MODE_BOTH_HALVES` | Mirror the PD-mode overlay across both halves. |
-| `PD_COLOR_MODE_TRIGGER_HALF` | Paint the half that triggered the currently effective PD mode. This requires `RGB_PD_MODE_ACTIVE_HALF_ENABLE`. |
+| `PD_COLOR_MODE_TRIGGER_HALF` | Paint the half that triggered the currently effective PD mode. |
+| `PD_COLOR_MODE_TRIGGER_KEYS` | Paint the key footprint that triggered the currently effective PD mode. |
 
 | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
 | --- | --- | --- | --- |

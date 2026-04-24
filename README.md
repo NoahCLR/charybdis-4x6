@@ -160,6 +160,8 @@ release matching, but the userspace now also tracks the full physical combo
 footprint for locality-sensitive features. That means combo-backed key
 feedback can stay on the relevant key or half, and `PD_COLOR_MODE_TRIGGER_HALF`
 can broaden to both halves when a combo spans both sides of the board.
+`PD_COLOR_MODE_TRIGGER_KEYS` can narrow the same PD ownership truth to the
+exact triggering key footprint.
 
 That footprint tracking follows the live resolved keycodes QMK sees, so dynamic
 keymap changes remain authoritative. It is not guessed from static comments or

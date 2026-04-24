@@ -106,3 +106,40 @@ No required checks were skipped for the implementation follow-up.
    priority explicit instead of relying on enum ordering.
 3. Keep the staged RGB runtime; this pass did not identify a reason to rewrite
    the pipeline.
+
+## 2026-04-24
+
+### PD Trigger-Key RGB Follow-Up
+
+- Added `PD_COLOR_MODE_TRIGGER_KEYS` so pd-mode overlays can paint the exact
+  key footprint that triggered the current effective PD mode.
+- Extended the pd-mode owner contract from side-only display state to include
+  an owner bitmap for RGB display consumers.
+- Mirrored the pd-mode owner bitmap through the base split-runtime sync packet
+  so the slave half can render exact trigger-key placement.
+- Updated RGB validation, the pd-mode renderer, authored RGB comments, README,
+  RGB docs, profile introspection, and the generated keymap overview.
+- Extended pd-mode, split-sync, and RGB render host coverage for direct,
+  combo-footprint, fallback, and remote exact-key behavior.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.

@@ -11,8 +11,8 @@ whole-userspace file-map review. This is a separate post-closure RGB runtime
 and profile review.
 
 The initial pass was review-only. Follow-up implementation in this same active
-thread added fixed left/right key-feedback placement modes and updated the RGB
-authoring docs.
+thread added fixed left/right key-feedback placement modes, added exact
+trigger-key PD RGB placement, and updated the RGB authoring docs.
 
 ## Findings
 
@@ -60,6 +60,12 @@ None.
   `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`,
   `users/noah/lib/rgb/core/rgb_validation.c`, and
   `tests/host/rgb_layer_render_test.c`.
+- PD-mode RGB now has exact trigger-key placement in addition to fixed
+  left/right, both halves, and trigger-half placement. Code references:
+  `users/noah/lib/pointing/runtime/pd_mode_state.c`,
+  `users/noah/lib/state/runtime/split_runtime_sync.c`,
+  `users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`, and
+  `tests/host/rgb_layer_render_test.c`.
 
 ## Non-Findings
 
@@ -80,10 +86,10 @@ None.
   trying to duplicate key-runtime decisions.
 - The authored RGB mode surface is broad enough for this firmware: layer all
   keys vs mapped-only, layer LED groups, auto-mouse fade destination modes,
-  pointing-mode left/right/both/trigger-half overlays, pointing-mode LED
-  groups, combo both/half/keys/fixed-side placement, key-feedback
-  both/fixed-half/key-half/key placement, and diagnostic override color are all
-  present.
+  pointing-mode left/right/both/trigger-half/trigger-key overlays,
+  pointing-mode LED groups, combo both/half/keys/fixed-side placement,
+  key-feedback both/fixed-half/key-half/key placement, and diagnostic override
+  color are all present.
 - All six registered pointing modes have profile colors:
   `DRAGSCROLL`, `VOLUME_MODE`, `BRIGHTNESS_MODE`, `ARROW_MODE`, `PINCH_MODE`,
   and `ZOOM_MODE`.
@@ -102,8 +108,9 @@ renders semantic state exported by the key runtime instead of duplicating tap,
 hold, longer-hold, multi-tap, combo-origin, or PD ownership logic.
 
 The current `.mode` authoring surface is coherent for the main feedback
-surfaces. PD and combo feedback support fixed left/right placement, and
-key-behavior feedback now does as well.
+surfaces. PD, combo feedback, and key-behavior feedback all support fixed
+left/right placement, and the event-driven feedback surfaces that can preserve
+exact key ownership now expose exact-key placement.
 
 ## Recommended Next Refactor Sequence
 

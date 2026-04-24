@@ -188,15 +188,21 @@ Each row also chooses where the overlay paints:
 - `PD_COLOR_MODE_LEFT_HALF`: always paint the left half
 - `PD_COLOR_MODE_BOTH_HALVES`: mirror the overlay across both halves
 - `PD_COLOR_MODE_TRIGGER_HALF`: paint the half that triggered the currently
-  effective PD mode; this requires `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in
-  [`users/noah/config.h`](../users/noah/config.h).
+  effective PD mode.
   If the triggering combo footprint spans both halves, the overlay paints both
   halves instead of guessing one side.
+- `PD_COLOR_MODE_TRIGGER_KEYS`: paint the key footprint that triggered the
+  currently effective PD mode. If a combo triggered the mode, every combo key
+  in the footprint is painted.
+
+Trigger-local placement relies on the backend PD ownership tracking in
+[`users/noah/config.h`](../users/noah/config.h).
 
 Use rows like:
 
 ```c
 { .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .mode = PD_COLOR_MODE_TRIGGER_HALF },
+{ .pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .mode = PD_COLOR_MODE_TRIGGER_KEYS },
 ```
 
 Use this table when you want `ARROW_MODE`, `VOLUME_MODE`, `PINCH_MODE`, and the

@@ -7,6 +7,7 @@
 #if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE)
 
 #    include "../core/rgb_helpers.h"
+#    include "../../key/runtime/origin_registry.h"
 #    include "../../pointing/defs/pd_modes.h"
 
 extern const pd_mode_color_t            pd_mode_colors[];
@@ -29,6 +30,45 @@ static bool rgb_runtime_pd_mode_stage_led_group_intersects(const uint8_t *leds, 
     }
 
     return false;
+}
+
+static bool rgb_runtime_pd_mode_stage_paint_key(rgb_t color, keypos_t key_pos, uint8_t led_min, uint8_t led_max) {
+    uint8_t leds[RGB_MATRIX_LED_COUNT];
+    uint8_t led_count = rgb_matrix_map_row_column_to_led(key_pos.row, key_pos.col, leds);
+    bool    painted   = false;
+
+    for (uint8_t index = 0; index < led_count; index++) {
+        uint8_t led = leds[index];
+
+        if (led >= led_min && led < led_max) {
+            rgb_set_led_color(led, led_min, led_max, color);
+            painted = true;
+        }
+    }
+
+    return painted;
+}
+
+static bool rgb_runtime_pd_mode_stage_paint_owner_keys(rgb_t color, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    bool painted = false;
+
+    if (!bitmap) {
+        return false;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            keypos_t key_pos = {.row = row, .col = col};
+
+            if (!key_origin_bitmap_has_keypos(bitmap, key_pos)) {
+                continue;
+            }
+
+            painted |= rgb_runtime_pd_mode_stage_paint_key(color, key_pos, led_min, led_max);
+        }
+    }
+
+    return painted;
 }
 
 void rgb_runtime_pd_mode_stage_post_init(void) {
@@ -72,6 +112,16 @@ static bool rgb_runtime_pd_mode_stage_paint_mode(rgb_t color, uint8_t mode, pd_m
         case PD_COLOR_MODE_TRIGGER_HALF:
             sides = rgb_runtime_pd_mode_stage_resolve_trigger_sides(snapshot);
             break;
+        case PD_COLOR_MODE_TRIGGER_KEYS: {
+            uint8_t owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+            if (pd_mode_display_owner_bitmap_snapshot(owner_bitmap)) {
+                return rgb_runtime_pd_mode_stage_paint_owner_keys(color, owner_bitmap, led_min, led_max);
+            }
+
+            rgb_set_both_halves(color, led_min, led_max);
+            return led_min < led_max;
+        }
         case PD_COLOR_MODE_RIGHT_HALF:
         default:
             sides = SPLIT_SIDE_MASK_RIGHT;

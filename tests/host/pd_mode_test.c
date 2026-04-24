@@ -69,6 +69,10 @@ static void test_fail(const char *expr, const char *file, int line) {
         }                                         \
     } while (0)
 
+static bool test_bitmap_has_keypos(const uint8_t *bitmap, uint8_t row, uint8_t col) {
+    return key_origin_bitmap_has_keypos(bitmap, (keypos_t){.row = row, .col = col});
+}
+
 static void test_reset_runtime(void) {
     host_runtime_fixture_reset_userspace_runtime();
 }
@@ -365,18 +369,26 @@ static void test_apply_remote_snapshot_keeps_only_one_effective_mode(void) {
 }
 
 static void test_keycode_press_at_tracks_trigger_half(void) {
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
     test_reset_stubs();
 
     CHECK(pd_mode_handle_keycode_press_at(VOLUME_MODE, (keypos_t){.row = 0, .col = 0}));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
     CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
+    CHECK(pd_mode_local_owner_bitmap_snapshot(bitmap));
+    CHECK(test_bitmap_has_keypos(bitmap, 0, 0));
+    CHECK(!test_bitmap_has_keypos(bitmap, 4, 0));
     CHECK(split_sync_count == 0);
 
     CHECK(pd_mode_handle_keycode_press_at(ARROW_MODE, (keypos_t){.row = 4, .col = 0}));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
     CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_RIGHT);
     CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_RIGHT);
+    CHECK(pd_mode_local_owner_bitmap_snapshot(bitmap));
+    CHECK(!test_bitmap_has_keypos(bitmap, 0, 0));
+    CHECK(test_bitmap_has_keypos(bitmap, 4, 0));
 }
 
 static void test_same_mode_key_owners_release_independently(void) {
@@ -431,6 +443,7 @@ static void test_ownerless_mode_change_clears_previous_trigger_half(void) {
 
 static void test_combo_origin_bitmap_promotes_trigger_half_to_both_sides(void) {
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t  owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     keypos_t owner_key_pos = {.row = 0, .col = 0};
 
     test_reset_stubs();
@@ -443,6 +456,9 @@ static void test_combo_origin_bitmap_promotes_trigger_half_to_both_sides(void) {
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ZOOM);
     CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_BOTH);
     CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_BOTH);
+    CHECK(pd_mode_local_owner_bitmap_snapshot(owner_bitmap));
+    CHECK(test_bitmap_has_keypos(owner_bitmap, 0, 0));
+    CHECK(test_bitmap_has_keypos(owner_bitmap, 4, 0));
 }
 
 static void test_apply_remote_mode_ids_tracks_display_owner_half(void) {
@@ -458,6 +474,48 @@ static void test_apply_remote_mode_ids_tracks_display_owner_half(void) {
     CHECK(snapshot.display.locked_mode == PD_MODE_ZOOM);
     CHECK(snapshot.display.owner_sides == SPLIT_SIDE_MASK_LEFT);
     CHECK(pd_mode_display_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
+}
+
+static void test_apply_remote_mode_ids_tracks_display_owner_bitmap(void) {
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t snapshot_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset_stubs();
+    fake_is_master = false;
+
+    key_origin_bitmap_clear(bitmap);
+    key_origin_bitmap_fill_single(bitmap, (keypos_t){.row = 4, .col = 1});
+
+    pd_mode_apply_remote_mode_ids_with_owner_bitmap(pd_mode_id_from_mask(PD_MODE_ZOOM), pd_mode_id_from_mask(PD_MODE_ZOOM), SPLIT_SIDE_MASK_RIGHT, bitmap);
+
+    CHECK(pd_mode_display_owner_bitmap_snapshot(snapshot_bitmap));
+    CHECK(test_bitmap_has_keypos(snapshot_bitmap, 4, 1));
+    CHECK(!test_bitmap_has_keypos(snapshot_bitmap, 0, 1));
+}
+
+static void test_same_side_owner_change_requires_split_sync_for_exact_rgb(void) {
+    pd_mode_apply_result_t result;
+    uint8_t                bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(VOLUME_MODE, (keypos_t){.row = 0, .col = 0}));
+    split_sync_count = 0;
+
+    result = pd_mode_apply_command((pd_mode_command_t){
+        .kind          = PD_MODE_COMMAND_KEY_PRESS,
+        .keycode       = VOLUME_MODE,
+        .owner_sides   = key_origin_registry_side_mask((keypos_t){.row = 0, .col = 1}),
+        .owner_key_pos = {.row = 0, .col = 1},
+    });
+
+    CHECK(result.handled);
+    CHECK(!result.local_state_changed);
+    CHECK(result.split_sync_required);
+    CHECK(pd_mode_local_owner_bitmap_snapshot(bitmap));
+    CHECK(test_bitmap_has_keypos(bitmap, 0, 0));
+    CHECK(test_bitmap_has_keypos(bitmap, 0, 1));
+    CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
 }
 
 static void test_set_lock_state_switches_to_single_locked_mode(void) {
@@ -805,6 +863,8 @@ int main(void) {
     test_ownerless_mode_change_clears_previous_trigger_half();
     test_combo_origin_bitmap_promotes_trigger_half_to_both_sides();
     test_apply_remote_mode_ids_tracks_display_owner_half();
+    test_apply_remote_mode_ids_tracks_display_owner_bitmap();
+    test_same_side_owner_change_requires_split_sync_for_exact_rgb();
     test_set_lock_state_switches_to_single_locked_mode();
     test_activate_switches_to_single_unlocked_mode();
     test_apply_command_reports_before_after_and_sync_intent_for_key_press();

@@ -29,6 +29,7 @@ typedef struct __attribute__((packed)) {
     pd_mode_id_t locked_mode_id;
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     uint8_t      pd_mode_owner_sides;
+    uint8_t      pd_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
     uint8_t      key_preview_layer;
 } split_runtime_base_sync_packet_t;
@@ -49,6 +50,7 @@ typedef struct {
     pd_mode_id_t locked_mode_id;
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     uint8_t      pd_mode_owner_sides;
+    uint8_t      pd_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
     uint8_t      key_preview_layer;
     uint8_t      combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -64,6 +66,7 @@ typedef struct {
             .active_mode_id        = PD_MODE_ID_NONE, \
             .locked_mode_id        = PD_MODE_ID_NONE, \
             .pd_mode_owner_sides   = SPLIT_SIDE_MASK_NONE, \
+            .pd_mode_owner_bitmap  = {0},        \
             .key_preview_layer     = UINT8_MAX,  \
             .combo_underlay_bitmap = {0},        \
             .combo_overlay_bitmap  = {0},        \

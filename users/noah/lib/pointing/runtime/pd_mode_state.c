@@ -24,6 +24,7 @@ static pd_mode_runtime_shared_state_t *pd_mode_shared_state(void) {
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 #    define PD_MODE_LOCAL_OWNER_SIDES (pd_mode_shared_state()->local_owner_sides)
 #    define PD_MODE_REMOTE_DISPLAY_OWNER_SIDES (pd_mode_shared_state()->remote_display_owner_sides)
+#    define PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP (pd_mode_shared_state()->remote_display_owner_bitmap)
 #endif
 #define PD_MODE_LOCAL_KEY_OWNERS (pd_mode_shared_state()->local_key_owners)
 
@@ -44,8 +45,41 @@ static keypos_t pd_mode_command_owner_key_pos(pd_mode_command_t command) {
     return command.owner_key_pos;
 }
 
+static const uint8_t *pd_mode_command_owner_bitmap(pd_mode_command_t command) {
+    return command.owner_bitmap;
+}
+
 static keypos_t pd_mode_invalid_owner_key_pos(void) {
     return (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
+}
+
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+static bool pd_mode_bitmap_equal(const uint8_t *lhs, const uint8_t *rhs) {
+    if (!(lhs && rhs)) {
+        return lhs == rhs;
+    }
+
+    for (uint8_t index = 0; index < KEY_ORIGIN_BITMAP_SIZE; index++) {
+        if (lhs[index] != rhs[index]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+#endif
+
+static bool pd_mode_owner_bitmap_for_keypos(keypos_t owner_key_pos, uint8_t *out_bitmap) {
+    if (!out_bitmap) {
+        return false;
+    }
+
+    key_origin_bitmap_clear(out_bitmap);
+    if (!key_origin_keypos_valid(owner_key_pos)) {
+        return false;
+    }
+
+    return key_origin_registry_get_bitmap(owner_key_pos, out_bitmap);
 }
 
 static bool pd_mode_keypos_equal(keypos_t lhs, keypos_t rhs) {
@@ -206,6 +240,35 @@ static split_side_mask_t pd_mode_local_key_owner_sides(pd_mode_mask_t mode) {
     return owner_sides;
 }
 
+static bool pd_mode_local_key_owner_bitmap(pd_mode_mask_t mode, uint8_t *out_bitmap) {
+    bool has_owner = false;
+
+    if (!out_bitmap) {
+        return false;
+    }
+
+    key_origin_bitmap_clear(out_bitmap);
+    if (mode == 0) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < PD_MODE_OWNER_SLOT_CAPACITY; index++) {
+        const pd_mode_owner_slot_t *slot = &PD_MODE_LOCAL_KEY_OWNERS[index];
+        uint8_t                     slot_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+        if (!(slot->active && slot->mode == mode)) {
+            continue;
+        }
+
+        if (pd_mode_owner_bitmap_for_keypos(slot->key_pos, slot_bitmap)) {
+            key_origin_bitmap_or_inplace(out_bitmap, slot_bitmap);
+            has_owner = true;
+        }
+    }
+
+    return has_owner;
+}
+
 static bool pd_mode_sync_local_key_owner_state(pd_mode_mask_t mode) {
     if (!pd_mode_local_key_owner_mode_active(mode)) {
         return pd_mode_sync_local_owner_state(pd_mode_invalid_owner_key_pos(), SPLIT_SIDE_MASK_NONE);
@@ -290,7 +353,7 @@ static bool pd_mode_apply_unlock_mode(pd_mode_mask_t mode) {
     return true;
 }
 
-static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode, split_side_mask_t owner_sides) {
+static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
     // Remote sync only mirrors mode state for the non-master half's policy/UI.
     // Do not replay local side effects such as dragscroll or auto-mouse
     // ownership changes from this path. Keep only one effective mode so the
@@ -299,14 +362,25 @@ static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_mode, pd
 
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     changed |= PD_MODE_REMOTE_DISPLAY_OWNER_SIDES != owner_sides;
+    if (owner_bitmap) {
+        changed |= !pd_mode_bitmap_equal(PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP, owner_bitmap);
+    } else {
+        changed |= key_origin_bitmap_has_any(PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP);
+    }
 #else
     (void)owner_sides;
+    (void)owner_bitmap;
 #endif
 
     PD_MODE_REMOTE_DISPLAY_LOCKED_MODE = locked_mode;
     PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE = active_mode;
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     PD_MODE_REMOTE_DISPLAY_OWNER_SIDES = owner_sides;
+    if (owner_bitmap) {
+        key_origin_bitmap_copy(PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP, owner_bitmap);
+    } else {
+        key_origin_bitmap_clear(PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP);
+    }
 #endif
     noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT, active_mode, locked_mode);
     return changed;
@@ -326,7 +400,7 @@ static void pd_mode_apply_result_finish(pd_mode_apply_result_t *result, bool spl
     result->after                 = pd_mode_snapshot();
     result->local_state_changed   = pd_mode_snapshot_view_changed(result->before.local, result->after.local);
     result->display_state_changed = pd_mode_snapshot_view_changed(result->before.display, result->after.display);
-    result->split_sync_required   = split_sync_required && result->local_state_changed;
+    result->split_sync_required   = split_sync_required;
 }
 
 void pd_mode_set(pd_mode_mask_t mode) {
@@ -384,6 +458,41 @@ bool pd_mode_local_owner_key_pos_snapshot(keypos_t *out) {
 
     *out = PD_MODE_LOCAL_OWNER_KEY_POS;
     return true;
+}
+
+bool pd_mode_local_owner_bitmap_snapshot(uint8_t *out_bitmap) {
+    if (!out_bitmap) {
+        return false;
+    }
+
+    key_origin_bitmap_clear(out_bitmap);
+    if (pd_mode_local_key_owner_bitmap(PD_MODE_LOCAL_ACTIVE_MODE, out_bitmap)) {
+        return true;
+    }
+
+    if (!PD_MODE_LOCAL_OWNER_KEY_POS_VALID) {
+        return false;
+    }
+
+    return pd_mode_owner_bitmap_for_keypos(PD_MODE_LOCAL_OWNER_KEY_POS, out_bitmap);
+}
+
+bool pd_mode_display_owner_bitmap_snapshot(uint8_t *out_bitmap) {
+    if (!out_bitmap) {
+        return false;
+    }
+
+    key_origin_bitmap_clear(out_bitmap);
+    if (is_keyboard_master()) {
+        return pd_mode_local_owner_bitmap_snapshot(out_bitmap);
+    }
+
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    key_origin_bitmap_copy(out_bitmap, PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP);
+    return key_origin_bitmap_has_any(out_bitmap);
+#else
+    return false;
+#endif
 }
 
 bool pd_mode_local_active(pd_mode_mask_t mode) {
@@ -495,7 +604,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             break;
         case PD_MODE_COMMAND_REMOTE_SNAPSHOT:
             result.handled = true;
-            (void)pd_mode_apply_remote_display_snapshot(pd_mode_mask_from_id(command.active_mode_id), pd_mode_mask_from_id(command.locked_mode_id), command.owner_sides);
+            (void)pd_mode_apply_remote_display_snapshot(pd_mode_mask_from_id(command.active_mode_id), pd_mode_mask_from_id(command.locked_mode_id), command.owner_sides, pd_mode_command_owner_bitmap(command));
             break;
         case PD_MODE_COMMAND_NONE:
         default:
@@ -539,12 +648,17 @@ void pd_mode_unlock(pd_mode_mask_t mode) {
 }
 
 void pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_side_mask_t owner_sides) {
+    pd_mode_apply_remote_mode_ids_with_owner_bitmap(active_mode_id, locked_mode_id, owner_sides, NULL);
+}
+
+void pd_mode_apply_remote_mode_ids_with_owner_bitmap(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
     (void)pd_mode_apply_command((pd_mode_command_t){
         .kind           = PD_MODE_COMMAND_REMOTE_SNAPSHOT,
         .active_mode_id = active_mode_id,
         .locked_mode_id = locked_mode_id,
         .owner_sides    = owner_sides,
         .owner_key_pos  = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
+        .owner_bitmap   = owner_bitmap,
     });
 }
 
@@ -624,4 +738,5 @@ bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 #    undef PD_MODE_LOCAL_OWNER_SIDES
 #    undef PD_MODE_REMOTE_DISPLAY_OWNER_SIDES
+#    undef PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP
 #endif

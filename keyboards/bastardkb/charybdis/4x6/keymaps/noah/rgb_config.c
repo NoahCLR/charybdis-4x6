@@ -141,6 +141,8 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 //   - PD_COLOR_MODE_TRIGGER_HALF = paint the half that triggered the current
 //     effective PD mode. Combo-driven triggers broaden this to both halves
 //     when the combo footprint spans both sides.
+//   - PD_COLOR_MODE_TRIGGER_KEYS = paint the key footprint that triggered the
+//     current effective PD mode; combo-driven triggers paint every combo key
 //
 // This profile uses PD_COLOR_MODE_RIGHT_HALF for every PD mode so pointing
 // state stays anchored to the pointer half.
@@ -150,32 +152,32 @@ const pd_mode_color_t pd_mode_colors[] = {
     {
         .pointing_mode = PD_MODE_DRAGSCROLL,
         .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
     }, // orange
     {
         .pointing_mode = PD_MODE_VOLUME,
         .color         = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
     }, // yellow
     {
         .pointing_mode = PD_MODE_BRIGHTNESS,
         .color         = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
     }, // magenta
     {
         .pointing_mode = PD_MODE_ARROW,
         .color         = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
     }, // cyan
     {
         .pointing_mode = PD_MODE_PINCH,
         .color         = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
     }, // lime
     {
         .pointing_mode = PD_MODE_ZOOM,
         .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
     }, // light green
 };
 const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));

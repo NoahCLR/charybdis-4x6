@@ -62,6 +62,7 @@ typedef struct {
     pd_mode_id_t           locked_mode_id;
     split_side_mask_t      owner_sides;
     keypos_t               owner_key_pos;
+    const uint8_t         *owner_bitmap;
 } pd_mode_command_t;
 
 typedef struct {
@@ -77,6 +78,7 @@ extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];
 
 pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command);
 void                   pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_side_mask_t owner_sides);
+void                   pd_mode_apply_remote_mode_ids_with_owner_bitmap(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_side_mask_t owner_sides, const uint8_t *owner_bitmap);
 void                   pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags);
 
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode);
@@ -94,6 +96,8 @@ bool pd_mode_handle_keycode_press(uint16_t keycode);
 bool pd_mode_handle_keycode_release(uint16_t keycode);
 bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos);
 bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos);
+bool pd_mode_local_owner_bitmap_snapshot(uint8_t *out_bitmap);
+bool pd_mode_display_owner_bitmap_snapshot(uint8_t *out_bitmap);
 
 bool           pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record);
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode);

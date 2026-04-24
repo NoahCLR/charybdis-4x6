@@ -93,7 +93,8 @@ Combo outputs now keep two runtime views at once:
 
 If a combo spans both halves, localized RGB and `PD_COLOR_MODE_TRIGGER_HALF`
 broaden to both halves instead of pretending the combo came from only one
-side.
+side. `PD_COLOR_MODE_TRIGGER_KEYS` can use that same footprint to paint the
+exact combo keys.
 
 ## Signature Behaviors
 
