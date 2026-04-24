@@ -243,3 +243,57 @@ No required checks were skipped.
 1. Flash and hammer repeated `PINCH_MODE` double taps on hardware.
 2. If the freeze remains reproducible, inspect same-key PD ownership/lifecycle
    transitions after the explicit Pinch-hold change.
+
+### Same-Key PD Lifecycle Root-Cause Follow-Up
+
+- Kept the authored `PINCH_MODE` keymap on the explicit-hold containment path
+  and added a separate host-test legacy Pinch variant that restores the old
+  implicit first-hold shape only inside
+  `run_pd_mode_key_runtime_integration_tests.sh`.
+- Reproduced the deeper invariant failure in host: when a held PD mode was
+  preempted by another PD mode, the PD engine moved to the new active mode but
+  the key runtime could retain a stale held-action owner for the old mode until
+  that old physical key was released.
+- Updated key-runtime effect projection so registering a held PD action, or
+  activating a PD lock/tap, first unregisters held PD actions for other modes.
+  This makes the PD engine, key-runtime shadow projection, held-action owner,
+  PD owner key, pointer anchor, and Pinch-owned GUI lifecycle move together at
+  the preemption boundary.
+- Added legacy-Pinch assertions for Pinch -> Volume, Volume -> Pinch, repeated
+  Pinch double-tap salvos, and legacy Pinch double-tap hold into Zoom. The
+  tests assert active PD mode, key-runtime shadow PD mode, held action owner,
+  PD owner key, pointer anchor, and Pinch-managed GUI state at each boundary.
+
+Verification passed:
+
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+### Next Steps
+
+1. Flash a build with the legacy-Pinch fixture behavior if we want hardware
+   proof that the root invariant is fixed independent of the safe authored
+   keymap containment.
+2. Decide separately whether the authored `PINCH_MODE` single hold should stay
+   explicit or return to implicit after hardware validation.

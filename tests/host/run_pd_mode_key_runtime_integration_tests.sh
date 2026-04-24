@@ -5,6 +5,7 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
 BIN="$BUILD_DIR/pd_mode_key_runtime_integration_test"
+LEGACY_BIN="$BUILD_DIR/pd_mode_key_runtime_legacy_pinch_integration_test"
 
 cleanup() {
     rm -rf "$BUILD_DIR"
@@ -12,7 +13,11 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
+compile_test() {
+    bin="$1"
+    shift
+
+    cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
@@ -24,6 +29,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -DS_D_MOD=0x7002u \
     -DS_D_RMOD=0x7003u \
     -DSPLIT_TRANSACTION_IDS_USER \
+    "$@" \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
@@ -63,6 +69,11 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
-    -o "$BIN"
+    -o "$bin"
+}
 
+compile_test "$BIN"
 "$BIN"
+
+compile_test "$LEGACY_BIN" -DPD_MODE_KEY_RUNTIME_TEST_LEGACY_PINCH_IMPLICIT
+"$LEGACY_BIN"

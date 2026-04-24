@@ -420,6 +420,69 @@ static void key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap
     key_runtime_core_release_effect_plan_push_dispatch_action(plan, key_pos, action);
 }
 
+static bool key_runtime_core_find_preempted_pd_held_action(key_runtime_core_state_t *state, pd_mode_mask_t keep_mode, keypos_t *out_key_pos, uint16_t *out_action) {
+    if (out_key_pos) {
+        *out_key_pos = key_runtime_core_invalid_keypos();
+    }
+    if (out_action) {
+        *out_action = KC_NO;
+    }
+
+    if (!(state && keep_mode != 0 && out_key_pos && out_action)) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
+        const lease_t *lease = &state->leases[index];
+        pd_mode_mask_t held_mode;
+
+        if (!(lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_HELD_ACTION)) {
+            continue;
+        }
+
+        held_mode = pd_mode_for_keycode(lease->data.action);
+        if (held_mode == 0 || held_mode == keep_mode) {
+            continue;
+        }
+
+        *out_key_pos = key_runtime_core_lease_owner_key_pos(lease);
+        *out_action  = lease->data.action;
+        return true;
+    }
+
+    return false;
+}
+
+static void key_runtime_core_preempt_other_pd_held_actions_for_mode(pd_mode_mask_t keep_mode) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!(state && keep_mode != 0)) {
+        return;
+    }
+
+    // PD mode state is exclusive. Keep held-action ownership exclusive too so
+    // a preempted mode cannot leave a stale key-runtime owner behind.
+    for (uint16_t guard = 0; guard < KEY_RUNTIME_CORE_LEASE_CAPACITY; guard++) {
+        keypos_t preempted_key_pos;
+        uint16_t preempted_action;
+
+        if (!key_runtime_core_find_preempted_pd_held_action(state, keep_mode, &preempted_key_pos, &preempted_action)) {
+            return;
+        }
+
+        held_action_unregister(preempted_key_pos, preempted_action);
+        key_runtime_core_observe_held_action_unregister(preempted_key_pos, preempted_action);
+    }
+}
+
+static void key_runtime_core_preempt_other_pd_held_actions(uint16_t action) {
+    key_runtime_core_preempt_other_pd_held_actions_for_mode(pd_mode_for_keycode(action));
+}
+
+static bool key_runtime_core_pd_mode_lock_tap_will_activate(pd_mode_mask_t mode) {
+    return mode != 0 && (pd_mode_local_locked_snapshot() != mode || pd_mode_local_active_snapshot() != mode);
+}
+
 void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
     if (!effect) {
         return;
@@ -430,6 +493,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             noah_emit_action_tap_at(key_runtime_effect_dispatch_action_key_pos(effect), effect->data.dispatch_action.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
             return;
         case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
+            key_runtime_core_preempt_other_pd_held_actions(effect->data.held_action.action);
             key_runtime_core_observe_held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
             held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
             return;
@@ -461,6 +525,9 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             key_feedback_pulse_arm(effect->data.feedback_pulse.long_hold_level);
             return;
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
+            if (key_runtime_core_pd_mode_lock_tap_will_activate(effect->data.pd_mode_lock_tap.pd_mode)) {
+                key_runtime_core_preempt_other_pd_held_actions_for_mode(effect->data.pd_mode_lock_tap.pd_mode);
+            }
             (void)pd_mode_toggle_lock_state_at(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos);
             return;
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:

@@ -80,6 +80,14 @@ None.
   `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`,
   `tests/host/pd_mode_key_runtime_integration_test.c`, and
   `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
+- Same-key and overlapping PD lifecycle handoff now clears stale held PD
+  owners at the preemption boundary. When a held PD action or PD lock/tap
+  activates a different mode, the key runtime unregisters held actions for
+  other PD modes before the new mode takes ownership. This keeps active PD
+  mode, shadow projection, held-action leases, owner key, pointer anchor, and
+  Pinch-owned GUI lifecycle aligned. Code references:
+  `users/noah/lib/key/runtime/core/runtime.c` and
+  `tests/host/pd_mode_key_runtime_integration_test.c`.
 
 ## Non-Findings
 
@@ -125,6 +133,10 @@ held-action branches whose PD mode differs from the physical trigger key.
 The highest-frequency Pinch double-tap prefix no longer activates Pinch's
 mode-owned GUI lifecycle before the runtime knows whether the user is tapping
 or holding; Pinch itself now starts at the first hold threshold on that key.
+The root same-key lifecycle issue is covered separately with a legacy Pinch
+host-test fixture: if the old implicit first-hold shape is reintroduced, PD
+mode preemption now clears stale held owners immediately instead of leaving the
+old key-runtime owner live until physical release.
 
 The current `.mode` authoring surface is coherent for the main feedback
 surfaces. PD, combo feedback, and key-behavior feedback all support fixed
