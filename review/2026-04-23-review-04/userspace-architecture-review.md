@@ -10,8 +10,9 @@ The pass used `prompts/initial-architecture-review.md`. It did not continue
 whole-userspace file-map review. This is a separate post-closure RGB runtime
 and profile review.
 
-No runtime, keymap, generated introspection, or user-facing documentation files
-were changed in this pass.
+The initial pass was review-only. Follow-up implementation in this same active
+thread added fixed left/right key-feedback placement modes and updated the RGB
+authoring docs.
 
 ## Findings
 
@@ -21,22 +22,7 @@ None.
 
 ### Should-Fix
 
-- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c:146` says the
-  profile uses `PD_COLOR_MODE_TRIGGER_HALF` for every pointing mode, but every
-  actual `pd_mode_colors[]` row uses `PD_COLOR_MODE_RIGHT_HALF` at
-  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c:155`,
-  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c:160`,
-  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c:165`,
-  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c:170`,
-  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c:175`, and
-  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c:180`.
-  `users/noah/config.h:50` also enables `RGB_PD_MODE_ACTIVE_HALF_ENABLE`,
-  while its local comment says that feature is required only when a profile row
-  uses trigger-half placement. This is not a render bug, but it is an
-  authoring-intent mismatch: the profile either wants pointer-mode feedback to
-  follow the triggering half, or it wants every mode pinned to the pointer half.
-  Pick one and make the comment, config flag, generated overview, and profile
-  data agree.
+None.
 
 ### Optional Cleanup
 
@@ -59,6 +45,22 @@ None.
   with an explicit priority helper or static assertions that document the
   intended ordering.
 
+## Resolved During Follow-Up
+
+- PD-mode RGB authoring comments now match the profile: `pd_mode_colors[]` uses
+  `PD_COLOR_MODE_RIGHT_HALF` for every pointing mode, and the user-facing
+  `rgb_config.c` comment describes that pointer-half policy without mentioning
+  backend debug defines. Verification: `python3 tools/profile_introspect.py
+  --check`, `sh tests/host/run_real_profile_validation_tests.sh`,
+  `sh tests/host/run_all_host_tests.sh`, `qmk compile -kb
+  bastardkb/charybdis/4x6 -km noah`, and `git diff --check`.
+- Key-behavior feedback now has fixed-half placement options in addition to
+  both halves, key half, and exact key. Code references:
+  `users/noah/lib/rgb/core/rgb_helpers.h`,
+  `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`,
+  `users/noah/lib/rgb/core/rgb_validation.c`, and
+  `tests/host/rgb_layer_render_test.c`.
+
 ## Non-Findings
 
 - The RGB runtime shape is coherent. `users/noah/lib/rgb/core/rgb_runtime.c:122`
@@ -80,7 +82,8 @@ None.
   keys vs mapped-only, layer LED groups, auto-mouse fade destination modes,
   pointing-mode left/right/both/trigger-half overlays, pointing-mode LED
   groups, combo both/half/keys/fixed-side placement, key-feedback
-  both/half/key placement, and diagnostic override color are all present.
+  both/fixed-half/key-half/key placement, and diagnostic override color are all
+  present.
 - All six registered pointing modes have profile colors:
   `DRAGSCROLL`, `VOLUME_MODE`, `BRIGHTNESS_MODE`, `ARROW_MODE`, `PINCH_MODE`,
   and `ZOOM_MODE`.
@@ -98,21 +101,15 @@ mostly data-driven. The tap-engine relationship is especially strong: RGB
 renders semantic state exported by the key runtime instead of duplicating tap,
 hold, longer-hold, multi-tap, combo-origin, or PD ownership logic.
 
-The main issue is not missing runtime capability. It is profile intent. The
-profile currently reads like it wants dynamic trigger-half PD feedback, but it
-actually renders every PD mode on the right half. That should be resolved
-before treating the RGB profile as polished.
+The current `.mode` authoring surface is coherent for the main feedback
+surfaces. PD and combo feedback support fixed left/right placement, and
+key-behavior feedback now does as well.
 
 ## Recommended Next Refactor Sequence
 
-1. Decide the PD overlay locality policy:
-   - choose `PD_COLOR_MODE_TRIGGER_HALF` for each PD color row if feedback
-     should follow the hand/combo that activated the mode, or
-   - keep `PD_COLOR_MODE_RIGHT_HALF`, update the stale `rgb_config.c` comment,
-     and disable `RGB_PD_MODE_ACTIVE_HALF_ENABLE` if no profile row needs it.
-2. If ordinary RGB Matrix controls are expected on-board, add a small authored
+1. If ordinary RGB Matrix controls are expected on-board, add a small authored
    path for `RM_TOGG`, `RM_NEXT`, and `RM_PREV` or document that VIA remapping
    is the intended control surface.
-3. If new key-feedback semantic states are added later, first make feedback
+2. If new key-feedback semantic states are added later, first make feedback
    priority explicit instead of relying on enum ordering.
-4. Keep the current staged RGB runtime. No rewrite is warranted from this pass.
+3. Keep the current staged RGB runtime. No rewrite is warranted from this pass.

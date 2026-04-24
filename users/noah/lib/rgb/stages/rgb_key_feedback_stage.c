@@ -217,6 +217,14 @@ static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t 
     }
 
     global_semantic = rgb_runtime_key_feedback_stage_global_semantic(semantic_map);
+    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_LEFT_HALF) {
+        return rgb_runtime_key_feedback_stage_paint_half(false, global_semantic, flash_meta, led_min, led_max);
+    }
+
+    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_RIGHT_HALF) {
+        return rgb_runtime_key_feedback_stage_paint_half(true, global_semantic, flash_meta, led_min, led_max);
+    }
+
     if (!rgb_runtime_key_feedback_stage_semantic_color(global_semantic, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(global_semantic, flash_meta)) {
         return false;
     }

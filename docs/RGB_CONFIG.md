@@ -284,6 +284,10 @@ The `mode` field controls where the overlay paints:
   this to both halves when the combo footprint spans both sides.
 - `KEY_FEEDBACK_MODE_KEY`: repaint only the feedback-driving key footprint.
   For combo outputs, that means every key that formed the combo.
+- `KEY_FEEDBACK_MODE_LEFT_HALF`: repaint the left half using the highest
+  priority active feedback state.
+- `KEY_FEEDBACK_MODE_RIGHT_HALF`: repaint the right half using the highest
+  priority active feedback state.
 
 Like PD trigger-half placement, key-behavior feedback locality is driven from
 the live runtime footprint, not a static guess from authored combo comments.

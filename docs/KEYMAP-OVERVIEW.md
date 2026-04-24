@@ -290,6 +290,8 @@ Current authored feedback paint mode: `KEY_FEEDBACK_MODE_KEY_HALF`.
 | `KEY_FEEDBACK_MODE_BOTH_HALVES` | Repaint both halves whenever a key-behavior feedback state is active. |
 | `KEY_FEEDBACK_MODE_KEY_HALF` | Repaint only the half that owns the key or tap series currently driving the feedback state. |
 | `KEY_FEEDBACK_MODE_KEY` | Repaint only the specific key currently driving the feedback state. |
+| `KEY_FEEDBACK_MODE_LEFT_HALF` | Always repaint the left half using the highest-priority active key-behavior feedback state. |
+| `KEY_FEEDBACK_MODE_RIGHT_HALF` | Always repaint the right half using the highest-priority active key-behavior feedback state. |
 
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |

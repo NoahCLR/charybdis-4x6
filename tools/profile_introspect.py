@@ -891,6 +891,8 @@ def key_behavior_feedback_mode_description(mode: str) -> str:
         "KEY_FEEDBACK_MODE_BOTH_HALVES": "Repaint both halves whenever a key-behavior feedback state is active.",
         "KEY_FEEDBACK_MODE_KEY_HALF": "Repaint only the half that owns the key or tap series currently driving the feedback state.",
         "KEY_FEEDBACK_MODE_KEY": "Repaint only the specific key currently driving the feedback state.",
+        "KEY_FEEDBACK_MODE_LEFT_HALF": "Always repaint the left half using the highest-priority active key-behavior feedback state.",
+        "KEY_FEEDBACK_MODE_RIGHT_HALF": "Always repaint the right half using the highest-priority active key-behavior feedback state.",
     }
     return descriptions.get(mode, "Unknown key-behavior feedback paint mode.")
 
@@ -2330,6 +2332,8 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
                 f"| `KEY_FEEDBACK_MODE_BOTH_HALVES` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_BOTH_HALVES')} |",
                 f"| `KEY_FEEDBACK_MODE_KEY_HALF` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_KEY_HALF')} |",
                 f"| `KEY_FEEDBACK_MODE_KEY` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_KEY')} |",
+                f"| `KEY_FEEDBACK_MODE_LEFT_HALF` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_LEFT_HALF')} |",
+                f"| `KEY_FEEDBACK_MODE_RIGHT_HALF` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_RIGHT_HALF')} |",
                 "",
             ]
         )

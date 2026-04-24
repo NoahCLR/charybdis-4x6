@@ -262,6 +262,8 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 //     can broaden this to both halves
 //   - KEY_FEEDBACK_MODE_KEY = paint only the key footprint currently driving
 //     the feedback state; combo-driven feedback paints every combo key
+//   - KEY_FEEDBACK_MODE_LEFT_HALF = always paint the left half
+//   - KEY_FEEDBACK_MODE_RIGHT_HALF = always paint the right half
 // This profile uses KEY_FEEDBACK_MODE_KEY_HALF so hold / multi-tap feedback
 // stays local to the half that caused it without becoming too subtle.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE

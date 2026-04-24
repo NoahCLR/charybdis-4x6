@@ -112,7 +112,8 @@ static void rgb_validation_log_invalid_combo_feedback_mode(uint8_t mode) {
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_log_invalid_key_behavior_feedback_mode(uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors.mode %u; expected KEY_FEEDBACK_MODE_BOTH_HALVES (0), KEY_FEEDBACK_MODE_KEY_HALF (1), or KEY_FEEDBACK_MODE_KEY (2)\n", (unsigned int)mode);
+    uprintf("Invalid key_behavior_feedback_colors.mode %u; expected KEY_FEEDBACK_MODE_BOTH_HALVES (0), KEY_FEEDBACK_MODE_KEY_HALF (1), KEY_FEEDBACK_MODE_KEY (2), KEY_FEEDBACK_MODE_LEFT_HALF (3), or KEY_FEEDBACK_MODE_RIGHT_HALF (4)\n",
+            (unsigned int)mode);
 #        else
     (void)mode;
 #        endif
@@ -220,7 +221,7 @@ static void rgb_validation_validate_combo_feedback_config(void) {
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_validate_key_behavior_feedback_config(void) {
-    if (key_behavior_feedback_colors.mode > KEY_FEEDBACK_MODE_KEY) {
+    if (key_behavior_feedback_colors.mode > KEY_FEEDBACK_MODE_RIGHT_HALF) {
         rgb_validation_log_invalid_key_behavior_feedback_mode((uint8_t)key_behavior_feedback_colors.mode);
     }
 }

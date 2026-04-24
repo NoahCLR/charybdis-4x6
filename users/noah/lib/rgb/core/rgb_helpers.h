@@ -78,6 +78,8 @@ typedef enum {
     KEY_FEEDBACK_MODE_BOTH_HALVES = 0,
     KEY_FEEDBACK_MODE_KEY_HALF,
     KEY_FEEDBACK_MODE_KEY,
+    KEY_FEEDBACK_MODE_LEFT_HALF,
+    KEY_FEEDBACK_MODE_RIGHT_HALF,
 } key_behavior_feedback_mode_t;
 
 typedef struct {
