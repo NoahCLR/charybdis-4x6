@@ -222,6 +222,8 @@ static void test_non_base_tap_commit_feedback_still_pulses(void) {
         KEY_RUNTIME_SCENARIO_ADVANCE(40),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 4),
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 4),
+        KEY_RUNTIME_SCENARIO_ADVANCE(121),
+        KEY_RUNTIME_SCENARIO_SCAN(),
     };
 
     key_runtime_scenario_reset();
@@ -230,10 +232,10 @@ static void test_non_base_tap_commit_feedback_still_pulses(void) {
     key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
 
     CHECK(key_runtime_scenario_effect_count() == 2);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
-    CHECK(key_runtime_scenario_effect_at(0)->data.action == TEST_ALT_ACTION);
-    CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(0)).row == 2);
-    CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(0)).col == 4);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_ALT_ACTION);
+    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).row == 2);
+    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).col == 4);
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
     CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 }

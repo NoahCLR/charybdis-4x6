@@ -155,5 +155,8 @@ uint16_t handled_key_flags_from_behavior(key_behavior_view_t behavior) {
 }
 
 bool handled_key_tap_resolves_on_press_behavior(handled_key_resolution_t resolution) {
-    return resolution.tap_count > 1 && handled_key_resolution_step_present(resolution) && !resolution.step.hold.present && !resolution.step.long_hold.present && !resolution.has_more_taps;
+    (void)resolution;
+    // Keep the selected tap branch visible through the normal pending window
+    // so feedback can show the branch before any optional tap-commit pulse.
+    return false;
 }

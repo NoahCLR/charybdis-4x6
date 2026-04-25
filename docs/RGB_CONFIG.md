@@ -347,16 +347,19 @@ Those rows populate the shared
 - `locality`
 
 The `RGB_TAP_PENDING_COLORS(...)` macro declares the colors available while
-the runtime is still resolving a multi-tap sequence. The first color is always
-the fallback pending color.
+the runtime is still resolving a selected tap branch. The first color is
+always the fallback pending color. Terminal tap-only branches stay in this
+pending feedback surface for the normal pending window, and tap-hold branches
+stay there until the hold tier resolves.
 
 The `tap_pending_mode` field controls how pending tap branches pick from that
 list:
 
 - `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR`: use the first pending color for
   every pending branch
-- `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`: use the pending tap count to pick
-  a color from the list; higher tap counts clamp to the last configured color
+- `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`: use the selected unresolved tap
+  branch to pick a color from the list; higher tap counts clamp to the last
+  configured color
 
 The `tap_commit_mode` field controls which committed tap branches pulse with
 `tap_committed_color`:
@@ -384,8 +387,8 @@ the live runtime footprint, not a static guess from authored combo comments.
 
 In the shared runtime, those colors are used for these categories:
 
-- multi-tap pending: the engine is waiting to see whether more taps arrive;
-  branch-color mode can show the pending tap count with a distinct color
+- multi-tap pending: the engine has selected a tap branch that is not resolved
+  yet; branch-color mode can show that branch with a distinct color
 - tap committed: an authored tap branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
 - hold trigger: a hold-tier action has just fired

@@ -855,7 +855,7 @@ def parse_key_behavior_feedback_colors(
                 {
                     "field": f"tap_pending_{index}_color",
                     "label": f"Tap Pending {index}",
-                    "meaning": "Pending multi-tap branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch.",
+                    "meaning": "Unresolved tap-branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch.",
                     "color": authored_color,
                     "preview_color": dict(authored_color),
                 }
@@ -945,7 +945,7 @@ def key_behavior_feedback_tap_commit_mode_description(mode: str) -> str:
 def key_behavior_feedback_tap_pending_mode_description(mode: str) -> str:
     descriptions = {
         "KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR": "Use the first tap-pending color for every unresolved tap branch.",
-        "KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS": "Use the pending tap count to pick a tap-pending color, clamping higher counts to the last configured color.",
+        "KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS": "Use the selected unresolved tap branch to pick a tap-pending color, clamping higher counts to the last configured color.",
     }
     return descriptions.get(mode, "Unknown key-behavior tap-pending feedback mode.")
 

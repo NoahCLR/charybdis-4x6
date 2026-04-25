@@ -187,6 +187,8 @@ enum keymap_custom_keycodes {
 //     multi-tap window before firing so the engine can see whether more taps
 //     follow
 //   - this means single taps on multi-tap keys are delayed by .multi_tap_term
+//   - a terminal tap-only branch uses the same pending window, so RGB can show
+//     the selected branch before the tap-commit pulse
 //
 // within one tap index:
 //   - .tap is the tap tier

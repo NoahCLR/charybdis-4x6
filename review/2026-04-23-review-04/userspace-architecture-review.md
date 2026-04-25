@@ -221,7 +221,10 @@ Pending multi-tap feedback now also carries tap branch state alongside the
 semantic map. `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS` lets the unresolved
 branch show a distinct authored color, while `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR`
 keeps the old single pending-color behavior by using the first configured
-pending color.
+pending color. Terminal tap-only branches stay in this pending surface for the
+normal pending window, and tap-hold branches stay there until the hold tier
+resolves, so RGB can show the selected branch before the commit or hold
+feedback takes over.
 
 ## Recommended Next Refactor Sequence
 

@@ -709,3 +709,93 @@ Next steps:
 2. Hardware-test pending single/double/triple tap branches on a key with
    visible multi-tap behavior to confirm branch colors match the authored RGB
    list.
+
+### Tap-Hold Branch Pending Feedback Regression
+
+- Hardware feedback showed normal pending taps using branch colors correctly,
+  but tap-hold branches could appear swallowed.
+- Root cause: `key_feedback_semantic_map()` and
+  `key_feedback_tap_branch_map()` projected active tap series only when
+  `pending_hold` was false. A second-press tap-hold branch is still an active
+  unresolved tap branch, so the runtime had valid tap-branch state that RGB
+  could not see.
+- Updated key-feedback projection so any active tap series with a nonzero tap
+  count emits pending semantic and tap-branch state, including pending-hold
+  windows.
+- Added a runtime debug regression that stages a second-press tap-hold branch
+  and asserts both the semantic map and tap-branch map remain visible.
+- Updated README, interaction/RGB/keymap docs, authored RGB comments, and this
+  review note to state that tap-hold branches stay in the pending feedback
+  surface until the hold tier resolves.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and hardware-test the tap-hold branch color on the affected key.
+2. If a future hold semantic should intentionally override pending branch
+   color earlier, add an explicit feedback-priority helper before changing the
+   current enum-priority behavior.
+
+### Terminal Tap-Only Branch Feedback
+
+- Reframed tap-pending branch feedback as selected unresolved branch feedback,
+  not "waiting for the next tap" feedback.
+- Updated terminal tap-only branches so they resolve after the normal pending
+  window instead of on press. This lets RGB show the final selected branch
+  color for the same duration as other pending tap branches, then emit the
+  tap-commit pulse after the branch resolves.
+- Kept scan from flushing the selected tap series while that branch's physical
+  press is still active, so a held final tap-only branch remains visible and
+  the pending window starts from release.
+- Updated the transparent/key-behavior lookup contract and key-runtime
+  scenario tests from press-resolved terminal branches to release-resolved
+  terminal branches.
+- Updated profile docs, generated keymap overview wording, authored keymap/RGB
+  comments, and the architecture note to describe tap-pending colors as
+  unresolved selected-branch colors.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 -m py_compile tools/profile_introspect.py`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and confirm the final tap-only branch shows its branch color for the
+   normal pending duration, then commit color when commit feedback is enabled.
+2. If branch and commit colors feel too close together on very quick taps,
+   consider a dedicated sequenced feedback pulse rather than changing tap
+   dispatch timing again.

@@ -244,8 +244,8 @@ also project its state into the RGB overlay.
 
 Shared semantics:
 
-- multi-tap pending can show a brief pending color while the engine waits for
-  more taps
+- multi-tap pending can show the currently selected unresolved tap branch,
+  including the terminal tap-only branch for the normal pending window
 - committed tap branches can pulse once after the tap output resolves; the
   authored RGB config can disable those pulses, limit them to double-tap and
   higher branches, or allow them for every tap branch

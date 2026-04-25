@@ -426,7 +426,7 @@ static void test_transparent_tap_uses_current_tap_count_for_lower_handled_key(vo
     CHECK(materialized.tap_repeat_count == 1);
 }
 
-static void test_transparent_tap_inherits_lower_press_resolve_contract(void) {
+static void test_transparent_tap_inherits_lower_release_resolve_contract_for_terminal_branch(void) {
     keypos_t                   key_pos = test_keypos(0, 6);
     handled_key_materialized_t second_tap;
 
@@ -438,7 +438,7 @@ static void test_transparent_tap_inherits_lower_press_resolve_contract(void) {
     second_tap = test_materialize(handled_key_lookup_tap_count(TEST_TRANSPARENT_PD_KEY, 2), key_pos);
 
     CHECK(!second_tap.tap_has_more_taps);
-    CHECK(second_tap.tap_resolves_on_press);
+    CHECK(!second_tap.tap_resolves_on_press);
     CHECK(second_tap.tap_action == TEST_TAP_ACTION);
     CHECK(second_tap.tap_repeat_count == 1);
     CHECK(second_tap.hold.present == false);
@@ -609,7 +609,7 @@ int main(void) {
     test_transparent_tap_stops_at_plain_pd_mode_key_without_tap_output();
     test_transparent_tap_chains_through_lower_authored_transparency();
     test_transparent_tap_uses_current_tap_count_for_lower_handled_key();
-    test_transparent_tap_inherits_lower_press_resolve_contract();
+    test_transparent_tap_inherits_lower_release_resolve_contract_for_terminal_branch();
     test_transparent_tap_inherits_lower_release_resolve_contract();
     test_transparent_hold_uses_lower_plain_key_normal_hold_behavior();
     test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata();

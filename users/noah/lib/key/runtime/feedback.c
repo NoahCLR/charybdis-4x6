@@ -93,6 +93,10 @@ static void key_feedback_apply_tap_branch_for_owner(uint8_t *tap_branch_map, key
     key_feedback_apply_tap_branch_to_bitmap(tap_branch_map, bitmap, tap_branch);
 }
 
+static bool key_feedback_tap_series_shows_pending_feedback(const tap_series_t *series) {
+    return series && series->active && series->tap_count != 0u;
+}
+
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {
     switch (kind) {
         case KEY_FEEDBACK_PULSE_TAP_COMMITTED:
@@ -297,7 +301,7 @@ void key_feedback_semantic_map(uint8_t *out_map) {
     for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
         keypos_t key_pos;
 
-        if (state->tap_series[index].active && !state->tap_series[index].pending_hold && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+        if (key_feedback_tap_series_shows_pending_feedback(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
             key_feedback_apply_semantic_for_owner(out_map, key_pos, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
         }
     }
@@ -326,7 +330,7 @@ void key_feedback_tap_branch_map(uint8_t *out_map) {
     for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
         keypos_t key_pos;
 
-        if (state->tap_series[index].active && !state->tap_series[index].pending_hold && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+        if (key_feedback_tap_series_shows_pending_feedback(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
             key_feedback_apply_tap_branch_for_owner(out_map, key_pos, state->tap_series[index].tap_count);
         }
     }

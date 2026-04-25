@@ -233,8 +233,10 @@ combo footprint rather than the fake QMK combo position `(0,0)`. In
 really spans both sides.
 
 Pending multi-tap feedback can also use branch colors. The current RGB config
-uses distinct pending colors for tap-count branches, while committed non-base
-tap branches still use the separate tap-commit pulse.
+uses distinct pending colors for selected unresolved tap-count branches,
+including terminal tap-only branches for the normal pending window and
+unresolved tap-hold branches. Committed non-base tap branches still use the
+separate tap-commit pulse.
 
 That `100 Hz` setting is also the current authored maximum: `100` repeats per
 second.

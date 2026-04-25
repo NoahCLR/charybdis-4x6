@@ -2077,7 +2077,7 @@ static void key_runtime_core_tap_series_note_hold_release(key_runtime_core_state
     series->pending_hold = false;
 }
 
-static void key_runtime_core_tap_series_preserve_pending_hold_release(key_runtime_core_state_t *state, keypos_t key_pos) {
+static void key_runtime_core_tap_series_preserve_release(key_runtime_core_state_t *state, keypos_t key_pos) {
     tap_series_t *series;
 
     if (!(state && key_runtime_core_keypos_valid(key_pos))) {
@@ -2085,14 +2085,16 @@ static void key_runtime_core_tap_series_preserve_pending_hold_release(key_runtim
     }
 
     series = key_runtime_core_tap_series_state(state, key_pos);
-    if (!(series && series->active && series->pending_hold)) {
+    if (!(series && series->active)) {
         return;
     }
 
-    series->pending_hold = false;
-    series->hold         = hold_behavior_none();
-    series->long_hold    = hold_behavior_none();
-    series->last_tap_at  = state->current_time;
+    if (series->pending_hold) {
+        series->pending_hold = false;
+        series->hold         = hold_behavior_none();
+        series->long_hold    = hold_behavior_none();
+    }
+    series->last_tap_at = state->current_time;
 }
 
 static uint16_t key_runtime_core_pending_multi_tap_release_held_lifecycle_action(const press_token_t *token, uint16_t candidate_action, uint16_t elapsed) {
@@ -2670,6 +2672,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     uint16_t                            elapsed;
     uint8_t                             series_tap_count;
     bool                                preserve_chain;
+    bool                                terminal_tap_only_feedback_window;
 
     if (out) {
         *out = (key_runtime_core_pending_multi_tap_release_resolution_t){0};
@@ -2687,7 +2690,9 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
 
     elapsed          = key_runtime_core_elapsed(token->pressed_at, token->released_at);
     series_tap_count = series ? series->tap_count : 0u;
-    preserve_chain   = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term && (token->interaction.binding.has_more_taps || (tap_action == KC_NO && tap_repeat_count == 0u));
+    terminal_tap_only_feedback_window = !token->interaction.binding.has_more_taps && !token->interaction.binding.hold.present && !token->interaction.binding.long_hold.present && tap_action != KC_NO;
+    preserve_chain = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term &&
+                     (token->interaction.binding.has_more_taps || terminal_tap_only_feedback_window || (tap_action == KC_NO && tap_repeat_count == 0u));
 
     if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term) {
         semantics.hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
@@ -2842,6 +2847,10 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
         return false;
     }
 
+    if (!series->pending_hold && token && token->active && token->handled_key && series->keycode == token->resolved_keycode) {
+        return true;
+    }
+
     if (!series->pending_hold) {
         if (key_runtime_core_elapsed(series->last_tap_at, state->current_time) > series->tap_term_ms && key_runtime_core_pending_multi_tap_flush_resolution(series, &flush_action, &flush_repeat_count)) {
             uint8_t flush_tap_count = series->tap_count;
@@ -2982,7 +2991,7 @@ static void key_runtime_core_apply_release_settlement(key_runtime_core_state_t *
 
     switch (release_plan->settlement) {
         case KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_CLEAR_ACTIVE_PRESERVE_PENDING_MULTI_TAP:
-            key_runtime_core_tap_series_preserve_pending_hold_release(state, key_pos);
+            key_runtime_core_tap_series_preserve_release(state, key_pos);
             break;
         case KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_RESET:
             (void)key_runtime_core_reset_pending_multi_tap(key_pos);
