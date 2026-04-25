@@ -542,7 +542,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    key_feedback_pulse_arm(false);
+    key_feedback_pulse_arm(KEY_FEEDBACK_PULSE_HOLD);
     (void)pd_mode_apply_command((pd_mode_command_t){
         .kind = PD_MODE_COMMAND_ACTIVATE,
         .mode = PD_MODE_VOLUME,
@@ -629,7 +629,7 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    key_feedback_pulse_arm(true);
+    key_feedback_pulse_arm(KEY_FEEDBACK_PULSE_LONG_HOLD);
     (void)pd_mode_apply_command((pd_mode_command_t){
         .kind = PD_MODE_COMMAND_LOCK,
         .mode = PD_MODE_ARROW,
@@ -902,11 +902,13 @@ static void test_key_runtime_core_active_release_effect_plan_releases_layer_and_
     CHECK(key_runtime_core_plan_active_release_effects(key_pos, TEST_INTERRUPTED_LAYER_KEY, &resolution, &plan));
     CHECK(plan.settlement == KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_RESET);
     CHECK(!plan.pending_multi_tap_seed.active);
-    CHECK(plan.count == 2u);
+    CHECK(plan.count == 3u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
     CHECK(test_keypos_equal(plan.items[0].data.key_pos, key_pos));
     CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK(plan.items[1].data.action == KC_V);
+    CHECK(plan.items[2].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(plan.items[2].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 }
 
 static void test_key_runtime_core_direct_active_release_helper_seeds_pending_multi_tap(void) {
@@ -926,6 +928,7 @@ static void test_key_runtime_core_direct_active_release_helper_seeds_pending_mul
 
     fake_time = (uint16_t)(fake_time + 20u);
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    key_runtime_core_effect_plan_init(&plan);
     CHECK(key_runtime_core_handle_handled_key_release(TEST_PENDING_MULTI_TAP_KEY, key_pos, test_handled_key_resolution(TEST_PENDING_MULTI_TAP_KEY, 1u), (keyboard_mod_state_t){0}, &plan));
     CHECK(plan.count == 0u);
     series = key_runtime_core_tap_series_at(key_pos);
@@ -1047,9 +1050,11 @@ static void test_key_runtime_core_direct_pending_multi_tap_release_helper_resets
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
     CHECK(key_runtime_core_resolve_pending_multi_tap_release(key_pos, TEST_ACTION, 1u, true, &resolution));
     CHECK(key_runtime_core_plan_pending_multi_tap_release_effects(key_pos, false, &resolution, (delayed_action_mods_t){0}, &plan));
-    CHECK(plan.count == 1u);
+    CHECK(plan.count == 2u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
+    CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
 
     token = key_runtime_core_press_token_at(key_pos);
@@ -1168,10 +1173,12 @@ static void test_key_runtime_core_transition_flush_foreign_multi_tap_clears_shad
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_flush_foreign_multi_tap(TEST_RELEASE_PRIMARY_KEY, other_key, &plan);
 
-    CHECK(plan.count == 1u);
+    CHECK(plan.count == 2u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
     CHECK(plan.items[0].data.delayed_action.repeat_count == 1u);
+    CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 
     series = key_runtime_core_tap_series_at(pending_key);
     CHECK(series != NULL);
@@ -1841,8 +1848,8 @@ static void test_runtime_debug_deferred_release_view_follows_key_runtime_core_qu
     fake_time = (uint16_t)(fake_time + 5u);
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_V, second_key, fake_time);
 
-    CHECK(key_runtime_core_queue_pending_release_dispatch(first_key, TEST_ACTION, first_mods));
-    CHECK(key_runtime_core_queue_pending_release_dispatch(second_key, TEST_SECOND_ACTION, second_mods));
+    CHECK(key_runtime_core_queue_pending_release_dispatch(first_key, TEST_ACTION, first_mods, false));
+    CHECK(key_runtime_core_queue_pending_release_dispatch(second_key, TEST_SECOND_ACTION, second_mods, false));
 
     CHECK(noah_runtime_debug_deferred_release_count() == 2u);
     CHECK(noah_runtime_debug_deferred_release_key_pos(0u, &debug_key_pos));

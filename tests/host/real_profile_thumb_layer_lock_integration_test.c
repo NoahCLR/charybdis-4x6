@@ -1033,8 +1033,8 @@ bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
     return slot >= 0 && test_held_actions[slot].action == action;
 }
 
-void key_feedback_pulse_arm(bool long_hold_level) {
-    (void)long_hold_level;
+void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
+    (void)kind;
 }
 
 uint8_t key_feedback_pack(void) {

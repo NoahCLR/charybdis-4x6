@@ -255,8 +255,8 @@ bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
     return pd_mode_toggle_lock_state(mode);
 }
 
-void key_feedback_pulse_arm(bool long_hold_level) {
-    (void)long_hold_level;
+void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
+    (void)kind;
 }
 
 void split_runtime_sync(void) {}

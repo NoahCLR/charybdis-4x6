@@ -39,6 +39,8 @@ typedef struct {
     key_runtime_core_pending_multi_tap_release_outcome_t outcome;
     uint16_t                                             action;
     uint8_t                                              repeat_count;
+    bool                                                 tap_commit_feedback;
+    uint8_t                                              tap_count;
 } key_runtime_core_pending_multi_tap_release_resolution_t;
 
 typedef enum {
@@ -55,6 +57,7 @@ typedef struct {
     bool                                              completes_hold;
     uint16_t                                          action;
     uint8_t                                           repeat_count;
+    uint8_t                                           tap_count;
 } key_runtime_core_pending_multi_tap_scan_resolution_t;
 
 typedef enum {

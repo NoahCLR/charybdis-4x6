@@ -121,9 +121,17 @@ static void rgb_validation_log_invalid_key_behavior_feedback_locality(uint8_t lo
 #        endif
 }
 
+static void rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode(uint8_t mode) {
+#        ifdef CONSOLE_ENABLE
+    uprintf("Invalid key_behavior_feedback_colors.tap_commit_mode %u; expected KEY_FEEDBACK_TAP_COMMIT_OFF (0), KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS (1), or KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS (2)\n", (unsigned int)mode);
+#        else
+    (void)mode;
+#        endif
+}
+
 static void rgb_validation_log_invalid_key_behavior_feedback_group_semantic(uint8_t group_index, uint8_t semantic) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_led_groups[%u].semantic %u; expected KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING (0), KEY_FEEDBACK_GROUP_HOLD_ACTIVE (1), or KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE (2)\n", (unsigned int)group_index, (unsigned int)semantic);
+    uprintf("Invalid key_behavior_feedback_led_groups[%u].semantic %u; expected KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING (0), KEY_FEEDBACK_GROUP_TAP_COMMITTED (1), KEY_FEEDBACK_GROUP_HOLD_ACTIVE (2), or KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE (3)\n", (unsigned int)group_index, (unsigned int)semantic);
 #        else
     (void)group_index;
     (void)semantic;
@@ -246,6 +254,9 @@ static void rgb_validation_validate_combo_feedback_led_groups(void) {
 static void rgb_validation_validate_key_behavior_feedback_config(void) {
     if (key_behavior_feedback_colors.locality > RGB_KEYS_ONLY) {
         rgb_validation_log_invalid_key_behavior_feedback_locality((uint8_t)key_behavior_feedback_colors.locality);
+    }
+    if (key_behavior_feedback_colors.tap_commit_mode > KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS) {
+        rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode((uint8_t)key_behavior_feedback_colors.tap_commit_mode);
     }
 }
 

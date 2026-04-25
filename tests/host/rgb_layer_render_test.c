@@ -161,8 +161,10 @@ EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 #endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(1, 2, 3),
-    .hold_active_color       = HSV(4, 5, 6),
-    .long_hold_active_color  = HSV(7, 8, 9),
+    .tap_committed_color     = HSV(4, 5, 6),
+    .hold_active_color       = HSV(7, 8, 9),
+    .long_hold_active_color  = HSV(10, 11, 12),
+    .tap_commit_mode         = KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS,
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
     .locality = RGB_KEYS_ONLY,
 #elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
@@ -178,7 +180,8 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     {.semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)},
-    {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)},
+    {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)},
+    {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)},
 );
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #endif
@@ -786,6 +789,22 @@ static void test_slave_multi_tap_pending_feedback_overrides_remote_combo_underla
 #endif
 }
 
+static void test_slave_tap_commit_feedback_uses_configured_color(void) {
+    test_reset();
+
+    fake_is_master = false;
+    layer_state    = (layer_state_t)1u << LAYER_SYM;
+    test_remote_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+
+    CHECK(render_output());
+
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color));
+#else
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color));
+#endif
+}
+
 static void test_slave_feedback_uses_remote_semantics_and_flash_phase(void) {
     test_reset();
 
@@ -829,6 +848,17 @@ static void test_key_feedback_led_groups_repaint_after_feedback_locality(void) {
     check_led(5, rgb_from_key_feedback_group(0));
 }
 
+static void test_key_feedback_tap_commit_led_group_repaints_after_feedback_locality(void) {
+    test_reset();
+
+    layer_state = (1UL << LAYER_SYM);
+    test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+
+    CHECK(render_output());
+
+    check_led(5, rgb_from_key_feedback_group(1));
+}
+
 static void test_key_feedback_led_groups_follow_flash_visibility(void) {
     test_reset();
 
@@ -841,7 +871,7 @@ static void test_key_feedback_led_groups_follow_flash_visibility(void) {
     fake_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
 
     CHECK(render_output());
-    check_led(5, rgb_from_key_feedback_group(1));
+    check_led(5, rgb_from_key_feedback_group(2));
 }
 #endif
 
@@ -1738,9 +1768,11 @@ int main(void) {
     test_slave_combo_underlay_stays_below_remote_pd_mode();
     test_slave_multi_tap_pending_feedback_overrides_remote_combo_overlay();
     test_slave_multi_tap_pending_feedback_overrides_remote_combo_underlay();
+    test_slave_tap_commit_feedback_uses_configured_color();
     test_slave_feedback_uses_remote_semantics_and_flash_phase();
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
     test_key_feedback_led_groups_repaint_after_feedback_locality();
+    test_key_feedback_tap_commit_led_group_repaints_after_feedback_locality();
     test_key_feedback_led_groups_follow_flash_visibility();
 #endif
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF

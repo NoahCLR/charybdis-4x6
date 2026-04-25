@@ -539,8 +539,8 @@ No required checks were skipped.
   stage rows can name groups like `RGB_LED_GROUP_TRACKBALL` instead of
   repeating LED indices.
 - Added `MATERIALIZE_RGB_CONFIG()` at the bottom of `rgb_config.c` so runtime
-  exports and derived counts are no longer scattered after each authored
-  table.
+  exports, feedback policy bridges, and derived counts are no longer scattered
+  after each authored table.
 - Kept the optional layer, PD-mode, combo feedback, and key-behavior feedback
   render-table examples in their own feature sections.
 - Clarified the feature sections so each LED group surface has a visible
@@ -604,3 +604,61 @@ Next steps:
    table examples behind the same feature flag.
 2. Hardware-test any disabled-stage profile before treating it as a final user
    configuration.
+
+### Tap Commit RGB Feedback
+
+- Added a distinct tap-commit feedback pulse kind and semantic so authored tap
+  branches can show a short confirmation separate from multi-tap pending and
+  hold/long-hold activity.
+- Added `tap_committed_color` and `KEY_FEEDBACK_GROUP_TAP_COMMITTED` to the
+  key-behavior RGB authoring surface, with the current profile using green for
+  tap commits.
+- Suppressed tap-commit pulses for layer-affecting and PD-mode-affecting tap
+  actions because those actions already have persistent layer or PD feedback.
+- Added an authored tap-commit feedback mode so profiles can disable commit
+  pulses, pulse only double-tap and higher branches, or pulse every committed
+  tap branch; the current profile uses `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`.
+- Materialized the runtime policy hook from `MATERIALIZE_RGB_CONFIG()` so
+  `rgb_config.c` stays declarative and does not hand-author bridge functions.
+- Carried the tap-commit pulse flag through deferred release dispatches so the
+  pulse drains with the delayed tap output instead of firing early while a
+  sibling tap-release blocker is still active.
+- Preserved the winning tap count before clearing pending multi-tap release
+  state so `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` still works for branches
+  that resolve on release.
+- Kept the packed key-feedback semantic map at three bits; the new semantic
+  uses the remaining value in that encoding.
+- Updated runtime tests, RGB render/validation tests, profile introspection,
+  authored RGB comments, generated layer overview assets, README/RGB docs, and
+  this active review note.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `python3 -m py_compile tools/profile_introspect.py`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and hardware-test a normal tap, a deferred tap-release overlap, a
+   layer-state tap, and a PD-mode tap to confirm the green pulse appears only
+   on non-state tap commits.
+2. If another key-feedback semantic is needed later, plan the packed semantic
+   map width and priority rules first.

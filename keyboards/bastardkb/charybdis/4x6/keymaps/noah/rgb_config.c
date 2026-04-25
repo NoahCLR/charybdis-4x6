@@ -241,6 +241,12 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 // Feedback categories:
 //   - multi_tap_pending_color = multi-tap sequence still resolving which tap
 //     index wins
+//   - tap_committed_color = tap branch resolved and committed; layer and
+//     PD-mode state actions stay quiet because their state overlays own that
+//     feedback
+//   - tap_commit_mode chooses which committed tap branches pulse:
+//     KEY_FEEDBACK_TAP_COMMIT_OFF, KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS, or
+//     KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS
 //   - hold_active_color = authored hold-tier pending / active states and
 //     hold-tier commit pulses
 //   - long_hold_active_color = authored long-hold-tier active states and
@@ -270,6 +276,12 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     // Used while the engine is still resolving the active tap index.
     .multi_tap_pending_color = HSV(0, 0, 150),
 
+    // Used for committed tap branches that do not already have state feedback.
+    .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+
+    // Commit feedback is most useful for double-tap and higher tap branches.
+    .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
+
     // Used for authored hold-tier pending / active states and commit pulses.
     .hold_active_color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
@@ -288,13 +300,14 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 // Uncomment or add rows inside this table to enable feedback accents.
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
 );
 #    endif // RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 
-// Expand the authored RGB tables and derived counts above into the runtime
-// symbols expected by the userspace RGB runtime.
+// Expand the authored RGB tables, derived counts, and RGB feedback policy
+// bridges above into the runtime symbols expected by the userspace runtime.
 MATERIALIZE_RGB_CONFIG();
 
 #endif // RGB_MATRIX_ENABLE

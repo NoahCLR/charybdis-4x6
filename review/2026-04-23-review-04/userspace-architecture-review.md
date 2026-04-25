@@ -118,7 +118,7 @@ None.
   from authored config, and profile authors can define reusable physical
   `RGB_LED_GROUP_*` macros below the LED map for reuse across stages.
   `MATERIALIZE_RGB_CONFIG()` at the bottom of `rgb_config.c` centralizes the
-  runtime exports and derived counts. Code references:
+  runtime exports, feedback policy bridges, and derived counts. Code references:
   `users/noah/lib/rgb/core/rgb_helpers.h`,
   `users/noah/lib/rgb/core/rgb_config_defaults.c`,
   `users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c`,
@@ -141,10 +141,11 @@ None.
   tests.
 - The runtime is coherent with the tap engine. RGB does not re-interpret
   `key_behaviors[]` directly; it consumes semantic outputs from
-  `users/noah/lib/key/runtime/feedback.c:147` and
-  `users/noah/lib/key/runtime/feedback.c:240`. The tap engine owns preview
-  layer selection, pending multi-tap truth, hold/long-hold semantics, pulses,
-  and combo locality. RGB only broadens or narrows that truth at paint time.
+  `users/noah/lib/key/runtime/feedback.c:149` and
+  `users/noah/lib/key/runtime/feedback.c:250`. The tap engine owns preview
+  layer selection, pending multi-tap truth, tap-commit pulses,
+  hold/long-hold semantics, and combo locality. RGB only broadens or narrows
+  that truth at paint time.
 - Split behavior is correctly layered. The master computes preview, combo, and
   key-feedback state, while `split_runtime_sync` transports those surfaces to
   the slave. The slave renderer uses the mirrored semantic map instead of
@@ -198,12 +199,21 @@ with shared `RGB_*` locality values. Layer coverage and auto-mouse fade still
 use `.mode` because they are not interaction-locality settings. PD, combo,
 key-behavior, and auto-mouse feedback can be disabled with their stage-level
 config flags; preview is intentionally not a separate user-facing toggle.
+Key-behavior feedback now also has a tap-commit semantic for authored tap
+branches that do not already have a persistent layer or PD-mode state surface.
+That semantic is policy-gated by the authored tap-commit feedback mode, and
+the current profile only pulses double-tap and higher branches while leaving
+the base single-tap branch quiet. Deferred tap dispatches carry the tap-commit
+pulse through pending-release drain, so feedback remains aligned with the
+actual output projection instead of firing early while a sibling tap-release
+blocker is still live.
 
 ## Recommended Next Refactor Sequence
 
 1. If ordinary RGB Matrix controls are expected on-board, add a small authored
    path for `RM_TOGG`, `RM_NEXT`, and `RM_PREV` or document that VIA remapping
    is the intended control surface.
-2. If new key-feedback semantic states are added later, first make feedback
-   priority explicit instead of relying on enum ordering.
+2. If more key-feedback semantic states are added later, increase the packed
+   semantic width deliberately and make feedback priority explicit instead of
+   relying on enum ordering.
 3. Keep the current staged RGB runtime. No rewrite is warranted from this pass.

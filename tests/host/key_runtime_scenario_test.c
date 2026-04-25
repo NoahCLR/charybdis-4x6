@@ -187,12 +187,78 @@ static void test_single_tap_waits_for_multi_tap_timeout_before_dispatching(void)
     test_configure_multi_tap_key();
     key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
 
-    CHECK(key_runtime_scenario_effect_count() == 1);
+    CHECK(key_runtime_scenario_effect_count() == 2);
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_TAP_ACTION);
     CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).row == 1);
     CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).col == 1);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+}
+
+static void test_base_tap_commit_feedback_can_be_suppressed(void) {
+    static const key_runtime_scenario_step_t scenario[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_FALLBACK_KEY, 2, 5),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_FALLBACK_KEY, 2, 5),
+    };
+
+    key_runtime_scenario_reset();
+    key_runtime_scenario_set_tap_commit_mode(KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS);
+    test_configure_fallback_tap_key(TEST_FALLBACK_KEY, TEST_TAP_ACTION);
+    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
+
+    CHECK(key_runtime_scenario_effect_count() == 1);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->data.action == TEST_TAP_ACTION);
+    CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(0)).row == 2);
+    CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(0)).col == 5);
+}
+
+static void test_non_base_tap_commit_feedback_still_pulses(void) {
+    static const key_runtime_scenario_step_t scenario[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 4),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 4),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 4),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 4),
+    };
+
+    key_runtime_scenario_reset();
+    key_runtime_scenario_set_tap_commit_mode(KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS);
+    test_configure_multi_tap_key();
+    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
+
+    CHECK(key_runtime_scenario_effect_count() == 2);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->data.action == TEST_ALT_ACTION);
+    CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(0)).row == 2);
+    CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(0)).col == 4);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+}
+
+static void test_non_base_release_resolved_tap_commit_feedback_still_pulses(void) {
+    static const key_runtime_scenario_step_t scenario[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+    };
+
+    key_runtime_scenario_reset();
+    key_runtime_scenario_set_tap_commit_mode(KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS);
+    test_configure_multi_tap_hold_key((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION), hold_behavior_none());
+    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
+
+    CHECK(key_runtime_scenario_effect_count() == 2);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_ALT_ACTION);
+    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).row == 2);
+    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).col == 3);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 }
 
 static void test_momentary_layer_key_tracks_press_and_release_events(void) {
@@ -272,9 +338,11 @@ static void test_press_on_other_handled_position_keeps_foreign_pending_multi_tap
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(timeout_and_scan, ARRAY_SIZE(timeout_and_scan));
 
-    CHECK(key_runtime_scenario_effect_count() == 1);
+    CHECK(key_runtime_scenario_effect_count() == 2);
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_TAP_ACTION);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 3)) == TEST_HOLD_KEY_TWO);
 }
@@ -332,15 +400,19 @@ static void test_independent_pending_multi_tap_chains_can_coexist_and_flush_inde
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(timeout_and_scan, ARRAY_SIZE(timeout_and_scan));
 
-    CHECK(key_runtime_scenario_effect_count() == 2);
+    CHECK(key_runtime_scenario_effect_count() == 4);
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_TAP_ACTION);
     CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).row == 1);
     CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).col == 1);
-    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK(key_runtime_scenario_effect_at(1)->data.delayed_action.action == TEST_TAP_ACTION_TWO);
-    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(1)).row == 1);
-    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(1)).col == 3);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(key_runtime_scenario_effect_at(2)->data.delayed_action.action == TEST_TAP_ACTION_TWO);
+    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(2)).row == 1);
+    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(2)).col == 3);
+    CHECK(key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(key_runtime_scenario_effect_at(3)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
 }
 
@@ -396,7 +468,7 @@ static void test_immediate_hold_promotes_long_hold_after_registration(void) {
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
     CHECK(key_runtime_scenario_effect_at(0)->data.held_action.action == TEST_HOLD_ACTION);
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(!key_runtime_scenario_effect_at(1)->data.feedback_pulse.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_HOLD);
     CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
     CHECK(key_runtime_scenario_effect_at(2)->data.key_pos.row == 0);
     CHECK(key_runtime_scenario_effect_at(2)->data.key_pos.col == 3);
@@ -405,7 +477,7 @@ static void test_immediate_hold_promotes_long_hold_after_registration(void) {
     CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(3)).row == 0);
     CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(3)).col == 3);
     CHECK(key_runtime_scenario_effect_at(4)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(key_runtime_scenario_effect_at(4)->data.feedback_pulse.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(4)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_LONG_HOLD);
     CHECK(key_runtime_scenario_slot_hold_is_complete(test_keypos(0, 3)));
     CHECK(key_runtime_scenario_slot_held_action_keycode(test_keypos(0, 3)) == KC_NO);
 }
@@ -434,7 +506,7 @@ static void test_threshold_hold_then_long_hold_with_intermediate_scans_promotes_
     CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(2)).row == 0);
     CHECK(key_runtime_effect_dispatch_action_key_pos(key_runtime_scenario_effect_at(2)).col == 4);
     CHECK(key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(key_runtime_scenario_effect_at(3)->data.feedback_pulse.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(3)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_LONG_HOLD);
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(0, 4)) == KC_NO);
     CHECK(key_runtime_scenario_slot_held_action_keycode(test_keypos(0, 4)) == KC_NO);
 }
@@ -477,11 +549,11 @@ static void test_double_tap_hold_can_toggle_same_layer_lock_twice(void) {
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK(key_runtime_scenario_effect_at(0)->data.action == LOCK_LAYER(TEST_NUM_LAYER));
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_LONG_HOLD);
     CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK(key_runtime_scenario_effect_at(2)->data.action == LOCK_LAYER(TEST_NUM_LAYER));
     CHECK(key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(key_runtime_scenario_effect_at(3)->data.feedback_pulse.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(3)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_LONG_HOLD);
     CHECK(!key_runtime_scenario_layer_locked(TEST_NUM_LAYER));
     CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(4, 2)));
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(4, 2)) == KC_NO);
@@ -521,7 +593,7 @@ static void test_repeat_hold_with_intermediate_scans_starts_once_and_releases_on
     CHECK(key_runtime_scenario_effect_at(0)->data.repeat.key_pos.row == 6);
     CHECK(key_runtime_scenario_effect_at(0)->data.repeat.key_pos.col == 0);
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(!key_runtime_scenario_effect_at(1)->data.feedback_pulse.long_hold_level);
+    CHECK(key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_HOLD);
     CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
     CHECK(key_runtime_scenario_effect_at(2)->data.key_pos.row == 6);
     CHECK(key_runtime_scenario_effect_at(2)->data.key_pos.col == 0);
@@ -573,6 +645,9 @@ static void test_pd_mode_hold_with_intermediate_scan_does_not_toggle_lock(void) 
 
 int main(void) {
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();
+    test_base_tap_commit_feedback_can_be_suppressed();
+    test_non_base_tap_commit_feedback_still_pulses();
+    test_non_base_release_resolved_tap_commit_feedback_still_pulses();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();
     test_press_on_other_handled_position_keeps_foreign_pending_multi_tap_until_timeout();

@@ -246,6 +246,9 @@ Shared semantics:
 
 - multi-tap pending can show a brief pending color while the engine waits for
   more taps
+- committed tap branches can pulse once after the tap output resolves; the
+  authored RGB config can disable those pulses, limit them to double-tap and
+  higher branches, or allow them for every tap branch
 - pending momentary-layer holds can preview the target layer's authored color
   and LED groups before that layer actually commits
 - unresolved hold windows can show the hold color while the action is still
@@ -255,6 +258,8 @@ Shared semantics:
   active while the action remains registered
 - held layer-switch actions use preview and active layer color instead of a
   pulse or hold overlay
+- layer and pointing-device state taps stay on their layer/PD overlays instead
+  of also emitting tap-commit feedback
 
 For the full RGB authoring model, render order, and configuration surface, see
 [RGB_CONFIG.md](./RGB_CONFIG.md).

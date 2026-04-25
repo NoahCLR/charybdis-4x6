@@ -13,7 +13,7 @@
   <g transform="rotate(0 65.0 201.0)">
     <rect x="36.0" y="172.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="65.0" y="205.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">ESC</text>
-    <circle cx="72.0" cy="182.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
+    <circle cx="72.0" cy="182.0" r="5.5" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.5"/>
     <circle cx="84.0" cy="182.0" r="5.5" fill="#0084ff" stroke="#f7f7f4" stroke-width="1.5"/>
   </g>
   <g transform="rotate(0 131.0 201.0)">
@@ -113,7 +113,7 @@
   <g transform="rotate(0 65.0 329.0)">
     <rect x="36.0" y="300.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="65.0" y="333.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LSFT</text>
-    <circle cx="84.0" cy="310.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
+    <circle cx="84.0" cy="310.0" r="5.5" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.5"/>
   </g>
   <g transform="rotate(0 131.0 329.0)">
     <rect x="102.0" y="300.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -130,7 +130,7 @@
   <g transform="rotate(0 329.0 289.0)">
     <rect x="300.0" y="260.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="329.0" y="293.0" fill="#f7f7f4" fill-opacity="1.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">ESC</text>
-    <circle cx="336.0" cy="270.0" r="5.5" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.5"/>
+    <circle cx="336.0" cy="270.0" r="5.5" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.5"/>
     <circle cx="348.0" cy="270.0" r="5.5" fill="#0084ff" stroke="#f7f7f4" stroke-width="1.5"/>
   </g>
   <g transform="rotate(0 395.0 289.0)">

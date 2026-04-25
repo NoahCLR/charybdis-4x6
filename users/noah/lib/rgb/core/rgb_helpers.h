@@ -19,6 +19,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "../../key/runtime/feedback_kind.h"
 #include "../../pointing/defs/pd_mode_flags.h"
 
 #if __has_include("color.h")
@@ -78,14 +79,17 @@ typedef struct {
 } combo_feedback_led_group_t;
 
 typedef struct {
-    hsv_t          multi_tap_pending_color;
-    hsv_t          hold_active_color;
-    hsv_t          long_hold_active_color;
-    rgb_locality_t locality;
+    hsv_t                          multi_tap_pending_color;
+    hsv_t                          tap_committed_color;
+    hsv_t                          hold_active_color;
+    hsv_t                          long_hold_active_color;
+    key_feedback_tap_commit_mode_t tap_commit_mode;
+    rgb_locality_t                 locality;
 } key_behavior_feedback_color_config_t;
 
 typedef enum {
     KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING = 0,
+    KEY_FEEDBACK_GROUP_TAP_COMMITTED,
     KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
     KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
 } key_behavior_feedback_group_semantic_t;

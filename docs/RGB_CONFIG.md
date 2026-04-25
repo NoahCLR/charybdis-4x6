@@ -322,6 +322,8 @@ In `rgb_config.c`, declare `key_behavior_feedback_colors` directly:
 ```c
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(0, 0, 150),
+    .tap_committed_color     = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .tap_commit_mode         = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
     .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .locality                = RGB_KEY_HALF,
@@ -332,9 +334,19 @@ Those rows populate the shared
 `key_behavior_feedback_colors` config object:
 
 - `multi_tap_pending_color`
+- `tap_committed_color`
+- `tap_commit_mode`
 - `hold_active_color`
 - `long_hold_active_color`
 - `locality`
+
+The `tap_commit_mode` field controls which committed tap branches pulse with
+`tap_committed_color`:
+
+- `KEY_FEEDBACK_TAP_COMMIT_OFF`: disable tap-commit pulses
+- `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`: pulse only for double-tap and
+  higher tap branches; the base single-tap branch stays quiet
+- `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS`: pulse for every committed tap branch
 
 The `locality` field controls where the overlay paints:
 
@@ -355,6 +367,7 @@ the live runtime footprint, not a static guess from authored combo comments.
 In the shared runtime, those colors are used for these categories:
 
 - multi-tap pending: the engine is waiting to see whether more taps arrive
+- tap committed: an authored tap branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
 - hold trigger: a hold-tier action has just fired
 - long-hold trigger: a longer-hold tier action has just fired
@@ -363,12 +376,15 @@ In the shared runtime, those colors are used for these categories:
 
 The tier decides the color:
 
+- tap commits allowed by `tap_commit_mode` use `tap_committed_color`, except
+  layer and PD-mode state actions stay quiet because their layer/PD overlays
+  are the persistent feedback
 - `.hold` surfaces use `hold_active_color`
 - `.long_hold` surfaces use `long_hold_active_color`
 
 Pending momentary-layer previews are a separate overlay path. They reuse the
 previewed layer's authored layer color and any matching layer LED groups
-instead of these three feedback colors.
+instead of these feedback colors.
 
 The helper decides the RGB behavior shape:
 
@@ -403,6 +419,8 @@ Each row chooses a semantic category:
 
 - `KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING`: visible while multi-tap resolution is
   pending
+- `KEY_FEEDBACK_GROUP_TAP_COMMITTED`: visible while the tap-commit pulse is
+  active
 - `KEY_FEEDBACK_GROUP_HOLD_ACTIVE`: visible for hold pending, steady hold, and
   flashing hold states
 - `KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE`: visible for steady and flashing
@@ -417,6 +435,7 @@ Use rows like:
 ```c
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
+    { .semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
 );
@@ -484,7 +503,8 @@ Examples:
 
 [`users/noah/lib/rgb/core/rgb_config_helpers.h`](../users/noah/lib/rgb/core/rgb_config_helpers.h)
 defines `HSV(...)`, `RGB_LED_GROUP(...)`, `RGB_LED_GROUP_TABLE(...)`, and
-`MATERIALIZE_RGB_CONFIG()` for authored RGB tables.
+`MATERIALIZE_RGB_CONFIG()` for authored RGB tables and the small runtime
+bridges derived from RGB feedback config.
 
 `rgb_helpers.h` also provides split-safe helper functions such as:
 

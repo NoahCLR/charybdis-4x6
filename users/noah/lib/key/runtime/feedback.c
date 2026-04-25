@@ -59,16 +59,28 @@ static void key_feedback_apply_semantic_for_owner(uint8_t *semantic_map, keypos_
     key_feedback_apply_semantic_to_bitmap(semantic_map, bitmap, semantic);
 }
 
-void key_feedback_pulse_arm(bool long_hold_level) {
+static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {
+    switch (kind) {
+        case KEY_FEEDBACK_PULSE_TAP_COMMITTED:
+            return KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED;
+        case KEY_FEEDBACK_PULSE_LONG_HOLD:
+            return KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY;
+        case KEY_FEEDBACK_PULSE_HOLD:
+        default:
+            return KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY;
+    }
+}
+
+void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 
     if (!state) {
         return;
     }
 
-    state->feedback_pulse_timer           = timer_read();
-    state->feedback_pulse_active          = true;
-    state->feedback_pulse_long_hold_level = long_hold_level;
+    state->feedback_pulse_timer  = timer_read();
+    state->feedback_pulse_active = true;
+    state->feedback_pulse_kind   = kind;
 }
 
 static bool key_feedback_pulse_active(void) {
@@ -245,7 +257,7 @@ void key_feedback_semantic_map(uint8_t *out_map) {
     key_feedback_semantic_map_clear(out_map);
 
     if (key_feedback_pulse_active() && state && key_origin_keypos_valid(state->feedback_pulse_key_pos)) {
-        key_feedback_apply_semantic_for_owner(out_map, state->feedback_pulse_key_pos, state->feedback_pulse_long_hold_level ? KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY : KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY);
+        key_feedback_apply_semantic_for_owner(out_map, state->feedback_pulse_key_pos, key_feedback_semantic_for_pulse(state->feedback_pulse_kind));
     }
 
     for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {

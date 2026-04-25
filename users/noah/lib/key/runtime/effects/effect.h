@@ -15,6 +15,7 @@
 #include "../../../pointing/defs/pd_mode_flags.h"
 #include "../keypos_codec.h"
 #include "../delayed_action.h"
+#include "../feedback_kind.h"
 
 typedef enum {
     KEY_RUNTIME_EFFECT_NONE = 0,
@@ -53,8 +54,8 @@ typedef struct {
             uint8_t  layer;
         } layer_press;
         struct {
-            keypos_t key_pos;
-            bool     long_hold_level;
+            keypos_t                  key_pos;
+            key_feedback_pulse_kind_t kind;
         } feedback_pulse;
         struct {
             pd_mode_mask_t pd_mode;

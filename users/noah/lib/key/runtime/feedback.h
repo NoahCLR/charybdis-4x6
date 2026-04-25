@@ -18,6 +18,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "feedback_kind.h"
 #include "origin_registry.h"
 
 #ifndef KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS
@@ -35,6 +36,7 @@ typedef enum {
     KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY,
     KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING,
     KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING,
+    KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED,
 } key_feedback_semantic_t;
 
 #define KEY_FEEDBACK_FLASH_META_PHASE (1u << 0)
@@ -145,4 +147,4 @@ void    key_feedback_semantic_map(uint8_t *out_map);
 uint8_t key_feedback_preview_layer(void);
 void    combo_feedback_underlay_bitmap(uint8_t *out_bitmap);
 void    combo_feedback_overlay_bitmap(uint8_t *out_bitmap);
-void    key_feedback_pulse_arm(bool long_hold_level);
+void    key_feedback_pulse_arm(key_feedback_pulse_kind_t kind);

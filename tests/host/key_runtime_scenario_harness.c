@@ -49,6 +49,7 @@ static key_runtime_scenario_pd_mode_entry_t  key_runtime_scenario_pd_modes[KEY_R
 static uint8_t                               key_runtime_scenario_pd_mode_count;
 static layer_state_t                         key_runtime_scenario_locked_layers;
 static pd_mode_mask_t                        key_runtime_scenario_pd_locked_modes;
+static key_feedback_tap_commit_mode_t        key_runtime_scenario_tap_commit_mode;
 static key_runtime_scenario_effect_t         key_runtime_scenario_effects[KEY_RUNTIME_SCENARIO_MAX_EFFECTS];
 static uint8_t                               key_runtime_scenario_effect_count_value;
 static uint8_t                               key_runtime_scenario_split_sync_count_value;
@@ -130,6 +131,7 @@ void key_runtime_scenario_reset(void) {
     key_runtime_scenario_pd_mode_count          = 0;
     key_runtime_scenario_locked_layers          = 0;
     key_runtime_scenario_pd_locked_modes        = 0;
+    key_runtime_scenario_tap_commit_mode        = KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS;
     key_runtime_scenario_effect_count_value     = 0;
     key_runtime_scenario_split_sync_count_value = 0;
 
@@ -232,6 +234,14 @@ void key_runtime_scenario_set_pd_locked_modes(pd_mode_mask_t modes) {
 
 void key_runtime_scenario_set_hold_survives_flush(bool survives_flush) {
     key_runtime_scenario_hold_survives_flush = survives_flush;
+}
+
+void key_runtime_scenario_set_tap_commit_mode(key_feedback_tap_commit_mode_t mode) {
+    key_runtime_scenario_tap_commit_mode = mode;
+}
+
+key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {
+    return key_runtime_scenario_tap_commit_mode;
 }
 
 void key_runtime_scenario_run(const key_runtime_scenario_step_t *steps, uint8_t step_count) {
@@ -649,12 +659,12 @@ void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_poli
     memset(out, 0, sizeof(*out));
 }
 
-void key_feedback_pulse_arm(bool long_hold_level) {
+void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
         .data.feedback_pulse =
             {
-                .long_hold_level = long_hold_level,
+                .kind = kind,
             },
     });
 }

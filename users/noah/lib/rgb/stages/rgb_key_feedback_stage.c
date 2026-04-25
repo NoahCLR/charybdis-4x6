@@ -17,6 +17,7 @@ extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 
 static rgb_t key_behavior_feedback_multi_tap_pending_rgb;
+static rgb_t key_behavior_feedback_tap_committed_rgb;
 static rgb_t key_behavior_feedback_hold_active_rgb;
 static rgb_t key_behavior_feedback_long_hold_active_rgb;
 
@@ -26,6 +27,7 @@ static rgb_t key_behavior_feedback_long_hold_active_rgb;
 
 void rgb_runtime_key_feedback_stage_post_init(void) {
     key_behavior_feedback_multi_tap_pending_rgb = hsv_to_rgb(key_behavior_feedback_colors.multi_tap_pending_color);
+    key_behavior_feedback_tap_committed_rgb     = hsv_to_rgb(key_behavior_feedback_colors.tap_committed_color);
     key_behavior_feedback_hold_active_rgb       = hsv_to_rgb(key_behavior_feedback_colors.hold_active_color);
     key_behavior_feedback_long_hold_active_rgb  = hsv_to_rgb(key_behavior_feedback_colors.long_hold_active_color);
 }
@@ -70,6 +72,9 @@ static bool rgb_runtime_key_feedback_stage_semantic_color(key_feedback_semantic_
         case KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING:
             *out_color = key_behavior_feedback_multi_tap_pending_rgb;
             return true;
+        case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
+            *out_color = key_behavior_feedback_tap_committed_rgb;
+            return true;
         case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
         case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY:
         case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
@@ -94,6 +99,8 @@ static bool rgb_runtime_key_feedback_stage_group_semantic_matches(key_behavior_f
     switch (group_semantic) {
         case KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING:
             return semantic == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING;
+        case KEY_FEEDBACK_GROUP_TAP_COMMITTED:
+            return semantic == KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED;
         case KEY_FEEDBACK_GROUP_HOLD_ACTIVE:
             return semantic == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING || semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY || semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING;
         case KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE:

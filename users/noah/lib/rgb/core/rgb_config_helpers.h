@@ -60,8 +60,13 @@
 #endif
 
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+#    define _RGB_KEY_BEHAVIOR_FEEDBACK_POLICY_DATA()                           \
+        key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {    \
+            return key_behavior_feedback_colors.tap_commit_mode;               \
+        }
 #    define _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA() EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #else
+#    define _RGB_KEY_BEHAVIOR_FEEDBACK_POLICY_DATA()
 #    define _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA()
 #endif
 
@@ -69,5 +74,6 @@
     _RGB_PD_MODE_COLOR_COUNT_DATA()                                             \
     _RGB_PD_MODE_LED_GROUP_DATA()                                               \
     _RGB_COMBO_FEEDBACK_LED_GROUP_DATA()                                        \
+    _RGB_KEY_BEHAVIOR_FEEDBACK_POLICY_DATA()                                    \
     _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA()                                 \
     EXPORT_LAYER_LED_GROUP_TABLE(layer_led_groups_data)

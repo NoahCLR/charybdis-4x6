@@ -6,6 +6,7 @@
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/interaction/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/effects/effect.h"
+#include "users/noah/lib/key/runtime/feedback_kind.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 
 typedef key_runtime_effect_t key_runtime_scenario_effect_t;
@@ -75,6 +76,7 @@ void                key_runtime_scenario_add_pd_mode(uint16_t keycode, pd_mode_m
 void                key_runtime_scenario_define_pd_mode_key(uint16_t keycode, pd_mode_mask_t mode, bool locked);
 void                key_runtime_scenario_set_pd_locked_modes(pd_mode_mask_t modes);
 void                key_runtime_scenario_set_hold_survives_flush(bool survives_flush);
+void                key_runtime_scenario_set_tap_commit_mode(key_feedback_tap_commit_mode_t mode);
 void                key_runtime_scenario_run(const key_runtime_scenario_step_t *steps, uint8_t step_count);
 bool                key_runtime_scenario_layer_locked(uint8_t layer);
 uint16_t            key_runtime_scenario_slot_owner_keycode(keypos_t key_pos);

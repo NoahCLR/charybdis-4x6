@@ -18,6 +18,7 @@
 
 #include "../../interaction/handled_key.h"
 #include "../keypos_codec.h"
+#include "../feedback_kind.h"
 #include "../effects/effect_queue.h"
 #include "../interaction.h"
 #include "../../../pointing/defs/pd_mode_flags.h"
@@ -126,19 +127,25 @@ typedef struct {
 
 _Static_assert(sizeof(key_runtime_core_effect_plan_t) <= 196u, "key_runtime_core_effect_plan_t must stay within the approved stack budget");
 
+typedef enum {
+    KEY_RUNTIME_PENDING_RELEASE_FLAG_ACTIVE              = (1u << 0),
+    KEY_RUNTIME_PENDING_RELEASE_FLAG_TAP_COMMIT_FEEDBACK = (1u << 1),
+} key_runtime_pending_release_flag_t;
+
 typedef struct {
-    bool                        active;
-    key_runtime_packed_keypos_t packed_key_pos;
     uint16_t                    owner_token_id;
     uint16_t                    sequence;
     uint16_t                    action;
     keyboard_mod_state_t        mods;
+    key_runtime_packed_keypos_t packed_key_pos;
+    uint8_t                     flags;
 } pending_release_slot_t;
 
 _Static_assert(sizeof(pending_release_slot_t) <= 12u, "pending_release_slot_t must stay compact");
 
 typedef struct {
     bool                 active;
+    bool                 tap_commit_feedback;
     uint16_t             owner_token_id;
     uint16_t             sequence;
     keypos_t             key_pos;
@@ -282,7 +289,7 @@ typedef struct {
     uint8_t                              cancelled_press_count;
     uint16_t                             feedback_pulse_timer;
     bool                                 feedback_pulse_active;
-    bool                                 feedback_pulse_long_hold_level;
+    key_feedback_pulse_kind_t            feedback_pulse_kind;
     keypos_t                             feedback_pulse_key_pos;
     uint16_t                             preview_display_bridge_started_at;
     uint8_t                              preview_display_last_semantic_layer;
@@ -310,7 +317,7 @@ bool                                        key_runtime_core_blocker_queries_aut
 bool                                        key_runtime_core_has_any_deferred_release_blocker(void);
 bool                                        key_runtime_core_has_foreign_deferred_release_blocker_except(keypos_t key_pos);
 uint8_t                                     key_runtime_core_pending_release_count(void);
-bool                                        key_runtime_core_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
+bool                                        key_runtime_core_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback);
 bool                                        key_runtime_core_pending_release_at_order(uint8_t order, pending_release_t *out);
 uint8_t                                     key_runtime_core_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity);
 void                                        key_runtime_core_project_effect(const key_runtime_effect_t *effect);

@@ -241,8 +241,8 @@ The runtime supports:
 
 With the default feedback stages enabled, RGB is not just there to look nice.
 It tells you what layer is active, which pointing mode is live, which combos
-are currently held, and when the key-behavior engine is waiting, previewing,
-or actively holding.
+are currently held, and when the key-behavior engine is waiting, committing a
+tap, previewing, or actively holding.
 
 For the full RGB authoring model, see
 [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md).

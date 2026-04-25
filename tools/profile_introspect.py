@@ -915,6 +915,15 @@ def key_behavior_feedback_locality_description(locality: str) -> str:
     return descriptions.get(locality, "Unknown key-behavior feedback RGB locality.")
 
 
+def key_behavior_feedback_tap_commit_mode_description(mode: str) -> str:
+    descriptions = {
+        "KEY_FEEDBACK_TAP_COMMIT_OFF": "Do not pulse when authored tap branches commit.",
+        "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS": "Pulse only for double-tap and higher tap branches; the base single-tap branch stays quiet.",
+        "KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS": "Pulse for every authored tap branch that commits.",
+    }
+    return descriptions.get(mode, "Unknown key-behavior tap-commit feedback mode.")
+
+
 def parse_key_behavior_feedback_locality(raw_text: str) -> dict[str, object] | None:
     try:
         body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
@@ -931,6 +940,25 @@ def parse_key_behavior_feedback_locality(raw_text: str) -> dict[str, object] | N
         "locality": normalized_locality,
         "label": humanize_identifier(normalized_locality.removeprefix("RGB_")),
         "meaning": key_behavior_feedback_locality_description(normalized_locality),
+    }
+
+
+def parse_key_behavior_feedback_tap_commit_mode(raw_text: str) -> dict[str, object] | None:
+    try:
+        body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
+    except SystemExit:
+        return None
+
+    fields = parse_designated_fields(strip_comments(body))
+    mode = fields.get(".tap_commit_mode")
+    if mode is None:
+        return None
+
+    normalized_mode = normalize_expr(mode)
+    return {
+        "mode": normalized_mode,
+        "label": humanize_identifier(normalized_mode.removeprefix("KEY_FEEDBACK_TAP_COMMIT_")),
+        "meaning": key_behavior_feedback_tap_commit_mode_description(normalized_mode),
     }
 
 
@@ -1421,6 +1449,9 @@ def build_profile_model() -> dict[str, object]:
     key_behavior_feedback_locality = (
         parse_key_behavior_feedback_locality(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
     )
+    key_behavior_feedback_tap_commit_mode = (
+        parse_key_behavior_feedback_tap_commit_mode(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
+    )
     key_behavior_feedback_led_groups = (
         parse_exported_rgb_led_groups(
             rgb_config_raw_text,
@@ -1486,6 +1517,7 @@ def build_profile_model() -> dict[str, object]:
             "combo_feedback_led_groups": combo_feedback_led_groups,
             "automouse_fade_end_config": automouse_fade_end_config,
             "key_behavior_feedback_locality": key_behavior_feedback_locality,
+            "key_behavior_feedback_tap_commit_mode": key_behavior_feedback_tap_commit_mode,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
             "key_behavior_feedback_led_groups": key_behavior_feedback_led_groups,
         },
@@ -1572,6 +1604,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
     automouse_fade_end_config = rgb["automouse_fade_end_config"]
     combo_feedback_locality = rgb["combo_feedback_locality"]
     feedback_locality = rgb["key_behavior_feedback_locality"]
+    tap_commit_mode = rgb["key_behavior_feedback_tap_commit_mode"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
@@ -1613,6 +1646,11 @@ def render_reference_section(profile: dict[str, object]) -> str:
             f"- Key-behavior feedback locality: `{feedback_locality['locality']}`"
             if feedback_locality is not None
             else "- Key-behavior feedback locality: `not authored`",
+        )
+        lines.append(
+            f"- Key-behavior tap-commit feedback: `{tap_commit_mode['mode']}`"
+            if tap_commit_mode is not None
+            else "- Key-behavior tap-commit feedback: `not authored`",
         )
     if features["rgb_combo_feedback_enabled"]:
         lines.append(
@@ -1709,7 +1747,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
     if features["rgb_key_behavior_feedback_enabled"] and profile["rgb"]["key_behavior_feedback_colors"]:
         lines.insert(
             10,
-            f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show numbered activity dots derived from the authored key-behavior feedback colors in {rgb_link}: white for authored tap actions, orange for authored hold tiers, and cyan for authored long-hold tiers",
+            f"- Keys with authored `key_behaviors[]` rows in {keymap_link} show numbered activity dots derived from the authored key-behavior feedback colors in {rgb_link}: tap-commit color for authored tap actions, hold color for authored hold tiers, and long-hold color for authored long-hold tiers",
         )
     for layer in profile["layers"]:
         color_config = layer_color_map[layer["name"]]
@@ -2112,7 +2150,7 @@ def resolve_behavior_indicator_preview_colors(profile: dict[str, object]) -> dic
         return None
 
     return {
-        "tap": feedback_preview_color({"multi", "tap"}),
+        "tap": feedback_preview_color({"tap", "committed"}) or feedback_preview_color({"multi", "tap"}),
         "hold": feedback_preview_color({"hold"}, {"long"}),
         "long_hold": feedback_preview_color({"long", "hold"}),
     }
@@ -2437,6 +2475,7 @@ def render_key_behavior_section(profile: dict[str, object]) -> str:
 def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
     feedback_colors = profile["rgb"]["key_behavior_feedback_colors"]
     feedback_locality = profile["rgb"]["key_behavior_feedback_locality"]
+    tap_commit_mode = profile["rgb"]["key_behavior_feedback_tap_commit_mode"]
     feedback_groups = profile["rgb"]["key_behavior_feedback_led_groups"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     lines = [
@@ -2472,6 +2511,20 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
                 f"| `RGB_RIGHT_HALF` | {key_behavior_feedback_locality_description('RGB_RIGHT_HALF')} |",
                 f"| `RGB_KEY_HALF` | {key_behavior_feedback_locality_description('RGB_KEY_HALF')} |",
                 f"| `RGB_KEYS_ONLY` | {key_behavior_feedback_locality_description('RGB_KEYS_ONLY')} |",
+                "",
+            ]
+        )
+
+    if tap_commit_mode is not None:
+        lines.extend(
+            [
+                f"Current authored tap-commit feedback mode: `{tap_commit_mode['mode']}`.",
+                "",
+                "| Available Tap-Commit Mode | Meaning |",
+                "| --- | --- |",
+                f"| `KEY_FEEDBACK_TAP_COMMIT_OFF` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_OFF')} |",
+                f"| `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS')} |",
+                f"| `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS')} |",
                 "",
             ]
         )

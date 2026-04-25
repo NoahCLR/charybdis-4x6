@@ -243,6 +243,8 @@ static test_release_summary_t test_release_summary_from_effects(const char *case
                 CHECK_CASE(case_name, !summary.release_owned_state);
                 summary.release_owned_state = true;
                 break;
+            case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
+                break;
             default:
                 test_case_fail(case_name, "unexpected effect kind in release summary", __FILE__, __LINE__);
         }
@@ -594,9 +596,11 @@ static void test_release_with_live_held_sibling_dispatches_immediately(void) {
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_RELEASE_PRIMARY);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
 }
 
@@ -635,11 +639,15 @@ static void test_release_dispatch_is_deferred_until_tap_release_sibling_clears(v
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_sibling_and_scan, ARRAY_SIZE(release_sibling_and_scan));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 4);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.delayed_action.action == TEST_RELEASE_PRIMARY);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(2)->data.delayed_action.action == TEST_RELEASE_PRIMARY);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(3)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK_CASE(case_name, noah_runtime_debug_deferred_release_count() == 0u);
 }
 
@@ -671,11 +679,15 @@ static void test_release_dispatch_drains_when_last_blocker_clears_on_release(voi
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_sibling, ARRAY_SIZE(release_sibling));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 4);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.delayed_action.action == TEST_RELEASE_PRIMARY);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(2)->data.delayed_action.action == TEST_RELEASE_PRIMARY);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(3)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == KC_NO);
 }
 
@@ -708,11 +720,15 @@ static void test_release_dispatch_drains_after_sibling_delayed_action_in_same_sc
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_sibling_and_scan, ARRAY_SIZE(release_sibling_and_scan));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 4);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_RELEASE_PRIMARY);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.delayed_action.action == TEST_SIBLING_TAP_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(2)->data.delayed_action.action == TEST_SIBLING_TAP_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(3)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(3)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == KC_NO);
     CHECK_CASE(case_name, !key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 2)));
 }
@@ -751,9 +767,11 @@ static void test_release_with_live_tap_release_sibling_keeps_owned_cleanup_immed
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(clear_sibling_steps, ARRAY_SIZE(clear_sibling_steps));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 }
 
 static void test_release_with_live_tap_release_sibling_splits_owned_cleanup_and_deferred_action(void) {
@@ -787,11 +805,13 @@ static void test_release_with_live_tap_release_sibling_splits_owned_cleanup_and_
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(clear_sibling_steps, ARRAY_SIZE(clear_sibling_steps));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 3);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.delayed_action.action == TEST_RELEASE_LONG);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(2)->data.delayed_action.action == TEST_RELEASE_LONG);
 }
 
 static void test_release_with_live_tap_release_sibling_keeps_layer_release_immediate(void) {
@@ -826,9 +846,11 @@ static void test_release_with_live_tap_release_sibling_keeps_layer_release_immed
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(clear_sibling_steps, ARRAY_SIZE(clear_sibling_steps));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 }
 
 static void test_release_with_interrupted_layer_tap_sibling_dispatches_immediately(void) {
@@ -850,9 +872,11 @@ static void test_release_with_interrupted_layer_tap_sibling_dispatches_immediate
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_RELEASE_PRIMARY);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == sibling_layer_tap_key);
 }
@@ -895,9 +919,11 @@ static void test_release_with_interrupted_pd_mode_press_keeps_lock_tap_immediate
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(clear_sibling_steps, ARRAY_SIZE(clear_sibling_steps));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 }
 
 static void test_pending_multi_tap_release_with_live_tap_release_sibling_keeps_held_lifecycle_immediate(void) {
@@ -932,9 +958,11 @@ static void test_pending_multi_tap_release_with_live_tap_release_sibling_keeps_h
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(clear_sibling_steps, ARRAY_SIZE(clear_sibling_steps));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 }
 
 int main(void) {
