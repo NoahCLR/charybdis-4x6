@@ -937,10 +937,26 @@ def parse_exported_rgb_led_groups(
     led_group_macros = parse_rgb_led_group_macros(raw_text)
     table_export_macro = export_macro.removesuffix("S") + "_TABLE" if export_macro.endswith("S") else f"{export_macro}_TABLE"
     export_match = re.search(rf"\b(?:{re.escape(export_macro)}|{re.escape(table_export_macro)})\s*\(\s*(?P<table>[A-Za-z_][A-Za-z0-9_]*)\s*\)", text)
-    if export_match is None:
+    if export_match is not None:
+        table_name = export_match.group("table")
+    elif re.search(r"\bMATERIALIZE_RGB_CONFIG\s*\(\s*\)", text):
+        materialized_tables = {
+            "EXPORT_LAYER_LED_GROUPS": "layer_led_groups_data",
+            "EXPORT_LAYER_LED_GROUP_TABLE": "layer_led_groups_data",
+            "EXPORT_PD_MODE_LED_GROUPS": "pd_mode_led_groups_data",
+            "EXPORT_PD_MODE_LED_GROUP_TABLE": "pd_mode_led_groups_data",
+            "EXPORT_COMBO_FEEDBACK_LED_GROUPS": "combo_feedback_led_groups_data",
+            "EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE": "combo_feedback_led_groups_data",
+            "EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS": "key_behavior_feedback_led_groups_data",
+            "EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE": "key_behavior_feedback_led_groups_data",
+        }
+        table_name = materialized_tables.get(export_macro)
+        if table_name is None:
+            table_name = materialized_tables.get(table_export_macro)
+        if table_name is None:
+            return []
+    else:
         return []
-
-    table_name = export_match.group("table")
     try:
         body = extract_initializer_body(text, rf"\b{re.escape(table_name)}\[\]\s*=")
     except SystemExit:

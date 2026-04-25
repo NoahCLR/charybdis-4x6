@@ -116,7 +116,8 @@ None.
   key-feedback group rows use the shared `.led_group` field backed by
   `rgb_led_group_t`; profile authors can define reusable physical
   `RGB_LED_GROUP_*` macros below the LED map and reuse them across stages.
-  Code references:
+  `MATERIALIZE_RGB_CONFIG()` at the bottom of `rgb_config.c` centralizes the
+  runtime exports and derived counts. Code references:
   `users/noah/lib/rgb/core/rgb_helpers.h`,
   `users/noah/lib/rgb/core/rgb_config_defaults.c`,
   `users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c`,
@@ -150,7 +151,7 @@ None.
 - The authored RGB surface is broad enough for this firmware: layer all keys
   vs mapped-only, shared `.led_group` LED groups for layer/PD/combo/key
   feedback, reusable physical `RGB_LED_GROUP_*` names under the LED map,
-  auto-mouse fade destination modes, shared
+  bottom-of-file RGB materialization, auto-mouse fade destination modes, shared
   `rgb_locality_t` placement for pointing-mode, combo-feedback, and
   key-feedback overlays, pointing-mode LED groups, and diagnostic override
   color are all present.

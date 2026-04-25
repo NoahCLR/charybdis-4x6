@@ -480,12 +480,10 @@ No required checks were skipped.
 ### Combo And Key-Feedback LED Groups
 
 - Added authored LED group support to combo feedback with
-  `combo_feedback_led_group_t` and
-  `EXPORT_COMBO_FEEDBACK_LED_GROUPS(...)`.
+  `combo_feedback_led_group_t`.
 - Added authored LED group support to key-behavior feedback with
   `key_behavior_feedback_led_group_t`,
-  `key_behavior_feedback_group_semantic_t`, and
-  `EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(...)`.
+  `key_behavior_feedback_group_semantic_t`.
 - Kept the group rendering rule consistent with existing layer and PD groups:
   render the normal locality/color first, then repaint matching custom LED
   groups last inside that substage.
@@ -528,9 +526,8 @@ No required checks were skipped.
 - Replaced the reusable physical LED arrays with inline
   `.led_group = RGB_LED_GROUP(...)` authoring inside each stage-specific LED
   group table.
-- Added `RGB_LED_GROUP_TABLE_END` plus `EXPORT_*_LED_GROUP_TABLE(...)` helpers
-  so empty LED group tables can stay materialized with only individual rows
-  commented out.
+- Added `RGB_LED_GROUP_TABLE_END` so empty LED group tables can stay
+  materialized with only individual rows commented out.
 - Tightened the sentinel to a designated `.led_group = {.count = 0}`
   initializer after the firmware compile caught QMK's `-Wmissing-braces`
   warning policy.
@@ -540,6 +537,9 @@ No required checks were skipped.
 - Added reusable physical `RGB_LED_GROUP_*` definitions under the LED map so
   stage rows can name groups like `RGB_LED_GROUP_TRACKBALL` instead of
   repeating LED indices.
+- Added `MATERIALIZE_RGB_CONFIG()` at the bottom of `rgb_config.c` so runtime
+  exports and derived counts are no longer scattered after each authored
+  table.
 - Kept the optional layer, PD-mode, combo feedback, and key-behavior feedback
   render-table examples in their own feature sections.
 - Clarified the feature sections so each LED group surface has a visible

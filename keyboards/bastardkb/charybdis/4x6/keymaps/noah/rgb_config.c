@@ -104,7 +104,6 @@ static const layer_led_group_t layer_led_groups_data[] = {
     // { .layer = LAYER_SYM, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_LEFT_THUMB },
     RGB_LED_GROUP_TABLE_END,
 };
-EXPORT_LAYER_LED_GROUP_TABLE(layer_led_groups_data);
 
 //
 // ─── Auto-mouse timeout fade ────────────────────────────────────────────────
@@ -181,7 +180,6 @@ const pd_mode_color_t pd_mode_colors[] = {
         .locality      = RGB_RIGHT_HALF,
     },
 };
-const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 
 // ─── Pointing-Device Mode LED Groups ────────────────────────────────────────
 //
@@ -194,7 +192,6 @@ static const pd_mode_led_group_t pd_mode_led_groups_data[] = {
     // { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     RGB_LED_GROUP_TABLE_END,
 };
-EXPORT_PD_MODE_LED_GROUP_TABLE(pd_mode_led_groups_data);
 #    endif // POINTING_DEVICE_ENABLE && RGB_PD_MODE_FEEDBACK_ENABLE
 
 // ─── Combo feedback ────────────────────────────────────────────────────────
@@ -234,7 +231,6 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
     // { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     RGB_LED_GROUP_TABLE_END,
 };
-EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 #    endif // COMBO_ENABLE && RGB_COMBO_FEEDBACK_ENABLE
 
 //
@@ -302,7 +298,10 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_
     // { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     RGB_LED_GROUP_TABLE_END,
 };
-EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #    endif // RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+
+// Expand the authored RGB tables and derived counts above into the runtime
+// symbols expected by the userspace RGB runtime.
+MATERIALIZE_RGB_CONFIG();
 
 #endif // RGB_MATRIX_ENABLE

@@ -151,8 +151,8 @@ In `rgb_config.c`, use one of these helper forms:
 
 - leave all row entries commented out when no per-layer LED groups are enabled
 - uncomment or add rows inside `layer_led_groups_data`
-- keep `RGB_LED_GROUP_TABLE_END` as the final row and export with
-  `EXPORT_LAYER_LED_GROUP_TABLE(layer_led_groups_data)`
+- keep `RGB_LED_GROUP_TABLE_END` as the final row; `MATERIALIZE_RGB_CONFIG()`
+  at the bottom exports the table
 
 Each row contains:
 
@@ -209,8 +209,8 @@ later overlays such as pd-mode color or key feedback still paint on top.
 `pd_mode_colors[]` defines the overlay color and locality for each active
 pointing-device mode.
 
-In `rgb_config.c`, declare `pd_mode_colors[]` and `pd_mode_color_count`
-directly.
+In `rgb_config.c`, declare `pd_mode_colors[]`; `MATERIALIZE_RGB_CONFIG()` at
+the bottom derives `pd_mode_color_count`.
 
 Each row is keyed by a `PD_MODE_*` flag rather than by array index. That means
 the color mapping follows the pointing mode itself, not the order of
@@ -251,8 +251,7 @@ Use this when one mode should highlight a very specific LED or cluster, such as
 the trackball LED or one side of the board.
 
 As above, leave row entries commented out when no per-mode LED groups are
-enabled, keep `RGB_LED_GROUP_TABLE_END` as the final row, and export with
-`EXPORT_PD_MODE_LED_GROUP_TABLE(pd_mode_led_groups_data)`.
+enabled and keep `RGB_LED_GROUP_TABLE_END` as the final row.
 
 Use rows like:
 
@@ -314,8 +313,6 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
     { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     RGB_LED_GROUP_TABLE_END,
 };
-
-EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 ```
 
 ### `key_behavior_feedback_colors`
@@ -424,8 +421,6 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_
     { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     RGB_LED_GROUP_TABLE_END,
 };
-
-EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 ```
 
 ## Render Order
@@ -489,8 +484,8 @@ Examples:
 - `pd_mode_led_group_t`
 
 [`users/noah/lib/rgb/core/rgb_config_helpers.h`](../users/noah/lib/rgb/core/rgb_config_helpers.h)
-defines `HSV(...)`, `RGB_LED_GROUP(...)`, `RGB_LED_GROUP_TABLE_END`, and the
-`EXPORT_*_LED_GROUP_TABLE(...)` helpers used by authored LED group tables.
+defines `HSV(...)`, `RGB_LED_GROUP(...)`, `RGB_LED_GROUP_TABLE_END`, and
+`MATERIALIZE_RGB_CONFIG()` for authored RGB tables.
 
 `rgb_helpers.h` also provides split-safe helper functions such as:
 
