@@ -98,12 +98,11 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // act as persistent underlay accents for the layer scene.
 //
 // Uncomment or add rows inside this table to enable layer-specific LED
-// highlights. Keep RGB_LED_GROUP_TABLE_END as the final row.
-static const layer_led_group_t layer_led_groups_data[] = {
+// highlights.
+static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_RIGHT_THUMB },
     // { .layer = LAYER_SYM, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_LEFT_THUMB },
-    RGB_LED_GROUP_TABLE_END,
-};
+);
 
 //
 // ─── Auto-mouse timeout fade ────────────────────────────────────────────────
@@ -187,11 +186,9 @@ const pd_mode_color_t pd_mode_colors[] = {
 // These groups repaint after the active pd-mode locality render.
 //
 // Uncomment or add rows inside this table to enable per-mode LED highlights.
-// Keep RGB_LED_GROUP_TABLE_END as the final row.
-static const pd_mode_led_group_t pd_mode_led_groups_data[] = {
+static const pd_mode_led_group_t pd_mode_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
-    RGB_LED_GROUP_TABLE_END,
-};
+);
 #    endif // POINTING_DEVICE_ENABLE && RGB_PD_MODE_FEEDBACK_ENABLE
 
 // ─── Combo feedback ────────────────────────────────────────────────────────
@@ -226,11 +223,9 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 // underlay/overlay substage is live.
 //
 // Uncomment or add rows inside this table to enable persistent combo accents.
-// Keep RGB_LED_GROUP_TABLE_END as the final row.
-static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
+static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
-    RGB_LED_GROUP_TABLE_END,
-};
+);
 #    endif // COMBO_ENABLE && RGB_COMBO_FEEDBACK_ENABLE
 
 //
@@ -290,14 +285,12 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 // These groups repaint after the feedback locality render when a matching
 // visible semantic category is live.
 //
-// Uncomment or add rows inside this table to enable feedback accents. Keep
-// RGB_LED_GROUP_TABLE_END as the final row.
-static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
+// Uncomment or add rows inside this table to enable feedback accents.
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
-    RGB_LED_GROUP_TABLE_END,
-};
+);
 #    endif // RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 
 // Expand the authored RGB tables and derived counts above into the runtime

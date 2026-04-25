@@ -526,8 +526,9 @@ No required checks were skipped.
 - Replaced the reusable physical LED arrays with inline
   `.led_group = RGB_LED_GROUP(...)` authoring inside each stage-specific LED
   group table.
-- Added `RGB_LED_GROUP_TABLE_END` so empty LED group tables can stay
-  materialized with only individual rows commented out.
+- Added `RGB_LED_GROUP_TABLE(...)` so empty LED group tables can stay
+  materialized with only individual rows commented out, without exposing a
+  sentinel row in `rgb_config.c`.
 - Tightened the sentinel to a designated `.led_group = {.count = 0}`
   initializer after the firmware compile caught QMK's `-Wmissing-braces`
   warning policy.

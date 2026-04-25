@@ -114,8 +114,9 @@ None.
   substage. Key-feedback groups repaint after feedback locality when their
   semantic category is visibly active. All layer, PD-mode, combo, and
   key-feedback group rows use the shared `.led_group` field backed by
-  `rgb_led_group_t`; profile authors can define reusable physical
-  `RGB_LED_GROUP_*` macros below the LED map and reuse them across stages.
+  `rgb_led_group_t`; `RGB_LED_GROUP_TABLE(...)` hides the zero-row sentinel
+  from authored config, and profile authors can define reusable physical
+  `RGB_LED_GROUP_*` macros below the LED map for reuse across stages.
   `MATERIALIZE_RGB_CONFIG()` at the bottom of `rgb_config.c` centralizes the
   runtime exports and derived counts. Code references:
   `users/noah/lib/rgb/core/rgb_helpers.h`,

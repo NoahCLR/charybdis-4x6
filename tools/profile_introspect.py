@@ -481,6 +481,21 @@ def extract_initializer_body(text: str, pattern: str) -> str:
     return text[brace_start + 1 : brace_end]
 
 
+def extract_rgb_led_group_table_body(text: str, table_name: str) -> str:
+    pattern = rf"\b{re.escape(table_name)}\[\]\s*="
+    match = re.search(pattern, text)
+    if not match:
+        die(f"could not find initializer for pattern: {pattern}")
+
+    table_macro_match = re.match(r"\s*RGB_LED_GROUP_TABLE\s*\(", text[match.end() :])
+    if table_macro_match is None:
+        return extract_initializer_body(text, pattern)
+
+    paren_start = match.end() + table_macro_match.end() - 1
+    paren_end = find_matching(text, paren_start, "(", ")")
+    return text[paren_start + 1 : paren_end]
+
+
 def parse_keymap_custom_keycodes(text: str) -> list[str]:
     match = re.search(r"enum\s+keymap_custom_keycodes\s*\{(?P<body>.*?)\};", text, re.DOTALL)
     if not match:
@@ -958,7 +973,7 @@ def parse_exported_rgb_led_groups(
     else:
         return []
     try:
-        body = extract_initializer_body(text, rf"\b{re.escape(table_name)}\[\]\s*=")
+        body = extract_rgb_led_group_table_body(text, table_name)
     except SystemExit:
         return []
 

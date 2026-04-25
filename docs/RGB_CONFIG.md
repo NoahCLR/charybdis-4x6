@@ -123,8 +123,9 @@ The LED map lives near the top of
 [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 Reusable physical groups are defined directly below that map with
 `#define RGB_LED_GROUP_* RGB_LED_GROUP(...)`. Stage-specific LED group tables
-then use `.led_group = RGB_LED_GROUP_*` in each row, so you do not need
-separate physical LED arrays or unused placeholders.
+use `RGB_LED_GROUP_TABLE(...)` and then set `.led_group = RGB_LED_GROUP_*` in
+each row, so you do not need separate physical LED arrays or visible
+placeholder rows.
 
 You can still use `.led_group = RGB_LED_GROUP(...)` directly for a one-off
 cluster, but named groups are clearer when the same LEDs may be used by more
@@ -151,8 +152,8 @@ In `rgb_config.c`, use one of these helper forms:
 
 - leave all row entries commented out when no per-layer LED groups are enabled
 - uncomment or add rows inside `layer_led_groups_data`
-- keep `RGB_LED_GROUP_TABLE_END` as the final row; `MATERIALIZE_RGB_CONFIG()`
-  at the bottom exports the table
+- keep the table wrapped in `RGB_LED_GROUP_TABLE(...)`; `MATERIALIZE_RGB_CONFIG()`
+  at the bottom exports it
 
 Each row contains:
 
@@ -251,7 +252,7 @@ Use this when one mode should highlight a very specific LED or cluster, such as
 the trackball LED or one side of the board.
 
 As above, leave row entries commented out when no per-mode LED groups are
-enabled and keep `RGB_LED_GROUP_TABLE_END` as the final row.
+enabled and keep the table wrapped in `RGB_LED_GROUP_TABLE(...)`.
 
 Use rows like:
 
@@ -309,10 +310,9 @@ The same group table is used by both combo substages:
 Use rows like:
 
 ```c
-static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
+static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
-    RGB_LED_GROUP_TABLE_END,
-};
+);
 ```
 
 ### `key_behavior_feedback_colors`
@@ -415,12 +415,11 @@ earlier group rows.
 Use rows like:
 
 ```c
-static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
     { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
-    RGB_LED_GROUP_TABLE_END,
-};
+);
 ```
 
 ## Render Order
@@ -484,7 +483,7 @@ Examples:
 - `pd_mode_led_group_t`
 
 [`users/noah/lib/rgb/core/rgb_config_helpers.h`](../users/noah/lib/rgb/core/rgb_config_helpers.h)
-defines `HSV(...)`, `RGB_LED_GROUP(...)`, `RGB_LED_GROUP_TABLE_END`, and
+defines `HSV(...)`, `RGB_LED_GROUP(...)`, `RGB_LED_GROUP_TABLE(...)`, and
 `MATERIALIZE_RGB_CONFIG()` for authored RGB tables.
 
 `rgb_helpers.h` also provides split-safe helper functions such as:
