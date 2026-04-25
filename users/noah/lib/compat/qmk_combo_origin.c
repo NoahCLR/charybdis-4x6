@@ -33,7 +33,7 @@ static combo_origin_physical_key_state_t physical_key_states[MATRIX_ROWS * MATRI
 #    endif
 
 static combo_origin_active_cache_entry_t combo_active_cache[COMBO_BUFFER_LENGTH];
-static uint32_t                          combo_origin_press_sequence = 0;
+static uint32_t                          combo_origin_press_sequence       = 0;
 static keypos_t                          combo_origin_last_pressed_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
 
 static uint16_t combo_origin_combo_keycode_for_record(keyrecord_t *record) {
@@ -87,10 +87,10 @@ static bool combo_origin_combo_is_active(const combo_t *combo) {
 }
 
 static bool combo_origin_combo_build_from_pressed_keys(uint16_t combo_index, uint8_t *out_bitmap, keypos_t *out_owner_key_pos) {
-    combo_t   *combo;
-    uint32_t   latest_press_sequence = 0;
-    keypos_t   latest_key_pos        = {0};
-    bool       found_any             = false;
+    combo_t *combo;
+    uint32_t latest_press_sequence = 0;
+    keypos_t latest_key_pos        = {0};
+    bool     found_any             = false;
 
     if (out_bitmap) {
         key_origin_bitmap_clear(out_bitmap);
@@ -106,7 +106,7 @@ static bool combo_origin_combo_build_from_pressed_keys(uint16_t combo_index, uin
     }
 
     for (uint16_t member_index = 0;; member_index++) {
-        uint16_t member_keycode = pgm_read_word(&combo->keys[member_index]);
+        uint16_t member_keycode  = pgm_read_word(&combo->keys[member_index]);
         keypos_t matched_key_pos = {0};
         bool     matched         = false;
 
@@ -116,8 +116,8 @@ static bool combo_origin_combo_build_from_pressed_keys(uint16_t combo_index, uin
 
         for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
             for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                keypos_t                                key_pos      = {.row = row, .col = col};
-                combo_origin_physical_key_state_t      *physical_key = &physical_key_states[key_origin_keypos_index(key_pos)];
+                keypos_t                           key_pos      = {.row = row, .col = col};
+                combo_origin_physical_key_state_t *physical_key = &physical_key_states[key_origin_keypos_index(key_pos)];
 
                 if (!(physical_key->pressed && physical_key->combo_keycode == member_keycode)) {
                     continue;
@@ -185,9 +185,9 @@ static void combo_origin_cache_store(uint16_t combo_index, uint16_t keycode, key
         return;
     }
 
-    entry->active       = true;
-    entry->combo_index  = combo_index;
-    entry->keycode      = keycode;
+    entry->active        = true;
+    entry->combo_index   = combo_index;
+    entry->keycode       = keycode;
     entry->owner_key_pos = owner_key_pos;
     key_origin_bitmap_copy(entry->bitmap, bitmap);
 }
@@ -285,9 +285,9 @@ static bool combo_origin_collect_matching_active_combos(uint16_t keycode, uint16
     }
 
     for (uint16_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
-        combo_t  *combo = combo_origin_combo_get(combo_index);
-        uint8_t   combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-        keypos_t  combo_owner_key_pos = {0};
+        combo_t *combo = combo_origin_combo_get(combo_index);
+        uint8_t  combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+        keypos_t combo_owner_key_pos = {0};
 
         if (!(combo && combo_origin_combo_is_active(combo) && combo->keycode == keycode)) {
             continue;
@@ -298,7 +298,7 @@ static bool combo_origin_collect_matching_active_combos(uint16_t keycode, uint16
         }
 
         if (!matched && primary_combo_index && primary_owner_key_pos) {
-            *primary_combo_index  = combo_index;
+            *primary_combo_index   = combo_index;
             *primary_owner_key_pos = combo_owner_key_pos;
         }
 
@@ -350,7 +350,7 @@ static bool combo_origin_collect_matching_cached_combos(uint16_t keycode, uint16
 }
 
 void noah_qmk_combo_origin_reset(void) {
-    combo_origin_press_sequence = 0;
+    combo_origin_press_sequence       = 0;
     combo_origin_last_pressed_key_pos = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
 
     for (uint16_t index = 0; index < ARRAY_SIZE(physical_key_states); index++) {
@@ -381,9 +381,9 @@ void noah_qmk_combo_origin_observe_physical_key_event(uint16_t keycode, keyrecor
 
     entry = &physical_key_states[key_origin_keypos_index(record->event.key)];
     if (record->event.pressed) {
-        entry->pressed        = true;
-        entry->combo_keycode  = combo_origin_combo_keycode_for_record(record);
-        entry->press_sequence = ++combo_origin_press_sequence;
+        entry->pressed                    = true;
+        entry->combo_keycode              = combo_origin_combo_keycode_for_record(record);
+        entry->press_sequence             = ++combo_origin_press_sequence;
         combo_origin_last_pressed_key_pos = record->event.key;
         return;
     }
@@ -396,7 +396,7 @@ void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *recor
     uint16_t combo_index   = UINT16_MAX;
     keypos_t owner_key_pos = {0};
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    bool     matched       = false;
+    bool     matched = false;
 
     if (!(record && record->event.type == COMBO_EVENT)) {
         return;

@@ -14,7 +14,7 @@ enum test_layers {
 
 static uint16_t test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 
-layer_state_t layer_state = 0;
+layer_state_t layer_state  = 0;
 led_config_t  g_led_config = {0};
 
 static const uint8_t base_group_leds[] = {3};

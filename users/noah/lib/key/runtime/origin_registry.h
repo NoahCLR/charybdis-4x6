@@ -117,9 +117,9 @@ static inline split_side_mask_t key_origin_bitmap_side_mask(const uint8_t *bitma
     return sides;
 }
 
-void             key_origin_registry_init(void);
-void             key_origin_registry_reset(void);
-void             key_origin_registry_set_single(keypos_t owner_key_pos);
-bool             key_origin_registry_set_bitmap(keypos_t owner_key_pos, const uint8_t *bitmap);
-bool             key_origin_registry_get_bitmap(keypos_t owner_key_pos, uint8_t *out_bitmap);
+void              key_origin_registry_init(void);
+void              key_origin_registry_reset(void);
+void              key_origin_registry_set_single(keypos_t owner_key_pos);
+bool              key_origin_registry_set_bitmap(keypos_t owner_key_pos, const uint8_t *bitmap);
+bool              key_origin_registry_get_bitmap(keypos_t owner_key_pos, uint8_t *out_bitmap);
 split_side_mask_t key_origin_registry_side_mask(keypos_t owner_key_pos);

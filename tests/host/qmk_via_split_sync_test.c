@@ -8,27 +8,27 @@
 #include "via.h"
 #include "users/noah/lib/compat/qmk_via_split_sync.h"
 
-static bool                           fake_is_master;
-static int8_t                         rpc_registered_id;
-static slave_callback_t               rpc_registered_callback;
-static int8_t                         rpc_last_send_id;
-static uint8_t                        rpc_send_count;
-static uint8_t                        rpc_last_size;
-static uint8_t                        rpc_last_data[RPC_M2S_BUFFER_SIZE];
-static uint8_t                        rgb_invalidate_count;
-static uint8_t                        set_keycode_calls;
-static uint8_t                        set_buffer_calls;
-static uint8_t                        reset_calls;
-static uint8_t                        eeprom_reset_calls;
-static uint8_t                        via_eeprom_set_valid_calls;
-static bool                           via_eeprom_last_valid;
-static uint8_t                        last_layer;
-static uint8_t                        last_row;
-static uint8_t                        last_col;
-static uint16_t                       last_keycode;
-static uint16_t                       last_buffer_offset;
-static uint8_t                        last_buffer_size;
-static uint8_t                        last_buffer_bytes[RPC_M2S_BUFFER_SIZE];
+static bool             fake_is_master;
+static int8_t           rpc_registered_id;
+static slave_callback_t rpc_registered_callback;
+static int8_t           rpc_last_send_id;
+static uint8_t          rpc_send_count;
+static uint8_t          rpc_last_size;
+static uint8_t          rpc_last_data[RPC_M2S_BUFFER_SIZE];
+static uint8_t          rgb_invalidate_count;
+static uint8_t          set_keycode_calls;
+static uint8_t          set_buffer_calls;
+static uint8_t          reset_calls;
+static uint8_t          eeprom_reset_calls;
+static uint8_t          via_eeprom_set_valid_calls;
+static bool             via_eeprom_last_valid;
+static uint8_t          last_layer;
+static uint8_t          last_row;
+static uint8_t          last_col;
+static uint16_t         last_keycode;
+static uint16_t         last_buffer_offset;
+static uint8_t          last_buffer_size;
+static uint8_t          last_buffer_bytes[RPC_M2S_BUFFER_SIZE];
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -43,26 +43,26 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset(void) {
-    fake_is_master           = true;
-    rpc_registered_id        = -1;
-    rpc_registered_callback  = NULL;
-    rpc_last_send_id         = -1;
-    rpc_send_count           = 0;
-    rpc_last_size            = 0;
+    fake_is_master          = true;
+    rpc_registered_id       = -1;
+    rpc_registered_callback = NULL;
+    rpc_last_send_id        = -1;
+    rpc_send_count          = 0;
+    rpc_last_size           = 0;
     memset(rpc_last_data, 0, sizeof(rpc_last_data));
-    rgb_invalidate_count     = 0;
-    set_keycode_calls        = 0;
-    set_buffer_calls         = 0;
-    reset_calls              = 0;
-    eeprom_reset_calls       = 0;
+    rgb_invalidate_count       = 0;
+    set_keycode_calls          = 0;
+    set_buffer_calls           = 0;
+    reset_calls                = 0;
+    eeprom_reset_calls         = 0;
     via_eeprom_set_valid_calls = 0;
-    via_eeprom_last_valid    = true;
-    last_layer               = 0;
-    last_row                 = 0;
-    last_col                 = 0;
-    last_keycode             = 0;
-    last_buffer_offset       = 0;
-    last_buffer_size         = 0;
+    via_eeprom_last_valid      = true;
+    last_layer                 = 0;
+    last_row                   = 0;
+    last_col                   = 0;
+    last_keycode               = 0;
+    last_buffer_offset         = 0;
+    last_buffer_size           = 0;
     memset(last_buffer_bytes, 0, sizeof(last_buffer_bytes));
 }
 

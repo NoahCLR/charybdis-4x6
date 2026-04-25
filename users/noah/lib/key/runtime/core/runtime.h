@@ -127,12 +127,12 @@ typedef struct {
 _Static_assert(sizeof(key_runtime_core_effect_plan_t) <= 196u, "key_runtime_core_effect_plan_t must stay within the approved stack budget");
 
 typedef struct {
-    bool                 active;
+    bool                        active;
     key_runtime_packed_keypos_t packed_key_pos;
-    uint16_t             owner_token_id;
-    uint16_t             sequence;
-    uint16_t             action;
-    keyboard_mod_state_t mods;
+    uint16_t                    owner_token_id;
+    uint16_t                    sequence;
+    uint16_t                    action;
+    keyboard_mod_state_t        mods;
 } pending_release_slot_t;
 
 _Static_assert(sizeof(pending_release_slot_t) <= 12u, "pending_release_slot_t must stay compact");
@@ -157,9 +157,9 @@ typedef enum {
 } lease_kind_t;
 
 typedef struct {
-    bool         active;
-    uint8_t      kind;
-    uint16_t     owner_token_id;
+    bool                        active;
+    uint8_t                     kind;
+    uint16_t                    owner_token_id;
     key_runtime_packed_keypos_t owner_packed_key_pos;
     union {
         uint8_t layer;
@@ -358,9 +358,9 @@ static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state)
         return;
     }
 
-    *state                               = (key_runtime_core_state_t){0};
-    state->next_token_id                 = 1u;
-    state->next_pending_release_sequence = 1u;
+    *state                                     = (key_runtime_core_state_t){0};
+    state->next_token_id                       = 1u;
+    state->next_pending_release_sequence       = 1u;
     state->preview_display_last_semantic_layer = UINT8_MAX;
     state->preview_display_bridge_layer        = UINT8_MAX;
 }

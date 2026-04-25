@@ -191,9 +191,9 @@ void noah_action_tap(uint16_t action) {
 }
 
 void noah_action_tap_at(keypos_t key_pos, uint16_t action) {
-    action_tap_call      = test_current_tap_call(action);
-    action_tap_call.row  = key_pos.row;
-    action_tap_call.col  = key_pos.col;
+    action_tap_call     = test_current_tap_call(action);
+    action_tap_call.row = key_pos.row;
+    action_tap_call.col = key_pos.col;
     action_tap_call_count++;
 }
 

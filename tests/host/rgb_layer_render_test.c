@@ -52,20 +52,20 @@ HOST_RUNTIME_FIXTURE_DEFINE_LAYER_STUBS()
 
 static uint16_t               test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static rgb_t                  led_output[RGB_MATRIX_LED_COUNT];
-static uint8_t                fake_preview_layer      = UINT8_MAX;
+static uint8_t                fake_preview_layer = UINT8_MAX;
 static uint8_t                fake_combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t                fake_combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t                fake_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
 static uint8_t                fake_feedback_flash_meta = 0;
-static uint8_t                fake_auto_mouse_layer   = LAYER_POINTER;
-static uint16_t               fake_auto_mouse_elapsed = 0;
-static bool                   fake_auto_mouse_active  = true;
-static host_runtime_fixture_t runtime_fixture         = HOST_RUNTIME_FIXTURE_INIT;
+static uint8_t                fake_auto_mouse_layer    = LAYER_POINTER;
+static uint16_t               fake_auto_mouse_elapsed  = 0;
+static bool                   fake_auto_mouse_active   = true;
+static host_runtime_fixture_t runtime_fixture          = HOST_RUNTIME_FIXTURE_INIT;
 #define fake_is_master runtime_fixture.is_master
-static pd_mode_mask_t fake_pd_active_mode = 0;
-static pd_mode_mask_t fake_pd_locked_mode = 0;
+static pd_mode_mask_t    fake_pd_active_mode = 0;
+static pd_mode_mask_t    fake_pd_locked_mode = 0;
 static split_side_mask_t fake_pd_owner_sides = SPLIT_SIDE_MASK_NONE;
-static uint8_t fake_pd_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+static uint8_t           fake_pd_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 
 static rgb_t test_runtime_diag_stage_rgb(noah_runtime_diag_stage_t stage) {
     switch (stage) {
@@ -95,7 +95,7 @@ static rgb_t test_runtime_diag_stage_rgb(noah_runtime_diag_stage_t stage) {
     }
 }
 
-ws2812_led_t               ws2812_leds[WS2812_LED_COUNT];
+ws2812_led_t                ws2812_leds[WS2812_LED_COUNT];
 split_runtime_sync_remote_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
 
 led_config_t g_led_config = {0};
@@ -129,11 +129,7 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 };
 
 const pd_mode_color_t pd_mode_colors[] = {
-    {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .mode = PD_COLOR_MODE_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .mode = PD_COLOR_MODE_LEFT_HALF},
-    {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .mode = PD_COLOR_MODE_BOTH_HALVES},
-    {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .mode = PD_COLOR_MODE_TRIGGER_HALF},
-    {.pointing_mode = PD_MODE_PINCH, .color = HSV(233, 234, 235), .mode = PD_COLOR_MODE_TRIGGER_KEYS},
+    {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .mode = PD_COLOR_MODE_RIGHT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .mode = PD_COLOR_MODE_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .mode = PD_COLOR_MODE_BOTH_HALVES}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .mode = PD_COLOR_MODE_TRIGGER_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(233, 234, 235), .mode = PD_COLOR_MODE_TRIGGER_KEYS},
 };
 const uint8_t                    pd_mode_color_count       = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 static const uint8_t             volume_mode_group_leds[]  = {1, 6};
@@ -152,23 +148,23 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
     .end_color = HSV(200, 210, 220),
 };
 const combo_feedback_color_config_t combo_feedback_colors = {
-    .color      = HSV(150, 151, 152),
-    .mode       = COMBO_FEEDBACK_MODE_COMBO_KEYS,
+    .color = HSV(150, 151, 152),
+    .mode  = COMBO_FEEDBACK_MODE_COMBO_KEYS,
 };
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(1, 2, 3),
     .hold_active_color       = HSV(4, 5, 6),
     .long_hold_active_color  = HSV(7, 8, 9),
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
-    .mode                    = KEY_FEEDBACK_MODE_KEY,
+    .mode = KEY_FEEDBACK_MODE_KEY,
 #elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
-    .mode                    = KEY_FEEDBACK_MODE_KEY_HALF,
+    .mode = KEY_FEEDBACK_MODE_KEY_HALF,
 #elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF
-    .mode                    = KEY_FEEDBACK_MODE_LEFT_HALF,
+    .mode = KEY_FEEDBACK_MODE_LEFT_HALF,
 #elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
-    .mode                    = KEY_FEEDBACK_MODE_RIGHT_HALF,
+    .mode = KEY_FEEDBACK_MODE_RIGHT_HALF,
 #else
-    .mode                    = KEY_FEEDBACK_MODE_BOTH_HALVES,
+    .mode = KEY_FEEDBACK_MODE_BOTH_HALVES,
 #endif
 };
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
@@ -255,18 +251,18 @@ static void test_reset(void) {
     memset(test_keymap, 0, sizeof(test_keymap));
     memset(led_output, 0, sizeof(led_output));
     memset(ws2812_leds, 0, sizeof(ws2812_leds));
-    layer_state               = 0;
-    fake_preview_layer        = UINT8_MAX;
+    layer_state        = 0;
+    fake_preview_layer = UINT8_MAX;
     key_origin_bitmap_clear(fake_combo_underlay_bitmap);
     key_origin_bitmap_clear(fake_combo_overlay_bitmap);
     key_feedback_semantic_map_clear(fake_feedback_semantic_map);
-    fake_feedback_flash_meta  = 0;
-    fake_auto_mouse_layer     = LAYER_POINTER;
-    fake_auto_mouse_elapsed   = 0;
-    fake_auto_mouse_active    = true;
-    fake_pd_active_mode       = 0;
-    fake_pd_locked_mode       = 0;
-    fake_pd_owner_sides       = SPLIT_SIDE_MASK_NONE;
+    fake_feedback_flash_meta = 0;
+    fake_auto_mouse_layer    = LAYER_POINTER;
+    fake_auto_mouse_elapsed  = 0;
+    fake_auto_mouse_active   = true;
+    fake_pd_active_mode      = 0;
+    fake_pd_locked_mode      = 0;
+    fake_pd_owner_sides      = SPLIT_SIDE_MASK_NONE;
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
     split_runtime_sync_remote = host_runtime_fixture_split_remote_init();
 
@@ -553,7 +549,7 @@ static void test_slave_preview_handoff_to_matching_remote_layer_stays_continuous
     check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
 
     memset(led_output, 0, sizeof(led_output));
-    layer_state = ((layer_state_t)1u << LAYER_SYM) | ((layer_state_t)1u << LAYER_NUM);
+    layer_state                                 = ((layer_state_t)1u << LAYER_SYM) | ((layer_state_t)1u << LAYER_NUM);
     split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
     CHECK(render_output());
     check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
@@ -637,9 +633,9 @@ static void test_combo_underlay_stays_below_pd_mode(void) {
 static void test_slave_combo_overlay_stays_visible_over_remote_preview(void) {
     test_reset();
 
-    fake_is_master                            = false;
-    test_keymap[LAYER_NUM][0][0]              = 0x0020u;
-    layer_state                               = (layer_state_t)1u << LAYER_SYM;
+    fake_is_master                              = false;
+    test_keymap[LAYER_NUM][0][0]                = 0x0020u;
+    layer_state                                 = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
     test_feedback_bitmap_set(split_runtime_sync_remote.combo_overlay_bitmap, 0, 0);
 
@@ -652,9 +648,9 @@ static void test_slave_combo_overlay_stays_visible_over_remote_preview(void) {
 static void test_slave_combo_underlay_stays_below_remote_preview(void) {
     test_reset();
 
-    fake_is_master                            = false;
-    test_keymap[LAYER_NUM][0][0]              = 0x0020u;
-    layer_state                               = (layer_state_t)1u << LAYER_SYM;
+    fake_is_master                              = false;
+    test_keymap[LAYER_NUM][0][0]                = 0x0020u;
+    layer_state                                 = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
     test_feedback_bitmap_set(split_runtime_sync_remote.combo_underlay_bitmap, 0, 0);
 
@@ -667,8 +663,8 @@ static void test_slave_combo_underlay_stays_below_remote_preview(void) {
 static void test_slave_combo_overlay_stays_visible_over_remote_pd_mode(void) {
     test_reset();
 
-    fake_is_master                          = false;
-    layer_state                             = (layer_state_t)1u << LAYER_SYM;
+    fake_is_master                           = false;
+    layer_state                              = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_ARROW);
     test_feedback_bitmap_set(split_runtime_sync_remote.combo_overlay_bitmap, 4, 0);
 
@@ -681,8 +677,8 @@ static void test_slave_combo_overlay_stays_visible_over_remote_pd_mode(void) {
 static void test_slave_combo_underlay_stays_below_remote_pd_mode(void) {
     test_reset();
 
-    fake_is_master                          = false;
-    layer_state                             = (layer_state_t)1u << LAYER_SYM;
+    fake_is_master                           = false;
+    layer_state                              = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_ARROW);
     test_feedback_bitmap_set(split_runtime_sync_remote.combo_underlay_bitmap, 4, 0);
 
@@ -954,13 +950,13 @@ static void test_key_right_half_feedback_uses_remote_snapshot(void) {
 static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_when_feedback_flash_is_hidden(void) {
     test_reset();
 
-    fake_is_master                            = false;
-    test_keymap[LAYER_NUM][0][0]              = 0x0020u;
-    test_keymap[LAYER_NUM][0][1]              = 0x0021u;
-    test_keymap[LAYER_NUM][1][0]              = 0x0022u;
-    layer_state                               = (layer_state_t)1u << LAYER_SYM;
+    fake_is_master                              = false;
+    test_keymap[LAYER_NUM][0][0]                = 0x0020u;
+    test_keymap[LAYER_NUM][0][1]                = 0x0021u;
+    test_keymap[LAYER_NUM][1][0]                = 0x0022u;
+    layer_state                                 = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
-    split_runtime_sync_remote.locked_mode_id  = pd_mode_id_from_mask(PD_MODE_VOLUME);
+    split_runtime_sync_remote.locked_mode_id    = pd_mode_id_from_mask(PD_MODE_VOLUME);
     test_remote_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING);
 
     CHECK(render_output());
@@ -977,13 +973,13 @@ static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_wh
 static void test_slave_full_scene_feedback_overrides_remote_preview_and_locked_pd_mode(void) {
     test_reset();
 
-    fake_is_master                            = false;
-    test_keymap[LAYER_NUM][0][0]              = 0x0020u;
-    test_keymap[LAYER_NUM][0][1]              = 0x0021u;
-    test_keymap[LAYER_NUM][1][0]              = 0x0022u;
-    layer_state                               = (layer_state_t)1u << LAYER_SYM;
+    fake_is_master                              = false;
+    test_keymap[LAYER_NUM][0][0]                = 0x0020u;
+    test_keymap[LAYER_NUM][0][1]                = 0x0021u;
+    test_keymap[LAYER_NUM][1][0]                = 0x0022u;
+    layer_state                                 = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
-    split_runtime_sync_remote.locked_mode_id  = pd_mode_id_from_mask(PD_MODE_VOLUME);
+    split_runtime_sync_remote.locked_mode_id    = pd_mode_id_from_mask(PD_MODE_VOLUME);
     test_remote_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
 
     CHECK(render_output());
@@ -1052,7 +1048,7 @@ static void test_runtime_diag_overlay_overrides_scene(void) {
     layer_state                  = (layer_state_t)1u << LAYER_SYM;
     fake_preview_layer           = LAYER_NUM;
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
-    fake_pd_active_mode          = PD_MODE_VOLUME;
+    fake_pd_active_mode = PD_MODE_VOLUME;
 
     noah_runtime_diag_test_backend_seed_watchdog_reboot(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK, 0u);
     noah_runtime_diag_post_init();
@@ -1094,7 +1090,7 @@ static void test_multi_tap_pending_feedback_overrides_preview_and_pd_mode(void) 
     layer_state                  = (layer_state_t)1u << LAYER_SYM;
     fake_preview_layer           = LAYER_NUM;
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
-    fake_pd_active_mode          = PD_MODE_VOLUME;
+    fake_pd_active_mode = PD_MODE_VOLUME;
 
     CHECK(render_output());
 
@@ -1115,7 +1111,7 @@ static void test_hold_pending_feedback_overrides_preview_and_pd_mode(void) {
     layer_state                  = (layer_state_t)1u << LAYER_SYM;
     fake_preview_layer           = LAYER_NUM;
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
-    fake_pd_active_mode          = PD_MODE_VOLUME;
+    fake_pd_active_mode = PD_MODE_VOLUME;
 
     CHECK(render_output());
 
@@ -1270,9 +1266,9 @@ static void test_pointer_mode_overlay_trigger_keys_falls_back_both_without_owner
 static void test_slave_pointer_mode_overlay_uses_remote_display_state_and_trigger_half(void) {
     test_reset();
 
-    fake_is_master                           = false;
-    layer_state                              = (layer_state_t)1u << LAYER_SYM;
-    split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_ZOOM);
+    fake_is_master                                = false;
+    layer_state                                   = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.active_mode_id      = pd_mode_id_from_mask(PD_MODE_ZOOM);
     split_runtime_sync_remote.pd_mode_owner_sides = SPLIT_SIDE_MASK_LEFT;
 
     CHECK(render_output());

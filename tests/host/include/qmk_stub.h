@@ -162,19 +162,19 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #define QK_MOD_TAP_GET_TAP_KEYCODE(keycode_) ((uint8_t)((keycode_) & 0x00FFu))
 
 typedef enum keyevent_type_t {
-    TICK_EVENT   = 0,
-    KEY_EVENT    = 1,
-    COMBO_EVENT  = 4,
+    TICK_EVENT  = 0,
+    KEY_EVENT   = 1,
+    COMBO_EVENT = 4,
 } keyevent_type_t;
 
 #define COMBO_END 0
-#define COMBO(keys_, result_) \
-    {                         \
-        .keys     = (keys_),  \
+#define COMBO(keys_, result_)  \
+    {                          \
+        .keys     = (keys_),   \
         .keycode  = (result_), \
-        .disabled = false,    \
-        .active   = false,    \
-        .state    = 0,        \
+        .disabled = false,     \
+        .active   = false,     \
+        .state    = 0,         \
     }
 
 typedef struct {
@@ -205,11 +205,11 @@ typedef struct {
         .type    = KEY_EVENT,                      \
     })
 
-#define MAKE_COMBOEVENT(press_)                       \
-    ((keyevent_t){                                    \
-        .key     = {.row = 0, .col = 0},              \
-        .pressed = (press_),                          \
-        .type    = COMBO_EVENT,                       \
+#define MAKE_COMBOEVENT(press_)          \
+    ((keyevent_t){                       \
+        .key     = {.row = 0, .col = 0}, \
+        .pressed = (press_),             \
+        .type    = COMBO_EVENT,          \
     })
 
 #define IS_NOEVENT(event_) ((event_).type == TICK_EVENT)

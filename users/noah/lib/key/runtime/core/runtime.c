@@ -297,8 +297,8 @@ static void key_runtime_core_effect_plan_push_feedback_pulse(key_runtime_core_ef
                                                 .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
                                                 .data.feedback_pulse =
                                                     {
-                                                        .key_pos          = key_pos,
-                                                        .long_hold_level  = long_hold_level,
+                                                        .key_pos         = key_pos,
+                                                        .long_hold_level = long_hold_level,
                                                     },
                                             });
 }
@@ -312,10 +312,10 @@ static void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_ef
                                                 .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
                                                 .data.delayed_action =
                                                     {
-                                                        .action       = action,
+                                                        .action         = action,
                                                         .packed_key_pos = key_runtime_keypos_pack(key_pos),
-                                                        .mods         = mods,
-                                                        .repeat_count = repeat_count,
+                                                        .mods           = mods,
+                                                        .repeat_count   = repeat_count,
                                                     },
                                             });
 }
@@ -401,10 +401,10 @@ static void key_runtime_core_release_effect_plan_push_delayed_action(key_runtime
                                                         .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
                                                         .data.delayed_action =
                                                             {
-                                                                .action       = action,
+                                                                .action         = action,
                                                                 .packed_key_pos = key_runtime_keypos_pack(key_pos),
-                                                                .mods         = mods,
-                                                                .repeat_count = repeat_count,
+                                                                .mods           = mods,
+                                                                .repeat_count   = repeat_count,
                                                             },
                                                     });
 }
@@ -1687,7 +1687,7 @@ static void key_runtime_core_press_token_attach_press_leases(key_runtime_core_st
 }
 
 static void key_runtime_core_press_token_attach_hold_leases(key_runtime_core_state_t *state, const press_token_t *token) {
-    bool changed = false;
+    bool     changed = false;
     keypos_t token_key_pos;
 
     if (!(state && token && token->active && token->phase == PRESS_TOKEN_PHASE_HELD)) {
@@ -2361,7 +2361,7 @@ void key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t 
     }
 
     owner_token_id = lease->owner_token_id;
-    *lease = (lease_t){0};
+    *lease         = (lease_t){0};
     if (state->lease_count != 0u) {
         state->lease_count--;
     }
@@ -3626,7 +3626,7 @@ bool key_runtime_core_pending_fallback_key_pos(keypos_t *out) {
         }
 
         token_key_pos = key_runtime_core_press_token_resolve_key_pos(state, token);
-        *out = token_key_pos;
+        *out          = token_key_pos;
         return true;
     }
 

@@ -40,14 +40,14 @@ static test_call_t pointer_action_call_1;
 static test_call_t pointer_action_call_2;
 static uint8_t     pointer_action_call_count;
 
-static uint8_t macro_dispatch_calls;
-static uint8_t pd_toggle_calls;
-static uint8_t pd_press_calls;
-static uint8_t pd_release_calls;
+static uint8_t  macro_dispatch_calls;
+static uint8_t  pd_toggle_calls;
+static uint8_t  pd_press_calls;
+static uint8_t  pd_release_calls;
 static keypos_t pd_toggle_key_pos;
 static keypos_t pd_press_key_pos;
 static keypos_t pd_release_key_pos;
-static uint8_t split_sync_calls;
+static uint8_t  split_sync_calls;
 
 static bool macro_dispatch_result;
 static bool pd_toggle_result;

@@ -23,17 +23,17 @@
 #    include "split_runtime_sync.h"
 #    include "transactions.h" // QMK
 
-split_runtime_sync_remote_t         split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
-static split_runtime_base_sync_packet_t split_runtime_base_last_sent = {0};
-static split_runtime_combo_feedback_packet_t split_runtime_combo_last_sent = {0};
-static split_runtime_key_feedback_packet_t split_runtime_key_feedback_last_sent = {0};
-static bool                         split_runtime_base_sent_once = false;
-static bool                         split_runtime_combo_sent_once = false;
-static bool                         split_runtime_key_feedback_sent_once = false;
-static bool                         split_runtime_sync_initialized = false;
-static uint32_t                     split_runtime_base_last_send = 0;
-static uint32_t                     split_runtime_combo_last_send = 0;
-static uint32_t                     split_runtime_key_feedback_last_send = 0;
+split_runtime_sync_remote_t                  split_runtime_sync_remote            = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
+static split_runtime_base_sync_packet_t      split_runtime_base_last_sent         = {0};
+static split_runtime_combo_feedback_packet_t split_runtime_combo_last_sent        = {0};
+static split_runtime_key_feedback_packet_t   split_runtime_key_feedback_last_sent = {0};
+static bool                                  split_runtime_base_sent_once         = false;
+static bool                                  split_runtime_combo_sent_once        = false;
+static bool                                  split_runtime_key_feedback_sent_once = false;
+static bool                                  split_runtime_sync_initialized       = false;
+static uint32_t                              split_runtime_base_last_send         = 0;
+static uint32_t                              split_runtime_combo_last_send        = 0;
+static uint32_t                              split_runtime_key_feedback_last_send = 0;
 
 #    ifndef SPLIT_RUNTIME_SYNC_ACTIVE_HEARTBEAT_MS
 #        define SPLIT_RUNTIME_SYNC_ACTIVE_HEARTBEAT_MS 250
@@ -109,9 +109,9 @@ static bool split_runtime_base_packet_is_active(const split_runtime_base_sync_pa
     }
 
     return pkt->automouse_progress != 0u || pkt->active_mode_id != PD_MODE_ID_NONE || pkt->locked_mode_id != PD_MODE_ID_NONE
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#    ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
            || pkt->pd_mode_owner_sides != SPLIT_SIDE_MASK_NONE || key_origin_bitmap_has_any(pkt->pd_mode_owner_bitmap)
-#endif
+#    endif
            || pkt->key_preview_layer != UINT8_MAX;
 }
 
@@ -193,26 +193,22 @@ static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_si
     split_runtime_sync_remote.automouse_progress = packet->automouse_progress;
     split_runtime_sync_remote.active_mode_id     = packet->active_mode_id;
     split_runtime_sync_remote.locked_mode_id     = packet->locked_mode_id;
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#    ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     split_runtime_sync_remote.pd_mode_owner_sides = packet->pd_mode_owner_sides;
     key_origin_bitmap_copy(split_runtime_sync_remote.pd_mode_owner_bitmap, packet->pd_mode_owner_bitmap);
-#endif
-    split_runtime_sync_remote.key_preview_layer  = packet->key_preview_layer;
+#    endif
+    split_runtime_sync_remote.key_preview_layer = packet->key_preview_layer;
 
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pd_mode_mask_from_id(packet->active_mode_id), pd_mode_mask_from_id(packet->locked_mode_id));
-#ifdef POINTING_DEVICE_ENABLE
-    pd_mode_apply_remote_mode_ids_with_owner_bitmap(
-        packet->active_mode_id,
-        packet->locked_mode_id,
-#    ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-        packet->pd_mode_owner_sides,
-        packet->pd_mode_owner_bitmap
-#    else
-        SPLIT_SIDE_MASK_NONE,
-        NULL
-#    endif
+#    ifdef POINTING_DEVICE_ENABLE
+    pd_mode_apply_remote_mode_ids_with_owner_bitmap(packet->active_mode_id, packet->locked_mode_id,
+#        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+                                                    packet->pd_mode_owner_sides, packet->pd_mode_owner_bitmap
+#        else
+                                                    SPLIT_SIDE_MASK_NONE, NULL
+#        endif
     );
-#endif
+#    endif
 }
 
 static void split_runtime_sync_slave_combo_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
@@ -257,16 +253,16 @@ void split_runtime_sync_init(void) {
     transaction_register_rpc(PUT_SPLIT_RUNTIME_BASE_SYNC, split_runtime_sync_slave_base_rpc);
     transaction_register_rpc(PUT_SPLIT_COMBO_FEEDBACK_SYNC, split_runtime_sync_slave_combo_rpc);
     transaction_register_rpc(PUT_SPLIT_KEY_FEEDBACK_SYNC, split_runtime_sync_slave_key_feedback_rpc);
-    split_runtime_sync_remote          = (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
-    split_runtime_base_last_sent       = (split_runtime_base_sync_packet_t){0};
-    split_runtime_combo_last_sent      = (split_runtime_combo_feedback_packet_t){0};
+    split_runtime_sync_remote            = (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
+    split_runtime_base_last_sent         = (split_runtime_base_sync_packet_t){0};
+    split_runtime_combo_last_sent        = (split_runtime_combo_feedback_packet_t){0};
     split_runtime_key_feedback_last_sent = (split_runtime_key_feedback_packet_t){0};
-    split_runtime_base_sent_once       = false;
-    split_runtime_combo_sent_once      = false;
+    split_runtime_base_sent_once         = false;
+    split_runtime_combo_sent_once        = false;
     split_runtime_key_feedback_sent_once = false;
-    split_runtime_sync_initialized     = true;
-    split_runtime_base_last_send       = timer_read32();
-    split_runtime_combo_last_send      = split_runtime_base_last_send;
+    split_runtime_sync_initialized       = true;
+    split_runtime_base_last_send         = timer_read32();
+    split_runtime_combo_last_send        = split_runtime_base_last_send;
     split_runtime_key_feedback_last_send = split_runtime_base_last_send;
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_INIT, is_keyboard_master() ? 1u : 0u, 0u);
 
@@ -286,9 +282,9 @@ void split_runtime_sync_tick(void) {
 }
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force) {
-    split_runtime_base_sync_packet_t         base_packet;
-    split_runtime_combo_feedback_packet_t    combo_packet;
-    split_runtime_key_feedback_packet_t      key_feedback_packet;
+    split_runtime_base_sync_packet_t      base_packet;
+    split_runtime_combo_feedback_packet_t combo_packet;
+    split_runtime_key_feedback_packet_t   key_feedback_packet;
 
     if (!split_runtime_sync_initialized || !is_keyboard_master()) {
         return;

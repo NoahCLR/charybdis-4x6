@@ -101,8 +101,7 @@ static void rgb_validation_log_invalid_automouse_fade_end_mode(uint8_t mode) {
 #    ifdef COMBO_ENABLE
 static void rgb_validation_log_invalid_combo_feedback_mode(uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid combo_feedback_colors.mode %u; expected COMBO_FEEDBACK_MODE_BOTH_HALVES (0), COMBO_FEEDBACK_MODE_COMBO_HALF (1), COMBO_FEEDBACK_MODE_COMBO_KEYS (2), COMBO_FEEDBACK_MODE_LEFT_HALF (3), or COMBO_FEEDBACK_MODE_RIGHT_HALF (4)\n",
-            (unsigned int)mode);
+    uprintf("Invalid combo_feedback_colors.mode %u; expected COMBO_FEEDBACK_MODE_BOTH_HALVES (0), COMBO_FEEDBACK_MODE_COMBO_HALF (1), COMBO_FEEDBACK_MODE_COMBO_KEYS (2), COMBO_FEEDBACK_MODE_LEFT_HALF (3), or COMBO_FEEDBACK_MODE_RIGHT_HALF (4)\n", (unsigned int)mode);
 #        else
     (void)mode;
 #        endif
@@ -112,8 +111,7 @@ static void rgb_validation_log_invalid_combo_feedback_mode(uint8_t mode) {
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_log_invalid_key_behavior_feedback_mode(uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors.mode %u; expected KEY_FEEDBACK_MODE_BOTH_HALVES (0), KEY_FEEDBACK_MODE_KEY_HALF (1), KEY_FEEDBACK_MODE_KEY (2), KEY_FEEDBACK_MODE_LEFT_HALF (3), or KEY_FEEDBACK_MODE_RIGHT_HALF (4)\n",
-            (unsigned int)mode);
+    uprintf("Invalid key_behavior_feedback_colors.mode %u; expected KEY_FEEDBACK_MODE_BOTH_HALVES (0), KEY_FEEDBACK_MODE_KEY_HALF (1), KEY_FEEDBACK_MODE_KEY (2), KEY_FEEDBACK_MODE_LEFT_HALF (3), or KEY_FEEDBACK_MODE_RIGHT_HALF (4)\n", (unsigned int)mode);
 #        else
     (void)mode;
 #        endif
@@ -132,9 +130,7 @@ static void rgb_validation_log_unknown_pd_mode_color(uint8_t color_index, pd_mod
 
 static void rgb_validation_log_invalid_pd_mode_color_mode(uint8_t color_index, uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid pd_mode_colors[%u].mode %u; expected PD_COLOR_MODE_RIGHT_HALF (0), PD_COLOR_MODE_LEFT_HALF (1), PD_COLOR_MODE_BOTH_HALVES (2), PD_COLOR_MODE_TRIGGER_HALF (3), or PD_COLOR_MODE_TRIGGER_KEYS (4)\n",
-            (unsigned int)color_index,
-            (unsigned int)mode);
+    uprintf("Invalid pd_mode_colors[%u].mode %u; expected PD_COLOR_MODE_RIGHT_HALF (0), PD_COLOR_MODE_LEFT_HALF (1), PD_COLOR_MODE_BOTH_HALVES (2), PD_COLOR_MODE_TRIGGER_HALF (3), or PD_COLOR_MODE_TRIGGER_KEYS (4)\n", (unsigned int)color_index, (unsigned int)mode);
 #        else
     (void)color_index;
     (void)mode;
@@ -143,12 +139,12 @@ static void rgb_validation_log_invalid_pd_mode_color_mode(uint8_t color_index, u
 
 #        ifndef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 static void rgb_validation_log_pd_mode_trigger_locality_requires_feature(uint8_t color_index, pd_mode_mask_t mode) {
-#        ifdef CONSOLE_ENABLE
+#            ifdef CONSOLE_ENABLE
     uprintf("pd_mode_colors[%u].mode uses trigger-local PD RGB placement for pd mode 0x%04X, but RGB_PD_MODE_ACTIVE_HALF_ENABLE is disabled\n", (unsigned int)color_index, (unsigned int)mode);
-#        else
+#            else
     (void)color_index;
     (void)mode;
-#        endif
+#            endif
 }
 #        endif
 

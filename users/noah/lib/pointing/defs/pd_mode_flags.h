@@ -68,11 +68,11 @@ static inline pd_mode_mask_t pd_mode_mask_from_id(pd_mode_id_t id) {
 // master half, mirrored split-sync state on the slave half.
 
 typedef struct {
-    pd_mode_mask_t   active_mode;
-    pd_mode_mask_t   locked_mode;
-    pd_mode_traits_t active_traits;
-    uint8_t          active_index;
-    uint8_t          locked_index;
+    pd_mode_mask_t    active_mode;
+    pd_mode_mask_t    locked_mode;
+    pd_mode_traits_t  active_traits;
+    uint8_t           active_index;
+    uint8_t           locked_index;
     split_side_mask_t owner_sides;
 } pd_mode_snapshot_view_t;
 
@@ -88,13 +88,13 @@ pd_mode_mask_t pd_mode_local_locked_snapshot(void);
 pd_mode_mask_t pd_mode_display_active_snapshot(void);
 pd_mode_mask_t pd_mode_display_locked_snapshot(void);
 
-bool pd_mode_local_active(pd_mode_mask_t mode);
-bool pd_mode_local_locked(pd_mode_mask_t mode);
-bool pd_mode_display_active(pd_mode_mask_t mode);
-bool pd_mode_display_locked(pd_mode_mask_t mode);
-bool pd_any_local_mode_active(void);
-bool pd_any_local_mode_locked(void);
-bool pd_any_display_mode_active(void);
-bool pd_any_display_mode_locked(void);
+bool              pd_mode_local_active(pd_mode_mask_t mode);
+bool              pd_mode_local_locked(pd_mode_mask_t mode);
+bool              pd_mode_display_active(pd_mode_mask_t mode);
+bool              pd_mode_display_locked(pd_mode_mask_t mode);
+bool              pd_any_local_mode_active(void);
+bool              pd_any_local_mode_locked(void);
+bool              pd_any_display_mode_active(void);
+bool              pd_any_display_mode_locked(void);
 split_side_mask_t pd_mode_local_owner_sides_snapshot(void);
 split_side_mask_t pd_mode_display_owner_sides_snapshot(void);

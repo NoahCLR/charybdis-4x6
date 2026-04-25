@@ -54,8 +54,7 @@ bool handled_key_resolution_uses_fallback_hold_behavior(handled_key_resolution_t
 }
 
 bool handled_key_resolution_uses_deferred_stacked_pd_hold(handled_key_resolution_t resolution) {
-    return resolution.tap_count == 1 && resolution.pd_mode != 0 && resolution.step.tap.present &&
-           key_behavior_future_tap_path_has_foreign_pd_mode(resolution.keycode, resolution.tap_count, resolution.pd_mode);
+    return resolution.tap_count == 1 && resolution.pd_mode != 0 && resolution.step.tap.present && key_behavior_future_tap_path_has_foreign_pd_mode(resolution.keycode, resolution.tap_count, resolution.pd_mode);
 }
 
 static uint16_t handled_key_default_tap_action(handled_key_resolution_t resolution) {

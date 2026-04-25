@@ -202,14 +202,9 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
     for (uint8_t i = 0; i < plan->count; i++) {
         const key_runtime_effect_t *effect = &plan->items[i];
 
-            switch (effect->kind) {
-                case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
-                uprintf("  [%u] %s key=(%u,%u) action=0x%04X\n",
-                        (unsigned int)i,
-                        key_runtime_trace_effect_name(effect->kind),
-                        (unsigned int)key_runtime_effect_dispatch_action_key_pos(effect).row,
-                        (unsigned int)key_runtime_effect_dispatch_action_key_pos(effect).col,
-                        (unsigned int)effect->data.dispatch_action.action);
+        switch (effect->kind) {
+            case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
+                uprintf("  [%u] %s key=(%u,%u) action=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)key_runtime_effect_dispatch_action_key_pos(effect).row, (unsigned int)key_runtime_effect_dispatch_action_key_pos(effect).col, (unsigned int)effect->data.dispatch_action.action);
                 break;
             case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
             case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
@@ -226,29 +221,13 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
                 uprintf("  [%u] %s key=(%u,%u) layer=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.layer_press.key_pos.row, (unsigned int)effect->data.layer_press.key_pos.col, (unsigned int)effect->data.layer_press.layer);
                 break;
             case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
-                uprintf("  [%u] %s key=(%u,%u) long=%u\n",
-                        (unsigned int)i,
-                        key_runtime_trace_effect_name(effect->kind),
-                        (unsigned int)effect->data.feedback_pulse.key_pos.row,
-                        (unsigned int)effect->data.feedback_pulse.key_pos.col,
-                        effect->data.feedback_pulse.long_hold_level ? 1u : 0u);
+                uprintf("  [%u] %s key=(%u,%u) long=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.feedback_pulse.key_pos.row, (unsigned int)effect->data.feedback_pulse.key_pos.col, effect->data.feedback_pulse.long_hold_level ? 1u : 0u);
                 break;
             case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
-                uprintf("  [%u] %s key=(%u,%u) mode=0x%04X\n",
-                        (unsigned int)i,
-                        key_runtime_trace_effect_name(effect->kind),
-                        (unsigned int)effect->data.pd_mode_lock_tap.key_pos.row,
-                        (unsigned int)effect->data.pd_mode_lock_tap.key_pos.col,
-                        (unsigned int)effect->data.pd_mode_lock_tap.pd_mode);
+                uprintf("  [%u] %s key=(%u,%u) mode=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pd_mode_lock_tap.key_pos.row, (unsigned int)effect->data.pd_mode_lock_tap.key_pos.col, (unsigned int)effect->data.pd_mode_lock_tap.pd_mode);
                 break;
             case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
-                uprintf("  [%u] %s key=(%u,%u) action=0x%04X repeat=%u\n",
-                        (unsigned int)i,
-                        key_runtime_trace_effect_name(effect->kind),
-                        (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).row,
-                        (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).col,
-                        (unsigned int)effect->data.delayed_action.action,
-                        (unsigned int)effect->data.delayed_action.repeat_count);
+                uprintf("  [%u] %s key=(%u,%u) action=0x%04X repeat=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).row, (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).col, (unsigned int)effect->data.delayed_action.action, (unsigned int)effect->data.delayed_action.repeat_count);
                 break;
             case KEY_RUNTIME_EFFECT_NONE:
             default:

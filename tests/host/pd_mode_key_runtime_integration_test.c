@@ -1058,11 +1058,7 @@ static void test_authored_pd_mode_hold_releases_authored_pd_mode_child_cleanly(v
     keypos_t                             hold_pos     = test_keypos(1, 2);
     keypos_t                             child_pos    = test_keypos(2, 4);
     const key_runtime_integration_step_t hold_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
-        KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4),
-        KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
-        KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(10), KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(),
     };
     const key_runtime_integration_step_t child_release_steps[] = {
         KEY_RUNTIME_INTEGRATION_RELEASE(PINCH_MODE, 2, 4),

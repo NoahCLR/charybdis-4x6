@@ -32,8 +32,8 @@ static void key_feedback_apply_semantic_to_bitmap(uint8_t *semantic_map, const u
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            keypos_t                 key_pos   = {.row = row, .col = col};
-            key_feedback_semantic_t  existing;
+            keypos_t                key_pos = {.row = row, .col = col};
+            key_feedback_semantic_t existing;
 
             if (!key_origin_bitmap_has_keypos(bitmap, key_pos)) {
                 continue;
@@ -159,18 +159,16 @@ uint8_t key_feedback_preview_layer(void) {
         return semantic_layer;
     }
 
-    if (!state->preview_display_bridge_active && state->preview_display_last_semantic_layer < LAYER_COUNT
-        && layer_state_cmp(layer_state, state->preview_display_last_semantic_layer)) {
-        state->preview_display_bridge_active       = true;
-        state->preview_display_bridge_layer        = state->preview_display_last_semantic_layer;
-        state->preview_display_bridge_started_at   = timer_read();
+    if (!state->preview_display_bridge_active && state->preview_display_last_semantic_layer < LAYER_COUNT && layer_state_cmp(layer_state, state->preview_display_last_semantic_layer)) {
+        state->preview_display_bridge_active     = true;
+        state->preview_display_bridge_layer      = state->preview_display_last_semantic_layer;
+        state->preview_display_bridge_started_at = timer_read();
     }
 
     state->preview_display_last_semantic_layer = UINT8_MAX;
 
     if (state->preview_display_bridge_active) {
-        if (state->preview_display_bridge_layer < LAYER_COUNT && layer_state_cmp(layer_state, state->preview_display_bridge_layer)
-            && timer_elapsed(state->preview_display_bridge_started_at) < KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS) {
+        if (state->preview_display_bridge_layer < LAYER_COUNT && layer_state_cmp(layer_state, state->preview_display_bridge_layer) && timer_elapsed(state->preview_display_bridge_started_at) < KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS) {
             return state->preview_display_bridge_layer;
         }
 
@@ -197,7 +195,7 @@ static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token
         return KEY_FEEDBACK_SEMANTIC_NONE;
     }
 
-    held_action = key_runtime_core_held_action_keycode_at(key_pos);
+    held_action            = key_runtime_core_held_action_keycode_at(key_pos);
     bool long_hold_reached = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.longer_hold_term;
 
     if (held_action != KC_NO) {
@@ -247,9 +245,7 @@ void key_feedback_semantic_map(uint8_t *out_map) {
     key_feedback_semantic_map_clear(out_map);
 
     if (key_feedback_pulse_active() && state && key_origin_keypos_valid(state->feedback_pulse_key_pos)) {
-        key_feedback_apply_semantic_for_owner(out_map,
-                                              state->feedback_pulse_key_pos,
-                                              state->feedback_pulse_long_hold_level ? KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY : KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY);
+        key_feedback_apply_semantic_for_owner(out_map, state->feedback_pulse_key_pos, state->feedback_pulse_long_hold_level ? KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY : KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY);
     }
 
     for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {

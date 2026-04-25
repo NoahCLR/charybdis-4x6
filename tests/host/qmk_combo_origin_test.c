@@ -51,11 +51,7 @@ static const uint16_t combo_keys_dup_right[] = {
 };
 
 combo_t key_combos[] = {
-    {.keys = combo_keys_left, .keycode = TEST_COMBO_OUT_LEFT},
-    {.keys = combo_keys_cross_half, .keycode = TEST_COMBO_OUT_BOTH},
-    {.keys = combo_keys_three, .keycode = TEST_COMBO_OUT_THREE},
-    {.keys = combo_keys_dup_left, .keycode = TEST_COMBO_OUT_DUP},
-    {.keys = combo_keys_dup_right, .keycode = TEST_COMBO_OUT_DUP},
+    {.keys = combo_keys_left, .keycode = TEST_COMBO_OUT_LEFT}, {.keys = combo_keys_cross_half, .keycode = TEST_COMBO_OUT_BOTH}, {.keys = combo_keys_three, .keycode = TEST_COMBO_OUT_THREE}, {.keys = combo_keys_dup_left, .keycode = TEST_COMBO_OUT_DUP}, {.keys = combo_keys_dup_right, .keycode = TEST_COMBO_OUT_DUP},
 };
 
 const uint8_t noah_combo_count = ARRAY_SIZE(key_combos);
@@ -113,7 +109,7 @@ static void test_reset_combo_state(void) {
 }
 
 static void test_reset(void) {
-    layer_state = 0;
+    layer_state         = 0;
     default_layer_state = (layer_state_t)1u << LAYER_BASE;
     test_reset_keymaps();
     test_reset_combo_state();
@@ -378,10 +374,7 @@ static void test_active_combo_partition_routes_preview_owner_to_underlay(void) {
     key_combos[1].active = true;
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &both_combo_record);
 
-    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos,
-                                                     (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS},
-                                                     underlay_bitmap,
-                                                     overlay_bitmap);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, underlay_bitmap, overlay_bitmap);
 
     CHECK(test_bitmap_has(underlay_bitmap, 0, 0));
     CHECK(test_bitmap_has(underlay_bitmap, 1, 0));
@@ -395,10 +388,10 @@ static void test_active_combo_partition_routes_preview_owner_to_underlay(void) {
 }
 
 static void test_active_combo_partition_routes_preview_and_pd_owners_to_underlay(void) {
-    keyrecord_t left_combo_record   = test_combo_record(true);
-    keyrecord_t both_combo_record   = test_combo_record(true);
-    keypos_t    left_owner_key_pos  = {0};
-    keypos_t    both_owner_key_pos  = {0};
+    keyrecord_t left_combo_record  = test_combo_record(true);
+    keyrecord_t both_combo_record  = test_combo_record(true);
+    keypos_t    left_owner_key_pos = {0};
+    keypos_t    both_owner_key_pos = {0};
     uint8_t     underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t     overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 

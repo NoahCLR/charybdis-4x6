@@ -36,8 +36,8 @@ typedef enum {
 } pd_color_mode_t;
 
 typedef struct {
-    pd_mode_mask_t pointing_mode;
-    hsv_t          color;
+    pd_mode_mask_t  pointing_mode;
+    hsv_t           color;
     pd_color_mode_t mode;
 } pd_mode_color_t;
 

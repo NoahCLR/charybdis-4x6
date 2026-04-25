@@ -22,10 +22,10 @@ static bool     fake_sniping_enabled;
 static uint16_t fake_default_dpi;
 static uint16_t fake_last_cpi;
 
-static uint8_t                        rpc_register_count;
-static int8_t                         rpc_registered_ids[3];
-static slave_callback_t               rpc_registered_callbacks[3];
-static uint8_t                        rpc_send_count;
+static uint8_t                          rpc_register_count;
+static int8_t                           rpc_registered_ids[3];
+static slave_callback_t                 rpc_registered_callbacks[3];
+static uint8_t                          rpc_send_count;
 static split_runtime_base_sync_packet_t rpc_last_base_packet;
 
 layer_state_t layer_state;
@@ -63,9 +63,9 @@ static void test_reset_stubs(void) {
     rpc_register_count      = 0u;
     memset(rpc_registered_ids, -1, sizeof(rpc_registered_ids));
     memset(rpc_registered_callbacks, 0, sizeof(rpc_registered_callbacks));
-    rpc_send_count          = 0u;
-    rpc_last_base_packet    = (split_runtime_base_sync_packet_t){0};
-    layer_state             = 0;
+    rpc_send_count       = 0u;
+    rpc_last_base_packet = (split_runtime_base_sync_packet_t){0};
+    layer_state          = 0;
 
     host_runtime_fixture_reset_userspace_runtime();
 }
@@ -297,7 +297,7 @@ static void test_key_runtime_and_layer_ownership_share_one_trace_buffer(void) {
 }
 
 static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
-    noah_runtime_trace_snapshot_t snapshot;
+    noah_runtime_trace_snapshot_t    snapshot;
     split_runtime_base_sync_packet_t packet = {
         .active_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),
         .locked_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),

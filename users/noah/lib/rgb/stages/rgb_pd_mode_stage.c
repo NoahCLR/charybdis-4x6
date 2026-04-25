@@ -15,7 +15,7 @@ extern const uint8_t                    pd_mode_color_count;
 extern const pd_mode_led_group_t *const pd_mode_led_groups;
 extern const uint8_t                    pd_mode_led_group_count;
 
-static rgb_t pd_mode_rgb[PD_MODE_COUNT];
+static rgb_t   pd_mode_rgb[PD_MODE_COUNT];
 static uint8_t pd_mode_render_mode[PD_MODE_COUNT];
 
 static bool rgb_runtime_pd_mode_stage_led_range_intersects(uint8_t led_min, uint8_t led_max, uint8_t from, uint8_t to) {

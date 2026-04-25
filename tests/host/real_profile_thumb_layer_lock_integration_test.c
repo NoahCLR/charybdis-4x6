@@ -1263,7 +1263,7 @@ static void test_click_spam_combo_uses_last_chord_key_as_runtime_owner(void) {
         MS_BTN2,
     };
 
-    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
     keypos_t active_slot_key_pos;
     keypos_t btn1_pos;
     keypos_t btn2_pos;

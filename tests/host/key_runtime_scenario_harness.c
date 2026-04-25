@@ -535,10 +535,10 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
         .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
         .data.delayed_action =
             {
-                .action       = action,
+                .action         = action,
                 .packed_key_pos = key_runtime_keypos_pack(key_pos),
-                .mods         = mods,
-                .repeat_count = 1,
+                .mods           = mods,
+                .repeat_count   = 1,
             },
     });
 }

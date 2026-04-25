@@ -104,9 +104,9 @@ static bool rgb_runtime_key_feedback_stage_render_key_mode(const uint8_t *semant
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            keypos_t                 key_pos   = {.row = row, .col = col};
-            key_feedback_semantic_t  semantic  = key_feedback_semantic_map_get(semantic_map, key_pos);
-            rgb_t                    color;
+            keypos_t                key_pos  = {.row = row, .col = col};
+            key_feedback_semantic_t semantic = key_feedback_semantic_map_get(semantic_map, key_pos);
+            rgb_t                   color;
 
             if (!rgb_runtime_key_feedback_stage_semantic_color(semantic, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(semantic, flash_meta)) {
                 continue;
@@ -128,7 +128,7 @@ static key_feedback_semantic_t rgb_runtime_key_feedback_stage_half_semantic(cons
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            keypos_t                key_pos   = {.row = row, .col = col};
+            keypos_t                key_pos = {.row = row, .col = col};
             key_feedback_semantic_t semantic;
             split_half_t            half;
 
@@ -192,12 +192,12 @@ static bool rgb_runtime_key_feedback_stage_paint_half(bool right_half, key_feedb
 }
 
 static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t led_max) {
-    uint8_t                semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
-    uint8_t                flash_meta;
+    uint8_t                 semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t                 flash_meta;
     key_feedback_semantic_t left_semantic;
     key_feedback_semantic_t right_semantic;
     key_feedback_semantic_t global_semantic;
-    rgb_t                  color;
+    rgb_t                   color;
 
     rgb_runtime_key_feedback_stage_current_semantic_map(semantic_map);
     flash_meta = rgb_runtime_key_feedback_stage_current_flash_meta();

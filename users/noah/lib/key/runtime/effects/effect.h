@@ -35,7 +35,7 @@ typedef struct {
     union {
         uint16_t action;
         struct {
-            uint16_t action;
+            uint16_t                    action;
             key_runtime_packed_keypos_t packed_key_pos;
         } dispatch_action;
         struct {
@@ -61,10 +61,10 @@ typedef struct {
             keypos_t       key_pos;
         } pd_mode_lock_tap;
         struct {
-            uint16_t              action;
+            uint16_t                    action;
             key_runtime_packed_keypos_t packed_key_pos;
-            delayed_action_mods_t mods;
-            uint8_t               repeat_count;
+            delayed_action_mods_t       mods;
+            uint8_t                     repeat_count;
         } delayed_action;
     } data;
 } key_runtime_effect_t;

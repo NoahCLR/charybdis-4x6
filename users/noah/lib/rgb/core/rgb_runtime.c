@@ -121,11 +121,7 @@ void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     static const rgb_runtime_render_stage_fn_t underlay_stages[] = {
-        rgb_runtime_render_combo_underlay_stage,
-        rgb_runtime_render_preview_stage,
-        rgb_runtime_render_pd_mode_stage,
-        rgb_runtime_render_combo_overlay_stage,
-        rgb_runtime_render_key_feedback_stage,
+        rgb_runtime_render_combo_underlay_stage, rgb_runtime_render_preview_stage, rgb_runtime_render_pd_mode_stage, rgb_runtime_render_combo_overlay_stage, rgb_runtime_render_key_feedback_stage,
     };
     bool painted = false;
 

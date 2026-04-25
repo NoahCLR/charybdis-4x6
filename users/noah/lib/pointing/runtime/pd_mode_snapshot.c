@@ -45,8 +45,8 @@ static pd_mode_snapshot_view_t pd_mode_snapshot_build_view(pd_mode_mask_t active
 pd_mode_snapshot_t pd_mode_snapshot(void) {
     const pd_mode_runtime_shared_state_t *state = pd_mode_runtime_shared_state();
     pd_mode_snapshot_t                    snapshot;
-    split_side_mask_t                    local_owner_sides   = SPLIT_SIDE_MASK_NONE;
-    split_side_mask_t                    display_owner_sides = SPLIT_SIDE_MASK_NONE;
+    split_side_mask_t                     local_owner_sides   = SPLIT_SIDE_MASK_NONE;
+    split_side_mask_t                     display_owner_sides = SPLIT_SIDE_MASK_NONE;
 
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     local_owner_sides = state->local_owner_sides;
