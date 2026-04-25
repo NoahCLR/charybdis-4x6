@@ -59,6 +59,7 @@ static uint8_t                fake_preview_layer = UINT8_MAX;
 static uint8_t                fake_combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t                fake_combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t                fake_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+static uint8_t                fake_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
 static uint8_t                fake_feedback_flash_meta = 0;
 static uint8_t                fake_auto_mouse_layer    = LAYER_POINTER;
 static uint16_t               fake_auto_mouse_elapsed  = 0;
@@ -160,7 +161,8 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 #endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    .multi_tap_pending_color = HSV(1, 2, 3),
+    RGB_TAP_PENDING_COLORS(HSV(1, 2, 3), HSV(13, 14, 15), HSV(16, 17, 18)),
+    .tap_pending_mode        = KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS,
     .tap_committed_color     = HSV(4, 5, 6),
     .hold_active_color       = HSV(7, 8, 9),
     .long_hold_active_color  = HSV(10, 11, 12),
@@ -213,6 +215,10 @@ static rgb_t rgb_from_combo_feedback(void) {
     return rgb_from_hsv(combo_feedback_colors.color);
 }
 
+static rgb_t rgb_from_tap_pending_color(uint8_t index) {
+    return rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[index]);
+}
+
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
 static rgb_t rgb_from_combo_feedback_group(uint8_t index) {
     return rgb_from_hsv(combo_feedback_led_groups[index].color);
@@ -235,12 +241,24 @@ static void test_feedback_semantic_set(uint8_t *semantic_map, uint8_t row, uint8
     key_feedback_semantic_map_set(semantic_map, (keypos_t){.row = row, .col = col}, semantic);
 }
 
+static void test_feedback_tap_branch_set(uint8_t *tap_branch_map, uint8_t row, uint8_t col, uint8_t tap_branch) {
+    key_feedback_tap_branch_map_set(tap_branch_map, (keypos_t){.row = row, .col = col}, tap_branch);
+}
+
 static void test_local_feedback_semantic_add(uint8_t row, uint8_t col, key_feedback_semantic_t semantic) {
     test_feedback_semantic_set(fake_feedback_semantic_map, row, col, semantic);
 }
 
+static void test_local_feedback_tap_branch_add(uint8_t row, uint8_t col, uint8_t tap_branch) {
+    test_feedback_tap_branch_set(fake_feedback_tap_branch_map, row, col, tap_branch);
+}
+
 static void test_remote_feedback_semantic_add(uint8_t row, uint8_t col, key_feedback_semantic_t semantic) {
     test_feedback_semantic_set(split_runtime_sync_remote.key_feedback_semantic_map, row, col, semantic);
+}
+
+static void test_remote_feedback_tap_branch_add(uint8_t row, uint8_t col, uint8_t tap_branch) {
+    test_feedback_tap_branch_set(split_runtime_sync_remote.key_feedback_tap_branch_map, row, col, tap_branch);
 }
 
 static rgb_t rgb_blend(rgb_t start, rgb_t end, uint8_t amount) {
@@ -284,6 +302,7 @@ static void test_reset(void) {
     key_origin_bitmap_clear(fake_combo_underlay_bitmap);
     key_origin_bitmap_clear(fake_combo_overlay_bitmap);
     key_feedback_semantic_map_clear(fake_feedback_semantic_map);
+    key_feedback_tap_branch_map_clear(fake_feedback_tap_branch_map);
     fake_feedback_flash_meta = 0;
     fake_auto_mouse_layer    = LAYER_POINTER;
     fake_auto_mouse_elapsed  = 0;
@@ -366,6 +385,10 @@ uint8_t key_feedback_flash_meta(void) {
 
 void key_feedback_semantic_map(uint8_t *out_map) {
     memcpy(out_map, fake_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
+}
+
+void key_feedback_tap_branch_map(uint8_t *out_map) {
+    memcpy(out_map, fake_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
 }
 
 void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
@@ -768,7 +791,7 @@ static void test_slave_multi_tap_pending_feedback_overrides_remote_combo_overlay
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     check_led(0, rgb_from_combo_feedback());
 #else
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 #endif
 }
 
@@ -785,7 +808,7 @@ static void test_slave_multi_tap_pending_feedback_overrides_remote_combo_underla
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     check_led(0, rgb_from_combo_feedback());
 #else
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 #endif
 }
 
@@ -835,6 +858,55 @@ static void test_slave_feedback_uses_remote_semantics_and_flash_phase(void) {
 #endif
 }
 
+static void check_pending_feedback_from_left_source(rgb_t expected_color) {
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, expected_color);
+#elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
+    check_led(0, expected_color);
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+#else
+    check_led(0, expected_color);
+#endif
+}
+
+static void test_multi_tap_pending_uses_branch_color(void) {
+    test_reset();
+
+    layer_state = (layer_state_t)1u << LAYER_SYM;
+    test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    test_local_feedback_tap_branch_add(0, 0, 2u);
+
+    CHECK(render_output());
+
+    check_pending_feedback_from_left_source(rgb_from_tap_pending_color(1));
+}
+
+static void test_multi_tap_pending_branch_color_clamps_to_last_configured_color(void) {
+    test_reset();
+
+    layer_state = (layer_state_t)1u << LAYER_SYM;
+    test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    test_local_feedback_tap_branch_add(0, 0, KEY_BEHAVIOR_MAX_TAP_COUNT);
+
+    CHECK(render_output());
+
+    check_pending_feedback_from_left_source(rgb_from_tap_pending_color(2));
+}
+
+static void test_slave_multi_tap_pending_uses_remote_branch_color(void) {
+    test_reset();
+
+    fake_is_master = false;
+    layer_state    = (layer_state_t)1u << LAYER_SYM;
+    test_remote_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    test_remote_feedback_tap_branch_add(0, 0, 3u);
+
+    CHECK(render_output());
+
+    check_pending_feedback_from_left_source(rgb_from_tap_pending_color(2));
+}
+
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
 static void test_key_feedback_led_groups_repaint_after_feedback_locality(void) {
     test_reset();
@@ -844,7 +916,7 @@ static void test_key_feedback_led_groups_repaint_after_feedback_locality(void) {
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(5, rgb_from_key_feedback_group(0));
 }
 
@@ -884,8 +956,8 @@ static void test_key_half_feedback_paints_only_master_half(void) {
 
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
 
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
@@ -901,8 +973,8 @@ static void test_key_half_feedback_paints_only_slave_half_from_remote_snapshot(v
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 }
 
 static void test_key_half_feedback_paints_both_halves_for_combo_footprint(void) {
@@ -914,10 +986,10 @@ static void test_key_half_feedback_paints_both_halves_for_combo_footprint(void) 
 
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
 
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 }
 
 static void test_key_half_feedback_uses_independent_priority_per_half(void) {
@@ -932,8 +1004,8 @@ static void test_key_half_feedback_uses_independent_priority_per_half(void) {
 
     check_led(0, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
     check_led(3, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 }
 #endif
 
@@ -947,7 +1019,7 @@ static void test_key_feedback_paints_only_master_key(void) {
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(1, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(1, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
@@ -965,7 +1037,7 @@ static void test_key_feedback_paints_only_slave_key_from_remote_snapshot(void) {
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(5, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
@@ -979,11 +1051,11 @@ static void test_key_feedback_paints_all_combo_keys_on_master(void) {
 
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
 
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(1, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(5, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(5, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
@@ -999,10 +1071,10 @@ static void test_key_feedback_paints_all_remote_combo_keys_from_snapshot(void) {
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(1, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(1, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(5, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 #endif
@@ -1016,8 +1088,8 @@ static void test_key_left_half_feedback_paints_fixed_left_half_from_any_source_s
 
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
 
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
@@ -1050,8 +1122,8 @@ static void test_key_right_half_feedback_paints_fixed_right_half_from_any_source
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 }
 
 static void test_key_right_half_feedback_uses_remote_snapshot(void) {
@@ -1065,8 +1137,8 @@ static void test_key_right_half_feedback_uses_remote_snapshot(void) {
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 }
 #endif
 
@@ -1107,12 +1179,12 @@ static void test_slave_full_scene_feedback_overrides_remote_preview_and_locked_p
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(1, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(1, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 }
 #endif
 
@@ -1156,10 +1228,10 @@ static void test_render_order_base_then_preview_then_pd_mode_then_feedback(void)
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 }
 #endif
 
@@ -1217,10 +1289,10 @@ static void test_multi_tap_pending_feedback_overrides_preview_and_pd_mode(void) 
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(6, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 }
 #endif
 
@@ -1254,10 +1326,10 @@ static void test_multi_tap_pending_wins_global_priority_over_flashing_long_hold(
 
     CHECK(render_output());
 
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
-    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(4, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
+    check_led(7, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_colors[0]));
 }
 #endif
 
@@ -1770,6 +1842,9 @@ int main(void) {
     test_slave_multi_tap_pending_feedback_overrides_remote_combo_underlay();
     test_slave_tap_commit_feedback_uses_configured_color();
     test_slave_feedback_uses_remote_semantics_and_flash_phase();
+    test_multi_tap_pending_uses_branch_color();
+    test_multi_tap_pending_branch_color_clamps_to_last_configured_color();
+    test_slave_multi_tap_pending_uses_remote_branch_color();
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
     test_key_feedback_led_groups_repaint_after_feedback_locality();
     test_key_feedback_tap_commit_led_group_repaints_after_feedback_locality();

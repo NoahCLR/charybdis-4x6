@@ -239,8 +239,12 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - long-hold tier = .long_hold on the winning tap index
 //
 // Feedback categories:
-//   - multi_tap_pending_color = multi-tap sequence still resolving which tap
-//     index wins
+//   - RGB_TAP_PENDING_COLORS(...) = colors available while a multi-tap
+//     sequence is still resolving which tap index wins
+//   - tap_pending_mode chooses how pending tap branches pick from that list:
+//     KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR uses the first color for every
+//     pending branch; KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS uses tap index
+//     order and clamps higher tap counts to the last configured color
 //   - tap_committed_color = tap branch resolved and committed; layer and
 //     PD-mode state actions stay quiet because their state overlays own that
 //     feedback
@@ -273,8 +277,16 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //     feedback state; combo-driven feedback paints every combo key
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    // Used while the engine is still resolving the active tap index.
-    .multi_tap_pending_color = HSV(0, 0, 150),
+    RGB_TAP_PENDING_COLORS(
+        HSV(0, 0, 150),
+        HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    ),
+
+    // Choose SINGLE_COLOR to always use the first pending color.
+    .tap_pending_mode = KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS,
 
     // Used for committed tap branches that do not already have state feedback.
     .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),

@@ -16,20 +16,34 @@ extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
 extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 
-static rgb_t key_behavior_feedback_multi_tap_pending_rgb;
+static rgb_t  key_behavior_feedback_tap_pending_rgb[KEY_BEHAVIOR_MAX_TAP_COUNT];
+static uint8_t key_behavior_feedback_tap_pending_rgb_count;
 static rgb_t key_behavior_feedback_tap_committed_rgb;
 static rgb_t key_behavior_feedback_hold_active_rgb;
 static rgb_t key_behavior_feedback_long_hold_active_rgb;
+
+typedef struct {
+    key_feedback_semantic_t semantic;
+    uint8_t                 tap_branch;
+} key_feedback_render_state_t;
 
 #    if RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS <= 0
 #        error "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS must be greater than zero"
 #    endif
 
 void rgb_runtime_key_feedback_stage_post_init(void) {
-    key_behavior_feedback_multi_tap_pending_rgb = hsv_to_rgb(key_behavior_feedback_colors.multi_tap_pending_color);
-    key_behavior_feedback_tap_committed_rgb     = hsv_to_rgb(key_behavior_feedback_colors.tap_committed_color);
-    key_behavior_feedback_hold_active_rgb       = hsv_to_rgb(key_behavior_feedback_colors.hold_active_color);
-    key_behavior_feedback_long_hold_active_rgb  = hsv_to_rgb(key_behavior_feedback_colors.long_hold_active_color);
+    key_behavior_feedback_tap_pending_rgb_count = key_behavior_feedback_colors.tap_pending_colors ? key_behavior_feedback_colors.tap_pending_color_count : 0u;
+    if (key_behavior_feedback_tap_pending_rgb_count > KEY_BEHAVIOR_MAX_TAP_COUNT) {
+        key_behavior_feedback_tap_pending_rgb_count = KEY_BEHAVIOR_MAX_TAP_COUNT;
+    }
+
+    for (uint8_t index = 0; index < key_behavior_feedback_tap_pending_rgb_count; index++) {
+        key_behavior_feedback_tap_pending_rgb[index] = hsv_to_rgb(key_behavior_feedback_colors.tap_pending_colors[index]);
+    }
+
+    key_behavior_feedback_tap_committed_rgb    = hsv_to_rgb(key_behavior_feedback_colors.tap_committed_color);
+    key_behavior_feedback_hold_active_rgb      = hsv_to_rgb(key_behavior_feedback_colors.hold_active_color);
+    key_behavior_feedback_long_hold_active_rgb = hsv_to_rgb(key_behavior_feedback_colors.long_hold_active_color);
 }
 
 static bool rgb_runtime_key_feedback_stage_led_range_intersects(uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
@@ -59,18 +73,54 @@ static void rgb_runtime_key_feedback_stage_current_semantic_map(uint8_t *out_map
     memcpy(out_map, split_runtime_sync_remote.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
 }
 
+static void rgb_runtime_key_feedback_stage_current_tap_branch_map(uint8_t *out_map) {
+    if (!out_map) {
+        return;
+    }
+
+    if (is_keyboard_master()) {
+        key_feedback_tap_branch_map(out_map);
+        return;
+    }
+
+    memcpy(out_map, split_runtime_sync_remote.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
+}
+
 static uint8_t rgb_runtime_key_feedback_stage_current_flash_meta(void) {
     return is_keyboard_master() ? key_feedback_flash_meta() : split_runtime_sync_remote.key_feedback_flash_meta;
 }
 
-static bool rgb_runtime_key_feedback_stage_semantic_color(key_feedback_semantic_t semantic, rgb_t *out_color) {
+static uint8_t rgb_runtime_key_feedback_stage_tap_pending_color_index(uint8_t tap_branch) {
+    uint8_t index;
+
+    if (key_behavior_feedback_tap_pending_rgb_count == 0u) {
+        return 0u;
+    }
+
+    if (key_behavior_feedback_colors.tap_pending_mode == KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR || tap_branch <= 1u) {
+        return 0u;
+    }
+
+    index = (uint8_t)(tap_branch - 1u);
+    if (index >= key_behavior_feedback_tap_pending_rgb_count) {
+        index = (uint8_t)(key_behavior_feedback_tap_pending_rgb_count - 1u);
+    }
+
+    return index;
+}
+
+static bool rgb_runtime_key_feedback_stage_semantic_color(key_feedback_semantic_t semantic, uint8_t tap_branch, rgb_t *out_color) {
     if (!out_color) {
         return false;
     }
 
     switch (semantic) {
         case KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING:
-            *out_color = key_behavior_feedback_multi_tap_pending_rgb;
+            if (key_behavior_feedback_tap_pending_rgb_count == 0u) {
+                *out_color = (rgb_t){0};
+                return false;
+            }
+            *out_color = key_behavior_feedback_tap_pending_rgb[rgb_runtime_key_feedback_stage_tap_pending_color_index(tap_branch)];
             return true;
         case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
             *out_color = key_behavior_feedback_tap_committed_rgb;
@@ -89,6 +139,18 @@ static bool rgb_runtime_key_feedback_stage_semantic_color(key_feedback_semantic_
             *out_color = (rgb_t){0};
             return false;
     }
+}
+
+static uint8_t rgb_runtime_key_feedback_stage_pending_branch_for_key(const uint8_t *semantic_map, const uint8_t *tap_branch_map, keypos_t key_pos) {
+    if (!(semantic_map && tap_branch_map)) {
+        return 0u;
+    }
+
+    if (key_feedback_semantic_map_get(semantic_map, key_pos) != KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING) {
+        return 0u;
+    }
+
+    return key_feedback_tap_branch_map_get(tap_branch_map, key_pos);
 }
 
 static bool rgb_runtime_key_feedback_stage_semantic_visible(key_feedback_semantic_t semantic, uint8_t flash_meta) {
@@ -145,10 +207,10 @@ static bool rgb_runtime_key_feedback_stage_paint_key(rgb_t color, keypos_t key_p
     return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_render_key_mode(const uint8_t *semantic_map, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_render_key_mode(const uint8_t *semantic_map, const uint8_t *tap_branch_map, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
-    if (!semantic_map) {
+    if (!(semantic_map && tap_branch_map)) {
         return false;
     }
 
@@ -156,9 +218,11 @@ static bool rgb_runtime_key_feedback_stage_render_key_mode(const uint8_t *semant
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
             keypos_t                key_pos  = {.row = row, .col = col};
             key_feedback_semantic_t semantic = key_feedback_semantic_map_get(semantic_map, key_pos);
+            uint8_t                 tap_branch;
             rgb_t                   color;
 
-            if (!rgb_runtime_key_feedback_stage_semantic_color(semantic, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(semantic, flash_meta)) {
+            tap_branch = rgb_runtime_key_feedback_stage_pending_branch_for_key(semantic_map, tap_branch_map, key_pos);
+            if (!rgb_runtime_key_feedback_stage_semantic_color(semantic, tap_branch, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(semantic, flash_meta)) {
                 continue;
             }
 
@@ -169,17 +233,34 @@ static bool rgb_runtime_key_feedback_stage_render_key_mode(const uint8_t *semant
     return painted;
 }
 
-static key_feedback_semantic_t rgb_runtime_key_feedback_stage_half_semantic(const uint8_t *semantic_map, bool right_half) {
-    key_feedback_semantic_t best = KEY_FEEDBACK_SEMANTIC_NONE;
+static void rgb_runtime_key_feedback_stage_consider_render_state(key_feedback_render_state_t *best, key_feedback_semantic_t semantic, uint8_t tap_branch) {
+    if (!best) {
+        return;
+    }
 
-    if (!semantic_map) {
-        return KEY_FEEDBACK_SEMANTIC_NONE;
+    if (semantic > best->semantic) {
+        best->semantic   = semantic;
+        best->tap_branch = semantic == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING ? tap_branch : 0u;
+        return;
+    }
+
+    if (semantic == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING && best->semantic == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING && tap_branch > best->tap_branch) {
+        best->tap_branch = tap_branch;
+    }
+}
+
+static key_feedback_render_state_t rgb_runtime_key_feedback_stage_half_state(const uint8_t *semantic_map, const uint8_t *tap_branch_map, bool right_half) {
+    key_feedback_render_state_t best = {.semantic = KEY_FEEDBACK_SEMANTIC_NONE, .tap_branch = 0u};
+
+    if (!(semantic_map && tap_branch_map)) {
+        return best;
     }
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
             keypos_t                key_pos = {.row = row, .col = col};
             key_feedback_semantic_t semantic;
+            uint8_t                 tap_branch;
             split_half_t            half;
 
             half = split_half_from_keypos(key_pos);
@@ -187,40 +268,41 @@ static key_feedback_semantic_t rgb_runtime_key_feedback_stage_half_semantic(cons
                 continue;
             }
 
-            semantic = key_feedback_semantic_map_get(semantic_map, key_pos);
-            if (semantic > best) {
-                best = semantic;
-            }
+            semantic   = key_feedback_semantic_map_get(semantic_map, key_pos);
+            tap_branch = rgb_runtime_key_feedback_stage_pending_branch_for_key(semantic_map, tap_branch_map, key_pos);
+            rgb_runtime_key_feedback_stage_consider_render_state(&best, semantic, tap_branch);
         }
     }
 
     return best;
 }
 
-static key_feedback_semantic_t rgb_runtime_key_feedback_stage_global_semantic(const uint8_t *semantic_map) {
-    key_feedback_semantic_t best = KEY_FEEDBACK_SEMANTIC_NONE;
+static key_feedback_render_state_t rgb_runtime_key_feedback_stage_global_state(const uint8_t *semantic_map, const uint8_t *tap_branch_map) {
+    key_feedback_render_state_t best = {.semantic = KEY_FEEDBACK_SEMANTIC_NONE, .tap_branch = 0u};
 
-    if (!semantic_map) {
-        return KEY_FEEDBACK_SEMANTIC_NONE;
+    if (!(semantic_map && tap_branch_map)) {
+        return best;
     }
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            key_feedback_semantic_t semantic = key_feedback_semantic_map_get(semantic_map, (keypos_t){.row = row, .col = col});
+            keypos_t                key_pos = {.row = row, .col = col};
+            key_feedback_semantic_t semantic;
+            uint8_t                 tap_branch;
 
-            if (semantic > best) {
-                best = semantic;
-            }
+            semantic   = key_feedback_semantic_map_get(semantic_map, key_pos);
+            tap_branch = rgb_runtime_key_feedback_stage_pending_branch_for_key(semantic_map, tap_branch_map, key_pos);
+            rgb_runtime_key_feedback_stage_consider_render_state(&best, semantic, tap_branch);
         }
     }
 
     return best;
 }
 
-static bool rgb_runtime_key_feedback_stage_paint_half(bool right_half, key_feedback_semantic_t semantic, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_paint_half(bool right_half, key_feedback_render_state_t state, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
     rgb_t color;
 
-    if (!rgb_runtime_key_feedback_stage_semantic_color(semantic, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(semantic, flash_meta)) {
+    if (!rgb_runtime_key_feedback_stage_semantic_color(state.semantic, state.tap_branch, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(state.semantic, flash_meta)) {
         return false;
     }
 
@@ -241,36 +323,36 @@ static bool rgb_runtime_key_feedback_stage_paint_half(bool right_half, key_feedb
     return true;
 }
 
-static bool rgb_runtime_key_feedback_stage_render_locality(const uint8_t *semantic_map, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
-    key_feedback_semantic_t left_semantic;
-    key_feedback_semantic_t right_semantic;
-    key_feedback_semantic_t global_semantic;
-    rgb_t                   color;
+static bool rgb_runtime_key_feedback_stage_render_locality(const uint8_t *semantic_map, const uint8_t *tap_branch_map, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
+    key_feedback_render_state_t left_state;
+    key_feedback_render_state_t right_state;
+    key_feedback_render_state_t global_state;
+    rgb_t                       color;
 
     if (key_behavior_feedback_colors.locality == RGB_KEYS_ONLY) {
-        return rgb_runtime_key_feedback_stage_render_key_mode(semantic_map, flash_meta, led_min, led_max);
+        return rgb_runtime_key_feedback_stage_render_key_mode(semantic_map, tap_branch_map, flash_meta, led_min, led_max);
     }
 
     if (key_behavior_feedback_colors.locality == RGB_KEY_HALF) {
         bool painted = false;
 
-        left_semantic  = rgb_runtime_key_feedback_stage_half_semantic(semantic_map, false);
-        right_semantic = rgb_runtime_key_feedback_stage_half_semantic(semantic_map, true);
-        painted |= rgb_runtime_key_feedback_stage_paint_half(false, left_semantic, flash_meta, led_min, led_max);
-        painted |= rgb_runtime_key_feedback_stage_paint_half(true, right_semantic, flash_meta, led_min, led_max);
+        left_state  = rgb_runtime_key_feedback_stage_half_state(semantic_map, tap_branch_map, false);
+        right_state = rgb_runtime_key_feedback_stage_half_state(semantic_map, tap_branch_map, true);
+        painted |= rgb_runtime_key_feedback_stage_paint_half(false, left_state, flash_meta, led_min, led_max);
+        painted |= rgb_runtime_key_feedback_stage_paint_half(true, right_state, flash_meta, led_min, led_max);
         return painted;
     }
 
-    global_semantic = rgb_runtime_key_feedback_stage_global_semantic(semantic_map);
+    global_state = rgb_runtime_key_feedback_stage_global_state(semantic_map, tap_branch_map);
     if (key_behavior_feedback_colors.locality == RGB_LEFT_HALF) {
-        return rgb_runtime_key_feedback_stage_paint_half(false, global_semantic, flash_meta, led_min, led_max);
+        return rgb_runtime_key_feedback_stage_paint_half(false, global_state, flash_meta, led_min, led_max);
     }
 
     if (key_behavior_feedback_colors.locality == RGB_RIGHT_HALF) {
-        return rgb_runtime_key_feedback_stage_paint_half(true, global_semantic, flash_meta, led_min, led_max);
+        return rgb_runtime_key_feedback_stage_paint_half(true, global_state, flash_meta, led_min, led_max);
     }
 
-    if (!rgb_runtime_key_feedback_stage_semantic_color(global_semantic, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(global_semantic, flash_meta)) {
+    if (!rgb_runtime_key_feedback_stage_semantic_color(global_state.semantic, global_state.tap_branch, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(global_state.semantic, flash_meta)) {
         return false;
     }
 
@@ -297,13 +379,15 @@ static bool rgb_runtime_key_feedback_stage_render_groups(const uint8_t *semantic
 
 static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t led_max) {
     uint8_t semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
     uint8_t flash_meta;
     bool    painted = false;
 
     rgb_runtime_key_feedback_stage_current_semantic_map(semantic_map);
+    rgb_runtime_key_feedback_stage_current_tap_branch_map(tap_branch_map);
     flash_meta = rgb_runtime_key_feedback_stage_current_flash_meta();
 
-    painted |= rgb_runtime_key_feedback_stage_render_locality(semantic_map, flash_meta, led_min, led_max);
+    painted |= rgb_runtime_key_feedback_stage_render_locality(semantic_map, tap_branch_map, flash_meta, led_min, led_max);
     painted |= rgb_runtime_key_feedback_stage_render_groups(semantic_map, flash_meta, led_min, led_max);
 
     return painted;

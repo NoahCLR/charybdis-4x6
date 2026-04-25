@@ -302,9 +302,20 @@ Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAP
 | `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | Pulse only for double-tap and higher tap branches; the base single-tap branch stays quiet. |
 | `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS` | Pulse for every authored tap branch that commits. |
 
+Current authored tap-pending feedback mode: `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`.
+
+| Available Tap-Pending Mode | Meaning |
+| --- | --- |
+| `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR` | Use the first tap-pending color for every unresolved tap branch. |
+| `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS` | Use the pending tap count to pick a tap-pending color, clamping higher counts to the last configured color. |
+
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
-| `Multi Tap Pending` | Used while the engine is still resolving the active tap index. | `HSV(0, 0, 150)` | <img alt="Multi Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+| `Tap Pending 1` | Pending multi-tap branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(0, 0, 150)` | <img alt="Tap Pending 1 color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+| `Tap Pending 2` | Pending multi-tap branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(169, 255, 200)` | <img alt="Tap Pending 2 color" src="media/profile-introspection/profile-color-swatch-0006ff.svg" width="96" height="28" /> |
+| `Tap Pending 3` | Pending multi-tap branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(213, 255, 200)` | <img alt="Tap Pending 3 color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `Tap Pending 4` | Pending multi-tap branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(0, 255, 200)` | <img alt="Tap Pending 4 color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" /> |
+| `Tap Pending 5` | Pending multi-tap branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(43, 255, 200)` | <img alt="Tap Pending 5 color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
 | `Tap Committed` | Used for committed tap branches that do not already have state feedback. | `HSV(85, 255, 200)` | <img alt="Tap Committed color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
 | `Hold Active` | Used for authored hold-tier pending / active states and commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff6c00.svg" width="96" height="28" /> |
 | `Long Hold Active` | Used for authored long-hold-tier active states and commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-0084ff.svg" width="96" height="28" /> |
@@ -348,6 +359,7 @@ No filled hardcoded macro slots.
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback locality: `RGB_KEY_HALF`
 - Key-behavior tap-commit feedback: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`
+- Key-behavior tap-pending feedback: `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`
 - Combo feedback locality: `RGB_KEY_HALF`
 
 ### Layer RGB Config
@@ -387,7 +399,7 @@ These values come from the keymap config and the shared userspace config. When t
 | `SERIAL_USART_TIMEOUT` | `5` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_LAYER_STATE_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_ACTIVITY_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
-| `SPLIT_TRANSACTION_IDS_USER` | `PUT_SPLIT_RUNTIME_BASE_SYNC,PUT_SPLIT_COMBO_FEEDBACK_SYNC,PUT_SPLIT_KEY_FEEDBACK_SYNC,PUT_VIA_KEYMAP_SYNC` | [users/noah/config.h](../users/noah/config.h) |
+| `SPLIT_TRANSACTION_IDS_USER` | `PUT_SPLIT_RUNTIME_BASE_SYNC,PUT_SPLIT_COMBO_FEEDBACK_SYNC,PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC,PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC,PUT_VIA_KEYMAP_SYNC` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_PD_MODE_ACTIVE_HALF_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_MATRIX_LED_COUNT` | `58` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_MATRIX_SPLIT` | `{29,29}` | [users/noah/config.h](../users/noah/config.h) |

@@ -14,7 +14,9 @@ The initial pass was review-only. Follow-up implementation in this same active
 thread added fixed left/right key-feedback placement, added exact-key PD RGB
 locality, migrated PD/combo/key-feedback RGB placement to one shared locality
 enum, added combo/key-feedback LED group authoring, added explicit
-interaction-feedback stage gates, and updated the RGB authoring docs.
+interaction-feedback stage gates, added tap-pending branch colors, split
+key-feedback sync into semantic and branch packets, and updated the RGB
+authoring docs.
 
 ## Findings
 
@@ -40,9 +42,9 @@ None.
   documented or a small control cluster should be added.
 - Key-feedback paint priority is currently encoded by enum ordinal ordering:
   `KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING` is last in
-  `users/noah/lib/key/runtime/feedback.h:30`, and the RGB renderer selects the
-  greatest semantic at `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c:140`
-  and `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c:159`. Current
+  `users/noah/lib/key/runtime/feedback.h`, and the RGB renderer selects the
+  greatest semantic before applying tap-branch color selection in
+  `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`. Current
   behavior is tested and coherent, but future feedback states would be safer
   with an explicit priority helper or static assertions that document the
   intended ordering.
@@ -131,6 +133,14 @@ None.
   When disabled, the related stage is omitted from the RGB render path rather
   than called as an empty stage. Preview remains internal to the key-behavior
   feedback path.
+- Key-behavior feedback now has branch-aware tap-pending colors. The authored
+  config uses `RGB_TAP_PENDING_COLORS(...)` plus `tap_pending_mode`, with the
+  first pending color acting as the single-color fallback and branch-color mode
+  clamping higher tap counts to the last configured color. The runtime keeps
+  tap branch state in a separate packed map so the existing semantic map
+  priority remains stable. Split sync now treats key feedback as a packet
+  family: semantic state and tap-branch state are separate RPC payloads because
+  the combined maps do not fit in one 32-byte QMK split transaction.
 
 ## Non-Findings
 
@@ -148,8 +158,8 @@ None.
   that truth at paint time.
 - Split behavior is correctly layered. The master computes preview, combo, and
   key-feedback state, while `split_runtime_sync` transports those surfaces to
-  the slave. The slave renderer uses the mirrored semantic map instead of
-  trying to duplicate key-runtime decisions.
+  the slave. The slave renderer uses mirrored semantic and tap-branch maps
+  instead of trying to duplicate key-runtime decisions.
 - The authored RGB surface is broad enough for this firmware: layer all keys
   vs mapped-only, shared `.led_group` LED groups for layer/PD/combo/key
   feedback, reusable physical `RGB_LED_GROUP_*` names under the LED map,
@@ -207,6 +217,11 @@ the base single-tap branch quiet. Deferred tap dispatches carry the tap-commit
 pulse through pending-release drain, so feedback remains aligned with the
 actual output projection instead of firing early while a sibling tap-release
 blocker is still live.
+Pending multi-tap feedback now also carries tap branch state alongside the
+semantic map. `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS` lets the unresolved
+branch show a distinct authored color, while `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR`
+keeps the old single pending-color behavior by using the first configured
+pending color.
 
 ## Recommended Next Refactor Sequence
 

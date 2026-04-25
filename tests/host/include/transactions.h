@@ -10,10 +10,11 @@
 typedef void (*slave_callback_t)(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer);
 
 enum {
-    PUT_SPLIT_RUNTIME_BASE_SYNC   = 1,
-    PUT_SPLIT_COMBO_FEEDBACK_SYNC = 2,
-    PUT_SPLIT_KEY_FEEDBACK_SYNC   = 3,
-    PUT_VIA_KEYMAP_SYNC           = 4,
+    PUT_SPLIT_RUNTIME_BASE_SYNC           = 1,
+    PUT_SPLIT_COMBO_FEEDBACK_SYNC         = 2,
+    PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC  = 3,
+    PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC    = 4,
+    PUT_VIA_KEYMAP_SYNC                   = 5,
 };
 
 void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback);

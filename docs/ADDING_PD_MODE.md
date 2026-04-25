@@ -465,8 +465,8 @@ This is the actual control path for pd modes:
 7. [`users/noah/lib/pointing/policy/pointer_layer_policy.c`](../users/noah/lib/pointing/policy/pointer_layer_policy.c) keeps the configured
    auto-mouse target layer alive while modes are active or locked.
 8. [`users/noah/lib/state/runtime/split_runtime_sync.c`](../users/noah/lib/state/runtime/split_runtime_sync.c) mirrors active and locked
-   mode ids, auto-mouse progress, key-feedback flags, and preview-layer state
-   to the other half, and
+   mode ids, auto-mouse progress, combo feedback, key-feedback semantic and tap-branch state,
+   and preview-layer state to the other half, and
    [`pd_mode_state.c`](../users/noah/lib/pointing/runtime/pd_mode_state.c)
    exposes the mirrored mode state as display-state queries for UI consumers.
 9. [`users/noah/lib/rgb/core/rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c) orchestrates stage order, and

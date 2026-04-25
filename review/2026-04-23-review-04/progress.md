@@ -95,6 +95,7 @@ Verification passed:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - `git diff --check`
+- `git diff --check`
 
 No required checks were skipped for the implementation follow-up.
 
@@ -662,3 +663,49 @@ Next steps:
    on non-state tap commits.
 2. If another key-feedback semantic is needed later, plan the packed semantic
    map width and priority rules first.
+
+### Tap-Pending Branch RGB Feedback And Split Packet Grouping
+
+- Replaced the single key-behavior pending color with
+  `RGB_TAP_PENDING_COLORS(...)` plus `tap_pending_mode`.
+- Added `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR` and
+  `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`; the first pending color remains the
+  single-color fallback, while branch mode uses tap-count order and clamps to
+  the last configured color.
+- Added a packed tap-branch map beside the packed key-feedback semantic map so
+  different pending keys can show different tap-count colors without consuming
+  the remaining semantic encoding space.
+- Updated key-feedback RGB rendering so `RGB_KEYS_ONLY` can paint each key
+  footprint with its own pending branch color, while half/global localities use
+  the highest visible pending branch inside the rendered scope.
+- Split key-feedback sync into explicit semantic and branch transactions:
+  `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` and
+  `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC`. `PUT_VIA_KEYMAP_SYNC` now follows them.
+- Updated authored RGB config, profile introspection, generated profile docs,
+  RGB docs, README, keymap docs, split tests, RGB render tests, validation
+  tests, and runtime trace tests.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `python3 -m py_compile tools/profile_introspect.py`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Next steps:
+
+1. Flash both halves together because the custom split transaction ID list
+   changed.
+2. Hardware-test pending single/double/triple tap branches on a key with
+   visible multi-tap behavior to confirm branch colors match the authored RGB
+   list.

@@ -3,10 +3,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Owns the custom split RPC sync for runtime-visible state. The sync surface
-// is intentionally split into three packets:
+// is intentionally split into three logical domains:
 // - base runtime state (automouse / pd / preview)
 // - combo RGB locality (underlay + overlay)
-// - authored key-feedback semantic truth
+// - authored key-feedback truth (semantic state + tap branch state)
 //
 // The master periodically re-sends each surface as a heartbeat so a rebooted
 // or rejoined half can recover even if the relevant state did not change.
@@ -42,7 +42,11 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint8_t key_feedback_flash_meta;
     uint8_t key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
-} split_runtime_key_feedback_packet_t;
+} split_runtime_key_feedback_semantic_packet_t;
+
+typedef struct __attribute__((packed)) {
+    uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+} split_runtime_key_feedback_branch_packet_t;
 
 typedef struct {
     uint16_t     automouse_progress;
@@ -57,6 +61,7 @@ typedef struct {
     uint8_t combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t key_feedback_flash_meta;
     uint8_t key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
 } split_runtime_sync_remote_t;
 
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
@@ -70,8 +75,9 @@ typedef struct {
             .key_preview_layer         = UINT8_MAX,            \
             .combo_underlay_bitmap     = {0},                  \
             .combo_overlay_bitmap      = {0},                  \
-            .key_feedback_flash_meta   = 0,                    \
-            .key_feedback_semantic_map = {0},                  \
+            .key_feedback_flash_meta      = 0,                 \
+            .key_feedback_semantic_map    = {0},               \
+            .key_feedback_tap_branch_map = {0},                \
         }
 #else
 #    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT          \
@@ -82,14 +88,16 @@ typedef struct {
             .key_preview_layer         = UINT8_MAX,       \
             .combo_underlay_bitmap     = {0},             \
             .combo_overlay_bitmap      = {0},             \
-            .key_feedback_flash_meta   = 0,               \
-            .key_feedback_semantic_map = {0},             \
+            .key_feedback_flash_meta      = 0,            \
+            .key_feedback_semantic_map    = {0},          \
+            .key_feedback_tap_branch_map = {0},           \
         }
 #endif
 
 _Static_assert(sizeof(split_runtime_base_sync_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_base_sync_packet_t must fit in one QMK RPC payload");
 _Static_assert(sizeof(split_runtime_combo_feedback_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_combo_feedback_packet_t must fit in one QMK RPC payload");
-_Static_assert(sizeof(split_runtime_key_feedback_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_key_feedback_packet_t must fit in one QMK RPC payload");
+_Static_assert(sizeof(split_runtime_key_feedback_semantic_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_key_feedback_semantic_packet_t must fit in one QMK RPC payload");
+_Static_assert(sizeof(split_runtime_key_feedback_branch_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_key_feedback_branch_packet_t must fit in one QMK RPC payload");
 
 #if defined(SPLIT_TRANSACTION_IDS_USER)
 

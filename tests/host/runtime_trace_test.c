@@ -23,8 +23,8 @@ static uint16_t fake_default_dpi;
 static uint16_t fake_last_cpi;
 
 static uint8_t                          rpc_register_count;
-static int8_t                           rpc_registered_ids[3];
-static slave_callback_t                 rpc_registered_callbacks[3];
+static int8_t                           rpc_registered_ids[4];
+static slave_callback_t                 rpc_registered_callbacks[4];
 static uint8_t                          rpc_send_count;
 static split_runtime_base_sync_packet_t rpc_last_base_packet;
 
@@ -156,6 +156,10 @@ void key_feedback_semantic_map(uint8_t *out_map) {
     key_feedback_semantic_map_clear(out_map);
 }
 
+void key_feedback_tap_branch_map(uint8_t *out_map) {
+    key_feedback_tap_branch_map_clear(out_map);
+}
+
 void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
     key_origin_bitmap_clear(out_bitmap);
 }
@@ -191,7 +195,7 @@ static slave_callback_t test_registered_callback(int8_t transaction_id) {
 }
 
 void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) {
-    CHECK(rpc_register_count < 3u);
+    CHECK(rpc_register_count < 4u);
     rpc_registered_ids[rpc_register_count]       = transaction_id;
     rpc_registered_callbacks[rpc_register_count] = callback;
     rpc_register_count++;
@@ -211,8 +215,13 @@ bool transaction_rpc_send(int8_t transaction_id, uint8_t initiator2target_buffer
         return true;
     }
 
-    if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_SYNC) {
-        CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_packet_t));
+    if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) {
+        CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_semantic_packet_t));
+        return true;
+    }
+
+    if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) {
+        CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_branch_packet_t));
         return true;
     }
 
@@ -312,11 +321,12 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     pd_mode_apply_remote_snapshot(PD_MODE_ARROW, PD_MODE_ARROW);
 
     split_runtime_sync_init();
-    CHECK(rpc_register_count == 3u);
+    CHECK(rpc_register_count == 4u);
     CHECK(test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC) != NULL);
     CHECK(test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC) != NULL);
-    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SYNC) != NULL);
-    CHECK(rpc_send_count == 3u);
+    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) != NULL);
+    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) != NULL);
+    CHECK(rpc_send_count == 4u);
     CHECK(rpc_last_base_packet.active_mode_id == PD_MODE_ID_NONE);
     CHECK(rpc_last_base_packet.locked_mode_id == PD_MODE_ID_NONE);
 

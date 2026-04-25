@@ -843,6 +843,24 @@ def parse_key_behavior_feedback_colors(
 
     colors: list[dict[str, object]] = []
     known_anchor_names = set(color_anchors)
+
+    tap_pending_match = re.search(r"\bRGB_TAP_PENDING_COLORS\s*\(", body)
+    if tap_pending_match is not None:
+        args_start = tap_pending_match.end() - 1
+        args_end = find_matching(body, args_start, "(", ")")
+        tap_pending_args = body[args_start + 1 : args_end]
+        for index, expr in enumerate(split_top_level(tap_pending_args), start=1):
+            authored_color = parse_hsv_expr(expr, known_values)
+            colors.append(
+                {
+                    "field": f"tap_pending_{index}_color",
+                    "label": f"Tap Pending {index}",
+                    "meaning": "Pending multi-tap branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch.",
+                    "color": authored_color,
+                    "preview_color": dict(authored_color),
+                }
+            )
+
     for match in field_pattern.finditer(body):
         field_name = match.group("field")
         if not field_name.endswith("_color"):
@@ -924,6 +942,14 @@ def key_behavior_feedback_tap_commit_mode_description(mode: str) -> str:
     return descriptions.get(mode, "Unknown key-behavior tap-commit feedback mode.")
 
 
+def key_behavior_feedback_tap_pending_mode_description(mode: str) -> str:
+    descriptions = {
+        "KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR": "Use the first tap-pending color for every unresolved tap branch.",
+        "KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS": "Use the pending tap count to pick a tap-pending color, clamping higher counts to the last configured color.",
+    }
+    return descriptions.get(mode, "Unknown key-behavior tap-pending feedback mode.")
+
+
 def parse_key_behavior_feedback_locality(raw_text: str) -> dict[str, object] | None:
     try:
         body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
@@ -960,6 +986,26 @@ def parse_key_behavior_feedback_tap_commit_mode(raw_text: str) -> dict[str, obje
         "label": humanize_identifier(normalized_mode.removeprefix("KEY_FEEDBACK_TAP_COMMIT_")),
         "meaning": key_behavior_feedback_tap_commit_mode_description(normalized_mode),
     }
+
+
+def parse_key_behavior_feedback_tap_pending_mode(raw_text: str) -> dict[str, object] | None:
+    try:
+        body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
+    except SystemExit:
+        return None
+
+    fields = parse_designated_fields(strip_comments(body))
+    mode = fields.get(".tap_pending_mode")
+    if mode is None:
+        return None
+
+    normalized_mode = normalize_expr(mode)
+    return {
+        "mode": normalized_mode,
+        "label": humanize_identifier(normalized_mode.removeprefix("KEY_FEEDBACK_TAP_PENDING_")),
+        "meaning": key_behavior_feedback_tap_pending_mode_description(normalized_mode),
+    }
+
 
 
 def parse_rgb_led_group_macros(raw_text: str) -> dict[str, list[str]]:
@@ -1452,6 +1498,9 @@ def build_profile_model() -> dict[str, object]:
     key_behavior_feedback_tap_commit_mode = (
         parse_key_behavior_feedback_tap_commit_mode(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
     )
+    key_behavior_feedback_tap_pending_mode = (
+        parse_key_behavior_feedback_tap_pending_mode(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
+    )
     key_behavior_feedback_led_groups = (
         parse_exported_rgb_led_groups(
             rgb_config_raw_text,
@@ -1518,6 +1567,7 @@ def build_profile_model() -> dict[str, object]:
             "automouse_fade_end_config": automouse_fade_end_config,
             "key_behavior_feedback_locality": key_behavior_feedback_locality,
             "key_behavior_feedback_tap_commit_mode": key_behavior_feedback_tap_commit_mode,
+            "key_behavior_feedback_tap_pending_mode": key_behavior_feedback_tap_pending_mode,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
             "key_behavior_feedback_led_groups": key_behavior_feedback_led_groups,
         },
@@ -1605,6 +1655,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
     combo_feedback_locality = rgb["combo_feedback_locality"]
     feedback_locality = rgb["key_behavior_feedback_locality"]
     tap_commit_mode = rgb["key_behavior_feedback_tap_commit_mode"]
+    tap_pending_mode = rgb["key_behavior_feedback_tap_pending_mode"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
@@ -1651,6 +1702,11 @@ def render_reference_section(profile: dict[str, object]) -> str:
             f"- Key-behavior tap-commit feedback: `{tap_commit_mode['mode']}`"
             if tap_commit_mode is not None
             else "- Key-behavior tap-commit feedback: `not authored`",
+        )
+        lines.append(
+            f"- Key-behavior tap-pending feedback: `{tap_pending_mode['mode']}`"
+            if tap_pending_mode is not None
+            else "- Key-behavior tap-pending feedback: `not authored`",
         )
     if features["rgb_combo_feedback_enabled"]:
         lines.append(
@@ -2476,6 +2532,7 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
     feedback_colors = profile["rgb"]["key_behavior_feedback_colors"]
     feedback_locality = profile["rgb"]["key_behavior_feedback_locality"]
     tap_commit_mode = profile["rgb"]["key_behavior_feedback_tap_commit_mode"]
+    tap_pending_mode = profile["rgb"]["key_behavior_feedback_tap_pending_mode"]
     feedback_groups = profile["rgb"]["key_behavior_feedback_led_groups"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     lines = [
@@ -2525,6 +2582,19 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
                 f"| `KEY_FEEDBACK_TAP_COMMIT_OFF` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_OFF')} |",
                 f"| `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS')} |",
                 f"| `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS')} |",
+                "",
+            ]
+        )
+
+    if tap_pending_mode is not None:
+        lines.extend(
+            [
+                f"Current authored tap-pending feedback mode: `{tap_pending_mode['mode']}`.",
+                "",
+                "| Available Tap-Pending Mode | Meaning |",
+                "| --- | --- |",
+                f"| `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR` | {key_behavior_feedback_tap_pending_mode_description('KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR')} |",
+                f"| `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS` | {key_behavior_feedback_tap_pending_mode_description('KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS')} |",
                 "",
             ]
         )

@@ -321,7 +321,12 @@ In `rgb_config.c`, declare `key_behavior_feedback_colors` directly:
 
 ```c
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    .multi_tap_pending_color = HSV(0, 0, 150),
+    RGB_TAP_PENDING_COLORS(
+        HSV(0, 0, 150),
+        HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    ),
+    .tap_pending_mode        = KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS,
     .tap_committed_color     = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .tap_commit_mode         = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
     .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
@@ -333,12 +338,25 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 Those rows populate the shared
 `key_behavior_feedback_colors` config object:
 
-- `multi_tap_pending_color`
+- `RGB_TAP_PENDING_COLORS(...)`
+- `tap_pending_mode`
 - `tap_committed_color`
 - `tap_commit_mode`
 - `hold_active_color`
 - `long_hold_active_color`
 - `locality`
+
+The `RGB_TAP_PENDING_COLORS(...)` macro declares the colors available while
+the runtime is still resolving a multi-tap sequence. The first color is always
+the fallback pending color.
+
+The `tap_pending_mode` field controls how pending tap branches pick from that
+list:
+
+- `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR`: use the first pending color for
+  every pending branch
+- `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`: use the pending tap count to pick
+  a color from the list; higher tap counts clamp to the last configured color
 
 The `tap_commit_mode` field controls which committed tap branches pulse with
 `tap_committed_color`:
@@ -366,7 +384,8 @@ the live runtime footprint, not a static guess from authored combo comments.
 
 In the shared runtime, those colors are used for these categories:
 
-- multi-tap pending: the engine is waiting to see whether more taps arrive
+- multi-tap pending: the engine is waiting to see whether more taps arrive;
+  branch-color mode can show the pending tap count with a distinct color
 - tap committed: an authored tap branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
 - hold trigger: a hold-tier action has just fired
@@ -405,7 +424,7 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keyma
 
 The runtime now keeps truthful per-key semantic state and only broadens that
 truth at paint time when the authored `locality` asks for it. On split boards,
-the slave receives that packed semantic map and shared flash metadata through
+the slave receives that packed semantic map, tap-branch map, and shared flash metadata through
 [`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c).
 
 ### `key_behavior_feedback_led_groups`

@@ -24,22 +24,25 @@ static uint8_t           fake_pd_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+static uint8_t           fake_key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
 static uint8_t           fake_key_feedback_flash_meta;
 static uint8_t           fake_key_preview_layer;
 
-static uint8_t                               rpc_register_count;
-static int8_t                                rpc_registered_ids[3];
-static slave_callback_t                      rpc_registered_callbacks[3];
-static uint8_t                               rpc_send_count;
-static uint8_t                               rpc_send_count_base;
-static uint8_t                               rpc_send_count_combo;
-static uint8_t                               rpc_send_count_key_feedback;
-static int8_t                                rpc_last_send_id;
-static uint8_t                               rpc_last_send_size;
-static split_runtime_base_sync_packet_t      rpc_last_base_packet;
-static split_runtime_combo_feedback_packet_t rpc_last_combo_packet;
-static split_runtime_key_feedback_packet_t   rpc_last_key_feedback_packet;
-static bool                                  fake_rpc_send_result = true;
+static uint8_t                                      rpc_register_count;
+static int8_t                                       rpc_registered_ids[4];
+static slave_callback_t                             rpc_registered_callbacks[4];
+static uint8_t                                      rpc_send_count;
+static uint8_t                                      rpc_send_count_base;
+static uint8_t                                      rpc_send_count_combo;
+static uint8_t                                      rpc_send_count_key_feedback_semantic;
+static uint8_t                                      rpc_send_count_key_feedback_branch;
+static int8_t                                       rpc_last_send_id;
+static uint8_t                                      rpc_last_send_size;
+static split_runtime_base_sync_packet_t             rpc_last_base_packet;
+static split_runtime_combo_feedback_packet_t        rpc_last_combo_packet;
+static split_runtime_key_feedback_semantic_packet_t rpc_last_key_feedback_semantic_packet;
+static split_runtime_key_feedback_branch_packet_t   rpc_last_key_feedback_branch_packet;
+static bool                                         fake_rpc_send_result = true;
 
 static uint8_t           remote_snapshot_apply_count;
 static pd_mode_mask_t    remote_snapshot_active;
@@ -74,6 +77,7 @@ static void test_reset_stubs(void) {
     fake_combo_overlay_bitmap[0] = 0x24u;
     key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
     key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 0, .col = 0}, KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING);
+    key_feedback_tap_branch_map_clear(fake_key_feedback_tap_branch_map);
     fake_key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
     fake_key_preview_layer       = 3u;
     rpc_register_count           = 0;
@@ -82,12 +86,14 @@ static void test_reset_stubs(void) {
     rpc_send_count               = 0;
     rpc_send_count_base          = 0;
     rpc_send_count_combo         = 0;
-    rpc_send_count_key_feedback  = 0;
+    rpc_send_count_key_feedback_semantic = 0;
+    rpc_send_count_key_feedback_branch   = 0;
     rpc_last_send_id             = -1;
     rpc_last_send_size           = 0;
     rpc_last_base_packet         = (split_runtime_base_sync_packet_t){0};
     rpc_last_combo_packet        = (split_runtime_combo_feedback_packet_t){0};
-    rpc_last_key_feedback_packet = (split_runtime_key_feedback_packet_t){0};
+    rpc_last_key_feedback_semantic_packet = (split_runtime_key_feedback_semantic_packet_t){0};
+    rpc_last_key_feedback_branch_packet   = (split_runtime_key_feedback_branch_packet_t){0};
     fake_rpc_send_result         = true;
     remote_snapshot_apply_count  = 0;
     remote_snapshot_active       = 0;
@@ -135,6 +141,10 @@ void key_feedback_semantic_map(uint8_t *out_map) {
     memcpy(out_map, fake_key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
 }
 
+void key_feedback_tap_branch_map(uint8_t *out_map) {
+    memcpy(out_map, fake_key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
+}
+
 void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
     key_origin_bitmap_copy(out_bitmap, fake_combo_underlay_bitmap);
 }
@@ -164,7 +174,7 @@ void pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t loc
 }
 
 void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) {
-    CHECK(rpc_register_count < 3u);
+    CHECK(rpc_register_count < 4u);
     rpc_registered_ids[rpc_register_count]       = transaction_id;
     rpc_registered_callbacks[rpc_register_count] = callback;
     rpc_register_count++;
@@ -183,10 +193,14 @@ bool transaction_rpc_send(int8_t transaction_id, uint8_t initiator2target_buffer
         rpc_send_count_combo++;
         CHECK(initiator2target_buffer_size == sizeof(split_runtime_combo_feedback_packet_t));
         memcpy(&rpc_last_combo_packet, initiator2target_buffer, sizeof(rpc_last_combo_packet));
-    } else if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_SYNC) {
-        rpc_send_count_key_feedback++;
-        CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_packet_t));
-        memcpy(&rpc_last_key_feedback_packet, initiator2target_buffer, sizeof(rpc_last_key_feedback_packet));
+    } else if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) {
+        rpc_send_count_key_feedback_semantic++;
+        CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_semantic_packet_t));
+        memcpy(&rpc_last_key_feedback_semantic_packet, initiator2target_buffer, sizeof(rpc_last_key_feedback_semantic_packet));
+    } else if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) {
+        rpc_send_count_key_feedback_branch++;
+        CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_branch_packet_t));
+        memcpy(&rpc_last_key_feedback_branch_packet, initiator2target_buffer, sizeof(rpc_last_key_feedback_branch_packet));
     } else {
         CHECK(false);
     }
@@ -204,6 +218,14 @@ static slave_callback_t test_registered_callback(int8_t id) {
     return NULL;
 }
 
+static void test_reset_rpc_send_counts(void) {
+    rpc_send_count                       = 0;
+    rpc_send_count_base                  = 0;
+    rpc_send_count_combo                 = 0;
+    rpc_send_count_key_feedback_semantic = 0;
+    rpc_send_count_key_feedback_branch   = 0;
+}
+
 static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     test_reset_stubs();
 
@@ -213,18 +235,21 @@ static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     CHECK(sizeof(split_runtime_base_sync_packet_t) == 5u);
 #endif
     CHECK(sizeof(split_runtime_combo_feedback_packet_t) == (size_t)(2u * KEY_ORIGIN_BITMAP_SIZE));
-    CHECK(sizeof(split_runtime_key_feedback_packet_t) == (size_t)(1u + KEY_FEEDBACK_SEMANTIC_MAP_SIZE));
+    CHECK(sizeof(split_runtime_key_feedback_semantic_packet_t) == (size_t)(1u + KEY_FEEDBACK_SEMANTIC_MAP_SIZE));
+    CHECK(sizeof(split_runtime_key_feedback_branch_packet_t) == KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
 
     split_runtime_sync_init();
 
-    CHECK(rpc_register_count == 3u);
+    CHECK(rpc_register_count == 4u);
     CHECK(test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC) != NULL);
     CHECK(test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC) != NULL);
-    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SYNC) != NULL);
-    CHECK(rpc_send_count == 3u);
+    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) != NULL);
+    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) != NULL);
+    CHECK(rpc_send_count == 4u);
     CHECK(rpc_send_count_base == 1u);
     CHECK(rpc_send_count_combo == 1u);
-    CHECK(rpc_send_count_key_feedback == 1u);
+    CHECK(rpc_send_count_key_feedback_semantic == 1u);
+    CHECK(rpc_send_count_key_feedback_branch == 1u);
     CHECK(rpc_last_base_packet.automouse_progress == 60u);
     CHECK(rpc_last_base_packet.active_mode_id == pd_mode_id_from_mask(fake_pd_active_flags));
     CHECK(rpc_last_base_packet.locked_mode_id == pd_mode_id_from_mask(fake_pd_locked_flags));
@@ -235,8 +260,9 @@ static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     CHECK(rpc_last_base_packet.key_preview_layer == fake_key_preview_layer);
     CHECK(memcmp(rpc_last_combo_packet.combo_underlay_bitmap, fake_combo_underlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(rpc_last_combo_packet.combo_overlay_bitmap, fake_combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
-    CHECK(rpc_last_key_feedback_packet.key_feedback_flash_meta == fake_key_feedback_flash_meta);
-    CHECK(memcmp(rpc_last_key_feedback_packet.key_feedback_semantic_map, fake_key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
+    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == fake_key_feedback_flash_meta);
+    CHECK(memcmp(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, fake_key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
+    CHECK(memcmp(rpc_last_key_feedback_branch_packet.key_feedback_tap_branch_map, fake_key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE) == 0);
     CHECK(split_runtime_sync_remote.key_preview_layer == UINT8_MAX);
 }
 
@@ -246,10 +272,11 @@ static void test_init_registers_rpcs_without_sending_on_slave(void) {
 
     split_runtime_sync_init();
 
-    CHECK(rpc_register_count == 3u);
+    CHECK(rpc_register_count == 4u);
     CHECK(test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC) != NULL);
     CHECK(test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC) != NULL);
-    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SYNC) != NULL);
+    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) != NULL);
+    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) != NULL);
     CHECK(rpc_send_count == 0u);
     CHECK(split_runtime_sync_remote.key_preview_layer == UINT8_MAX);
 }
@@ -258,10 +285,7 @@ static void test_elapsed_skips_unchanged_packets_until_heartbeat(void) {
     test_reset_stubs();
 
     split_runtime_sync_init();
-    rpc_send_count              = 0;
-    rpc_send_count_base         = 0;
-    rpc_send_count_combo        = 0;
-    rpc_send_count_key_feedback = 0;
+    test_reset_rpc_send_counts();
 
     split_runtime_sync_elapsed(fake_auto_mouse_elapsed);
     CHECK(rpc_send_count == 0u);
@@ -275,24 +299,23 @@ static void test_elapsed_skips_unchanged_packets_until_heartbeat(void) {
     CHECK(rpc_send_count == 3u);
     CHECK(rpc_send_count_base == 1u);
     CHECK(rpc_send_count_combo == 1u);
-    CHECK(rpc_send_count_key_feedback == 1u);
+    CHECK(rpc_send_count_key_feedback_semantic == 1u);
+    CHECK(rpc_send_count_key_feedback_branch == 0u);
 }
 
 static void test_force_sync_sends_all_packets_even_when_unchanged(void) {
     test_reset_stubs();
 
     split_runtime_sync_init();
-    rpc_send_count              = 0;
-    rpc_send_count_base         = 0;
-    rpc_send_count_combo        = 0;
-    rpc_send_count_key_feedback = 0;
+    test_reset_rpc_send_counts();
 
     split_runtime_sync();
 
-    CHECK(rpc_send_count == 3u);
+    CHECK(rpc_send_count == 4u);
     CHECK(rpc_send_count_base == 1u);
     CHECK(rpc_send_count_combo == 1u);
-    CHECK(rpc_send_count_key_feedback == 1u);
+    CHECK(rpc_send_count_key_feedback_semantic == 1u);
+    CHECK(rpc_send_count_key_feedback_branch == 1u);
 }
 
 static void test_key_feedback_phase_is_ignored_without_flashing_semantics(void) {
@@ -302,39 +325,35 @@ static void test_key_feedback_phase_is_ignored_without_flashing_semantics(void) 
     fake_key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
 
     split_runtime_sync_init();
-    CHECK(rpc_last_key_feedback_packet.key_feedback_flash_meta == 0u);
+    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == 0u);
 
-    rpc_send_count               = 0;
-    rpc_send_count_base          = 0;
-    rpc_send_count_combo         = 0;
-    rpc_send_count_key_feedback  = 0;
+    test_reset_rpc_send_counts();
     fake_key_feedback_flash_meta = 0u;
 
     split_runtime_sync_tick();
     CHECK(rpc_send_count == 0u);
     CHECK(rpc_send_count_base == 0u);
     CHECK(rpc_send_count_combo == 0u);
-    CHECK(rpc_send_count_key_feedback == 0u);
+    CHECK(rpc_send_count_key_feedback_semantic == 0u);
+    CHECK(rpc_send_count_key_feedback_branch == 0u);
 }
 
 static void test_key_feedback_phase_changes_when_flashing_semantics_are_present(void) {
     test_reset_stubs();
 
     split_runtime_sync_init();
-    CHECK(rpc_last_key_feedback_packet.key_feedback_flash_meta == KEY_FEEDBACK_FLASH_META_PHASE);
+    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == KEY_FEEDBACK_FLASH_META_PHASE);
 
-    rpc_send_count               = 0;
-    rpc_send_count_base          = 0;
-    rpc_send_count_combo         = 0;
-    rpc_send_count_key_feedback  = 0;
+    test_reset_rpc_send_counts();
     fake_key_feedback_flash_meta = 0u;
 
     split_runtime_sync_tick();
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 0u);
     CHECK(rpc_send_count_combo == 0u);
-    CHECK(rpc_send_count_key_feedback == 1u);
-    CHECK(rpc_last_key_feedback_packet.key_feedback_flash_meta == 0u);
+    CHECK(rpc_send_count_key_feedback_semantic == 1u);
+    CHECK(rpc_send_count_key_feedback_branch == 0u);
+    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == 0u);
 }
 
 static void test_locked_pd_mode_zeroes_automouse_progress(void) {
@@ -350,10 +369,7 @@ static void test_tick_sends_only_base_packet_when_only_automouse_changes(void) {
     test_reset_stubs();
 
     split_runtime_sync_init();
-    rpc_send_count              = 0;
-    rpc_send_count_base         = 0;
-    rpc_send_count_combo        = 0;
-    rpc_send_count_key_feedback = 0;
+    test_reset_rpc_send_counts();
     fake_auto_mouse_elapsed     = 91u;
 
     split_runtime_sync_tick();
@@ -361,7 +377,8 @@ static void test_tick_sends_only_base_packet_when_only_automouse_changes(void) {
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 1u);
     CHECK(rpc_send_count_combo == 0u);
-    CHECK(rpc_send_count_key_feedback == 0u);
+    CHECK(rpc_send_count_key_feedback_semantic == 0u);
+    CHECK(rpc_send_count_key_feedback_branch == 0u);
     CHECK(rpc_last_base_packet.automouse_progress == 70u);
 }
 
@@ -369,10 +386,7 @@ static void test_tick_sends_only_combo_packet_when_only_combo_feedback_changes(v
     test_reset_stubs();
 
     split_runtime_sync_init();
-    rpc_send_count              = 0;
-    rpc_send_count_base         = 0;
-    rpc_send_count_combo        = 0;
-    rpc_send_count_key_feedback = 0;
+    test_reset_rpc_send_counts();
 
     fake_combo_underlay_bitmap[0] = 0x01u;
 
@@ -381,7 +395,8 @@ static void test_tick_sends_only_combo_packet_when_only_combo_feedback_changes(v
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 0u);
     CHECK(rpc_send_count_combo == 1u);
-    CHECK(rpc_send_count_key_feedback == 0u);
+    CHECK(rpc_send_count_key_feedback_semantic == 0u);
+    CHECK(rpc_send_count_key_feedback_branch == 0u);
     CHECK(rpc_last_send_id == PUT_SPLIT_COMBO_FEEDBACK_SYNC);
     CHECK(rpc_last_combo_packet.combo_underlay_bitmap[0] == 0x01u);
 }
@@ -390,10 +405,7 @@ static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_chan
     test_reset_stubs();
 
     split_runtime_sync_init();
-    rpc_send_count              = 0;
-    rpc_send_count_base         = 0;
-    rpc_send_count_combo        = 0;
-    rpc_send_count_key_feedback = 0;
+    test_reset_rpc_send_counts();
 
     key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
 
@@ -402,9 +414,29 @@ static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_chan
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 0u);
     CHECK(rpc_send_count_combo == 0u);
-    CHECK(rpc_send_count_key_feedback == 1u);
-    CHECK(rpc_last_send_id == PUT_SPLIT_KEY_FEEDBACK_SYNC);
-    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    CHECK(rpc_send_count_key_feedback_semantic == 1u);
+    CHECK(rpc_send_count_key_feedback_branch == 0u);
+    CHECK(rpc_last_send_id == PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC);
+    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+}
+
+static void test_tick_sends_only_key_feedback_branch_packet_when_only_tap_branch_changes(void) {
+    test_reset_stubs();
+
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+
+    key_feedback_tap_branch_map_set(fake_key_feedback_tap_branch_map, (keypos_t){.row = 1, .col = 1}, 3u);
+
+    split_runtime_sync_tick();
+
+    CHECK(rpc_send_count == 1u);
+    CHECK(rpc_send_count_base == 0u);
+    CHECK(rpc_send_count_combo == 0u);
+    CHECK(rpc_send_count_key_feedback_semantic == 0u);
+    CHECK(rpc_send_count_key_feedback_branch == 1u);
+    CHECK(rpc_last_send_id == PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC);
+    CHECK(key_feedback_tap_branch_map_get(rpc_last_key_feedback_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 1, .col = 1}) == 3u);
 }
 
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
@@ -412,10 +444,7 @@ static void test_tick_sends_base_packet_when_only_pd_owner_bitmap_changes(void) 
     test_reset_stubs();
 
     split_runtime_sync_init();
-    rpc_send_count              = 0;
-    rpc_send_count_base         = 0;
-    rpc_send_count_combo        = 0;
-    rpc_send_count_key_feedback = 0;
+    test_reset_rpc_send_counts();
 
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
     key_origin_bitmap_fill_single(fake_pd_owner_bitmap, (keypos_t){.row = 4, .col = 1});
@@ -425,7 +454,8 @@ static void test_tick_sends_base_packet_when_only_pd_owner_bitmap_changes(void) 
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 1u);
     CHECK(rpc_send_count_combo == 0u);
-    CHECK(rpc_send_count_key_feedback == 0u);
+    CHECK(rpc_send_count_key_feedback_semantic == 0u);
+    CHECK(rpc_send_count_key_feedback_branch == 0u);
     CHECK(memcmp(rpc_last_base_packet.pd_mode_owner_bitmap, fake_pd_owner_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
 }
 #endif
@@ -442,14 +472,12 @@ static void test_idle_packets_use_idle_heartbeat(void) {
     key_origin_bitmap_clear(fake_combo_underlay_bitmap);
     key_origin_bitmap_clear(fake_combo_overlay_bitmap);
     key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
+    key_feedback_tap_branch_map_clear(fake_key_feedback_tap_branch_map);
 
     split_runtime_sync_init();
-    CHECK(rpc_last_key_feedback_packet.key_feedback_flash_meta == 0u);
+    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == 0u);
 
-    rpc_send_count              = 0;
-    rpc_send_count_base         = 0;
-    rpc_send_count_combo        = 0;
-    rpc_send_count_key_feedback = 0;
+    test_reset_rpc_send_counts();
 
     fake_time32 += 999u;
     split_runtime_sync_tick();
@@ -457,10 +485,11 @@ static void test_idle_packets_use_idle_heartbeat(void) {
 
     fake_time32 += 1u;
     split_runtime_sync_tick();
-    CHECK(rpc_send_count == 3u);
+    CHECK(rpc_send_count == 4u);
     CHECK(rpc_send_count_base == 1u);
     CHECK(rpc_send_count_combo == 1u);
-    CHECK(rpc_send_count_key_feedback == 1u);
+    CHECK(rpc_send_count_key_feedback_semantic == 1u);
+    CHECK(rpc_send_count_key_feedback_branch == 1u);
 }
 
 static void test_slave_rpcs_apply_exact_remote_state(void) {
@@ -474,24 +503,28 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
 #endif
         .key_preview_layer = 6u,
     };
-    split_runtime_combo_feedback_packet_t combo_packet = {0};
-    split_runtime_key_feedback_packet_t   key_packet   = {0};
+    split_runtime_combo_feedback_packet_t        combo_packet        = {0};
+    split_runtime_key_feedback_semantic_packet_t key_semantic_packet = {0};
+    split_runtime_key_feedback_branch_packet_t   key_branch_packet   = {0};
 
     test_reset_stubs();
     fake_is_master                        = false;
     combo_packet.combo_underlay_bitmap[0] = 0x11u;
     combo_packet.combo_overlay_bitmap[1]  = 0x22u;
-    key_packet.key_feedback_flash_meta    = KEY_FEEDBACK_FLASH_META_PHASE;
-    key_feedback_semantic_map_set(key_packet.key_feedback_semantic_map, (keypos_t){.row = 0, .col = 1}, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    key_semantic_packet.key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+    key_feedback_semantic_map_set(key_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 0, .col = 1}, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    key_feedback_tap_branch_map_set(key_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 0, .col = 1}, 2u);
 
     split_runtime_sync_init();
     CHECK(test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC) != NULL);
     CHECK(test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC) != NULL);
-    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SYNC) != NULL);
+    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) != NULL);
+    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) != NULL);
 
     test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)(sizeof(base_packet), &base_packet, 0u, NULL);
     test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC)(sizeof(combo_packet), &combo_packet, 0u, NULL);
-    test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SYNC)(sizeof(key_packet), &key_packet, 0u, NULL);
+    test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC)(sizeof(key_semantic_packet), &key_semantic_packet, 0u, NULL);
+    test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC)(sizeof(key_branch_packet), &key_branch_packet, 0u, NULL);
 
     CHECK(split_runtime_sync_remote.automouse_progress == base_packet.automouse_progress);
     CHECK(split_runtime_sync_remote.active_mode_id == base_packet.active_mode_id);
@@ -507,8 +540,9 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
     CHECK(split_runtime_sync_remote.key_preview_layer == base_packet.key_preview_layer);
     CHECK(memcmp(split_runtime_sync_remote.combo_underlay_bitmap, combo_packet.combo_underlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(split_runtime_sync_remote.combo_overlay_bitmap, combo_packet.combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
-    CHECK(split_runtime_sync_remote.key_feedback_flash_meta == key_packet.key_feedback_flash_meta);
-    CHECK(memcmp(split_runtime_sync_remote.key_feedback_semantic_map, key_packet.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
+    CHECK(split_runtime_sync_remote.key_feedback_flash_meta == key_semantic_packet.key_feedback_flash_meta);
+    CHECK(memcmp(split_runtime_sync_remote.key_feedback_semantic_map, key_semantic_packet.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
+    CHECK(memcmp(split_runtime_sync_remote.key_feedback_tap_branch_map, key_branch_packet.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE) == 0);
     CHECK(remote_snapshot_apply_count == 1u);
     CHECK(remote_snapshot_active == pd_mode_mask_from_id(base_packet.active_mode_id));
     CHECK(remote_snapshot_locked == pd_mode_mask_from_id(base_packet.locked_mode_id));
@@ -544,6 +578,7 @@ int main(void) {
     test_tick_sends_only_base_packet_when_only_automouse_changes();
     test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();
     test_tick_sends_only_key_feedback_packet_when_only_key_feedback_changes();
+    test_tick_sends_only_key_feedback_branch_packet_when_only_tap_branch_changes();
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     test_tick_sends_base_packet_when_only_pd_owner_bitmap_changes();
 #endif
