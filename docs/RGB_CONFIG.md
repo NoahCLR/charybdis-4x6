@@ -172,7 +172,7 @@ later overlays such as pd-mode color or key feedback still paint on top.
 
 ### `pd_mode_colors[]`
 
-`pd_mode_colors[]` defines the overlay color and paint mode for each active
+`pd_mode_colors[]` defines the overlay color and locality for each active
 pointing-device mode.
 
 In `rgb_config.c`, declare `pd_mode_colors[]` and `pd_mode_color_count`
@@ -182,27 +182,27 @@ Each row is keyed by a `PD_MODE_*` flag rather than by array index. That means
 the color mapping follows the pointing mode itself, not the order of
 `pd_modes[]`.
 
-Each row also chooses where the overlay paints:
+Each row also chooses where the overlay paints through `.locality`:
 
-- `PD_COLOR_MODE_RIGHT_HALF`: always paint the right half
-- `PD_COLOR_MODE_LEFT_HALF`: always paint the left half
-- `PD_COLOR_MODE_BOTH_HALVES`: mirror the overlay across both halves
-- `PD_COLOR_MODE_TRIGGER_HALF`: paint the half that triggered the currently
-  effective PD mode.
+- `RGB_BOTH_HALVES`: mirror the overlay across both halves
+- `RGB_LEFT_HALF`: always paint the left half
+- `RGB_RIGHT_HALF`: always paint the right half
+- `RGB_KEY_HALF`: paint the half or halves containing the key footprint that
+  triggered the currently effective PD mode.
   If the triggering combo footprint spans both halves, the overlay paints both
   halves instead of guessing one side.
-- `PD_COLOR_MODE_TRIGGER_KEYS`: paint the key footprint that triggered the
-  currently effective PD mode. If a combo triggered the mode, every combo key
-  in the footprint is painted.
+- `RGB_KEYS_ONLY`: paint only the key footprint that triggered the currently
+  effective PD mode. If a combo triggered the mode, every combo key in the
+  footprint is painted.
 
-Trigger-local placement relies on the backend PD ownership tracking in
+Key-local placement relies on the backend PD ownership tracking in
 [`users/noah/config.h`](../users/noah/config.h).
 
 Use rows like:
 
 ```c
-{ .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .mode = PD_COLOR_MODE_TRIGGER_HALF },
-{ .pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .mode = PD_COLOR_MODE_TRIGGER_KEYS },
+{ .pointing_mode = PD_MODE_ARROW, .color = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEY_HALF },
+{ .pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEYS_ONLY },
 ```
 
 Use this table when you want `ARROW_MODE`, `VOLUME_MODE`, `PINCH_MODE`, and the
@@ -235,8 +235,8 @@ In `rgb_config.c`, declare `combo_feedback_colors` directly:
 
 ```c
 const combo_feedback_color_config_t combo_feedback_colors = {
-    .color      = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-    .mode       = COMBO_FEEDBACK_MODE_COMBO_KEYS,
+    .color    = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .locality = RGB_KEYS_ONLY,
 };
 ```
 
@@ -248,14 +248,14 @@ This is a persistent combo identity layer:
   state indicators
 - unrelated combos stay above preview and PD
 
-The `mode` field controls where the combo layer paints:
+The `locality` field controls where the combo layer paints:
 
-- `COMBO_FEEDBACK_MODE_BOTH_HALVES`: repaint both halves while any combo is active
-- `COMBO_FEEDBACK_MODE_COMBO_HALF`: repaint the half or halves touched by the
-  live combo footprint
-- `COMBO_FEEDBACK_MODE_COMBO_KEYS`: repaint only the exact combo keys
-- `COMBO_FEEDBACK_MODE_LEFT_HALF`: always repaint the left half
-- `COMBO_FEEDBACK_MODE_RIGHT_HALF`: always repaint the right half
+- `RGB_BOTH_HALVES`: repaint both halves while any combo is active
+- `RGB_LEFT_HALF`: always repaint the left half
+- `RGB_RIGHT_HALF`: always repaint the right half
+- `RGB_KEY_HALF`: repaint the half or halves touched by the live combo
+  footprint
+- `RGB_KEYS_ONLY`: repaint only the exact combo keys
 
 This layer is intentionally steady while held. That keeps combo identity
 visible underneath later flashing key-behavior overlays instead of competing
@@ -270,7 +270,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(0, 0, 150),
     .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-    .mode                    = KEY_FEEDBACK_MODE_KEY_HALF,
+    .locality                = RGB_KEY_HALF,
 };
 ```
 
@@ -280,22 +280,22 @@ Those rows populate the shared
 - `multi_tap_pending_color`
 - `hold_active_color`
 - `long_hold_active_color`
-- `mode`
+- `locality`
 
-The `mode` field controls where the overlay paints:
+The `locality` field controls where the overlay paints:
 
-- `KEY_FEEDBACK_MODE_BOTH_HALVES`: repaint both halves
-- `KEY_FEEDBACK_MODE_KEY_HALF`: repaint only the half that owns the
-  feedback-driving key or active tap series. Combo-driven feedback can expand
-  this to both halves when the combo footprint spans both sides.
-- `KEY_FEEDBACK_MODE_KEY`: repaint only the feedback-driving key footprint.
-  For combo outputs, that means every key that formed the combo.
-- `KEY_FEEDBACK_MODE_LEFT_HALF`: repaint the left half using the highest
+- `RGB_BOTH_HALVES`: repaint both halves
+- `RGB_LEFT_HALF`: repaint the left half using the highest
   priority active feedback state.
-- `KEY_FEEDBACK_MODE_RIGHT_HALF`: repaint the right half using the highest
+- `RGB_RIGHT_HALF`: repaint the right half using the highest
   priority active feedback state.
+- `RGB_KEY_HALF`: repaint only the half that owns the feedback-driving key or
+  active tap series. Combo-driven feedback can expand this to both halves when
+  the combo footprint spans both sides.
+- `RGB_KEYS_ONLY`: repaint only the feedback-driving key footprint. For combo
+  outputs, that means every key that formed the combo.
 
-Like PD trigger-half placement, key-behavior feedback locality is driven from
+Like PD key-local placement, key-behavior feedback locality is driven from
 the live runtime footprint, not a static guess from authored combo comments.
 
 In the shared runtime, those colors are used for these categories:
@@ -334,8 +334,8 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keyma
 `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
 
 The runtime now keeps truthful per-key semantic state and only broadens that
-truth at paint time when the authored `mode` asks for it. On split boards, the
-slave receives that packed semantic map and shared flash metadata through
+truth at paint time when the authored `locality` asks for it. On split boards,
+the slave receives that packed semantic map and shared flash metadata through
 [`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c).
 
 ## Render Order
@@ -351,7 +351,7 @@ slave receives that packed semantic map and shared flash metadata through
 4. per-layer preview overlay for a pending momentary-layer hold, if
    `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on and that previewed layer has a
    nonzero solid color
-5. the active pointing-device mode color using the authored PD paint mode
+5. the active pointing-device mode color using the authored PD locality
 6. per-mode LED groups
 7. combo overlay for all other active combos
 8. the key-behavior feedback overlay on both halves, only the key half, or
@@ -365,11 +365,11 @@ Examples:
 - a preview- or PD-owning combo can stay underneath the preview or PD overlay
 - an unrelated active combo can repaint above preview or PD if it uses the
   combo overlay path
-- a pd-mode overlay can repaint the authored half or both halves after the
-  base scene and any combo underlay
+- a pd-mode overlay can repaint its authored locality after the base scene and
+  any combo underlay
 - a pd-mode LED group can then repaint selected LEDs on top of the mode overlay
 - the key-behavior overlay can still repaint last, either on both halves, only
-  the key half, or only the specific key footprint depending on `mode`
+  the key half, or only the specific key footprint depending on `locality`
 
 ## The Helper Types
 
@@ -414,7 +414,7 @@ Edit the matching row in `pd_mode_colors[]`.
 
 ### Change where a pd-mode overlay paints
 
-Edit the matching row in `pd_mode_colors[]` and change its `.mode`.
+Edit the matching row in `pd_mode_colors[]` and change its `.locality`.
 
 ### Add a small highlight to one layer
 

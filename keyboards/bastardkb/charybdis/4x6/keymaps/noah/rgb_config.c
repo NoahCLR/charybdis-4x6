@@ -134,50 +134,49 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 // Each entry is tagged with its pointing mode so the order doesn't need to
 // match pd_modes[] — adding or reordering modes won't silently break colors.
 //
-// Mode decides where the overlay paints:
-//   - PD_COLOR_MODE_RIGHT_HALF = always paint the right half
-//   - PD_COLOR_MODE_LEFT_HALF = always paint the left half
-//   - PD_COLOR_MODE_BOTH_HALVES = mirror the PD color across both halves
-//   - PD_COLOR_MODE_TRIGGER_HALF = paint the half that triggered the current
-//     effective PD mode. Combo-driven triggers broaden this to both halves
-//     when the combo footprint spans both sides.
-//   - PD_COLOR_MODE_TRIGGER_KEYS = paint the key footprint that triggered the
-//     current effective PD mode; combo-driven triggers paint every combo key
+// Locality decides where the overlay paints:
+//   - RGB_BOTH_HALVES = mirror the PD color across both halves
+//   - RGB_LEFT_HALF = always paint the left half
+//   - RGB_RIGHT_HALF = always paint the right half
+//   - RGB_KEY_HALF = paint the half or halves containing the key footprint
+//     that triggered the current effective PD mode
+//   - RGB_KEYS_ONLY = paint the key footprint that triggered the current
+//     effective PD mode; combo-driven triggers paint every combo key
 //
-// This profile uses PD_COLOR_MODE_RIGHT_HALF for every PD mode so pointing
+// This profile uses RGB_RIGHT_HALF for every PD mode so pointing
 // state stays anchored to the pointer half.
 //
-// { .pointing_mode = ..., .color = HSV(hue, sat, val), .mode = ... }
+// { .pointing_mode = ..., .color = HSV(hue, sat, val), .locality = ... }
 const pd_mode_color_t pd_mode_colors[] = {
     {
         .pointing_mode = PD_MODE_DRAGSCROLL,
         .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .locality      = RGB_RIGHT_HALF,
     }, // orange
     {
         .pointing_mode = PD_MODE_VOLUME,
         .color         = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .locality      = RGB_RIGHT_HALF,
     }, // yellow
     {
         .pointing_mode = PD_MODE_BRIGHTNESS,
         .color         = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .locality      = RGB_RIGHT_HALF,
     }, // magenta
     {
         .pointing_mode = PD_MODE_ARROW,
         .color         = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .locality      = RGB_RIGHT_HALF,
     }, // cyan
     {
         .pointing_mode = PD_MODE_PINCH,
         .color         = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .locality      = RGB_RIGHT_HALF,
     }, // lime
     {
         .pointing_mode = PD_MODE_ZOOM,
         .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_RIGHT_HALF,
+        .locality      = RGB_RIGHT_HALF,
     }, // light green
 };
 const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
@@ -209,16 +208,15 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 //   - authored key-behavior feedback can still repaint above the combo color
 //     on the same keys
 //
-// Mode decides where the combo layer paints:
-//   - COMBO_FEEDBACK_MODE_BOTH_HALVES = mirror the combo color across both
-//     halves
-//   - COMBO_FEEDBACK_MODE_COMBO_HALF = paint the half or halves touched by the
-//     live combo footprint
-//   - COMBO_FEEDBACK_MODE_COMBO_KEYS = paint the exact combo keys
-//   - COMBO_FEEDBACK_MODE_LEFT_HALF = always paint the left half
-//   - COMBO_FEEDBACK_MODE_RIGHT_HALF = always paint the right half
+// Locality decides where the combo layer paints:
+//   - RGB_BOTH_HALVES = mirror the combo color across both halves
+//   - RGB_LEFT_HALF = always paint the left half
+//   - RGB_RIGHT_HALF = always paint the right half
+//   - RGB_KEY_HALF = paint the half or halves touched by the live combo
+//     footprint
+//   - RGB_KEYS_ONLY = paint the exact combo keys
 //
-// This profile uses COMBO_FEEDBACK_MODE_COMBO_HALF so active combos stay local
+// This profile uses RGB_KEY_HALF so active combos stay local
 // to the half or halves that formed the chord without narrowing to individual
 // keys or broadening across the board.
 #    ifdef COMBO_ENABLE
@@ -228,7 +226,7 @@ const combo_feedback_color_config_t combo_feedback_colors = {
     .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
     // Keep combo identity on the half or halves touched by the live combo.
-    .mode = COMBO_FEEDBACK_MODE_COMBO_HALF,
+    .locality = RGB_KEY_HALF,
 };
 #    endif
 
@@ -256,17 +254,16 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 //   - PRESS_AND_HOLD_UNTIL_RELEASE(...) and REPEAT_WHILE_HELD(...) flash while
 //     that tier stays active
 //
-// Mode decides where the overlay paints:
-//   - KEY_FEEDBACK_MODE_BOTH_HALVES = mirror the feedback color across both
-//     halves
-//   - KEY_FEEDBACK_MODE_KEY_HALF = paint only the half that owns the key or
-//     tap series currently driving the feedback state; combo-driven feedback
-//     can broaden this to both halves
-//   - KEY_FEEDBACK_MODE_KEY = paint only the key footprint currently driving
-//     the feedback state; combo-driven feedback paints every combo key
-//   - KEY_FEEDBACK_MODE_LEFT_HALF = always paint the left half
-//   - KEY_FEEDBACK_MODE_RIGHT_HALF = always paint the right half
-// This profile uses KEY_FEEDBACK_MODE_KEY_HALF so hold / multi-tap feedback
+// Locality decides where the overlay paints:
+//   - RGB_BOTH_HALVES = mirror the feedback color across both halves
+//   - RGB_LEFT_HALF = always paint the left half
+//   - RGB_RIGHT_HALF = always paint the right half
+//   - RGB_KEY_HALF = paint only the half that owns the key or tap series
+//     currently driving the feedback state; combo-driven feedback can broaden
+//     this to both halves
+//   - RGB_KEYS_ONLY = paint only the key footprint currently driving the
+//     feedback state; combo-driven feedback paints every combo key
+// This profile uses RGB_KEY_HALF so hold / multi-tap feedback
 // stays local to the half that caused it without becoming too subtle.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
@@ -282,7 +279,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .long_hold_active_color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
     // Keep feedback on the half that owns the current key / tap series.
-    .mode = KEY_FEEDBACK_MODE_KEY_HALF,
+    .locality = RGB_KEY_HALF,
 };
 #    endif
 

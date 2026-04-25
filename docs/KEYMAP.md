@@ -88,12 +88,12 @@ single pointer-specific utility chord.
 Combo outputs now keep two runtime views at once:
 
 - one representative owner key for release matching and other ownership paths
-- one full physical combo footprint for RGB locality and PD trigger-side
+- one full physical combo footprint for RGB locality and PD key-local
   placement
 
-If a combo spans both halves, localized RGB and `PD_COLOR_MODE_TRIGGER_HALF`
+If a combo spans both halves, localized RGB and `RGB_KEY_HALF`
 broaden to both halves instead of pretending the combo came from only one
-side. `PD_COLOR_MODE_TRIGGER_KEYS` can use that same footprint to paint the
+side. `RGB_KEYS_ONLY` can use that same footprint to paint the
 exact combo keys.
 
 ## Signature Behaviors
@@ -228,7 +228,7 @@ until release.
 
 Because `CLICK_SPAM` is combo-backed, localized key-feedback RGB follows the
 combo footprint rather than the fake QMK combo position `(0,0)`. In
-`KEY_FEEDBACK_MODE_KEY_HALF`, that means it can light both halves when a combo
+`RGB_KEY_HALF`, that means it can light both halves when a combo
 really spans both sides.
 
 That `100 Hz` setting is also the current authored maximum: `100` repeats per

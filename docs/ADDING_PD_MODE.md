@@ -318,8 +318,11 @@ Edit [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboard
 Add a new row to `pd_mode_colors[]`:
 
 ```c
-{ .pointing_mode = PD_MODE_EXAMPLE, .color = HSV(120, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS) },
+{ .pointing_mode = PD_MODE_EXAMPLE, .color = HSV(120, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_RIGHT_HALF },
 ```
+
+Use `.locality` to choose where the overlay paints: `RGB_BOTH_HALVES`,
+`RGB_LEFT_HALF`, `RGB_RIGHT_HALF`, `RGB_KEY_HALF`, or `RGB_KEYS_ONLY`.
 
 Optional: uncomment the `pd_mode_led_groups_data` block if the mode wants a
 specific LED subset highlighted.

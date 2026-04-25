@@ -158,9 +158,9 @@ simultaneous chord that emits one keycode or action.
 At runtime, a combo still keeps one representative owner key for ownership and
 release matching, but the userspace now also tracks the full physical combo
 footprint for locality-sensitive features. That means combo-backed key
-feedback can stay on the relevant key or half, and `PD_COLOR_MODE_TRIGGER_HALF`
+feedback can stay on the relevant key or half, and `RGB_KEY_HALF`
 can broaden to both halves when a combo spans both sides of the board.
-`PD_COLOR_MODE_TRIGGER_KEYS` can narrow the same PD ownership truth to the
+`RGB_KEYS_ONLY` can narrow the same PD ownership truth to the
 exact triggering key footprint.
 
 That footprint tracking follows the live resolved keycodes QMK sees, so dynamic
@@ -228,7 +228,8 @@ The runtime supports:
 
 - per-layer colors
 - per-layer LED group highlights
-- per-mode left/right/both/trigger-half colors
+- per-mode RGB locality on both halves, a fixed half, the key half, or the
+  exact triggering key footprint
 - per-mode LED group highlights
 - steady combo feedback that can sit above or below preview / PD depending on live ownership
 - optional auto-mouse countdown gradient feedback

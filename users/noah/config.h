@@ -47,8 +47,9 @@
 // so both halves render layer-owned RGB from the same runtime and keymap data.
 #    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SYNC, PUT_VIA_KEYMAP_SYNC
 
-// Dynamic trigger-half placement for PD-mode RGB overlays.
-// Required only when a pd_mode_colors[] row uses PD_COLOR_MODE_TRIGGER_HALF.
+// Dynamic key-local placement for PD-mode RGB overlays.
+// Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or
+// RGB_KEYS_ONLY.
 // Comment out RGB_PD_MODE_ACTIVE_HALF_ENABLE to keep the split runtime packet
 // smaller and limit PD overlays to fixed left/right/both placement modes.
 #    ifdef POINTING_DEVICE_ENABLE

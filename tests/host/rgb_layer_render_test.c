@@ -129,7 +129,7 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 };
 
 const pd_mode_color_t pd_mode_colors[] = {
-    {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .mode = PD_COLOR_MODE_RIGHT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .mode = PD_COLOR_MODE_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .mode = PD_COLOR_MODE_BOTH_HALVES}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .mode = PD_COLOR_MODE_TRIGGER_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(233, 234, 235), .mode = PD_COLOR_MODE_TRIGGER_KEYS},
+    {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .locality = RGB_RIGHT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .locality = RGB_BOTH_HALVES}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .locality = RGB_KEY_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(233, 234, 235), .locality = RGB_KEYS_ONLY},
 };
 const uint8_t                    pd_mode_color_count       = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 static const uint8_t             volume_mode_group_leds[]  = {1, 6};
@@ -148,23 +148,23 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
     .end_color = HSV(200, 210, 220),
 };
 const combo_feedback_color_config_t combo_feedback_colors = {
-    .color = HSV(150, 151, 152),
-    .mode  = COMBO_FEEDBACK_MODE_COMBO_KEYS,
+    .color    = HSV(150, 151, 152),
+    .locality = RGB_KEYS_ONLY,
 };
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(1, 2, 3),
     .hold_active_color       = HSV(4, 5, 6),
     .long_hold_active_color  = HSV(7, 8, 9),
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
-    .mode = KEY_FEEDBACK_MODE_KEY,
+    .locality = RGB_KEYS_ONLY,
 #elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
-    .mode = KEY_FEEDBACK_MODE_KEY_HALF,
+    .locality = RGB_KEY_HALF,
 #elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF
-    .mode = KEY_FEEDBACK_MODE_LEFT_HALF,
+    .locality = RGB_LEFT_HALF,
 #elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
-    .mode = KEY_FEEDBACK_MODE_RIGHT_HALF,
+    .locality = RGB_RIGHT_HALF,
 #else
-    .mode = KEY_FEEDBACK_MODE_BOTH_HALVES,
+    .locality = RGB_BOTH_HALVES,
 #endif
 };
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {

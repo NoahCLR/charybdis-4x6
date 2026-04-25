@@ -11,8 +11,9 @@ whole-userspace file-map review. This is a separate post-closure RGB runtime
 and profile review.
 
 The initial pass was review-only. Follow-up implementation in this same active
-thread added fixed left/right key-feedback placement modes, added exact
-trigger-key PD RGB placement, and updated the RGB authoring docs.
+thread added fixed left/right key-feedback placement, added exact-key PD RGB
+locality, migrated PD/combo/key-feedback RGB placement to one shared locality
+enum, and updated the RGB authoring docs.
 
 ## Findings
 
@@ -48,7 +49,7 @@ None.
 ## Resolved During Follow-Up
 
 - PD-mode RGB authoring comments now match the profile: `pd_mode_colors[]` uses
-  `PD_COLOR_MODE_RIGHT_HALF` for every pointing mode, and the user-facing
+  `RGB_RIGHT_HALF` locality for every pointing mode, and the user-facing
   `rgb_config.c` comment describes that pointer-half policy without mentioning
   backend debug defines. Verification: `python3 tools/profile_introspect.py
   --check`, `sh tests/host/run_real_profile_validation_tests.sh`,
@@ -60,8 +61,8 @@ None.
   `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`,
   `users/noah/lib/rgb/core/rgb_validation.c`, and
   `tests/host/rgb_layer_render_test.c`.
-- PD-mode RGB now has exact trigger-key placement in addition to fixed
-  left/right, both halves, and trigger-half placement. Code references:
+- PD-mode RGB now has exact-key locality in addition to fixed left/right,
+  both halves, and key-half locality. Code references:
   `users/noah/lib/pointing/runtime/pd_mode_state.c`,
   `users/noah/lib/state/runtime/split_runtime_sync.c`,
   `users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`, and
@@ -96,6 +97,16 @@ None.
   `ZOOM_MODE` path. Code references:
   `users/noah/lib/key/runtime/core/runtime.c` and
   `tests/host/pd_mode_key_runtime_integration_test.c`.
+- PD, combo feedback, and key-behavior feedback now share one RGB locality API:
+  `.locality` plus `RGB_BOTH_HALVES`, `RGB_LEFT_HALF`, `RGB_RIGHT_HALF`,
+  `RGB_KEY_HALF`, and `RGB_KEYS_ONLY`. Layer coverage and auto-mouse fade keep
+  their existing `.mode` fields because they are not interaction-locality
+  settings. Code references: `users/noah/lib/rgb/core/rgb_helpers.h`,
+  `users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`,
+  `users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c`,
+  `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`,
+  `users/noah/lib/rgb/core/rgb_validation.c`, and
+  `tools/profile_introspect.py`.
 
 ## Non-Findings
 
@@ -114,11 +125,10 @@ None.
   key-feedback state, while `split_runtime_sync` transports those surfaces to
   the slave. The slave renderer uses the mirrored semantic map instead of
   trying to duplicate key-runtime decisions.
-- The authored RGB mode surface is broad enough for this firmware: layer all
-  keys vs mapped-only, layer LED groups, auto-mouse fade destination modes,
-  pointing-mode left/right/both/trigger-half/trigger-key overlays,
-  pointing-mode LED groups, combo both/half/keys/fixed-side placement,
-  key-feedback both/fixed-half/key-half/key placement, and diagnostic override
+- The authored RGB surface is broad enough for this firmware: layer all keys
+  vs mapped-only, layer LED groups, auto-mouse fade destination modes, shared
+  `rgb_locality_t` placement for pointing-mode, combo-feedback, and
+  key-feedback overlays, pointing-mode LED groups, and diagnostic override
   color are all present.
 - All six registered pointing modes have profile colors:
   `DRAGSCROLL`, `VOLUME_MODE`, `BRIGHTNESS_MODE`, `ARROW_MODE`, `PINCH_MODE`,
@@ -156,10 +166,10 @@ re-registering an already-held pd mode must transfer lease ownership to the
 current press token, otherwise the eventual release cannot observe and
 unregister the active PD lifecycle.
 
-The current `.mode` authoring surface is coherent for the main feedback
-surfaces. PD, combo feedback, and key-behavior feedback all support fixed
-left/right placement, and the event-driven feedback surfaces that can preserve
-exact key ownership now expose exact-key placement.
+The current interaction RGB authoring surface is coherent for the main feedback
+surfaces. PD, combo feedback, and key-behavior feedback all use `.locality`
+with shared `RGB_*` locality values. Layer coverage and auto-mouse fade still
+use `.mode` because they are not interaction-locality settings.
 
 ## Recommended Next Refactor Sequence
 

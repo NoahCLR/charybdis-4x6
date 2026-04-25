@@ -15,8 +15,8 @@ extern const uint8_t                    pd_mode_color_count;
 extern const pd_mode_led_group_t *const pd_mode_led_groups;
 extern const uint8_t                    pd_mode_led_group_count;
 
-static rgb_t   pd_mode_rgb[PD_MODE_COUNT];
-static uint8_t pd_mode_render_mode[PD_MODE_COUNT];
+static rgb_t          pd_mode_rgb[PD_MODE_COUNT];
+static rgb_locality_t pd_mode_render_locality[PD_MODE_COUNT];
 
 static bool rgb_runtime_pd_mode_stage_led_range_intersects(uint8_t led_min, uint8_t led_max, uint8_t from, uint8_t to) {
     return led_min < to && led_max > from;
@@ -73,13 +73,13 @@ static bool rgb_runtime_pd_mode_stage_paint_owner_keys(rgb_t color, const uint8_
 
 void rgb_runtime_pd_mode_stage_post_init(void) {
     for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        pd_mode_rgb[i]         = (rgb_t){0};
-        pd_mode_render_mode[i] = PD_COLOR_MODE_RIGHT_HALF;
+        pd_mode_rgb[i]             = (rgb_t){0};
+        pd_mode_render_locality[i] = RGB_RIGHT_HALF;
 
         for (uint8_t c = 0; c < pd_mode_color_count; c++) {
             if (pd_mode_colors[c].pointing_mode == pd_modes[i].mode_flag) {
-                pd_mode_rgb[i]         = hsv_to_rgb(pd_mode_colors[c].color);
-                pd_mode_render_mode[i] = pd_mode_colors[c].mode;
+                pd_mode_rgb[i]             = hsv_to_rgb(pd_mode_colors[c].color);
+                pd_mode_render_locality[i] = pd_mode_colors[c].locality;
                 break;
             }
         }
@@ -96,23 +96,23 @@ static split_side_mask_t rgb_runtime_pd_mode_stage_resolve_trigger_sides(pd_mode
     return SPLIT_SIDE_MASK_BOTH;
 }
 
-static bool rgb_runtime_pd_mode_stage_paint_mode(rgb_t color, uint8_t mode, pd_mode_snapshot_t snapshot, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_pd_mode_stage_paint_locality(rgb_t color, rgb_locality_t locality, pd_mode_snapshot_t snapshot, uint8_t led_min, uint8_t led_max) {
     split_side_mask_t sides = SPLIT_SIDE_MASK_NONE;
 
-    switch (mode) {
-        case PD_COLOR_MODE_LEFT_HALF:
+    switch (locality) {
+        case RGB_LEFT_HALF:
             if (!rgb_runtime_pd_mode_stage_led_range_intersects(led_min, led_max, 0, RGB_LEFT_LED_COUNT)) {
                 return false;
             }
             rgb_set_left_half(color, led_min, led_max);
             return true;
-        case PD_COLOR_MODE_BOTH_HALVES:
+        case RGB_BOTH_HALVES:
             rgb_set_both_halves(color, led_min, led_max);
             return led_min < led_max;
-        case PD_COLOR_MODE_TRIGGER_HALF:
+        case RGB_KEY_HALF:
             sides = rgb_runtime_pd_mode_stage_resolve_trigger_sides(snapshot);
             break;
-        case PD_COLOR_MODE_TRIGGER_KEYS: {
+        case RGB_KEYS_ONLY: {
             uint8_t owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 
             if (pd_mode_display_owner_bitmap_snapshot(owner_bitmap)) {
@@ -122,7 +122,7 @@ static bool rgb_runtime_pd_mode_stage_paint_mode(rgb_t color, uint8_t mode, pd_m
             rgb_set_both_halves(color, led_min, led_max);
             return led_min < led_max;
         }
-        case PD_COLOR_MODE_RIGHT_HALF:
+        case RGB_RIGHT_HALF:
         default:
             sides = SPLIT_SIDE_MASK_RIGHT;
             break;
@@ -155,7 +155,7 @@ bool rgb_runtime_pd_mode_stage_render(uint8_t led_min, uint8_t led_max) {
     uint8_t            active_mode = snapshot.display.active_index;
 
     if (active_mode < PD_MODE_COUNT) {
-        painted |= rgb_runtime_pd_mode_stage_paint_mode(pd_mode_rgb[active_mode], pd_mode_render_mode[active_mode], snapshot, led_min, led_max);
+        painted |= rgb_runtime_pd_mode_stage_paint_locality(pd_mode_rgb[active_mode], pd_mode_render_locality[active_mode], snapshot, led_min, led_max);
     }
 
     for (uint8_t group = 0; group < pd_mode_led_group_count; group++) {

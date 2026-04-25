@@ -130,7 +130,7 @@ enum keymap_custom_keycodes {
 // that emitted key can reuse the same custom behavior handling.
 //
 // Runtime ownership still keeps one representative combo owner key for release
-// matching, but RGB feedback and PD trigger-side rendering use the full
+// matching, but RGB feedback and PD key-local rendering use the full
 // physical combo footprint. Cross-half combos therefore broaden locality to
 // both halves instead of guessing one side.
 //

@@ -202,11 +202,11 @@ static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t 
     rgb_runtime_key_feedback_stage_current_semantic_map(semantic_map);
     flash_meta = rgb_runtime_key_feedback_stage_current_flash_meta();
 
-    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY) {
+    if (key_behavior_feedback_colors.locality == RGB_KEYS_ONLY) {
         return rgb_runtime_key_feedback_stage_render_key_mode(semantic_map, flash_meta, led_min, led_max);
     }
 
-    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_KEY_HALF) {
+    if (key_behavior_feedback_colors.locality == RGB_KEY_HALF) {
         bool painted = false;
 
         left_semantic  = rgb_runtime_key_feedback_stage_half_semantic(semantic_map, false);
@@ -217,11 +217,11 @@ static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t 
     }
 
     global_semantic = rgb_runtime_key_feedback_stage_global_semantic(semantic_map);
-    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_LEFT_HALF) {
+    if (key_behavior_feedback_colors.locality == RGB_LEFT_HALF) {
         return rgb_runtime_key_feedback_stage_paint_half(false, global_semantic, flash_meta, led_min, led_max);
     }
 
-    if (key_behavior_feedback_colors.mode == KEY_FEEDBACK_MODE_RIGHT_HALF) {
+    if (key_behavior_feedback_colors.locality == RGB_RIGHT_HALF) {
         return rgb_runtime_key_feedback_stage_paint_half(true, global_semantic, flash_meta, led_min, led_max);
     }
 

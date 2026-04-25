@@ -28,17 +28,17 @@
 // ─── RGB config types ───────────────────────────────────────────────────────
 
 typedef enum {
-    PD_COLOR_MODE_RIGHT_HALF = 0,
-    PD_COLOR_MODE_LEFT_HALF,
-    PD_COLOR_MODE_BOTH_HALVES,
-    PD_COLOR_MODE_TRIGGER_HALF,
-    PD_COLOR_MODE_TRIGGER_KEYS,
-} pd_color_mode_t;
+    RGB_BOTH_HALVES = 0,
+    RGB_LEFT_HALF,
+    RGB_RIGHT_HALF,
+    RGB_KEY_HALF,
+    RGB_KEYS_ONLY,
+} rgb_locality_t;
 
 typedef struct {
-    pd_mode_mask_t  pointing_mode;
-    hsv_t           color;
-    pd_color_mode_t mode;
+    pd_mode_mask_t pointing_mode;
+    hsv_t          color;
+    rgb_locality_t locality;
 } pd_mode_color_t;
 
 typedef enum {
@@ -62,32 +62,16 @@ typedef struct {
     hsv_t                     end_color;
 } automouse_fade_end_config_t;
 
-typedef enum {
-    COMBO_FEEDBACK_MODE_BOTH_HALVES = 0,
-    COMBO_FEEDBACK_MODE_COMBO_HALF,
-    COMBO_FEEDBACK_MODE_COMBO_KEYS,
-    COMBO_FEEDBACK_MODE_LEFT_HALF,
-    COMBO_FEEDBACK_MODE_RIGHT_HALF,
-} combo_feedback_mode_t;
-
 typedef struct {
-    hsv_t                 color;
-    combo_feedback_mode_t mode;
+    hsv_t          color;
+    rgb_locality_t locality;
 } combo_feedback_color_config_t;
 
-typedef enum {
-    KEY_FEEDBACK_MODE_BOTH_HALVES = 0,
-    KEY_FEEDBACK_MODE_KEY_HALF,
-    KEY_FEEDBACK_MODE_KEY,
-    KEY_FEEDBACK_MODE_LEFT_HALF,
-    KEY_FEEDBACK_MODE_RIGHT_HALF,
-} key_behavior_feedback_mode_t;
-
 typedef struct {
-    hsv_t                        multi_tap_pending_color;
-    hsv_t                        hold_active_color;
-    hsv_t                        long_hold_active_color;
-    key_behavior_feedback_mode_t mode;
+    hsv_t          multi_tap_pending_color;
+    hsv_t          hold_active_color;
+    hsv_t          long_hold_active_color;
+    rgb_locality_t locality;
 } key_behavior_feedback_color_config_t;
 
 typedef struct {

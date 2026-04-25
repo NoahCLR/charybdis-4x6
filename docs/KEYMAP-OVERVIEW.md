@@ -86,9 +86,9 @@ Timing legend for the layer-local behavior tables:
 
 #### PD Modes Reachable On This Layer
 
-| Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
+| Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -118,9 +118,9 @@ Timing legend for the layer-local behavior tables:
 
 #### PD Modes Reachable On This Layer
 
-| Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
+| Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -175,9 +175,9 @@ No authored combos resolve entirely from keys on this layer.
 
 #### PD Modes Reachable On This Layer
 
-| Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
+| Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `RGB_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -208,13 +208,13 @@ No authored combos resolve entirely from keys on this layer.
 
 #### PD Modes Reachable On This Layer
 
-| Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |
+| Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `VOLUME` directly on layer | `VOLUME` (`VOLUME_MODE`) | `PD_MODE_VOLUME` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
-| `BRIGHTNESS` directly on layer | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `PD_MODE_BRIGHTNESS` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
-| `PINCH` via `double hold` -> `ZOOM` (`ZOOM_MODE`) | `ZOOM` (`ZOOM_MODE`) | `PD_MODE_ZOOM` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
-| `PINCH` directly on layer | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
+| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `RGB_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `VOLUME` directly on layer | `VOLUME` (`VOLUME_MODE`) | `PD_MODE_VOLUME` | `RGB_RIGHT_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `BRIGHTNESS` directly on layer | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `PD_MODE_BRIGHTNESS` | `RGB_RIGHT_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `PINCH` via `double hold` -> `ZOOM` (`ZOOM_MODE`) | `ZOOM` (`ZOOM_MODE`) | `PD_MODE_ZOOM` | `RGB_RIGHT_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
+| `PINCH` directly on layer | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `RGB_RIGHT_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -224,25 +224,25 @@ No authored combos resolve entirely from keys on this layer.
 
 ## PD Mode Colors
 
-These overlays come from `pd_mode_colors[]` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). Each row chooses its own paint mode and color for the matching pointing mode.
-Trigger-local PD paint modes are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in [users/noah/config.h](../users/noah/config.h); current state: `defined`.
+These overlays come from `pd_mode_colors[]` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). Each row chooses its own locality and color for the matching pointing mode.
+Key-local PD RGB localities are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in [users/noah/config.h](../users/noah/config.h); current state: `defined`.
 
-| PD Paint Mode | Meaning |
+| PD Locality | Meaning |
 | --- | --- |
-| `PD_COLOR_MODE_RIGHT_HALF` | Paint the right half whenever the matching PD mode is active. |
-| `PD_COLOR_MODE_LEFT_HALF` | Paint the left half whenever the matching PD mode is active. |
-| `PD_COLOR_MODE_BOTH_HALVES` | Mirror the PD-mode overlay across both halves. |
-| `PD_COLOR_MODE_TRIGGER_HALF` | Paint the half that triggered the currently effective PD mode. |
-| `PD_COLOR_MODE_TRIGGER_KEYS` | Paint the key footprint that triggered the currently effective PD mode. |
+| `RGB_BOTH_HALVES` | Mirror the PD-mode overlay across both halves. |
+| `RGB_LEFT_HALF` | Paint the left half whenever the matching PD mode is active. |
+| `RGB_RIGHT_HALF` | Paint the right half whenever the matching PD mode is active. |
+| `RGB_KEY_HALF` | Paint the half or halves containing the key footprint that triggered the currently effective PD mode. |
+| `RGB_KEYS_ONLY` | Paint only the key footprint that triggered the currently effective PD mode. |
 
-| Pointing Mode | Paint Mode | Authored HSV | Preview Color |
+| Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
-| `PD_MODE_DRAGSCROLL` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `PD_MODE_VOLUME` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
-| `PD_MODE_BRIGHTNESS` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
-| `PD_MODE_ARROW` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
-| `PD_MODE_PINCH` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
-| `PD_MODE_ZOOM` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
+| `PD_MODE_DRAGSCROLL` | `RGB_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `PD_MODE_VOLUME` | `RGB_RIGHT_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `PD_MODE_BRIGHTNESS` | `RGB_RIGHT_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `PD_MODE_PINCH` | `RGB_RIGHT_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
+| `PD_MODE_ZOOM` | `RGB_RIGHT_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
 
 ## Auto-mouse Fade
 
@@ -266,15 +266,15 @@ Preview color: <img alt="Auto-mouse end color" src="media/profile-introspection/
 
 This steady combo layer comes from `combo_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). It stays visible while a combo chord is active, sits underneath preview and pd-mode indicators when that combo owns those states, and otherwise repaints above preview and pd-mode overlays but below key-behavior feedback.
 
-Current authored combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_HALF`.
+Current authored combo feedback locality: `RGB_KEY_HALF`.
 
-| Available Mode | Meaning |
+| Available Locality | Meaning |
 | --- | --- |
-| `COMBO_FEEDBACK_MODE_BOTH_HALVES` | Mirror the steady combo color across both halves while any combo is active. |
-| `COMBO_FEEDBACK_MODE_COMBO_HALF` | Paint the half or halves touched by the live combo footprint. |
-| `COMBO_FEEDBACK_MODE_COMBO_KEYS` | Paint only the exact keys that formed the currently active combo footprint. |
-| `COMBO_FEEDBACK_MODE_LEFT_HALF` | Always paint the left half for active combos. |
-| `COMBO_FEEDBACK_MODE_RIGHT_HALF` | Always paint the right half for active combos. |
+| `RGB_BOTH_HALVES` | Mirror the steady combo color across both halves while any combo is active. |
+| `RGB_LEFT_HALF` | Always paint the left half for active combos. |
+| `RGB_RIGHT_HALF` | Always paint the right half for active combos. |
+| `RGB_KEY_HALF` | Paint the half or halves touched by the live combo footprint. |
+| `RGB_KEYS_ONLY` | Paint only the exact keys that formed the currently active combo footprint. |
 
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
@@ -282,17 +282,17 @@ Current authored combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_HALF`.
 
 ## Key-Behavior Feedback LEDs
 
-These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored paint modes intentionally collapse that truth to a half or full-board presentation.
+These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored localities intentionally collapse that truth to a half or full-board presentation.
 
-Current authored feedback paint mode: `KEY_FEEDBACK_MODE_KEY_HALF`.
+Current authored feedback locality: `RGB_KEY_HALF`.
 
-| Available Mode | Meaning |
+| Available Locality | Meaning |
 | --- | --- |
-| `KEY_FEEDBACK_MODE_BOTH_HALVES` | Repaint both halves whenever a key-behavior feedback state is active. |
-| `KEY_FEEDBACK_MODE_KEY_HALF` | Repaint only the half that owns the key or tap series currently driving the feedback state. |
-| `KEY_FEEDBACK_MODE_KEY` | Repaint only the specific key currently driving the feedback state. |
-| `KEY_FEEDBACK_MODE_LEFT_HALF` | Always repaint the left half using the highest-priority active key-behavior feedback state. |
-| `KEY_FEEDBACK_MODE_RIGHT_HALF` | Always repaint the right half using the highest-priority active key-behavior feedback state. |
+| `RGB_BOTH_HALVES` | Repaint both halves whenever a key-behavior feedback state is active. |
+| `RGB_LEFT_HALF` | Always repaint the left half using the highest-priority active key-behavior feedback state. |
+| `RGB_RIGHT_HALF` | Always repaint the right half using the highest-priority active key-behavior feedback state. |
+| `RGB_KEY_HALF` | Repaint only the half that owns the key or tap series currently driving the feedback state. |
+| `RGB_KEYS_ONLY` | Repaint only the specific key currently driving the feedback state. |
 
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
@@ -337,8 +337,8 @@ No filled hardcoded macro slots.
 - Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
-- Key-behavior feedback paint mode: `KEY_FEEDBACK_MODE_KEY_HALF`
-- Combo feedback paint mode: `COMBO_FEEDBACK_MODE_COMBO_HALF`
+- Key-behavior feedback locality: `RGB_KEY_HALF`
+- Combo feedback locality: `RGB_KEY_HALF`
 
 ### Layer RGB Config
 

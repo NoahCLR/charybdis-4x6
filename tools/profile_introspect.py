@@ -667,18 +667,18 @@ def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[di
 
     for match in entry_pattern.finditer(body):
         fields = parse_designated_fields(strip_comments(match.group("body")))
-        if ".pointing_mode" not in fields or ".color" not in fields or ".mode" not in fields:
+        if ".pointing_mode" not in fields or ".color" not in fields or ".locality" not in fields:
             continue
         pointing_mode = normalize_expr(fields[".pointing_mode"])
         color = parse_hsv_expr(fields[".color"], known_values)
-        mode = normalize_expr(fields[".mode"])
+        locality = normalize_expr(fields[".locality"])
         rows.append(
             {
                 "pointing_mode": pointing_mode,
                 "color": color,
-                "mode": mode,
-                "mode_label": humanize_identifier(mode.removeprefix("PD_COLOR_MODE_")),
-                "mode_meaning": pd_color_mode_description(mode),
+                "locality": locality,
+                "locality_label": humanize_identifier(locality.removeprefix("RGB_")),
+                "locality_meaning": pd_color_locality_description(locality),
                 "preview_color": dict(color),
                 "comment_color_name": normalize_color_name(match.group("label")) or None,
             }
@@ -764,26 +764,26 @@ def automouse_fade_end_mode_description(mode: str) -> str:
     return descriptions.get(mode, "Unknown auto-mouse fade destination mode.")
 
 
-def pd_color_mode_description(mode: str) -> str:
+def pd_color_locality_description(locality: str) -> str:
     descriptions = {
-        "PD_COLOR_MODE_RIGHT_HALF": "Paint the right half whenever the matching PD mode is active.",
-        "PD_COLOR_MODE_LEFT_HALF": "Paint the left half whenever the matching PD mode is active.",
-        "PD_COLOR_MODE_BOTH_HALVES": "Mirror the PD-mode overlay across both halves.",
-        "PD_COLOR_MODE_TRIGGER_HALF": "Paint the half that triggered the currently effective PD mode.",
-        "PD_COLOR_MODE_TRIGGER_KEYS": "Paint the key footprint that triggered the currently effective PD mode.",
+        "RGB_RIGHT_HALF": "Paint the right half whenever the matching PD mode is active.",
+        "RGB_LEFT_HALF": "Paint the left half whenever the matching PD mode is active.",
+        "RGB_BOTH_HALVES": "Mirror the PD-mode overlay across both halves.",
+        "RGB_KEY_HALF": "Paint the half or halves containing the key footprint that triggered the currently effective PD mode.",
+        "RGB_KEYS_ONLY": "Paint only the key footprint that triggered the currently effective PD mode.",
     }
-    return descriptions.get(mode, "Unknown PD-mode paint mode.")
+    return descriptions.get(locality, "Unknown PD-mode RGB locality.")
 
 
-def combo_feedback_mode_description(mode: str) -> str:
+def combo_feedback_locality_description(locality: str) -> str:
     descriptions = {
-        "COMBO_FEEDBACK_MODE_BOTH_HALVES": "Mirror the steady combo color across both halves while any combo is active.",
-        "COMBO_FEEDBACK_MODE_COMBO_HALF": "Paint the half or halves touched by the live combo footprint.",
-        "COMBO_FEEDBACK_MODE_COMBO_KEYS": "Paint only the exact keys that formed the currently active combo footprint.",
-        "COMBO_FEEDBACK_MODE_LEFT_HALF": "Always paint the left half for active combos.",
-        "COMBO_FEEDBACK_MODE_RIGHT_HALF": "Always paint the right half for active combos.",
+        "RGB_BOTH_HALVES": "Mirror the steady combo color across both halves while any combo is active.",
+        "RGB_KEY_HALF": "Paint the half or halves touched by the live combo footprint.",
+        "RGB_KEYS_ONLY": "Paint only the exact keys that formed the currently active combo footprint.",
+        "RGB_LEFT_HALF": "Always paint the left half for active combos.",
+        "RGB_RIGHT_HALF": "Always paint the right half for active combos.",
     }
-    return descriptions.get(mode, "Unknown combo feedback paint mode.")
+    return descriptions.get(locality, "Unknown combo feedback RGB locality.")
 
 
 def parse_automouse_fade_end_config(raw_text: str, known_values: dict[str, str]) -> dict[str, object] | None:
@@ -868,52 +868,52 @@ def parse_combo_feedback_color(raw_text: str, known_values: dict[str, str]) -> d
     }
 
 
-def parse_combo_feedback_mode(raw_text: str) -> dict[str, object] | None:
+def parse_combo_feedback_locality(raw_text: str) -> dict[str, object] | None:
     try:
         body = extract_initializer_body(raw_text, r"combo_feedback_colors\s*=")
     except SystemExit:
         return None
 
     fields = parse_designated_fields(strip_comments(body))
-    mode = fields.get(".mode")
-    if mode is None:
+    locality = fields.get(".locality")
+    if locality is None:
         return None
 
-    normalized_mode = normalize_expr(mode)
+    normalized_locality = normalize_expr(locality)
     return {
-        "mode": normalized_mode,
-        "label": humanize_identifier(normalized_mode.removeprefix("COMBO_FEEDBACK_MODE_")),
-        "meaning": combo_feedback_mode_description(normalized_mode),
+        "locality": normalized_locality,
+        "label": humanize_identifier(normalized_locality.removeprefix("RGB_")),
+        "meaning": combo_feedback_locality_description(normalized_locality),
     }
 
 
-def key_behavior_feedback_mode_description(mode: str) -> str:
+def key_behavior_feedback_locality_description(locality: str) -> str:
     descriptions = {
-        "KEY_FEEDBACK_MODE_BOTH_HALVES": "Repaint both halves whenever a key-behavior feedback state is active.",
-        "KEY_FEEDBACK_MODE_KEY_HALF": "Repaint only the half that owns the key or tap series currently driving the feedback state.",
-        "KEY_FEEDBACK_MODE_KEY": "Repaint only the specific key currently driving the feedback state.",
-        "KEY_FEEDBACK_MODE_LEFT_HALF": "Always repaint the left half using the highest-priority active key-behavior feedback state.",
-        "KEY_FEEDBACK_MODE_RIGHT_HALF": "Always repaint the right half using the highest-priority active key-behavior feedback state.",
+        "RGB_BOTH_HALVES": "Repaint both halves whenever a key-behavior feedback state is active.",
+        "RGB_KEY_HALF": "Repaint only the half that owns the key or tap series currently driving the feedback state.",
+        "RGB_KEYS_ONLY": "Repaint only the specific key currently driving the feedback state.",
+        "RGB_LEFT_HALF": "Always repaint the left half using the highest-priority active key-behavior feedback state.",
+        "RGB_RIGHT_HALF": "Always repaint the right half using the highest-priority active key-behavior feedback state.",
     }
-    return descriptions.get(mode, "Unknown key-behavior feedback paint mode.")
+    return descriptions.get(locality, "Unknown key-behavior feedback RGB locality.")
 
 
-def parse_key_behavior_feedback_mode(raw_text: str) -> dict[str, object] | None:
+def parse_key_behavior_feedback_locality(raw_text: str) -> dict[str, object] | None:
     try:
         body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
     except SystemExit:
         return None
 
     fields = parse_designated_fields(strip_comments(body))
-    mode = fields.get(".mode")
-    if mode is None:
+    locality = fields.get(".locality")
+    if locality is None:
         return None
 
-    normalized_mode = normalize_expr(mode)
+    normalized_locality = normalize_expr(locality)
     return {
-        "mode": normalized_mode,
-        "label": humanize_identifier(normalized_mode.removeprefix("KEY_FEEDBACK_MODE_")),
-        "meaning": key_behavior_feedback_mode_description(normalized_mode),
+        "locality": normalized_locality,
+        "label": humanize_identifier(normalized_locality.removeprefix("RGB_")),
+        "meaning": key_behavior_feedback_locality_description(normalized_locality),
     }
 
 
@@ -1298,7 +1298,7 @@ def build_profile_model() -> dict[str, object]:
         if row["comment_color_name"] is not None
     }
     combo_feedback_color = parse_combo_feedback_color(rgb_config_raw_text, config_macros)
-    combo_feedback_mode = parse_combo_feedback_mode(rgb_config_raw_text)
+    combo_feedback_locality = parse_combo_feedback_locality(rgb_config_raw_text)
     automouse_fade_end_config = (
         parse_automouse_fade_end_config(rgb_config_raw_text, config_macros) if rgb_automouse_gradient_enabled else None
     )
@@ -1307,8 +1307,8 @@ def build_profile_model() -> dict[str, object]:
         if rgb_key_behavior_feedback_enabled
         else []
     )
-    key_behavior_feedback_mode = (
-        parse_key_behavior_feedback_mode(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
+    key_behavior_feedback_locality = (
+        parse_key_behavior_feedback_locality(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
     )
 
     macro_usages = collect_macro_usages(parsed_layers, behaviors, combos, via_macros + hardcoded_macros)
@@ -1359,9 +1359,9 @@ def build_profile_model() -> dict[str, object]:
             "layer_colors": layer_colors,
             "pd_mode_colors": pd_mode_colors,
             "combo_feedback_color": combo_feedback_color,
-            "combo_feedback_mode": combo_feedback_mode,
+            "combo_feedback_locality": combo_feedback_locality,
             "automouse_fade_end_config": automouse_fade_end_config,
-            "key_behavior_feedback_mode": key_behavior_feedback_mode,
+            "key_behavior_feedback_locality": key_behavior_feedback_locality,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
         },
         "keymap_custom_keycodes": keymap_custom_keycodes,
@@ -1444,8 +1444,8 @@ def render_reference_section(profile: dict[str, object]) -> str:
     features = profile["features"]
     rgb = profile["rgb"]
     automouse_fade_end_config = rgb["automouse_fade_end_config"]
-    combo_feedback_mode = rgb["combo_feedback_mode"]
-    feedback_mode = rgb["key_behavior_feedback_mode"]
+    combo_feedback_locality = rgb["combo_feedback_locality"]
+    feedback_locality = rgb["key_behavior_feedback_locality"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
@@ -1481,15 +1481,15 @@ def render_reference_section(profile: dict[str, object]) -> str:
         )
     if features["rgb_key_behavior_feedback_enabled"]:
         lines.append(
-            f"- Key-behavior feedback paint mode: `{feedback_mode['mode']}`"
-            if feedback_mode is not None
-            else "- Key-behavior feedback paint mode: `not authored`",
+            f"- Key-behavior feedback locality: `{feedback_locality['locality']}`"
+            if feedback_locality is not None
+            else "- Key-behavior feedback locality: `not authored`",
         )
     if rgb["combo_feedback_color"] is not None:
         lines.append(
-            f"- Combo feedback paint mode: `{combo_feedback_mode['mode']}`"
-            if combo_feedback_mode is not None
-            else "- Combo feedback paint mode: `not authored`",
+            f"- Combo feedback locality: `{combo_feedback_locality['locality']}`"
+            if combo_feedback_locality is not None
+            else "- Combo feedback locality: `not authored`",
         )
     lines.extend(
         [
@@ -1623,18 +1623,18 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
 
     lines.extend(
         [
-            f"These overlays come from `pd_mode_colors[]` in {rgb_link}. Each row chooses its own paint mode and color for the matching pointing mode.",
-            f"Trigger-local PD paint modes are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in {user_config_link}; current state: `{ 'defined' if profile['features']['rgb_pd_mode_active_half_enabled'] else 'not defined' }`.",
+            f"These overlays come from `pd_mode_colors[]` in {rgb_link}. Each row chooses its own locality and color for the matching pointing mode.",
+            f"Key-local PD RGB localities are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in {user_config_link}; current state: `{ 'defined' if profile['features']['rgb_pd_mode_active_half_enabled'] else 'not defined' }`.",
             "",
-            "| PD Paint Mode | Meaning |",
+            "| PD Locality | Meaning |",
             "| --- | --- |",
-            f"| `PD_COLOR_MODE_RIGHT_HALF` | {pd_color_mode_description('PD_COLOR_MODE_RIGHT_HALF')} |",
-            f"| `PD_COLOR_MODE_LEFT_HALF` | {pd_color_mode_description('PD_COLOR_MODE_LEFT_HALF')} |",
-            f"| `PD_COLOR_MODE_BOTH_HALVES` | {pd_color_mode_description('PD_COLOR_MODE_BOTH_HALVES')} |",
-            f"| `PD_COLOR_MODE_TRIGGER_HALF` | {pd_color_mode_description('PD_COLOR_MODE_TRIGGER_HALF')} |",
-            f"| `PD_COLOR_MODE_TRIGGER_KEYS` | {pd_color_mode_description('PD_COLOR_MODE_TRIGGER_KEYS')} |",
+            f"| `RGB_BOTH_HALVES` | {pd_color_locality_description('RGB_BOTH_HALVES')} |",
+            f"| `RGB_LEFT_HALF` | {pd_color_locality_description('RGB_LEFT_HALF')} |",
+            f"| `RGB_RIGHT_HALF` | {pd_color_locality_description('RGB_RIGHT_HALF')} |",
+            f"| `RGB_KEY_HALF` | {pd_color_locality_description('RGB_KEY_HALF')} |",
+            f"| `RGB_KEYS_ONLY` | {pd_color_locality_description('RGB_KEYS_ONLY')} |",
             "",
-            "| Pointing Mode | Paint Mode | Authored HSV | Preview Color |",
+            "| Pointing Mode | Locality | Authored HSV | Preview Color |",
             "| --- | --- | --- | --- |",
         ]
     )
@@ -1643,7 +1643,7 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
         color = row["color"]
         preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['pointing_mode']} color")
         lines.append(
-            f"| `{row['pointing_mode']}` | `{row['mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
+            f"| `{row['pointing_mode']}` | `{row['locality']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
         )
 
     lines.append("")
@@ -1892,7 +1892,7 @@ def render_layer_local_pd_modes(layer: dict[str, object], profile: dict[str, obj
 
     lines.extend(
         [
-            "| Reachable Via | Mode Keycode | Pointing Mode | Paint Mode | Authored HSV | Preview Color |",
+            "| Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |",
             "| --- | --- | --- | --- | --- | --- |",
         ]
     )
@@ -1903,7 +1903,7 @@ def render_layer_local_pd_modes(layer: dict[str, object], profile: dict[str, obj
             preview_swatch = "no override"
         else:
             color = color_row["color"]
-            paint_mode = f"`{color_row['mode']}`"
+            paint_mode = f"`{color_row['locality']}`"
             authored_hsv = f"`HSV({color['h']}, {color['s']}, {color['v']})`"
             preview_swatch = markdown_color_swatch(color_row["preview_color"], f"{pd_mode['pointing_mode']} color")
         lines.append(
@@ -2301,7 +2301,7 @@ def render_key_behavior_section(profile: dict[str, object]) -> str:
 
 def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
     feedback_colors = profile["rgb"]["key_behavior_feedback_colors"]
-    feedback_mode = profile["rgb"]["key_behavior_feedback_mode"]
+    feedback_locality = profile["rgb"]["key_behavior_feedback_locality"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     lines = [
         "## Key-Behavior Feedback LEDs",
@@ -2319,23 +2319,23 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
 
     lines.extend(
         [
-            f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored paint modes intentionally collapse that truth to a half or full-board presentation.",
+            f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored localities intentionally collapse that truth to a half or full-board presentation.",
             "",
         ]
     )
 
-    if feedback_mode is not None:
+    if feedback_locality is not None:
         lines.extend(
             [
-                f"Current authored feedback paint mode: `{feedback_mode['mode']}`.",
+                f"Current authored feedback locality: `{feedback_locality['locality']}`.",
                 "",
-                "| Available Mode | Meaning |",
+                "| Available Locality | Meaning |",
                 "| --- | --- |",
-                f"| `KEY_FEEDBACK_MODE_BOTH_HALVES` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_BOTH_HALVES')} |",
-                f"| `KEY_FEEDBACK_MODE_KEY_HALF` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_KEY_HALF')} |",
-                f"| `KEY_FEEDBACK_MODE_KEY` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_KEY')} |",
-                f"| `KEY_FEEDBACK_MODE_LEFT_HALF` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_LEFT_HALF')} |",
-                f"| `KEY_FEEDBACK_MODE_RIGHT_HALF` | {key_behavior_feedback_mode_description('KEY_FEEDBACK_MODE_RIGHT_HALF')} |",
+                f"| `RGB_BOTH_HALVES` | {key_behavior_feedback_locality_description('RGB_BOTH_HALVES')} |",
+                f"| `RGB_LEFT_HALF` | {key_behavior_feedback_locality_description('RGB_LEFT_HALF')} |",
+                f"| `RGB_RIGHT_HALF` | {key_behavior_feedback_locality_description('RGB_RIGHT_HALF')} |",
+                f"| `RGB_KEY_HALF` | {key_behavior_feedback_locality_description('RGB_KEY_HALF')} |",
+                f"| `RGB_KEYS_ONLY` | {key_behavior_feedback_locality_description('RGB_KEYS_ONLY')} |",
                 "",
             ]
         )
@@ -2361,7 +2361,7 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
 
 def render_combo_feedback_section(profile: dict[str, object]) -> str:
     combo_feedback_color = profile["rgb"]["combo_feedback_color"]
-    combo_feedback_mode = profile["rgb"]["combo_feedback_mode"]
+    combo_feedback_locality = profile["rgb"]["combo_feedback_locality"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     lines = [
         "## Combo Feedback LEDs",
@@ -2384,18 +2384,18 @@ def render_combo_feedback_section(profile: dict[str, object]) -> str:
         ]
     )
 
-    if combo_feedback_mode is not None:
+    if combo_feedback_locality is not None:
         lines.extend(
             [
-                f"Current authored combo feedback paint mode: `{combo_feedback_mode['mode']}`.",
+                f"Current authored combo feedback locality: `{combo_feedback_locality['locality']}`.",
                 "",
-                "| Available Mode | Meaning |",
+                "| Available Locality | Meaning |",
                 "| --- | --- |",
-                f"| `COMBO_FEEDBACK_MODE_BOTH_HALVES` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_BOTH_HALVES')} |",
-                f"| `COMBO_FEEDBACK_MODE_COMBO_HALF` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_COMBO_HALF')} |",
-                f"| `COMBO_FEEDBACK_MODE_COMBO_KEYS` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_COMBO_KEYS')} |",
-                f"| `COMBO_FEEDBACK_MODE_LEFT_HALF` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_LEFT_HALF')} |",
-                f"| `COMBO_FEEDBACK_MODE_RIGHT_HALF` | {combo_feedback_mode_description('COMBO_FEEDBACK_MODE_RIGHT_HALF')} |",
+                f"| `RGB_BOTH_HALVES` | {combo_feedback_locality_description('RGB_BOTH_HALVES')} |",
+                f"| `RGB_LEFT_HALF` | {combo_feedback_locality_description('RGB_LEFT_HALF')} |",
+                f"| `RGB_RIGHT_HALF` | {combo_feedback_locality_description('RGB_RIGHT_HALF')} |",
+                f"| `RGB_KEY_HALF` | {combo_feedback_locality_description('RGB_KEY_HALF')} |",
+                f"| `RGB_KEYS_ONLY` | {combo_feedback_locality_description('RGB_KEYS_ONLY')} |",
                 "",
             ]
         )

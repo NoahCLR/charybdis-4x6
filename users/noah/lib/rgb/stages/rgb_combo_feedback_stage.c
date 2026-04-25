@@ -87,22 +87,22 @@ static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_m
         return false;
     }
 
-    switch (combo_feedback_colors.mode) {
-        case COMBO_FEEDBACK_MODE_COMBO_KEYS:
+    switch (combo_feedback_colors.locality) {
+        case RGB_KEYS_ONLY:
             return rgb_runtime_combo_feedback_stage_paint_bitmap_keys(bitmap, led_min, led_max);
-        case COMBO_FEEDBACK_MODE_LEFT_HALF:
+        case RGB_LEFT_HALF:
             if (!rgb_runtime_combo_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
                 return false;
             }
             rgb_set_left_half(combo_feedback_active_rgb, led_min, led_max);
             return true;
-        case COMBO_FEEDBACK_MODE_RIGHT_HALF:
+        case RGB_RIGHT_HALF:
             if (!rgb_runtime_combo_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
                 return false;
             }
             rgb_set_right_half(combo_feedback_active_rgb, led_min, led_max);
             return true;
-        case COMBO_FEEDBACK_MODE_COMBO_HALF:
+        case RGB_KEY_HALF:
             sides = key_origin_bitmap_side_mask(bitmap);
             if (sides == SPLIT_SIDE_MASK_LEFT) {
                 if (!rgb_runtime_combo_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
@@ -120,7 +120,7 @@ static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_m
                 return true;
             }
             break;
-        case COMBO_FEEDBACK_MODE_BOTH_HALVES:
+        case RGB_BOTH_HALVES:
         default:
             break;
     }

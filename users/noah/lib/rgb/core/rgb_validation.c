@@ -99,21 +99,21 @@ static void rgb_validation_log_invalid_automouse_fade_end_mode(uint8_t mode) {
 #    endif
 
 #    ifdef COMBO_ENABLE
-static void rgb_validation_log_invalid_combo_feedback_mode(uint8_t mode) {
+static void rgb_validation_log_invalid_combo_feedback_locality(uint8_t locality) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid combo_feedback_colors.mode %u; expected COMBO_FEEDBACK_MODE_BOTH_HALVES (0), COMBO_FEEDBACK_MODE_COMBO_HALF (1), COMBO_FEEDBACK_MODE_COMBO_KEYS (2), COMBO_FEEDBACK_MODE_LEFT_HALF (3), or COMBO_FEEDBACK_MODE_RIGHT_HALF (4)\n", (unsigned int)mode);
+    uprintf("Invalid combo_feedback_colors.locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)locality);
 #        else
-    (void)mode;
+    (void)locality;
 #        endif
 }
 #    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-static void rgb_validation_log_invalid_key_behavior_feedback_mode(uint8_t mode) {
+static void rgb_validation_log_invalid_key_behavior_feedback_locality(uint8_t locality) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors.mode %u; expected KEY_FEEDBACK_MODE_BOTH_HALVES (0), KEY_FEEDBACK_MODE_KEY_HALF (1), KEY_FEEDBACK_MODE_KEY (2), KEY_FEEDBACK_MODE_LEFT_HALF (3), or KEY_FEEDBACK_MODE_RIGHT_HALF (4)\n", (unsigned int)mode);
+    uprintf("Invalid key_behavior_feedback_colors.locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)locality);
 #        else
-    (void)mode;
+    (void)locality;
 #        endif
 }
 #    endif
@@ -128,19 +128,19 @@ static void rgb_validation_log_unknown_pd_mode_color(uint8_t color_index, pd_mod
 #        endif
 }
 
-static void rgb_validation_log_invalid_pd_mode_color_mode(uint8_t color_index, uint8_t mode) {
+static void rgb_validation_log_invalid_pd_mode_color_locality(uint8_t color_index, uint8_t locality) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid pd_mode_colors[%u].mode %u; expected PD_COLOR_MODE_RIGHT_HALF (0), PD_COLOR_MODE_LEFT_HALF (1), PD_COLOR_MODE_BOTH_HALVES (2), PD_COLOR_MODE_TRIGGER_HALF (3), or PD_COLOR_MODE_TRIGGER_KEYS (4)\n", (unsigned int)color_index, (unsigned int)mode);
+    uprintf("Invalid pd_mode_colors[%u].locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)color_index, (unsigned int)locality);
 #        else
     (void)color_index;
-    (void)mode;
+    (void)locality;
 #        endif
 }
 
 #        ifndef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-static void rgb_validation_log_pd_mode_trigger_locality_requires_feature(uint8_t color_index, pd_mode_mask_t mode) {
+static void rgb_validation_log_pd_mode_key_locality_requires_feature(uint8_t color_index, pd_mode_mask_t mode) {
 #            ifdef CONSOLE_ENABLE
-    uprintf("pd_mode_colors[%u].mode uses trigger-local PD RGB placement for pd mode 0x%04X, but RGB_PD_MODE_ACTIVE_HALF_ENABLE is disabled\n", (unsigned int)color_index, (unsigned int)mode);
+    uprintf("pd_mode_colors[%u].locality uses key-local PD RGB placement for pd mode 0x%04X, but RGB_PD_MODE_ACTIVE_HALF_ENABLE is disabled\n", (unsigned int)color_index, (unsigned int)mode);
 #            else
     (void)color_index;
     (void)mode;
@@ -209,16 +209,16 @@ static void rgb_validation_validate_automouse_fade_end_config(void) {
 
 #    ifdef COMBO_ENABLE
 static void rgb_validation_validate_combo_feedback_config(void) {
-    if (combo_feedback_colors.mode > COMBO_FEEDBACK_MODE_RIGHT_HALF) {
-        rgb_validation_log_invalid_combo_feedback_mode((uint8_t)combo_feedback_colors.mode);
+    if (combo_feedback_colors.locality > RGB_KEYS_ONLY) {
+        rgb_validation_log_invalid_combo_feedback_locality((uint8_t)combo_feedback_colors.locality);
     }
 }
 #    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_validate_key_behavior_feedback_config(void) {
-    if (key_behavior_feedback_colors.mode > KEY_FEEDBACK_MODE_RIGHT_HALF) {
-        rgb_validation_log_invalid_key_behavior_feedback_mode((uint8_t)key_behavior_feedback_colors.mode);
+    if (key_behavior_feedback_colors.locality > RGB_KEYS_ONLY) {
+        rgb_validation_log_invalid_key_behavior_feedback_locality((uint8_t)key_behavior_feedback_colors.locality);
     }
 }
 #    endif
@@ -226,21 +226,21 @@ static void rgb_validation_validate_key_behavior_feedback_config(void) {
 #    ifdef POINTING_DEVICE_ENABLE
 static void rgb_validation_validate_pd_mode_colors(void) {
     for (uint8_t color_index = 0; color_index < pd_mode_color_count; color_index++) {
-        pd_mode_mask_t mode       = pd_mode_colors[color_index].pointing_mode;
-        uint8_t        color_mode = (uint8_t)pd_mode_colors[color_index].mode;
+        pd_mode_mask_t mode     = pd_mode_colors[color_index].pointing_mode;
+        uint8_t        locality = (uint8_t)pd_mode_colors[color_index].locality;
 
         if (!rgb_validation_pd_mode_known(mode)) {
             rgb_validation_log_unknown_pd_mode_color(color_index, mode);
         }
 
-        if (color_mode > PD_COLOR_MODE_TRIGGER_KEYS) {
-            rgb_validation_log_invalid_pd_mode_color_mode(color_index, color_mode);
+        if (locality > RGB_KEYS_ONLY) {
+            rgb_validation_log_invalid_pd_mode_color_locality(color_index, locality);
             continue;
         }
 
 #        ifndef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-        if (color_mode == PD_COLOR_MODE_TRIGGER_HALF || color_mode == PD_COLOR_MODE_TRIGGER_KEYS) {
-            rgb_validation_log_pd_mode_trigger_locality_requires_feature(color_index, mode);
+        if (locality == RGB_KEY_HALF || locality == RGB_KEYS_ONLY) {
+            rgb_validation_log_pd_mode_key_locality_requires_feature(color_index, mode);
         }
 #        endif
     }
