@@ -136,7 +136,7 @@ const pd_mode_color_t pd_mode_colors[] = {
 };
 const uint8_t                    pd_mode_color_count       = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 static const pd_mode_led_group_t pd_mode_led_groups_data[] = {
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), RGB_LEDS(1, 6)},
+    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .led_group = RGB_LED_GROUP(1, 6)},
     RGB_LED_GROUP_TABLE_END,
 };
 EXPORT_PD_MODE_LED_GROUP_TABLE(pd_mode_led_groups_data);
@@ -156,7 +156,7 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
-    {.color = HSV(153, 154, 155), RGB_LEDS(3)},
+    {.color = HSV(153, 154, 155), .led_group = RGB_LED_GROUP(3)},
     RGB_LED_GROUP_TABLE_END,
 };
 EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
@@ -179,8 +179,8 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
-    {.semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(11, 12, 13), RGB_LEDS(5)},
-    {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(14, 15, 16), RGB_LEDS(5)},
+    {.semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)},
+    {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)},
     RGB_LED_GROUP_TABLE_END,
 };
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);

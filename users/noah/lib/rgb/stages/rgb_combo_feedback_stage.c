@@ -139,9 +139,10 @@ static bool rgb_runtime_combo_feedback_stage_render_groups(uint8_t led_min, uint
     bool painted = false;
 
     for (uint8_t group = 0; group < combo_feedback_led_group_count; group++) {
-        rgb_t group_rgb = hsv_to_rgb(combo_feedback_led_groups[group].color);
-        rgb_set_led_group(combo_feedback_led_groups[group].leds, combo_feedback_led_groups[group].count, led_min, led_max, group_rgb);
-        painted |= rgb_runtime_combo_feedback_stage_led_group_intersects(combo_feedback_led_groups[group].leds, combo_feedback_led_groups[group].count, led_min, led_max);
+        const rgb_led_group_t *led_group = &combo_feedback_led_groups[group].led_group;
+        rgb_t                  group_rgb = hsv_to_rgb(combo_feedback_led_groups[group].color);
+        rgb_set_led_group(led_group->leds, led_group->count, led_min, led_max, group_rgb);
+        painted |= rgb_runtime_combo_feedback_stage_led_group_intersects(led_group->leds, led_group->count, led_min, led_max);
     }
 
     return painted;

@@ -326,8 +326,9 @@ Add a new row to `pd_mode_colors[]`:
 Use `.locality` to choose where the overlay paints: `RGB_BOTH_HALVES`,
 `RGB_LEFT_HALF`, `RGB_RIGHT_HALF`, `RGB_KEY_HALF`, or `RGB_KEYS_ONLY`.
 
-Optional: add or uncomment a `pd_mode_led_groups_data` row with `RGB_LEDS(...)`
-if the mode wants a specific LED subset highlighted.
+Optional: add or uncomment a `pd_mode_led_groups_data` row with
+`.led_group = RGB_LED_GROUP_*` if the mode wants a specific LED subset
+highlighted.
 
 ### 8. Update User Docs If The Mode Is Real
 

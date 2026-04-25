@@ -112,7 +112,11 @@ None.
   the same last-within-substage shape as layer and PD groups. Combo groups
   repaint after combo locality inside the live combo underlay or overlay
   substage. Key-feedback groups repaint after feedback locality when their
-  semantic category is visibly active. Code references:
+  semantic category is visibly active. All layer, PD-mode, combo, and
+  key-feedback group rows use the shared `.led_group` field backed by
+  `rgb_led_group_t`; profile authors can define reusable physical
+  `RGB_LED_GROUP_*` macros below the LED map and reuse them across stages.
+  Code references:
   `users/noah/lib/rgb/core/rgb_helpers.h`,
   `users/noah/lib/rgb/core/rgb_config_defaults.c`,
   `users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c`,
@@ -144,7 +148,9 @@ None.
   the slave. The slave renderer uses the mirrored semantic map instead of
   trying to duplicate key-runtime decisions.
 - The authored RGB surface is broad enough for this firmware: layer all keys
-  vs mapped-only, layer LED groups, auto-mouse fade destination modes, shared
+  vs mapped-only, shared `.led_group` LED groups for layer/PD/combo/key
+  feedback, reusable physical `RGB_LED_GROUP_*` names under the LED map,
+  auto-mouse fade destination modes, shared
   `rgb_locality_t` placement for pointing-mode, combo-feedback, and
   key-feedback overlays, pointing-mode LED groups, and diagnostic override
   color are all present.

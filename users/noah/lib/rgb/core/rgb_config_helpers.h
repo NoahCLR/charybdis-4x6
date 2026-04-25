@@ -9,8 +9,8 @@
 #include "rgb_helpers.h"
 
 #define HSV(h_, s_, v_) {.h = (h_), .s = (s_), .v = (v_)}
-#define RGB_LEDS(...) .leds = (const uint8_t[]){__VA_ARGS__}, .count = (uint8_t)ARRAY_SIZE(((const uint8_t[]){__VA_ARGS__}))
-#define RGB_LED_GROUP_TABLE_END {.count = 0}
+#define RGB_LED_GROUP(...) ((rgb_led_group_t){.leds = (const uint8_t[]){__VA_ARGS__}, .count = (uint8_t)ARRAY_SIZE(((const uint8_t[]){__VA_ARGS__}))})
+#define RGB_LED_GROUP_TABLE_END {.led_group = {.count = 0}}
 
 #define EXPORT_LAYER_LED_GROUPS(groups_)                              \
     const layer_led_group_t *const layer_led_groups      = (groups_); \

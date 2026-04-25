@@ -158,8 +158,9 @@ bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_stat
             continue;
         }
 
-        rgb_t group_rgb = hsv_to_rgb(layer_led_groups[group].color);
-        painted |= rgb_runtime_frame_paint_led_group(frame, layer_led_groups[group].leds, layer_led_groups[group].count, group_rgb, led_min, led_max);
+        const rgb_led_group_t *led_group = &layer_led_groups[group].led_group;
+        rgb_t                  group_rgb = hsv_to_rgb(layer_led_groups[group].color);
+        painted |= rgb_runtime_frame_paint_led_group(frame, led_group->leds, led_group->count, group_rgb, led_min, led_max);
     }
 
     return painted;

@@ -74,7 +74,7 @@ static void rgb_validation_log_invalid_layer_led_group_layer(uint8_t group_index
 
 static void rgb_validation_log_invalid_layer_led_index(const char *group_kind, uint8_t group_index, uint8_t led_index, uint8_t led) {
 #    ifdef CONSOLE_ENABLE
-    uprintf("Invalid %s[%u].leds[%u] LED index %u; expected a value below RGB_MATRIX_LED_COUNT (%u)\n", group_kind, (unsigned int)group_index, (unsigned int)led_index, (unsigned int)led, (unsigned int)RGB_MATRIX_LED_COUNT);
+    uprintf("Invalid %s[%u].led_group.leds[%u] LED index %u; expected a value below RGB_MATRIX_LED_COUNT (%u)\n", group_kind, (unsigned int)group_index, (unsigned int)led_index, (unsigned int)led, (unsigned int)RGB_MATRIX_LED_COUNT);
 #    else
     (void)group_kind;
     (void)group_index;
@@ -204,9 +204,10 @@ static void rgb_validation_validate_layer_led_groups(void) {
             rgb_validation_log_invalid_layer_led_group_layer(group_index, group->layer);
         }
 
-        for (uint8_t led_index = 0; led_index < group->count; led_index++) {
-            if (group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
-                rgb_validation_log_invalid_layer_led_index("layer_led_groups", group_index, led_index, group->leds[led_index]);
+        const rgb_led_group_t *led_group = &group->led_group;
+        for (uint8_t led_index = 0; led_index < led_group->count; led_index++) {
+            if (led_group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
+                rgb_validation_log_invalid_layer_led_index("layer_led_groups", group_index, led_index, led_group->leds[led_index]);
             }
         }
     }
@@ -231,9 +232,10 @@ static void rgb_validation_validate_combo_feedback_led_groups(void) {
     for (uint8_t group_index = 0; group_index < combo_feedback_led_group_count; group_index++) {
         const combo_feedback_led_group_t *group = &combo_feedback_led_groups[group_index];
 
-        for (uint8_t led_index = 0; led_index < group->count; led_index++) {
-            if (group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
-                rgb_validation_log_invalid_layer_led_index("combo_feedback_led_groups", group_index, led_index, group->leds[led_index]);
+        const rgb_led_group_t *led_group = &group->led_group;
+        for (uint8_t led_index = 0; led_index < led_group->count; led_index++) {
+            if (led_group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
+                rgb_validation_log_invalid_layer_led_index("combo_feedback_led_groups", group_index, led_index, led_group->leds[led_index]);
             }
         }
     }
@@ -256,9 +258,10 @@ static void rgb_validation_validate_key_behavior_feedback_led_groups(void) {
             rgb_validation_log_invalid_key_behavior_feedback_group_semantic(group_index, semantic);
         }
 
-        for (uint8_t led_index = 0; led_index < group->count; led_index++) {
-            if (group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
-                rgb_validation_log_invalid_layer_led_index("key_behavior_feedback_led_groups", group_index, led_index, group->leds[led_index]);
+        const rgb_led_group_t *led_group = &group->led_group;
+        for (uint8_t led_index = 0; led_index < led_group->count; led_index++) {
+            if (led_group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
+                rgb_validation_log_invalid_layer_led_index("key_behavior_feedback_led_groups", group_index, led_index, led_group->leds[led_index]);
             }
         }
     }
@@ -306,9 +309,10 @@ static void rgb_validation_validate_pd_mode_led_groups(void) {
             rgb_validation_log_unknown_pd_mode_led_group(group_index, group->pointing_mode);
         }
 
-        for (uint8_t led_index = 0; led_index < group->count; led_index++) {
-            if (group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
-                rgb_validation_log_invalid_layer_led_index("pd_mode_led_groups", group_index, led_index, group->leds[led_index]);
+        const rgb_led_group_t *led_group = &group->led_group;
+        for (uint8_t led_index = 0; led_index < led_group->count; led_index++) {
+            if (led_group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
+                rgb_validation_log_invalid_layer_led_index("pd_mode_led_groups", group_index, led_index, led_group->leds[led_index]);
             }
         }
     }

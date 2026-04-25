@@ -42,8 +42,12 @@
 // LED 56 is the custom trackball LED soldered on the right half, not part of
 // the standard key matrix.
 //
-// Use RGB_LEDS(...) inside the per-stage LED group tables below to list the
-// exact LEDs each row should repaint.
+// Define reusable physical groups here, then reference them from any
+// per-stage LED group table below.
+#define RGB_LED_GROUP_LEFT_THUMB  RGB_LED_GROUP(26, 27, 28, 25, 24)
+#define RGB_LED_GROUP_RIGHT_THUMB RGB_LED_GROUP(53, 54, 55)
+#define RGB_LED_GROUP_THUMBS      RGB_LED_GROUP(26, 27, 28, 25, 24, 53, 54, 55)
+#define RGB_LED_GROUP_TRACKBALL   RGB_LED_GROUP(56)
 
 // ─── Layer colors ───────────────────────────────────────────────────────────
 //
@@ -96,8 +100,8 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // Uncomment or add rows inside this table to enable layer-specific LED
 // highlights. Keep RGB_LED_GROUP_TABLE_END as the final row.
 static const layer_led_group_t layer_led_groups_data[] = {
-    // { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(33, 18) },
-    // { .layer = LAYER_SYM, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(4, 47) },
+    // { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_RIGHT_THUMB },
+    // { .layer = LAYER_SYM, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_LEFT_THUMB },
     RGB_LED_GROUP_TABLE_END,
 };
 EXPORT_LAYER_LED_GROUP_TABLE(layer_led_groups_data);
@@ -187,7 +191,7 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 // Uncomment or add rows inside this table to enable per-mode LED highlights.
 // Keep RGB_LED_GROUP_TABLE_END as the final row.
 static const pd_mode_led_group_t pd_mode_led_groups_data[] = {
-    // { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(56) },
+    // { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     RGB_LED_GROUP_TABLE_END,
 };
 EXPORT_PD_MODE_LED_GROUP_TABLE(pd_mode_led_groups_data);
@@ -227,7 +231,7 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 // Uncomment or add rows inside this table to enable persistent combo accents.
 // Keep RGB_LED_GROUP_TABLE_END as the final row.
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
-    // { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(56) },
+    // { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     RGB_LED_GROUP_TABLE_END,
 };
 EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
@@ -293,9 +297,9 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 // Uncomment or add rows inside this table to enable feedback accents. Keep
 // RGB_LED_GROUP_TABLE_END as the final row.
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
-    // { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), RGB_LEDS(56) },
-    // { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(56) },
-    // { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(56) },
+    // { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     RGB_LED_GROUP_TABLE_END,
 };
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);

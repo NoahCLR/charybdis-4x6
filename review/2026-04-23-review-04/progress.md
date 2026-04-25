@@ -525,13 +525,21 @@ No required checks were skipped.
 
 - Moved the authored LED reference map in `rgb_config.c` into one central
   `LED Map` section.
-- Replaced the reusable physical LED arrays with inline `RGB_LEDS(...)`
-  authoring inside each stage-specific LED group table.
+- Replaced the reusable physical LED arrays with inline
+  `.led_group = RGB_LED_GROUP(...)` authoring inside each stage-specific LED
+  group table.
 - Added `RGB_LED_GROUP_TABLE_END` plus `EXPORT_*_LED_GROUP_TABLE(...)` helpers
   so empty LED group tables can stay materialized with only individual rows
   commented out.
-- Tightened the sentinel to a designated `.count = 0` initializer after the
-  firmware compile caught QMK's `-Wmissing-braces` warning policy.
+- Tightened the sentinel to a designated `.led_group = {.count = 0}`
+  initializer after the firmware compile caught QMK's `-Wmissing-braces`
+  warning policy.
+- Added shared `rgb_led_group_t` value ownership so layer, PD-mode, combo
+  feedback, and key-behavior feedback rows expose one `.led_group` field
+  instead of loose `.leds` and `.count` members.
+- Added reusable physical `RGB_LED_GROUP_*` definitions under the LED map so
+  stage rows can name groups like `RGB_LED_GROUP_TRACKBALL` instead of
+  repeating LED indices.
 - Kept the optional layer, PD-mode, combo feedback, and key-behavior feedback
   render-table examples in their own feature sections.
 - Clarified the feature sections so each LED group surface has a visible
@@ -544,6 +552,7 @@ Verification passed:
 - `python3 tools/profile_introspect.py --write`
 - `python3 tools/profile_introspect.py --check`
 - `python3 -m py_compile tools/profile_introspect.py`
+- `python3 -c 'import tools.profile_introspect as p; ...'`
 - `sh tests/host/run_rgb_validation_tests.sh`
 - `sh tests/host/run_rgb_layer_render_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
@@ -558,7 +567,8 @@ No required checks were skipped.
 
 1. Enable actual layer, PD-mode, combo feedback, or key-behavior feedback group
    rows from the relevant feature section when tuning the profile.
-2. Add LED indices directly with `RGB_LEDS(...)` in the relevant render table.
+2. Add reusable physical groups under the LED map, then reference them with
+   `.led_group = RGB_LED_GROUP_*` in the relevant render table.
 
 ### Interaction RGB Stage Gates
 

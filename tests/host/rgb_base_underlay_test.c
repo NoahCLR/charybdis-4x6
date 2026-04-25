@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/rgb/core/rgb_config_helpers.h"
 #include "users/noah/lib/rgb/stages/rgb_layer_stage.h"
 
 enum test_layers {
@@ -16,8 +17,6 @@ static uint16_t test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 
 layer_state_t layer_state  = 0;
 led_config_t  g_led_config = {0};
-
-static const uint8_t base_group_leds[] = {3};
 
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
     [LAYER_BASE] =
@@ -39,10 +38,9 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 
 static const layer_led_group_t layer_led_groups_data[] = {
     {
-        .layer = LAYER_BASE,
-        .color = {.h = 7, .s = 8, .v = 9},
-        .leds  = base_group_leds,
-        .count = ARRAY_SIZE(base_group_leds),
+        .layer     = LAYER_BASE,
+        .color     = {.h = 7, .s = 8, .v = 9},
+        .led_group = RGB_LED_GROUP(3),
     },
 };
 

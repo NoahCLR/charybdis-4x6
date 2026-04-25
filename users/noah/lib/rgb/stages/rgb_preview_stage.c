@@ -40,9 +40,10 @@ bool rgb_runtime_preview_stage_render(uint8_t led_min, uint8_t led_max) {
             continue;
         }
 
-        rgb_t group_rgb = hsv_to_rgb(layer_led_groups[group].color);
-        rgb_set_led_group(layer_led_groups[group].leds, layer_led_groups[group].count, led_min, led_max, group_rgb);
-        painted |= rgb_runtime_preview_stage_led_group_intersects(layer_led_groups[group].leds, layer_led_groups[group].count, led_min, led_max);
+        const rgb_led_group_t *led_group = &layer_led_groups[group].led_group;
+        rgb_t                  group_rgb = hsv_to_rgb(layer_led_groups[group].color);
+        rgb_set_led_group(led_group->leds, led_group->count, led_min, led_max, group_rgb);
+        painted |= rgb_runtime_preview_stage_led_group_intersects(led_group->leds, led_group->count, led_min, led_max);
     }
 
     return painted;

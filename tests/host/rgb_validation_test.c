@@ -11,23 +11,18 @@
 
 static char log_buffer[4096];
 
-static const uint8_t           invalid_layer_leds[] = {0, RGB_MATRIX_LED_COUNT};
-static const uint8_t           invalid_mode_leds[]  = {RGB_MATRIX_LED_COUNT};
-static const uint8_t           unknown_mode_leds[]  = {1};
-static const uint8_t           invalid_combo_leds[] = {RGB_MATRIX_LED_COUNT};
-static const uint8_t           invalid_key_feedback_leds[] = {RGB_MATRIX_LED_COUNT};
-static const layer_led_group_t layer_groups[]       = {
-    {.layer = LAYER_COUNT, .color = HSV(0, 0, 0), .leds = invalid_layer_leds, .count = ARRAY_SIZE(invalid_layer_leds)},
+static const layer_led_group_t layer_groups[] = {
+    {.layer = LAYER_COUNT, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(0, RGB_MATRIX_LED_COUNT)},
 };
 static const pd_mode_led_group_t pd_mode_groups[] = {
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(1, 1, 1), .leds = invalid_mode_leds, .count = ARRAY_SIZE(invalid_mode_leds)},
-    {.pointing_mode = (pd_mode_mask_t)0x8000u, .color = HSV(2, 2, 2), .leds = unknown_mode_leds, .count = ARRAY_SIZE(unknown_mode_leds)},
+    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(1, 1, 1), .led_group = RGB_LED_GROUP(RGB_MATRIX_LED_COUNT)},
+    {.pointing_mode = (pd_mode_mask_t)0x8000u, .color = HSV(2, 2, 2), .led_group = RGB_LED_GROUP(1)},
 };
 static const combo_feedback_led_group_t combo_feedback_groups[] = {
-    {.color = HSV(4, 4, 4), .leds = invalid_combo_leds, .count = ARRAY_SIZE(invalid_combo_leds)},
+    {.color = HSV(4, 4, 4), .led_group = RGB_LED_GROUP(RGB_MATRIX_LED_COUNT)},
 };
 static const key_behavior_feedback_led_group_t key_behavior_feedback_groups[] = {
-    {.semantic = (key_behavior_feedback_group_semantic_t)0xFFu, .color = HSV(5, 5, 5), .leds = invalid_key_feedback_leds, .count = ARRAY_SIZE(invalid_key_feedback_leds)},
+    {.semantic = (key_behavior_feedback_group_semantic_t)0xFFu, .color = HSV(5, 5, 5), .led_group = RGB_LED_GROUP(RGB_MATRIX_LED_COUNT)},
 };
 
 const layer_color_config_t layer_colors[LAYER_COUNT] = {

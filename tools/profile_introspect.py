@@ -919,6 +919,14 @@ def parse_key_behavior_feedback_locality(raw_text: str) -> dict[str, object] | N
     }
 
 
+def parse_rgb_led_group_macros(raw_text: str) -> dict[str, list[str]]:
+    groups: dict[str, list[str]] = {}
+    text = strip_comments(raw_text)
+    for match in re.finditer(r"^\s*#\s*define\s+(?P<name>RGB_LED_GROUP_[A-Za-z0-9_]+)\s+RGB_LED_GROUP\s*\((?P<leds>[^)]*)\)", text, re.MULTILINE):
+        groups[match.group("name")] = [normalize_expr(part) for part in split_top_level(match.group("leds"))]
+    return groups
+
+
 def parse_exported_rgb_led_groups(
     raw_text: str,
     export_macro: str,
@@ -926,6 +934,7 @@ def parse_exported_rgb_led_groups(
     semantic_field: bool = False,
 ) -> list[dict[str, object]]:
     text = strip_comments(raw_text)
+    led_group_macros = parse_rgb_led_group_macros(raw_text)
     table_export_macro = export_macro.removesuffix("S") + "_TABLE" if export_macro.endswith("S") else f"{export_macro}_TABLE"
     export_match = re.search(rf"\b(?:{re.escape(export_macro)}|{re.escape(table_export_macro)})\s*\(\s*(?P<table>[A-Za-z_][A-Za-z0-9_]*)\s*\)", text)
     if export_match is None:
@@ -945,13 +954,18 @@ def parse_exported_rgb_led_groups(
 
         fields = parse_designated_fields(entry[1:-1].strip())
         color_expr = fields.get(".color")
-        leds_expr = fields.get(".leds")
-        count_expr = fields.get(".count")
-        inline_leds_match = re.search(r"\bRGB_LEDS\s*\((?P<leds>[^)]*)\)", entry)
-        if inline_leds_match is not None:
-            leds = [normalize_expr(part) for part in split_top_level(inline_leds_match.group("leds"))]
+        leds_expr = None
+        count_expr = None
+        inline_led_group_match = re.search(r"\bRGB_LED_GROUP\s*\((?P<leds>[^)]*)\)", entry)
+        if inline_led_group_match is not None:
+            leds = [normalize_expr(part) for part in split_top_level(inline_led_group_match.group("leds"))]
             leds_expr = ", ".join(leds)
             count_expr = str(len(leds))
+        else:
+            led_group_name = normalize_expr(fields.get(".led_group", ""))
+            if led_group_name in led_group_macros:
+                leds_expr = ", ".join(led_group_macros[led_group_name])
+                count_expr = str(len(led_group_macros[led_group_name]))
         if color_expr is None or leds_expr is None or count_expr is None:
             continue
 

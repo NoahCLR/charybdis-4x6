@@ -68,9 +68,13 @@ typedef struct {
 } combo_feedback_color_config_t;
 
 typedef struct {
-    hsv_t          color;
     const uint8_t *leds;
     uint8_t        count;
+} rgb_led_group_t;
+
+typedef struct {
+    hsv_t           color;
+    rgb_led_group_t led_group;
 } combo_feedback_led_group_t;
 
 typedef struct {
@@ -89,22 +93,19 @@ typedef enum {
 typedef struct {
     key_behavior_feedback_group_semantic_t semantic;
     hsv_t                                  color;
-    const uint8_t                         *leds;
-    uint8_t                                count;
+    rgb_led_group_t                        led_group;
 } key_behavior_feedback_led_group_t;
 
 typedef struct {
-    uint8_t        layer;
-    hsv_t          color;
-    const uint8_t *leds;
-    uint8_t        count;
+    uint8_t         layer;
+    hsv_t           color;
+    rgb_led_group_t led_group;
 } layer_led_group_t;
 
 typedef struct {
-    pd_mode_mask_t pointing_mode;
-    hsv_t          color;
-    const uint8_t *leds;
-    uint8_t        count;
+    pd_mode_mask_t  pointing_mode;
+    hsv_t           color;
+    rgb_led_group_t led_group;
 } pd_mode_led_group_t;
 
 #if defined(RGB_MATRIX_ENABLE)
