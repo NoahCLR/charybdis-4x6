@@ -14,12 +14,20 @@ static char log_buffer[4096];
 static const uint8_t           invalid_layer_leds[] = {0, RGB_MATRIX_LED_COUNT};
 static const uint8_t           invalid_mode_leds[]  = {RGB_MATRIX_LED_COUNT};
 static const uint8_t           unknown_mode_leds[]  = {1};
+static const uint8_t           invalid_combo_leds[] = {RGB_MATRIX_LED_COUNT};
+static const uint8_t           invalid_key_feedback_leds[] = {RGB_MATRIX_LED_COUNT};
 static const layer_led_group_t layer_groups[]       = {
     {.layer = LAYER_COUNT, .color = HSV(0, 0, 0), .leds = invalid_layer_leds, .count = ARRAY_SIZE(invalid_layer_leds)},
 };
 static const pd_mode_led_group_t pd_mode_groups[] = {
     {.pointing_mode = PD_MODE_VOLUME, .color = HSV(1, 1, 1), .leds = invalid_mode_leds, .count = ARRAY_SIZE(invalid_mode_leds)},
     {.pointing_mode = (pd_mode_mask_t)0x8000u, .color = HSV(2, 2, 2), .leds = unknown_mode_leds, .count = ARRAY_SIZE(unknown_mode_leds)},
+};
+static const combo_feedback_led_group_t combo_feedback_groups[] = {
+    {.color = HSV(4, 4, 4), .leds = invalid_combo_leds, .count = ARRAY_SIZE(invalid_combo_leds)},
+};
+static const key_behavior_feedback_led_group_t key_behavior_feedback_groups[] = {
+    {.semantic = (key_behavior_feedback_group_semantic_t)0xFFu, .color = HSV(5, 5, 5), .leds = invalid_key_feedback_leds, .count = ARRAY_SIZE(invalid_key_feedback_leds)},
 };
 
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
@@ -29,9 +37,17 @@ const layer_led_group_t *const    layer_led_groups          = layer_groups;
 const uint8_t                     layer_led_group_count     = (uint8_t)ARRAY_SIZE(layer_groups);
 const pd_mode_led_group_t *const  pd_mode_led_groups        = pd_mode_groups;
 const uint8_t                     pd_mode_led_group_count   = (uint8_t)ARRAY_SIZE(pd_mode_groups);
+const combo_feedback_led_group_t *const combo_feedback_led_groups      = combo_feedback_groups;
+const uint8_t                           combo_feedback_led_group_count = (uint8_t)ARRAY_SIZE(combo_feedback_groups);
+const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups      = key_behavior_feedback_groups;
+const uint8_t                                  key_behavior_feedback_led_group_count = (uint8_t)ARRAY_SIZE(key_behavior_feedback_groups);
 const automouse_fade_end_config_t automouse_fade_end_config = {
     .mode      = (automouse_fade_end_mode_t)0xFFu,
     .end_color = HSV(3, 3, 3),
+};
+const combo_feedback_color_config_t combo_feedback_colors = {
+    .color    = HSV(0, 0, 4),
+    .locality = (rgb_locality_t)0xFFu,
 };
 
 const pd_mode_color_t pd_mode_colors[] = {
@@ -89,7 +105,11 @@ int main(void) {
     CHECK(strstr(log_buffer, "Missing pd_mode_colors entry") != NULL);
     CHECK(strstr(log_buffer, "Unknown pd_mode_led_groups") != NULL);
     CHECK(strstr(log_buffer, "Invalid pd_mode_led_groups") != NULL);
+    CHECK(strstr(log_buffer, "Invalid combo_feedback_colors.locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid combo_feedback_led_groups") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_led_groups[0].semantic") != NULL);
+    CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_led_groups") != NULL);
 
     puts("rgb_validation host tests passed");
     return 0;

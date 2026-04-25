@@ -34,6 +34,9 @@
 #ifndef RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
 #    define RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF 0
 #endif
+#ifndef RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
+#    define RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS 0
+#endif
 #if (RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF) > 1
 #    error "Only one key-feedback render test mode variant may be enabled at a time"
 #endif
@@ -151,6 +154,13 @@ const combo_feedback_color_config_t combo_feedback_colors = {
     .color    = HSV(150, 151, 152),
     .locality = RGB_KEYS_ONLY,
 };
+#if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
+static const uint8_t                    combo_feedback_group_leds[]      = {3};
+static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
+    {.color = HSV(153, 154, 155), .leds = combo_feedback_group_leds, .count = ARRAY_SIZE(combo_feedback_group_leds)},
+};
+EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data);
+#endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(1, 2, 3),
     .hold_active_color       = HSV(4, 5, 6),
@@ -167,6 +177,14 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .locality = RGB_BOTH_HALVES,
 #endif
 };
+#if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
+static const uint8_t key_feedback_group_leds[] = {5};
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
+    {.semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(11, 12, 13), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
+    {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(14, 15, 16), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
+};
+EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data);
+#endif
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
     [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL}, [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME}, [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS}, [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM}, [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW}, [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH},
 };
@@ -194,6 +212,16 @@ static rgb_t rgb_from_ws2812(ws2812_led_t led) {
 static rgb_t rgb_from_combo_feedback(void) {
     return rgb_from_hsv(combo_feedback_colors.color);
 }
+
+#if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
+static rgb_t rgb_from_combo_feedback_group(uint8_t index) {
+    return rgb_from_hsv(combo_feedback_led_groups[index].color);
+}
+
+static rgb_t rgb_from_key_feedback_group(uint8_t index) {
+    return rgb_from_hsv(key_behavior_feedback_led_groups[index].color);
+}
+#endif
 
 static __attribute__((unused)) void test_feedback_bitmap_set(uint8_t *bitmap, uint8_t row, uint8_t col) {
     key_origin_bitmap_fill_single(bitmap, (keypos_t){.row = row, .col = col});
@@ -630,6 +658,45 @@ static void test_combo_underlay_stays_below_pd_mode(void) {
     check_led(5, rgb_from_hsv(pd_mode_colors[0].color));
 }
 
+#if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
+static void test_combo_overlay_led_groups_repaint_after_combo_locality(void) {
+    test_reset();
+
+    layer_state = (layer_state_t)1u << LAYER_SYM;
+    test_feedback_bitmap_set(fake_combo_overlay_bitmap, 0, 0);
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_combo_feedback());
+    check_led(3, rgb_from_combo_feedback_group(0));
+}
+
+static void test_combo_underlay_led_groups_stay_below_preview(void) {
+    test_reset();
+
+    test_keymap[LAYER_NUM][0][3] = 0x0020u;
+    layer_state                  = (layer_state_t)1u << LAYER_SYM;
+    fake_preview_layer           = LAYER_NUM;
+    test_feedback_bitmap_set(fake_combo_underlay_bitmap, 0, 0);
+
+    CHECK(render_output());
+
+    check_led(3, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+}
+
+static void test_combo_overlay_led_groups_repaint_after_pd_mode(void) {
+    test_reset();
+
+    layer_state         = (layer_state_t)1u << LAYER_SYM;
+    fake_pd_active_mode = PD_MODE_VOLUME;
+    test_feedback_bitmap_set(fake_combo_overlay_bitmap, 0, 0);
+
+    CHECK(render_output());
+
+    check_led(3, rgb_from_combo_feedback_group(0));
+}
+#endif
+
 static void test_slave_combo_overlay_stays_visible_over_remote_preview(void) {
     test_reset();
 
@@ -751,6 +818,35 @@ static void test_slave_feedback_uses_remote_semantics_and_flash_phase(void) {
     check_led(7, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
 #endif
 }
+
+#if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
+static void test_key_feedback_led_groups_repaint_after_feedback_locality(void) {
+    test_reset();
+
+    layer_state = (1UL << LAYER_SYM);
+    test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.multi_tap_pending_color));
+    check_led(5, rgb_from_key_feedback_group(0));
+}
+
+static void test_key_feedback_led_groups_follow_flash_visibility(void) {
+    test_reset();
+
+    layer_state = (1UL << LAYER_SYM);
+    test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING);
+
+    CHECK(render_output());
+    check_led(5, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+
+    fake_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+
+    CHECK(render_output());
+    check_led(5, rgb_from_key_feedback_group(1));
+}
+#endif
 
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
 static void test_key_half_feedback_paints_only_master_half(void) {
@@ -1634,6 +1730,11 @@ int main(void) {
     test_combo_underlay_stays_below_preview();
     test_combo_overlay_stays_visible_over_pd_mode();
     test_combo_underlay_stays_below_pd_mode();
+#if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
+    test_combo_overlay_led_groups_repaint_after_combo_locality();
+    test_combo_underlay_led_groups_stay_below_preview();
+    test_combo_overlay_led_groups_repaint_after_pd_mode();
+#endif
     test_slave_combo_overlay_stays_visible_over_remote_preview();
     test_slave_combo_underlay_stays_below_remote_preview();
     test_slave_combo_overlay_stays_visible_over_remote_pd_mode();
@@ -1641,6 +1742,10 @@ int main(void) {
     test_slave_multi_tap_pending_feedback_overrides_remote_combo_overlay();
     test_slave_multi_tap_pending_feedback_overrides_remote_combo_underlay();
     test_slave_feedback_uses_remote_semantics_and_flash_phase();
+#if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
+    test_key_feedback_led_groups_repaint_after_feedback_locality();
+    test_key_feedback_led_groups_follow_flash_visibility();
+#endif
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
     test_key_half_feedback_paints_only_master_half();
     test_key_half_feedback_paints_only_slave_half_from_remote_snapshot();

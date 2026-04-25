@@ -68,11 +68,30 @@ typedef struct {
 } combo_feedback_color_config_t;
 
 typedef struct {
+    hsv_t          color;
+    const uint8_t *leds;
+    uint8_t        count;
+} combo_feedback_led_group_t;
+
+typedef struct {
     hsv_t          multi_tap_pending_color;
     hsv_t          hold_active_color;
     hsv_t          long_hold_active_color;
     rgb_locality_t locality;
 } key_behavior_feedback_color_config_t;
+
+typedef enum {
+    KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING = 0,
+    KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
+    KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
+} key_behavior_feedback_group_semantic_t;
+
+typedef struct {
+    key_behavior_feedback_group_semantic_t semantic;
+    hsv_t                                  color;
+    const uint8_t                         *leds;
+    uint8_t                                count;
+} key_behavior_feedback_led_group_t;
 
 typedef struct {
     uint8_t        layer;

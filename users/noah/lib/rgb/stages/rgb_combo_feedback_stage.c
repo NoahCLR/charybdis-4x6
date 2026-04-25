@@ -11,6 +11,8 @@
 #    include "../../state/runtime/split_runtime_sync.h"
 
 extern const combo_feedback_color_config_t combo_feedback_colors;
+extern const combo_feedback_led_group_t *const combo_feedback_led_groups;
+extern const uint8_t                          combo_feedback_led_group_count;
 
 static rgb_t combo_feedback_active_rgb;
 
@@ -20,6 +22,16 @@ void rgb_runtime_combo_feedback_stage_post_init(void) {
 
 static bool rgb_runtime_combo_feedback_stage_led_range_intersects(uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
     return from < led_max && to > led_min;
+}
+
+static bool rgb_runtime_combo_feedback_stage_led_group_intersects(const uint8_t *leds, uint8_t count, uint8_t led_min, uint8_t led_max) {
+    for (uint8_t i = 0; i < count; i++) {
+        if (leds[i] >= led_min && leds[i] < led_max) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static void rgb_runtime_combo_feedback_stage_current_bitmap(bool underlay, uint8_t *out_bitmap) {
@@ -78,14 +90,8 @@ static bool rgb_runtime_combo_feedback_stage_paint_bitmap_keys(const uint8_t *bi
     return painted;
 }
 
-static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_min, uint8_t led_max) {
-    uint8_t           bitmap[KEY_ORIGIN_BITMAP_SIZE];
+static bool rgb_runtime_combo_feedback_stage_render_locality(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
     split_side_mask_t sides;
-
-    rgb_runtime_combo_feedback_stage_current_bitmap(underlay, bitmap);
-    if (!key_origin_bitmap_has_any(bitmap)) {
-        return false;
-    }
 
     switch (combo_feedback_colors.locality) {
         case RGB_KEYS_ONLY:
@@ -127,6 +133,33 @@ static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_m
 
     rgb_set_both_halves(combo_feedback_active_rgb, led_min, led_max);
     return led_min < led_max;
+}
+
+static bool rgb_runtime_combo_feedback_stage_render_groups(uint8_t led_min, uint8_t led_max) {
+    bool painted = false;
+
+    for (uint8_t group = 0; group < combo_feedback_led_group_count; group++) {
+        rgb_t group_rgb = hsv_to_rgb(combo_feedback_led_groups[group].color);
+        rgb_set_led_group(combo_feedback_led_groups[group].leds, combo_feedback_led_groups[group].count, led_min, led_max, group_rgb);
+        painted |= rgb_runtime_combo_feedback_stage_led_group_intersects(combo_feedback_led_groups[group].leds, combo_feedback_led_groups[group].count, led_min, led_max);
+    }
+
+    return painted;
+}
+
+static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_min, uint8_t led_max) {
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    bool    painted = false;
+
+    rgb_runtime_combo_feedback_stage_current_bitmap(underlay, bitmap);
+    if (!key_origin_bitmap_has_any(bitmap)) {
+        return false;
+    }
+
+    painted |= rgb_runtime_combo_feedback_stage_render_locality(bitmap, led_min, led_max);
+    painted |= rgb_runtime_combo_feedback_stage_render_groups(led_min, led_max);
+
+    return painted;
 }
 
 bool rgb_runtime_combo_feedback_stage_render_underlay(uint8_t led_min, uint8_t led_max) {

@@ -917,6 +917,53 @@ def parse_key_behavior_feedback_locality(raw_text: str) -> dict[str, object] | N
     }
 
 
+def parse_exported_rgb_led_groups(
+    raw_text: str,
+    export_macro: str,
+    known_values: dict[str, str],
+    semantic_field: bool = False,
+) -> list[dict[str, object]]:
+    text = strip_comments(raw_text)
+    export_match = re.search(rf"\b{re.escape(export_macro)}\s*\(\s*(?P<table>[A-Za-z_][A-Za-z0-9_]*)\s*\)", text)
+    if export_match is None:
+        return []
+
+    table_name = export_match.group("table")
+    try:
+        body = extract_initializer_body(text, rf"\b{re.escape(table_name)}\[\]\s*=")
+    except SystemExit:
+        return []
+
+    rows: list[dict[str, object]] = []
+    for entry in split_top_level(body):
+        entry = entry.strip()
+        if not (entry.startswith("{") and entry.endswith("}")):
+            continue
+
+        fields = parse_designated_fields(entry[1:-1].strip())
+        color_expr = fields.get(".color")
+        leds_expr = fields.get(".leds")
+        count_expr = fields.get(".count")
+        if color_expr is None or leds_expr is None or count_expr is None:
+            continue
+
+        color = parse_hsv_expr(color_expr, known_values)
+        row: dict[str, object] = {
+            "color": color,
+            "preview_color": dict(color),
+            "leds": normalize_expr(leds_expr),
+            "count": normalize_expr(count_expr),
+        }
+        if semantic_field:
+            row["semantic"] = normalize_expr(fields.get(".semantic", ""))
+            row["label"] = humanize_identifier(row["semantic"].removeprefix("KEY_FEEDBACK_GROUP_"))
+        else:
+            row["label"] = "Combo Feedback Group"
+        rows.append(row)
+
+    return rows
+
+
 def resolve_rgb_default_color(known_values: dict[str, str]) -> dict[str, object]:
     return {
         "h": eval_numeric_expr(known_values["RGB_MATRIX_DEFAULT_HUE"], known_values),
@@ -1299,6 +1346,11 @@ def build_profile_model() -> dict[str, object]:
     }
     combo_feedback_color = parse_combo_feedback_color(rgb_config_raw_text, config_macros)
     combo_feedback_locality = parse_combo_feedback_locality(rgb_config_raw_text)
+    combo_feedback_led_groups = parse_exported_rgb_led_groups(
+        rgb_config_raw_text,
+        "EXPORT_COMBO_FEEDBACK_LED_GROUPS",
+        config_macros,
+    )
     automouse_fade_end_config = (
         parse_automouse_fade_end_config(rgb_config_raw_text, config_macros) if rgb_automouse_gradient_enabled else None
     )
@@ -1309,6 +1361,16 @@ def build_profile_model() -> dict[str, object]:
     )
     key_behavior_feedback_locality = (
         parse_key_behavior_feedback_locality(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
+    )
+    key_behavior_feedback_led_groups = (
+        parse_exported_rgb_led_groups(
+            rgb_config_raw_text,
+            "EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS",
+            config_macros,
+            semantic_field=True,
+        )
+        if rgb_key_behavior_feedback_enabled
+        else []
     )
 
     macro_usages = collect_macro_usages(parsed_layers, behaviors, combos, via_macros + hardcoded_macros)
@@ -1360,9 +1422,11 @@ def build_profile_model() -> dict[str, object]:
             "pd_mode_colors": pd_mode_colors,
             "combo_feedback_color": combo_feedback_color,
             "combo_feedback_locality": combo_feedback_locality,
+            "combo_feedback_led_groups": combo_feedback_led_groups,
             "automouse_fade_end_config": automouse_fade_end_config,
             "key_behavior_feedback_locality": key_behavior_feedback_locality,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
+            "key_behavior_feedback_led_groups": key_behavior_feedback_led_groups,
         },
         "keymap_custom_keycodes": keymap_custom_keycodes,
         "via_macros": via_slots,
@@ -2049,7 +2113,13 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     if combo_feedback_color is not None:
         swatch_colors.add(combo_feedback_color["preview_color"]["hex"])
 
+    for row in profile["rgb"]["combo_feedback_led_groups"]:
+        swatch_colors.add(row["preview_color"]["hex"])
+
     for row in profile["rgb"]["key_behavior_feedback_colors"]:
+        swatch_colors.add(row["preview_color"]["hex"])
+
+    for row in profile["rgb"]["key_behavior_feedback_led_groups"]:
         swatch_colors.add(row["preview_color"]["hex"])
 
     for fill_hex in sorted(swatch_colors):
@@ -2302,6 +2372,7 @@ def render_key_behavior_section(profile: dict[str, object]) -> str:
 def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
     feedback_colors = profile["rgb"]["key_behavior_feedback_colors"]
     feedback_locality = profile["rgb"]["key_behavior_feedback_locality"]
+    feedback_groups = profile["rgb"]["key_behavior_feedback_led_groups"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     lines = [
         "## Key-Behavior Feedback LEDs",
@@ -2355,6 +2426,23 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
             f"| `{row['label']}` | {row['meaning']} | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
         )
 
+    if feedback_groups:
+        lines.extend(
+            [
+                "",
+                "Authored key-feedback LED groups repaint after the feedback locality render inside this stage.",
+                "",
+                "| Semantic Group | LEDs | Count | Authored HSV | Preview Color |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+        )
+        for row in feedback_groups:
+            color = row["color"]
+            preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['label']} group color")
+            lines.append(
+                f"| `{row['semantic']}` | `{row['leds']}` | `{row['count']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
+            )
+
     lines.append("")
     return "\n".join(lines)
 
@@ -2362,6 +2450,7 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
 def render_combo_feedback_section(profile: dict[str, object]) -> str:
     combo_feedback_color = profile["rgb"]["combo_feedback_color"]
     combo_feedback_locality = profile["rgb"]["combo_feedback_locality"]
+    combo_feedback_groups = profile["rgb"]["combo_feedback_led_groups"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     lines = [
         "## Combo Feedback LEDs",
@@ -2407,9 +2496,26 @@ def render_combo_feedback_section(profile: dict[str, object]) -> str:
             "| State | Meaning | Authored HSV | Preview Color |",
             "| --- | --- | --- | --- |",
             f"| `{combo_feedback_color['label']}` | {combo_feedback_color['meaning']} | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |",
-            "",
         ]
     )
+    if combo_feedback_groups:
+        lines.extend(
+            [
+                "",
+                "Authored combo feedback LED groups repaint after the combo locality render inside the current combo underlay or overlay substage.",
+                "",
+                "| Group | LEDs | Count | Authored HSV | Preview Color |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+        )
+        for index, row in enumerate(combo_feedback_groups):
+            group_color = row["color"]
+            group_swatch = markdown_color_swatch(row["preview_color"], f"Combo feedback group {index + 1} color")
+            lines.append(
+                f"| `{index + 1}` | `{row['leds']}` | `{row['count']}` | `HSV({group_color['h']}, {group_color['s']}, {group_color['v']})` | {group_swatch} |"
+            )
+
+    lines.append("")
     return "\n".join(lines)
 
 

@@ -476,3 +476,47 @@ No required checks were skipped.
    key-behavior feedback still render in the same places as before.
 2. If future interaction RGB surfaces are added, use `rgb_locality_t` directly
    instead of creating another surface-specific placement enum.
+
+### Combo And Key-Feedback LED Groups
+
+- Added authored LED group support to combo feedback with
+  `combo_feedback_led_group_t` and
+  `EXPORT_COMBO_FEEDBACK_LED_GROUPS(...)`.
+- Added authored LED group support to key-behavior feedback with
+  `key_behavior_feedback_led_group_t`,
+  `key_behavior_feedback_group_semantic_t`, and
+  `EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(...)`.
+- Kept the group rendering rule consistent with existing layer and PD groups:
+  render the normal locality/color first, then repaint matching custom LED
+  groups last inside that substage.
+- Combo feedback groups render inside the live combo underlay or overlay
+  substage, so preview/PD ownership still decides whether they sit below or
+  above those indicators.
+- Key-behavior feedback groups render only when their semantic category is
+  visibly active, including the same flash-phase gating as the main feedback
+  color.
+- Updated RGB validation, focused host tests, profile introspection, authored
+  RGB comments, docs, and this active review note for the new authoring
+  surface.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+### Next Steps
+
+1. Decide whether the current profile should enable actual combo/key-feedback
+   group rows, or keep the feature as an authored option for later tuning.
+2. If real group rows are added, regenerate the profile overview and re-run
+   RGB render/validation plus real profile validation.

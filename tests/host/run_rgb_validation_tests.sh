@@ -17,6 +17,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCONSOLE_ENABLE \
     -DRGB_MATRIX_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
+    -DCOMBO_ENABLE \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
@@ -32,6 +33,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCONSOLE_ENABLE \
     -DRGB_MATRIX_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
+    -DCOMBO_ENABLE \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

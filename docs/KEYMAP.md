@@ -94,7 +94,8 @@ Combo outputs now keep two runtime views at once:
 If a combo spans both halves, localized RGB and `RGB_KEY_HALF`
 broaden to both halves instead of pretending the combo came from only one
 side. `RGB_KEYS_ONLY` can use that same footprint to paint the
-exact combo keys.
+exact combo keys. Combo and key-behavior feedback can also add custom LED
+group accents after their main locality render.
 
 ## Signature Behaviors
 

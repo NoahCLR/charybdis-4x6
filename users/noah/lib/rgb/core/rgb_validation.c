@@ -22,10 +22,14 @@ extern const automouse_fade_end_config_t automouse_fade_end_config;
 
 #    ifdef COMBO_ENABLE
 extern const combo_feedback_color_config_t combo_feedback_colors;
+extern const combo_feedback_led_group_t *const combo_feedback_led_groups;
+extern const uint8_t                          combo_feedback_led_group_count;
 #    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
+extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;
+extern const uint8_t                                  key_behavior_feedback_led_group_count;
 #    endif
 
 #    ifdef POINTING_DEVICE_ENABLE
@@ -114,6 +118,15 @@ static void rgb_validation_log_invalid_key_behavior_feedback_locality(uint8_t lo
     uprintf("Invalid key_behavior_feedback_colors.locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)locality);
 #        else
     (void)locality;
+#        endif
+}
+
+static void rgb_validation_log_invalid_key_behavior_feedback_group_semantic(uint8_t group_index, uint8_t semantic) {
+#        ifdef CONSOLE_ENABLE
+    uprintf("Invalid key_behavior_feedback_led_groups[%u].semantic %u; expected KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING (0), KEY_FEEDBACK_GROUP_HOLD_ACTIVE (1), or KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE (2)\n", (unsigned int)group_index, (unsigned int)semantic);
+#        else
+    (void)group_index;
+    (void)semantic;
 #        endif
 }
 #    endif
@@ -213,12 +226,41 @@ static void rgb_validation_validate_combo_feedback_config(void) {
         rgb_validation_log_invalid_combo_feedback_locality((uint8_t)combo_feedback_colors.locality);
     }
 }
+
+static void rgb_validation_validate_combo_feedback_led_groups(void) {
+    for (uint8_t group_index = 0; group_index < combo_feedback_led_group_count; group_index++) {
+        const combo_feedback_led_group_t *group = &combo_feedback_led_groups[group_index];
+
+        for (uint8_t led_index = 0; led_index < group->count; led_index++) {
+            if (group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
+                rgb_validation_log_invalid_layer_led_index("combo_feedback_led_groups", group_index, led_index, group->leds[led_index]);
+            }
+        }
+    }
+}
 #    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_validate_key_behavior_feedback_config(void) {
     if (key_behavior_feedback_colors.locality > RGB_KEYS_ONLY) {
         rgb_validation_log_invalid_key_behavior_feedback_locality((uint8_t)key_behavior_feedback_colors.locality);
+    }
+}
+
+static void rgb_validation_validate_key_behavior_feedback_led_groups(void) {
+    for (uint8_t group_index = 0; group_index < key_behavior_feedback_led_group_count; group_index++) {
+        const key_behavior_feedback_led_group_t *group    = &key_behavior_feedback_led_groups[group_index];
+        uint8_t                                  semantic = (uint8_t)group->semantic;
+
+        if (semantic > KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE) {
+            rgb_validation_log_invalid_key_behavior_feedback_group_semantic(group_index, semantic);
+        }
+
+        for (uint8_t led_index = 0; led_index < group->count; led_index++) {
+            if (group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
+                rgb_validation_log_invalid_layer_led_index("key_behavior_feedback_led_groups", group_index, led_index, group->leds[led_index]);
+            }
+        }
     }
 }
 #    endif
@@ -283,10 +325,12 @@ void noah_rgb_validate_config(void) {
 
 #    ifdef COMBO_ENABLE
     rgb_validation_validate_combo_feedback_config();
+    rgb_validation_validate_combo_feedback_led_groups();
 #    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     rgb_validation_validate_key_behavior_feedback_config();
+    rgb_validation_validate_key_behavior_feedback_led_groups();
 #    endif
 
 #    ifdef POINTING_DEVICE_ENABLE

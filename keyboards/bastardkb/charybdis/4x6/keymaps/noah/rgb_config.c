@@ -228,6 +228,18 @@ const combo_feedback_color_config_t combo_feedback_colors = {
     // Keep combo identity on the half or halves touched by the live combo.
     .locality = RGB_KEY_HALF,
 };
+
+// Optional combo feedback LED groups repaint after the combo locality render
+// inside whichever combo substage is live. Uncomment the block below when a
+// persistent combo accent needs its own color.
+//
+// static const uint8_t combo_feedback_group_leds[] = {TRACKBALL_LED};
+//
+// static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
+//     {.color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = combo_feedback_group_leds, .count = ARRAY_SIZE(combo_feedback_group_leds)},
+// };
+//
+// EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data);
 #    endif
 
 //
@@ -281,6 +293,19 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     // Keep feedback on the half that owns the current key / tap series.
     .locality = RGB_KEY_HALF,
 };
+
+// Optional key-behavior feedback LED groups repaint after the feedback
+// locality render when a matching visible semantic category is live.
+//
+// static const uint8_t key_feedback_group_leds[] = {TRACKBALL_LED};
+//
+// static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
+//     {.semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
+//     {.semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
+//     {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
+// };
+//
+// EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data);
 #    endif
 
 #endif // RGB_MATRIX_ENABLE

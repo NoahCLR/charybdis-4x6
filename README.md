@@ -232,8 +232,10 @@ The runtime supports:
   exact triggering key footprint
 - per-mode LED group highlights
 - steady combo feedback that can sit above or below preview / PD depending on live ownership
+- optional combo feedback LED group highlights
 - optional auto-mouse countdown gradient feedback
 - optional truthful key-behavior state feedback on both halves, a fixed half, only the key half, or only the key itself
+- optional key-behavior feedback LED group highlights
 
 That means RGB is not just there to look nice. It tells you what layer is
 active, which pointing mode is live, which combos are currently held, and when

@@ -261,6 +261,33 @@ This layer is intentionally steady while held. That keeps combo identity
 visible underneath later flashing key-behavior overlays instead of competing
 with them.
 
+### `combo_feedback_led_groups`
+
+`combo_feedback_led_groups` adds custom-color LED accents to the live combo
+feedback stage. Groups render after `combo_feedback_colors.locality` inside the
+current combo substage, so they are compatible with every combo locality:
+both halves, fixed halves, key half, or keys only.
+
+The same group table is used by both combo substages:
+
+- preview- or PD-owning combos use the combo underlay path, so their groups
+  remain below preview and PD indicators
+- unrelated combos use the combo overlay path, so their groups repaint above
+  preview and PD indicators
+- key-behavior feedback still renders later and can repaint above combo groups
+
+Use rows like:
+
+```c
+static const uint8_t combo_accent_leds[] = {TRACKBALL_LED};
+
+static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
+    { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = combo_accent_leds, .count = ARRAY_SIZE(combo_accent_leds) },
+};
+
+EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data);
+```
+
 ### `key_behavior_feedback_colors`
 
 In `rgb_config.c`, declare `key_behavior_feedback_colors` directly:
@@ -338,6 +365,40 @@ truth at paint time when the authored `locality` asks for it. On split boards,
 the slave receives that packed semantic map and shared flash metadata through
 [`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c).
 
+### `key_behavior_feedback_led_groups`
+
+`key_behavior_feedback_led_groups` adds custom-color LED accents to the
+key-behavior feedback stage. Groups render after
+`key_behavior_feedback_colors.locality`, so they work with every feedback
+locality while still remaining within the key-behavior feedback stage.
+
+Each row chooses a semantic category:
+
+- `KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING`: visible while multi-tap resolution is
+  pending
+- `KEY_FEEDBACK_GROUP_HOLD_ACTIVE`: visible for hold pending, steady hold, and
+  flashing hold states
+- `KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE`: visible for steady and flashing
+  long-hold states
+
+Flashing categories follow the same flash visibility as the main
+key-behavior feedback color. Later group rows can repaint LEDs painted by
+earlier group rows.
+
+Use rows like:
+
+```c
+static const uint8_t feedback_accent_leds[] = {TRACKBALL_LED};
+
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
+    { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .leds = feedback_accent_leds, .count = ARRAY_SIZE(feedback_accent_leds) },
+    { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = feedback_accent_leds, .count = ARRAY_SIZE(feedback_accent_leds) },
+    { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = feedback_accent_leds, .count = ARRAY_SIZE(feedback_accent_leds) },
+};
+
+EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data);
+```
+
 ## Render Order
 
 [`rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c) applies RGB in a deliberate order:
@@ -347,15 +408,17 @@ the slave receives that packed semantic map and shared flash metadata through
    only the LEDs owned by that layer's non-transparent keys
 2. if the auto-mouse layer is active, that layer stage is blended toward its
    destination state instead of being painted as a fixed separate gradient
-3. combo underlay for combos that currently own preview and/or PD state
+3. combo underlay for combos that currently own preview and/or PD state,
+   including any matching combo feedback LED groups
 4. per-layer preview overlay for a pending momentary-layer hold, if
    `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on and that previewed layer has a
    nonzero solid color
 5. the active pointing-device mode color using the authored PD locality
 6. per-mode LED groups
-7. combo overlay for all other active combos
+7. combo overlay for all other active combos, including any matching combo
+   feedback LED groups
 8. the key-behavior feedback overlay on both halves, only the key half, or
-   only the specific key
+   only the specific key, then any matching key-behavior feedback LED groups
 
 That order matters.
 
@@ -365,11 +428,15 @@ Examples:
 - a preview- or PD-owning combo can stay underneath the preview or PD overlay
 - an unrelated active combo can repaint above preview or PD if it uses the
   combo overlay path
+- a combo feedback LED group repaints after its combo locality render, but
+  still stays within the combo underlay or overlay substage that owns it
 - a pd-mode overlay can repaint its authored locality after the base scene and
   any combo underlay
 - a pd-mode LED group can then repaint selected LEDs on top of the mode overlay
 - the key-behavior overlay can still repaint last, either on both halves, only
   the key half, or only the specific key footprint depending on `locality`
+- a key-behavior feedback LED group repaints after that feedback locality
+  render when its semantic category is currently visible
 
 ## The Helper Types
 
@@ -380,12 +447,18 @@ Examples:
 - `layer_color_config_t`
 - `automouse_fade_end_config_t`
 - `combo_feedback_color_config_t`
+- `combo_feedback_led_group_t`
+- `key_behavior_feedback_color_config_t`
+- `key_behavior_feedback_group_semantic_t`
+- `key_behavior_feedback_led_group_t`
 - `layer_led_group_t`
 - `pd_mode_led_group_t`
 
 [`users/noah/lib/rgb/core/rgb_config_helpers.h`](../users/noah/lib/rgb/core/rgb_config_helpers.h)
-defines the shared `HSV(...)`, `EXPORT_LAYER_LED_GROUPS(...)`, and
-`EXPORT_PD_MODE_LED_GROUPS(...)` helpers used by the authored config tables.
+defines the shared `HSV(...)`, `EXPORT_LAYER_LED_GROUPS(...)`,
+`EXPORT_PD_MODE_LED_GROUPS(...)`, `EXPORT_COMBO_FEEDBACK_LED_GROUPS(...)`, and
+`EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(...)` helpers used by the authored
+config tables.
 
 `rgb_helpers.h` also provides split-safe helper functions such as:
 
@@ -429,6 +502,20 @@ Edit the matching row in `pd_mode_colors[]` and change its `.locality`.
 2. Uncomment the `pd_mode_led_groups_data` block plus
    `EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data)`, then add the rows you
    want.
+
+### Add a small highlight to combo feedback
+
+1. Define a `uint8_t` LED index array.
+2. Uncomment the `combo_feedback_led_groups_data` block plus
+   `EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data)`, then add
+   the rows you want.
+
+### Add a small highlight to key-behavior feedback
+
+1. Define a `uint8_t` LED index array.
+2. Uncomment the `key_behavior_feedback_led_groups_data` block plus
+   `EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data)`,
+   then add rows for the semantic categories you want to accent.
 
 ### Change the auto-mouse timeout fade
 

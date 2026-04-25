@@ -13,7 +13,8 @@ and profile review.
 The initial pass was review-only. Follow-up implementation in this same active
 thread added fixed left/right key-feedback placement, added exact-key PD RGB
 locality, migrated PD/combo/key-feedback RGB placement to one shared locality
-enum, and updated the RGB authoring docs.
+enum, added combo/key-feedback LED group authoring, and updated the RGB
+authoring docs.
 
 ## Findings
 
@@ -107,6 +108,17 @@ None.
   `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`,
   `users/noah/lib/rgb/core/rgb_validation.c`, and
   `tools/profile_introspect.py`.
+- Combo feedback and key-behavior feedback now support authored LED groups in
+  the same last-within-substage shape as layer and PD groups. Combo groups
+  repaint after combo locality inside the live combo underlay or overlay
+  substage. Key-feedback groups repaint after feedback locality when their
+  semantic category is visibly active. Code references:
+  `users/noah/lib/rgb/core/rgb_helpers.h`,
+  `users/noah/lib/rgb/core/rgb_config_defaults.c`,
+  `users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c`,
+  `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`,
+  `users/noah/lib/rgb/core/rgb_validation.c`, and
+  `tests/host/rgb_layer_render_test.c`.
 
 ## Non-Findings
 

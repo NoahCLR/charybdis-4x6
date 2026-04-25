@@ -13,6 +13,8 @@
 #    include "../../state/runtime/split_runtime_sync.h"
 
 extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
+extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;
+extern const uint8_t                                  key_behavior_feedback_led_group_count;
 
 static rgb_t key_behavior_feedback_multi_tap_pending_rgb;
 static rgb_t key_behavior_feedback_hold_active_rgb;
@@ -30,6 +32,16 @@ void rgb_runtime_key_feedback_stage_post_init(void) {
 
 static bool rgb_runtime_key_feedback_stage_led_range_intersects(uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
     return from < led_max && to > led_min;
+}
+
+static bool rgb_runtime_key_feedback_stage_led_group_intersects(const uint8_t *leds, uint8_t count, uint8_t led_min, uint8_t led_max) {
+    for (uint8_t i = 0; i < count; i++) {
+        if (leds[i] >= led_min && leds[i] < led_max) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static void rgb_runtime_key_feedback_stage_current_semantic_map(uint8_t *out_map) {
@@ -76,6 +88,37 @@ static bool rgb_runtime_key_feedback_stage_semantic_color(key_feedback_semantic_
 
 static bool rgb_runtime_key_feedback_stage_semantic_visible(key_feedback_semantic_t semantic, uint8_t flash_meta) {
     return !key_feedback_semantic_is_flashing(semantic) || key_feedback_flash_meta_phase(flash_meta);
+}
+
+static bool rgb_runtime_key_feedback_stage_group_semantic_matches(key_behavior_feedback_group_semantic_t group_semantic, key_feedback_semantic_t semantic) {
+    switch (group_semantic) {
+        case KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING:
+            return semantic == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING;
+        case KEY_FEEDBACK_GROUP_HOLD_ACTIVE:
+            return semantic == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING || semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY || semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING;
+        case KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE:
+            return semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY || semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING;
+        default:
+            return false;
+    }
+}
+
+static bool rgb_runtime_key_feedback_stage_group_semantic_visible(const uint8_t *semantic_map, uint8_t flash_meta, key_behavior_feedback_group_semantic_t group_semantic) {
+    if (!semantic_map) {
+        return false;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            key_feedback_semantic_t semantic = key_feedback_semantic_map_get(semantic_map, (keypos_t){.row = row, .col = col});
+
+            if (rgb_runtime_key_feedback_stage_group_semantic_matches(group_semantic, semantic) && rgb_runtime_key_feedback_stage_semantic_visible(semantic, flash_meta)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 static bool rgb_runtime_key_feedback_stage_paint_key(rgb_t color, keypos_t key_pos, uint8_t led_min, uint8_t led_max) {
@@ -191,16 +234,11 @@ static bool rgb_runtime_key_feedback_stage_paint_half(bool right_half, key_feedb
     return true;
 }
 
-static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t led_max) {
-    uint8_t                 semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
-    uint8_t                 flash_meta;
+static bool rgb_runtime_key_feedback_stage_render_locality(const uint8_t *semantic_map, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
     key_feedback_semantic_t left_semantic;
     key_feedback_semantic_t right_semantic;
     key_feedback_semantic_t global_semantic;
     rgb_t                   color;
-
-    rgb_runtime_key_feedback_stage_current_semantic_map(semantic_map);
-    flash_meta = rgb_runtime_key_feedback_stage_current_flash_meta();
 
     if (key_behavior_feedback_colors.locality == RGB_KEYS_ONLY) {
         return rgb_runtime_key_feedback_stage_render_key_mode(semantic_map, flash_meta, led_min, led_max);
@@ -231,6 +269,36 @@ static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t 
 
     rgb_set_both_halves(color, led_min, led_max);
     return led_min < led_max;
+}
+
+static bool rgb_runtime_key_feedback_stage_render_groups(const uint8_t *semantic_map, uint8_t flash_meta, uint8_t led_min, uint8_t led_max) {
+    bool painted = false;
+
+    for (uint8_t group = 0; group < key_behavior_feedback_led_group_count; group++) {
+        if (!rgb_runtime_key_feedback_stage_group_semantic_visible(semantic_map, flash_meta, key_behavior_feedback_led_groups[group].semantic)) {
+            continue;
+        }
+
+        rgb_t group_rgb = hsv_to_rgb(key_behavior_feedback_led_groups[group].color);
+        rgb_set_led_group(key_behavior_feedback_led_groups[group].leds, key_behavior_feedback_led_groups[group].count, led_min, led_max, group_rgb);
+        painted |= rgb_runtime_key_feedback_stage_led_group_intersects(key_behavior_feedback_led_groups[group].leds, key_behavior_feedback_led_groups[group].count, led_min, led_max);
+    }
+
+    return painted;
+}
+
+static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t led_max) {
+    uint8_t semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t flash_meta;
+    bool    painted = false;
+
+    rgb_runtime_key_feedback_stage_current_semantic_map(semantic_map);
+    flash_meta = rgb_runtime_key_feedback_stage_current_flash_meta();
+
+    painted |= rgb_runtime_key_feedback_stage_render_locality(semantic_map, flash_meta, led_min, led_max);
+    painted |= rgb_runtime_key_feedback_stage_render_groups(semantic_map, flash_meta, led_min, led_max);
+
+    return painted;
 }
 
 bool rgb_runtime_key_feedback_stage_render(uint8_t led_min, uint8_t led_max) {
