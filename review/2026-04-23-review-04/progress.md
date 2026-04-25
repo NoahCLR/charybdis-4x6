@@ -876,3 +876,120 @@ Next steps:
 2. If PD-mode, combo-feedback, or key-feedback stages need full board-image
    previews later, add separate stage-preview SVGs instead of overloading the
    per-layer images.
+
+## 2026-04-26
+
+### Tap Feedback And Direct Dragscroll Regression Follow-Up
+
+- Added real-profile regression coverage for the `LEFT_THUMB` double-tap hold
+  `KC_ESC` path: unresolved pending feedback, committed branch pulse, steady
+  hold-pending feedback, and release dispatch are now checked together.
+- Scoped pending multi-tap preflight flushing to foreign non-handled key
+  presses. This keeps independent authored key pending chains intact while
+  making terminal tap-only actions such as `KC_LEFT_GUI` triple-tap
+  `OSM(MOD_LSFT)` dispatch before the next ordinary key reaches QMK.
+- Added authored NAV and POINTER `DRAGSCROLL` quick-tap salvos to verify direct
+  PD-mode activation leaves no stale active slot, held owner, local lock,
+  dragscroll backend state, or auto-mouse key tracker.
+- Linked the real-profile thumb-layer integration runner against the actual
+  key-feedback map implementation so feedback semantics can be asserted in the
+  same authored-profile scenario tests.
+- Updated the architecture note to record the handled-vs-non-handled
+  multi-tap flush boundary and the release-hold feedback coverage.
+
+Verification passed:
+
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and verify `KC_LEFT_GUI` triple-tap Shift OSM against a real normal
+   follow-up key.
+2. Try repeated `DRAGSCROLL` quick taps on hardware from both NAV and POINTER
+   layers to confirm the crash path is gone.
+
+### Hardware Regression Reconciliation
+
+The first 2026-04-26 host pass was insufficient. Hardware testing showed the
+ESC feedback path, Shift OSM path, and repeated `DRAGSCROLL` path were still
+not fixed, so this follow-up treats that earlier result as an audit-time
+snapshot rather than a resolved state.
+
+Root causes found in this pass:
+
+- Delayed `OSM(MOD_LSFT)` dispatch armed QMK one-shot state, then
+  `dispatch_delayed_action_at()` restored the saved keyboard mod state over
+  the emitted one-shot state. The next normal key therefore did not see the
+  intended Shift OSM.
+- The real-profile OSM regression test only logged delayed actions; it did not
+  model the one-shot side effect, so the previous host test could pass while
+  the hardware behavior remained broken.
+- `LEFT_THUMB` double-tap hold to `KC_ESC` emitted branch feedback only if a
+  scan crossed `tap_hold_term` before release. If release itself was the first
+  post-threshold event, the branch pulse was coupled to tap-commit feedback and
+  was suppressed for the release-hold action path.
+- Terminal no-action / hold-only branches were preserved as pending multi-tap
+  chains after quick release. That stale branch state matched the repeated
+  direct `DRAGSCROLL` crash shape better than the earlier cleanup-only theory.
+
+Fixes landed:
+
+- `users/noah/lib/key/runtime/delayed_action.c` now preserves emitted one-shot
+  state when replaying delayed QMK behavior keycodes.
+- `users/noah/lib/key/runtime/core/runtime.c` now carries branch feedback
+  independently from tap-commit feedback, so release-hold actions can pulse the
+  committed branch before clearing.
+- Terminal no-action / hold-only multi-tap branches no longer stay in the
+  preserve-chain path after quick release. Preserve-chain is limited to
+  branches that can still accept another tap, plus the terminal tap-only
+  feedback window.
+- `tests/host/real_profile_thumb_layer_lock_integration_test.c` now covers
+  release-crossing-threshold ESC feedback, delayed OSM side effects, and
+  per-cycle `DRAGSCROLL` quick-tap state.
+
+Verification passed:
+
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and retest the exact three hardware regressions: double-tap hold
+   `LEFT_THUMB` to `KC_ESC`, triple-tap `KC_LEFT_GUI` to Shift OSM followed by
+   a normal key, and repeated quick `DRAGSCROLL` press/release.
+2. If any of those still fail on hardware, use the existing runtime trace
+   points around preflight, delayed dispatch, release resolution, and PD
+   lifecycle with these narrowed repros.

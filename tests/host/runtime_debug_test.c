@@ -972,9 +972,9 @@ static void test_key_runtime_core_pending_multi_tap_release_resolution_preserves
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
     fake_time = (uint16_t)(fake_time + 60u);
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
 
     CHECK(key_runtime_core_resolve_pending_multi_tap_release(key_pos, KC_NO, 0u, true, &resolution));
     CHECK(resolution.outcome == KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN);
@@ -990,9 +990,9 @@ static void test_key_runtime_core_pending_multi_tap_release_effect_plan_preserve
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
     fake_time = (uint16_t)(fake_time + 60u);
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_RELEASE_KEY, key_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
 
     CHECK(key_runtime_core_resolve_pending_multi_tap_release(key_pos, KC_NO, 0u, true, &resolution));
     CHECK(key_runtime_core_plan_pending_multi_tap_release_effects(key_pos, false, &resolution, (delayed_action_mods_t){0}, &plan));

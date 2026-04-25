@@ -2728,6 +2728,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     uint8_t                             series_tap_count;
     bool                                preserve_chain;
     bool                                terminal_tap_only_feedback_window;
+    bool                                tap_branch_feedback_on_release;
 
     if (out) {
         *out = (key_runtime_core_pending_multi_tap_release_resolution_t){0};
@@ -2746,8 +2747,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     elapsed          = key_runtime_core_elapsed(token->pressed_at, token->released_at);
     series_tap_count = series ? series->tap_count : 0u;
     terminal_tap_only_feedback_window = !token->interaction.binding.has_more_taps && !token->interaction.binding.hold.present && !token->interaction.binding.long_hold.present && tap_action != KC_NO;
-    preserve_chain = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term &&
-                     (token->interaction.binding.has_more_taps || terminal_tap_only_feedback_window || (tap_action == KC_NO && tap_repeat_count == 0u));
+    preserve_chain = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term && (token->interaction.binding.has_more_taps || terminal_tap_only_feedback_window);
+    tap_branch_feedback_on_release = series_tap_count > 1u && token->slot_phase != KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
 
     if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term) {
         semantics.hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
@@ -2777,6 +2778,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .outcome             = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
                 .action              = decision.action,
                 .repeat_count        = decision.action == KC_NO ? 0u : 1u,
+                .tap_branch_feedback = tap_branch_feedback_on_release,
                 .tap_commit_feedback = false,
                 .tap_count           = series_tap_count,
             };
@@ -2806,6 +2808,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .outcome             = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
                 .action              = tap_action,
                 .repeat_count        = tap_repeat_count,
+                .tap_branch_feedback = true,
                 .tap_commit_feedback = true,
                 .tap_count           = series_tap_count,
             };
@@ -2837,6 +2840,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .outcome             = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
                 .action              = tap_action,
                 .repeat_count        = tap_repeat_count,
+                .tap_branch_feedback = true,
                 .tap_commit_feedback = true,
                 .tap_count           = series_tap_count,
             };
@@ -2867,8 +2871,10 @@ bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, b
             return true;
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION:
             key_runtime_core_release_effect_plan_push_delayed_action(out, key_pos, resolution->action, mods, resolution->repeat_count);
-            if (resolution->tap_commit_feedback) {
+            if (resolution->tap_branch_feedback) {
                 key_runtime_core_release_effect_plan_push_tap_branch_commit_feedback_pulse(out, key_pos, resolution->tap_count);
+            }
+            if (resolution->tap_commit_feedback) {
                 key_runtime_core_release_effect_plan_push_tap_commit_feedback_pulse(out, key_pos, resolution->action, resolution->tap_count);
             }
             return true;

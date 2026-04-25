@@ -141,6 +141,12 @@ None.
   state in a separate packed map so the semantic map remains 3 bits per key and
   still fits one QMK split transaction. Split sync treats key feedback as a
   packet family: semantic state and tap-branch state are separate RPC payloads.
+- Foreign non-handled key presses now flush pending multi-tap actions before
+  the key leaves userspace for the normal QMK path. This preserves independent
+  authored-key pending chains while making terminal tap-only actions such as
+  `KC_LEFT_GUI` triple-tap `OSM(MOD_LSFT)` arm before the next ordinary key is
+  processed. Code references: `users/noah/lib/key/runtime/preflight.c` and
+  `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
 
 ## Non-Findings
 
@@ -223,6 +229,28 @@ When the runtime commits a tap branch, it emits a short
 branch in the tap-branch map. That branch pulse is queued before tap-commit,
 hold, or long-hold feedback, so every tap level follows the same visual order:
 pending, branch confirmation, then action feedback.
+For release-hold branches such as `LEFT_THUMB` double-tap hold to `KC_ESC`,
+branch feedback is independent from tap-commit feedback. This matters when the
+release event itself is the first event after `tap_hold_term`: the runtime can
+still emit the committed-branch pulse before clearing the slot and dispatching
+the release-hold action. The scanned threshold path remains covered by steady
+hold-pending feedback until release dispatches the action.
+
+Pending multi-tap dispatch is intentionally split by destination: foreign
+handled keys keep independent authored pending chains, while foreign
+non-handled keys flush pending tap actions in preflight before QMK handles the
+new key. That distinction is what lets two thumb pending chains coexist
+without delaying terminal tap-only actions like OSM before a normal follow-up
+key. Delayed QMK behavior dispatch must also preserve behavior-owned side
+effects, such as one-shot mod state, when it restores the saved keyboard mod
+snapshot around replay.
+
+Not every quick release is eligible to preserve a pending multi-tap chain.
+Branches that can still accept another tap may remain pending, and terminal
+tap-only branches may remain pending long enough to show the final branch
+confirmation. Terminal no-action / hold-only branches are not useful pending
+tap chains; they must clear on quick release so repeated direct PD-mode keys
+such as `DRAGSCROLL` cannot accumulate stale tap-series ownership.
 
 ## Recommended Next Refactor Sequence
 

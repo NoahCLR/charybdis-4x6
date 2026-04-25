@@ -12,6 +12,7 @@
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/compat/qmk_combo_origin.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/runtime/feedback.h"
 #include "users/noah/lib/key/runtime/origin_registry.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/key/runtime/core/runtime.h"
@@ -323,6 +324,20 @@ static void test_assert_thumb_runtime_quiescent(keypos_t key_pos) {
     CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(key_pos));
 }
 
+static key_feedback_semantic_t test_feedback_semantic_for_key(keypos_t key_pos) {
+    uint8_t semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+
+    key_feedback_semantic_map(semantic_map);
+    return key_feedback_semantic_map_get(semantic_map, key_pos);
+}
+
+static uint8_t test_feedback_tap_branch_for_key(keypos_t key_pos) {
+    uint8_t tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+
+    key_feedback_tap_branch_map(tap_branch_map);
+    return key_feedback_tap_branch_map_get(tap_branch_map, key_pos);
+}
+
 typedef enum {
     TEST_RELEASE_TARGET_CHILD = 0,
     TEST_RELEASE_TARGET_PARENT,
@@ -565,7 +580,9 @@ void noah_dispatch_synthetic_tap(uint16_t keycode) {
 }
 
 void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
-    (void)keycode;
+    if (IS_QK_ONE_SHOT_MOD(keycode)) {
+        fake_oneshot_mods |= QK_ONE_SHOT_MOD_GET_MODS(keycode);
+    }
 }
 
 bool noah_dispatch_synthetic_record(uint16_t keycode, bool pressed) {
@@ -957,8 +974,27 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
-    (void)key_pos;
     dispatch_delayed_action(action, mods);
+
+    if (!IS_QK_ONE_SHOT_MOD(action)) {
+        return;
+    }
+
+    keyboard_mod_state_t saved = keyboard_mod_state_suspend();
+
+    keyboard_mod_state_apply(mods);
+    noah_emit_action_tap_at(key_pos, action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+
+    keyboard_mod_state_t emitted = {
+        .real           = fake_mods,
+        .weak           = fake_weak_mods,
+        .oneshot        = fake_oneshot_mods,
+        .oneshot_locked = fake_oneshot_locked_mods,
+    };
+
+    saved.oneshot |= emitted.oneshot;
+    saved.oneshot_locked |= emitted.oneshot_locked;
+    keyboard_mod_state_apply(saved);
 }
 
 void held_action_register(keypos_t key_pos, uint16_t action) {
@@ -1033,20 +1069,12 @@ bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
     return slot >= 0 && test_held_actions[slot].action == action;
 }
 
-void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
-    (void)kind;
-}
-
 uint8_t key_feedback_pack(void) {
     return 0;
 }
 
 void key_feedback_bitmap(uint8_t *out_bitmap) {
     key_origin_bitmap_clear(out_bitmap);
-}
-
-uint8_t key_feedback_preview_layer(void) {
-    return UINT8_MAX;
 }
 
 void split_runtime_sync(void) {}
@@ -1102,6 +1130,69 @@ static void test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_
     test_run_double_tap_hold_cycle_with_intermediate_scan(key_pos, 120, 281);
     CHECK(!test_layer_locked(LAYER_NUM));
     CHECK(!test_layer_active(LAYER_NUM));
+}
+
+static void test_left_thumb_double_tap_hold_escape_feedback_sequence(void) {
+    keypos_t key_pos      = test_left_thumb_pos();
+    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+
+    test_reset_state();
+
+    CHECK(test_resolve_keycode(key_pos) == base_keycode);
+    test_press_resolved(key_pos);
+    test_release_resolved(key_pos);
+
+    key_runtime_integration_advance(&fake_time, 40);
+    test_press_resolved(key_pos);
+
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 2);
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_holding(key_pos));
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
+    key_runtime_integration_scan();
+
+    CHECK(noah_runtime_debug_slot_phase(key_pos) == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
+
+    key_runtime_integration_advance(&fake_time, RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS + 1);
+
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
+
+    test_release_resolved(key_pos);
+
+    CHECK(test_delayed_action_count == 1u);
+    CHECK(test_last_delayed_action == KC_ESC);
+    test_assert_thumb_runtime_quiescent(key_pos);
+}
+
+static void test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pulses_branch(void) {
+    keypos_t key_pos      = test_left_thumb_pos();
+    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+
+    test_reset_state();
+
+    CHECK(test_resolve_keycode(key_pos) == base_keycode);
+    test_press_resolved(key_pos);
+    test_release_resolved(key_pos);
+
+    key_runtime_integration_advance(&fake_time, 40);
+    test_press_resolved(key_pos);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
+    test_release_resolved(key_pos);
+
+    CHECK(test_delayed_action_count == 1u);
+    CHECK(test_last_delayed_action == KC_ESC);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
+
+    key_runtime_integration_advance(&fake_time, RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS + 1);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
+    test_assert_thumb_runtime_quiescent(key_pos);
 }
 
 static void test_left_and_right_thumb_single_taps_keep_independent_pending_chains(void) {
@@ -1409,6 +1500,74 @@ static void test_assert_dragscroll_overlap_quiescent(keypos_t parent_pos, keypos
     CHECK(auto_mouse_key_tracker == 0);
 }
 
+static void test_assert_direct_dragscroll_quiescent(keypos_t dragscroll_pos, uint8_t expected_reset_count) {
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == KC_NO);
+    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(reset_dragscroll_count == expected_reset_count);
+    CHECK(fake_mods == 0);
+    CHECK(fake_weak_mods == 0);
+    CHECK(fake_oneshot_mods == 0);
+    CHECK(fake_oneshot_locked_mods == 0);
+    CHECK(fake_managed_mods == 0);
+    CHECK(fake_physical_mods == 0);
+    CHECK(!dragscroll_enabled);
+    CHECK(auto_mouse_key_tracker == 0);
+}
+
+static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t layer_num) {
+    keypos_t dragscroll_pos = test_find_keypos_on_layer(layer_num, DRAGSCROLL);
+    uint8_t  expected_reset_count = 0u;
+
+    CHECK(test_keypos_valid(dragscroll_pos));
+
+    test_reset_state();
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(layer_num));
+
+    for (uint8_t iteration = 0; iteration < 8u; iteration++) {
+        CHECK(test_resolve_keycode(dragscroll_pos) == DRAGSCROLL);
+
+        test_press_resolved(dragscroll_pos);
+        if (pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL) {
+            expected_reset_count++;
+            CHECK(pd_mode_local_locked_snapshot() == 0);
+            CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == DRAGSCROLL);
+            CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == DRAGSCROLL);
+            CHECK(auto_mouse_key_tracker == 1);
+        }
+
+        test_release_resolved(dragscroll_pos);
+        key_runtime_integration_scan();
+        test_assert_direct_dragscroll_quiescent(dragscroll_pos, expected_reset_count);
+
+        if ((iteration % 2u) == 0u) {
+            CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1u);
+            CHECK(noah_runtime_debug_slot_pending_multi_tap_count(dragscroll_pos) == 1u);
+        } else {
+            CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+            CHECK(noah_runtime_debug_slot_pending_multi_tap_count(dragscroll_pos) == 0u);
+        }
+
+        key_runtime_integration_advance(&fake_time, 10u);
+    }
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+    key_runtime_integration_scan();
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+}
+
+static void test_nav_dragscroll_repeated_quick_taps_stay_quiescent(void) {
+    test_direct_dragscroll_repeated_quick_taps_stay_quiescent(LAYER_NAV);
+}
+
+static void test_pointer_dragscroll_repeated_quick_taps_stay_quiescent(void) {
+    test_direct_dragscroll_repeated_quick_taps_stay_quiescent(LAYER_POINTER);
+}
+
 static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool requires_parent_scan) {
     keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, DRAGSCROLL);
     keypos_t follow_on_pos  = test_find_keypos_on_layer(LAYER_BASE, KC_C);
@@ -1521,6 +1680,37 @@ static void test_commit_pending_gui_double_tap_alt_hold(keypos_t gui_pos) {
     CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(gui_pos));
     CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_LEFT_ALT);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) != 0);
+}
+
+static void test_gui_triple_tap_osm_flushes_before_next_plain_key(void) {
+    keypos_t gui_pos       = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
+    keypos_t follow_on_pos = test_find_keypos_on_layer(LAYER_BASE, KC_C);
+
+    CHECK(test_keypos_valid(gui_pos));
+    CHECK(test_keypos_valid(follow_on_pos));
+
+    test_reset_state();
+
+    test_run_quick_tap(gui_pos);
+    key_runtime_integration_advance(&fake_time, 40);
+    test_run_quick_tap(gui_pos);
+    key_runtime_integration_advance(&fake_time, 40);
+    test_run_quick_tap(gui_pos);
+
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(gui_pos) == 3u);
+    CHECK(test_delayed_action_count == 0u);
+
+    CHECK(key_runtime_integration_process_record(KC_C, follow_on_pos, true));
+
+    CHECK(test_delayed_action_count == 1u);
+    CHECK(test_last_delayed_action == OSM(MOD_LSFT));
+    CHECK(fake_oneshot_mods == MOD_LSFT);
+    CHECK(!noah_runtime_debug_slot_has_pending_multi_tap(gui_pos));
+    CHECK(noah_runtime_debug_slot_owner_keycode(gui_pos) == KC_NO);
+
+    CHECK(key_runtime_integration_process_record(KC_C, follow_on_pos, false));
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
 }
 
 static void test_activate_nav_parent_hold(keypos_t parent_pos, uint16_t parent_keycode, bool requires_threshold_scan) {
@@ -2333,6 +2523,8 @@ int main(void) {
     test_left_thumb_double_tap_hold_toggles_num_layer();
     test_right_thumb_double_tap_hold_toggles_num_layer();
     test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle();
+    test_left_thumb_double_tap_hold_escape_feedback_sequence();
+    test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pulses_branch();
     test_left_and_right_thumb_single_taps_keep_independent_pending_chains();
     test_right_thumb_triple_tap_flushes_next_track_after_timeout();
     test_right_thumb_triple_tap_long_hold_registers_next_track_hold();
@@ -2344,6 +2536,9 @@ int main(void) {
     test_right_thumb_hold_dispatches_nav_taps_immediately();
     test_raw_nav_layer_hold_enters_dragscroll_mode_cleanly();
     test_right_thumb_nav_hold_enters_dragscroll_mode_cleanly();
+    test_nav_dragscroll_repeated_quick_taps_stay_quiescent();
+    test_pointer_dragscroll_repeated_quick_taps_stay_quiescent();
+    test_gui_triple_tap_osm_flushes_before_next_plain_key();
     test_raw_nav_dragscroll_hold_keeps_arrow_taps_immediate();
     test_right_thumb_dragscroll_hold_keeps_arrow_taps_immediate();
     test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable();

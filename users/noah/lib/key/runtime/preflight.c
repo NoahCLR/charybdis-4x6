@@ -32,6 +32,15 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         key_runtime_transition_execute_plan(&plan);
     }
 
+    if (record->event.pressed && !handled_key_resolution_is_handled(handled_key)) {
+        key_runtime_transition_plan_t plan;
+
+        key_runtime_transition_plan_init(&plan);
+        key_runtime_transition_flush_foreign_multi_tap(keycode, record->event.key, &plan);
+        key_runtime_trace_plan("preflight:flush_foreign_multi_tap", &plan);
+        key_runtime_transition_execute_plan(&plan);
+    }
+
     return true;
 }
 
