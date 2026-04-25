@@ -1327,6 +1327,8 @@ def build_profile_model() -> dict[str, object]:
     keymap_config_macros = parse_config_macros(keymap_config_text)
     config_macros = merge_config_macros(userspace_config_macros, keymap_config_macros)
     rgb_automouse_gradient_enabled = "RGB_AUTOMOUSE_GRADIENT_ENABLE" in config_macros
+    rgb_pd_mode_feedback_enabled = "RGB_PD_MODE_FEEDBACK_ENABLE" in config_macros
+    rgb_combo_feedback_enabled = "RGB_COMBO_FEEDBACK_ENABLE" in config_macros
     rgb_key_behavior_feedback_enabled = "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE" in config_macros
     rgb_pd_mode_active_half_enabled = "RGB_PD_MODE_ACTIVE_HALF_ENABLE" in config_macros
     timing_defaults = resolve_behavior_timing_defaults(config_macros)
@@ -1338,18 +1340,22 @@ def build_profile_model() -> dict[str, object]:
     combos = parse_combos(keymap_text)
     parsed_layers = parse_layers(keymap_text, known_behaviors={behavior_lookup_key(behavior.keycode) for behavior in behaviors})
     pd_modes = parse_pd_mode_manifest(pd_mode_manifest_text)
-    pd_mode_colors = parse_pd_mode_colors(rgb_config_raw_text, config_macros)
+    pd_mode_colors = parse_pd_mode_colors(rgb_config_raw_text, config_macros) if rgb_pd_mode_feedback_enabled else []
     pd_mode_color_anchors = {
         row["comment_color_name"]: row["preview_color"]
         for row in pd_mode_colors
         if row["comment_color_name"] is not None
     }
-    combo_feedback_color = parse_combo_feedback_color(rgb_config_raw_text, config_macros)
-    combo_feedback_locality = parse_combo_feedback_locality(rgb_config_raw_text)
-    combo_feedback_led_groups = parse_exported_rgb_led_groups(
-        rgb_config_raw_text,
-        "EXPORT_COMBO_FEEDBACK_LED_GROUPS",
-        config_macros,
+    combo_feedback_color = parse_combo_feedback_color(rgb_config_raw_text, config_macros) if rgb_combo_feedback_enabled else None
+    combo_feedback_locality = parse_combo_feedback_locality(rgb_config_raw_text) if rgb_combo_feedback_enabled else None
+    combo_feedback_led_groups = (
+        parse_exported_rgb_led_groups(
+            rgb_config_raw_text,
+            "EXPORT_COMBO_FEEDBACK_LED_GROUPS",
+            config_macros,
+        )
+        if rgb_combo_feedback_enabled
+        else []
     )
     automouse_fade_end_config = (
         parse_automouse_fade_end_config(rgb_config_raw_text, config_macros) if rgb_automouse_gradient_enabled else None
@@ -1413,6 +1419,8 @@ def build_profile_model() -> dict[str, object]:
         },
         "features": {
             "rgb_automouse_gradient_enabled": rgb_automouse_gradient_enabled,
+            "rgb_pd_mode_feedback_enabled": rgb_pd_mode_feedback_enabled,
+            "rgb_combo_feedback_enabled": rgb_combo_feedback_enabled,
             "rgb_key_behavior_feedback_enabled": rgb_key_behavior_feedback_enabled,
             "rgb_pd_mode_active_half_enabled": rgb_pd_mode_active_half_enabled,
         },
@@ -1453,11 +1461,12 @@ def render_markdown(profile: dict[str, object]) -> str:
         "",
         render_quick_legend_section(profile),
         render_layer_maps_section(profile),
-        render_pd_mode_color_section(profile),
     ]
+    if profile["features"]["rgb_pd_mode_feedback_enabled"]:
+        sections.append(render_pd_mode_color_section(profile))
     if profile["features"]["rgb_automouse_gradient_enabled"]:
         sections.append(render_automouse_fade_section(profile))
-    if profile["rgb"]["combo_feedback_color"] is not None:
+    if profile["features"]["rgb_combo_feedback_enabled"]:
         sections.append(render_combo_feedback_section(profile))
     if profile["features"]["rgb_key_behavior_feedback_enabled"]:
         sections.append(render_key_behavior_feedback_section(profile))
@@ -1513,10 +1522,12 @@ def render_reference_section(profile: dict[str, object]) -> str:
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
-    rgb_authored_surfaces = ["layer colors", "pd-mode colors"]
+    rgb_authored_surfaces = ["layer colors"]
+    if features["rgb_pd_mode_feedback_enabled"]:
+        rgb_authored_surfaces.append("pd-mode colors")
     if features["rgb_automouse_gradient_enabled"]:
         rgb_authored_surfaces.append("auto-mouse fade config")
-    if rgb["combo_feedback_color"] is not None:
+    if features["rgb_combo_feedback_enabled"]:
         rgb_authored_surfaces.append("combo feedback color")
     if features["rgb_key_behavior_feedback_enabled"]:
         rgb_authored_surfaces.append("key-behavior feedback colors")
@@ -1535,8 +1546,9 @@ def render_reference_section(profile: dict[str, object]) -> str:
         "",
         f"- Layers: {', '.join(f'`{layer}`' for layer in config['layers'])}",
         f"- Keymap-local custom keycodes: {', '.join(f'`{name}`' for name in profile['keymap_custom_keycodes']) or '`none`'}",
-        f"- PD color overlays: {', '.join(f'`{row['pointing_mode']}`' for row in rgb['pd_mode_colors']) or '`none`'}",
     ]
+    if features["rgb_pd_mode_feedback_enabled"]:
+        lines.append(f"- PD color overlays: {', '.join(f'`{row['pointing_mode']}`' for row in rgb['pd_mode_colors']) or '`none`'}")
     if features["rgb_automouse_gradient_enabled"]:
         lines.append(
             f"- Auto-mouse fade destination mode: `{automouse_fade_end_config['mode']}`"
@@ -1549,7 +1561,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
             if feedback_locality is not None
             else "- Key-behavior feedback locality: `not authored`",
         )
-    if rgb["combo_feedback_color"] is not None:
+    if features["rgb_combo_feedback_enabled"]:
         lines.append(
             f"- Combo feedback locality: `{combo_feedback_locality['locality']}`"
             if combo_feedback_locality is not None

@@ -162,6 +162,7 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 // state stays anchored to the pointer half.
 //
 // { .pointing_mode = ..., .color = HSV(hue, sat, val), .locality = ... }
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 const pd_mode_color_t pd_mode_colors[] = {
     {
         .pointing_mode = PD_MODE_DRAGSCROLL,
@@ -210,6 +211,7 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 //     { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) }
 // };
 // EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data);
+#    endif // POINTING_DEVICE_ENABLE && RGB_PD_MODE_FEEDBACK_ENABLE
 
 // ─── Combo feedback ────────────────────────────────────────────────────────
 //
@@ -233,7 +235,7 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 // This profile uses RGB_KEY_HALF so active combos stay local
 // to the half or halves that formed the chord without narrowing to individual
 // keys or broadening across the board.
-#    ifdef COMBO_ENABLE
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 const combo_feedback_color_config_t combo_feedback_colors = {
     // Strong blue so the combo layer stays distinct from white/orange/cyan
     // authored key-behavior semantics.
@@ -258,7 +260,7 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 // };
 //
 // EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data);
-#    endif // COMBO_ENABLE
+#    endif // COMBO_ENABLE && RGB_COMBO_FEEDBACK_ENABLE
 
 //
 // ─── Key behavior feedback ──────────────────────────────────────────────────

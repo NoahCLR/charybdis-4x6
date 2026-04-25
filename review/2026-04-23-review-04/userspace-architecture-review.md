@@ -13,8 +13,8 @@ and profile review.
 The initial pass was review-only. Follow-up implementation in this same active
 thread added fixed left/right key-feedback placement, added exact-key PD RGB
 locality, migrated PD/combo/key-feedback RGB placement to one shared locality
-enum, added combo/key-feedback LED group authoring, and updated the RGB
-authoring docs.
+enum, added combo/key-feedback LED group authoring, added explicit
+interaction-feedback stage gates, and updated the RGB authoring docs.
 
 ## Findings
 
@@ -119,12 +119,18 @@ None.
   `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`,
   `users/noah/lib/rgb/core/rgb_validation.c`, and
   `tests/host/rgb_layer_render_test.c`.
+- Interaction RGB feedback stages now have explicit user-facing gates:
+  `RGB_PD_MODE_FEEDBACK_ENABLE`, `RGB_COMBO_FEEDBACK_ENABLE`,
+  `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, and `RGB_AUTOMOUSE_GRADIENT_ENABLE`.
+  When disabled, the related stage is omitted from the RGB render path rather
+  than called as an empty stage. Preview remains internal to the key-behavior
+  feedback path.
 
 ## Non-Findings
 
-- The RGB runtime shape is coherent. `users/noah/lib/rgb/core/rgb_runtime.c:122`
-  keeps top-level rendering as a stage pipeline: base/layer state first, then
-  combo underlay, preview, pointing-mode overlay, combo overlay, and
+- The RGB runtime shape is coherent. `users/noah/lib/rgb/core/rgb_runtime.c`
+  keeps top-level rendering in a fixed order: base/layer state first, then any
+  enabled combo underlay, preview, pointing-mode overlay, combo overlay, and
   key-feedback overlay. That ordering matches the docs and the host render
   tests.
 - The runtime is coherent with the tap engine. RGB does not re-interpret
@@ -181,7 +187,9 @@ unregister the active PD lifecycle.
 The current interaction RGB authoring surface is coherent for the main feedback
 surfaces. PD, combo feedback, and key-behavior feedback all use `.locality`
 with shared `RGB_*` locality values. Layer coverage and auto-mouse fade still
-use `.mode` because they are not interaction-locality settings.
+use `.mode` because they are not interaction-locality settings. PD, combo,
+key-behavior, and auto-mouse feedback can be disabled with their stage-level
+config flags; preview is intentionally not a separate user-facing toggle.
 
 ## Recommended Next Refactor Sequence
 

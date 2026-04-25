@@ -103,6 +103,18 @@ enum charybdis_keymap_layers {
 // Turn off LEDs after this many ms of inactivity (requires SPLIT_ACTIVITY_ENABLE).
 #    define RGB_MATRIX_TIMEOUT 900000
 
+// PD-mode RGB feedback overlay.
+// Comment out RGB_PD_MODE_FEEDBACK_ENABLE to disable the stage entirely.
+#    ifdef POINTING_DEVICE_ENABLE
+#        define RGB_PD_MODE_FEEDBACK_ENABLE
+#    endif
+
+// Combo feedback overlay.
+// Comment out RGB_COMBO_FEEDBACK_ENABLE to disable the stage entirely.
+#    ifdef COMBO_ENABLE
+#        define RGB_COMBO_FEEDBACK_ENABLE
+#    endif
+
 // Key-behavior feedback overlay.
 // Shows multi-tap progress and hold-threshold colors on individual keys.
 // Comment out RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE to disable entirely.

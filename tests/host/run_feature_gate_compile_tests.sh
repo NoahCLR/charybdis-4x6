@@ -224,6 +224,7 @@ compile_variant() {
 compile_variant "tests/host/include/noah_compile_config.h" "" "$COMMON_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DCONSOLE_ENABLE -DNOAH_KEY_RUNTIME_TRACE_ENABLE -DNOAH_RUNTIME_TRACE_ENABLE" "$COMMON_SOURCES users/noah/lib/key/runtime/process.c users/noah/lib/key/runtime/preflight.c users/noah/lib/key/runtime/press.c users/noah/lib/key/runtime/release.c users/noah/lib/key/runtime/scan.c users/noah/lib/key/runtime/transition.c"
 compile_variant "tests/host/include/noah_compile_config_no_rgb_feedback.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
+compile_variant "tests/host/include/noah_compile_config_no_rgb_feedback.h" "$POINTING_TEST_FLAGS -DCOMBO_ENABLE $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config_no_pd_active_half.h" "-DSPLIT_KEYBOARD $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "-DNOAH_RUNTIME_TRACE_ENABLE $POINTING_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES"

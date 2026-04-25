@@ -551,3 +551,37 @@ No required checks were skipped.
    rows from the relevant feature section when tuning the profile.
 2. Add new physical LED clusters only in the central `LED Groups` section,
    then reference them from the relevant render table.
+
+### Interaction RGB Stage Gates
+
+- Added explicit user-facing gates for PD-mode feedback and combo feedback:
+  `RGB_PD_MODE_FEEDBACK_ENABLE` and `RGB_COMBO_FEEDBACK_ENABLE`.
+- Kept `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` and
+  `RGB_AUTOMOUSE_GRADIENT_ENABLE` as the existing key-behavior and auto-mouse
+  stage gates.
+- Kept preview internal to the key-behavior feedback path instead of exposing
+  a separate preview toggle.
+- Updated `rgb_runtime.c` so disabled interaction feedback stages are skipped
+  in post-init and in per-frame rendering, rather than being called as empty
+  no-op stages.
+- Gated authored PD-mode and combo feedback RGB tables, defaults, validation,
+  profile introspection, and docs behind the matching flags.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Next steps:
+
+1. If a user disables one of the RGB feedback stages, keep any future authored
+   table examples behind the same feature flag.
+2. Hardware-test any disabled-stage profile before treating it as a final user
+   configuration.

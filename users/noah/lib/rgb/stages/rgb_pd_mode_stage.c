@@ -4,7 +4,7 @@
 
 #include "rgb_pd_mode_stage.h"
 
-#if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE)
+#if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 
 #    include "../core/rgb_helpers.h"
 #    include "../../key/runtime/origin_registry.h"

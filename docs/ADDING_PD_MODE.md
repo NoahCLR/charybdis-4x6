@@ -314,6 +314,8 @@ Current examples in this repo:
 ### 7. Add RGB Color
 
 Edit [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
+The `pd_mode_colors[]` table is compiled when `RGB_PD_MODE_FEEDBACK_ENABLE` is
+enabled in the active keymap config.
 
 Add a new row to `pd_mode_colors[]`:
 

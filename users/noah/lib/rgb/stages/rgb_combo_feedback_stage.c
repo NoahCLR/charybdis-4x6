@@ -4,7 +4,7 @@
 
 #include "rgb_combo_feedback_stage.h"
 
-#if defined(RGB_MATRIX_ENABLE) && defined(COMBO_ENABLE)
+#if defined(RGB_MATRIX_ENABLE) && defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 
 #    include "../core/rgb_helpers.h"
 #    include "../../key/runtime/feedback.h"

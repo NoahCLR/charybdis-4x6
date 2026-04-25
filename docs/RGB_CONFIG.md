@@ -4,9 +4,22 @@ Most authored RGB configuration in this repo lives in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 
 Use this doc when you want to change colors, LED groups, auto-mouse fade
-visuals, combo feedback, or key-behavior feedback colors. If you only want to see what the
-current profile looks like, start with
+visuals, combo feedback, or key-behavior feedback colors. If you only want to
+see what the current profile looks like, start with
 [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md).
+
+The interaction feedback stages are individually gated from the active keymap
+[`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
+
+- `RGB_PD_MODE_FEEDBACK_ENABLE` controls the pointing-device mode overlay and
+  its LED groups
+- `RGB_COMBO_FEEDBACK_ENABLE` controls combo feedback and its LED groups
+- `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` controls key-behavior feedback and its
+  LED groups; the preview-layer overlay remains internal to this path
+- `RGB_AUTOMOUSE_GRADIENT_ENABLE` controls the auto-mouse timeout fade
+
+When one of those flags is off, the runtime skips that render stage instead of
+calling an empty stage.
 
 `rgb_config.c` is the main authored RGB surface:
 
@@ -67,7 +80,8 @@ The file reads best in render order:
 1. base layer render surfaces
 2. the auto-mouse base-stage transition
 3. later overlay surfaces, in order:
-   pd-mode colors, combo feedback, then key-behavior feedback
+   enabled combo underlay, preview, pd-mode colors, combo overlay, then
+   key-behavior feedback
 
 ### `layer_colors[]`
 
@@ -429,17 +443,21 @@ EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data);
    only the LEDs owned by that layer's non-transparent keys
 2. if the auto-mouse layer is active, that layer stage is blended toward its
    destination state instead of being painted as a fixed separate gradient
-3. combo underlay for combos that currently own preview and/or PD state,
+3. if `RGB_COMBO_FEEDBACK_ENABLE` is on, combo underlay for combos that
+   currently own preview and/or PD state,
    including any matching combo feedback LED groups
 4. per-layer preview overlay for a pending momentary-layer hold, if
    `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on and that previewed layer has a
    nonzero solid color
-5. the active pointing-device mode color using the authored PD locality
-6. per-mode LED groups
-7. combo overlay for all other active combos, including any matching combo
+5. if `RGB_PD_MODE_FEEDBACK_ENABLE` is on, the active pointing-device mode
+   color using the authored PD locality
+6. if `RGB_PD_MODE_FEEDBACK_ENABLE` is on, per-mode LED groups
+7. if `RGB_COMBO_FEEDBACK_ENABLE` is on, combo overlay for all other active
+   combos, including any matching combo
    feedback LED groups
-8. the key-behavior feedback overlay on both halves, only the key half, or
-   only the specific key, then any matching key-behavior feedback LED groups
+8. if `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on, the key-behavior feedback
+   overlay on both halves, only the key half, or only the specific key, then
+   any matching key-behavior feedback LED groups
 
 That order matters.
 
@@ -510,6 +528,11 @@ Edit the matching row in `pd_mode_colors[]`.
 
 Edit the matching row in `pd_mode_colors[]` and change its `.locality`.
 
+### Disable the pd-mode overlay
+
+Comment out `RGB_PD_MODE_FEEDBACK_ENABLE` in the active keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+That disables both `pd_mode_colors[]` and `pd_mode_led_groups`.
+
 ### Add a small highlight to one layer
 
 1. Pick one of the reusable `rgb_led_group_*` arrays, or add a new one to the
@@ -561,6 +584,11 @@ checks that at compile time.
 
 Edit the three designated initializer rows in
 [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
+
+### Disable combo feedback
+
+Comment out `RGB_COMBO_FEEDBACK_ENABLE` in the active keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+That disables both `combo_feedback_colors` and `combo_feedback_led_groups`.
 
 ### Disable the key-behavior overlay
 

@@ -228,18 +228,21 @@ The runtime supports:
 
 - per-layer colors
 - per-layer LED group highlights
-- per-mode RGB locality on both halves, a fixed half, the key half, or the
-  exact triggering key footprint
-- per-mode LED group highlights
-- steady combo feedback that can sit above or below preview / PD depending on live ownership
+- optional per-mode RGB locality on both halves, a fixed half, the key half,
+  or the exact triggering key footprint
+- optional per-mode LED group highlights
+- optional steady combo feedback that can sit above or below preview / PD
+  depending on live ownership
 - optional combo feedback LED group highlights
 - optional auto-mouse countdown gradient feedback
-- optional truthful key-behavior state feedback on both halves, a fixed half, only the key half, or only the key itself
+- optional truthful key-behavior state feedback on both halves, a fixed half,
+  only the key half, or only the key itself
 - optional key-behavior feedback LED group highlights
 
-That means RGB is not just there to look nice. It tells you what layer is
-active, which pointing mode is live, which combos are currently held, and when
-the key-behavior engine is waiting, previewing, or actively holding.
+With the default feedback stages enabled, RGB is not just there to look nice.
+It tells you what layer is active, which pointing mode is live, which combos
+are currently held, and when the key-behavior engine is waiting, previewing,
+or actively holding.
 
 For the full RGB authoring model, see
 [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md).

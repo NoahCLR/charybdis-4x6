@@ -16,7 +16,6 @@
 static rgb_runtime_frame_t rgb_runtime_frame_primary;
 
 typedef void (*rgb_runtime_stage_fn_t)(void);
-typedef bool (*rgb_runtime_render_stage_fn_t)(uint8_t led_min, uint8_t led_max);
 
 // Reserved watchdog reboot palette. Keep every diagnostic stage color distinct
 // within this table so a latched crash breadcrumb is unambiguous at boot.
@@ -79,14 +78,19 @@ static bool rgb_runtime_render_base_stage(uint8_t led_min, uint8_t led_max) {
 }
 #    endif
 
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static bool rgb_runtime_render_preview_stage(uint8_t led_min, uint8_t led_max) {
     return rgb_runtime_preview_stage_render(led_min, led_max);
 }
+#    endif
 
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 static bool rgb_runtime_render_pd_mode_stage(uint8_t led_min, uint8_t led_max) {
     return rgb_runtime_pd_mode_stage_render(led_min, led_max);
 }
+#    endif
 
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 static bool rgb_runtime_render_combo_underlay_stage(uint8_t led_min, uint8_t led_max) {
     return rgb_runtime_combo_feedback_stage_render_underlay(led_min, led_max);
 }
@@ -94,10 +98,13 @@ static bool rgb_runtime_render_combo_underlay_stage(uint8_t led_min, uint8_t led
 static bool rgb_runtime_render_combo_overlay_stage(uint8_t led_min, uint8_t led_max) {
     return rgb_runtime_combo_feedback_stage_render_overlay(led_min, led_max);
 }
+#    endif
 
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static bool rgb_runtime_render_key_feedback_stage(uint8_t led_min, uint8_t led_max) {
     return rgb_runtime_key_feedback_stage_render(led_min, led_max);
 }
+#    endif
 #endif
 
 void noah_rgb_runtime_invalidate_layer_maps(void) {
@@ -109,7 +116,20 @@ void noah_rgb_runtime_invalidate_layer_maps(void) {
 void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
     static const rgb_runtime_stage_fn_t stages[] = {
-        noah_rgb_validate_config, rgb_runtime_layer_stage_post_init, rgb_runtime_automouse_stage_post_init, rgb_runtime_pd_mode_stage_post_init, rgb_runtime_combo_feedback_stage_post_init, rgb_runtime_key_feedback_stage_post_init,
+        noah_rgb_validate_config,
+        rgb_runtime_layer_stage_post_init,
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+        rgb_runtime_automouse_stage_post_init,
+#    endif
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
+        rgb_runtime_pd_mode_stage_post_init,
+#    endif
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+        rgb_runtime_combo_feedback_stage_post_init,
+#    endif
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+        rgb_runtime_key_feedback_stage_post_init,
+#    endif
     };
 
     for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {
@@ -120,9 +140,6 @@ void noah_rgb_runtime_post_init(void) {
 
 #ifdef RGB_MATRIX_ENABLE
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    static const rgb_runtime_render_stage_fn_t underlay_stages[] = {
-        rgb_runtime_render_combo_underlay_stage, rgb_runtime_render_preview_stage, rgb_runtime_render_pd_mode_stage, rgb_runtime_render_combo_overlay_stage, rgb_runtime_render_key_feedback_stage,
-    };
     bool painted = false;
 
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER);
@@ -133,9 +150,21 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 
     painted |= rgb_runtime_render_base_stage(led_min, led_max);
 
-    for (uint8_t index = 0; index < ARRAY_SIZE(underlay_stages); index++) {
-        painted |= underlay_stages[index](led_min, led_max);
-    }
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+    painted |= rgb_runtime_render_combo_underlay_stage(led_min, led_max);
+#    endif
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+    painted |= rgb_runtime_render_preview_stage(led_min, led_max);
+#    endif
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
+    painted |= rgb_runtime_render_pd_mode_stage(led_min, led_max);
+#    endif
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+    painted |= rgb_runtime_render_combo_overlay_stage(led_min, led_max);
+#    endif
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+    painted |= rgb_runtime_render_key_feedback_stage(led_min, led_max);
+#    endif
 
     noah_runtime_diag_scope_leave();
     return painted;

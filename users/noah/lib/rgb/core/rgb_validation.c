@@ -20,7 +20,7 @@ extern const uint8_t                  layer_led_group_count;
 extern const automouse_fade_end_config_t automouse_fade_end_config;
 #    endif
 
-#    ifdef COMBO_ENABLE
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 extern const combo_feedback_color_config_t combo_feedback_colors;
 extern const combo_feedback_led_group_t *const combo_feedback_led_groups;
 extern const uint8_t                          combo_feedback_led_group_count;
@@ -32,7 +32,7 @@ extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 #    endif
 
-#    ifdef POINTING_DEVICE_ENABLE
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 #        include "../../pointing/defs/pd_modes.h"
 
 extern const pd_mode_color_t            pd_mode_colors[];
@@ -102,7 +102,7 @@ static void rgb_validation_log_invalid_automouse_fade_end_mode(uint8_t mode) {
 }
 #    endif
 
-#    ifdef COMBO_ENABLE
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 static void rgb_validation_log_invalid_combo_feedback_locality(uint8_t locality) {
 #        ifdef CONSOLE_ENABLE
     uprintf("Invalid combo_feedback_colors.locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)locality);
@@ -131,7 +131,7 @@ static void rgb_validation_log_invalid_key_behavior_feedback_group_semantic(uint
 }
 #    endif
 
-#    ifdef POINTING_DEVICE_ENABLE
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 static void rgb_validation_log_unknown_pd_mode_color(uint8_t color_index, pd_mode_mask_t mode) {
 #        ifdef CONSOLE_ENABLE
     uprintf("Unknown pd_mode_colors[%u].pointing_mode 0x%04X; entry does not match any registered pd mode\n", (unsigned int)color_index, (unsigned int)mode);
@@ -220,7 +220,7 @@ static void rgb_validation_validate_automouse_fade_end_config(void) {
 }
 #    endif
 
-#    ifdef COMBO_ENABLE
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 static void rgb_validation_validate_combo_feedback_config(void) {
     if (combo_feedback_colors.locality > RGB_KEYS_ONLY) {
         rgb_validation_log_invalid_combo_feedback_locality((uint8_t)combo_feedback_colors.locality);
@@ -265,7 +265,7 @@ static void rgb_validation_validate_key_behavior_feedback_led_groups(void) {
 }
 #    endif
 
-#    ifdef POINTING_DEVICE_ENABLE
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 static void rgb_validation_validate_pd_mode_colors(void) {
     for (uint8_t color_index = 0; color_index < pd_mode_color_count; color_index++) {
         pd_mode_mask_t mode     = pd_mode_colors[color_index].pointing_mode;
@@ -323,7 +323,7 @@ void noah_rgb_validate_config(void) {
     rgb_validation_validate_automouse_fade_end_config();
 #    endif
 
-#    ifdef COMBO_ENABLE
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
     rgb_validation_validate_combo_feedback_config();
     rgb_validation_validate_combo_feedback_led_groups();
 #    endif
@@ -333,7 +333,7 @@ void noah_rgb_validate_config(void) {
     rgb_validation_validate_key_behavior_feedback_led_groups();
 #    endif
 
-#    ifdef POINTING_DEVICE_ENABLE
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
     rgb_validation_validate_pd_mode_colors();
     rgb_validation_validate_pd_mode_led_groups();
 #    endif
