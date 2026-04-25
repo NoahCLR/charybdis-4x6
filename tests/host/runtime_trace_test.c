@@ -324,47 +324,51 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
 
     snapshot = test_trace_snapshot();
 
-    CHECK(snapshot.count == 9u);
+    CHECK(snapshot.count == 10u);
     CHECK(snapshot.entries[0].kind == NOAH_TRACE_PD_MODE);
-    CHECK(snapshot.entries[0].event == NOAH_TRACE_PD_MODE_EVENT_ACTIVATE);
+    CHECK(snapshot.entries[0].event == NOAH_TRACE_PD_MODE_EVENT_KEY_PRESS);
     CHECK(snapshot.entries[0].a == PD_MODE_VOLUME);
-    CHECK(snapshot.entries[0].b == PD_MODE_VOLUME);
+    CHECK(snapshot.entries[0].b == test_pack_keypos((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}));
 
-    CHECK(snapshot.entries[1].event == NOAH_TRACE_PD_MODE_EVENT_LOCK);
+    CHECK(snapshot.entries[1].event == NOAH_TRACE_PD_MODE_EVENT_ACTIVATE);
     CHECK(snapshot.entries[1].a == PD_MODE_VOLUME);
     CHECK(snapshot.entries[1].b == PD_MODE_VOLUME);
 
-    CHECK(snapshot.entries[2].event == NOAH_TRACE_PD_MODE_EVENT_DEACTIVATE);
+    CHECK(snapshot.entries[2].event == NOAH_TRACE_PD_MODE_EVENT_LOCK);
     CHECK(snapshot.entries[2].a == PD_MODE_VOLUME);
-    CHECK(snapshot.entries[2].b == 0u);
+    CHECK(snapshot.entries[2].b == PD_MODE_VOLUME);
 
-    CHECK(snapshot.entries[3].event == NOAH_TRACE_PD_MODE_EVENT_UNLOCK);
+    CHECK(snapshot.entries[3].event == NOAH_TRACE_PD_MODE_EVENT_DEACTIVATE);
     CHECK(snapshot.entries[3].a == PD_MODE_VOLUME);
     CHECK(snapshot.entries[3].b == 0u);
 
-    CHECK(snapshot.entries[4].event == NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT);
-    CHECK(snapshot.entries[4].a == PD_MODE_ARROW);
-    CHECK(snapshot.entries[4].b == PD_MODE_ARROW);
+    CHECK(snapshot.entries[4].event == NOAH_TRACE_PD_MODE_EVENT_UNLOCK);
+    CHECK(snapshot.entries[4].a == PD_MODE_VOLUME);
+    CHECK(snapshot.entries[4].b == 0u);
 
-    CHECK(snapshot.entries[5].kind == NOAH_TRACE_SPLIT_SYNC);
-    CHECK(snapshot.entries[5].event == NOAH_TRACE_SPLIT_SYNC_EVENT_INIT);
-    CHECK(snapshot.entries[5].a == 1u);
-    CHECK(snapshot.entries[5].b == 0u);
+    CHECK(snapshot.entries[5].event == NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT);
+    CHECK(snapshot.entries[5].a == PD_MODE_ARROW);
+    CHECK(snapshot.entries[5].b == PD_MODE_ARROW);
 
     CHECK(snapshot.entries[6].kind == NOAH_TRACE_SPLIT_SYNC);
-    CHECK(snapshot.entries[6].event == NOAH_TRACE_SPLIT_SYNC_EVENT_SEND);
-    CHECK(snapshot.entries[6].a == 0u);
+    CHECK(snapshot.entries[6].event == NOAH_TRACE_SPLIT_SYNC_EVENT_INIT);
+    CHECK(snapshot.entries[6].a == 1u);
     CHECK(snapshot.entries[6].b == 0u);
 
     CHECK(snapshot.entries[7].kind == NOAH_TRACE_SPLIT_SYNC);
-    CHECK(snapshot.entries[7].event == NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE);
-    CHECK(snapshot.entries[7].a == PD_MODE_ZOOM);
-    CHECK(snapshot.entries[7].b == PD_MODE_ZOOM);
+    CHECK(snapshot.entries[7].event == NOAH_TRACE_SPLIT_SYNC_EVENT_SEND);
+    CHECK(snapshot.entries[7].a == 0u);
+    CHECK(snapshot.entries[7].b == 0u);
 
-    CHECK(snapshot.entries[8].kind == NOAH_TRACE_PD_MODE);
-    CHECK(snapshot.entries[8].event == NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT);
+    CHECK(snapshot.entries[8].kind == NOAH_TRACE_SPLIT_SYNC);
+    CHECK(snapshot.entries[8].event == NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE);
     CHECK(snapshot.entries[8].a == PD_MODE_ZOOM);
     CHECK(snapshot.entries[8].b == PD_MODE_ZOOM);
+
+    CHECK(snapshot.entries[9].kind == NOAH_TRACE_PD_MODE);
+    CHECK(snapshot.entries[9].event == NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT);
+    CHECK(snapshot.entries[9].a == PD_MODE_ZOOM);
+    CHECK(snapshot.entries[9].b == PD_MODE_ZOOM);
 }
 
 static void test_key_runtime_decision_events_capture_release_hold_and_multi_tap_details(void) {

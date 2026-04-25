@@ -53,6 +53,10 @@ static keypos_t pd_mode_invalid_owner_key_pos(void) {
     return (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
 }
 
+static uint16_t pd_mode_trace_pack_keypos(keypos_t key_pos) {
+    return (uint16_t)(((uint16_t)key_pos.row << 8) | key_pos.col);
+}
+
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 static bool pd_mode_bitmap_equal(const uint8_t *lhs, const uint8_t *rhs) {
     if (!(lhs && rhs)) {
@@ -143,6 +147,7 @@ static bool pd_mode_clear_local_key_owners(void) {
 
     for (uint16_t index = 0; index < PD_MODE_OWNER_SLOT_CAPACITY; index++) {
         if (PD_MODE_LOCAL_KEY_OWNERS[index].active) {
+            noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_OWNER_CLEAR, PD_MODE_LOCAL_KEY_OWNERS[index].mode, pd_mode_trace_pack_keypos(PD_MODE_LOCAL_KEY_OWNERS[index].key_pos));
             PD_MODE_LOCAL_KEY_OWNERS[index] = (pd_mode_owner_slot_t){0};
             changed                         = true;
         }
@@ -176,6 +181,7 @@ static bool pd_mode_local_key_owner_activate(pd_mode_mask_t mode, keypos_t owner
         .key_pos     = owner_key_pos,
         .owner_sides = owner_sides,
     };
+    noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_OWNER_PRESS, mode, pd_mode_trace_pack_keypos(owner_key_pos));
     return true;
 }
 
@@ -186,6 +192,7 @@ static bool pd_mode_local_key_owner_release(pd_mode_mask_t mode, keypos_t owner_
         return false;
     }
 
+    noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_OWNER_RELEASE, mode, pd_mode_trace_pack_keypos(owner_key_pos));
     *slot = (pd_mode_owner_slot_t){0};
     return true;
 }
@@ -572,6 +579,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
                 bool locked_same_mode = pd_mode_local_locked(mode);
                 bool owner_changed    = false;
 
+                noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_KEY_PRESS, mode, pd_mode_trace_pack_keypos(pd_mode_command_owner_key_pos(command)));
                 split_sync_required = pd_mode_apply_activate_mode(mode);
                 if (!locked_same_mode) {
                     if (split_sync_required) {
@@ -588,6 +596,9 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
         case PD_MODE_COMMAND_KEY_RELEASE:
             mode           = pd_mode_for_keycode(command.keycode);
             result.handled = mode != 0;
+            if (mode != 0) {
+                noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_KEY_RELEASE, mode, pd_mode_trace_pack_keypos(pd_mode_command_owner_key_pos(command)));
+            }
             if (mode != 0 && pd_mode_local_active(mode) && !pd_mode_local_locked(mode)) {
                 bool owner_changed = pd_mode_local_key_owner_release(mode, pd_mode_command_owner_key_pos(command));
 

@@ -199,7 +199,7 @@ No authored combos resolve entirely from keys on this layer.
 | Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
 | --- | --- | --- | --- | --- | --- | --- |
 | `BRIGHTNESS` | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
-| `PINCH` | `PINCH` (`PINCH_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `PRESS_AND_HOLD_UNTIL_RELEASE(PINCH_MODE)` | `-` | `tap_hold(150), multi_tap(150)` |
+| `PINCH` | `PINCH` (`PINCH_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `multi_tap(150)` |
@@ -214,7 +214,7 @@ No authored combos resolve entirely from keys on this layer.
 | `VOLUME` directly on layer | `VOLUME` (`VOLUME_MODE`) | `PD_MODE_VOLUME` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
 | `BRIGHTNESS` directly on layer | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `PD_MODE_BRIGHTNESS` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
 | `PINCH` via `double hold` -> `ZOOM` (`ZOOM_MODE`) | `ZOOM` (`ZOOM_MODE`) | `PD_MODE_ZOOM` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
-| `PINCH` directly on layer; `PINCH` via `single hold` -> `PINCH` (`PINCH_MODE`) | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
+| `PINCH` directly on layer | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `PD_COLOR_MODE_TRIGGER_KEYS` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 

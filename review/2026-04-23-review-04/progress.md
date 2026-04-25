@@ -297,3 +297,85 @@ No required checks were skipped.
    keymap containment.
 2. Decide separately whether the authored `PINCH_MODE` single hold should stay
    explicit or return to implicit after hardware validation.
+
+### PD Clash Trace Follow-Up
+
+- Added structured trace events for PD key press/release commands, local PD
+  owner press/release/clear changes, and key-runtime held PD
+  register/unregister/preemption.
+- Enabled `NOAH_RUNTIME_TRACE_ENABLE` in the focused
+  `run_pd_mode_key_runtime_integration_tests.sh` host runner so the Pinch/Zoom
+  integration path compiles the same trace instrumentation used to inspect the
+  suspected hardware clash.
+- Confirmed the current source tree has the legacy implicit first Pinch hold in
+  `keymap.c`. Regenerated profile introspection output so generated docs match
+  that repro shape instead of masking it by moving `PINCH_MODE` back to
+  `[0].hold`.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+### Next Steps
+
+1. Flash a trace-enabled build and reproduce the repeated Pinch taps on
+   hardware.
+2. Compare the final trace tail for stale `PINCH_MODE`, `ZOOM_MODE`, or
+   `VOLUME_MODE` held-PD events against the actual active PD mode at freeze.
+3. Decide whether to keep the legacy implicit first-hold repro shape or restore
+   the explicit first-hold containment after the root clash is identified.
+
+### Stacked PD Lease-Owner Fix
+
+- Turned the stacked-PD suspicion into a failing host regression: with legacy
+  implicit Pinch active, a duplicate same-key Pinch press could cancel the old
+  press token while the already-registered held `PINCH_MODE` action remained
+  owned by the canceled token.
+- Confirmed that the following release no longer saw its own held PD action,
+  leaving `PD_MODE_PINCH` active after the key was released. This matches the
+  hardware symptom better than the earlier final-state-only tests because it
+  catches the illegal intermediate owner-token handoff.
+- Updated held-action and repeat lease activation so re-registering the same
+  key/action reassigns the existing lease to the current token instead of
+  leaving it attached to a canceled token.
+- Extended the legacy Pinch fixture through the stacked transition into the
+  second-tap `ZOOM_MODE` hold, proving the same physical key can recover from
+  the duplicate press and then hand off cleanly to the other PD mode.
+
+Verification passed:
+
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+### Next Steps
+
+1. Flash this candidate fix and hammer repeated `PINCH_MODE` taps on hardware;
+   unlike the trace-only pass, this one changes the suspected runtime behavior.
+2. If hardware still freezes, use the structured PD/key-runtime trace events
+   added in this thread to inspect the remaining owner transition.

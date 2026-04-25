@@ -470,6 +470,7 @@ static void key_runtime_core_preempt_other_pd_held_actions_for_mode(pd_mode_mask
             return;
         }
 
+        noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME, NOAH_TRACE_KEY_RUNTIME_EVENT_PD_HELD_PREEMPT, pd_mode_for_keycode(preempted_action), preempted_action);
         held_action_unregister(preempted_key_pos, preempted_action);
         key_runtime_core_observe_held_action_unregister(preempted_key_pos, preempted_action);
     }
@@ -1217,8 +1218,15 @@ static bool key_runtime_core_held_action_lease_activate(key_runtime_core_state_t
         return false;
     }
 
-    if (key_runtime_core_find_held_action_lease(state, owner_key_pos, action)) {
-        return false;
+    lease = key_runtime_core_find_held_action_lease(state, owner_key_pos, action);
+    if (lease) {
+        if (lease->owner_token_id == owner_token_id && key_runtime_core_lease_owner_keypos_equal(lease, owner_key_pos)) {
+            return false;
+        }
+
+        lease->owner_token_id       = owner_token_id;
+        lease->owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos);
+        return true;
     }
 
     lease = key_runtime_core_allocate_lease(state);
@@ -1243,8 +1251,16 @@ static bool key_runtime_core_repeat_lease_activate(key_runtime_core_state_t *sta
         return false;
     }
 
-    if (key_runtime_core_find_repeat_lease(state, owner_key_pos, action)) {
-        return false;
+    lease = key_runtime_core_find_repeat_lease(state, owner_key_pos, action);
+    if (lease) {
+        if (lease->owner_token_id == owner_token_id && key_runtime_core_lease_owner_keypos_equal(lease, owner_key_pos)) {
+            return false;
+        }
+
+        lease->owner_token_id        = owner_token_id;
+        lease->owner_packed_key_pos  = key_runtime_keypos_pack(owner_key_pos);
+        lease->data.repeat.repeat_hz = (uint8_t)repeat_hz;
+        return true;
     }
 
     lease = key_runtime_core_allocate_lease(state);
@@ -2300,6 +2316,9 @@ void key_runtime_core_observe_held_action_register(keypos_t key_pos, uint16_t ac
     token = key_runtime_core_press_token_state(state, key_pos);
     (void)key_runtime_core_held_action_lease_activate(state, token ? token->token_id : 0u, key_pos, action);
     mode = key_runtime_core_pd_mode_for_keycode(action);
+    if (mode != 0) {
+        noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME, NOAH_TRACE_KEY_RUNTIME_EVENT_PD_HELD_REGISTER, mode, action);
+    }
     if (key_runtime_core_pd_mode_leases_activate(state, token ? token->token_id : 0u, key_pos, mode)) {
         key_runtime_core_shadow_projection_recompute(state);
     }
@@ -2348,6 +2367,9 @@ void key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t 
     }
 
     mode = key_runtime_core_pd_mode_for_keycode(action);
+    if (mode != 0) {
+        noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME, NOAH_TRACE_KEY_RUNTIME_EVENT_PD_HELD_UNREGISTER, mode, action);
+    }
     if (mode != 0) {
         if (owner_token_id != 0u) {
             changed |= key_runtime_core_release_pd_related_leases_for_token(state, owner_token_id);

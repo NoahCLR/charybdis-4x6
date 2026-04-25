@@ -1753,6 +1753,36 @@ static void test_legacy_pinch_double_tap_hold_zoom_branch_keeps_single_owner(voi
     key_runtime_integration_scan();
     test_assert_no_pd_owner_invariant();
 }
+
+static void test_legacy_stacked_pinch_duplicate_press_keeps_owner_token_coherent(void) {
+    keypos_t pinch_pos = test_keypos(2, 4);
+
+    test_reset_state();
+    test_configure_pinch_transparent_profile_path(pinch_pos);
+
+    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, PINCH_MODE, PD_MODE_PINCH, true);
+
+    key_runtime_integration_advance(&fake_time, 5);
+    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, PINCH_MODE, PD_MODE_PINCH, true);
+
+    key_runtime_integration_advance(&fake_time, 5);
+    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+    key_runtime_integration_scan();
+    test_assert_no_pd_owner_invariant();
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
+
+    key_runtime_integration_advance(&fake_time, 20);
+    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
+    key_runtime_integration_scan();
+    test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, ZOOM_MODE, PD_MODE_ZOOM, false);
+
+    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+    key_runtime_integration_scan();
+    test_assert_no_pd_owner_invariant();
+}
 #endif
 
 static void test_gui_double_tap_hold_with_authored_pd_hold_keeps_processed_child_immediate(void) {
@@ -1833,6 +1863,7 @@ int main(void) {
     test_legacy_volume_preempted_by_pinch_clears_stale_volume_owner();
     test_legacy_pinch_double_tap_salvos_leave_no_pd_owner();
     test_legacy_pinch_double_tap_hold_zoom_branch_keeps_single_owner();
+    test_legacy_stacked_pinch_duplicate_press_keeps_owner_token_coherent();
 #else
     test_pinch_single_tap_defers_mode_owned_gui_from_delayed_replay();
     test_pinch_single_tap_preserves_physically_held_gui_on_delayed_replay();

@@ -21,6 +21,7 @@ compile_test() {
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
+    -DNOAH_RUNTIME_TRACE_ENABLE \
     -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
     -DAUTO_MOUSE_DEFAULT_LAYER=1 \
     -DCHARYBDIS_AUTO_SNIPING_LAYER=3 \
@@ -59,6 +60,7 @@ compile_test() {
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/transition.c" \
     "$ROOT/users/noah/lib/key/runtime/core/runtime.c" \
+    "$ROOT/users/noah/lib/key/runtime/core/trace.c" \
     "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
@@ -69,6 +71,7 @@ compile_test() {
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
+    "$ROOT/users/noah/lib/state/runtime/runtime_trace.c" \
     -o "$bin"
 }
 

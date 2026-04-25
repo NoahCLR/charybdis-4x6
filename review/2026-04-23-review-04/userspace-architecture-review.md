@@ -72,11 +72,11 @@ None.
   coherent with the PD engine. Code references:
   `users/noah/lib/key/runtime/core/runtime.c` and
   `tests/host/pd_mode_key_runtime_integration_test.c`.
-- `PINCH_MODE` now makes its single-hold path explicit as
-  `PRESS_AND_HOLD_UNTIL_RELEASE(PINCH_MODE)` while keeping the double-hold
-  branch on `ZOOM_MODE`. This keeps quick Pinch tap/double-tap prefixes out of
-  the mode-owned GUI lifecycle and preserves `VIA_MACRO_6` as the authored
-  double-tap zoom chord. Code references:
+- `PINCH_MODE` was tested with an explicit single-hold containment path,
+  `PRESS_AND_HOLD_UNTIL_RELEASE(PINCH_MODE)`, while keeping the double-hold
+  branch on `ZOOM_MODE`. The current source tree is intentionally back on the
+  legacy implicit first-hold shape for hardware repro work; generated
+  introspection docs now match that repro shape. Code references:
   `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`,
   `tests/host/pd_mode_key_runtime_integration_test.c`, and
   `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
@@ -86,6 +86,14 @@ None.
   other PD modes before the new mode takes ownership. This keeps active PD
   mode, shadow projection, held-action leases, owner key, pointer anchor, and
   Pinch-owned GUI lifecycle aligned. Code references:
+  `users/noah/lib/key/runtime/core/runtime.c` and
+  `tests/host/pd_mode_key_runtime_integration_test.c`.
+- Stacked PD keys now preserve owner-token coherence when the same physical
+  key re-registers an already-active held action. If a duplicate same-key press
+  arrives while legacy implicit Pinch is active, the existing held-action lease
+  is reassigned to the current token so release resolution can still see and
+  unregister the held PD action before branching into the second-tap
+  `ZOOM_MODE` path. Code references:
   `users/noah/lib/key/runtime/core/runtime.c` and
   `tests/host/pd_mode_key_runtime_integration_test.c`.
 
@@ -130,13 +138,20 @@ renders semantic state exported by the key runtime instead of duplicating tap,
 hold, longer-hold, multi-tap, combo-origin, or PD ownership logic.
 The PD projection exported by the key runtime now also tracks explicit
 held-action branches whose PD mode differs from the physical trigger key.
-The highest-frequency Pinch double-tap prefix no longer activates Pinch's
-mode-owned GUI lifecycle before the runtime knows whether the user is tapping
-or holding; Pinch itself now starts at the first hold threshold on that key.
+The safest authored Pinch shape is the explicit first-hold path, because it
+keeps quick Pinch tap/double-tap prefixes out of Pinch's mode-owned GUI
+lifecycle until the runtime knows whether the user is tapping or holding. The
+current tree has been returned to the legacy implicit first-hold shape to keep
+the hardware freeze reproducible while additional trace events identify the
+remaining clash.
 The root same-key lifecycle issue is covered separately with a legacy Pinch
 host-test fixture: if the old implicit first-hold shape is reintroduced, PD
 mode preemption now clears stale held owners immediately instead of leaving the
 old key-runtime owner live until physical release.
+That fixture now also covers duplicate same-key press handoff for stacked PD
+keys: re-registering the already-held first PD mode must transfer lease
+ownership to the current press token, otherwise the eventual release cannot
+observe and unregister the active PD lifecycle.
 
 The current `.mode` authoring surface is coherent for the main feedback
 surfaces. PD, combo feedback, and key-behavior feedback all support fixed
