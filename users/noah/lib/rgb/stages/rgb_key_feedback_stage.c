@@ -16,8 +16,9 @@ extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
 extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 
-static rgb_t  key_behavior_feedback_tap_pending_rgb[KEY_BEHAVIOR_MAX_TAP_COUNT];
-static uint8_t key_behavior_feedback_tap_pending_rgb_count;
+static rgb_t key_behavior_feedback_tap_pending_rgb;
+static rgb_t key_behavior_feedback_tap_branch_rgb[KEY_BEHAVIOR_MAX_TAP_COUNT];
+static uint8_t key_behavior_feedback_tap_branch_rgb_count;
 static rgb_t key_behavior_feedback_tap_committed_rgb;
 static rgb_t key_behavior_feedback_hold_active_rgb;
 static rgb_t key_behavior_feedback_long_hold_active_rgb;
@@ -32,13 +33,14 @@ typedef struct {
 #    endif
 
 void rgb_runtime_key_feedback_stage_post_init(void) {
-    key_behavior_feedback_tap_pending_rgb_count = key_behavior_feedback_colors.tap_pending_colors ? key_behavior_feedback_colors.tap_pending_color_count : 0u;
-    if (key_behavior_feedback_tap_pending_rgb_count > KEY_BEHAVIOR_MAX_TAP_COUNT) {
-        key_behavior_feedback_tap_pending_rgb_count = KEY_BEHAVIOR_MAX_TAP_COUNT;
+    key_behavior_feedback_tap_pending_rgb       = hsv_to_rgb(key_behavior_feedback_colors.tap_pending_color);
+    key_behavior_feedback_tap_branch_rgb_count = key_behavior_feedback_colors.tap_branch_colors ? key_behavior_feedback_colors.tap_branch_color_count : 0u;
+    if (key_behavior_feedback_tap_branch_rgb_count > KEY_BEHAVIOR_MAX_TAP_COUNT) {
+        key_behavior_feedback_tap_branch_rgb_count = KEY_BEHAVIOR_MAX_TAP_COUNT;
     }
 
-    for (uint8_t index = 0; index < key_behavior_feedback_tap_pending_rgb_count; index++) {
-        key_behavior_feedback_tap_pending_rgb[index] = hsv_to_rgb(key_behavior_feedback_colors.tap_pending_colors[index]);
+    for (uint8_t index = 0; index < key_behavior_feedback_tap_branch_rgb_count; index++) {
+        key_behavior_feedback_tap_branch_rgb[index] = hsv_to_rgb(key_behavior_feedback_colors.tap_branch_colors[index]);
     }
 
     key_behavior_feedback_tap_committed_rgb    = hsv_to_rgb(key_behavior_feedback_colors.tap_committed_color);
@@ -90,20 +92,20 @@ static uint8_t rgb_runtime_key_feedback_stage_current_flash_meta(void) {
     return is_keyboard_master() ? key_feedback_flash_meta() : split_runtime_sync_remote.key_feedback_flash_meta;
 }
 
-static uint8_t rgb_runtime_key_feedback_stage_tap_pending_color_index(uint8_t tap_branch) {
+static uint8_t rgb_runtime_key_feedback_stage_tap_branch_color_index(uint8_t tap_branch) {
     uint8_t index;
 
-    if (key_behavior_feedback_tap_pending_rgb_count == 0u) {
+    if (key_behavior_feedback_tap_branch_rgb_count == 0u) {
         return 0u;
     }
 
-    if (key_behavior_feedback_colors.tap_pending_mode == KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR || tap_branch <= 1u) {
+    if (tap_branch <= 1u) {
         return 0u;
     }
 
     index = (uint8_t)(tap_branch - 1u);
-    if (index >= key_behavior_feedback_tap_pending_rgb_count) {
-        index = (uint8_t)(key_behavior_feedback_tap_pending_rgb_count - 1u);
+    if (index >= key_behavior_feedback_tap_branch_rgb_count) {
+        index = (uint8_t)(key_behavior_feedback_tap_branch_rgb_count - 1u);
     }
 
     return index;
@@ -115,18 +117,20 @@ static bool rgb_runtime_key_feedback_stage_semantic_color(key_feedback_semantic_
     }
 
     switch (semantic) {
-        case KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING:
-            if (key_behavior_feedback_tap_pending_rgb_count == 0u) {
+        case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
+            *out_color = key_behavior_feedback_tap_pending_rgb;
+            return true;
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED:
+            if (key_behavior_feedback_tap_branch_rgb_count == 0u) {
                 *out_color = (rgb_t){0};
                 return false;
             }
-            *out_color = key_behavior_feedback_tap_pending_rgb[rgb_runtime_key_feedback_stage_tap_pending_color_index(tap_branch)];
+            *out_color = key_behavior_feedback_tap_branch_rgb[rgb_runtime_key_feedback_stage_tap_branch_color_index(tap_branch)];
             return true;
         case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
             *out_color = key_behavior_feedback_tap_committed_rgb;
             return true;
         case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
-        case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY:
         case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
             *out_color = key_behavior_feedback_hold_active_rgb;
             return true;
@@ -141,12 +145,12 @@ static bool rgb_runtime_key_feedback_stage_semantic_color(key_feedback_semantic_
     }
 }
 
-static uint8_t rgb_runtime_key_feedback_stage_pending_branch_for_key(const uint8_t *semantic_map, const uint8_t *tap_branch_map, keypos_t key_pos) {
+static uint8_t rgb_runtime_key_feedback_stage_branch_for_key(const uint8_t *semantic_map, const uint8_t *tap_branch_map, keypos_t key_pos) {
     if (!(semantic_map && tap_branch_map)) {
         return 0u;
     }
 
-    if (key_feedback_semantic_map_get(semantic_map, key_pos) != KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING) {
+    if (key_feedback_semantic_map_get(semantic_map, key_pos) != KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED) {
         return 0u;
     }
 
@@ -157,14 +161,36 @@ static bool rgb_runtime_key_feedback_stage_semantic_visible(key_feedback_semanti
     return !key_feedback_semantic_is_flashing(semantic) || key_feedback_flash_meta_phase(flash_meta);
 }
 
+static uint8_t rgb_runtime_key_feedback_stage_semantic_priority(key_feedback_semantic_t semantic) {
+    switch (semantic) {
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED:
+            return 70u;
+        case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
+            return 60u;
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY:
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING:
+            return 50u;
+        case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
+        case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
+            return 40u;
+        case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
+            return 10u;
+        case KEY_FEEDBACK_SEMANTIC_NONE:
+        default:
+            return 0u;
+    }
+}
+
 static bool rgb_runtime_key_feedback_stage_group_semantic_matches(key_behavior_feedback_group_semantic_t group_semantic, key_feedback_semantic_t semantic) {
     switch (group_semantic) {
-        case KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING:
-            return semantic == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING;
+        case KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH:
+            return semantic == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH;
+        case KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED:
+            return semantic == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED;
         case KEY_FEEDBACK_GROUP_TAP_COMMITTED:
             return semantic == KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED;
         case KEY_FEEDBACK_GROUP_HOLD_ACTIVE:
-            return semantic == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING || semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY || semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING;
+            return semantic == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING || semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING;
         case KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE:
             return semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY || semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING;
         default:
@@ -221,7 +247,7 @@ static bool rgb_runtime_key_feedback_stage_render_key_mode(const uint8_t *semant
             uint8_t                 tap_branch;
             rgb_t                   color;
 
-            tap_branch = rgb_runtime_key_feedback_stage_pending_branch_for_key(semantic_map, tap_branch_map, key_pos);
+            tap_branch = rgb_runtime_key_feedback_stage_branch_for_key(semantic_map, tap_branch_map, key_pos);
             if (!rgb_runtime_key_feedback_stage_semantic_color(semantic, tap_branch, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(semantic, flash_meta)) {
                 continue;
             }
@@ -238,13 +264,13 @@ static void rgb_runtime_key_feedback_stage_consider_render_state(key_feedback_re
         return;
     }
 
-    if (semantic > best->semantic) {
+    if (rgb_runtime_key_feedback_stage_semantic_priority(semantic) > rgb_runtime_key_feedback_stage_semantic_priority(best->semantic)) {
         best->semantic   = semantic;
-        best->tap_branch = semantic == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING ? tap_branch : 0u;
+        best->tap_branch = semantic == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED ? tap_branch : 0u;
         return;
     }
 
-    if (semantic == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING && best->semantic == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING && tap_branch > best->tap_branch) {
+    if (semantic == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED && best->semantic == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED && tap_branch > best->tap_branch) {
         best->tap_branch = tap_branch;
     }
 }
@@ -269,7 +295,7 @@ static key_feedback_render_state_t rgb_runtime_key_feedback_stage_half_state(con
             }
 
             semantic   = key_feedback_semantic_map_get(semantic_map, key_pos);
-            tap_branch = rgb_runtime_key_feedback_stage_pending_branch_for_key(semantic_map, tap_branch_map, key_pos);
+            tap_branch = rgb_runtime_key_feedback_stage_branch_for_key(semantic_map, tap_branch_map, key_pos);
             rgb_runtime_key_feedback_stage_consider_render_state(&best, semantic, tap_branch);
         }
     }
@@ -291,7 +317,7 @@ static key_feedback_render_state_t rgb_runtime_key_feedback_stage_global_state(c
             uint8_t                 tap_branch;
 
             semantic   = key_feedback_semantic_map_get(semantic_map, key_pos);
-            tap_branch = rgb_runtime_key_feedback_stage_pending_branch_for_key(semantic_map, tap_branch_map, key_pos);
+            tap_branch = rgb_runtime_key_feedback_stage_branch_for_key(semantic_map, tap_branch_map, key_pos);
             rgb_runtime_key_feedback_stage_consider_render_state(&best, semantic, tap_branch);
         }
     }

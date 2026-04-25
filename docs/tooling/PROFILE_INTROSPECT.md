@@ -44,10 +44,14 @@ The report is meant to be a visual snapshot of the current authored profile. It
 includes:
 
 - per-layer visual previews with authored layer colors
+- layer LED-group overlays in the per-layer previews
 - transparent-key visibility for partial layers
 - key-behavior markers and timing summaries
 - combos, macro inventory, and VIA macro defaults
-- pointer-mode reachability, mode colors, and layer-local mode entry paths
+- pointer-mode reachability, mode colors, LED groups, and layer-local mode
+  entry paths
+- auto-mouse, combo-feedback, and key-behavior feedback colors with generated
+  swatches
 
 ## Commands
 
@@ -80,7 +84,7 @@ documented profile view, especially:
   [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - layer enum or keymap-facing timing/config surfaces in
   [`config.h`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
-- layer colors, mode colors, or feedback colors in
+- layer colors, LED groups, mode colors, or feedback colors in
   [`rgb_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - shared pd-mode definitions in
   [`pd_mode_manifest.h`](../../users/noah/lib/pointing/defs/pd_mode_manifest.h)
@@ -96,7 +100,8 @@ After regenerating the outputs, check that:
 - layer order and names still match the keymap's `LAYER_*` enum
 - moved keys appear in the expected physical positions
 - transparent `TRNS` keys still show through where you expect
-- layer colors, pointer-mode colors, and feedback swatches match authored data
+- layer colors, LED-group overlays, pointer-mode colors, and feedback swatches
+  match authored data
 - key-behavior dots and timing legends still describe the intended behavior
 
 If the authored profile changed, this repo's normal maintenance workflow also

@@ -21,8 +21,28 @@
 
 static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token);
 
+static uint8_t key_feedback_semantic_priority(key_feedback_semantic_t semantic) {
+    switch (semantic) {
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED:
+            return 70u;
+        case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
+            return 60u;
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING:
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY:
+            return 50u;
+        case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
+        case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
+            return 40u;
+        case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
+            return 10u;
+        case KEY_FEEDBACK_SEMANTIC_NONE:
+        default:
+            return 0u;
+    }
+}
+
 static key_feedback_semantic_t key_feedback_semantic_max(key_feedback_semantic_t a, key_feedback_semantic_t b) {
-    return a >= b ? a : b;
+    return key_feedback_semantic_priority(a) >= key_feedback_semantic_priority(b) ? a : b;
 }
 
 static void key_feedback_apply_semantic_to_bitmap(uint8_t *semantic_map, const uint8_t *bitmap, key_feedback_semantic_t semantic) {
@@ -99,13 +119,15 @@ static bool key_feedback_tap_series_shows_pending_feedback(const tap_series_t *s
 
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {
     switch (kind) {
+        case KEY_FEEDBACK_PULSE_TAP_BRANCH_COMMITTED:
+            return KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED;
         case KEY_FEEDBACK_PULSE_TAP_COMMITTED:
             return KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED;
         case KEY_FEEDBACK_PULSE_LONG_HOLD:
             return KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY;
         case KEY_FEEDBACK_PULSE_HOLD:
         default:
-            return KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY;
+            return KEY_FEEDBACK_SEMANTIC_HOLD_PENDING;
     }
 }
 
@@ -119,6 +141,8 @@ void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
     state->feedback_pulse_timer  = timer_read();
     state->feedback_pulse_active = true;
     state->feedback_pulse_kind   = kind;
+    state->feedback_pulse_tap_branch = 0u;
+    state->feedback_pulse_queued     = false;
 }
 
 static bool key_feedback_pulse_active(void) {
@@ -129,6 +153,16 @@ static bool key_feedback_pulse_active(void) {
     }
 
     if (timer_elapsed(state->feedback_pulse_timer) < KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) {
+        return true;
+    }
+
+    if (state->feedback_pulse_queued) {
+        state->feedback_pulse_timer      = timer_read();
+        state->feedback_pulse_active     = true;
+        state->feedback_pulse_kind       = state->feedback_pulse_queued_kind;
+        state->feedback_pulse_key_pos    = state->feedback_pulse_queued_key_pos;
+        state->feedback_pulse_tap_branch = state->feedback_pulse_queued_tap_branch;
+        state->feedback_pulse_queued     = false;
         return true;
     }
 
@@ -302,7 +336,7 @@ void key_feedback_semantic_map(uint8_t *out_map) {
         keypos_t key_pos;
 
         if (key_feedback_tap_series_shows_pending_feedback(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
-            key_feedback_apply_semantic_for_owner(out_map, key_pos, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+            key_feedback_apply_semantic_for_owner(out_map, key_pos, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
         }
     }
 
@@ -327,12 +361,8 @@ void key_feedback_tap_branch_map(uint8_t *out_map) {
 
     key_feedback_tap_branch_map_clear(out_map);
 
-    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
-        keypos_t key_pos;
-
-        if (key_feedback_tap_series_shows_pending_feedback(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
-            key_feedback_apply_tap_branch_for_owner(out_map, key_pos, state->tap_series[index].tap_count);
-        }
+    if (key_feedback_pulse_active() && state && state->feedback_pulse_kind == KEY_FEEDBACK_PULSE_TAP_BRANCH_COMMITTED && key_origin_keypos_valid(state->feedback_pulse_key_pos)) {
+        key_feedback_apply_tap_branch_for_owner(out_map, state->feedback_pulse_key_pos, state->feedback_pulse_tap_branch);
     }
 }
 

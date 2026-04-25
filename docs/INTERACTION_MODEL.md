@@ -244,8 +244,10 @@ also project its state into the RGB overlay.
 
 Shared semantics:
 
-- multi-tap pending can show the currently selected unresolved tap branch,
-  including the terminal tap-only branch for the normal pending window
+- multi-tap pending shows the neutral unresolved color while the winning tap
+  branch is still undecided
+- committed tap branches can show a short branch-color confirmation before
+  tap, hold, or long-hold action feedback takes over
 - committed tap branches can pulse once after the tap output resolves; the
   authored RGB config can disable those pulses, limit them to double-tap and
   higher branches, or allow them for every tap branch

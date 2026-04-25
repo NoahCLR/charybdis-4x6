@@ -129,23 +129,15 @@ static void rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode(uin
 #        endif
 }
 
-static void rgb_validation_log_invalid_key_behavior_feedback_tap_pending_mode(uint8_t mode) {
+static void rgb_validation_log_invalid_key_behavior_feedback_tap_branch_colors(void) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors.tap_pending_mode %u; expected KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR (0) or KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS (1)\n", (unsigned int)mode);
-#        else
-    (void)mode;
-#        endif
-}
-
-static void rgb_validation_log_invalid_key_behavior_feedback_tap_pending_colors(void) {
-#        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors tap-pending colors; RGB_TAP_PENDING_COLORS(...) must provide at least one color\n");
+    uprintf("Invalid key_behavior_feedback_colors tap-branch colors; RGB_TAP_BRANCH_COLORS(...) must provide at least one color\n");
 #        endif
 }
 
 static void rgb_validation_log_invalid_key_behavior_feedback_group_semantic(uint8_t group_index, uint8_t semantic) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_led_groups[%u].semantic %u; expected KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING (0), KEY_FEEDBACK_GROUP_TAP_COMMITTED (1), KEY_FEEDBACK_GROUP_HOLD_ACTIVE (2), or KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE (3)\n", (unsigned int)group_index, (unsigned int)semantic);
+    uprintf("Invalid key_behavior_feedback_led_groups[%u].semantic %u; expected KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH (0), KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED (1), KEY_FEEDBACK_GROUP_TAP_COMMITTED (2), KEY_FEEDBACK_GROUP_HOLD_ACTIVE (3), or KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE (4)\n", (unsigned int)group_index, (unsigned int)semantic);
 #        else
     (void)group_index;
     (void)semantic;
@@ -272,11 +264,8 @@ static void rgb_validation_validate_key_behavior_feedback_config(void) {
     if (key_behavior_feedback_colors.tap_commit_mode > KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS) {
         rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode((uint8_t)key_behavior_feedback_colors.tap_commit_mode);
     }
-    if (key_behavior_feedback_colors.tap_pending_mode > KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS) {
-        rgb_validation_log_invalid_key_behavior_feedback_tap_pending_mode((uint8_t)key_behavior_feedback_colors.tap_pending_mode);
-    }
-    if (!key_behavior_feedback_colors.tap_pending_colors || key_behavior_feedback_colors.tap_pending_color_count == 0u) {
-        rgb_validation_log_invalid_key_behavior_feedback_tap_pending_colors();
+    if (!key_behavior_feedback_colors.tap_branch_colors || key_behavior_feedback_colors.tap_branch_color_count == 0u) {
+        rgb_validation_log_invalid_key_behavior_feedback_tap_branch_colors();
     }
 }
 

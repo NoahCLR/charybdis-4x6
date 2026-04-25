@@ -311,6 +311,14 @@ handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t 
     return test_handled_key_resolution(keycode, tap_count);
 }
 
+bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
+    if (keycode == TEST_PENDING_MULTI_TAP_KEY || keycode == TEST_FINAL_TAP_ONLY_KEY) {
+        return count < 2u;
+    }
+
+    return false;
+}
+
 handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos) {
     return handled_key_resolution_ctx_make(key_pos, (layer_state_t)1u << 0);
 }
@@ -1063,11 +1071,14 @@ static void test_key_runtime_core_direct_pending_multi_tap_release_helper_resets
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
     CHECK(key_runtime_core_resolve_pending_multi_tap_release(key_pos, TEST_ACTION, 1u, true, &resolution));
     CHECK(key_runtime_core_plan_pending_multi_tap_release_effects(key_pos, false, &resolution, (delayed_action_mods_t){0}, &plan));
-    CHECK(plan.count == 2u);
+    CHECK(plan.count == 3u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
     CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_BRANCH_COMMITTED);
+    CHECK(plan.items[1].data.feedback_pulse.tap_branch == 2u);
+    CHECK(plan.items[2].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(plan.items[2].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
 
     token = key_runtime_core_press_token_at(key_pos);
@@ -1076,7 +1087,7 @@ static void test_key_runtime_core_direct_pending_multi_tap_release_helper_resets
     CHECK(token->observed_release_keycode == TEST_PENDING_MULTI_TAP_KEY);
 }
 
-static void test_key_feedback_maps_keep_pending_hold_tap_branch_visible(void) {
+static void test_key_feedback_maps_keep_pending_hold_neutral_until_branch_commits(void) {
     uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
     const tap_series_t *series;
@@ -1100,11 +1111,11 @@ static void test_key_feedback_maps_keep_pending_hold_tap_branch_visible(void) {
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
 
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
-    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
 }
 
-static void test_key_feedback_maps_show_final_tap_only_branch_for_pending_window(void) {
+static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_branch_commit(void) {
     uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
     const tap_series_t *series;
@@ -1130,8 +1141,8 @@ static void test_key_feedback_maps_show_final_tap_only_branch_for_pending_window
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
 
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
-    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
     noah_key_runtime_scan();
@@ -1154,8 +1165,8 @@ static void test_key_feedback_maps_show_final_tap_only_branch_for_pending_window
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
 
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
-    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
     noah_key_runtime_scan();
@@ -1163,6 +1174,11 @@ static void test_key_feedback_maps_show_final_tap_only_branch_for_pending_window
     CHECK(last_delayed_action == TEST_SECOND_ACTION);
     CHECK(delayed_action_count == 1u);
     CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
 }
 
 static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hold_threshold(void) {
@@ -1275,12 +1291,15 @@ static void test_key_runtime_core_transition_flush_foreign_multi_tap_clears_shad
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_flush_foreign_multi_tap(TEST_RELEASE_PRIMARY_KEY, other_key, &plan);
 
-    CHECK(plan.count == 2u);
+    CHECK(plan.count == 3u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
     CHECK(plan.items[0].data.delayed_action.repeat_count == 1u);
     CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_BRANCH_COMMITTED);
+    CHECK(plan.items[1].data.feedback_pulse.tap_branch == 1u);
+    CHECK(plan.items[2].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
+    CHECK(plan.items[2].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 
     series = key_runtime_core_tap_series_at(pending_key);
     CHECK(series != NULL);
@@ -2090,8 +2109,8 @@ int main(void) {
     test_key_runtime_core_pending_multi_tap_release_resolution_uses_hold_action_after_term();
     test_key_runtime_core_pending_multi_tap_release_effect_plan_delays_action();
     test_key_runtime_core_direct_pending_multi_tap_release_helper_resets_slot();
-    test_key_feedback_maps_keep_pending_hold_tap_branch_visible();
-    test_key_feedback_maps_show_final_tap_only_branch_for_pending_window();
+    test_key_feedback_maps_keep_pending_hold_neutral_until_branch_commits();
+    test_key_feedback_maps_show_final_tap_only_neutral_pending_then_branch_commit();
     test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hold_threshold();
     test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_long_hold();
     test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expired_chain();

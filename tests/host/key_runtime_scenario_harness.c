@@ -669,6 +669,18 @@ void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
     });
 }
 
+void key_feedback_pulse_observe(keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
+    key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
+        .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
+        .data.feedback_pulse =
+            {
+                .key_pos    = key_pos,
+                .kind       = kind,
+                .tap_branch = tap_branch,
+            },
+    });
+}
+
 void split_runtime_sync(void) {
     key_runtime_scenario_split_sync_count_value++;
 }

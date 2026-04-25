@@ -232,11 +232,10 @@ combo footprint rather than the fake QMK combo position `(0,0)`. In
 `RGB_KEY_HALF`, that means it can light both halves when a combo
 really spans both sides.
 
-Pending multi-tap feedback can also use branch colors. The current RGB config
-uses distinct pending colors for selected unresolved tap-count branches,
-including terminal tap-only branches for the normal pending window and
-unresolved tap-hold branches. Committed non-base tap branches still use the
-separate tap-commit pulse.
+Pending multi-tap feedback uses a neutral unresolved color while the runtime is
+still deciding which tap index wins. After a branch commits, the current RGB
+config briefly shows the committed branch color before any tap, hold, or
+long-hold action feedback takes over.
 
 That `100 Hz` setting is also the current authored maximum: `100` repeats per
 second.

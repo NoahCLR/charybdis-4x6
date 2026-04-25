@@ -321,12 +321,13 @@ In `rgb_config.c`, declare `key_behavior_feedback_colors` directly:
 
 ```c
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    RGB_TAP_PENDING_COLORS(
-        HSV(0, 0, 150),
+    .tap_pending_color = HSV(0, 0, 150),
+
+    RGB_TAP_BRANCH_COLORS(
         HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     ),
-    .tap_pending_mode        = KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS,
+
     .tap_committed_color     = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .tap_commit_mode         = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
     .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
@@ -338,28 +339,21 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 Those rows populate the shared
 `key_behavior_feedback_colors` config object:
 
-- `RGB_TAP_PENDING_COLORS(...)`
-- `tap_pending_mode`
+- `tap_pending_color`
+- `RGB_TAP_BRANCH_COLORS(...)`
 - `tap_committed_color`
 - `tap_commit_mode`
 - `hold_active_color`
 - `long_hold_active_color`
 - `locality`
 
-The `RGB_TAP_PENDING_COLORS(...)` macro declares the colors available while
-the runtime is still resolving a selected tap branch. The first color is
-always the fallback pending color. Terminal tap-only branches stay in this
-pending feedback surface for the normal pending window, and tap-hold branches
-stay there until the hold tier resolves.
+The `tap_pending_color` field is the neutral unresolved multi-tap color while
+the runtime is still waiting to know which tap index wins.
 
-The `tap_pending_mode` field controls how pending tap branches pick from that
-list:
-
-- `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR`: use the first pending color for
-  every pending branch
-- `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`: use the selected unresolved tap
-  branch to pick a color from the list; higher tap counts clamp to the last
-  configured color
+The `RGB_TAP_BRANCH_COLORS(...)` macro declares the short confirmation colors
+used after a tap branch commits. The first entry is tap branch 1, the second
+entry is tap branch 2, and so on; higher committed tap indexes clamp to the
+last configured branch color.
 
 The `tap_commit_mode` field controls which committed tap branches pulse with
 `tap_committed_color`:
@@ -387,8 +381,9 @@ the live runtime footprint, not a static guess from authored combo comments.
 
 In the shared runtime, those colors are used for these categories:
 
-- multi-tap pending: the engine has selected a tap branch that is not resolved
-  yet; branch-color mode can show that branch with a distinct color
+- multi-tap pending: the engine has not resolved the winning tap branch yet
+- tap branch committed: the winning tap branch is known and briefly shows its
+  branch color
 - tap committed: an authored tap branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
 - hold trigger: a hold-tier action has just fired
@@ -439,12 +434,14 @@ locality while still remaining within the key-behavior feedback stage.
 
 Each row chooses a semantic category:
 
-- `KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING`: visible while multi-tap resolution is
+- `KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH`: visible while multi-tap resolution is
   pending
+- `KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED`: visible while a committed branch
+  confirmation pulse is active
 - `KEY_FEEDBACK_GROUP_TAP_COMMITTED`: visible while the tap-commit pulse is
   active
-- `KEY_FEEDBACK_GROUP_HOLD_ACTIVE`: visible for hold pending, steady hold, and
-  flashing hold states
+- `KEY_FEEDBACK_GROUP_HOLD_ACTIVE`: visible for hold pending, hold commit
+  pulses, and flashing hold states
 - `KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE`: visible for steady and flashing
   long-hold states
 
@@ -456,7 +453,8 @@ Use rows like:
 
 ```c
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
-    { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
+    { .semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
+    { .semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     { .semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },

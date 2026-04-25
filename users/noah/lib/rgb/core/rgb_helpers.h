@@ -79,18 +79,19 @@ typedef struct {
 } combo_feedback_led_group_t;
 
 typedef struct {
-    const hsv_t                   *tap_pending_colors;
-    uint8_t                        tap_pending_color_count;
-    hsv_t                          tap_committed_color;
-    hsv_t                          hold_active_color;
-    hsv_t                          long_hold_active_color;
-    key_feedback_tap_commit_mode_t  tap_commit_mode;
-    key_feedback_tap_pending_mode_t tap_pending_mode;
-    rgb_locality_t                  locality;
+    hsv_t                         tap_pending_color;
+    const hsv_t                  *tap_branch_colors;
+    uint8_t                       tap_branch_color_count;
+    hsv_t                         tap_committed_color;
+    hsv_t                         hold_active_color;
+    hsv_t                         long_hold_active_color;
+    key_feedback_tap_commit_mode_t tap_commit_mode;
+    rgb_locality_t                 locality;
 } key_behavior_feedback_color_config_t;
 
 typedef enum {
-    KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING = 0,
+    KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH = 0,
+    KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED,
     KEY_FEEDBACK_GROUP_TAP_COMMITTED,
     KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
     KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,

@@ -430,6 +430,7 @@ Verification passed:
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
 
 No required checks were skipped.
 
@@ -664,20 +665,18 @@ Next steps:
 2. If another key-feedback semantic is needed later, plan the packed semantic
    map width and priority rules first.
 
-### Tap-Pending Branch RGB Feedback And Split Packet Grouping
+### Tap Branch Confirmation RGB Feedback And Split Packet Grouping
 
-- Replaced the single key-behavior pending color with
-  `RGB_TAP_PENDING_COLORS(...)` plus `tap_pending_mode`.
-- Added `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR` and
-  `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`; the first pending color remains the
-  single-color fallback, while branch mode uses tap-count order and clamps to
-  the last configured color.
+- Kept neutral unresolved key-behavior pending feedback in
+  `tap_pending_color`.
+- Added `RGB_TAP_BRANCH_COLORS(...)` for the short committed-branch pulse that
+  runs after a tap index commits and before tap/hold/long-hold action feedback.
 - Added a packed tap-branch map beside the packed key-feedback semantic map so
-  different pending keys can show different tap-count colors without consuming
+  different committed keys can show different tap-branch colors without consuming
   the remaining semantic encoding space.
 - Updated key-feedback RGB rendering so `RGB_KEYS_ONLY` can paint each key
-  footprint with its own pending branch color, while half/global localities use
-  the highest visible pending branch inside the rendered scope.
+  footprint with its own committed branch color, while half/global localities
+  use the highest visible committed branch inside the rendered scope.
 - Split key-feedback sync into explicit semantic and branch transactions:
   `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` and
   `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC`. `PUT_VIA_KEYMAP_SYNC` now follows them.
@@ -706,27 +705,25 @@ Next steps:
 
 1. Flash both halves together because the custom split transaction ID list
    changed.
-2. Hardware-test pending single/double/triple tap branches on a key with
-   visible multi-tap behavior to confirm branch colors match the authored RGB
-   list.
+2. Hardware-test single/double/triple tap branches on a key with visible
+   multi-tap behavior to confirm branch-confirmation colors match the authored
+   RGB list.
 
 ### Tap-Hold Branch Pending Feedback Regression
 
-- Hardware feedback showed normal pending taps using branch colors correctly,
-  but tap-hold branches could appear swallowed.
-- Root cause: `key_feedback_semantic_map()` and
-  `key_feedback_tap_branch_map()` projected active tap series only when
-  `pending_hold` was false. A second-press tap-hold branch is still an active
-  unresolved tap branch, so the runtime had valid tap-branch state that RGB
-  could not see.
-- Updated key-feedback projection so any active tap series with a nonzero tap
-  count emits pending semantic and tap-branch state, including pending-hold
-  windows.
-- Added a runtime debug regression that stages a second-press tap-hold branch
-  and asserts both the semantic map and tap-branch map remain visible.
+- Hardware feedback showed normal branch confirmation working, but tap-hold
+  branch confirmation could appear swallowed by the following hold feedback.
+- Root cause: the branch location needed to be represented as its own commit
+  pulse rather than as unresolved pending color. Otherwise hold resolution could
+  take over before the branch location was visible.
+- Updated key-feedback projection so pending stays neutral and committed
+  branches use a queued `TAP_BRANCH_COMMITTED` pulse before tap/hold/long-hold
+  action feedback.
+- Added runtime regressions that stage second-press tap-hold and terminal
+  tap-only paths and assert branch confirmation precedes the action feedback.
 - Updated README, interaction/RGB/keymap docs, authored RGB comments, and this
-  review note to state that tap-hold branches stay in the pending feedback
-  surface until the hold tier resolves.
+  review note to state that tap-hold branches show neutral pending first,
+  committed branch confirmation second, and hold feedback after that.
 
 Verification passed:
 
@@ -745,19 +742,19 @@ No required checks were skipped.
 
 Next steps:
 
-1. Flash and hardware-test the tap-hold branch color on the affected key.
-2. If a future hold semantic should intentionally override pending branch
-   color earlier, add an explicit feedback-priority helper before changing the
-   current enum-priority behavior.
+1. Flash and hardware-test the tap-hold branch confirmation on the affected key.
+2. If a future hold semantic should intentionally override branch confirmation
+   earlier, add an explicit feedback-priority helper before changing the current
+   semantic priority behavior.
 
-### Terminal Tap-Only Branch Feedback
+### Terminal Tap-Only Branch Confirmation
 
-- Reframed tap-pending branch feedback as selected unresolved branch feedback,
-  not "waiting for the next tap" feedback.
+- Reframed tap branch feedback as committed branch-location confirmation, not
+  "waiting for the next tap" feedback.
 - Updated terminal tap-only branches so they resolve after the normal pending
-  window instead of on press. This lets RGB show the final selected branch
-  color for the same duration as other pending tap branches, then emit the
-  tap-commit pulse after the branch resolves.
+  window instead of on press. This lets RGB show neutral pending for the same
+  duration as other pending tap branches, then emit branch confirmation before
+  any tap-commit pulse after the branch resolves.
 - Kept scan from flushing the selected tap series while that branch's physical
   press is still active, so a held final tap-only branch remains visible and
   the pending window starts from release.
@@ -765,8 +762,8 @@ Next steps:
   scenario tests from press-resolved terminal branches to release-resolved
   terminal branches.
 - Updated profile docs, generated keymap overview wording, authored keymap/RGB
-  comments, and the architecture note to describe tap-pending colors as
-  unresolved selected-branch colors.
+  comments, and the architecture note to describe neutral pending, branch
+  confirmation, and action feedback as separate stages.
 
 Verification passed:
 
@@ -799,3 +796,83 @@ Next steps:
 2. If branch and commit colors feel too close together on very quick taps,
    consider a dedicated sequenced feedback pulse rather than changing tap
    dispatch timing again.
+
+## 2026-04-25
+
+### Tap Branch Naming Cleanup
+
+- Renamed the visible branch-feedback API pieces from pending-branch wording to
+  unresolved/branch wording: `KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH`,
+  `KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH`, and `RGB_TAP_BRANCH_COLORS(...)`.
+- Kept `tap_pending_color` as the neutral unresolved pending feedback surface.
+- Updated RGB validation messages, profile introspection, generated docs,
+  authored RGB comments, and host tests to use the new branch-oriented names.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 -m py_compile tools/profile_introspect.py`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Keep future branch-location feedback names centered on committed branch
+   confirmation unless the runtime behavior changes again.
+2. If another key-feedback semantic is added later, revisit explicit priority
+   handling before consuming more packed semantic space.
+
+### Profile Introspection LED Group Coverage
+
+- Audited authored RGB color surfaces against generated
+  `docs/KEYMAP-OVERVIEW.md` coverage.
+- Found that active layer LED groups and PD-mode LED groups were parsed by the
+  runtime config but not represented in the generated overview or swatch asset
+  set.
+- Added first-class profile-introspection model fields for layer and PD-mode
+  LED groups, including owner, named/inline LED group, LED ids, count, authored
+  HSV, and generated preview color.
+- Updated generated layer SVG previews so active layer LED groups repaint their
+  configured LED ids on top of the normal layer preview color. LED 56 has an
+  explicit generated marker for trackball LED group previews.
+- Updated generated docs so layer, PD-mode, combo-feedback, and key-feedback
+  LED group sections are present even when the current profile has no active
+  rows.
+- Updated `docs/tooling/PROFILE_INTROSPECT.md` to describe LED-group preview
+  coverage.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 -m py_compile tools/profile_introspect.py`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_profile_introspection_checks.sh`
+- synthetic LED group parser/render mapping check for active layer and PD-mode
+  group rows
+- `git diff --check`
+
+Skipped under the Python-tooling/docs exception:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Runtime/build behavior was not changed in this pass.
+
+Next steps:
+
+1. If a future hardware revision changes the physical LED order, update the
+   introspection LED-to-layout map together with `rgb_config.c`'s LED map.
+2. If PD-mode, combo-feedback, or key-feedback stages need full board-image
+   previews later, add separate stage-preview SVGs instead of overloading the
+   per-layer images.

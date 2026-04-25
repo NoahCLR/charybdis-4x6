@@ -16,7 +16,7 @@ PD mode names and bindings in this report stay in sync with the shared definitio
 
 ## Layer Images
 
-These previews are generated as SVG image assets under [docs/media/profile-introspection/](media/profile-introspection). The renderer uses the authored `layer_colors[]` config from [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and the current `LAYOUT()` slot order from [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c):
+These previews are generated as SVG image assets under [docs/media/profile-introspection/](media/profile-introspection). The renderer uses the authored `layer_colors[]` and layer LED-group config from [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c), plus the current `LAYOUT()` slot order from [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c):
 
 | Available Layer RGB Mode | Meaning |
 | --- | --- |
@@ -26,6 +26,7 @@ These previews are generated as SVG image assets under [docs/media/profile-intro
 - `LAYER_BASE` falls back to the default RGB color from [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) when its authored layer color is `HSV(0, 0, 0)`
 - Keys with authored `key_behaviors[]` rows in [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show numbered activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): tap-commit color for authored tap actions, hold color for authored hold tiers, and long-hold color for authored long-hold tiers
 - Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer
+- Active layer LED groups repaint their configured LED ids on top of the normal layer color in the same generated layer preview
 - Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer
 
 Timing legend for the layer-local behavior tables:
@@ -244,6 +245,10 @@ Key-local PD RGB localities are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in [us
 | `PD_MODE_PINCH` | `RGB_RIGHT_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
 | `PD_MODE_ZOOM` | `RGB_RIGHT_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
 
+### PD Mode LED Groups
+
+No active authored PD-mode LED group rows are configured.
+
 ## Auto-mouse Fade
 
 This fade destination comes from `automouse_fade_end_config` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). The mode chooses where the timeout fade lands after the auto-mouse layer starts dropping out.
@@ -280,9 +285,13 @@ Current authored combo feedback locality: `RGB_KEY_HALF`.
 | --- | --- | --- | --- |
 | `Active Combo` | Steady combo layer color while a combo chord stays active. Preview- or PD-owning combos can be routed underneath those state indicators, while unrelated combos remain above them. | `HSV(191, 255, 200)` | <img alt="Active combo color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
 
+No active authored combo feedback LED group rows are configured.
+
 ## Key-Behavior Feedback LEDs
 
 These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored localities intentionally collapse that truth to a half or full-board presentation.
+
+Tap feedback is staged as neutral unresolved pending first, then a short committed-branch pulse from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.
 
 Current authored feedback locality: `RGB_KEY_HALF`.
 
@@ -302,23 +311,18 @@ Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAP
 | `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | Pulse only for double-tap and higher tap branches; the base single-tap branch stays quiet. |
 | `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS` | Pulse for every authored tap branch that commits. |
 
-Current authored tap-pending feedback mode: `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`.
-
-| Available Tap-Pending Mode | Meaning |
-| --- | --- |
-| `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR` | Use the first tap-pending color for every unresolved tap branch. |
-| `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS` | Use the selected unresolved tap branch to pick a tap-pending color, clamping higher counts to the last configured color. |
-
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
-| `Tap Pending 1` | Unresolved tap-branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(0, 0, 150)` | <img alt="Tap Pending 1 color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
-| `Tap Pending 2` | Unresolved tap-branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(169, 255, 200)` | <img alt="Tap Pending 2 color" src="media/profile-introspection/profile-color-swatch-0006ff.svg" width="96" height="28" /> |
-| `Tap Pending 3` | Unresolved tap-branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(213, 255, 200)` | <img alt="Tap Pending 3 color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
-| `Tap Pending 4` | Unresolved tap-branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(0, 255, 200)` | <img alt="Tap Pending 4 color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" /> |
-| `Tap Pending 5` | Unresolved tap-branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch. | `HSV(43, 255, 200)` | <img alt="Tap Pending 5 color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `Tap Pending` | Neutral unresolved multi-tap state while the runtime is still waiting to know which tap index wins. | `HSV(0, 0, 150)` | <img alt="Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+| `Tap Branch 1` | Short branch-confirmation pulse after that tap index commits. Higher committed tap indexes clamp to the last configured branch color. | `HSV(169, 255, 200)` | <img alt="Tap Branch 1 color" src="media/profile-introspection/profile-color-swatch-0006ff.svg" width="96" height="28" /> |
+| `Tap Branch 2` | Short branch-confirmation pulse after that tap index commits. Higher committed tap indexes clamp to the last configured branch color. | `HSV(213, 255, 200)` | <img alt="Tap Branch 2 color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `Tap Branch 3` | Short branch-confirmation pulse after that tap index commits. Higher committed tap indexes clamp to the last configured branch color. | `HSV(43, 255, 200)` | <img alt="Tap Branch 3 color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `Tap Branch 4` | Short branch-confirmation pulse after that tap index commits. Higher committed tap indexes clamp to the last configured branch color. | `HSV(235, 255, 200)` | <img alt="Tap Branch 4 color" src="media/profile-introspection/profile-color-swatch-ff0078.svg" width="96" height="28" /> |
 | `Tap Committed` | Used for committed tap branches that do not already have state feedback. | `HSV(85, 255, 200)` | <img alt="Tap Committed color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
 | `Hold Active` | Used for authored hold-tier pending / active states and commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff6c00.svg" width="96" height="28" /> |
 | `Long Hold Active` | Used for authored long-hold-tier active states and commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-0084ff.svg" width="96" height="28" /> |
+
+No active authored key-feedback LED group rows are configured.
 
 ## Macro Inventory
 
@@ -349,7 +353,7 @@ No filled hardcoded macro slots.
 | --- | --- |
 | [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |
 | [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
-| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, pd-mode colors, auto-mouse fade config, combo feedback color, key-behavior feedback colors |
+| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, layer LED groups, pd-mode colors and LED groups, auto-mouse fade config, combo feedback color and LED groups, key-behavior feedback colors and LED groups |
 
 ### Shared Keycode Surfaces
 
@@ -359,7 +363,6 @@ No filled hardcoded macro slots.
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback locality: `RGB_KEY_HALF`
 - Key-behavior tap-commit feedback: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`
-- Key-behavior tap-pending feedback: `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS`
 - Combo feedback locality: `RGB_KEY_HALF`
 
 ### Layer RGB Config
@@ -371,6 +374,10 @@ No filled hardcoded macro slots.
 | `LAYER_SYM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(169, 255, 200)` | <img alt="LAYER_SYM preview color" src="media/profile-introspection/profile-color-swatch-0006ff.svg" width="96" height="28" /> |
 | `LAYER_NAV` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(180, 255, 200)` | <img alt="LAYER_NAV preview color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
 | `LAYER_POINTER` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 150)` | <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+
+### Layer LED Groups
+
+No active authored layer LED group rows are configured.
 
 ## Summary
 
@@ -388,6 +395,10 @@ No filled hardcoded macro slots.
 | `keymap_custom_keycode_count` | `3` |
 | `pd_mode_count` | `6` |
 | `pd_mode_color_count` | `6` |
+| `layer_led_group_count` | `0` |
+| `pd_mode_led_group_count` | `0` |
+| `combo_feedback_led_group_count` | `0` |
+| `key_behavior_feedback_led_group_count` | `0` |
 | `combo_feedback_configured` | `1` |
 
 ## Config Defines

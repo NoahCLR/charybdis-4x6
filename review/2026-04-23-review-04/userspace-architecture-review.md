@@ -14,7 +14,7 @@ The initial pass was review-only. Follow-up implementation in this same active
 thread added fixed left/right key-feedback placement, added exact-key PD RGB
 locality, migrated PD/combo/key-feedback RGB placement to one shared locality
 enum, added combo/key-feedback LED group authoring, added explicit
-interaction-feedback stage gates, added tap-pending branch colors, split
+interaction-feedback stage gates, added tap-branch confirmation colors, split
 key-feedback sync into semantic and branch packets, and updated the RGB
 authoring docs.
 
@@ -41,7 +41,7 @@ None.
   physical path. This can remain a conscious VIA-only choice, but it should be
   documented or a small control cluster should be added.
 - Key-feedback paint priority is currently encoded by enum ordinal ordering:
-  `KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING` is last in
+  `KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH` is last in
   `users/noah/lib/key/runtime/feedback.h`, and the RGB renderer selects the
   greatest semantic before applying tap-branch color selection in
   `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`. Current
@@ -133,14 +133,14 @@ None.
   When disabled, the related stage is omitted from the RGB render path rather
   than called as an empty stage. Preview remains internal to the key-behavior
   feedback path.
-- Key-behavior feedback now has branch-aware tap-pending colors. The authored
-  config uses `RGB_TAP_PENDING_COLORS(...)` plus `tap_pending_mode`, with the
-  first pending color acting as the single-color fallback and branch-color mode
-  clamping higher tap counts to the last configured color. The runtime keeps
-  tap branch state in a separate packed map so the existing semantic map
-  priority remains stable. Split sync now treats key feedback as a packet
-  family: semantic state and tap-branch state are separate RPC payloads because
-  the combined maps do not fit in one 32-byte QMK split transaction.
+- Key-behavior feedback now separates unresolved pending color, committed
+  branch color, and action feedback. The authored config uses
+  `tap_pending_color` for the neutral unresolved state and
+  `RGB_TAP_BRANCH_COLORS(...)` for the short committed-branch pulse before
+  tap/hold/long-hold action feedback takes over. The runtime keeps tap branch
+  state in a separate packed map so the semantic map remains 3 bits per key and
+  still fits one QMK split transaction. Split sync treats key feedback as a
+  packet family: semantic state and tap-branch state are separate RPC payloads.
 
 ## Non-Findings
 
@@ -217,14 +217,12 @@ the base single-tap branch quiet. Deferred tap dispatches carry the tap-commit
 pulse through pending-release drain, so feedback remains aligned with the
 actual output projection instead of firing early while a sibling tap-release
 blocker is still live.
-Pending multi-tap feedback now also carries tap branch state alongside the
-semantic map. `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS` lets the unresolved
-branch show a distinct authored color, while `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR`
-keeps the old single pending-color behavior by using the first configured
-pending color. Terminal tap-only branches stay in this pending surface for the
-normal pending window, and tap-hold branches stay there until the hold tier
-resolves, so RGB can show the selected branch before the commit or hold
-feedback takes over.
+Pending multi-tap feedback now stays neutral while the branch is unresolved.
+When the runtime commits a tap branch, it emits a short
+`KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED` pulse carrying the committed tap
+branch in the tap-branch map. That branch pulse is queued before tap-commit,
+hold, or long-hold feedback, so every tap level follows the same visual order:
+pending, branch confirmation, then action feedback.
 
 ## Recommended Next Refactor Sequence
 

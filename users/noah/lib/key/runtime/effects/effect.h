@@ -54,8 +54,9 @@ typedef struct {
             uint8_t  layer;
         } layer_press;
         struct {
-            keypos_t                  key_pos;
-            key_feedback_pulse_kind_t kind;
+            keypos_t key_pos;
+            uint8_t  kind;
+            uint8_t  tap_branch;
         } feedback_pulse;
         struct {
             pd_mode_mask_t pd_mode;

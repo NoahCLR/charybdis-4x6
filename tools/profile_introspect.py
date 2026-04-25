@@ -201,6 +201,67 @@ LAYOUT_SLOT_COUNT = 56
 MAIN_CLUSTER_KEYS_PER_HALF = 24
 ROWS_PER_MAIN_CLUSTER = 4
 COLUMNS_PER_MAIN_CLUSTER = 6
+LED_TO_LAYOUT_INDEX = {
+    0: 0,
+    7: 1,
+    8: 2,
+    15: 3,
+    16: 4,
+    20: 5,
+    1: 12,
+    6: 13,
+    9: 14,
+    14: 15,
+    17: 16,
+    21: 17,
+    2: 24,
+    5: 25,
+    10: 26,
+    13: 27,
+    18: 28,
+    22: 29,
+    3: 36,
+    4: 37,
+    11: 38,
+    12: 39,
+    19: 40,
+    23: 41,
+    49: 6,
+    45: 7,
+    44: 8,
+    37: 9,
+    36: 10,
+    29: 11,
+    50: 18,
+    46: 19,
+    43: 20,
+    38: 21,
+    35: 22,
+    30: 23,
+    51: 30,
+    47: 31,
+    42: 32,
+    39: 33,
+    34: 34,
+    31: 35,
+    52: 42,
+    48: 43,
+    41: 44,
+    40: 45,
+    33: 46,
+    32: 47,
+    26: 48,
+    27: 49,
+    28: 50,
+    53: 51,
+    54: 52,
+    25: 53,
+    24: 54,
+    55: 55,
+}
+EXTRA_LED_VISUALS = {
+    56: {"cx": 698, "cy": 522, "radius": 13},
+}
 
 
 @dataclass
@@ -841,25 +902,35 @@ def parse_key_behavior_feedback_colors(
         re.MULTILINE,
     )
 
-    colors: list[dict[str, object]] = []
+    colors: list[tuple[int, dict[str, object]]] = []
     known_anchor_names = set(color_anchors)
 
-    tap_pending_match = re.search(r"\bRGB_TAP_PENDING_COLORS\s*\(", body)
-    if tap_pending_match is not None:
-        args_start = tap_pending_match.end() - 1
+    tap_branch_match = re.search(r"\bRGB_TAP_BRANCH_COLORS\s*\(", body)
+    if tap_branch_match is not None:
+        args_start = tap_branch_match.end() - 1
         args_end = find_matching(body, args_start, "(", ")")
-        tap_pending_args = body[args_start + 1 : args_end]
-        for index, expr in enumerate(split_top_level(tap_pending_args), start=1):
+        tap_branch_args = body[args_start + 1 : args_end]
+        for index, expr in enumerate(split_top_level(tap_branch_args), start=1):
             authored_color = parse_hsv_expr(expr, known_values)
             colors.append(
-                {
-                    "field": f"tap_pending_{index}_color",
-                    "label": f"Tap Pending {index}",
-                    "meaning": "Unresolved tap-branch color. Branch-color mode uses tap-count order; single-color mode uses the first pending color for every branch.",
-                    "color": authored_color,
-                    "preview_color": dict(authored_color),
-                }
+                (
+                    tap_branch_match.start() + index,
+                    {
+                        "field": f"tap_branch_{index}_color",
+                        "label": f"Tap Branch {index}",
+                        "meaning": "Short branch-confirmation pulse after that tap index commits. Higher committed tap indexes clamp to the last configured branch color.",
+                        "color": authored_color,
+                        "preview_color": dict(authored_color),
+                    },
+                )
             )
+
+    default_meanings = {
+        "tap_pending_color": "Neutral unresolved multi-tap state while the runtime is still waiting to know which tap index wins.",
+        "tap_committed_color": "Action feedback after committed tap branches that do not already have state feedback.",
+        "hold_active_color": "Authored hold-tier pending / active states and hold-tier commit pulses.",
+        "long_hold_active_color": "Authored long-hold-tier active states and long-hold-tier commit pulses.",
+    }
 
     for match in field_pattern.finditer(body):
         field_name = match.group("field")
@@ -870,16 +941,19 @@ def parse_key_behavior_feedback_colors(
         semantic_name = extract_color_name_from_comment(comment_text, known_anchor_names)
         preview_color = resolve_preview_color(authored_color, semantic_name, color_anchors)
         colors.append(
-            {
-                "field": field_name,
-                "label": humanize_identifier(field_name.removesuffix("_color")),
-                "meaning": comment_text or "Authored key-behavior feedback color.",
-                "color": authored_color,
-                "preview_color": preview_color,
-            }
+            (
+                match.start(),
+                {
+                    "field": field_name,
+                    "label": humanize_identifier(field_name.removesuffix("_color")),
+                    "meaning": comment_text or default_meanings.get(field_name, "Authored key-behavior feedback color."),
+                    "color": authored_color,
+                    "preview_color": preview_color,
+                },
+            )
         )
 
-    return colors
+    return [row for _, row in sorted(colors, key=lambda item: item[0])]
 
 
 def parse_combo_feedback_color(raw_text: str, known_values: dict[str, str]) -> dict[str, object] | None:
@@ -942,14 +1016,6 @@ def key_behavior_feedback_tap_commit_mode_description(mode: str) -> str:
     return descriptions.get(mode, "Unknown key-behavior tap-commit feedback mode.")
 
 
-def key_behavior_feedback_tap_pending_mode_description(mode: str) -> str:
-    descriptions = {
-        "KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR": "Use the first tap-pending color for every unresolved tap branch.",
-        "KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS": "Use the selected unresolved tap branch to pick a tap-pending color, clamping higher counts to the last configured color.",
-    }
-    return descriptions.get(mode, "Unknown key-behavior tap-pending feedback mode.")
-
-
 def parse_key_behavior_feedback_locality(raw_text: str) -> dict[str, object] | None:
     try:
         body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
@@ -988,26 +1054,6 @@ def parse_key_behavior_feedback_tap_commit_mode(raw_text: str) -> dict[str, obje
     }
 
 
-def parse_key_behavior_feedback_tap_pending_mode(raw_text: str) -> dict[str, object] | None:
-    try:
-        body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
-    except SystemExit:
-        return None
-
-    fields = parse_designated_fields(strip_comments(body))
-    mode = fields.get(".tap_pending_mode")
-    if mode is None:
-        return None
-
-    normalized_mode = normalize_expr(mode)
-    return {
-        "mode": normalized_mode,
-        "label": humanize_identifier(normalized_mode.removeprefix("KEY_FEEDBACK_TAP_PENDING_")),
-        "meaning": key_behavior_feedback_tap_pending_mode_description(normalized_mode),
-    }
-
-
-
 def parse_rgb_led_group_macros(raw_text: str) -> dict[str, list[str]]:
     groups: dict[str, list[str]] = {}
     text = strip_comments(raw_text)
@@ -1016,11 +1062,22 @@ def parse_rgb_led_group_macros(raw_text: str) -> dict[str, list[str]]:
     return groups
 
 
+def parse_rgb_led_indices(leds: list[str], known_values: dict[str, str]) -> list[int]:
+    indices: list[int] = []
+    for led in leds:
+        try:
+            indices.append(eval_numeric_expr(led, known_values))
+        except Exception:
+            continue
+    return indices
+
+
 def parse_exported_rgb_led_groups(
     raw_text: str,
     export_macro: str,
     known_values: dict[str, str],
     semantic_field: bool = False,
+    owner_field: str | None = None,
 ) -> list[dict[str, object]]:
     text = strip_comments(raw_text)
     led_group_macros = parse_rgb_led_group_macros(raw_text)
@@ -1066,11 +1123,13 @@ def parse_exported_rgb_led_groups(
             leds = [normalize_expr(part) for part in split_top_level(inline_led_group_match.group("leds"))]
             leds_expr = ", ".join(leds)
             count_expr = str(len(leds))
+            led_group_name = "inline"
         else:
             led_group_name = normalize_expr(fields.get(".led_group", ""))
             if led_group_name in led_group_macros:
-                leds_expr = ", ".join(led_group_macros[led_group_name])
-                count_expr = str(len(led_group_macros[led_group_name]))
+                leds = led_group_macros[led_group_name]
+                leds_expr = ", ".join(leds)
+                count_expr = str(len(leds))
         if color_expr is None or leds_expr is None or count_expr is None:
             continue
 
@@ -1078,10 +1137,19 @@ def parse_exported_rgb_led_groups(
         row: dict[str, object] = {
             "color": color,
             "preview_color": dict(color),
+            "led_group": led_group_name,
             "leds": normalize_expr(leds_expr),
             "count": normalize_expr(count_expr),
+            "led_indices": parse_rgb_led_indices(leds, known_values),
         }
-        if semantic_field:
+        if owner_field is not None:
+            owner = normalize_expr(fields.get(owner_field, ""))
+            if not owner:
+                continue
+            owner_key = owner_field.removeprefix(".")
+            row[owner_key] = owner
+            row["label"] = humanize_identifier(owner)
+        elif semantic_field:
             row["semantic"] = normalize_expr(fields.get(".semantic", ""))
             row["label"] = humanize_identifier(row["semantic"].removeprefix("KEY_FEEDBACK_GROUP_"))
         else:
@@ -1460,6 +1528,12 @@ def build_profile_model() -> dict[str, object]:
     rgb_pd_mode_active_half_enabled = "RGB_PD_MODE_ACTIVE_HALF_ENABLE" in config_macros
     timing_defaults = resolve_behavior_timing_defaults(config_macros)
     layer_colors = finalize_layer_colors(parse_layer_colors(rgb_config_text, config_macros), resolve_rgb_default_color(config_macros))
+    layer_led_groups = parse_exported_rgb_led_groups(
+        rgb_config_raw_text,
+        "EXPORT_LAYER_LED_GROUPS",
+        config_macros,
+        owner_field=".layer",
+    )
     keymap_custom_keycodes = parse_keymap_custom_keycodes(keymap_text)
     via_macros = parse_macro_slots(parse_macro_table(keymap_text, "VIA_MACROS", "MACRO"), kind="via")
     hardcoded_macros = parse_macro_slots(parse_macro_table(keymap_text, "HARDCODED_MACROS", "MACRO"), kind="hardcoded")
@@ -1468,6 +1542,16 @@ def build_profile_model() -> dict[str, object]:
     parsed_layers = parse_layers(keymap_text, known_behaviors={behavior_lookup_key(behavior.keycode) for behavior in behaviors})
     pd_modes = parse_pd_mode_manifest(pd_mode_manifest_text)
     pd_mode_colors = parse_pd_mode_colors(rgb_config_raw_text, config_macros) if rgb_pd_mode_feedback_enabled else []
+    pd_mode_led_groups = (
+        parse_exported_rgb_led_groups(
+            rgb_config_raw_text,
+            "EXPORT_PD_MODE_LED_GROUPS",
+            config_macros,
+            owner_field=".pointing_mode",
+        )
+        if rgb_pd_mode_feedback_enabled
+        else []
+    )
     pd_mode_color_anchors = {
         row["comment_color_name"]: row["preview_color"]
         for row in pd_mode_colors
@@ -1497,9 +1581,6 @@ def build_profile_model() -> dict[str, object]:
     )
     key_behavior_feedback_tap_commit_mode = (
         parse_key_behavior_feedback_tap_commit_mode(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
-    )
-    key_behavior_feedback_tap_pending_mode = (
-        parse_key_behavior_feedback_tap_pending_mode(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
     )
     key_behavior_feedback_led_groups = (
         parse_exported_rgb_led_groups(
@@ -1538,6 +1619,10 @@ def build_profile_model() -> dict[str, object]:
         "keymap_custom_keycode_count": len(keymap_custom_keycodes),
         "pd_mode_count": len(pd_modes),
         "pd_mode_color_count": len(pd_mode_colors),
+        "layer_led_group_count": len(layer_led_groups),
+        "pd_mode_led_group_count": len(pd_mode_led_groups),
+        "combo_feedback_led_group_count": len(combo_feedback_led_groups),
+        "key_behavior_feedback_led_group_count": len(key_behavior_feedback_led_groups),
         "combo_feedback_configured": int(combo_feedback_color is not None),
     }
 
@@ -1560,14 +1645,15 @@ def build_profile_model() -> dict[str, object]:
         "pd_modes": pd_modes,
         "rgb": {
             "layer_colors": layer_colors,
+            "layer_led_groups": layer_led_groups,
             "pd_mode_colors": pd_mode_colors,
+            "pd_mode_led_groups": pd_mode_led_groups,
             "combo_feedback_color": combo_feedback_color,
             "combo_feedback_locality": combo_feedback_locality,
             "combo_feedback_led_groups": combo_feedback_led_groups,
             "automouse_fade_end_config": automouse_fade_end_config,
             "key_behavior_feedback_locality": key_behavior_feedback_locality,
             "key_behavior_feedback_tap_commit_mode": key_behavior_feedback_tap_commit_mode,
-            "key_behavior_feedback_tap_pending_mode": key_behavior_feedback_tap_pending_mode,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
             "key_behavior_feedback_led_groups": key_behavior_feedback_led_groups,
         },
@@ -1655,19 +1741,18 @@ def render_reference_section(profile: dict[str, object]) -> str:
     combo_feedback_locality = rgb["combo_feedback_locality"]
     feedback_locality = rgb["key_behavior_feedback_locality"]
     tap_commit_mode = rgb["key_behavior_feedback_tap_commit_mode"]
-    tap_pending_mode = rgb["key_behavior_feedback_tap_pending_mode"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
-    rgb_authored_surfaces = ["layer colors"]
+    rgb_authored_surfaces = ["layer colors", "layer LED groups"]
     if features["rgb_pd_mode_feedback_enabled"]:
-        rgb_authored_surfaces.append("pd-mode colors")
+        rgb_authored_surfaces.append("pd-mode colors and LED groups")
     if features["rgb_automouse_gradient_enabled"]:
         rgb_authored_surfaces.append("auto-mouse fade config")
     if features["rgb_combo_feedback_enabled"]:
-        rgb_authored_surfaces.append("combo feedback color")
+        rgb_authored_surfaces.append("combo feedback color and LED groups")
     if features["rgb_key_behavior_feedback_enabled"]:
-        rgb_authored_surfaces.append("key-behavior feedback colors")
+        rgb_authored_surfaces.append("key-behavior feedback colors and LED groups")
     lines = [
         "## Reference",
         "",
@@ -1703,11 +1788,6 @@ def render_reference_section(profile: dict[str, object]) -> str:
             if tap_commit_mode is not None
             else "- Key-behavior tap-commit feedback: `not authored`",
         )
-        lines.append(
-            f"- Key-behavior tap-pending feedback: `{tap_pending_mode['mode']}`"
-            if tap_pending_mode is not None
-            else "- Key-behavior tap-pending feedback: `not authored`",
-        )
     if features["rgb_combo_feedback_enabled"]:
         lines.append(
             f"- Combo feedback locality: `{combo_feedback_locality['locality']}`"
@@ -1729,6 +1809,25 @@ def render_reference_section(profile: dict[str, object]) -> str:
         lines.append(
             f"| `{row['layer']}` | `{row['mode']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
         )
+
+    lines.extend(["", "### Layer LED Groups", ""])
+    if rgb["layer_led_groups"]:
+        lines.extend(
+            [
+                "Layer LED groups repaint after the normal layer color in the generated layer previews and in firmware.",
+                "",
+                "| Layer | LED Group | LEDs | Count | Authored HSV | Preview Color |",
+                "| --- | --- | --- | --- | --- | --- |",
+            ]
+        )
+        for row in rgb["layer_led_groups"]:
+            color = row["color"]
+            preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['layer']} LED group color")
+            lines.append(
+                f"| `{row['layer']}` | `{row['led_group']}` | `{row['leds']}` | `{row['count']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
+            )
+    else:
+        lines.append("No active authored layer LED group rows are configured.")
 
     lines.append("")
     return "\n".join(lines)
@@ -1774,6 +1873,9 @@ def render_config_defines_section(profile: dict[str, object]) -> str:
 def render_layer_maps_section(profile: dict[str, object]) -> str:
     features = profile["features"]
     layer_color_map = {row["layer"]: row for row in profile["rgb"]["layer_colors"]}
+    layer_led_groups_by_layer: dict[str, list[dict[str, object]]] = {}
+    for row in profile["rgb"]["layer_led_groups"]:
+        layer_led_groups_by_layer.setdefault(row["layer"], []).append(row)
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
@@ -1781,7 +1883,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
     lines = [
         "## Layer Images",
         "",
-        f"These previews are generated as SVG image assets under {asset_dir_link}. The renderer uses the authored `layer_colors[]` config from {rgb_link} and the current `LAYOUT()` slot order from {keymap_link}:",
+        f"These previews are generated as SVG image assets under {asset_dir_link}. The renderer uses the authored `layer_colors[]` and layer LED-group config from {rgb_link}, plus the current `LAYOUT()` slot order from {keymap_link}:",
         "",
         "| Available Layer RGB Mode | Meaning |",
         "| --- | --- |",
@@ -1790,6 +1892,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "",
         f"- `LAYER_BASE` falls back to the default RGB color from {config_link} when its authored layer color is `HSV(0, 0, 0)`",
         "- Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer",
+        "- Active layer LED groups repaint their configured LED ids on top of the normal layer color in the same generated layer preview",
         "- Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer",
         "",
         "Timing legend for the layer-local behavior tables:",
@@ -1815,6 +1918,13 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         lines.append(f"- RGB matrix render mode: `{color_config['mode']}`")
         lines.append(f"- Authored layer color: `HSV({color_config['color']['h']}, {color_config['color']['s']}, {color_config['color']['v']})`")
         lines.append(f"- Preview color: {preview_swatch}")
+        layer_led_groups = layer_led_groups_by_layer.get(layer["name"], [])
+        if layer_led_groups:
+            rendered_groups: list[str] = []
+            for row in layer_led_groups:
+                group_swatch = markdown_color_swatch(row["preview_color"], f"{row['layer']} LED group color")
+                rendered_groups.append(f"`{row['led_group']}` LEDs `{row['leds']}` {group_swatch}")
+            lines.append("- Active layer LED groups: " + ", ".join(rendered_groups))
         if combo_badge_map:
             lines.append(f"- Combo badges on this layer: {', '.join(f'`{badge}`' for badge in sorted({badge for badges in combo_badge_map.values() for badge in badges}))}")
         lines.append("")
@@ -1828,6 +1938,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
 
 def render_pd_mode_color_section(profile: dict[str, object]) -> str:
     pd_mode_colors = profile["rgb"]["pd_mode_colors"]
+    pd_mode_led_groups = profile["rgb"]["pd_mode_led_groups"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     user_config_link = markdown_path_link(USER_CONFIG_FILE, "users/noah/config.h")
     lines = [
@@ -1868,6 +1979,25 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
         lines.append(
             f"| `{row['pointing_mode']}` | `{row['locality']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
         )
+
+    lines.extend(["", "### PD Mode LED Groups", ""])
+    if pd_mode_led_groups:
+        lines.extend(
+            [
+                "Authored PD-mode LED groups repaint after the active PD-mode locality render.",
+                "",
+                "| Pointing Mode | LED Group | LEDs | Count | Authored HSV | Preview Color |",
+                "| --- | --- | --- | --- | --- | --- |",
+            ]
+        )
+        for row in pd_mode_led_groups:
+            color = row["color"]
+            preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['pointing_mode']} LED group color")
+            lines.append(
+                f"| `{row['pointing_mode']}` | `{row['led_group']}` | `{row['leds']}` | `{row['count']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
+            )
+    else:
+        lines.append("No active authored PD-mode LED group rows are configured.")
 
     lines.append("")
     return "\n".join(lines)
@@ -2249,11 +2379,20 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     }
 
     layer_color_map = {row["layer"]: row for row in profile["rgb"]["layer_colors"]}
+    layer_led_groups_by_layer: dict[str, list[dict[str, object]]] = {}
+    for row in profile["rgb"]["layer_led_groups"]:
+        layer_led_groups_by_layer.setdefault(row["layer"], []).append(row)
     behavior_indicator_map = build_behavior_indicator_map(profile)
     for layer in profile["layers"]:
         image_path = ASSET_OUTPUT_DIR / layer_image_name(layer["name"])
         combo_badge_map = build_layer_combo_badge_map(layer, profile)
-        assets[image_path] = render_layer_svg(layer, layer_color_map[layer["name"]], behavior_indicator_map, combo_badge_map)
+        assets[image_path] = render_layer_svg(
+            layer,
+            layer_color_map[layer["name"]],
+            layer_led_groups_by_layer.get(layer["name"], []),
+            behavior_indicator_map,
+            combo_badge_map,
+        )
 
     swatch_colors: set[str] = set()
     for row in profile["rgb"]["layer_colors"]:
@@ -2261,7 +2400,13 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
         if preview_color is not None:
             swatch_colors.add(preview_color["hex"])
 
+    for row in profile["rgb"]["layer_led_groups"]:
+        swatch_colors.add(row["preview_color"]["hex"])
+
     for row in profile["rgb"]["pd_mode_colors"]:
+        swatch_colors.add(row["preview_color"]["hex"])
+
+    for row in profile["rgb"]["pd_mode_led_groups"]:
         swatch_colors.add(row["preview_color"]["hex"])
 
     automouse_fade_end_config = profile["rgb"]["automouse_fade_end_config"]
@@ -2287,17 +2432,50 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     return assets
 
 
+def layer_led_group_colors_by_layout_index(layer_led_groups: list[dict[str, object]]) -> dict[int, dict[str, object]]:
+    colors_by_layout_index: dict[int, dict[str, object]] = {}
+    for row in layer_led_groups:
+        for led_index in row["led_indices"]:
+            layout_index = LED_TO_LAYOUT_INDEX.get(led_index)
+            if layout_index is not None:
+                colors_by_layout_index[layout_index] = row["preview_color"]
+    return colors_by_layout_index
+
+
+def layer_led_group_colors_by_extra_led(layer_led_groups: list[dict[str, object]]) -> dict[int, dict[str, object]]:
+    colors_by_led_index: dict[int, dict[str, object]] = {}
+    for row in layer_led_groups:
+        for led_index in row["led_indices"]:
+            if led_index in EXTRA_LED_VISUALS:
+                colors_by_led_index[led_index] = row["preview_color"]
+    return colors_by_led_index
+
+
+def apply_led_group_preview_style(style: dict[str, object], color: dict[str, object]) -> dict[str, object]:
+    fill = color["hex"]
+    return {
+        **style,
+        "fill": fill,
+        "text": ideal_text_color(fill),
+        "stroke": adjust_hex(fill, -36),
+        "label_opacity": max(float(style["label_opacity"]), 0.82),
+    }
+
+
 def render_layer_svg(
     layer: dict[str, object],
     color_config: dict[str, object],
+    layer_led_groups: list[dict[str, object]],
     behavior_indicator_map: dict[str, list[dict[str, object]]],
     combo_badge_map: dict[str, list[str]],
 ) -> str:
+    led_group_colors_by_layout_index = layer_led_group_colors_by_layout_index(layer_led_groups)
+    extra_led_group_colors = layer_led_group_colors_by_extra_led(layer_led_groups)
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{SVG_CANVAS_WIDTH}" height="{SVG_CANVAS_HEIGHT}" viewBox="0 0 {SVG_CANVAS_WIDTH} {SVG_CANVAS_HEIGHT}" role="img" aria-labelledby="title desc">',
         f"  <title id=\"title\">{layer['name']} layout preview</title>",
-        f"  <desc id=\"desc\">Generated layer preview for {layer['name']} using authored RGB layer color, mapped-key render mode, numbered activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>",
+        f"  <desc id=\"desc\">Generated layer preview for {layer['name']} using authored RGB layer color, mapped-key render mode, layer LED groups, numbered activity dots for keys with key_behaviors[] rows, and combo badges for keys that participate in layer-local combos.</desc>",
         "  <defs>",
         "    <filter id=\"shadow\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\">",
         "      <feDropShadow dx=\"0\" dy=\"5\" stdDeviation=\"4\" flood-color=\"#000000\" flood-opacity=\"0.22\"/>",
@@ -2311,10 +2489,16 @@ def render_layer_svg(
     for position in layer["positions"]:
         geometry = visual_geometry(position)
         style = layer_key_style(position, color_config)
+        led_group_color = led_group_colors_by_layout_index.get(position["layout_index"])
+        if led_group_color is not None:
+            style = apply_led_group_preview_style(style, led_group_color)
         label = visual_label_for_position(position, style["variant"])
         behavior_dots = behavior_indicator_map.get(behavior_lookup_key(position["keycode"])) if position["has_key_behavior"] else None
         combo_badges = combo_badge_map.get(position["keycode"])
         parts.extend(render_svg_key(geometry, label, style, behavior_dots, combo_badges))
+
+    for led_index, color in sorted(extra_led_group_colors.items()):
+        parts.extend(render_extra_led_marker(led_index, color))
 
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
@@ -2452,6 +2636,19 @@ def render_svg_key(
     return parts
 
 
+def render_extra_led_marker(led_index: int, color: dict[str, object]) -> list[str]:
+    visual = EXTRA_LED_VISUALS[led_index]
+    fill = color["hex"]
+    text_color = ideal_text_color(fill)
+    radius = visual["radius"]
+    cx = visual["cx"]
+    cy = visual["cy"]
+    return [
+        f'  <circle cx="{cx}" cy="{cy}" r="{radius}" fill="{fill}" stroke="{adjust_hex(fill, -36)}" stroke-width="2" filter="url(#shadow)"/>',
+        f'  <text x="{cx}" y="{cy + 0.5}" fill="{text_color}" font-size="8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">{led_index}</text>',
+    ]
+
+
 def font_size_for_key_label(label: str) -> int:
     if len(label) <= 5:
         return 12
@@ -2532,7 +2729,6 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
     feedback_colors = profile["rgb"]["key_behavior_feedback_colors"]
     feedback_locality = profile["rgb"]["key_behavior_feedback_locality"]
     tap_commit_mode = profile["rgb"]["key_behavior_feedback_tap_commit_mode"]
-    tap_pending_mode = profile["rgb"]["key_behavior_feedback_tap_pending_mode"]
     feedback_groups = profile["rgb"]["key_behavior_feedback_led_groups"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     lines = [
@@ -2552,6 +2748,8 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
     lines.extend(
         [
             f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored localities intentionally collapse that truth to a half or full-board presentation.",
+            "",
+            "Tap feedback is staged as neutral unresolved pending first, then a short committed-branch pulse from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.",
             "",
         ]
     )
@@ -2582,19 +2780,6 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
                 f"| `KEY_FEEDBACK_TAP_COMMIT_OFF` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_OFF')} |",
                 f"| `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS')} |",
                 f"| `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS')} |",
-                "",
-            ]
-        )
-
-    if tap_pending_mode is not None:
-        lines.extend(
-            [
-                f"Current authored tap-pending feedback mode: `{tap_pending_mode['mode']}`.",
-                "",
-                "| Available Tap-Pending Mode | Meaning |",
-                "| --- | --- |",
-                f"| `KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR` | {key_behavior_feedback_tap_pending_mode_description('KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR')} |",
-                f"| `KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS` | {key_behavior_feedback_tap_pending_mode_description('KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS')} |",
                 "",
             ]
         )
@@ -2630,6 +2815,13 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
             lines.append(
                 f"| `{row['semantic']}` | `{row['leds']}` | `{row['count']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
             )
+    else:
+        lines.extend(
+            [
+                "",
+                "No active authored key-feedback LED group rows are configured.",
+            ]
+        )
 
     lines.append("")
     return "\n".join(lines)
@@ -2702,6 +2894,13 @@ def render_combo_feedback_section(profile: dict[str, object]) -> str:
             lines.append(
                 f"| `{index + 1}` | `{row['leds']}` | `{row['count']}` | `HSV({group_color['h']}, {group_color['s']}, {group_color['v']})` | {group_swatch} |"
             )
+    else:
+        lines.extend(
+            [
+                "",
+                "No active authored combo feedback LED group rows are configured.",
+            ]
+        )
 
     lines.append("")
     return "\n".join(lines)

@@ -237,8 +237,8 @@ The runtime supports:
 - optional auto-mouse countdown gradient feedback
 - optional truthful key-behavior state feedback on both halves, a fixed half,
   only the key half, or only the key itself
-- optional tap-pending branch colors so unresolved multi-tap and tap-hold
-  sequences can show which tap branch is currently selected
+- optional tap-branch confirmation colors so committed multi-tap and tap-hold
+  branches can show which branch won before action feedback takes over
 - optional key-behavior feedback LED group highlights
 
 With the default feedback stages enabled, RGB is not just there to look nice.

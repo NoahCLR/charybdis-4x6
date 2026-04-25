@@ -206,6 +206,8 @@ enum keymap_custom_keycodes {
 // RGB feedback follows authored tiers on the current tap index:
 //   - multi-tap windows show a neutral pending color while the engine is still
 //     resolving which tap index wins
+//   - when a tap index commits, it can briefly show the authored branch color
+//     before action feedback takes over
 //   - an authored .hold tier can show hold-tier feedback while pending/active
 //   - an authored .long_hold tier can show longer-hold-tier feedback when it
 //     commits or stays active

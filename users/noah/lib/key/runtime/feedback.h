@@ -27,6 +27,7 @@
 
 #define KEY_FEEDBACK_SEMANTIC_BITS 3u
 #define KEY_FEEDBACK_SEMANTIC_MAP_SIZE ((((MATRIX_ROWS * MATRIX_COLS) * KEY_FEEDBACK_SEMANTIC_BITS) + 7u) / 8u)
+#define KEY_FEEDBACK_SEMANTIC_MASK ((uint16_t)((1u << KEY_FEEDBACK_SEMANTIC_BITS) - 1u))
 
 #if KEY_BEHAVIOR_MAX_TAP_COUNT == 0u
 #    error "KEY_BEHAVIOR_MAX_TAP_COUNT must be greater than zero"
@@ -59,13 +60,15 @@ _Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT <= KEY_FEEDBACK_TAP_BRANCH_MASK, "key 
 typedef enum {
     KEY_FEEDBACK_SEMANTIC_NONE = 0,
     KEY_FEEDBACK_SEMANTIC_HOLD_PENDING,
-    KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_STEADY,
     KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING,
     KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY,
     KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING,
-    KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING,
+    KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH,
+    KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED,
     KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED,
 } key_feedback_semantic_t;
+
+_Static_assert(KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED <= KEY_FEEDBACK_SEMANTIC_MASK, "key feedback semantic map must represent every semantic value");
 
 #define KEY_FEEDBACK_FLASH_META_PHASE (1u << 0)
 
@@ -105,7 +108,7 @@ static inline key_feedback_semantic_t key_feedback_semantic_map_get(const uint8_
         packed |= (uint16_t)((uint16_t)map[byte_index + 1u] << 8u);
     }
 
-    return (key_feedback_semantic_t)((packed >> shift) & 0x7u);
+    return (key_feedback_semantic_t)((packed >> shift) & KEY_FEEDBACK_SEMANTIC_MASK);
 }
 
 static inline void key_feedback_semantic_map_set(uint8_t *map, keypos_t key_pos, key_feedback_semantic_t semantic) {
@@ -126,8 +129,8 @@ static inline void key_feedback_semantic_map_set(uint8_t *map, keypos_t key_pos,
         packed |= (uint16_t)((uint16_t)map[byte_index + 1u] << 8u);
     }
 
-    packed &= (uint16_t)~((uint16_t)0x7u << shift);
-    packed |= (uint16_t)(((uint16_t)semantic & 0x7u) << shift);
+    packed &= (uint16_t)~((uint16_t)KEY_FEEDBACK_SEMANTIC_MASK << shift);
+    packed |= (uint16_t)(((uint16_t)semantic & KEY_FEEDBACK_SEMANTIC_MASK) << shift);
 
     map[byte_index] = (uint8_t)(packed & 0xFFu);
     if ((byte_index + 1u) < KEY_FEEDBACK_SEMANTIC_MAP_SIZE) {

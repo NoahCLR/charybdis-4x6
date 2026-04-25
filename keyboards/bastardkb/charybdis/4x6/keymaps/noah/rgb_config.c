@@ -239,16 +239,13 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - long-hold tier = .long_hold on the winning tap index
 //
 // Feedback categories:
-//   - RGB_TAP_PENDING_COLORS(...) = colors available while a selected tap
-//     index is still unresolved, including terminal tap-only branches for the
-//     normal pending window and tap-hold branches until the hold tier resolves
-//   - tap_pending_mode chooses how pending tap branches pick from that list:
-//     KEY_FEEDBACK_TAP_PENDING_SINGLE_COLOR uses the first color for every
-//     pending branch; KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS uses the selected
-//     tap index and clamps higher tap counts to the last configured color
-//   - tap_committed_color = tap branch resolved and committed; layer and
-//     PD-mode state actions stay quiet because their state overlays own that
-//     feedback
+//   - tap_pending_color = unresolved multi-tap state while the runtime is still
+//     waiting to know which tap index wins
+//   - RGB_TAP_BRANCH_COLORS(...) = short branch-confirmation pulse after a tap
+//     index commits; tap indexes clamp to the last configured color
+//   - tap_committed_color = action feedback after committed tap branches that
+//     do not already have state feedback; layer and PD-mode state actions stay
+//     quiet because their state overlays own that feedback
 //   - tap_commit_mode chooses which committed tap branches pulse:
 //     KEY_FEEDBACK_TAP_COMMIT_OFF, KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS, or
 //     KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS
@@ -278,16 +275,14 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //     feedback state; combo-driven feedback paints every combo key
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    RGB_TAP_PENDING_COLORS(
-        HSV(0, 0, 150),
+    .tap_pending_color = HSV(0, 0, 150),
+
+    RGB_TAP_BRANCH_COLORS(
         HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        HSV(235, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     ),
-
-    // Choose SINGLE_COLOR to always use the first pending color.
-    .tap_pending_mode = KEY_FEEDBACK_TAP_PENDING_BRANCH_COLORS,
 
     // Used for committed tap branches that do not already have state feedback.
     .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
@@ -312,7 +307,8 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 //
 // Uncomment or add rows inside this table to enable feedback accents.
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
-    // { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },

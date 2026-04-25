@@ -321,7 +321,7 @@ static void test_force_sync_sends_all_packets_even_when_unchanged(void) {
 static void test_key_feedback_phase_is_ignored_without_flashing_semantics(void) {
     test_reset_stubs();
     key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
-    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
     fake_key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
 
     split_runtime_sync_init();
@@ -407,7 +407,7 @@ static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_chan
     split_runtime_sync_init();
     test_reset_rpc_send_counts();
 
-    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
 
     split_runtime_sync_tick();
 
@@ -417,7 +417,7 @@ static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_chan
     CHECK(rpc_send_count_key_feedback_semantic == 1u);
     CHECK(rpc_send_count_key_feedback_branch == 0u);
     CHECK(rpc_last_send_id == PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC);
-    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
 }
 
 static void test_tick_sends_only_key_feedback_branch_packet_when_only_tap_branch_changes(void) {
@@ -512,7 +512,7 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
     combo_packet.combo_underlay_bitmap[0] = 0x11u;
     combo_packet.combo_overlay_bitmap[1]  = 0x22u;
     key_semantic_packet.key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
-    key_feedback_semantic_map_set(key_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 0, .col = 1}, KEY_FEEDBACK_SEMANTIC_MULTI_TAP_PENDING);
+    key_feedback_semantic_map_set(key_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 0, .col = 1}, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
     key_feedback_tap_branch_map_set(key_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 0, .col = 1}, 2u);
 
     split_runtime_sync_init();

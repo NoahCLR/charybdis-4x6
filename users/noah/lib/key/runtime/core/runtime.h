@@ -291,6 +291,11 @@ typedef struct {
     bool                                 feedback_pulse_active;
     key_feedback_pulse_kind_t            feedback_pulse_kind;
     keypos_t                             feedback_pulse_key_pos;
+    uint8_t                              feedback_pulse_tap_branch;
+    bool                                 feedback_pulse_queued;
+    key_feedback_pulse_kind_t            feedback_pulse_queued_kind;
+    keypos_t                             feedback_pulse_queued_key_pos;
+    uint8_t                              feedback_pulse_queued_tap_branch;
     uint16_t                             preview_display_bridge_started_at;
     uint8_t                              preview_display_last_semantic_layer;
     uint8_t                              preview_display_bridge_layer;
