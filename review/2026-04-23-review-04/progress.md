@@ -524,21 +524,30 @@ No required checks were skipped.
 ### Shared RGB LED Group Section
 
 - Moved the authored LED reference map in `rgb_config.c` into one central
-  `LED Groups` section.
-- Added shared physical cluster arrays for the nav reference LEDs, symbol
-  reference LEDs, left thumb, right thumb, and custom trackball LED.
+  `LED Map` section.
+- Replaced the reusable physical LED arrays with inline `RGB_LEDS(...)`
+  authoring inside each stage-specific LED group table.
+- Added `RGB_LED_GROUP_TABLE_END` plus `EXPORT_*_LED_GROUP_TABLE(...)` helpers
+  so empty LED group tables can stay materialized with only individual rows
+  commented out.
+- Tightened the sentinel to a designated `.count = 0` initializer after the
+  firmware compile caught QMK's `-Wmissing-braces` warning policy.
 - Kept the optional layer, PD-mode, combo feedback, and key-behavior feedback
-  render-table examples in their own feature sections, now referencing the
-  shared `rgb_led_group_*` arrays.
+  render-table examples in their own feature sections.
 - Clarified the feature sections so each LED group surface has a visible
   stage-specific heading in `rgb_config.c`.
-- Updated `docs/RGB_CONFIG.md` so the authoring model separates physical LED
-  clusters from the stage-specific table that chooses when and how they light.
+- Updated `docs/RGB_CONFIG.md` so LED groups are authored directly in the
+  stage-specific table that chooses when and how they light.
 
 Verification passed:
 
 - `python3 tools/profile_introspect.py --write`
 - `python3 tools/profile_introspect.py --check`
+- `python3 -m py_compile tools/profile_introspect.py`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - `git diff --check`
@@ -549,8 +558,7 @@ No required checks were skipped.
 
 1. Enable actual layer, PD-mode, combo feedback, or key-behavior feedback group
    rows from the relevant feature section when tuning the profile.
-2. Add new physical LED clusters only in the central `LED Groups` section,
-   then reference them from the relevant render table.
+2. Add LED indices directly with `RGB_LEDS(...)` in the relevant render table.
 
 ### Interaction RGB Stage Gates
 

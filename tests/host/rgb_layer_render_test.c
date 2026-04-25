@@ -135,11 +135,11 @@ const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .locality = RGB_RIGHT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .locality = RGB_BOTH_HALVES}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .locality = RGB_KEY_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(233, 234, 235), .locality = RGB_KEYS_ONLY},
 };
 const uint8_t                    pd_mode_color_count       = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
-static const uint8_t             volume_mode_group_leds[]  = {1, 6};
 static const pd_mode_led_group_t pd_mode_led_groups_data[] = {
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .leds = volume_mode_group_leds, .count = ARRAY_SIZE(volume_mode_group_leds)},
+    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), RGB_LEDS(1, 6)},
+    RGB_LED_GROUP_TABLE_END,
 };
-EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data);
+EXPORT_PD_MODE_LED_GROUP_TABLE(pd_mode_led_groups_data);
 const automouse_fade_end_config_t automouse_fade_end_config = {
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
     .mode = END_COLOR_ON_ALL_KEYS,
@@ -155,11 +155,11 @@ const combo_feedback_color_config_t combo_feedback_colors = {
     .locality = RGB_KEYS_ONLY,
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static const uint8_t                    combo_feedback_group_leds[]      = {3};
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
-    {.color = HSV(153, 154, 155), .leds = combo_feedback_group_leds, .count = ARRAY_SIZE(combo_feedback_group_leds)},
+    {.color = HSV(153, 154, 155), RGB_LEDS(3)},
+    RGB_LED_GROUP_TABLE_END,
 };
-EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data);
+EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 #endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .multi_tap_pending_color = HSV(1, 2, 3),
@@ -178,12 +178,12 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 #endif
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static const uint8_t key_feedback_group_leds[] = {5};
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
-    {.semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(11, 12, 13), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
-    {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(14, 15, 16), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
+    {.semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(11, 12, 13), RGB_LEDS(5)},
+    {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(14, 15, 16), RGB_LEDS(5)},
+    RGB_LED_GROUP_TABLE_END,
 };
-EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data);
+EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #endif
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
     [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL}, [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME}, [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS}, [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM}, [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW}, [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH},

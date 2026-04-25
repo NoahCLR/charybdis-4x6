@@ -119,23 +119,13 @@ useful for:
 
 ### LED Groups
 
-The LED map and reusable physical LED groups live together in one `LED Groups`
-section in
+The LED map lives near the top of
 [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
-Use the named arrays from every LED-group table instead of redefining the same
-physical cluster in multiple sections.
+Stage-specific LED group tables use `RGB_LEDS(...)` directly in each row, so
+you do not need separate physical LED arrays or unused placeholders.
 
-Current shared group names include:
-
-- `rgb_led_group_nav_reference`
-- `rgb_led_group_sym_reference`
-- `rgb_led_group_left_thumb`
-- `rgb_led_group_right_thumb`
-- `rgb_led_group_trackball`
-
-Those names only identify physical LED clusters. The optional stage-specific
-LED group tables in their own feature sections decide when a cluster lights
-and which color it uses:
+The optional stage-specific LED group tables decide when a cluster lights and
+which color it uses:
 
 - `Layer LED Groups`
 - `Pointing-Device Mode LED Groups`
@@ -153,22 +143,21 @@ or later overlay repaints those LEDs.
 
 In `rgb_config.c`, use one of these helper forms:
 
-- leave the section commented out when no per-layer LED groups are enabled
-- declare `layer_led_groups_data` and then export it with
-  `EXPORT_LAYER_LED_GROUPS(layer_led_groups_data)` when you want one or more
-  authored rows
+- leave all row entries commented out when no per-layer LED groups are enabled
+- uncomment or add rows inside `layer_led_groups_data`
+- keep `RGB_LED_GROUP_TABLE_END` as the final row and export with
+  `EXPORT_LAYER_LED_GROUP_TABLE(layer_led_groups_data)`
 
 Each row contains:
 
 - the layer id
 - an HSV color
-- a pointer to an LED index array
-- the LED count
+- an `RGB_LEDS(...)` list with the LEDs to repaint
 
 Use rows like:
 
 ```c
-{ .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_nav_reference, .count = ARRAY_SIZE(rgb_led_group_nav_reference) },
+{ .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(33, 18) },
 ```
 
 This is useful for things like:
@@ -255,17 +244,14 @@ pointing-device mode instead of layer.
 Use this when one mode should highlight a very specific LED or cluster, such as
 the trackball LED or one side of the board.
 
-As above, use:
-
-- leave the section commented out when no per-mode LED groups are enabled
-- declare `pd_mode_led_groups_data` and then export it with
-  `EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data)` when you want one or
-  more authored rows
+As above, leave row entries commented out when no per-mode LED groups are
+enabled, keep `RGB_LED_GROUP_TABLE_END` as the final row, and export with
+`EXPORT_PD_MODE_LED_GROUP_TABLE(pd_mode_led_groups_data)`.
 
 Use rows like:
 
 ```c
-{ .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
+{ .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(56) },
 ```
 
 ### `combo_feedback_colors`
@@ -319,10 +305,11 @@ Use rows like:
 
 ```c
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
-    { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
+    { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(56) },
+    RGB_LED_GROUP_TABLE_END,
 };
 
-EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data);
+EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 ```
 
 ### `key_behavior_feedback_colors`
@@ -426,12 +413,13 @@ Use rows like:
 
 ```c
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
-    { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
-    { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
-    { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
+    { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), RGB_LEDS(56) },
+    { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(56) },
+    { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), RGB_LEDS(56) },
+    RGB_LED_GROUP_TABLE_END,
 };
 
-EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data);
+EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 ```
 
 ## Render Order
@@ -494,10 +482,8 @@ Examples:
 - `pd_mode_led_group_t`
 
 [`users/noah/lib/rgb/core/rgb_config_helpers.h`](../users/noah/lib/rgb/core/rgb_config_helpers.h)
-defines the shared `HSV(...)`, `EXPORT_LAYER_LED_GROUPS(...)`,
-`EXPORT_PD_MODE_LED_GROUPS(...)`, `EXPORT_COMBO_FEEDBACK_LED_GROUPS(...)`, and
-`EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(...)` helpers used by the authored
-config tables.
+defines `HSV(...)`, `RGB_LEDS(...)`, `RGB_LED_GROUP_TABLE_END`, and the
+`EXPORT_*_LED_GROUP_TABLE(...)` helpers used by authored LED group tables.
 
 `rgb_helpers.h` also provides split-safe helper functions such as:
 
@@ -535,35 +521,25 @@ That disables both `pd_mode_colors[]` and `pd_mode_led_groups`.
 
 ### Add a small highlight to one layer
 
-1. Pick one of the reusable `rgb_led_group_*` arrays, or add a new one to the
-   shared LED group catalog.
-2. Uncomment the `layer_led_groups_data` block plus
-   `EXPORT_LAYER_LED_GROUPS(layer_led_groups_data)`, then add the rows you
-   want.
+1. Find the target LEDs in the LED map at the top of `rgb_config.c`.
+2. Uncomment or add a row in `layer_led_groups_data` with `RGB_LEDS(...)`.
 
 ### Add a small highlight to one pd mode
 
-1. Pick one of the reusable `rgb_led_group_*` arrays, or add a new one to the
-   shared LED group catalog.
-2. Uncomment the `pd_mode_led_groups_data` block plus
-   `EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data)`, then add the rows you
-   want.
+1. Find the target LEDs in the LED map at the top of `rgb_config.c`.
+2. Uncomment or add a row in `pd_mode_led_groups_data` with `RGB_LEDS(...)`.
 
 ### Add a small highlight to combo feedback
 
-1. Pick one of the reusable `rgb_led_group_*` arrays, or add a new one to the
-   shared LED group catalog.
-2. Uncomment the `combo_feedback_led_groups_data` block plus
-   `EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data)`, then add
-   the rows you want.
+1. Find the target LEDs in the LED map at the top of `rgb_config.c`.
+2. Uncomment or add a row in `combo_feedback_led_groups_data` with
+   `RGB_LEDS(...)`.
 
 ### Add a small highlight to key-behavior feedback
 
-1. Pick one of the reusable `rgb_led_group_*` arrays, or add a new one to the
-   shared LED group catalog.
-2. Uncomment the `key_behavior_feedback_led_groups_data` block plus
-   `EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data)`,
-   then add rows for the semantic categories you want to accent.
+1. Find the target LEDs in the LED map at the top of `rgb_config.c`.
+2. Uncomment or add rows in `key_behavior_feedback_led_groups_data` with
+   `RGB_LEDS(...)` for the semantic categories you want to accent.
 
 ### Change the auto-mouse timeout fade
 
