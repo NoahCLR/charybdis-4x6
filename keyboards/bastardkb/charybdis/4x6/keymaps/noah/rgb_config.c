@@ -152,32 +152,32 @@ const pd_mode_color_t pd_mode_colors[] = {
     {
         .pointing_mode = PD_MODE_DRAGSCROLL,
         .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // orange
     {
         .pointing_mode = PD_MODE_VOLUME,
         .color         = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // yellow
     {
         .pointing_mode = PD_MODE_BRIGHTNESS,
         .color         = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // magenta
     {
         .pointing_mode = PD_MODE_ARROW,
         .color         = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // cyan
     {
         .pointing_mode = PD_MODE_PINCH,
         .color         = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // lime
     {
         .pointing_mode = PD_MODE_ZOOM,
         .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        .mode          = PD_COLOR_MODE_TRIGGER_KEYS,
+        .mode          = PD_COLOR_MODE_RIGHT_HALF,
     }, // light green
 };
 const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
