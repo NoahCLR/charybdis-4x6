@@ -520,3 +520,34 @@ No required checks were skipped.
    group rows, or keep the feature as an authored option for later tuning.
 2. If real group rows are added, regenerate the profile overview and re-run
    RGB render/validation plus real profile validation.
+
+### Shared RGB LED Group Section
+
+- Moved the authored LED reference map in `rgb_config.c` into one central
+  `LED Groups` section.
+- Added shared physical cluster arrays for the nav reference LEDs, symbol
+  reference LEDs, left thumb, right thumb, and custom trackball LED.
+- Kept the optional layer, PD-mode, combo feedback, and key-behavior feedback
+  render-table examples in their own feature sections, now referencing the
+  shared `rgb_led_group_*` arrays.
+- Clarified the feature sections so each LED group surface has a visible
+  stage-specific heading in `rgb_config.c`.
+- Updated `docs/RGB_CONFIG.md` so the authoring model separates physical LED
+  clusters from the stage-specific table that chooses when and how they light.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+### Next Steps
+
+1. Enable actual layer, PD-mode, combo feedback, or key-behavior feedback group
+   rows from the relevant feature section when tuning the profile.
+2. Add new physical LED clusters only in the central `LED Groups` section,
+   then reference them from the relevant render table.

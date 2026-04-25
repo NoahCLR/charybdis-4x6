@@ -22,6 +22,45 @@
 
 #if defined(RGB_MATRIX_ENABLE)
 
+// ─── LED Groups ─────────────────────────────────────────────────────────────
+//
+// Reference map for LED group authoring:
+//
+//   ╭────────────────────────╮                 ╭────────────────────────╮
+//    0   7   8  15  16  20                     49  45  44  37  36  29
+//   ├────────────────────────┤                 ├────────────────────────┤
+//    1   6   9  14  17  21                     50  46  43  38  35  30
+//   ├────────────────────────┤                 ├────────────────────────┤
+//    2   5  10  13  18  22                     51  47  42  39  34  31
+//   ├────────────────────────┤                 ├────────────────────────┤
+//    3   4  11  12  19  23                     52  48  41  40  33  32
+//   ╰────────────────────────╯                 ╰────────────────────────╯
+//                       26  27  28     53  54
+//                           25  24     55     (56)
+//                     ╰────────────╯ ╰────────╯
+//
+// LED 56 is the custom trackball LED soldered on the right half, not part of
+// the standard key matrix.
+//
+// Define physical LED groups once.
+//
+// These named arrays can be reused by every LED-group render table below:
+// layer groups, pd-mode groups, combo feedback groups, and key-behavior
+// feedback groups. Add new physical clusters here instead of redefining the
+// same LED list in multiple tables.
+//
+static const uint8_t rgb_led_group_nav_reference[] __attribute__((unused)) = {33, 18};
+static const uint8_t rgb_led_group_sym_reference[] __attribute__((unused)) = {4, 47};
+static const uint8_t rgb_led_group_left_thumb[] __attribute__((unused))    = {26, 27, 28, 25, 24};
+static const uint8_t rgb_led_group_right_thumb[] __attribute__((unused))   = {53, 54, 55};
+static const uint8_t rgb_led_group_trackball[] __attribute__((unused))     = {56};
+
+// Use these arrays from the optional per-stage LED group tables:
+//   - Layer LED Groups
+//   - Pointing-Device Mode LED Groups
+//   - Combo Feedback LED Groups
+//   - Key-Behavior Feedback LED Groups
+
 // ─── Layer colors ───────────────────────────────────────────────────────────
 //
 // Layer indicator colors and render modes, indexed by layer enum.
@@ -67,41 +106,17 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 
 // ─── Layer LED Groups ───────────────────────────────────────────────────────
 //
-// Paint specific LEDs a different color when a layer is active. Define an LED
-// index array, then add a row to the table. Rows keyed to LAYER_BASE act as
-// persistent underlay accents for the layer scene, following the same
-// "always below higher layers unless repainted later" rule as the base layer
-// color above.
+// Paint specific LEDs a different color when a layer is active.
 //
-// ╭────────────────────────╮                 ╭────────────────────────╮
-//    0   7   8  15  16  20                     49  45  44  37  36  29
-// ├────────────────────────┤                 ├────────────────────────┤
-//    1   6   9  14  17  21                     50  46  43  38  35  30
-// ├────────────────────────┤                 ├────────────────────────┤
-//    2   5  10  13  18  22                     51  47  42  39  34  31
-// ├────────────────────────┤                 ├────────────────────────┤
-//    3   4  11  12  19  23                     52  48  41  40  33  32
-// ╰────────────────────────╯                 ╰────────────────────────╯
-//                       26  27  28     53  54
-//                           25  24     55     (56)
-//                     ╰────────────╯ ╰────────╯
-//
-// Optional examples. Uncomment any LED index lists you want, then uncomment
-// the layer_led_groups_data block below plus EXPORT_LAYER_LED_GROUPS(...) to
-// enable per-layer highlights. If you leave it commented out, shared defaults
-// keep the exported table empty.
-//
-// static const uint8_t nav_highlight_leds[] = {33, 18};
-// static const uint8_t sym_highlight_leds[] = {4, 47};
-// static const uint8_t left_thumb_leds[]    = {26, 27, 28, 25, 24};
-// static const uint8_t right_thumb_leds[]   = {53, 54, 55};
+// Layer LED groups repaint after normal layer colors. Rows keyed to LAYER_BASE
+// act as persistent underlay accents for the layer scene.
 //
 // static const layer_led_group_t layer_led_groups_data[] = {
-//     { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = nav_highlight_leds, .count = ARRAY_SIZE(nav_highlight_leds) },  // red
-//     { .layer = LAYER_SYM, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = sym_highlight_leds, .count = ARRAY_SIZE(sym_highlight_leds) }  // yellow
+//     { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_nav_reference, .count = ARRAY_SIZE(rgb_led_group_nav_reference) },  // red
+//     { .layer = LAYER_SYM, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_sym_reference, .count = ARRAY_SIZE(rgb_led_group_sym_reference) }  // yellow
 // };
 // EXPORT_LAYER_LED_GROUPS(layer_led_groups_data);
-//
+
 //
 // ─── Auto-mouse timeout fade ────────────────────────────────────────────────
 //
@@ -126,7 +141,7 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
     .mode      = FOLLOW_REAL_DESTINATION,
     .end_color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 };
-#    endif
+#    endif // RGB_AUTOMOUSE_GRADIENT_ENABLE
 
 // ─── Pointing device mode colors ────────────────────────────────────────────
 //
@@ -184,19 +199,18 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 // ─── Pointing-Device Mode LED Groups ────────────────────────────────────────
 //
 // Paint specific LEDs a different color while a pointing mode is active.
+// These groups repaint after the active pd-mode locality render.
 //
 // Uncomment the pd_mode_led_groups_data block below plus
 // EXPORT_PD_MODE_LED_GROUPS(...) if you want one or more per-mode LED
 // highlights. If you leave it commented out, shared defaults keep the
 // exported table empty.
 //
-// static const uint8_t trackball_led[] = {56}; // Custom trackball led soldered on the right half, not part of the standard RGB matrix.
-//
 // static const pd_mode_led_group_t pd_mode_led_groups_data[] = {
-//     { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = trackball_led, .count = ARRAY_SIZE(trackball_led) }
+//     { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) }
 // };
 // EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data);
-//
+
 // ─── Combo feedback ────────────────────────────────────────────────────────
 //
 // Visual identity for any currently active combo chord.
@@ -229,18 +243,22 @@ const combo_feedback_color_config_t combo_feedback_colors = {
     .locality = RGB_KEY_HALF,
 };
 
-// Optional combo feedback LED groups repaint after the combo locality render
-// inside whichever combo substage is live. Uncomment the block below when a
-// persistent combo accent needs its own color.
+// ─── Combo Feedback LED Groups ──────────────────────────────────────────────
 //
-// static const uint8_t combo_feedback_group_leds[] = {TRACKBALL_LED};
+// Paint specific LEDs a different color while combo feedback is active.
+// These groups repaint after the combo locality render inside whichever combo
+// underlay/overlay substage is live.
+//
+// Uncomment the combo_feedback_led_groups_data block below plus
+// EXPORT_COMBO_FEEDBACK_LED_GROUPS(...) if you want a persistent combo accent.
+// If you leave it commented out, shared defaults keep the exported table empty.
 //
 // static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
-//     {.color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = combo_feedback_group_leds, .count = ARRAY_SIZE(combo_feedback_group_leds)},
+//     {.color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball)},
 // };
 //
 // EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data);
-#    endif
+#    endif // COMBO_ENABLE
 
 //
 // ─── Key behavior feedback ──────────────────────────────────────────────────
@@ -294,18 +312,23 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .locality = RGB_KEY_HALF,
 };
 
-// Optional key-behavior feedback LED groups repaint after the feedback
-// locality render when a matching visible semantic category is live.
+// ─── Key-Behavior Feedback LED Groups ───────────────────────────────────────
 //
-// static const uint8_t key_feedback_group_leds[] = {TRACKBALL_LED};
+// Paint specific LEDs a different color while key-behavior feedback is active.
+// These groups repaint after the feedback locality render when a matching
+// visible semantic category is live.
+//
+// Uncomment the key_behavior_feedback_led_groups_data block below plus
+// EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(...) if you want feedback accents.
+// If you leave it commented out, shared defaults keep the exported table empty.
 //
 // static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
-//     {.semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
-//     {.semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
-//     {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = key_feedback_group_leds, .count = ARRAY_SIZE(key_feedback_group_leds)},
+//     {.semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball)},
+//     {.semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball)},
+//     {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball)},
 // };
 //
 // EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data);
-#    endif
+#    endif // RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 
 #endif // RGB_MATRIX_ENABLE

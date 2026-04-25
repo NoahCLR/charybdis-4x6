@@ -103,6 +103,31 @@ useful for:
 - `LAYER_BASE`, when you want the base scene to fall through to the normal RGB Matrix effect
 - any layer you intentionally want to stay colorless in the layer stack
 
+### LED Groups
+
+The LED map and reusable physical LED groups live together in one `LED Groups`
+section in
+[`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
+Use the named arrays from every LED-group table instead of redefining the same
+physical cluster in multiple sections.
+
+Current shared group names include:
+
+- `rgb_led_group_nav_reference`
+- `rgb_led_group_sym_reference`
+- `rgb_led_group_left_thumb`
+- `rgb_led_group_right_thumb`
+- `rgb_led_group_trackball`
+
+Those names only identify physical LED clusters. The optional stage-specific
+LED group tables in their own feature sections decide when a cluster lights
+and which color it uses:
+
+- `Layer LED Groups`
+- `Pointing-Device Mode LED Groups`
+- `Combo Feedback LED Groups`
+- `Key-Behavior Feedback LED Groups`
+
 ### `layer_led_groups`
 
 `layer_led_groups` lets a layer highlight specific LEDs instead of, or in
@@ -129,7 +154,7 @@ Each row contains:
 Use rows like:
 
 ```c
-{ .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = nav_highlight_leds, .count = ARRAY_SIZE(nav_highlight_leds) },
+{ .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_nav_reference, .count = ARRAY_SIZE(rgb_led_group_nav_reference) },
 ```
 
 This is useful for things like:
@@ -226,7 +251,7 @@ As above, use:
 Use rows like:
 
 ```c
-{ .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = trackball_led, .count = ARRAY_SIZE(trackball_led) },
+{ .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
 ```
 
 ### `combo_feedback_colors`
@@ -279,10 +304,8 @@ The same group table is used by both combo substages:
 Use rows like:
 
 ```c
-static const uint8_t combo_accent_leds[] = {TRACKBALL_LED};
-
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
-    { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = combo_accent_leds, .count = ARRAY_SIZE(combo_accent_leds) },
+    { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
 };
 
 EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data);
@@ -388,12 +411,10 @@ earlier group rows.
 Use rows like:
 
 ```c
-static const uint8_t feedback_accent_leds[] = {TRACKBALL_LED};
-
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {
-    { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .leds = feedback_accent_leds, .count = ARRAY_SIZE(feedback_accent_leds) },
-    { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = feedback_accent_leds, .count = ARRAY_SIZE(feedback_accent_leds) },
-    { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = feedback_accent_leds, .count = ARRAY_SIZE(feedback_accent_leds) },
+    { .semantic = KEY_FEEDBACK_GROUP_MULTI_TAP_PENDING, .color = HSV(0, 0, 150), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
+    { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
+    { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .leds = rgb_led_group_trackball, .count = ARRAY_SIZE(rgb_led_group_trackball) },
 };
 
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data);
@@ -491,28 +512,32 @@ Edit the matching row in `pd_mode_colors[]` and change its `.locality`.
 
 ### Add a small highlight to one layer
 
-1. Define a `uint8_t` LED index array.
+1. Pick one of the reusable `rgb_led_group_*` arrays, or add a new one to the
+   shared LED group catalog.
 2. Uncomment the `layer_led_groups_data` block plus
    `EXPORT_LAYER_LED_GROUPS(layer_led_groups_data)`, then add the rows you
    want.
 
 ### Add a small highlight to one pd mode
 
-1. Define a `uint8_t` LED index array.
+1. Pick one of the reusable `rgb_led_group_*` arrays, or add a new one to the
+   shared LED group catalog.
 2. Uncomment the `pd_mode_led_groups_data` block plus
    `EXPORT_PD_MODE_LED_GROUPS(pd_mode_led_groups_data)`, then add the rows you
    want.
 
 ### Add a small highlight to combo feedback
 
-1. Define a `uint8_t` LED index array.
+1. Pick one of the reusable `rgb_led_group_*` arrays, or add a new one to the
+   shared LED group catalog.
 2. Uncomment the `combo_feedback_led_groups_data` block plus
    `EXPORT_COMBO_FEEDBACK_LED_GROUPS(combo_feedback_led_groups_data)`, then add
    the rows you want.
 
 ### Add a small highlight to key-behavior feedback
 
-1. Define a `uint8_t` LED index array.
+1. Pick one of the reusable `rgb_led_group_*` arrays, or add a new one to the
+   shared LED group catalog.
 2. Uncomment the `key_behavior_feedback_led_groups_data` block plus
    `EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(key_behavior_feedback_led_groups_data)`,
    then add rows for the semantic categories you want to accent.
