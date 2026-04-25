@@ -7,6 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include "../../pointing/defs/pd_mode_flags.h"
 #include "key_behavior.h"
 
 typedef struct {
@@ -24,5 +25,6 @@ typedef struct {
 
 key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count);
 bool                key_behavior_has_more_taps(uint16_t keycode, uint8_t count);
+bool                key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode);
 key_behavior_view_t key_behavior_lookup(uint16_t keycode);
 uint8_t             key_behavior_validate_all(void);

@@ -138,20 +138,23 @@ renders semantic state exported by the key runtime instead of duplicating tap,
 hold, longer-hold, multi-tap, combo-origin, or PD ownership logic.
 The PD projection exported by the key runtime now also tracks explicit
 held-action branches whose PD mode differs from the physical trigger key.
-The safest authored Pinch shape is the explicit first-hold path, because it
-keeps quick Pinch tap/double-tap prefixes out of Pinch's mode-owned GUI
-lifecycle until the runtime knows whether the user is tapping or holding. The
-current tree has been returned to the legacy implicit first-hold shape to keep
-the hardware freeze reproducible while additional trace events identify the
-remaining clash.
-The root same-key lifecycle issue is covered separately with a legacy Pinch
-host-test fixture: if the old implicit first-hold shape is reintroduced, PD
-mode preemption now clears stale held owners immediately instead of leaving the
-old key-runtime owner live until physical release.
-That fixture now also covers duplicate same-key press handoff for stacked PD
-keys: re-registering the already-held first PD mode must transfer lease
-ownership to the current press token, otherwise the eventual release cannot
-observe and unregister the active PD lifecycle.
+Stacked pd-mode keys now have runtime containment instead of relying on the
+keymap to author an explicit first hold. If a pd-mode key has a first-tap
+override and a later tap-count hold can enter a different pd mode, the
+materializer gives the first mode thresholded
+`PRESS_AND_HOLD_UNTIL_RELEASE(<base mode>)` behavior and keeps it out of the
+immediate implicit-hold path. The current `PINCH_MODE` row can therefore stay
+in the compact legacy shape while quick Pinch tap/double-tap prefixes remain
+outside Pinch's mode-owned GUI lifecycle until a real first hold crosses the
+threshold.
+The earlier same-key lifecycle issue is still covered separately with a legacy
+Pinch host-test fixture: if a held pd mode is preempted by another pd mode, PD
+mode preemption clears stale held owners immediately instead of leaving the old
+key-runtime owner live until physical release.
+That fixture also covers duplicate same-key press handoff for stacked PD keys:
+re-registering an already-held pd mode must transfer lease ownership to the
+current press token, otherwise the eventual release cannot observe and
+unregister the active PD lifecycle.
 
 The current `.mode` authoring surface is coherent for the main feedback
 surfaces. PD, combo feedback, and key-behavior feedback all support fixed

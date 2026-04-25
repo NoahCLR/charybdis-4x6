@@ -379,3 +379,62 @@ No required checks were skipped.
    unlike the trace-only pass, this one changes the suspected runtime behavior.
 2. If hardware still freezes, use the structured PD/key-runtime trace events
    added in this thread to inspect the remaining owner transition.
+
+### Stacked PD Tap-Path Containment
+
+- Hardware still reproduced the freeze after the same-key lease-owner fix,
+  which ruled out owner-token handoff as the whole problem.
+- Moved the containment from authored data into the behavior materializer:
+  when a pd-mode key has a first-tap override and a later tap-count hold can
+  enter a different pd mode, the first mode is materialized as a normal
+  threshold hold instead of an immediate implicit hold.
+- Kept the authored `PINCH_MODE` row in the legacy repro shape:
+  `[0].tap = TAP_SENDS(KC_TRNS)` and `[1].hold =
+  PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)`. The runtime now supplies the
+  safe first-hold containment for this stacked-pd shape.
+- Added lookup coverage that proves stacked pd rows lose the
+  `HANDLED_KEY_FLAG_IMPLICIT_HOLD` path and receive
+  `PRESS_AND_HOLD_UNTIL_RELEASE(<base mode>)` on the first tap.
+- Updated the legacy Pinch integration expectations: quick Pinch prefixes stay
+  out of Pinch/GUI ownership, real first holds enter Pinch at threshold, and
+  double-tap holds still enter Zoom with one coherent owner.
+- Updated user-facing docs and the keymap comments so the authored behavior
+  surface matches the runtime rule.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_behavior_validation_tests.sh`
+- `sh tests/host/run_keymap_validation_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_action_lifecycle_tests.sh`
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+No required checks were skipped.
+
+### Next Steps
+
+1. Flash this build and hammer repeated `PINCH_MODE` quick taps and
+   double-tap holds on hardware.
+2. If hardware still freezes, capture the trace tail and compare whether the
+   remaining clash is outside the key-runtime/pd-mode ownership path.

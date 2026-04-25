@@ -325,6 +325,10 @@ The currently placed mode keys behave like this:
 - `PINCH_MODE`: single tap `J`, hold for pinch, second quick tap sends `VIA_MACRO_6`, second hold enters `ZOOM_MODE`
 - `DRAGSCROLL`: single tap `.`, hold for momentary scrolling, double-tap hold locks
 
+Because `PINCH_MODE` can branch into `ZOOM_MODE` on the second hold, its first
+pinch hold is resolved at the normal hold threshold instead of starting the
+Pinch lifecycle immediately during the tap-count window.
+
 For the current macOS setup, `PINCH_MODE` is meant to be used with
 [BetterMouse](https://better-mouse.com/), which turns the command-scroll path
 into pinch-style zoom. `ZOOM_MODE` is the fallback explicit zoom path that does

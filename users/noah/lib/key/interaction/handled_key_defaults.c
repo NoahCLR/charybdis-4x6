@@ -4,6 +4,13 @@
 
 #include "handled_key_internal.h"
 
+__attribute__((weak)) bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+    (void)keycode;
+    (void)count;
+    (void)base_mode;
+    return false;
+}
+
 uint8_t behavior_get_layer(uint16_t keycode) {
     return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
 }
@@ -46,6 +53,11 @@ bool handled_key_resolution_uses_fallback_hold_behavior(handled_key_resolution_t
     return resolution.step.tap.present || handled_key_resolution_has_multi_tap(resolution);
 }
 
+bool handled_key_resolution_uses_deferred_stacked_pd_hold(handled_key_resolution_t resolution) {
+    return resolution.tap_count == 1 && resolution.pd_mode != 0 && resolution.step.tap.present &&
+           key_behavior_future_tap_path_has_foreign_pd_mode(resolution.keycode, resolution.tap_count, resolution.pd_mode);
+}
+
 static uint16_t handled_key_default_tap_action(handled_key_resolution_t resolution) {
     return noah_action_desc_default_tap_action(noah_action_describe(resolution.keycode));
 }
@@ -72,6 +84,16 @@ hold_behavior_t handled_key_hold_behavior(handled_key_resolution_t resolution) {
             .present = true,
             .action  = resolution.keycode,
             .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        };
+    }
+
+    if (handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
+        // Keep stacked PD modes out of the immediate activation path while the
+        // tap-count branch is unresolved.
+        return (hold_behavior_t){
+            .present = true,
+            .action  = resolution.keycode,
+            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
         };
     }
 

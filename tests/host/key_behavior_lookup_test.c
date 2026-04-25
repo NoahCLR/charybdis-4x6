@@ -27,6 +27,8 @@ enum {
     TEST_HOLD_BEHAVIOR_KEY          = SAFE_RANGE + 0x1Au,
     TEST_LONG_HOLD_BEHAVIOR_KEY     = SAFE_RANGE + 0x1Bu,
     TEST_CHAIN_MULTI_TAP_KEY        = SAFE_RANGE + 0x1Cu,
+    TEST_STACKED_PD_KEY             = SAFE_RANGE + 0x1Du,
+    TEST_OTHER_PD_MODE_KEY          = SAFE_RANGE + 0x1Eu,
 };
 
 layer_state_t   layer_state;
@@ -150,12 +152,28 @@ const key_behavior_t key_behaviors[] = {
                 [0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(TEST_LONG_HOLD_ACTION)},
             },
     },
+    {
+        .keycode = TEST_STACKED_PD_KEY,
+        .tap_counts =
+            {
+                [0] = {.tap = TAP_SENDS(KC_TRNS)},
+                [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_OTHER_PD_MODE_KEY)},
+            },
+    },
 };
 
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    return keycode == TEST_PD_MODE_KEY || keycode == TEST_TRANSPARENT_PD_KEY ? 1u : 0u;
+    if (keycode == TEST_PD_MODE_KEY || keycode == TEST_TRANSPARENT_PD_KEY || keycode == TEST_STACKED_PD_KEY) {
+        return 1u;
+    }
+
+    if (keycode == TEST_OTHER_PD_MODE_KEY) {
+        return 2u;
+    }
+
+    return 0u;
 }
 
 bool is_pd_mode_lock_action(uint16_t action) {
@@ -476,6 +494,30 @@ static void test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata(void)
     CHECK(materialized.pd_mode == 1u);
 }
 
+static void test_stacked_pd_first_tap_defers_implicit_hold_until_threshold(void) {
+    keypos_t                   key_pos = test_keypos(1, 7);
+    handled_key_materialized_t materialized;
+
+    test_reset_keymap();
+    test_set_keymap_key(1, key_pos, KC_V);
+    test_set_keymap_key(2, key_pos, TEST_STACKED_PD_KEY);
+    layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
+
+    materialized = test_materialize(handled_key_lookup(TEST_STACKED_PD_KEY), key_pos);
+    CHECK(materialized.hold.present);
+    CHECK(materialized.hold.action == TEST_STACKED_PD_KEY);
+    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+    CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
+    CHECK((materialized.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) == 0);
+    CHECK(materialized.pd_mode == 1u);
+
+    materialized = test_materialize(handled_key_lookup_tap_count(TEST_STACKED_PD_KEY, 2), key_pos);
+    CHECK(materialized.hold.present);
+    CHECK(materialized.hold.action == TEST_OTHER_PD_MODE_KEY);
+    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+    CHECK(materialized.pd_mode == 1u);
+}
+
 static void test_transparent_hold_uses_lower_layer_tap_metadata(void) {
     keypos_t                   key_pos = test_keypos(1, 2);
     handled_key_materialized_t materialized;
@@ -571,6 +613,7 @@ int main(void) {
     test_transparent_tap_inherits_lower_release_resolve_contract();
     test_transparent_hold_uses_lower_plain_key_normal_hold_behavior();
     test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata();
+    test_stacked_pd_first_tap_defers_implicit_hold_until_threshold();
     test_transparent_hold_uses_lower_layer_tap_metadata();
     test_transparent_hold_other_uses_lower_layer_tap_metadata();
     test_transparent_hold_chains_through_lower_authored_transparency();

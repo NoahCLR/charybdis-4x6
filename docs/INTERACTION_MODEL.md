@@ -109,6 +109,10 @@ An authored row does not automatically replace everything about a key.
   metadata
 - if `.tap` is present but `.hold` and `.long_hold` are both omitted, keys
   that already have a default held path keep using it for that branch
+- stacked pd-mode rows are the exception: when a first-tap override and a
+  later tap-count hold can enter a different pd mode, the first pd mode waits
+  until the hold threshold instead of activating while the tap count is still
+  unresolved
 - once `.hold` or `.long_hold` is authored for that branch, the normal held
   fallback is no longer used for that branch
 
@@ -124,6 +128,9 @@ In practice, the common families look like this:
   overridden
 - plain pd-mode keycodes keep their default momentary mode hold when only the
   tap is overridden
+- pd-mode keys whose tap path can branch into another pd mode defer the lower
+  mode until hold threshold so the two mode lifecycles cannot overlap during
+  tap disambiguation
 - keycodes without a default held path, such as most custom keycodes, do not
   invent one just because a tap override exists
 
@@ -215,6 +222,9 @@ Pointing-device mode keys do not use a separate timing system.
   and multi-tap behavior on top of that default
 - if a `[0].tap` override is omitted, a quick single tap sends nothing and the
   default momentary hold remains
+- if `[0].tap` is authored and a later hold enters a different pd mode, the
+  runtime treats the first mode like a normal threshold hold rather than an
+  immediate implicit hold
 
 That means a mode key can stay simple, or it can grow patterns such as:
 

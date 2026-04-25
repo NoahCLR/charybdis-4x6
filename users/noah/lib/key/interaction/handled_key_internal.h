@@ -29,6 +29,7 @@ pd_mode_mask_t                   handled_key_pd_mode_for_behavior(key_behavior_v
 uint16_t                         handled_key_flags_from_behavior(key_behavior_view_t behavior);
 bool                             handled_key_resolution_step_present(handled_key_resolution_t resolution);
 bool                             handled_key_resolution_uses_fallback_hold_behavior(handled_key_resolution_t resolution);
+bool                             handled_key_resolution_uses_deferred_stacked_pd_hold(handled_key_resolution_t resolution);
 uint16_t                         handled_key_tap_action_behavior(handled_key_resolution_t resolution);
 uint8_t                          handled_key_tap_repeat_count_behavior(handled_key_resolution_t resolution, uint16_t tap_action);
 hold_behavior_t                  handled_key_hold_behavior(handled_key_resolution_t resolution);

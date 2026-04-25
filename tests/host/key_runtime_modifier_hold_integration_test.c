@@ -199,6 +199,13 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 3;
 }
 
+bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+    (void)keycode;
+    (void)count;
+    (void)base_mode;
+    return false;
+}
+
 bool is_pd_mode_lock_action(uint16_t action) {
     (void)action;
     return false;

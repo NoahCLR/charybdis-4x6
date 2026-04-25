@@ -78,7 +78,9 @@ typedef struct {
 //   If omitted, the key keeps its normal tap behavior for that step.
 //   If present but hold/long_hold are both omitted, keys that already have a
 //   default held path keep using it (for example normal keys, LT()/MO(), and
-//   pd-mode keys). Other keycodes keep the tap override and send it on release.
+//   pd-mode keys). Stacked pd-mode rows defer that default hold until the hold
+//   threshold when a later tap-count branch can enter a different pd mode.
+//   Other keycodes keep the tap override and send it on release.
 //
 // hold:
 //   What happens after the first hold threshold.

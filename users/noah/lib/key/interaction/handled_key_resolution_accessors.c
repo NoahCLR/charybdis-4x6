@@ -9,7 +9,7 @@ bool handled_key_resolution_is_handled(handled_key_resolution_t resolution) {
 }
 
 bool handled_key_resolution_uses_implicit_hold(handled_key_resolution_t resolution) {
-    return resolution.tap_count == 1 && resolution.pd_mode != 0;
+    return resolution.tap_count == 1 && resolution.pd_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution);
 }
 
 bool handled_key_resolution_uses_fallback_hold(handled_key_resolution_t resolution) {

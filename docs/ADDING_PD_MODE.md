@@ -277,6 +277,11 @@ Tap behavior is never implicit. If you want a single tap, double tap, lock,
 mute, or a second-tap alternate mode, you must author that explicitly in
 `key_behaviors[]`.
 
+When a pd-mode key has a first-tap override and a later tap-count hold enters a
+different pd mode, the runtime defers the first mode until the hold threshold.
+That keeps stacked mode lifecycles from overlapping while the tap count is
+still unresolved.
+
 Common lockable patterns are:
 
 - hold: momentary mode
@@ -400,7 +405,7 @@ Example from the current keymap:
     .keycode = PINCH_MODE,
     .tap_counts =
         {
-            [0] = {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PINCH_MODE)},
+            [0] = {.tap = TAP_SENDS(KC_TRNS)},
             [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
         },
 },
@@ -409,6 +414,9 @@ Example from the current keymap:
 The important rule is that the hold action on that second press must resolve to
 another pd-mode keycode. The generic held-action dispatch path will treat that
 as another pd-mode key and switch to the alternate mode.
+The first tap does not need an explicit `PRESS_AND_HOLD_UNTIL_RELEASE(...)`
+entry for containment; the stacked-pd runtime rule supplies thresholded first
+hold behavior for this shape.
 
 You do not need to edit the generic key-runtime or pd-mode runtime files unless
 you are inventing a new runtime behavior that existing modes do not cover.

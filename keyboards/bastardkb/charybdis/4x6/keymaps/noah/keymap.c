@@ -194,8 +194,10 @@ enum keymap_custom_keycodes {
 //   - .long_hold is the longer-hold tier
 // omit .tap to keep the key's normal tap behavior for that tap index
 // if .tap is set but hold/long_hold are omitted, keys that already have a
-// default held path keep using it; other keycodes keep the tap override and
-// send it on release
+// default held path keep using it. Stacked pd-mode rows are contained: if a
+// first-tap override can branch into another pd mode on a later hold, the
+// first pd mode waits until the hold threshold instead of activating
+// immediately. Other keycodes keep the tap override and send it on release
 // .hold and .long_hold are independent: define either one by itself, or use
 // both together for a two-stage hold
 //

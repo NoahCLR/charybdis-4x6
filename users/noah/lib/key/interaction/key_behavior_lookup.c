@@ -43,6 +43,44 @@ static bool key_behavior_has_multi_tap_in_config(const key_behavior_t *config) {
     return key_behavior_has_more_taps_in_config(config, 1);
 }
 
+static bool key_behavior_step_references_foreign_pd_mode(key_behavior_step_t step, pd_mode_mask_t base_mode) {
+    pd_mode_mask_t mode;
+
+    if (base_mode == 0) {
+        return false;
+    }
+
+    if (step.hold.present) {
+        mode = pd_mode_for_keycode(step.hold.action);
+        if (mode != 0 && mode != base_mode) {
+            return true;
+        }
+    }
+
+    if (step.long_hold.present) {
+        mode = pd_mode_for_keycode(step.long_hold.action);
+        if (mode != 0 && mode != base_mode) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool key_behavior_future_tap_path_has_foreign_pd_mode_in_config(const key_behavior_t *config, uint8_t count, pd_mode_mask_t base_mode) {
+    if (!config || base_mode == 0 || count >= KEY_BEHAVIOR_MAX_TAP_COUNT) {
+        return false;
+    }
+
+    for (uint8_t index = count; index < KEY_BEHAVIOR_MAX_TAP_COUNT; index++) {
+        if (key_behavior_step_references_foreign_pd_mode(config->tap_counts[index], base_mode)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static bool key_behavior_keycode_supported(uint16_t keycode) {
     return noah_action_desc_supported_as_behavior_keycode(noah_action_describe(keycode));
 }
@@ -124,6 +162,10 @@ key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count
 
 bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return key_behavior_has_more_taps_in_config(key_behavior_config_lookup(keycode), count);
+}
+
+bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+    return key_behavior_future_tap_path_has_foreign_pd_mode_in_config(key_behavior_config_lookup(keycode), count, base_mode);
 }
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {

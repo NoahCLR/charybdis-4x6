@@ -190,6 +190,9 @@ Charybdis userspace rather than a generic keyboard config.
 A plain pointing-mode keycode works as a default momentary mode key. That same
 key can also participate in `key_behaviors[]`, which means it can gain richer
 tap, hold, longer-hold, and multi-tap behavior like the rest of the board.
+If that authored tap path can branch into a different pointing mode, the
+runtime defers the first mode until the hold threshold so two mode lifecycles
+do not overlap while the tap count is still unresolved.
 
 The current runtime supports these mode families:
 
