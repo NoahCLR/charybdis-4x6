@@ -662,11 +662,13 @@ def qmk_preview_hsv_to_rgb(h: int, s: int, v: int) -> tuple[int, int, int]:
 
 def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[dict[str, object]]:
     body = extract_initializer_body(raw_text, r"pd_mode_colors\[\]\s*=")
-    entry_pattern = re.compile(r"\{(?P<body>.*?)\}\s*,\s*//\s*(?P<label>[^\n]+)", re.DOTALL)
     rows: list[dict[str, object]] = []
 
-    for match in entry_pattern.finditer(body):
-        fields = parse_designated_fields(strip_comments(match.group("body")))
+    for entry in split_top_level(strip_comments(body)):
+        entry_body = entry.strip()
+        if not (entry_body.startswith("{") and entry_body.endswith("}")):
+            continue
+        fields = parse_designated_fields(entry_body[1:-1].strip())
         if ".pointing_mode" not in fields or ".color" not in fields or ".locality" not in fields:
             continue
         pointing_mode = normalize_expr(fields[".pointing_mode"])
@@ -680,7 +682,7 @@ def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[di
                 "locality_label": humanize_identifier(locality.removeprefix("RGB_")),
                 "locality_meaning": pd_color_locality_description(locality),
                 "preview_color": dict(color),
-                "comment_color_name": normalize_color_name(match.group("label")) or None,
+                "comment_color_name": None,
             }
         )
 

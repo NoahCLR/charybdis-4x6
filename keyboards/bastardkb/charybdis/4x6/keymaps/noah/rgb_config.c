@@ -64,12 +64,10 @@ static const uint8_t rgb_led_group_trackball[] __attribute__((unused))     = {56
 // ─── Layer colors ───────────────────────────────────────────────────────────
 //
 // Layer indicator colors and render modes, indexed by layer enum.
-// LAYER_BASE is the persistent layer underlay for this scene: if it has a
-// non-black color, it paints below higher layers; if it stays HSV(0, 0, 0),
-// the base scene falls through to the default RGB matrix effect. The
-// configured auto-mouse target layer uses its authored layer color as the
-// timeout fade start state. In this keymap, that target defaults to
-// LAYER_POINTER.
+// LAYER_BASE is the persistent layer underlay: a non-black color paints below
+// higher layers, while HSV(0, 0, 0) lets the default RGB Matrix effect show.
+// The configured auto-mouse target layer uses its authored layer color as the
+// timeout fade start state.
 // .mode:
 //   - ALL_KEYS = paint the whole layer color wash
 //   - KEYS_MAPPED_ON_THIS_LAYER_ONLY = paint only keys that have a real key
@@ -81,27 +79,27 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
         {
             .color = HSV(0, 0, 0),
             .mode  = ALL_KEYS,
-        }, // no override
+        },
     [LAYER_NUM] =
         {
             .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
             .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-        }, // green
+        },
     [LAYER_SYM] =
         {
             .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
             .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-        }, // blue
+        },
     [LAYER_NAV] =
         {
             .color = HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
             .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-        }, // purple
+        },
     [LAYER_POINTER] =
         {
             .color = HSV(0, 0, 150),
             .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
-        }, // default auto-mouse layer: white mapped keys, capped at v=150 to limit current draw
+        },
 };
 
 // ─── Layer LED Groups ───────────────────────────────────────────────────────
@@ -121,7 +119,7 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // ─── Auto-mouse timeout fade ────────────────────────────────────────────────
 //
 // Auto-mouse starts from the authored auto-mouse layer rendering above and
-// fades toward the destination chosen below. The first AUTOMOUSE_RGB_DEAD_TIME
+// fades toward the destination configured below. The first AUTOMOUSE_RGB_DEAD_TIME
 // ms are dead time; only the remaining portion of AUTO_MOUSE_TIME animates.
 //
 // .mode chooses how the fade picks its destination:
@@ -158,9 +156,6 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 //   - RGB_KEYS_ONLY = paint the key footprint that triggered the current
 //     effective PD mode; combo-driven triggers paint every combo key
 //
-// This profile uses RGB_RIGHT_HALF for every PD mode so pointing
-// state stays anchored to the pointer half.
-//
 // { .pointing_mode = ..., .color = HSV(hue, sat, val), .locality = ... }
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 const pd_mode_color_t pd_mode_colors[] = {
@@ -168,32 +163,32 @@ const pd_mode_color_t pd_mode_colors[] = {
         .pointing_mode = PD_MODE_DRAGSCROLL,
         .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
-    }, // orange
+    },
     {
         .pointing_mode = PD_MODE_VOLUME,
         .color         = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
-    }, // yellow
+    },
     {
         .pointing_mode = PD_MODE_BRIGHTNESS,
         .color         = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
-    }, // magenta
+    },
     {
         .pointing_mode = PD_MODE_ARROW,
         .color         = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
-    }, // cyan
+    },
     {
         .pointing_mode = PD_MODE_PINCH,
         .color         = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
-    }, // lime
+    },
     {
         .pointing_mode = PD_MODE_ZOOM,
         .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
-    }, // light green
+    },
 };
 const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 
@@ -232,16 +227,9 @@ const uint8_t pd_mode_color_count = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd
 //     footprint
 //   - RGB_KEYS_ONLY = paint the exact combo keys
 //
-// This profile uses RGB_KEY_HALF so active combos stay local
-// to the half or halves that formed the chord without narrowing to individual
-// keys or broadening across the board.
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 const combo_feedback_color_config_t combo_feedback_colors = {
-    // Strong blue so the combo layer stays distinct from white/orange/cyan
-    // authored key-behavior semantics.
-    .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-
-    // Keep combo identity on the half or halves touched by the live combo.
+    .color    = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .locality = RGB_KEY_HALF,
 };
 
@@ -272,14 +260,18 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 //   - hold tier = .hold on the winning tap index
 //   - long-hold tier = .long_hold on the winning tap index
 //
-// Feedback rule:
-//   - white = multi-tap sequence still resolving which tap index wins
-//   - orange = authored hold-tier feedback or hold-tier commit
-//   - cyan = authored long-hold-tier feedback or long-hold-tier commit
+// Feedback categories:
+//   - multi_tap_pending_color = multi-tap sequence still resolving which tap
+//     index wins
+//   - hold_active_color = authored hold-tier pending / active states and
+//     hold-tier commit pulses
+//   - long_hold_active_color = authored long-hold-tier active states and
+//     long-hold-tier commit pulses
 //   - missing tiers stay quiet; e.g. a long-hold-only surface does not show
-//     orange before the long-hold tier commits
-//   - the active tier picks the color: .hold always uses orange, .long_hold
-//     always uses cyan, regardless of which helper authored that tier
+//     hold feedback before the long-hold tier commits
+//   - the active tier picks the color: .hold always uses hold_active_color,
+//     .long_hold always uses long_hold_active_color, regardless of which
+//     helper authored that tier
 //   - TAP_AT_HOLD_THRESHOLD(...) pulses once when that tier commits
 //   - TAP_ON_RELEASE_AFTER_HOLD(...) stays steady while that tier is pending
 //     release
@@ -295,22 +287,17 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 //     this to both halves
 //   - RGB_KEYS_ONLY = paint only the key footprint currently driving the
 //     feedback state; combo-driven feedback paints every combo key
-// This profile uses RGB_KEY_HALF so hold / multi-tap feedback
-// stays local to the half that caused it without becoming too subtle.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    // Neutral white while the engine is still resolving the active tap index.
+    // Used while the engine is still resolving the active tap index.
     .multi_tap_pending_color = HSV(0, 0, 150),
 
-    // Orange for authored hold-tier pending / active states and hold-tier
-    // commit pulses.
+    // Used for authored hold-tier pending / active states and commit pulses.
     .hold_active_color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
-    // Icy cyan for authored long-hold-tier active states and long-hold-tier
-    // commit pulses.
+    // Used for authored long-hold-tier active states and commit pulses.
     .long_hold_active_color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
-    // Keep feedback on the half that owns the current key / tap series.
     .locality = RGB_KEY_HALF,
 };
 

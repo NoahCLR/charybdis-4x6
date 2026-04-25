@@ -8,8 +8,8 @@ PD mode names and bindings in this report stay in sync with the shared definitio
 | --- | --- | --- |
 | Layer image | `C1`, `C2`, ... | Combo badge. Match the badge id to the layer-local combo table below the image. |
 | Layer image | `tap` dot <img alt="Tap indicator color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> with optional count | This key has authored tap actions. A plain dot means one authored tap action; a numbered dot means multiple tap tiers on that key define a tap action. Use the behavior table below for `single`, `double`, `triple`, and higher tap counts. |
-| Layer image | `hold` dot <img alt="Hold indicator color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> with optional count | This key has authored hold tiers. A plain dot means one hold tier; a numbered dot means multiple tap tiers on that key define a hold action. |
-| Layer image | `long hold` dot <img alt="Long hold indicator color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> with optional count | This key has authored long-hold tiers. A plain dot means one long-hold tier; a numbered dot means multiple tap tiers on that key define a long-hold action. |
+| Layer image | `hold` dot <img alt="Hold indicator color" src="media/profile-introspection/profile-color-swatch-ff6c00.svg" width="96" height="28" /> with optional count | This key has authored hold tiers. A plain dot means one hold tier; a numbered dot means multiple tap tiers on that key define a hold action. |
+| Layer image | `long hold` dot <img alt="Long hold indicator color" src="media/profile-introspection/profile-color-swatch-0084ff.svg" width="96" height="28" /> with optional count | This key has authored long-hold tiers. A plain dot means one long-hold tier; a numbered dot means multiple tap tiers on that key define a long-hold action. |
 | Behavior table | `single`, `double`, `triple`, `quadruple`, `quintuple` | Tap tiers for the same physical key: 1 tap, 2 taps, 3 taps, 4 taps, 5 taps. |
 | Behavior table | repeated rows for one key | The same physical key exposes different actions at different tap tiers. |
 | Behavior table | `Tap` / `Hold` / `Long Hold` | Actions that fire for that tap tier on tap, hold, or deeper long hold. |
@@ -296,9 +296,9 @@ Current authored feedback locality: `RGB_KEY_HALF`.
 
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
-| `Multi Tap Pending` | Neutral white while the engine is still resolving the active tap index. | `HSV(0, 0, 150)` | <img alt="Multi Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
-| `Hold Active` | Orange for authored hold-tier pending / active states and hold-tier commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `Long Hold Active` | Icy cyan for authored long-hold-tier active states and long-hold-tier commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `Multi Tap Pending` | Used while the engine is still resolving the active tap index. | `HSV(0, 0, 150)` | <img alt="Multi Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+| `Hold Active` | Used for authored hold-tier pending / active states and commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff6c00.svg" width="96" height="28" /> |
+| `Long Hold Active` | Used for authored long-hold-tier active states and commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-0084ff.svg" width="96" height="28" /> |
 
 ## Macro Inventory
 
