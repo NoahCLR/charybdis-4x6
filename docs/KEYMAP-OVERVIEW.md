@@ -41,7 +41,7 @@ Timing legend for the layer-local behavior tables:
 - RGB matrix render mode: `ALL_KEYS`
 - Authored layer color: `HSV(0, 0, 0)`
 - Preview color: <img alt="LAYER_BASE preview color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" />
-- Combo badges on this layer: `C1`
+- Combo badges on this layer: `C1`, `C2`
 
 ![LAYER_BASE](media/profile-introspection/profile-layer-LAYER_BASE.svg)
 
@@ -96,6 +96,7 @@ Timing legend for the layer-local behavior tables:
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
 | `C1` | `D` + `LT[NAV]/F` | `TAB` (`KC_TAB`) |
+| `C2` | `N` + `M` | `LGUI` (`KC_LEFT_GUI`) |
 
 ### `LAYER_NUM`
 
@@ -387,7 +388,7 @@ No active authored layer LED group rows are configured.
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `33` |
 | `key_behavior_step_count` | `47` |
-| `combo_count` | `2` |
+| `combo_count` | `3` |
 | `via_macro_count` | `16` |
 | `via_macro_non_empty_count` | `10` |
 | `hardcoded_macro_count` | `16` |

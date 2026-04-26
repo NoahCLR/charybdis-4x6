@@ -1460,6 +1460,55 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
     }
 }
 
+static void test_pointer_terminal_double_tap_action_defers_on_exact_third_press(uint16_t keycode, uint16_t expected_action) {
+    keypos_t key_pos;
+    keypos_t deferred_key_pos;
+
+    key_pos = test_find_keypos_on_layer(LAYER_POINTER, keycode);
+    CHECK(test_keypos_valid(key_pos));
+
+    test_reset_state();
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_POINTER));
+
+    CHECK(test_resolve_keycode(key_pos) == keycode);
+    test_run_quick_tap(key_pos);
+    test_advance_thumb_multi_tap_gap();
+    test_run_quick_tap(key_pos);
+    test_advance_thumb_multi_tap_gap();
+
+    test_press_resolved(key_pos);
+
+    CHECK(test_tap_code16_count == 0);
+    CHECK(test_delayed_action_count == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 1u);
+    CHECK(noah_runtime_debug_deferred_release_action(0u) == expected_action);
+    CHECK(noah_runtime_debug_deferred_release_key_pos(0u, &deferred_key_pos));
+    CHECK(test_keypos_equal(deferred_key_pos, key_pos));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == keycode);
+
+    key_runtime_integration_scan();
+
+    CHECK(test_delayed_action_count == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 1u);
+
+    test_release_resolved(key_pos);
+
+    CHECK(test_delayed_action_count == 1);
+    CHECK(test_last_delayed_action == expected_action);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0);
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+}
+
+static void test_pointer_pinch_exact_third_tap_defers_zoom_chord_until_release(void) {
+    test_pointer_terminal_double_tap_action_defers_on_exact_third_press(PINCH_MODE, VIA_MACRO_6);
+}
+
+static void test_pointer_volume_exact_third_tap_defers_mute_until_release(void) {
+    test_pointer_terminal_double_tap_action_defers_on_exact_third_press(VOLUME_MODE, KC_MUTE);
+}
+
 static void test_click_spam_combo_uses_last_chord_key_as_runtime_owner(void) {
     static const uint16_t click_spam_combo_keys[] = {
         MS_BTN1,
@@ -2656,6 +2705,8 @@ int main(void) {
     test_right_thumb_quadruple_tap_dispatches_previous_track();
     test_pointer_pinch_double_tap_queues_zoom_chord();
     test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly();
+    test_pointer_pinch_exact_third_tap_defers_zoom_chord_until_release();
+    test_pointer_volume_exact_third_tap_defers_mute_until_release();
     test_click_spam_combo_uses_last_chord_key_as_runtime_owner();
     test_right_nav_layer_hold_dispatches_nav_taps_immediately();
     test_right_thumb_hold_dispatches_nav_taps_immediately();

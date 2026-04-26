@@ -1038,6 +1038,64 @@ Next steps:
 1. Flash and retest the double-tap hold `LEFT_THUMB` to `KC_ESC` path. The
    intended sequence is branch color, then hold/action feedback color, even if
    release happens during the branch pulse.
+
+### Same-Key Terminal Tap Interruption
+
+- Hardware testing narrowed the remaining freeze to exact third presses on
+  `PINCH_MODE` and `VOLUME_MODE`, while `DRAGSCROLL` and the thumb keys did not
+  reproduce the same failure.
+- Root cause: the third same-key press could interrupt a terminal second-tap
+  branch and dispatch that previous branch action inside the new physical press
+  transition. On `PINCH_MODE` this mixed the second-tap zoom chord with the new
+  PD-mode/key-transparent press; on `VOLUME_MODE` it mixed the second-tap mute
+  action with the new direct Volume press.
+- `DRAGSCROLL` does not hit this exact path because its second branch has no
+  terminal tap action to flush, and the thumb keys continue into authored
+  higher tap branches instead of interrupting a terminal one.
+- Updated same-key terminal tap interruption so the previous branch's delayed
+  action queues as a pending-release dispatch owned by the current physical
+  press token. The previous branch drains after that third press releases
+  rather than inside the third press transition.
+- Kept foreign-key pending tap flushing immediate, preserving the earlier
+  Shift OSM fix where a normal follow-up key must see the one-shot state before
+  QMK handles it.
+- Updated key-runtime trace output so deferred delayed-action flags are shown
+  as flags rather than as inflated repeat counts.
+- Added generic key-runtime coverage for the same-key terminal interruption and
+  real-profile coverage for exact third presses on `PINCH_MODE` and
+  `VOLUME_MODE`.
+- The first full-host pass failed because generated profile introspection
+  output was stale for the current authored combo set. Regenerated the profile
+  overview and reran the full suite successfully.
+
+Verification passed:
+
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+Next steps:
+
+1. Flash and test exact three-press `PINCH_MODE` and `VOLUME_MODE` on hardware.
+2. If either still freezes, capture the trace tail around the third press and
+   compare pending-release drain against PD key press/release events.
 2. If the two feedback windows still feel too compressed on hardware, consider
    increasing `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` rather than
    changing dispatch timing.

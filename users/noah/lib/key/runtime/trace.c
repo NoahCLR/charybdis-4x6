@@ -226,9 +226,14 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
             case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
                 uprintf("  [%u] %s key=(%u,%u) mode=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pd_mode_lock_tap.key_pos.row, (unsigned int)effect->data.pd_mode_lock_tap.key_pos.col, (unsigned int)effect->data.pd_mode_lock_tap.pd_mode);
                 break;
-            case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
-                uprintf("  [%u] %s key=(%u,%u) action=0x%04X repeat=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).row, (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).col, (unsigned int)effect->data.delayed_action.action, (unsigned int)effect->data.delayed_action.repeat_count);
+            case KEY_RUNTIME_EFFECT_DELAYED_ACTION: {
+                uint8_t repeat_count        = (uint8_t)(effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK);
+                bool    defer_until_release = (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_DEFER_UNTIL_RELEASE) != 0u;
+                bool    tap_commit_feedback = (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_TAP_COMMIT_FEEDBACK) != 0u;
+
+                uprintf("  [%u] %s key=(%u,%u) action=0x%04X repeat=%u defer_release=%u tap_commit_feedback=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).row, (unsigned int)key_runtime_effect_delayed_action_key_pos(effect).col, (unsigned int)effect->data.delayed_action.action, (unsigned int)repeat_count, defer_until_release ? 1u : 0u, tap_commit_feedback ? 1u : 0u);
                 break;
+            }
             case KEY_RUNTIME_EFFECT_NONE:
             default:
                 uprintf("  [%u] %s\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind));

@@ -331,6 +331,52 @@ static void test_terminal_tap_branch_does_not_accept_undefined_higher_branch(voi
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
 }
 
+static void test_same_key_terminal_tap_interruption_defers_previous_branch_action(void) {
+    static const key_runtime_scenario_step_t first_two_taps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
+    };
+    static const key_runtime_scenario_step_t third_press[] = {
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1),
+    };
+    static const key_runtime_scenario_step_t third_release[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
+    };
+    const keypos_t key_pos = test_keypos(2, 1);
+
+    key_runtime_scenario_reset();
+    test_configure_multi_tap_key();
+    key_runtime_scenario_run(first_two_taps, ARRAY_SIZE(first_two_taps));
+
+    CHECK(key_runtime_scenario_effect_count() == 0);
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 2u);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(third_press, ARRAY_SIZE(third_press));
+
+    CHECK(key_runtime_scenario_effect_count() == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 1u);
+    CHECK(noah_runtime_debug_deferred_release_action(0) == TEST_ALT_ACTION);
+    CHECK(key_runtime_scenario_slot_owner_keycode(key_pos) == TEST_MULTI_TAP_KEY);
+
+    key_runtime_scenario_run(third_release, ARRAY_SIZE(third_release));
+
+    CHECK(key_runtime_scenario_effect_count() == 2);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_ALT_ACTION);
+    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).row == 2);
+    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).col == 1);
+    test_check_feedback_pulse(1, KEY_FEEDBACK_PULSE_TAP_COMMITTED, 2, 1, 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
+}
+
 static void test_momentary_layer_key_tracks_press_and_release_events(void) {
     static const key_runtime_scenario_step_t scenario[] = {
         KEY_RUNTIME_SCENARIO_PRESS(MO(3), 2, 4),
@@ -724,6 +770,7 @@ int main(void) {
     test_non_base_tap_commit_feedback_still_pulses();
     test_non_base_release_resolved_tap_commit_feedback_still_pulses();
     test_terminal_tap_branch_does_not_accept_undefined_higher_branch();
+    test_same_key_terminal_tap_interruption_defers_previous_branch_action();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();
     test_press_on_other_handled_position_keeps_foreign_pending_multi_tap_until_timeout();

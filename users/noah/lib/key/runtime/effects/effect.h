@@ -31,6 +31,12 @@ typedef enum {
     KEY_RUNTIME_EFFECT_DELAYED_ACTION,
 } key_runtime_effect_kind_t;
 
+typedef enum {
+    KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK        = 0x3fu,
+    KEY_RUNTIME_DELAYED_ACTION_FLAG_TAP_COMMIT_FEEDBACK = 0x40u,
+    KEY_RUNTIME_DELAYED_ACTION_FLAG_DEFER_UNTIL_RELEASE = 0x80u,
+} key_runtime_delayed_action_flag_t;
+
 typedef struct {
     key_runtime_effect_kind_t kind;
     union {

@@ -147,6 +147,14 @@ None.
   `KC_LEFT_GUI` triple-tap `OSM(MOD_LSFT)` arm before the next ordinary key is
   processed. Code references: `users/noah/lib/key/runtime/preflight.c` and
   `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
+- Same-key interruption of a terminal tap branch now defers the previous
+  branch action to the current physical press release instead of dispatching it
+  inside the new press transition. This keeps exact third presses on
+  `PINCH_MODE` and `VOLUME_MODE` from mixing the previous second-tap action
+  with the new PD-mode/key-transparent press. Code references:
+  `users/noah/lib/key/runtime/core/runtime.c`,
+  `tests/host/key_runtime_scenario_test.c`, and
+  `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
 
 ## Non-Findings
 
@@ -252,6 +260,14 @@ without delaying terminal tap-only actions like OSM before a normal follow-up
 key. Delayed QMK behavior dispatch must also preserve behavior-owned side
 effects, such as one-shot mod state, when it restores the saved keyboard mod
 snapshot around replay.
+
+Same-key interruption has a stricter ordering rule than foreign-key flushing.
+If a same-key press arrives after the previous tap branch has become terminal,
+the previous branch's delayed action is queued onto the pending-release path
+owned by the current physical press. That lets the new press finish its normal
+key-runtime/PD ownership transition first, then drains the prior branch action
+after release. Foreign-key flushing remains immediate because the follow-up key
+must see already-committed behavior such as OSM before QMK processes it.
 
 Not every quick release is eligible to preserve a pending multi-tap chain.
 Branches that can still accept another tap may remain pending, and terminal
