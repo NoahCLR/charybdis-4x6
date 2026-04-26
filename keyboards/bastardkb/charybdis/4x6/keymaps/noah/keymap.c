@@ -143,7 +143,7 @@ enum keymap_custom_keycodes {
 #define COMBOS(COMBO)                                \
     COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))       \
     COMBO(CLICK_SPAM, (MS_BTN1, MS_BTN2))            \
-    COMBO(KC_LEFT_GUI, (KC_N, KC_M, ))               \
+    COMBO(KC_LEFT_GUI, (KC_N, KC_M))                 \
     /* COMBO(MACRO_0, (KC_Q, KC_W)) */               \
     /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */           \
     /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */ \
