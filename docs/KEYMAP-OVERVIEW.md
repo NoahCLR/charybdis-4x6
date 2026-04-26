@@ -192,7 +192,7 @@ No authored combos resolve entirely from keys on this layer.
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(0, 0, 150)`
 - Preview color: <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" />
-- Combo badges on this layer: `C1`
+- Combo badges on this layer: `C1`, `C2`
 
 ![LAYER_POINTER](media/profile-introspection/profile-layer-LAYER_POINTER.svg)
 
@@ -223,6 +223,7 @@ No authored combos resolve entirely from keys on this layer.
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
 | `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
+| `C2` | `VOLUME` + `MS_BTN1` | `LGUI` (`KC_LEFT_GUI`) |
 
 ## PD Mode Colors
 
@@ -388,7 +389,7 @@ No active authored layer LED group rows are configured.
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `33` |
 | `key_behavior_step_count` | `47` |
-| `combo_count` | `3` |
+| `combo_count` | `4` |
 | `via_macro_count` | `16` |
 | `via_macro_non_empty_count` | `10` |
 | `hardcoded_macro_count` | `16` |

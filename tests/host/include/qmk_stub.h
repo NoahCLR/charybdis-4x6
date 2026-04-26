@@ -298,6 +298,7 @@ void    wait_ms(uint16_t ms);
 bool     charybdis_get_pointer_dragscroll_enabled(void);
 bool     charybdis_get_pointer_sniping_enabled(void);
 uint16_t charybdis_get_pointer_default_dpi(void);
+uint16_t charybdis_get_pointer_sniping_dpi(void);
 void     charybdis_set_pointer_dragscroll_enabled(bool enabled);
 void     charybdis_set_pointer_sniping_enabled(bool enabled);
 void     pointing_device_set_cpi(uint16_t cpi);

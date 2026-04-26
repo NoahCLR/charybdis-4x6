@@ -14,6 +14,7 @@ HOST_RUNTIME_FIXTURE_DEFINE_RESET_QMK_STUBS(runtime_fixture)
 static uint16_t current_cpi;
 static uint16_t cpi_set_count;
 static uint16_t default_dpi;
+static uint16_t sniping_dpi;
 static uint32_t fake_timer_ms;
 static uint32_t fake_last_input_idle_ms;
 static uint32_t fake_last_matrix_idle_ms;
@@ -74,6 +75,7 @@ static void test_reset_stubs(void) {
     current_cpi                   = 0;
     cpi_set_count                 = 0;
     default_dpi                   = 900;
+    sniping_dpi                   = 350;
     fake_timer_ms                 = 0;
     fake_last_input_idle_ms       = 0;
     fake_last_matrix_idle_ms      = UINT32_MAX;
@@ -142,6 +144,10 @@ bool charybdis_get_pointer_sniping_enabled(void) {
 
 uint16_t charybdis_get_pointer_default_dpi(void) {
     return default_dpi;
+}
+
+uint16_t charybdis_get_pointer_sniping_dpi(void) {
+    return sniping_dpi;
 }
 
 void charybdis_set_pointer_dragscroll_enabled(bool enabled) {
@@ -461,7 +467,7 @@ static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_afte
     pd_mode_service_active_dpi_sync();
     current_cpi     = 0;
     cpi_set_count   = 0;
-    sniping_enabled = true;
+    pd_mode_set_auto_sniping_layer_active(true);
 
     layer_state_t next = noah_layer_state_set_user((layer_state_t)1u << 0);
 
@@ -500,10 +506,12 @@ static void test_layer_state_set_enables_sniping_and_blocks_dpi_restore_while_sn
 
     layer_state_t next = noah_layer_state_set_user(((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER) | ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER));
 
-    CHECK(sniping_enabled);
+    CHECK(!sniping_enabled);
+    CHECK(pd_mode_auto_sniping_layer_active());
     CHECK(cpi_set_count == 0);
     pd_mode_service_active_dpi_sync();
-    CHECK(cpi_set_count == 0);
+    CHECK(current_cpi == sniping_dpi);
+    CHECK(cpi_set_count == 1);
     CHECK((next & ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER)) != 0);
     CHECK((next & ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER)) == 0);
 }

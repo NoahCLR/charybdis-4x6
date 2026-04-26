@@ -62,6 +62,14 @@ void pd_mode_request_active_dpi_sync(void) {
     pd_mode_runtime_shared_state()->active_dpi_sync_pending = true;
 }
 
+void pd_mode_set_auto_sniping_layer_active(bool active) {
+    pd_mode_runtime_shared_state()->auto_sniping_layer_active = active;
+}
+
+bool pd_mode_auto_sniping_layer_active(void) {
+    return pd_mode_runtime_shared_state()->auto_sniping_layer_active;
+}
+
 void pd_mode_service_active_dpi_sync(void) {
     if (!pd_mode_runtime_shared_state()->active_dpi_sync_pending) {
         return;
@@ -75,14 +83,15 @@ void pd_mode_apply_active_dpi(void) {
 
     pd_mode_snapshot_t   snapshot    = pd_mode_snapshot();
     const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
+    bool                 sniping     = pd_mode_auto_sniping_layer_active() || noah_qmk_contract_pointer_sniping_enabled();
 
     if (pd_mode_policy_mode_uses_dragscroll_backend(snapshot.local.active_mode)) {
         pointing_device_set_cpi(noah_qmk_contract_pointer_dragscroll_dpi());
         return;
     }
 
-    if (noah_qmk_contract_pointer_sniping_enabled()) {
-        noah_qmk_contract_pointer_set_sniping_enabled(true);
+    if (sniping) {
+        pointing_device_set_cpi(noah_qmk_contract_pointer_sniping_dpi());
         return;
     }
 

@@ -25,6 +25,7 @@ enum {
 static uint16_t current_cpi;
 static uint16_t cpi_set_count;
 static uint16_t default_dpi;
+static uint16_t sniping_dpi;
 
 static bool    sniping_enabled;
 static bool    auto_mouse_toggle_enabled;
@@ -85,6 +86,7 @@ static void test_reset_stubs(void) {
     current_cpi                          = 0;
     cpi_set_count                        = 0;
     default_dpi                          = 900;
+    sniping_dpi                          = 350;
     sniping_enabled                      = false;
     auto_mouse_toggle_enabled            = false;
     auto_mouse_enabled                   = false;
@@ -135,6 +137,10 @@ bool charybdis_get_pointer_sniping_enabled(void) {
 
 uint16_t charybdis_get_pointer_default_dpi(void) {
     return default_dpi;
+}
+
+uint16_t charybdis_get_pointer_sniping_dpi(void) {
+    return sniping_dpi;
 }
 
 void charybdis_set_pointer_dragscroll_enabled(bool enabled) {
@@ -705,8 +711,8 @@ static void test_apply_active_dpi_respects_pointer_state(void) {
     current_cpi     = 7777;
     sniping_enabled = true;
     pd_mode_apply_active_dpi();
-    CHECK(current_cpi == 7777);
-    CHECK(cpi_set_count == 0);
+    CHECK(current_cpi == sniping_dpi);
+    CHECK(cpi_set_count == 1);
 
     sniping_enabled = false;
     pd_mode_deactivate(PD_MODE_VOLUME);

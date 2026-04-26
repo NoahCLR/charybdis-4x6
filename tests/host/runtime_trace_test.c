@@ -20,6 +20,7 @@ static bool     fake_is_master;
 static bool     fake_dragscroll_enabled;
 static bool     fake_sniping_enabled;
 static uint16_t fake_default_dpi;
+static uint16_t fake_sniping_dpi;
 static uint16_t fake_last_cpi;
 
 static uint8_t                          rpc_register_count;
@@ -59,6 +60,7 @@ static void test_reset_stubs(void) {
     fake_dragscroll_enabled = false;
     fake_sniping_enabled    = false;
     fake_default_dpi        = 800u;
+    fake_sniping_dpi        = 350u;
     fake_last_cpi           = 0u;
     rpc_register_count      = 0u;
     memset(rpc_registered_ids, -1, sizeof(rpc_registered_ids));
@@ -110,6 +112,10 @@ void send_keyboard_report(void) {}
 
 uint16_t charybdis_get_pointer_default_dpi(void) {
     return fake_default_dpi;
+}
+
+uint16_t charybdis_get_pointer_sniping_dpi(void) {
+    return fake_sniping_dpi;
 }
 
 void charybdis_set_pointer_dragscroll_enabled(bool enabled) {

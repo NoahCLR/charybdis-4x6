@@ -36,6 +36,7 @@ typedef struct {
     pd_mode_owner_slot_t local_key_owners[PD_MODE_OWNER_SLOT_CAPACITY];
     bool                 synthetic_auto_mouse_anchor_active;
     bool                 active_dpi_sync_pending;
+    bool                 auto_sniping_layer_active;
 } pd_mode_runtime_shared_state_t;
 
 pd_mode_runtime_shared_state_t *pd_mode_runtime_shared_state(void);

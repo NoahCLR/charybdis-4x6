@@ -1205,3 +1205,59 @@ Next steps:
 
 1. Flash and verify that branch color duration now lines up with the action
    model for `LEFT_THUMB`, stacked PD modes, and terminal tap branches.
+
+### Auto-Sniping Layer DPI Transition Fix
+
+- Hardware repro was narrowed to holding the right-side
+  `LT(LAYER_NAV, KC_SLSH)` from a non-NAV layer. Tapping still worked, and the
+  hold did not reproduce when `LAYER_NAV` was already active.
+- Root cause: the auto-sniping layer transition called the Charybdis sniping
+  setter from `layer_state_set_user()`. In upstream Charybdis that setter
+  immediately updates pointing CPI, so the layer hook was performing a
+  synchronous pointing-device write before the existing scan-time DPI sync.
+- Changed `noah_layer_state_set_user()` to store auto-sniping layer state in
+  userspace and queue the active DPI policy for scan-time service instead of
+  mutating the upstream sniping flag.
+- Updated `pd_mode_apply_active_dpi()` so dragscroll-backed modes keep first
+  priority, auto/manual sniping uses Charybdis's configured sniping CPI, active
+  modes can apply their own DPI, and the default Charybdis CPI is restored when
+  no special owner is active.
+- Added host regression coverage for the reported right NAV hold: pressing the
+  key activates NAV and marks auto-sniping active without flipping the upstream
+  sniping flag or writing CPI from the press path; the scan path applies
+  sniping CPI; release restores the default CPI.
+- Inspected upstream Charybdis pointing behavior in `../bastardkb-qmk`; no
+  sibling workspace files were edited.
+- The first full-host pass exposed stale generated profile introspection output
+  for the current authored pointer-layer combo set. Regenerated the overview
+  and reran the full suite successfully.
+
+Verification passed:
+
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and retest holding and tapping `LT(LAYER_NAV, KC_SLSH)` from BASE.
+2. Smoke-test the same hold while already on `LAYER_NAV`, plus NAV
+   dragscroll/pointer-mode CPI behavior.

@@ -22,7 +22,8 @@ Across the current pd-mode runtime:
 
 One important non-rule:
 
-- auto-sniping is not a pd mode
+- auto-sniping is not a pd mode; it is layer state whose CPI change is applied
+  by the shared scan-time DPI policy
 
 ## Pointer-Layer Policy
 

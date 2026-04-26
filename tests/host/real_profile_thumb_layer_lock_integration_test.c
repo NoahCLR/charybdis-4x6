@@ -769,6 +769,10 @@ uint16_t charybdis_get_pointer_default_dpi(void) {
     return 800;
 }
 
+uint16_t charybdis_get_pointer_sniping_dpi(void) {
+    return 350;
+}
+
 void charybdis_set_pointer_dragscroll_enabled(bool enabled) {
     dragscroll_enabled = enabled;
 }
@@ -1581,6 +1585,15 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
 
     test_press_resolved(nav_hold_pos);
     CHECK(test_layer_active(LAYER_NAV));
+    CHECK(pd_mode_auto_sniping_layer_active());
+    CHECK(!sniping_enabled);
+    CHECK(current_cpi == 0);
+
+    key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(pd_mode_auto_sniping_layer_active());
+    CHECK(!sniping_enabled);
+    CHECK(current_cpi == charybdis_get_pointer_sniping_dpi());
 
     key_runtime_integration_advance(&fake_time, 20);
     CHECK(test_resolve_keycode(nav_left_pos) == KC_LEFT);
@@ -1599,6 +1612,9 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
     CHECK(test_tap_code16_count == 1);
     CHECK(test_delayed_action_count == 0);
     CHECK(test_last_delayed_action == KC_NO);
+    CHECK(!pd_mode_auto_sniping_layer_active());
+    CHECK(!sniping_enabled);
+    CHECK(current_cpi == charybdis_get_pointer_default_dpi());
 }
 
 static void test_right_thumb_hold_dispatches_nav_taps_immediately(void) {

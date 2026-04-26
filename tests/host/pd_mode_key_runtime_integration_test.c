@@ -144,6 +144,7 @@ const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 static uint16_t              fake_time;
 static uint16_t              current_cpi;
 static uint16_t              default_dpi;
+static uint16_t              sniping_dpi;
 static uint8_t               split_sync_count;
 static uint8_t               reset_volume_count;
 static uint8_t               layer_state_set_count;
@@ -248,6 +249,7 @@ static void test_reset_state(void) {
     fake_time                              = 1000;
     current_cpi                            = 0;
     default_dpi                            = 900;
+    sniping_dpi                            = 350;
     split_sync_count                       = 0;
     reset_volume_count                     = 0;
     layer_state_set_count                  = 0;
@@ -663,6 +665,10 @@ bool charybdis_get_pointer_sniping_enabled(void) {
 
 uint16_t charybdis_get_pointer_default_dpi(void) {
     return default_dpi;
+}
+
+uint16_t charybdis_get_pointer_sniping_dpi(void) {
+    return sniping_dpi;
 }
 
 void charybdis_set_pointer_dragscroll_enabled(bool enabled) {

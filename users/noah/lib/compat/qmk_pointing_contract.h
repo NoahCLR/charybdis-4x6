@@ -29,6 +29,10 @@ static inline uint16_t noah_qmk_contract_pointer_default_dpi(void) {
     return charybdis_get_pointer_default_dpi();
 }
 
+static inline uint16_t noah_qmk_contract_pointer_sniping_dpi(void) {
+    return charybdis_get_pointer_sniping_dpi();
+}
+
 static inline uint16_t noah_qmk_contract_pointer_dragscroll_dpi(void) {
     return CHARYBDIS_DRAGSCROLL_DPI;
 }
@@ -42,6 +46,10 @@ static inline void noah_qmk_contract_pointer_set_sniping_enabled(bool enable) {
 }
 
 static inline uint16_t noah_qmk_contract_pointer_default_dpi(void) {
+    return 0;
+}
+
+static inline uint16_t noah_qmk_contract_pointer_sniping_dpi(void) {
     return 0;
 }
 

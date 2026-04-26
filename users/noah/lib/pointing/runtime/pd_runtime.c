@@ -124,11 +124,11 @@ layer_state_t noah_layer_state_set_user(layer_state_t state) {
 
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET);
 #ifdef POINTING_DEVICE_ENABLE
+    bool auto_sniping_active = false;
 #    if defined(CHARYBDIS_AUTO_SNIPING_ENABLE)
-    noah_qmk_contract_pointer_set_sniping_enabled(layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER));
-#    else
-    noah_qmk_contract_pointer_set_sniping_enabled(false);
+    auto_sniping_active = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
 #    endif
+    pd_mode_set_auto_sniping_layer_active(auto_sniping_active);
     // Sniping can temporarily own CPI, so queue a re-apply of the active
     // pd-mode DPI policy after the layer-owned sniping state changes. Service
     // the actual hardware write on scan instead of from this layer hook.

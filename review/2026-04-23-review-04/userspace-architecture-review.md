@@ -155,6 +155,16 @@ None.
   `users/noah/lib/key/runtime/core/runtime.c`,
   `tests/host/key_runtime_scenario_test.c`, and
   `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
+- Auto-sniping layer transitions now use userspace shadow state plus the
+  scan-time DPI policy instead of mutating Charybdis's sniping flag from
+  `layer_state_set_user()`. Manual Charybdis sniping keycodes still flow
+  through the upstream flag, and `pd_mode_apply_active_dpi()` honors both
+  manual sniping and the auto-sniping layer with Charybdis's configured
+  sniping CPI. Code references:
+  `users/noah/lib/pointing/runtime/pd_runtime.c`,
+  `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`,
+  `users/noah/lib/compat/qmk_pointing_contract.h`, and
+  `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
 
 ## Non-Findings
 
@@ -199,6 +209,13 @@ renders semantic state exported by the key runtime instead of duplicating tap,
 hold, longer-hold, multi-tap, combo-origin, or PD ownership logic.
 The PD projection exported by the key runtime now also tracks explicit
 held-action branches whose PD mode differs from the physical trigger key.
+Pointer CPI ownership is centralized in the scan-time PD DPI policy:
+dragscroll-backed modes have priority, auto/manual sniping uses Charybdis's
+configured sniping CPI, active modes can apply their own DPI overrides, and
+the default Charybdis CPI is restored when nothing else owns it. The layer hook
+records whether the configured auto-sniping layer is active and queues a DPI
+sync; it does not write pointing hardware or mutate the upstream sniping flag
+while handling the layer transition.
 Stacked pd-mode keys now have runtime containment instead of relying on the
 keymap to author an explicit first hold. If a pd-mode key has a first-tap
 override and a later tap-count hold can enter a different pd mode, the
