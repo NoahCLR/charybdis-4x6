@@ -233,8 +233,16 @@ For release-hold branches such as `LEFT_THUMB` double-tap hold to `KC_ESC`,
 branch feedback is independent from tap-commit feedback. This matters when the
 release event itself is the first event after `tap_hold_term`: the runtime can
 still emit the committed-branch pulse before clearing the slot and dispatching
-the release-hold action. The scanned threshold path remains covered by steady
-hold-pending feedback until release dispatches the action.
+the release-hold action. Release-hold branches also queue hold-tier action
+feedback after the branch pulse when release would otherwise clear the steady
+hold-pending state too quickly. The scanned threshold path remains covered by
+steady hold-pending feedback until release dispatches the action, with the same
+queued action-feedback fallback if release happens during the branch pulse.
+When a higher hold tier commits while an older branch or lower-tier pulse is
+still active, the higher-tier action feedback replaces that older pulse because
+the runtime behavior has already changed. This keeps the visible state aligned
+with behavior for paths such as `LEFT_THUMB` double-tap hold crossing into
+`LOCK_LAYER(LAYER_NUM)`.
 
 Pending multi-tap dispatch is intentionally split by destination: foreign
 handled keys keep independent authored pending chains, while foreign

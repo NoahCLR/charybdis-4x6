@@ -993,3 +993,97 @@ Next steps:
 2. If any of those still fail on hardware, use the existing runtime trace
    points around preflight, delayed dispatch, release resolution, and PD
    lifecycle with these narrowed repros.
+
+### Release-Hold Feedback Sequencing
+
+- Hardware testing confirmed Shift OSM is fixed, but the release-hold feedback
+  sequence still made branch confirmation and `.hold` action feedback feel
+  visually overlapped.
+- Root cause: `TAP_ON_RELEASE_AFTER_HOLD(...)` branches could clear the
+  release-hold slot while the branch-confirmation pulse was still active. When
+  that happened, the steady hold-pending semantic disappeared before it had its
+  own clean visible window.
+- Updated pending multi-tap release planning so release-hold actions can queue
+  hold-tier action feedback after the branch-confirmation pulse when release
+  itself crosses the hold threshold.
+- Updated pending multi-tap scan planning so the scanned release-hold-pending
+  path also queues hold-tier feedback behind the branch pulse. If the key is
+  released during the branch pulse, the queued hold feedback still remains
+  visible afterward.
+- Added real-profile coverage for both `LEFT_THUMB` release-crossing-threshold
+  and release-during-branch cases: branch color first, hold feedback second,
+  then no stale runtime state.
+- Updated `docs/RGB_CONFIG.md` and the architecture note to describe the queued
+  release-hold feedback behavior.
+
+Verification passed:
+
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and retest the double-tap hold `LEFT_THUMB` to `KC_ESC` path. The
+   intended sequence is branch color, then hold/action feedback color, even if
+   release happens during the branch pulse.
+2. If the two feedback windows still feel too compressed on hardware, consider
+   increasing `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` rather than
+   changing dispatch timing.
+
+### Higher-Tier Feedback Alignment
+
+- Hardware testing showed the release-hold feedback sequence was better, but
+  still not aligned with behavior: releasing while an older feedback color was
+  visible could still leave `LOCK_LAYER(LAYER_NUM)` active because the
+  long-hold threshold had already committed underneath that feedback.
+- Root cause: older branch or lower-tier pulses were allowed to keep painting
+  after a higher hold tier actually fired. For `LEFT_THUMB`, the double-tap
+  hold branch can move from release-hold `KC_ESCAPE` into the long-hold
+  `LOCK_LAYER(LAYER_NUM)` action while a previous branch pulse is still active.
+- Added a replace-active feedback pulse path for threshold hold actions. If a
+  higher tier commits after branch feedback was already shown, the higher-tier
+  feedback replaces the older pulse immediately instead of waiting behind it.
+- Stopped queueing hold feedback from the scan-only release-hold-pending path;
+  hold feedback is queued on release when needed, while a still-held key uses
+  live token state until a higher tier actually commits.
+- Added real-profile coverage that deliberately starts branch feedback late,
+  crosses the `LAYER_NUM` long-hold threshold while that branch pulse is still
+  visible, and asserts the visible semantic becomes long-hold feedback with no
+  stale tap-branch color.
+- Updated README, `docs/KEYMAP.md`, `docs/RGB_CONFIG.md`, and the architecture
+  note to state that higher-tier behavior replaces older feedback once it
+  commits.
+
+Verification passed:
+
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and verify that once NUM has actually committed, the visible feedback
+   no longer suggests the earlier ESC hold path is still available.

@@ -1191,8 +1191,78 @@ static void test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pu
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
     key_runtime_integration_advance(&fake_time, RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS + 1);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
+
+    key_runtime_integration_advance(&fake_time, RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS + 1);
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
     test_assert_thumb_runtime_quiescent(key_pos);
+}
+
+static void test_left_thumb_double_tap_hold_escape_release_during_branch_keeps_hold_feedback_pulse(void) {
+    keypos_t key_pos      = test_left_thumb_pos();
+    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+
+    test_reset_state();
+
+    CHECK(test_resolve_keycode(key_pos) == base_keycode);
+    test_press_resolved(key_pos);
+    test_release_resolved(key_pos);
+
+    key_runtime_integration_advance(&fake_time, 40);
+    test_press_resolved(key_pos);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
+    key_runtime_integration_scan();
+
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
+
+    test_release_resolved(key_pos);
+
+    CHECK(test_delayed_action_count == 1u);
+    CHECK(test_last_delayed_action == KC_ESC);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
+
+    key_runtime_integration_advance(&fake_time, RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS + 1);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
+
+    key_runtime_integration_advance(&fake_time, RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS + 1);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
+    test_assert_thumb_runtime_quiescent(key_pos);
+}
+
+static void test_left_thumb_double_tap_long_hold_num_feedback_replaces_branch(void) {
+    keypos_t key_pos      = test_left_thumb_pos();
+    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+    uint16_t branch_scan_elapsed = (uint16_t)(CUSTOM_TAP_HOLD_TERM + 100u);
+
+    test_reset_state();
+
+    CHECK(test_resolve_keycode(key_pos) == base_keycode);
+    test_press_resolved(key_pos);
+    test_release_resolved(key_pos);
+
+    key_runtime_integration_advance(&fake_time, 40);
+    test_press_resolved(key_pos);
+
+    key_runtime_integration_advance(&fake_time, branch_scan_elapsed);
+    key_runtime_integration_scan();
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
+
+    key_runtime_integration_advance(&fake_time, (uint16_t)(CUSTOM_LONGER_HOLD_TERM - branch_scan_elapsed + 1u));
+    key_runtime_integration_scan();
+
+    CHECK(test_layer_locked(LAYER_NUM));
+    CHECK(test_layer_active(LAYER_NUM));
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
+
+    test_release_resolved(key_pos);
+    CHECK(test_layer_locked(LAYER_NUM));
 }
 
 static void test_left_and_right_thumb_single_taps_keep_independent_pending_chains(void) {
@@ -2525,6 +2595,8 @@ int main(void) {
     test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle();
     test_left_thumb_double_tap_hold_escape_feedback_sequence();
     test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pulses_branch();
+    test_left_thumb_double_tap_hold_escape_release_during_branch_keeps_hold_feedback_pulse();
+    test_left_thumb_double_tap_long_hold_num_feedback_replaces_branch();
     test_left_and_right_thumb_single_taps_keep_independent_pending_chains();
     test_right_thumb_triple_tap_flushes_next_track_after_timeout();
     test_right_thumb_triple_tap_long_hold_registers_next_track_hold();

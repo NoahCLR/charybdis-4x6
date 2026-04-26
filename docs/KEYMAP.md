@@ -235,7 +235,9 @@ really spans both sides.
 Pending multi-tap feedback uses a neutral unresolved color while the runtime is
 still deciding which tap index wins. After a branch commits, the current RGB
 config briefly shows the committed branch color before any tap, hold, or
-long-hold action feedback takes over.
+long-hold action feedback takes over. If a higher hold tier commits while an
+older feedback pulse is still visible, the higher-tier feedback takes over so
+the LEDs match the behavior that is now active.
 
 That `100 Hz` setting is also the current authored maximum: `100` repeats per
 second.

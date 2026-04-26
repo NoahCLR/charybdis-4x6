@@ -407,9 +407,16 @@ The helper decides the RGB behavior shape:
 
 - `TAP_AT_HOLD_THRESHOLD(...)`: pulse once when that tier commits
 - `TAP_ON_RELEASE_AFTER_HOLD(...)`: stay steadily lit while that tier is
-  pending release
+  pending release; if release happens while a branch-confirmation pulse is
+  still visible, the hold-tier action feedback is queued after the branch pulse
+  so both states get a visible window
 - `PRESS_AND_HOLD_UNTIL_RELEASE(...)` and `REPEAT_WHILE_HELD(...)`: flash while
   that tier remains active
+
+When a higher hold tier actually commits, such as a `.long_hold` threshold
+action, that action feedback replaces older branch or lower-tier feedback. RGB
+should not continue showing the lower-tier state after the runtime has already
+committed the higher-tier behavior.
 
 Held layer-switch actions are intentionally a special case: they get the short
 preview color before activation and the real layer color after activation, but

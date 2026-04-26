@@ -57,6 +57,7 @@ typedef struct {
             keypos_t key_pos;
             uint8_t  kind;
             uint8_t  tap_branch;
+            bool     replace_active;
         } feedback_pulse;
         struct {
             pd_mode_mask_t pd_mode;

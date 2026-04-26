@@ -238,7 +238,8 @@ The runtime supports:
 - optional truthful key-behavior state feedback on both halves, a fixed half,
   only the key half, or only the key itself
 - optional tap-branch confirmation colors so committed multi-tap and tap-hold
-  branches can show which branch won before action feedback takes over
+  branches can show which branch won before action feedback takes over, with
+  higher hold tiers replacing older feedback once their behavior commits
 - optional key-behavior feedback LED group highlights
 
 With the default feedback stages enabled, RGB is not just there to look nice.

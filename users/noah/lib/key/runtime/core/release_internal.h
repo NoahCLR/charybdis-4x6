@@ -41,6 +41,8 @@ typedef struct {
     uint8_t                                              repeat_count;
     bool                                                 tap_branch_feedback;
     bool                                                 tap_commit_feedback;
+    bool                                                 action_feedback;
+    key_feedback_pulse_kind_t                            action_feedback_kind;
     uint8_t                                              tap_count;
 } key_runtime_core_pending_multi_tap_release_resolution_t;
 
