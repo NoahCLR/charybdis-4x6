@@ -269,6 +269,10 @@ static bool test_process_combo_output(uint16_t keycode, bool pressed) {
     };
     bool keep_processing;
 
+    if (!noah_pre_process_record_user(keycode, &record)) {
+        return false;
+    }
+
     keep_processing = noah_process_record_user(keycode, &record);
     if (!keep_processing) {
         noah_process_record_user_finalize(keycode, &record, false);
@@ -1513,7 +1517,7 @@ static void test_pointer_volume_exact_third_tap_defers_mute_until_release(void) 
     test_pointer_terminal_double_tap_action_defers_on_exact_third_press(VOLUME_MODE, KC_MUTE);
 }
 
-static void test_click_spam_combo_uses_last_chord_key_as_runtime_owner(void) {
+static void test_click_spam_combo_uses_authored_combo_owner(void) {
     static const uint16_t click_spam_combo_keys[] = {
         MS_BTN1,
         MS_BTN2,
@@ -1570,6 +1574,89 @@ static void test_click_spam_combo_uses_last_chord_key_as_runtime_owner(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0u);
     CHECK(noah_runtime_debug_slot_owner_keycode(btn2_pos) == KC_NO);
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+}
+
+static void test_cmd_combo_double_tap_hold_uses_stable_owner_across_press_order(void) {
+    static const uint16_t cmd_combo_keys[] = {
+        KC_N,
+        KC_M,
+    };
+
+    keypos_t n_pos;
+    keypos_t m_pos;
+    int16_t  combo_index;
+    uint16_t combo_keycode;
+
+    test_reset_state();
+
+    n_pos = test_find_keypos_on_layer(LAYER_BASE, KC_N);
+    m_pos = test_find_keypos_on_layer(LAYER_BASE, KC_M);
+
+    CHECK(test_keypos_valid(n_pos));
+    CHECK(test_keypos_valid(m_pos));
+    CHECK(test_resolve_keycode(n_pos) == KC_N);
+    CHECK(test_resolve_keycode(m_pos) == KC_M);
+
+    combo_index = test_find_combo_index_for_exact_keys(cmd_combo_keys, ARRAY_SIZE(cmd_combo_keys));
+    CHECK(combo_index >= 0);
+    combo_keycode = key_combos[combo_index].keycode;
+    CHECK(combo_keycode == KC_LEFT_GUI);
+
+    test_observe_combo_member(n_pos, true);
+    test_observe_combo_member(m_pos, true);
+    key_combos[combo_index].active = true;
+    CHECK(!test_process_combo_output(combo_keycode, true));
+    CHECK(noah_runtime_debug_slot_owner_keycode(m_pos) == KC_LEFT_GUI);
+    CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0u);
+
+    key_combos[combo_index].active = false;
+    test_observe_combo_member(m_pos, false);
+    test_observe_combo_member(n_pos, false);
+    CHECK(!test_process_combo_output(combo_keycode, false));
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(m_pos) == 1u);
+    CHECK(test_feedback_semantic_for_key(m_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM - 10u);
+
+    test_observe_combo_member(m_pos, true);
+    test_observe_combo_member(n_pos, true);
+
+    CHECK(test_feedback_semantic_for_key(m_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
+    CHECK(test_feedback_semantic_for_key(n_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
+
+    key_runtime_integration_advance(&fake_time, COMBO_TERM + 1u);
+    test_observe_combo_member(n_pos, false);
+
+    key_combos[combo_index].active = true;
+    CHECK(!test_process_combo_output(combo_keycode, true));
+    CHECK(noah_runtime_debug_slot_owner_keycode(m_pos) == KC_LEFT_GUI);
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_holding(m_pos));
+    CHECK((fake_mods & (MOD_BIT(KC_LEFT_GUI) | MOD_BIT(KC_LEFT_ALT))) == 0u);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1u);
+    key_runtime_integration_scan();
+
+    CHECK(noah_runtime_debug_slot_owner_keycode(m_pos) == KC_LEFT_GUI);
+    CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(m_pos));
+    CHECK(test_feedback_semantic_for_key(m_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+
+    test_finish_tap_branch_confirmation();
+
+    CHECK(noah_runtime_debug_slot_held_action_keycode(m_pos) == KC_LEFT_ALT);
+    CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) != 0u);
+    CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0u);
+
+    key_combos[combo_index].active = false;
+    test_observe_combo_member(m_pos, false);
+    CHECK(!test_process_combo_output(combo_keycode, false));
+    key_runtime_integration_scan();
+
+    CHECK(noah_runtime_debug_slot_owner_keycode(m_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(m_pos) == KC_NO);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+    CHECK(fake_mods == 0u);
+    CHECK(fake_managed_mods == 0u);
+    CHECK(fake_physical_mods == 0u);
 }
 
 static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
@@ -2723,7 +2810,8 @@ int main(void) {
     test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly();
     test_pointer_pinch_exact_third_tap_defers_zoom_chord_until_release();
     test_pointer_volume_exact_third_tap_defers_mute_until_release();
-    test_click_spam_combo_uses_last_chord_key_as_runtime_owner();
+    test_click_spam_combo_uses_authored_combo_owner();
+    test_cmd_combo_double_tap_hold_uses_stable_owner_across_press_order();
     test_right_nav_layer_hold_dispatches_nav_taps_immediately();
     test_right_thumb_hold_dispatches_nav_taps_immediately();
     test_raw_nav_layer_hold_enters_dragscroll_mode_cleanly();

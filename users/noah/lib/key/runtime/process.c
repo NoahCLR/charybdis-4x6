@@ -200,12 +200,12 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
         return true;
     }
 
-    if (key_origin_keypos_valid(record->event.key)) {
+    if (record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key)) {
         key_origin_registry_set_single(record->event.key);
         noah_qmk_combo_origin_observe_physical_key_event(keycode, record);
+        keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     }
 
-    keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     return true;
 }
 

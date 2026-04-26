@@ -74,8 +74,8 @@ dedicate a physical key to every role:
 - `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, and `LAYER_POINTER` split number
   entry, symbols, navigation/system control, and pointer utilities into
   distinct surfaces
-- a small combo set adds a chorded `Tab` and a pointer-side `CLICK_SPAM`
-  utility without turning the layout into a combo-heavy board
+- a small combo set adds chorded `Tab`, pointer-side `CLICK_SPAM`, and
+  right-side Cmd paths without turning the layout into a combo-heavy board
 - the current profile leans macOS-first, especially in launcher, editing, and
   system shortcuts
 
@@ -164,6 +164,12 @@ feedback can stay on the relevant key or half, and `RGB_KEY_HALF`
 can broaden to both halves when a combo spans both sides of the board.
 `RGB_KEYS_ONLY` can narrow the same PD ownership truth to the
 exact triggering key footprint.
+
+The runtime also remembers a complete physical combo while QMK's combo buffer
+is waiting out `COMBO_TERM`, including the quick-tap path where a member has
+already released before QMK emits the combo output. Combo-backed multi-tap
+behaviors that complete inside their authored tap window therefore do not lose
+that tap chain to QMK's output delay.
 
 That footprint tracking follows the live resolved keycodes QMK sees, so dynamic
 keymap changes remain authoritative. It is not guessed from static comments or

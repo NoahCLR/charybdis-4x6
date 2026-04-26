@@ -65,6 +65,26 @@ static void key_feedback_apply_semantic_to_bitmap(uint8_t *semantic_map, const u
     }
 }
 
+static void key_feedback_clear_semantic_from_bitmap(uint8_t *semantic_map, const uint8_t *bitmap, key_feedback_semantic_t semantic) {
+    if (!(semantic_map && bitmap && semantic != KEY_FEEDBACK_SEMANTIC_NONE)) {
+        return;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            keypos_t key_pos = {.row = row, .col = col};
+
+            if (!key_origin_bitmap_has_keypos(bitmap, key_pos)) {
+                continue;
+            }
+
+            if (key_feedback_semantic_map_get(semantic_map, key_pos) == semantic) {
+                key_feedback_semantic_map_set(semantic_map, key_pos, KEY_FEEDBACK_SEMANTIC_NONE);
+            }
+        }
+    }
+}
+
 static void key_feedback_apply_semantic_for_owner(uint8_t *semantic_map, keypos_t owner_key_pos, key_feedback_semantic_t semantic) {
     uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
 
@@ -355,6 +375,13 @@ void key_feedback_semantic_map(uint8_t *out_map) {
         }
 
         key_feedback_apply_semantic_for_owner(out_map, key_pos, semantic);
+    }
+
+    if (state) {
+        uint8_t pressed_combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+        noah_qmk_combo_origin_pressed_combo_bitmap(pressed_combo_bitmap);
+        key_feedback_clear_semantic_from_bitmap(out_map, pressed_combo_bitmap, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
     }
 }
 

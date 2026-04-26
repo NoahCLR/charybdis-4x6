@@ -18,6 +18,7 @@ layer_state_t layer_state         = 0;
 layer_state_t default_layer_state = (layer_state_t)1u << LAYER_BASE;
 
 static uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
+static uint16_t fake_time;
 
 static const uint16_t combo_keys_left[] = {
     KC_A,
@@ -111,10 +112,15 @@ static void test_reset_combo_state(void) {
 static void test_reset(void) {
     layer_state         = 0;
     default_layer_state = (layer_state_t)1u << LAYER_BASE;
+    fake_time           = 1000u;
     test_reset_keymaps();
     test_reset_combo_state();
     key_origin_registry_reset();
     noah_qmk_combo_origin_reset();
+}
+
+uint16_t timer_read(void) {
+    return fake_time;
 }
 
 uint8_t get_highest_layer(layer_state_t state) {
@@ -200,6 +206,89 @@ static void test_single_half_combo_uses_last_key_from_combo_ref_layer(void) {
     CHECK(test_bitmap_has(bitmap, 0, 0));
     CHECK(test_bitmap_has(bitmap, 1, 0));
     CHECK(noah_qmk_combo_origin_event_side_mask(&combo_record) == SPLIT_SIDE_MASK_LEFT);
+}
+
+static void test_combo_owner_is_stable_when_member_press_order_changes(void) {
+    keyrecord_t combo_record = test_combo_record(true);
+    uint8_t     bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    keypos_t    owner_key_pos;
+
+    test_reset();
+
+    test_observe_physical_key(test_key(1, 0), true);
+    test_observe_physical_key(test_key(0, 0), true);
+    key_combos[0].active = true;
+
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &combo_record);
+
+    CHECK(noah_qmk_combo_origin_event_owner_keypos(&combo_record, &owner_key_pos));
+    CHECK(owner_key_pos.row == 1);
+    CHECK(owner_key_pos.col == 0);
+    CHECK(noah_qmk_combo_origin_event_bitmap(&combo_record, bitmap));
+    CHECK(test_bitmap_has(bitmap, 0, 0));
+    CHECK(test_bitmap_has(bitmap, 1, 0));
+}
+
+static void test_pressed_combo_bitmap_reports_complete_physical_combo(void) {
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+
+    test_observe_physical_key(test_key(0, 0), true);
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(!key_origin_bitmap_has_any(bitmap));
+
+    test_observe_physical_key(test_key(1, 0), true);
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(test_bitmap_has(bitmap, 0, 0));
+    CHECK(test_bitmap_has(bitmap, 1, 0));
+}
+
+static void test_pressed_combo_match_reports_pending_output_owner(void) {
+    test_reset();
+
+    test_observe_physical_key(test_key(1, 0), true);
+    CHECK(!noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LEFT, test_key(1, 0), fake_time, COMBO_TERM));
+
+    fake_time = (uint16_t)(fake_time + 20u);
+    test_observe_physical_key(test_key(0, 0), true);
+    CHECK(noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LEFT, test_key(1, 0), (uint16_t)(fake_time - 20u), 20u));
+    CHECK(!noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LEFT, test_key(1, 0), (uint16_t)(fake_time - 21u), 20u));
+    CHECK(!noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LEFT, test_key(0, 0), (uint16_t)(fake_time - 20u), 20u));
+    CHECK(!noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_BOTH, test_key(1, 0), (uint16_t)(fake_time - 20u), 20u));
+}
+
+static void test_pending_combo_output_survives_member_release(void) {
+    keyrecord_t combo_press   = test_combo_record(true);
+    keyrecord_t combo_release = test_combo_record(false);
+    uint8_t     bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    keypos_t    owner_key_pos;
+
+    test_reset();
+
+    test_observe_physical_key(test_key(0, 0), true);
+    fake_time = (uint16_t)(fake_time + 20u);
+    test_observe_physical_key(test_key(1, 0), true);
+    CHECK(noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LEFT, test_key(1, 0), (uint16_t)(fake_time - 20u), 20u));
+
+    test_observe_physical_key(test_key(1, 0), false);
+    key_combos[0].active = true;
+
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &combo_press);
+
+    CHECK(noah_qmk_combo_origin_event_owner_keypos(&combo_press, &owner_key_pos));
+    CHECK(owner_key_pos.row == 1);
+    CHECK(owner_key_pos.col == 0);
+    CHECK(noah_qmk_combo_origin_event_bitmap(&combo_press, bitmap));
+    CHECK(test_bitmap_has(bitmap, 0, 0));
+    CHECK(test_bitmap_has(bitmap, 1, 0));
+    CHECK(noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LEFT, test_key(1, 0), (uint16_t)(fake_time - 20u), 20u));
+
+    key_combos[0].active = false;
+    test_observe_physical_key(test_key(0, 0), false);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &combo_release);
+
+    CHECK(!noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LEFT, test_key(1, 0), (uint16_t)(fake_time - 20u), 20u));
 }
 
 static void test_combo_release_uses_cached_footprint_after_physical_releases(void) {
@@ -293,7 +382,7 @@ static void test_duplicate_output_active_combos_union_to_both_sides(void) {
     CHECK(noah_qmk_combo_origin_event_side_mask(&combo_record) == SPLIT_SIDE_MASK_BOTH);
 }
 
-static void test_unresolved_combo_press_broadens_to_both_sides(void) {
+static void test_pending_combo_press_uses_exact_pending_footprint(void) {
     keyrecord_t combo_record = test_combo_record(true);
     uint8_t     bitmap[KEY_ORIGIN_BITMAP_SIZE];
 
@@ -307,12 +396,12 @@ static void test_unresolved_combo_press_broadens_to_both_sides(void) {
     CHECK(combo_record.event.key.row == 4);
     CHECK(combo_record.event.key.col == 0);
     CHECK(noah_qmk_combo_origin_event_bitmap(&combo_record, bitmap));
-    CHECK(test_bitmap_has(bitmap, 0, 0));
-    CHECK(test_bitmap_has(bitmap, 5, 2));
+    CHECK(test_bitmap_has(bitmap, 0, 1));
+    CHECK(test_bitmap_has(bitmap, 4, 0));
     CHECK(noah_qmk_combo_origin_event_side_mask(&combo_record) == SPLIT_SIDE_MASK_BOTH);
 }
 
-static void test_unresolved_combo_release_uses_cached_broad_fallback(void) {
+static void test_pending_combo_release_uses_cached_exact_footprint(void) {
     keyrecord_t combo_press   = test_combo_record(true);
     keyrecord_t combo_release = test_combo_record(false);
     uint8_t     bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -331,8 +420,8 @@ static void test_unresolved_combo_release_uses_cached_broad_fallback(void) {
     CHECK(combo_release.event.key.row == 4);
     CHECK(combo_release.event.key.col == 0);
     CHECK(noah_qmk_combo_origin_event_bitmap(&combo_release, bitmap));
-    CHECK(test_bitmap_has(bitmap, 0, 0));
-    CHECK(test_bitmap_has(bitmap, 5, 2));
+    CHECK(test_bitmap_has(bitmap, 0, 1));
+    CHECK(test_bitmap_has(bitmap, 4, 0));
     CHECK(noah_qmk_combo_origin_event_side_mask(&combo_release) == SPLIT_SIDE_MASK_BOTH);
 }
 
@@ -420,12 +509,16 @@ static void test_active_combo_partition_routes_preview_and_pd_owners_to_underlay
 
 int main(void) {
     test_single_half_combo_uses_last_key_from_combo_ref_layer();
+    test_combo_owner_is_stable_when_member_press_order_changes();
+    test_pressed_combo_bitmap_reports_complete_physical_combo();
+    test_pressed_combo_match_reports_pending_output_owner();
+    test_pending_combo_output_survives_member_release();
     test_combo_release_uses_cached_footprint_after_physical_releases();
     test_cross_half_combo_reports_both_sides();
     test_three_key_combo_bitmap_contains_all_members();
     test_duplicate_output_active_combos_union_to_both_sides();
-    test_unresolved_combo_press_broadens_to_both_sides();
-    test_unresolved_combo_release_uses_cached_broad_fallback();
+    test_pending_combo_press_uses_exact_pending_footprint();
+    test_pending_combo_release_uses_cached_exact_footprint();
     test_reset_clears_cached_combo_origin_state();
     test_active_combo_partition_routes_preview_owner_to_underlay();
     test_active_combo_partition_routes_preview_and_pd_owners_to_underlay();

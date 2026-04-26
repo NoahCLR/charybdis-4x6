@@ -88,6 +88,51 @@ static void rgb_runtime_key_feedback_stage_current_tap_branch_map(uint8_t *out_m
     memcpy(out_map, split_runtime_sync_remote.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
 }
 
+static void rgb_runtime_key_feedback_stage_current_combo_bitmap(uint8_t *out_bitmap) {
+    uint8_t overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    if (!out_bitmap) {
+        return;
+    }
+
+    if (is_keyboard_master()) {
+        combo_feedback_underlay_bitmap(out_bitmap);
+        combo_feedback_overlay_bitmap(overlay_bitmap);
+    } else {
+        key_origin_bitmap_copy(out_bitmap, split_runtime_sync_remote.combo_underlay_bitmap);
+        key_origin_bitmap_copy(overlay_bitmap, split_runtime_sync_remote.combo_overlay_bitmap);
+    }
+
+    key_origin_bitmap_or_inplace(out_bitmap, overlay_bitmap);
+}
+
+static void rgb_runtime_key_feedback_stage_clear_semantic_for_bitmap(uint8_t *semantic_map, const uint8_t *bitmap, key_feedback_semantic_t semantic) {
+    if (!(semantic_map && bitmap && semantic != KEY_FEEDBACK_SEMANTIC_NONE)) {
+        return;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            keypos_t key_pos = {.row = row, .col = col};
+
+            if (key_origin_bitmap_has_keypos(bitmap, key_pos) && key_feedback_semantic_map_get(semantic_map, key_pos) == semantic) {
+                key_feedback_semantic_map_set(semantic_map, key_pos, KEY_FEEDBACK_SEMANTIC_NONE);
+            }
+        }
+    }
+}
+
+static void rgb_runtime_key_feedback_stage_suppress_combo_unresolved_semantics(uint8_t *semantic_map) {
+    uint8_t combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    if (!semantic_map) {
+        return;
+    }
+
+    rgb_runtime_key_feedback_stage_current_combo_bitmap(combo_bitmap);
+    rgb_runtime_key_feedback_stage_clear_semantic_for_bitmap(semantic_map, combo_bitmap, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+}
+
 static uint8_t rgb_runtime_key_feedback_stage_current_flash_meta(void) {
     return is_keyboard_master() ? key_feedback_flash_meta() : split_runtime_sync_remote.key_feedback_flash_meta;
 }
@@ -411,6 +456,7 @@ static bool rgb_runtime_key_feedback_stage_render_impl(uint8_t led_min, uint8_t 
 
     rgb_runtime_key_feedback_stage_current_semantic_map(semantic_map);
     rgb_runtime_key_feedback_stage_current_tap_branch_map(tap_branch_map);
+    rgb_runtime_key_feedback_stage_suppress_combo_unresolved_semantics(semantic_map);
     flash_meta = rgb_runtime_key_feedback_stage_current_flash_meta();
 
     painted |= rgb_runtime_key_feedback_stage_render_locality(semantic_map, tap_branch_map, flash_meta, led_min, led_max);

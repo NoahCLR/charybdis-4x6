@@ -82,9 +82,12 @@ The current combo set is intentionally small:
 
 - `KC_D` + `LT(LAYER_NAV, KC_F)` -> `KC_TAB`
 - `MS_BTN1` + `MS_BTN2` -> `CLICK_SPAM`
+- `KC_N` + `KC_M` -> `KC_LEFT_GUI`
+- `VOLUME_MODE` + `MS_BTN1` -> `KC_LEFT_GUI`
 
-That keeps the layout readable while still giving one easy chorded `Tab` and a
-single pointer-specific utility chord.
+That keeps the layout readable while still giving one easy chorded `Tab`, one
+pointer-specific utility chord, and two right-side paths to the authored
+`KC_LEFT_GUI` behavior row.
 
 Combo outputs now keep two runtime views at once:
 
@@ -97,6 +100,14 @@ broaden to both halves instead of pretending the combo came from only one
 side. `RGB_KEYS_ONLY` can use that same footprint to paint the
 exact combo keys. Combo and key-behavior feedback can also add custom LED
 group accents after their main locality render.
+
+Normal QMK combo outputs are buffered until QMK decides the chord is ready to
+emit. While that output is pending, the runtime keeps the pending multi-tap
+chain alive for the matching combo-owned behavior when the physical combo
+completed inside the authored multi-tap term, even if a combo member released
+before the buffered combo output arrived. It also hides stale unresolved tap
+feedback on the physical combo footprint, including stale mirrored feedback on
+the slave half when combo feedback has already synced.
 
 ## Signature Behaviors
 

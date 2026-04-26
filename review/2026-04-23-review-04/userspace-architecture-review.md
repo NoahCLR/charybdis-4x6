@@ -165,6 +165,29 @@ None.
   `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c`,
   `users/noah/lib/compat/qmk_pointing_contract.h`, and
   `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
+- Combo-origin normalization now gives each active combo a deterministic
+  runtime owner: the final authored combo member, not whichever physical member
+  happened to be pressed last. The full combo bitmap remains the source of
+  truth for RGB and PD locality. The same bridge also exposes complete
+  physically pressed combos whose QMK output is still buffered behind
+  `COMBO_TERM`; this pending-output signal is remembered even if a combo member
+  releases before QMK emits the buffered output. The key runtime uses that
+  generic signal to keep combo-backed multi-tap chains alive when the physical
+  combo completed inside the authored multi-tap term, and key-feedback
+  rendering uses the complete footprint to suppress stale unresolved tap
+  feedback during the buffer gap. The RGB key-feedback stage also suppresses
+  stale unresolved tap feedback on synced combo footprints so a slave half does
+  not render a one-packet-old pending branch over combo feedback.
+  `COMBO_EVENT` records are no longer treated as physical
+  `KEY_EVENT` records during pre-processing, so combo outputs that are consumed
+  by userspace do not create fake physical modifier ownership. Code references:
+  `users/noah/lib/compat/qmk_combo_origin.c`,
+  `users/noah/lib/key/runtime/core/runtime.c`,
+  `users/noah/lib/key/runtime/feedback.c`,
+  `users/noah/lib/key/runtime/process.c`,
+  `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`,
+  `tests/host/qmk_combo_origin_test.c`, and
+  `tests/host/real_profile_thumb_layer_lock_integration_test.c`.
 
 ## Non-Findings
 

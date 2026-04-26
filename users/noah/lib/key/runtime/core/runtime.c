@@ -18,6 +18,7 @@
 #include "../../ownership/held_action.h"
 #include "../../ownership/held_repeat.h"
 #include "../feedback.h"
+#include "../../../compat/qmk_combo_origin.h"
 #include "../../../state/ownership/keyboard_mod_ownership.h"
 #include "../../../state/ownership/layer_ownership.h"
 #include "../../../state/runtime/runtime_debug.h"
@@ -896,9 +897,20 @@ static uint16_t key_runtime_core_elapsed(uint16_t start, uint16_t end) {
     return (uint16_t)(end - start);
 }
 
-static bool key_runtime_core_tap_series_can_accept_press(const tap_series_t *series, uint16_t keycode, uint16_t now) {
+static bool key_runtime_core_tap_series_pending_combo_output(const key_runtime_core_state_t *state, const tap_series_t *series) {
+    keypos_t key_pos;
+
+    if (!(state && series && series->active)) {
+        return false;
+    }
+
+    key_pos = key_runtime_core_tap_series_resolve_key_pos(state, series);
+    return key_runtime_core_keypos_valid(key_pos) && noah_qmk_combo_origin_pressed_combo_matches(series->keycode, key_pos, series->last_tap_at, series->tap_term_ms);
+}
+
+static bool key_runtime_core_tap_series_can_accept_press(const key_runtime_core_state_t *state, const tap_series_t *series, uint16_t keycode, uint16_t now) {
     return series && series->active && !series->branch_confirmed && !series->branch_confirming && series->keycode == keycode && key_behavior_has_more_taps(series->keycode, series->tap_count) &&
-           key_runtime_core_elapsed(series->last_tap_at, now) <= series->tap_term_ms;
+           (key_runtime_core_elapsed(series->last_tap_at, now) <= series->tap_term_ms || key_runtime_core_tap_series_pending_combo_output(state, series));
 }
 
 static bool key_runtime_core_interaction_has_multi_tap(key_runtime_slot_interaction_t interaction) {
@@ -2051,7 +2063,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
         key_runtime_core_press_token_cancel(state, token, now);
     }
 
-    if (key_runtime_core_tap_series_can_accept_press(series, event->keycode, now)) {
+    if (key_runtime_core_tap_series_can_accept_press(state, series, event->keycode, now)) {
         tap_count = (uint8_t)(series->tap_count + 1u);
     }
 
@@ -2139,7 +2151,7 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
         return;
     }
 
-    reuse_existing   = key_runtime_core_tap_series_can_accept_press(series, token->resolved_keycode, now);
+    reuse_existing   = key_runtime_core_tap_series_can_accept_press(state, series, token->resolved_keycode, now);
     single_action    = reuse_existing ? series->single_action : token->resolved_keycode;
     tap_action       = token->resolved_keycode;
     tap_repeat_count = 0u;
@@ -3134,6 +3146,10 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
     }
 
     if (!series->pending_hold) {
+        if (key_runtime_core_tap_series_pending_combo_output(state, series)) {
+            return true;
+        }
+
         if (key_runtime_core_elapsed(series->last_tap_at, state->current_time) > series->tap_term_ms && key_runtime_core_pending_multi_tap_flush_resolution(series, &flush_action, &flush_repeat_count)) {
             uint8_t flush_tap_count = series->tap_count;
 
@@ -3822,7 +3838,7 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
     token_key_pos  = key_runtime_core_press_token_resolve_key_pos(state, token);
     series_key_pos = key_runtime_core_tap_series_resolve_key_pos(state, series);
 
-    if (series && series->active && !key_runtime_core_tap_series_can_accept_press(series, keycode, state->current_time)) {
+    if (series && series->active && !key_runtime_core_tap_series_can_accept_press(state, series, keycode, state->current_time)) {
         if (series->branch_confirming && series->branch_confirm_kind == KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION) {
             key_runtime_core_plan_same_key_branch_confirm_interruption(state, series, series_key_pos, plan);
         } else if (key_runtime_core_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
@@ -3833,7 +3849,7 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
         }
     }
 
-    if (key_runtime_core_tap_series_can_accept_press(series, keycode, state->current_time)) {
+    if (key_runtime_core_tap_series_can_accept_press(state, series, keycode, state->current_time)) {
         key_runtime_core_tap_series_update_for_press(state, series, token);
         if (token->interaction.binding.tap_resolves_on_press && !series->pending_hold) {
             key_runtime_core_effect_plan_push_dispatch_action(plan, token_key_pos, token->interaction.binding.tap_action);

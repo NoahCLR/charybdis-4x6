@@ -1261,3 +1261,84 @@ Next steps:
 1. Flash and retest holding and tapping `LT(LAYER_NAV, KC_SLSH)` from BASE.
 2. Smoke-test the same hold while already on `LAYER_NAV`, plus NAV
    dragscroll/pointer-mode CPI behavior.
+
+## 2026-04-26
+
+### Buffered Combo Multi-Tap Follow-Up
+
+- Hardware retesting showed the first combo-owner fix was incomplete: Cmd
+  combos could still miss the authored multi-tap path, and pending tap feedback
+  could still flash on the slave while the physical combo was already fully
+  held.
+- The remaining root cause is QMK's normal combo output buffering. QMK can see
+  the physical chord as complete, then wait out `COMBO_TERM` before emitting the
+  `COMBO_EVENT` output. During that gap, the key runtime previously only saw a
+  stale pending tap series and could either flash unresolved tap feedback or
+  flush the series before the combo output arrived. Hardware retesting also
+  exposed the quick-tap version of that race: QMK can emit the combo output
+  from a physical release event after userspace has already observed one combo
+  member as released.
+- Kept the stable representative owner change from the first pass: combo-origin
+  normalization now uses the combo definition's final authored member instead
+  of whichever member was physically pressed last. This keeps repeated combo
+  taps on one owner even when the physical press order changes.
+- Added a generic pressed-combo query to the QMK combo-origin bridge. The key
+  runtime now treats a remembered complete physical combo whose buffered output
+  matches a pending tap series, and whose physical completion happened inside
+  that series' authored multi-tap term, as an in-flight same-key press. The
+  remembered pending output survives member release until the matching
+  `COMBO_EVENT` release clears it, so the authored multi-tap chain survives
+  QMK's `COMBO_TERM` output delay without a `KC_LEFT_GUI` special case or a
+  per-key timing override.
+- Key-feedback rendering now clears only stale
+  `KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH` semantics across the complete
+  physical combo footprint while the buffered combo output is pending. Hold and
+  committed feedback semantics remain intact.
+- RGB key-feedback rendering also suppresses stale unresolved tap feedback on a
+  synced combo footprint. This covers the slave-side packet-order case where
+  combo feedback has arrived but the mirrored key-feedback map still contains
+  the previous pending tap branch for one render pass.
+- Stopped `noah_pre_process_record_user()` from treating QMK `COMBO_EVENT`
+  records as physical `KEY_EVENT` records for origin tracking and modifier
+  physical ownership. Combo events are still normalized in the normal
+  process-record path before runtime consumers see them.
+- Added host coverage for reversed combo member press order, complete physical
+  combo bitmap reporting, pending-output owner matching after member release,
+  remote RGB suppression of stale pending feedback on combo footprints, and the
+  authored `KC_N` + `KC_M` Cmd combo double-tap hold path arriving after
+  `CUSTOM_MULTI_TAP_TERM + COMBO_TERM` with one combo member already released.
+- Updated `README.md` and `docs/KEYMAP.md` to list the right-side Cmd combos
+  and describe the generic buffered-combo runtime behavior.
+
+Verification passed:
+
+- `sh tests/host/run_qmk_combo_origin_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_qmk_contract_checks.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and retest both Cmd combos: `KC_N` + `KC_M` on BASE and
+   `VOLUME_MODE` + `MS_BTN1` on the pointer layer.
+2. Specifically vary combo member press order between repeated taps and verify
+   that pending tap feedback does not flash on the slave while the full combo is
+   physically held.

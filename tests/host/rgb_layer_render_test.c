@@ -784,7 +784,7 @@ static void test_slave_combo_underlay_stays_below_remote_pd_mode(void) {
     check_led(5, rgb_from_hsv(pd_mode_colors[0].color));
 }
 
-static void test_slave_multi_tap_pending_feedback_overrides_remote_combo_overlay(void) {
+static void test_slave_remote_combo_overlay_suppresses_stale_pending_feedback(void) {
     test_reset();
 
     fake_is_master = false;
@@ -794,14 +794,10 @@ static void test_slave_multi_tap_pending_feedback_overrides_remote_combo_overlay
 
     CHECK(render_output());
 
-#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     check_led(0, rgb_from_combo_feedback());
-#else
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_color));
-#endif
 }
 
-static void test_slave_multi_tap_pending_feedback_overrides_remote_combo_underlay(void) {
+static void test_slave_remote_combo_underlay_suppresses_stale_pending_feedback(void) {
     test_reset();
 
     fake_is_master = false;
@@ -811,11 +807,7 @@ static void test_slave_multi_tap_pending_feedback_overrides_remote_combo_underla
 
     CHECK(render_output());
 
-#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     check_led(0, rgb_from_combo_feedback());
-#else
-    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_color));
-#endif
 }
 
 static void test_slave_tap_commit_feedback_uses_configured_color(void) {
@@ -1867,8 +1859,8 @@ int main(void) {
     test_slave_combo_underlay_stays_below_remote_preview();
     test_slave_combo_overlay_stays_visible_over_remote_pd_mode();
     test_slave_combo_underlay_stays_below_remote_pd_mode();
-    test_slave_multi_tap_pending_feedback_overrides_remote_combo_overlay();
-    test_slave_multi_tap_pending_feedback_overrides_remote_combo_underlay();
+    test_slave_remote_combo_overlay_suppresses_stale_pending_feedback();
+    test_slave_remote_combo_underlay_suppresses_stale_pending_feedback();
     test_slave_tap_commit_feedback_uses_configured_color();
     test_slave_feedback_uses_remote_semantics_and_flash_phase();
     test_multi_tap_pending_uses_pending_color();
