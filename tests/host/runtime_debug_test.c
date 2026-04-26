@@ -198,6 +198,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         .tap_hold_term    = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
         .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term   = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
+        .branch_confirm_term = CUSTOM_TAP_BRANCH_CONFIRM_TERM,
         .layer            = layer,
         .pd_mode          = pd_mode_for_keycode(keycode),
         .has_more_taps    = has_more_taps,
@@ -1071,15 +1072,12 @@ static void test_key_runtime_core_direct_pending_multi_tap_release_helper_resets
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
     CHECK(key_runtime_core_resolve_pending_multi_tap_release(key_pos, TEST_ACTION, 1u, true, &resolution));
     CHECK(key_runtime_core_plan_pending_multi_tap_release_effects(key_pos, false, &resolution, (delayed_action_mods_t){0}, &plan));
-    CHECK(plan.count == 3u);
-    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
-    CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_BRANCH_COMMITTED);
-    CHECK(plan.items[1].data.feedback_pulse.tap_branch == 2u);
-    CHECK(plan.items[2].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(plan.items[2].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
-    CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
+    CHECK(plan.count == 0u);
+    CHECK(key_runtime_core_has_pending_multi_tap_at(key_pos));
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->branch_confirming);
+    CHECK(series->branch_confirm_tap_count == 2u);
 
     token = key_runtime_core_press_token_at(key_pos);
     CHECK(token != NULL);
@@ -1171,14 +1169,26 @@ static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_bran
     fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
     noah_key_runtime_scan();
 
+    CHECK(last_delayed_action == KC_NO);
+    CHECK(delayed_action_count == 0u);
+    CHECK(key_runtime_core_has_pending_multi_tap_at(key_pos));
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1u);
+    noah_key_runtime_scan();
+
     CHECK(last_delayed_action == TEST_SECOND_ACTION);
     CHECK(delayed_action_count == 1u);
     CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
 
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
-    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
 }
 
 static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hold_threshold(void) {
@@ -1211,7 +1221,8 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hol
 
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);
-    CHECK(!series->active);
+    CHECK(series->active);
+    CHECK(!series->branch_confirming);
 }
 
 static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_long_hold(void) {
@@ -1239,7 +1250,8 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_lon
 
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);
-    CHECK(!series->active);
+    CHECK(series->active);
+    CHECK(!series->branch_confirming);
 }
 
 static void test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expired_chain(void) {
@@ -1271,7 +1283,8 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expi
 
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);
-    CHECK(!series->active);
+    CHECK(series->active);
+    CHECK(!series->branch_confirming);
 }
 
 static void test_key_runtime_core_transition_flush_foreign_multi_tap_clears_shadow_series(void) {
@@ -1291,15 +1304,12 @@ static void test_key_runtime_core_transition_flush_foreign_multi_tap_clears_shad
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_flush_foreign_multi_tap(TEST_RELEASE_PRIMARY_KEY, other_key, &plan);
 
-    CHECK(plan.count == 3u);
+    CHECK(plan.count == 2u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
     CHECK(plan.items[0].data.delayed_action.repeat_count == 1u);
     CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_BRANCH_COMMITTED);
-    CHECK(plan.items[1].data.feedback_pulse.tap_branch == 1u);
-    CHECK(plan.items[2].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(plan.items[2].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 
     series = key_runtime_core_tap_series_at(pending_key);
     CHECK(series != NULL);
@@ -1452,11 +1462,12 @@ static void test_key_runtime_core_tap_series_state_stays_independent_from_active
 
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);
-    CHECK(!series->active);
+    CHECK(series->active);
+    CHECK(!series->branch_confirming);
 
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_press_token_count == 0u);
-    CHECK(snapshot.core_tap_series_count == 0u);
+    CHECK(snapshot.core_tap_series_count == 1u);
 }
 
 static void test_key_runtime_core_layer_lock_observes_live_layer_ownership_state(void) {

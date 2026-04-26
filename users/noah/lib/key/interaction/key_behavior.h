@@ -13,6 +13,10 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#ifndef CUSTOM_TAP_BRANCH_CONFIRM_TERM
+#    define CUSTOM_TAP_BRANCH_CONFIRM_TERM CUSTOM_MULTI_TAP_TERM
+#endif
+
 // ─── Hold Tiers ─────────────────────────────────────────────────────────────
 //
 // A hold tier is an action plus its timing mode.
@@ -94,6 +98,19 @@ typedef struct {
     hold_behavior_t long_hold;
 } key_behavior_step_t;
 
+// ─── Optional Timing Overrides ──────────────────────────────────────────────
+//
+// Plain scalar fields cannot distinguish "omitted" from "explicitly 0" in a
+// C designated initializer. Optional timing fields use a tiny tagged value:
+// omitted = use the global default, KEY_BEHAVIOR_TERM(ms) = explicit override.
+
+typedef struct {
+    bool     set;
+    uint16_t term;
+} key_behavior_optional_term_t;
+
+#define KEY_BEHAVIOR_TERM(ms_) {.set = true, .term = (ms_)}
+
 // ─── Key Behavior Config ────────────────────────────────────────────────────
 //
 // A single authored behavior row for one keycode.
@@ -107,11 +124,12 @@ typedef struct {
 // Unused entries stay zero-initialized.
 
 typedef struct {
-    uint16_t            keycode;
-    uint16_t            tap_hold_term;    // 0 = TAPPING_TERM for LT(), CUSTOM_TAP_HOLD_TERM otherwise
-    uint16_t            longer_hold_term; // 0 = CUSTOM_LONGER_HOLD_TERM
-    uint16_t            multi_tap_term;   // 0 = CUSTOM_MULTI_TAP_TERM
-    key_behavior_step_t tap_counts[KEY_BEHAVIOR_MAX_TAP_COUNT];
+    uint16_t                     keycode;
+    uint16_t                     tap_hold_term;    // 0 = TAPPING_TERM for LT(), CUSTOM_TAP_HOLD_TERM otherwise
+    uint16_t                     longer_hold_term; // 0 = CUSTOM_LONGER_HOLD_TERM
+    uint16_t                     multi_tap_term;   // 0 = CUSTOM_MULTI_TAP_TERM
+    key_behavior_optional_term_t branch_confirm_term; // omitted = CUSTOM_TAP_BRANCH_CONFIRM_TERM; KEY_BEHAVIOR_TERM(0) = skip
+    key_behavior_step_t          tap_counts[KEY_BEHAVIOR_MAX_TAP_COUNT];
 } key_behavior_t;
 
 // ─── Authoring Helpers ──────────────────────────────────────────────────────

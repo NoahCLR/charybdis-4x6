@@ -317,6 +317,11 @@ static void test_advance_thumb_multi_tap_gap(void) {
     key_runtime_integration_advance(&fake_time, 40);
 }
 
+static void test_finish_tap_branch_confirmation(void) {
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1);
+    key_runtime_integration_scan();
+}
+
 static void test_assert_thumb_runtime_quiescent(keypos_t key_pos) {
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
@@ -387,7 +392,7 @@ static void test_assert_runtime_trace_snapshot_equal(const noah_runtime_trace_sn
     CHECK(expected->count == actual->count);
     CHECK(expected->overflowed == actual->overflowed);
 
-    for (uint8_t index = 0; index < expected->count; index++) {
+    for (uint16_t index = 0; index < expected->count; index++) {
         CHECK(expected->entries[index].kind == actual->entries[index].kind);
         CHECK(expected->entries[index].event == actual->entries[index].event);
         CHECK(expected->entries[index].a == actual->entries[index].a);
@@ -396,7 +401,7 @@ static void test_assert_runtime_trace_snapshot_equal(const noah_runtime_trace_sn
 }
 
 static void test_shadow_replay_scenario(void (*scenario)(void)) {
-    runtime_event_t               events[128];
+    runtime_event_t               events[2048];
     noah_runtime_trace_snapshot_t original_trace;
     noah_runtime_trace_snapshot_t replay_trace;
     projection_snapshot_t         original_projection;
@@ -1153,12 +1158,13 @@ static void test_left_thumb_double_tap_hold_escape_feedback_sequence(void) {
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
 
-    CHECK(noah_runtime_debug_slot_phase(key_pos) == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING);
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
-    key_runtime_integration_advance(&fake_time, RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS + 1);
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1);
+    key_runtime_integration_scan();
 
+    CHECK(noah_runtime_debug_slot_phase(key_pos) == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING);
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
 
@@ -1185,12 +1191,15 @@ static void test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pu
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     test_release_resolved(key_pos);
 
-    CHECK(test_delayed_action_count == 1u);
-    CHECK(test_last_delayed_action == KC_ESC);
+    CHECK(test_delayed_action_count == 0u);
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
-    key_runtime_integration_advance(&fake_time, RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS + 1);
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1);
+    key_runtime_integration_scan();
+
+    CHECK(test_delayed_action_count == 1u);
+    CHECK(test_last_delayed_action == KC_ESC);
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
 
@@ -1220,12 +1229,15 @@ static void test_left_thumb_double_tap_hold_escape_release_during_branch_keeps_h
 
     test_release_resolved(key_pos);
 
-    CHECK(test_delayed_action_count == 1u);
-    CHECK(test_last_delayed_action == KC_ESC);
+    CHECK(test_delayed_action_count == 0u);
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
-    key_runtime_integration_advance(&fake_time, RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS + 1);
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1);
+    key_runtime_integration_scan();
+
+    CHECK(test_delayed_action_count == 1u);
+    CHECK(test_last_delayed_action == KC_ESC);
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
 
@@ -1283,6 +1295,12 @@ static void test_left_and_right_thumb_single_taps_keep_independent_pending_chain
     key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
     key_runtime_integration_scan();
 
+    CHECK(test_delayed_action_count == 0);
+    CHECK(test_feedback_semantic_for_key(left_thumb_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(right_thumb_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+
+    test_finish_tap_branch_confirmation();
+
     CHECK(test_delayed_action_count == 2);
     CHECK(test_delayed_actions[0] == LOCK_LAYER(LAYER_SYM));
     CHECK(test_delayed_actions[1] == LOCK_LAYER(LAYER_NAV));
@@ -1311,6 +1329,11 @@ static void test_right_thumb_triple_tap_flushes_next_track_after_timeout(void) {
     key_runtime_integration_scan();
 
     CHECK(test_tap_code16_count == 0);
+    CHECK(test_delayed_action_count == 0);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+
+    test_finish_tap_branch_confirmation();
+
     CHECK(test_delayed_action_count == 1);
     CHECK(test_last_delayed_action == KC_MNXT);
     test_assert_thumb_runtime_quiescent(key_pos);
@@ -1336,6 +1359,12 @@ static void test_right_thumb_triple_tap_long_hold_registers_next_track_hold(void
     key_runtime_integration_advance(&fake_time, CUSTOM_LONGER_HOLD_TERM + 1);
     key_runtime_integration_scan();
 
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 3u);
+
+    test_finish_tap_branch_confirmation();
+
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_MNXT);
     CHECK(test_tap_code16_count == 0);
 
@@ -1359,6 +1388,13 @@ static void test_right_thumb_quadruple_tap_dispatches_previous_track(void) {
     test_run_quick_tap(key_pos);
 
     CHECK(test_tap_code16_count == 0);
+    CHECK(test_delayed_action_count == 0);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+    key_runtime_integration_scan();
+
+    test_finish_tap_branch_confirmation();
+
     CHECK(test_delayed_action_count == 1);
     CHECK(test_last_delayed_action == KC_MPRV);
     test_assert_thumb_runtime_quiescent(key_pos);
@@ -1380,6 +1416,9 @@ static void test_pointer_pinch_double_tap_queues_zoom_chord(void) {
     if (test_delayed_action_count == 0) {
         key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
         key_runtime_integration_scan();
+    }
+    if (test_delayed_action_count == 0) {
+        test_finish_tap_branch_confirmation();
     }
 
     CHECK(test_tap_code16_count == 0);
@@ -1405,6 +1444,9 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
         if (test_delayed_action_count == salvo) {
             key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
             key_runtime_integration_scan();
+        }
+        if (test_delayed_action_count == salvo) {
+            test_finish_tap_branch_confirmation();
         }
 
         CHECK(test_tap_code16_count == 0);
@@ -1721,6 +1763,11 @@ static void test_activate_gui_double_tap_alt_hold(keypos_t gui_pos) {
     key_runtime_integration_scan();
 
     CHECK(noah_runtime_debug_slot_owner_keycode(gui_pos) == KC_LEFT_GUI);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_NO);
+    CHECK(test_feedback_semantic_for_key(gui_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+
+    test_finish_tap_branch_confirmation();
+
     CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_LEFT_ALT);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) != 0);
 }
@@ -1748,6 +1795,12 @@ static void test_commit_pending_gui_double_tap_alt_hold(keypos_t gui_pos) {
 
     CHECK(noah_runtime_debug_slot_owner_keycode(gui_pos) == KC_LEFT_GUI);
     CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(gui_pos));
+
+    if (noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_NO) {
+        CHECK(test_feedback_semantic_for_key(gui_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+        test_finish_tap_branch_confirmation();
+    }
+
     CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_LEFT_ALT);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) != 0);
 }

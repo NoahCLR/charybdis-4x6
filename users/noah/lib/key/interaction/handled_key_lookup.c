@@ -16,6 +16,7 @@ handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t 
         .tap_hold_term    = behavior.tap_hold_term,
         .longer_hold_term = behavior.longer_hold_term,
         .multi_tap_term   = behavior.multi_tap_term,
+        .branch_confirm_term = behavior.branch_confirm_term,
         .layer            = behavior.is_momentary_layer ? behavior_get_layer(behavior.keycode) : UINT8_MAX,
         .pd_mode          = handled_key_pd_mode_for_behavior(behavior),
         .has_more_taps    = more,

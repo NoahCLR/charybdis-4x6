@@ -106,7 +106,7 @@ uint16_t key_runtime_core_trace_decode_input_events(const noah_runtime_trace_sna
         return 0u;
     }
 
-    for (uint8_t index = 0; index < snapshot->count && count < capacity; index++) {
+    for (uint16_t index = 0; index < snapshot->count && count < capacity; index++) {
         const noah_runtime_trace_entry_t *entry = &snapshot->entries[index];
 
         if (entry->kind != NOAH_TRACE_KEY_RUNTIME_CORE) {

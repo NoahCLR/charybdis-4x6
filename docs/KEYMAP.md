@@ -56,6 +56,7 @@ The keymap currently sets these defaults in
 - `CUSTOM_TAP_HOLD_TERM = 150`
 - `CUSTOM_LONGER_HOLD_TERM = 400`
 - `CUSTOM_MULTI_TAP_TERM = 150`
+- `CUSTOM_TAP_BRANCH_CONFIRM_TERM = CUSTOM_MULTI_TAP_TERM`
 - `COMBO_TERM = 50`
 
 There are also current per-key exceptions:
@@ -234,10 +235,10 @@ really spans both sides.
 
 Pending multi-tap feedback uses a neutral unresolved color while the runtime is
 still deciding which tap index wins. After a branch commits, the current RGB
-config briefly shows the committed branch color before any tap, hold, or
-long-hold action feedback takes over. If a higher hold tier commits while an
-older feedback pulse is still visible, the higher-tier feedback takes over so
-the LEDs match the behavior that is now active.
+config shows the committed branch color during the branch-confirmation window
+before any tap, hold, or long-hold action fires. If a higher hold tier commits
+after that, the higher-tier feedback takes over so the LEDs match the behavior
+that is now active.
 
 That `100 Hz` setting is also the current authored maximum: `100` repeats per
 second.

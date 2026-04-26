@@ -48,15 +48,20 @@ That keymap chooses:
 - `CUSTOM_TAP_HOLD_TERM`
 - `CUSTOM_LONGER_HOLD_TERM`
 - `CUSTOM_MULTI_TAP_TERM`
+- `CUSTOM_TAP_BRANCH_CONFIRM_TERM`
 
 Individual `key_behaviors[]` rows can override those defaults with:
 
 - `.tap_hold_term`
 - `.longer_hold_term`
 - `.multi_tap_term`
+- `.branch_confirm_term = KEY_BEHAVIOR_TERM(ms)`
 
-If one of those fields is omitted, C zero-initializes it. A value of `0` means
-"use the default timing for this row."
+For the scalar timing fields, omission means C zero-initializes the field and a
+value of `0` means "use the default timing for this row." `branch_confirm_term`
+is intentionally different because authors need to distinguish omitted from
+explicit zero: omitting it uses `CUSTOM_TAP_BRANCH_CONFIRM_TERM`, while
+`KEY_BEHAVIOR_TERM(0)` disables branch confirmation for that row.
 
 In plain terms:
 
@@ -65,6 +70,8 @@ In plain terms:
 - crossing the longer-hold term can promote to the longer-hold tier
 - repeated taps must stay within the multi-tap term to remain part of the same
   sequence
+- once a tap branch is committed, the branch-confirm term can hold the model in
+  that committed branch before the tap, hold, or long-hold action fires
 
 Foreign-key interruption only cancels the quick tap for true momentary-layer
 taps. Other authored hold families, such as press-registering modifier holds
@@ -246,8 +253,8 @@ Shared semantics:
 
 - multi-tap pending shows the neutral unresolved color while the winning tap
   branch is still undecided
-- committed tap branches can show a short branch-color confirmation before
-  tap, hold, or long-hold action feedback takes over
+- committed tap branches can show a branch-color confirmation during the same
+  model-level branch-confirm window that delays the action
 - committed tap branches can pulse once after the tap output resolves; the
   authored RGB config can disable those pulses, limit them to double-tap and
   higher branches, or allow them for every tap branch

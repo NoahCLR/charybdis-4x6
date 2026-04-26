@@ -46,6 +46,7 @@ enum charybdis_keymap_layers {
 #define CUSTOM_TAP_HOLD_TERM 150     // tap vs hold boundary (ms)
 #define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary (ms)
 #define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps (ms)
+#define CUSTOM_TAP_BRANCH_CONFIRM_TERM CUSTOM_MULTI_TAP_TERM // global committed-branch confirmation window (ms); 0 disables unless a row overrides it
 
 // ─── Pointing device ────────────────────────────────────────────────────────
 

@@ -123,10 +123,12 @@ Default timing lives in the keymap
 
 - built-in QMK dual-role timing through `TAPPING_TERM`
 - custom key-behavior defaults through `CUSTOM_TAP_HOLD_TERM`,
-  `CUSTOM_LONGER_HOLD_TERM`, and `CUSTOM_MULTI_TAP_TERM`
+  `CUSTOM_LONGER_HOLD_TERM`, `CUSTOM_MULTI_TAP_TERM`, and
+  `CUSTOM_TAP_BRANCH_CONFIRM_TERM`
 
 Timing can also be customized per key with `.tap_hold_term`,
-`.longer_hold_term`, and `.multi_tap_term`.
+`.longer_hold_term`, `.multi_tap_term`, and `.branch_confirm_term =
+KEY_BEHAVIOR_TERM(ms)`.
 
 ### Hold Tiers
 
@@ -193,6 +195,9 @@ tap, hold, longer-hold, and multi-tap behavior like the rest of the board.
 If that authored tap path can branch into a different pointing mode, the
 runtime defers the first mode until the hold threshold so two mode lifecycles
 do not overlap while the tap count is still unresolved.
+Committed tap branches can also hold in a branch-confirmation window before
+their tap, hold, long-hold, or PD-mode action fires, so RGB feedback and the
+actual model use the same timing.
 
 The current runtime supports these mode families:
 

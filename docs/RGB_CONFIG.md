@@ -350,10 +350,10 @@ Those rows populate the shared
 The `tap_pending_color` field is the neutral unresolved multi-tap color while
 the runtime is still waiting to know which tap index wins.
 
-The `RGB_TAP_BRANCH_COLORS(...)` macro declares the short confirmation colors
-used after a tap branch commits. The first entry is tap branch 1, the second
-entry is tap branch 2, and so on; higher committed tap indexes clamp to the
-last configured branch color.
+The `RGB_TAP_BRANCH_COLORS(...)` macro declares the confirmation colors used
+while a committed tap branch is being held in the model-level branch-confirm
+window. The first entry is tap branch 1, the second entry is tap branch 2, and
+so on; higher committed tap indexes clamp to the last configured branch color.
 
 The `tap_commit_mode` field controls which committed tap branches pulse with
 `tap_committed_color`:
@@ -382,8 +382,8 @@ the live runtime footprint, not a static guess from authored combo comments.
 In the shared runtime, those colors are used for these categories:
 
 - multi-tap pending: the engine has not resolved the winning tap branch yet
-- tap branch committed: the winning tap branch is known and briefly shows its
-  branch color
+- tap branch committed: the winning tap branch is known and the model is in
+  the branch-confirm window before firing that branch's action
 - tap committed: an authored tap branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
 - hold trigger: a hold-tier action has just fired
@@ -407,15 +407,15 @@ The helper decides the RGB behavior shape:
 
 - `TAP_AT_HOLD_THRESHOLD(...)`: pulse once when that tier commits
 - `TAP_ON_RELEASE_AFTER_HOLD(...)`: stay steadily lit while that tier is
-  pending release; if release happens while a branch-confirmation pulse is
-  still visible, the hold-tier action feedback is queued after the branch pulse
-  so both states get a visible window
+  pending release; if release happens during branch confirmation, the hold-tier
+  action feedback follows after confirmation completes so both states get a
+  visible window
 - `PRESS_AND_HOLD_UNTIL_RELEASE(...)` and `REPEAT_WHILE_HELD(...)`: flash while
   that tier remains active
 
 When a higher hold tier actually commits, such as a `.long_hold` threshold
-action, that action feedback replaces older branch or lower-tier feedback. RGB
-should not continue showing the lower-tier state after the runtime has already
+action, that action feedback replaces older lower-tier feedback. RGB should
+not continue showing the lower-tier state after the runtime has already
 committed the higher-tier behavior.
 
 Held layer-switch actions are intentionally a special case: they get the short

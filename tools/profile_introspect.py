@@ -285,6 +285,7 @@ class KeyBehavior:
     tap_hold_term: int | None
     longer_hold_term: int | None
     multi_tap_term: int | None
+    branch_confirm_term: int | None
     steps: list[BehaviorStep]
 
 
@@ -918,7 +919,7 @@ def parse_key_behavior_feedback_colors(
                     {
                         "field": f"tap_branch_{index}_color",
                         "label": f"Tap Branch {index}",
-                        "meaning": "Short branch-confirmation pulse after that tap index commits. Higher committed tap indexes clamp to the last configured branch color.",
+                        "meaning": "Visible branch-confirmation window while that tap index is the committed branch. Higher committed tap indexes clamp to the last configured branch color.",
                         "color": authored_color,
                         "preview_color": dict(authored_color),
                     },
@@ -1174,11 +1175,13 @@ def resolve_rgb_default_color(known_values: dict[str, str]) -> dict[str, object]
 
 
 def resolve_behavior_timing_defaults(known_values: dict[str, str]) -> dict[str, int]:
+    branch_confirm_expr = known_values.get("CUSTOM_TAP_BRANCH_CONFIRM_TERM", known_values["CUSTOM_MULTI_TAP_TERM"])
     return {
         "tap_hold": eval_numeric_expr(known_values["CUSTOM_TAP_HOLD_TERM"], known_values),
         "tap_hold_lt": eval_numeric_expr(known_values["TAPPING_TERM"], known_values),
         "long_hold": eval_numeric_expr(known_values["CUSTOM_LONGER_HOLD_TERM"], known_values),
         "multi_tap": eval_numeric_expr(known_values["CUSTOM_MULTI_TAP_TERM"], known_values),
+        "branch_confirm": eval_numeric_expr(branch_confirm_expr, known_values),
     }
 
 
@@ -1226,7 +1229,7 @@ def parse_macro_slots(rows: list[list[str]], kind: str) -> list[MacroSlot]:
     return slots
 
 
-def parse_key_behaviors(text: str) -> list[KeyBehavior]:
+def parse_key_behaviors(text: str, known_values: dict[str, str]) -> list[KeyBehavior]:
     body = extract_initializer_body(text, r"key_behaviors\[\]\s*=")
     behaviors: list[KeyBehavior] = []
 
@@ -1243,6 +1246,7 @@ def parse_key_behaviors(text: str) -> list[KeyBehavior]:
                 tap_hold_term=parse_optional_int(fields.get(".tap_hold_term")),
                 longer_hold_term=parse_optional_int(fields.get(".longer_hold_term")),
                 multi_tap_term=parse_optional_int(fields.get(".multi_tap_term")),
+                branch_confirm_term=parse_optional_term(fields.get(".branch_confirm_term"), known_values),
                 steps=steps,
             )
         )
@@ -1260,6 +1264,16 @@ def parse_optional_int(value: str | None) -> int | None:
         return int(normalized, 10)
     except ValueError:
         return None
+
+
+def parse_optional_term(value: str | None, known_values: dict[str, str]) -> int | None:
+    if value is None:
+        return None
+    normalized = normalize_expr(value)
+    match = re.fullmatch(r"KEY_BEHAVIOR_TERM\((?P<term>.+)\)", normalized)
+    if not match:
+        return None
+    return eval_numeric_expr(match.group("term"), known_values)
 
 
 def parse_behavior_steps(tap_counts_body: str) -> list[BehaviorStep]:
@@ -1537,7 +1551,7 @@ def build_profile_model() -> dict[str, object]:
     keymap_custom_keycodes = parse_keymap_custom_keycodes(keymap_text)
     via_macros = parse_macro_slots(parse_macro_table(keymap_text, "VIA_MACROS", "MACRO"), kind="via")
     hardcoded_macros = parse_macro_slots(parse_macro_table(keymap_text, "HARDCODED_MACROS", "MACRO"), kind="hardcoded")
-    behaviors = parse_key_behaviors(keymap_text)
+    behaviors = parse_key_behaviors(keymap_text, config_macros)
     combos = parse_combos(keymap_text)
     parsed_layers = parse_layers(keymap_text, known_behaviors={behavior_lookup_key(behavior.keycode) for behavior in behaviors})
     pd_modes = parse_pd_mode_manifest(pd_mode_manifest_text)
@@ -1897,8 +1911,8 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "",
         "Timing legend for the layer-local behavior tables:",
         "",
-        f"- `tap_hold(...)`, `long_hold(...)`, and `multi_tap(...)` use the default timings from {config_link}",
-        "- `tap_hold=...`, `long_hold=...`, and `multi_tap=...` are custom timings authored on that key",
+        f"- `tap_hold(...)`, `long_hold(...)`, `multi_tap(...)`, and `branch_confirm(...)` use the default timings from {config_link}",
+        "- `tap_hold=...`, `long_hold=...`, `multi_tap=...`, and `branch_confirm=...` are custom timings authored on that key",
         "- `release before tap_hold(...); otherwise normal hold` means the tap fires on a quick release; if you keep holding, the key keeps its normal hold behavior",
         "- Timing is shown per tap count, so each row lists only the timings that matter for that behavior",
         "",
@@ -2749,7 +2763,7 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
         [
             f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored localities intentionally collapse that truth to a half or full-board presentation.",
             "",
-            "Tap feedback is staged as neutral unresolved pending first, then a short committed-branch pulse from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.",
+            "Tap feedback is staged as neutral unresolved pending first, then a model-level branch confirmation from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.",
             "",
         ]
     )
@@ -2944,6 +2958,10 @@ def format_timing_for_step(
             parts.append(f"multi_tap={behavior['multi_tap_term']}")
         else:
             parts.append(f"multi_tap({timing_defaults['multi_tap']})")
+        if behavior["branch_confirm_term"] is not None:
+            parts.append(f"branch_confirm={behavior['branch_confirm_term']}")
+        else:
+            parts.append(f"branch_confirm({timing_defaults['branch_confirm']})")
 
     if parts:
         return ", ".join(parts)

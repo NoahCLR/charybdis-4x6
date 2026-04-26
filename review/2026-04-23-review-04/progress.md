@@ -1087,3 +1087,63 @@ Next steps:
 
 1. Flash and verify that once NUM has actually committed, the visible feedback
    no longer suggests the earlier ESC hold path is still available.
+
+### Branch Confirmation Timing Reconciliation
+
+Reconciliation note: the previous release-hold and higher-tier feedback
+sections describe branch confirmation as an RGB pulse. That was the
+audit-time implementation. The current tree supersedes it by making branch
+confirmation part of the key-behavior model timing itself.
+
+- Added global `CUSTOM_TAP_BRANCH_CONFIRM_TERM` and per-row
+  `.branch_confirm_term = KEY_BEHAVIOR_TERM(ms)` support. Omitted rows inherit
+  the global term; `KEY_BEHAVIOR_TERM(0)` skips branch confirmation for that
+  row.
+- Moved committed-branch confirmation into `tap_series_t` runtime state. RGB
+  now projects `KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED` from that model
+  state instead of from a standalone feedback pulse.
+- Delayed tap, hold, long-hold, release-hold, and PD-mode actions until the
+  branch-confirm window completes. A late scan still resolves immediately if
+  the authored window has already elapsed.
+- Kept foreign-key flush immediate so terminal tap outputs such as
+  `OSM(MOD_LSFT)` still dispatch before the next ordinary key reaches QMK.
+- Removed the previous replace-active branch-pulse plumbing and updated
+  scenario, runtime-debug, real-profile, PD-mode, release-matrix, and RGB tests
+  around the new model state.
+- Widened runtime trace snapshot counters from `uint8_t` to `uint16_t` after
+  the longer branch-confirm replay scenarios exposed the old 255-event cap.
+
+Verification passed:
+
+- `python3 tools/profile_introspect.py --write`
+- `python3 -m py_compile tools/profile_introspect.py`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and verify that branch color duration now lines up with the action
+   model for `LEFT_THUMB`, stacked PD modes, and terminal tap branches.

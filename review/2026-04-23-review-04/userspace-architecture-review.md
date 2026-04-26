@@ -136,11 +136,11 @@ None.
 - Key-behavior feedback now separates unresolved pending color, committed
   branch color, and action feedback. The authored config uses
   `tap_pending_color` for the neutral unresolved state and
-  `RGB_TAP_BRANCH_COLORS(...)` for the short committed-branch pulse before
-  tap/hold/long-hold action feedback takes over. The runtime keeps tap branch
-  state in a separate packed map so the semantic map remains 3 bits per key and
-  still fits one QMK split transaction. Split sync treats key feedback as a
-  packet family: semantic state and tap-branch state are separate RPC payloads.
+  `RGB_TAP_BRANCH_COLORS(...)` for the model-level branch-confirm window before
+  tap/hold/long-hold actions fire. The runtime keeps tap branch state in a
+  separate packed map so the semantic map remains 3 bits per key and still fits
+  one QMK split transaction. Split sync treats key feedback as a packet family:
+  semantic state and tap-branch state are separate RPC payloads.
 - Foreign non-handled key presses now flush pending multi-tap actions before
   the key leaves userspace for the normal QMK path. This preserves independent
   authored-key pending chains while making terminal tap-only actions such as
@@ -224,22 +224,22 @@ pulse through pending-release drain, so feedback remains aligned with the
 actual output projection instead of firing early while a sibling tap-release
 blocker is still live.
 Pending multi-tap feedback now stays neutral while the branch is unresolved.
-When the runtime commits a tap branch, it emits a short
-`KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED` pulse carrying the committed tap
-branch in the tap-branch map. That branch pulse is queued before tap-commit,
-hold, or long-hold feedback, so every tap level follows the same visual order:
-pending, branch confirmation, then action feedback.
+When the runtime commits a tap branch, it enters a timed
+`KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED` model state carrying the committed
+tap branch in the tap-branch map. The tap, hold, or long-hold action is delayed
+until that branch-confirm window completes, so every tap level follows the same
+visual and behavioral order: pending, branch confirmation, then action
+feedback.
 For release-hold branches such as `LEFT_THUMB` double-tap hold to `KC_ESC`,
 branch feedback is independent from tap-commit feedback. This matters when the
 release event itself is the first event after `tap_hold_term`: the runtime can
-still emit the committed-branch pulse before clearing the slot and dispatching
-the release-hold action. Release-hold branches also queue hold-tier action
-feedback after the branch pulse when release would otherwise clear the steady
-hold-pending state too quickly. The scanned threshold path remains covered by
-steady hold-pending feedback until release dispatches the action, with the same
-queued action-feedback fallback if release happens during the branch pulse.
-When a higher hold tier commits while an older branch or lower-tier pulse is
-still active, the higher-tier action feedback replaces that older pulse because
+still enter the committed-branch state before dispatching the release-hold
+action. Release-hold action feedback follows after branch confirmation when
+release would otherwise clear the steady hold-pending state too quickly. The
+scanned threshold path remains covered by steady hold-pending feedback until
+release dispatches the action.
+When a higher hold tier commits while older lower-tier feedback is still
+active, the higher-tier action feedback replaces that older feedback because
 the runtime behavior has already changed. This keeps the visible state aligned
 with behavior for paths such as `LEFT_THUMB` double-tap hold crossing into
 `LOCK_LAYER(LAYER_NUM)`.

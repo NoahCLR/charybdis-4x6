@@ -23,7 +23,7 @@ void noah_runtime_trace_emit(noah_trace_kind_t kind, uint8_t event, uint16_t a, 
         .b     = b,
     };
 
-    state->next_index = (uint8_t)((state->next_index + 1u) % NOAH_RUNTIME_TRACE_CAPACITY);
+    state->next_index = (uint16_t)((state->next_index + 1u) % NOAH_RUNTIME_TRACE_CAPACITY);
 
     if (state->count < NOAH_RUNTIME_TRACE_CAPACITY) {
         state->count++;
@@ -44,10 +44,10 @@ void noah_runtime_trace_snapshot(noah_runtime_trace_snapshot_t *out) {
         .overflowed = state->overflowed,
     };
 
-    uint8_t start = (uint8_t)((state->next_index + NOAH_RUNTIME_TRACE_CAPACITY - state->count) % NOAH_RUNTIME_TRACE_CAPACITY);
+    uint16_t start = (uint16_t)((state->next_index + NOAH_RUNTIME_TRACE_CAPACITY - state->count) % NOAH_RUNTIME_TRACE_CAPACITY);
 
-    for (uint8_t i = 0; i < state->count; i++) {
-        out->entries[i] = state->entries[(uint8_t)((start + i) % NOAH_RUNTIME_TRACE_CAPACITY)];
+    for (uint16_t i = 0; i < state->count; i++) {
+        out->entries[i] = state->entries[(uint16_t)((start + i) % NOAH_RUNTIME_TRACE_CAPACITY)];
     }
 }
 
@@ -65,7 +65,7 @@ void noah_runtime_trace_dump_snapshot_to_console(const noah_runtime_trace_snapsh
     }
 
     uprintf("Runtime trace snapshot count=%u overflowed=%u\n", (unsigned int)snapshot->count, snapshot->overflowed ? 1u : 0u);
-    for (uint8_t index = 0; index < snapshot->count; index++) {
+    for (uint16_t index = 0; index < snapshot->count; index++) {
         const noah_runtime_trace_entry_t *entry = &snapshot->entries[index];
 
         uprintf("  [%u] kind=%u event=%u a=0x%04X b=0x%04X\n", (unsigned int)index, (unsigned int)entry->kind, (unsigned int)entry->event, (unsigned int)entry->a, (unsigned int)entry->b);

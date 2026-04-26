@@ -97,7 +97,7 @@ typedef struct {
 
 typedef struct {
     noah_runtime_trace_entry_t entries[NOAH_RUNTIME_TRACE_CAPACITY];
-    uint8_t                    count;
+    uint16_t                   count;
     bool                       overflowed;
 } noah_runtime_trace_snapshot_t;
 
