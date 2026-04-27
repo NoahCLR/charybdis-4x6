@@ -1342,3 +1342,101 @@ Next steps:
 2. Specifically vary combo member press order between repeated taps and verify
    that pending tap feedback does not flash on the slave while the full combo is
    physically held.
+
+### Base Tap Branch Feedback Follow-Up
+
+- Hardware/runtime observation showed base number-key taps could still emit
+  branch feedback. The root cause was the key-feedback semantic map treating
+  any nonzero pending tap count as unresolved branch feedback, and any nonzero
+  branch-confirm tap count as committed branch feedback.
+- Tightened key-feedback branch visibility so only double-tap and higher
+  branches emit `KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH`,
+  `KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED`, or a tap-branch map value. The
+  base single-tap candidate can still remain pending internally for multi-tap
+  timing, but it stays visually quiet.
+- Added direct runtime coverage for tap count 1 before and during
+  branch-confirm, plus real-profile coverage that `KC_6` stays quiet on the
+  base tap while its second tap still shows unresolved and committed branch
+  feedback.
+- Updated the prior first-tap Cmd combo and single-thumb expectations to match
+  the quiet base-tap rule.
+- Updated `README.md`, `docs/KEYMAP.md`, `docs/INTERACTION_MODEL.md`,
+  `docs/RGB_CONFIG.md`, generated `docs/KEYMAP-OVERVIEW.md`,
+  `rgb_config.c` comments, and this review note so the behavior is described as
+  double-tap-or-higher branch feedback, not base tap feedback.
+
+Verification passed:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and retest a single `KC_6` tap on BASE: it should no longer flash
+   tap-pending or tap-branch feedback while waiting out the multi-tap window.
+2. Retest `KC_6` double tap and the Cmd combos to confirm second-tap branch
+   feedback still appears only after the second tap tier is actually entered.
+
+### Base Tap Branch-Confirm Timing Follow-Up
+
+- Follow-up timing inspection showed the base tap was visually quiet but still
+  waited through the model-level branch-confirm window after the multi-tap
+  window expired. For `KC_6`, that meant a single tap waited roughly
+  `CUSTOM_MULTI_TAP_TERM + CUSTOM_TAP_BRANCH_CONFIRM_TERM` after release.
+- Tightened the runtime branch-confirm gate so tap count 1 does not enter
+  branch-confirm at all. Base single taps on multi-tap keys still wait one
+  multi-tap window so the runtime can detect a second tap, then dispatch
+  immediately. Double-tap and higher branches still use branch-confirm.
+- This applies to base tap, hold, release-hold, and long-hold resolutions that
+  previously tried to enter branch-confirm through the shared tap-series
+  helper. Non-base branch timing remains unchanged.
+- Updated runtime scenario coverage, direct runtime debug coverage, PD-mode
+  integration expectations, and real-profile `KC_6`/thumb single-tap
+  expectations to assert immediate base dispatch after the multi-tap timeout.
+- Updated `README.md`, `docs/KEYMAP.md`, `docs/INTERACTION_MODEL.md`,
+  generated `docs/KEYMAP-OVERVIEW.md`, `keymap.c` comments, and this review
+  note so branch-confirm is described as double-tap-or-higher behavior.
+
+Verification passed:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and retest a single `KC_6` tap on BASE. Expected delay after release
+   is now just `CUSTOM_MULTI_TAP_TERM` (`150ms`), plus scan scheduling.
+2. Retest `KC_6` double tap and a double-tap hold path to confirm the
+   non-base branch-confirm window still exists where it is useful.

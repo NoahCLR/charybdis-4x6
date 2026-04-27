@@ -133,12 +133,16 @@ static void key_feedback_apply_tap_branch_for_owner(uint8_t *tap_branch_map, key
     key_feedback_apply_tap_branch_to_bitmap(tap_branch_map, bitmap, tap_branch);
 }
 
+static bool key_feedback_tap_branch_is_higher_tier(uint8_t tap_count) {
+    return tap_count > 1u;
+}
+
 static bool key_feedback_tap_series_shows_pending_feedback(const tap_series_t *series) {
-    return series && series->active && !series->branch_confirmed && !series->branch_confirming && series->tap_count != 0u;
+    return series && series->active && !series->branch_confirmed && !series->branch_confirming && key_feedback_tap_branch_is_higher_tier(series->tap_count);
 }
 
 static bool key_feedback_tap_series_shows_branch_confirmation(const tap_series_t *series) {
-    return series && series->active && series->branch_confirming && series->branch_confirm_tap_count != 0u;
+    return series && series->active && series->branch_confirming && key_feedback_tap_branch_is_higher_tier(series->branch_confirm_tap_count);
 }
 
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {

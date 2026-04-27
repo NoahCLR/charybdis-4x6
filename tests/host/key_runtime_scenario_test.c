@@ -207,11 +207,6 @@ static void test_single_tap_waits_for_multi_tap_timeout_before_dispatching(void)
     test_configure_multi_tap_key();
     key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
 
-    CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
-
-    test_finish_tap_branch_confirmation();
-
     CHECK(key_runtime_scenario_effect_count() == 2);
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_TAP_ACTION);
@@ -454,11 +449,6 @@ static void test_press_on_other_handled_position_keeps_foreign_pending_multi_tap
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(timeout_and_scan, ARRAY_SIZE(timeout_and_scan));
 
-    CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
-
-    test_finish_tap_branch_confirmation();
-
     CHECK(key_runtime_scenario_effect_count() == 2);
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_TAP_ACTION);
@@ -519,11 +509,6 @@ static void test_independent_pending_multi_tap_chains_can_coexist_and_flush_inde
 
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(timeout_and_scan, ARRAY_SIZE(timeout_and_scan));
-
-    CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 2);
-
-    test_finish_tap_branch_confirmation();
 
     CHECK(key_runtime_scenario_effect_count() == 4);
     CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);

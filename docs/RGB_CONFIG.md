@@ -347,13 +347,15 @@ Those rows populate the shared
 - `long_hold_active_color`
 - `locality`
 
-The `tap_pending_color` field is the neutral unresolved multi-tap color while
-the runtime is still waiting to know which tap index wins.
+The `tap_pending_color` field is the neutral unresolved multi-tap color for
+double-tap and higher branches while the runtime is still waiting to know
+which tap index wins. The base single-tap candidate stays quiet during that
+same pending window.
 
 The `RGB_TAP_BRANCH_COLORS(...)` macro declares the confirmation colors used
-while a committed tap branch is being held in the model-level branch-confirm
-window. The first entry is tap branch 1, the second entry is tap branch 2, and
-so on; higher committed tap indexes clamp to the last configured branch color.
+while a committed double-tap or higher branch is being held in the model-level
+branch-confirm window. The color table is indexed by tap branch count; higher
+committed tap indexes clamp to the last configured branch color.
 
 The `tap_commit_mode` field controls which committed tap branches pulse with
 `tap_committed_color`:
@@ -381,9 +383,10 @@ the live runtime footprint, not a static guess from authored combo comments.
 
 In the shared runtime, those colors are used for these categories:
 
-- multi-tap pending: the engine has not resolved the winning tap branch yet
-- tap branch committed: the winning tap branch is known and the model is in
-  the branch-confirm window before firing that branch's action
+- multi-tap pending: the engine has not resolved the winning double-tap or
+  higher branch yet; the base single-tap candidate stays quiet
+- tap branch committed: the winning double-tap or higher branch is known and
+  the model is in the branch-confirm window before firing that branch's action
 - tap committed: an authored tap branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
 - hold trigger: a hold-tier action has just fired
@@ -441,10 +444,10 @@ locality while still remaining within the key-behavior feedback stage.
 
 Each row chooses a semantic category:
 
-- `KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH`: visible while multi-tap resolution is
-  pending
-- `KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED`: visible while a committed branch
-  confirmation pulse is active
+- `KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH`: visible while double-tap or
+  higher multi-tap resolution is pending
+- `KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED`: visible while a committed
+  double-tap or higher branch confirmation pulse is active
 - `KEY_FEEDBACK_GROUP_TAP_COMMITTED`: visible while the tap-commit pulse is
   active
 - `KEY_FEEDBACK_GROUP_HOLD_ACTIVE`: visible for hold pending, hold commit

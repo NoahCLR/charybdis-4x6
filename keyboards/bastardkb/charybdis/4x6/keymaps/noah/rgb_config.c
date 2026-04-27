@@ -239,10 +239,12 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - long-hold tier = .long_hold on the winning tap index
 //
 // Feedback categories:
-//   - tap_pending_color = unresolved multi-tap state while the runtime is still
-//     waiting to know which tap index wins
+//   - tap_pending_color = unresolved multi-tap state for second-tap and higher
+//     branches while the runtime is still waiting to know which tap index wins;
+//     the base single-tap candidate stays quiet
 //   - RGB_TAP_BRANCH_COLORS(...) = visible branch-confirmation window after a
-//     tap index commits; tap indexes clamp to the last configured color
+//     second-tap or higher index commits; tap indexes clamp to the last
+//     configured color
 //   - tap_committed_color = action feedback after committed tap branches that
 //     do not already have state feedback; layer and PD-mode state actions stay
 //     quiet because their state overlays own that feedback

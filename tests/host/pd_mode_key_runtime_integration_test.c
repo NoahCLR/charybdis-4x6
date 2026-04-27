@@ -1392,8 +1392,6 @@ static void test_pinch_single_tap_defers_mode_owned_gui_from_delayed_replay(void
     CHECK(fake_mods == MOD_BIT(KC_LEFT_SHIFT));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     key_runtime_integration_run(&fake_time, flush_steps, ARRAY_SIZE(flush_steps));
-    CHECK(delayed_action_count == 0);
-    test_finish_tap_branch_confirmation();
     CHECK(delayed_action_count == 1);
     CHECK(last_delayed_action == KC_J);
     CHECK(last_delayed_mods.real == MOD_BIT(KC_LEFT_SHIFT));
@@ -1439,8 +1437,6 @@ static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_repla
     CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
 
     key_runtime_integration_run(&fake_time, flush_steps, ARRAY_SIZE(flush_steps));
-    CHECK(delayed_action_count == 0);
-    test_finish_tap_branch_confirmation();
     CHECK(delayed_action_count == 1);
     CHECK(last_delayed_action == KC_J);
     CHECK(last_delayed_mods.real == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));

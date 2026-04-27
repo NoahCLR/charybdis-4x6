@@ -2303,8 +2303,12 @@ static bool key_runtime_core_branch_confirm_window_active(uint16_t started_at, u
     return term_ms != 0u && key_runtime_core_elapsed(started_at, now) < term_ms;
 }
 
+static bool key_runtime_core_tap_count_uses_branch_confirm(uint8_t tap_count) {
+    return tap_count > 1u;
+}
+
 static bool key_runtime_core_tap_series_start_branch_confirm(key_runtime_core_state_t *state, tap_series_t *series, key_runtime_tap_series_branch_confirm_kind_t kind, uint8_t tap_count, uint16_t started_at, uint16_t term_ms) {
-    if (!(state && series && series->active && kind != KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_NONE)) {
+    if (!(state && series && series->active && kind != KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_NONE && key_runtime_core_tap_count_uses_branch_confirm(tap_count))) {
         return false;
     }
 
@@ -3030,7 +3034,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .outcome             = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
                 .action              = tap_action,
                 .repeat_count        = tap_repeat_count,
-                .tap_branch_feedback = true,
+                .tap_branch_feedback = key_runtime_core_tap_count_uses_branch_confirm(series_tap_count),
                 .tap_commit_feedback = true,
                 .tap_count           = series_tap_count,
             };
@@ -3061,7 +3065,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .outcome             = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
                 .action              = tap_action,
                 .repeat_count        = tap_repeat_count,
-                .tap_branch_feedback = true,
+                .tap_branch_feedback = key_runtime_core_tap_count_uses_branch_confirm(series_tap_count),
                 .tap_commit_feedback = true,
                 .tap_count           = series_tap_count,
             };

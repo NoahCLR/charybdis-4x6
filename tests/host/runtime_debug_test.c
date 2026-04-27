@@ -1085,6 +1085,46 @@ static void test_key_runtime_core_direct_pending_multi_tap_release_helper_resets
     CHECK(token->observed_release_keycode == TEST_PENDING_MULTI_TAP_KEY);
 }
 
+static void test_base_tap_multi_tap_flush_skips_branch_confirm(void) {
+    uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    const tap_series_t *series;
+    keypos_t            key_pos = test_keypos(6, 6);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(TEST_FINAL_TAP_ONLY_KEY, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(TEST_FINAL_TAP_ONLY_KEY, key_pos, false));
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->tap_count == 1u);
+    CHECK(!series->branch_confirming);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
+    noah_key_runtime_scan();
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(!series->active);
+    CHECK(last_delayed_action == TEST_ACTION);
+    CHECK(delayed_action_count == 1u);
+    CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
+}
+
 static void test_key_feedback_maps_keep_pending_hold_neutral_until_branch_commits(void) {
     uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
@@ -2120,6 +2160,7 @@ int main(void) {
     test_key_runtime_core_pending_multi_tap_release_resolution_uses_hold_action_after_term();
     test_key_runtime_core_pending_multi_tap_release_effect_plan_delays_action();
     test_key_runtime_core_direct_pending_multi_tap_release_helper_resets_slot();
+    test_base_tap_multi_tap_flush_skips_branch_confirm();
     test_key_feedback_maps_keep_pending_hold_neutral_until_branch_commits();
     test_key_feedback_maps_show_final_tap_only_neutral_pending_then_branch_commit();
     test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hold_threshold();

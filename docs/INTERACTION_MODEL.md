@@ -70,8 +70,9 @@ In plain terms:
 - crossing the longer-hold term can promote to the longer-hold tier
 - repeated taps must stay within the multi-tap term to remain part of the same
   sequence
-- once a tap branch is committed, the branch-confirm term can hold the model in
-  that committed branch before the tap, hold, or long-hold action fires
+- once a double-tap or higher branch is committed, the branch-confirm term can
+  hold the model in that committed branch before the tap, hold, or long-hold
+  action fires
 
 Foreign-key interruption only cancels the quick tap for true momentary-layer
 taps. Other authored hold families, such as press-registering modifier holds
@@ -85,7 +86,8 @@ must not reopen the key's quick-release tap or first-tap multi-tap path.
 
 One practical consequence is that a single tap on a multi-tap key is delayed by
 one multi-tap window so the firmware can tell whether you meant one tap or
-more.
+more. The base single-tap branch skips the branch-confirm window; that extra
+window is only for double-tap and higher committed branches.
 
 Those pending multi-tap windows are tracked per physical key. Pressing a
 different key does not flush an unrelated pending tap series by itself, so
@@ -251,10 +253,10 @@ also project its state into the RGB overlay.
 
 Shared semantics:
 
-- multi-tap pending shows the neutral unresolved color while the winning tap
-  branch is still undecided
-- committed tap branches can show a branch-color confirmation during the same
-  model-level branch-confirm window that delays the action
+- multi-tap pending shows the neutral unresolved color only for double-tap and
+  higher branches; the base single-tap candidate stays quiet while it waits
+- committed double-tap and higher branches can show a branch-color confirmation
+  during the same model-level branch-confirm window that delays the action
 - committed tap branches can pulse once after the tap output resolves; the
   authored RGB config can disable those pulses, limit them to double-tap and
   higher branches, or allow them for every tap branch

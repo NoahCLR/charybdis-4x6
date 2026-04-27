@@ -16,7 +16,9 @@ locality, migrated PD/combo/key-feedback RGB placement to one shared locality
 enum, added combo/key-feedback LED group authoring, added explicit
 interaction-feedback stage gates, added tap-branch confirmation colors, split
 key-feedback sync into semantic and branch packets, and updated the RGB
-authoring docs.
+authoring docs. Later follow-up tightened tap-branch feedback semantics so the
+base single-tap candidate stays quiet and only double-tap or higher branches
+emit unresolved or committed branch feedback.
 
 ## Findings
 
@@ -135,12 +137,14 @@ None.
   feedback path.
 - Key-behavior feedback now separates unresolved pending color, committed
   branch color, and action feedback. The authored config uses
-  `tap_pending_color` for the neutral unresolved state and
-  `RGB_TAP_BRANCH_COLORS(...)` for the model-level branch-confirm window before
-  tap/hold/long-hold actions fire. The runtime keeps tap branch state in a
-  separate packed map so the semantic map remains 3 bits per key and still fits
-  one QMK split transaction. Split sync treats key feedback as a packet family:
-  semantic state and tap-branch state are separate RPC payloads.
+  `tap_pending_color` for the neutral unresolved state on double-tap and higher
+  branches and `RGB_TAP_BRANCH_COLORS(...)` for their model-level
+  branch-confirm window before tap/hold/long-hold actions fire. The base
+  single-tap candidate remains a quiet pending series rather than branch
+  feedback. The runtime keeps tap branch state in a separate packed map so the
+  semantic map remains 3 bits per key and still fits one QMK split transaction.
+  Split sync treats key feedback as a packet family: semantic state and
+  tap-branch state are separate RPC payloads.
 - Foreign non-handled key presses now flush pending multi-tap actions before
   the key leaves userspace for the normal QMK path. This preserves independent
   authored-key pending chains while making terminal tap-only actions such as
@@ -271,13 +275,14 @@ the base single-tap branch quiet. Deferred tap dispatches carry the tap-commit
 pulse through pending-release drain, so feedback remains aligned with the
 actual output projection instead of firing early while a sibling tap-release
 blocker is still live.
-Pending multi-tap feedback now stays neutral while the branch is unresolved.
-When the runtime commits a tap branch, it enters a timed
-`KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED` model state carrying the committed
-tap branch in the tap-branch map. The tap, hold, or long-hold action is delayed
-until that branch-confirm window completes, so every tap level follows the same
-visual and behavioral order: pending, branch confirmation, then action
-feedback.
+Pending multi-tap feedback now stays neutral while a non-base branch is
+unresolved. When the runtime commits a double-tap or higher branch, it enters a
+timed `KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED` model state carrying the
+committed tap branch in the tap-branch map. The tap, hold, or long-hold action
+for that non-base branch is delayed until the branch-confirm window completes,
+so non-base tap levels follow the same visual and behavioral order: pending,
+branch confirmation, then action feedback. The base single-tap branch remains
+quiet and dispatches immediately after the multi-tap window expires.
 For release-hold branches such as `LEFT_THUMB` double-tap hold to `KC_ESC`,
 branch feedback is independent from tap-commit feedback. This matters when the
 release event itself is the first event after `tap_hold_term`: the runtime can

@@ -919,7 +919,7 @@ def parse_key_behavior_feedback_colors(
                     {
                         "field": f"tap_branch_{index}_color",
                         "label": f"Tap Branch {index}",
-                        "meaning": "Visible branch-confirmation window while that tap index is the committed branch. Higher committed tap indexes clamp to the last configured branch color.",
+                        "meaning": "Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color.",
                         "color": authored_color,
                         "preview_color": dict(authored_color),
                     },
@@ -927,7 +927,7 @@ def parse_key_behavior_feedback_colors(
             )
 
     default_meanings = {
-        "tap_pending_color": "Neutral unresolved multi-tap state while the runtime is still waiting to know which tap index wins.",
+        "tap_pending_color": "Neutral unresolved multi-tap state for double-tap and higher branches while the runtime is still waiting to know which tap index wins; the base single-tap candidate stays quiet.",
         "tap_committed_color": "Action feedback after committed tap branches that do not already have state feedback.",
         "hold_active_color": "Authored hold-tier pending / active states and hold-tier commit pulses.",
         "long_hold_active_color": "Authored long-hold-tier active states and long-hold-tier commit pulses.",
@@ -1914,6 +1914,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         f"- `tap_hold(...)`, `long_hold(...)`, `multi_tap(...)`, and `branch_confirm(...)` use the default timings from {config_link}",
         "- `tap_hold=...`, `long_hold=...`, `multi_tap=...`, and `branch_confirm=...` are custom timings authored on that key",
         "- `release before tap_hold(...); otherwise normal hold` means the tap fires on a quick release; if you keep holding, the key keeps its normal hold behavior",
+        "- `branch_confirm(...)` is only applied to double-tap and higher committed branches; a base single tap on a multi-tap key waits only the multi-tap window",
         "- Timing is shown per tap count, so each row lists only the timings that matter for that behavior",
         "",
     ]
@@ -2958,6 +2959,7 @@ def format_timing_for_step(
             parts.append(f"multi_tap={behavior['multi_tap_term']}")
         else:
             parts.append(f"multi_tap({timing_defaults['multi_tap']})")
+    if needs_multi_tap and step["tap_count"] > 0:
         if behavior["branch_confirm_term"] is not None:
             parts.append(f"branch_confirm={behavior['branch_confirm_term']}")
         else:

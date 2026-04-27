@@ -201,9 +201,10 @@ tap, hold, longer-hold, and multi-tap behavior like the rest of the board.
 If that authored tap path can branch into a different pointing mode, the
 runtime defers the first mode until the hold threshold so two mode lifecycles
 do not overlap while the tap count is still unresolved.
-Committed tap branches can also hold in a branch-confirmation window before
-their tap, hold, long-hold, or PD-mode action fires, so RGB feedback and the
-actual model use the same timing.
+Committed double-tap and higher branches can also hold in a
+branch-confirmation window before their tap, hold, long-hold, or PD-mode action
+fires, so RGB feedback and the actual model use the same timing. The base
+single-tap branch skips that confirmation window after its multi-tap wait.
 
 The current runtime supports these mode families:
 
@@ -248,9 +249,10 @@ The runtime supports:
 - optional auto-mouse countdown gradient feedback
 - optional truthful key-behavior state feedback on both halves, a fixed half,
   only the key half, or only the key itself
-- optional tap-branch confirmation colors so committed multi-tap and tap-hold
-  branches can show which branch won before action feedback takes over, with
-  higher hold tiers replacing older feedback once their behavior commits
+- optional tap-branch confirmation colors so committed double-tap and higher
+  branches can show which branch won before action feedback takes over, while
+  base single-tap candidates stay quiet and higher hold tiers replace older
+  feedback once their behavior commits
 - optional key-behavior feedback LED group highlights
 
 With the default feedback stages enabled, RGB is not just there to look nice.
