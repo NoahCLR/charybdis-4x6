@@ -57,12 +57,9 @@ Timing legend for the layer-local behavior tables:
 | `3` | `3` (`KC_3`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_HASH)` | `-` | `tap_hold(150)` |
 | `4` | `4` (`KC_4`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DLR)` | `-` | `tap_hold(150)` |
 | `5` | `5` (`KC_5`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_PERC)` | `-` | `tap_hold(150)` |
-| `6` | `6` (`KC_6`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_CIRC)` | `-` | `tap_hold(150), multi_tap(150)` |
-| `6` | `6` (`KC_6`) | `double` | `TAP_SENDS(KC_MPLY)` | `-` | `-` | `multi_tap(150), branch_confirm(150)` |
-| `7` | `7` (`KC_7`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_AMPR)` | `-` | `tap_hold(150), multi_tap(150)` |
-| `7` | `7` (`KC_7`) | `double` | `TAP_SENDS(KC_MNXT)` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `-` | `tap_hold(150), multi_tap(150), branch_confirm(150)` |
-| `8` | `8` (`KC_8`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR)` | `-` | `tap_hold(150), multi_tap(150)` |
-| `8` | `8` (`KC_8`) | `double` | `TAP_SENDS(KC_MPRV)` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `-` | `tap_hold(150), multi_tap(150), branch_confirm(150)` |
+| `6` | `6` (`KC_6`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_CIRC)` | `-` | `tap_hold(150)` |
+| `7` | `7` (`KC_7`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_AMPR)` | `-` | `tap_hold(150)` |
+| `8` | `8` (`KC_8`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR)` | `-` | `tap_hold(150)` |
 | `9` | `9` (`KC_9`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LPRN)` | `-` | `tap_hold(150)` |
 | `0` | `0` (`KC_0`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RPRN)` | `-` | `tap_hold(150)` |
 | `-` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `tap_hold(150)` |
@@ -317,10 +314,11 @@ Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAP
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
 | `Tap Pending` | Neutral unresolved multi-tap state for double-tap and higher branches while the runtime is still waiting to know which tap index wins; the base single-tap candidate stays quiet. | `HSV(0, 0, 150)` | <img alt="Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
-| `Tap Branch 1` | Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(169, 255, 200)` | <img alt="Tap Branch 1 color" src="media/profile-introspection/profile-color-swatch-0006ff.svg" width="96" height="28" /> |
-| `Tap Branch 2` | Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(213, 255, 200)` | <img alt="Tap Branch 2 color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
-| `Tap Branch 3` | Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(43, 255, 200)` | <img alt="Tap Branch 3 color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
-| `Tap Branch 4` | Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(235, 255, 200)` | <img alt="Tap Branch 4 color" src="media/profile-introspection/profile-color-swatch-ff0078.svg" width="96" height="28" /> |
+| `Tap Branch 1` | Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(235, 255, 200)` | <img alt="Tap Branch 1 color" src="media/profile-introspection/profile-color-swatch-ff0078.svg" width="96" height="28" /> |
+| `Tap Branch 2` | Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(200, 255, 200)` | <img alt="Tap Branch 2 color" src="media/profile-introspection/profile-color-swatch-b400ff.svg" width="96" height="28" /> |
+| `Tap Branch 3` | Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(180, 255, 200)` | <img alt="Tap Branch 3 color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
+| `Tap Branch 4` | Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(143, 255, 200)` | <img alt="Tap Branch 4 color" src="media/profile-introspection/profile-color-swatch-00a2ff.svg" width="96" height="28" /> |
+| `Tap Branch 5` | Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(85, 255, 200)` | <img alt="Tap Branch 5 color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
 | `Tap Committed` | Used for committed tap branches that do not already have state feedback. | `HSV(85, 255, 200)` | <img alt="Tap Committed color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
 | `Hold Active` | Used for authored hold-tier pending / active states and commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff6c00.svg" width="96" height="28" /> |
 | `Long Hold Active` | Used for authored long-hold-tier active states and commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-0084ff.svg" width="96" height="28" /> |
@@ -389,7 +387,7 @@ No active authored layer LED group rows are configured.
 | `layer_count` | `5` |
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `33` |
-| `key_behavior_step_count` | `47` |
+| `key_behavior_step_count` | `44` |
 | `combo_count` | `4` |
 | `via_macro_count` | `16` |
 | `via_macro_non_empty_count` | `10` |
@@ -450,7 +448,7 @@ These values come from the keymap config and the shared userspace config. When t
 | `CUSTOM_TAP_HOLD_TERM` | `150` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CUSTOM_LONGER_HOLD_TERM` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CUSTOM_MULTI_TAP_TERM` | `150` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
-| `CUSTOM_TAP_BRANCH_CONFIRM_TERM` | `CUSTOM_MULTI_TAP_TERM` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `CUSTOM_TAP_BRANCH_CONFIRM_TERM` | `150` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CHARYBDIS_DRAGSCROLL_DPI` | `100` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `PD_MODE_VOLUME_DPI` | `0` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `PD_MODE_BRIGHTNESS_DPI` | `0` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |

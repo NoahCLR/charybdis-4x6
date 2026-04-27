@@ -653,7 +653,7 @@ def eval_numeric_expr(expr: str, known_values: dict[str, str]) -> int:
 
 
 def parse_hsv_expr(expr: str, known_values: dict[str, str]) -> dict[str, object]:
-    normalized = normalize_expr(expr)
+    normalized = normalize_expr(strip_comments(expr))
     if not normalized.startswith("HSV(") or not normalized.endswith(")"):
         die(f"expected HSV(...) color expression, got: {expr!r}")
     parts = split_top_level(normalized[4:-1])
@@ -910,7 +910,7 @@ def parse_key_behavior_feedback_colors(
     if tap_branch_match is not None:
         args_start = tap_branch_match.end() - 1
         args_end = find_matching(body, args_start, "(", ")")
-        tap_branch_args = body[args_start + 1 : args_end]
+        tap_branch_args = strip_comments(body[args_start + 1 : args_end])
         for index, expr in enumerate(split_top_level(tap_branch_args), start=1):
             authored_color = parse_hsv_expr(expr, known_values)
             colors.append(
