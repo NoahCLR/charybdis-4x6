@@ -53,6 +53,10 @@ includes:
 - auto-mouse, combo-feedback, and key-behavior feedback colors with generated
   swatches
 
+The parser accepts normal C comments in authored inputs. In RGB authoring, this
+includes comments next to `HSV(...)` arguments inside helper macros such as
+`RGB_TAP_BRANCH_COLORS(...)`.
+
 ## Commands
 
 Run from the repo root with Python 3.

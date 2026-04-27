@@ -171,6 +171,12 @@ already released before QMK emits the combo output. Combo-backed multi-tap
 behaviors that complete inside their authored tap window therefore do not lose
 that tap chain to QMK's output delay.
 
+Combo outputs that match an authored `key_behaviors[]` keycode use the same
+tap, hold, and multi-tap rules as the physical key. That includes release-time
+tap settlement: a terminal `TAP_SENDS(...)` branch reached by tapping a combo
+does not fire on the combo press itself; it commits when the combo output
+release settles the tap branch.
+
 That footprint tracking follows the live resolved keycodes QMK sees, so dynamic
 keymap changes remain authoritative. It is not guessed from static comments or
 hardcoded layout assumptions.

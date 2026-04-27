@@ -89,6 +89,13 @@ That keeps the layout readable while still giving one easy chorded `Tab`, one
 pointer-specific utility chord, and two right-side paths to the authored
 `KC_LEFT_GUI` behavior row.
 
+Those two Cmd combos are normal QMK combo outputs, not special one-off runtime
+cases. Once QMK emits `KC_LEFT_GUI`, the shared key-behavior engine sees the
+same keycode as the physical thumb Cmd key: single tap or hold stays normal
+left `Cmd`, the second tap branch can hold `Left Alt`, and the third tap branch
+sends one-shot `Shift`. The tap branch is committed by the combo output release,
+so the third-tap `OSM(MOD_LSFT)` is not sent on the third combo press itself.
+
 Combo outputs now keep two runtime views at once:
 
 - one representative owner key for release matching and other ownership paths
@@ -128,13 +135,9 @@ Single holds on `1` through `0` expose the shifted symbol family:
 - `9` -> `(`
 - `0` -> `)`
 
-Some keys then grow higher-tap behavior:
-
-- double tap `6` -> play/pause
-- double tap `7` -> next track
-- hold the second tap of `7` -> keep next-track held
-- double tap `8` -> previous track
-- hold the second tap of `8` -> keep previous-track held
+Those number-row keys currently stop at the single-tap hold symbol layer. Media
+multi-tap behavior lives on the custom thumb keys and the navigation layer
+instead.
 
 The base-layer punctuation keys follow the same pattern on hold:
 
@@ -197,6 +200,8 @@ These are small profile-specific quality-of-life keys:
 - `KC_ENT`: hold `Shift+Enter`
 - `KC_LEFT_SHIFT`: tap `Caps Lock`, hold normal left `Shift`
 - `KC_RIGHT_ALT`: tap `ARROW_MODE_LOCK`, hold normal right `Alt`
+- `KC_LEFT_GUI`: single tap or hold normal left `Cmd`, double-tap hold
+  `Left Alt`, triple tap one-shot `Shift`
 
 `KC_RIGHT_ALT` is a good example of the profile using a plain key's default held
 path while still stealing its tap for something more specialized. That matters

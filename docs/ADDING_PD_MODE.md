@@ -289,6 +289,9 @@ Common lockable patterns are:
 - quick double tap: lock the mode when `[1].tap = TAP_SENDS(EXAMPLE_MODE_LOCK)`
 - double-tap hold: lock the mode when `[1].hold = TAP_AT_HOLD_THRESHOLD(EXAMPLE_MODE_LOCK)`
 
+`TAP_SENDS(...)` actions are tap outcomes, so they settle on release or pending
+tap-series expiry rather than on the press that first reaches that tap count.
+
 Example:
 
 ```c

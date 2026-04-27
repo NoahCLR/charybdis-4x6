@@ -89,6 +89,12 @@ one multi-tap window so the firmware can tell whether you meant one tap or
 more. The base single-tap branch skips the branch-confirm window; that extra
 window is only for double-tap and higher committed branches.
 
+Tap actions are release-settled. Reaching a tap-count branch on press selects
+the candidate branch, but `TAP_SENDS(...)` is selected by release or pending
+tap-series expiry, then emitted after any configured branch-confirm window. For
+terminal tap-only multi-tap branches, this means the final press can identify
+the branch before the action has actually been sent.
+
 Those pending multi-tap windows are tracked per physical key. Pressing a
 different key does not flush an unrelated pending tap series by itself, so
 independent keys can keep separate tap counts and timing windows alive at the
@@ -220,6 +226,11 @@ That lets one key combine patterns such as:
 - persistent layer change on a tap or higher-tap hold
 - media or alternate actions on later taps
 - branching into a different action family on a later press
+
+Combo outputs follow the same rules when their output keycode has an authored
+behavior row. A combo that emits `KC_LEFT_GUI`, for example, participates in
+the `KC_LEFT_GUI` tap series like the physical key, but tap actions still settle
+from the combo output release rather than from the combo output press.
 
 ## Pointer-Mode Keys
 

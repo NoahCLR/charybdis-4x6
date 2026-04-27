@@ -911,15 +911,15 @@ def parse_key_behavior_feedback_colors(
         args_start = tap_branch_match.end() - 1
         args_end = find_matching(body, args_start, "(", ")")
         tap_branch_args = strip_comments(body[args_start + 1 : args_end])
-        for index, expr in enumerate(split_top_level(tap_branch_args), start=1):
+        for tap_index, expr in enumerate(split_top_level(tap_branch_args)):
             authored_color = parse_hsv_expr(expr, known_values)
             colors.append(
                 (
-                    tap_branch_match.start() + index,
+                    tap_branch_match.start() + tap_index,
                     {
-                        "field": f"tap_branch_{index}_color",
-                        "label": f"Tap Branch {index}",
-                        "meaning": "Configured branch-confirmation color for this tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color.",
+                        "field": f"tap_index_{tap_index}_branch_color",
+                        "label": f"Tap Index {tap_index}",
+                        "meaning": "Configured branch-confirmation color for this zero-based tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color.",
                         "color": authored_color,
                         "preview_color": dict(authored_color),
                     },

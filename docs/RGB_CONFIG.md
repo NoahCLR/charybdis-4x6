@@ -324,8 +324,11 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .tap_pending_color = HSV(0, 0, 150),
 
     RGB_TAP_BRANCH_COLORS(
-        HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        HSV(235, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 0
+        HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 1
+        HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 2
+        HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 3
+        HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap index 4
     ),
 
     .tap_committed_color     = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
@@ -354,8 +357,12 @@ same pending window.
 
 The `RGB_TAP_BRANCH_COLORS(...)` macro declares the confirmation colors used
 while a committed double-tap or higher branch is being held in the model-level
-branch-confirm window. The color table is indexed by tap branch count; higher
-committed tap indexes clamp to the last configured branch color.
+branch-confirm window. The color table is authored in zero-based tap-index
+order, matching `key_behaviors[].tap_counts[]`. The base single-tap index is
+normally quiet, while double-tap and higher committed indexes use their matching
+entry and clamp to the last configured branch color if they exceed the table.
+Inline C comments next to those `HSV(...)` arguments are allowed and are
+ignored by the profile introspector.
 
 The `tap_commit_mode` field controls which committed tap branches pulse with
 `tap_committed_color`:
@@ -612,8 +619,9 @@ checks that at compile time.
 
 ### Change the key-behavior feedback colors
 
-Edit the three designated initializer rows in
-[`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
+Edit the `HSV(...)` values in `key_behavior_feedback_colors` in
+[`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
+including any `RGB_TAP_BRANCH_COLORS(...)` entries that should change.
 
 ### Disable combo feedback
 
