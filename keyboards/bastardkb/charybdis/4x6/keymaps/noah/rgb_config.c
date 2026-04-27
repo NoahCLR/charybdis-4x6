@@ -44,10 +44,10 @@
 //
 // Define reusable physical groups here, then reference them from any
 // per-stage LED group table below.
-#define RGB_LED_GROUP_LEFT_THUMB  RGB_LED_GROUP(26, 27, 28, 25, 24)
-#define RGB_LED_GROUP_RIGHT_THUMB RGB_LED_GROUP(53, 54, 55)
-#define RGB_LED_GROUP_THUMBS      RGB_LED_GROUP(26, 27, 28, 25, 24, 53, 54, 55)
-#define RGB_LED_GROUP_TRACKBALL   RGB_LED_GROUP(56)
+#    define RGB_LED_GROUP_LEFT_THUMB RGB_LED_GROUP(26, 27, 28, 25, 24)
+#    define RGB_LED_GROUP_RIGHT_THUMB RGB_LED_GROUP(53, 54, 55)
+#    define RGB_LED_GROUP_THUMBS RGB_LED_GROUP(26, 27, 28, 25, 24, 53, 54, 55)
+#    define RGB_LED_GROUP_TRACKBALL RGB_LED_GROUP(56)
 
 // ─── Layer colors ───────────────────────────────────────────────────────────
 //
@@ -279,12 +279,12 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .tap_pending_color = HSV(0, 0, 150),
 
-    RGB_TAP_BRANCH_COLORS(
-        HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-        HSV(235, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-    ),
+    RGB_TAP_BRANCH_COLORS(HSV(235, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 0
+                          HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 1
+                          HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 2
+                          HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 3
+                          HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap index 4
+                          ),
 
     // Used for committed tap branches that do not already have state feedback.
     .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
