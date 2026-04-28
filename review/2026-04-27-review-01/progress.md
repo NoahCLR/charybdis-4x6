@@ -1115,7 +1115,7 @@ Starting worktree status:
 ## Finding Status
 
 - Key runtime accumulator remains partially resolved. The extracted modules are real improvements, but `runtime.h` still stores broad reducer state and `runtime.c` still owns press/tap orchestration.
-- Owner ledgers remain partially resolved. Projection direction is documented and PD lock observation is gated, but layer-lock write-back lacks an equivalent compile-gate boundary.
+- Audit-time status: owner ledgers remained partially resolved because layer-lock write-back lacked an equivalent compile-gate boundary. This was superseded by the following `Owner Ledger Bridge Enforcement` pass.
 - Audit-time status: modifier masking/replay remained partially resolved because `noah_emit_policy_t` still owned a separate preservation path. This was superseded by the following `Modifier Policy Closure` pass.
 - Audit-time status: no partial finding was marked resolved in this audit. This was superseded for modifier masking/replay by the following `Modifier Policy Closure` pass.
 
@@ -1127,8 +1127,8 @@ Host tests and firmware compile were intentionally skipped because this pass onl
 
 ## Next Steps
 
-1. Decide whether to add a compile-gate guard for the layer-lock bridge.
-2. Decide whether `noah_emit_policy_t` stays action-owned or moves behind a higher-level modifier replay planner.
+1. Audit-time next step: decide whether to add a compile-gate guard for the layer-lock bridge. This was superseded by the following `Owner Ledger Bridge Enforcement` pass.
+2. Audit-time next step: decide whether `noah_emit_policy_t` stays action-owned or moves behind a higher-level runtime modifier replay planner. This was superseded by the following `Modifier Policy Closure` pass.
 3. Avoid generic `runtime.c` splitting unless a clear next owner boundary emerges.
 
 ## 2026-04-28 - Modifier Policy Closure
@@ -1151,7 +1151,7 @@ Starting worktree status:
 
 - Modifier masking/replay is resolved.
 - `noah_emit_policy_t` remains action-owned intent, but no longer owns modifier preservation mechanics.
-- Remaining partial findings are key runtime accumulator and owner-ledger bridge enforcement.
+- Remaining partial finding is key runtime accumulator.
 
 ## Verification
 
@@ -1184,5 +1184,49 @@ All listed pass/fail commands passed. The `--no-index` whitespace checks returne
 
 ## Next Steps
 
-1. Continue with owner-ledger bridge enforcement or runtime accumulator cleanup.
+1. Continue with runtime accumulator cleanup only if a clear owner boundary emerges.
 2. Keep `keyboard_mod_policy.h` as the modifier replay/preserve owner for future action dispatch, delayed action, process, and PD-mode changes.
+
+## 2026-04-28 - Owner Ledger Bridge Enforcement
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added a compile-gate rule to `tests/host/run_feature_gate_compile_tests.sh` that only allows `users/noah/lib/state/ownership/layer_ownership.c` to call `key_runtime_core_layer_lock_set()` outside the core declaration/definition.
+- Kept `layer_ownership_set_lock_state()` as the accepted layer-lock bridge into key-runtime shadow state.
+- Updated `docs/KEY_RUNTIME.md` to state that feature gates enforce both lock bridge directions.
+- Updated `userspace-architecture-review.md` so the owner-ledger finding is marked resolved and the follow-up audit reconciliation note reflects the new gate.
+
+## Finding Status
+
+- Owner-ledger bridge enforcement is resolved.
+- PD lock observation remains gated through `pd_mode_key_runtime_bridge.c`.
+- Layer-lock write-back is now gated through `layer_ownership.c`.
+- The remaining partially resolved finding is the broad key-runtime accumulator.
+
+## Verification
+
+Post-change targeted checks:
+
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_layer_ownership_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+All listed post-change targeted checks passed.
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+All listed final checks passed.
+
+## Next Steps
+
+1. Keep new cross-ledger write-backs behind documented bridge points and compile-gate updates.
+2. Continue runtime accumulator cleanup only if a clear owner boundary emerges.

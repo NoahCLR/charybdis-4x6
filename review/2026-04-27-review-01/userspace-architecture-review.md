@@ -71,11 +71,11 @@ Recommended direction:
 - Treat pending-release queue storage as core-owned state; keep queue mechanics behind `pending_release_queue.c`.
 - Keep the existing release matrix, modifier-hold, PD-mode, scenario, layer-lock, runtime-debug, full host, and firmware compile checks as the safety net.
 
-### Partially Resolved: Multiple Owner Ledgers Track the Same Runtime Facts
+### Resolved: Multiple Owner Ledgers Track Runtime Facts Through Explicit Bridges
 
 Several modules track "who owns this held effect" independently. Some are necessary QMK-facing registries, but the current design makes authority easy to blur.
 
-Status as of 2026-04-28: partially resolved. `docs/KEY_RUNTIME.md` now contains an ownership authority map that labels reducer-owned state, release planner state, pending-release transport, projected ownership registries, PD runtime ownership, feedback projection, and combo-origin compatibility state. Runtime effect execution now flows through `users/noah/lib/key/runtime/core/projection.c` instead of a local switch in `runtime.c`, and reducer-owned lease/persistent-intent mechanics now live in `users/noah/lib/key/runtime/core/ownership_state.c` instead of being embedded in the main reducer file. The code still has real bridge points, especially layer lock write-back through `layer_ownership_set_lock_state()` and PD lock observation through `pd_mode_key_runtime_bridge_observe_local_lock_state()`, so this is not fully resolved yet.
+Status as of 2026-04-28: resolved. `docs/KEY_RUNTIME.md` now contains an ownership authority map that labels reducer-owned state, release planner state, pending-release transport, projected ownership registries, PD runtime ownership, feedback projection, and combo-origin compatibility state. Runtime effect execution now flows through `users/noah/lib/key/runtime/core/projection.c` instead of a local switch in `runtime.c`, and reducer-owned lease/persistent-intent mechanics now live in `users/noah/lib/key/runtime/core/ownership_state.c` instead of being embedded in the main reducer file. The remaining two-way bridge points are intentional: layer lock write-back through `layer_ownership_set_lock_state()` and PD lock observation through `pd_mode_key_runtime_bridge_observe_local_lock_state()`. `tests/host/run_feature_gate_compile_tests.sh` now mechanically guards both bridge directions.
 
 Evidence:
 
@@ -88,7 +88,8 @@ Evidence:
 - PD local owners are tracked in `users/noah/lib/pointing/runtime/pd_mode_state.c:117-284`.
 - `users/noah/lib/state/runtime/runtime_context_internal.h:49-56` aggregates these ledgers into one runtime context.
 - `docs/KEY_RUNTIME.md` now states the intended write direction: core reducer state plans effects, `core/projection.c` applies QMK/action/layer/modifier/PD side effects, and compatibility bridges must not become independent key-runtime ownership truth.
-- Current two-way bridge points remain in `users/noah/lib/state/ownership/layer_ownership.c:116-140` and `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`.
+- Current two-way bridge points are `users/noah/lib/state/ownership/layer_ownership.c:116-140` and `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c:1-7`.
+- `tests/host/run_feature_gate_compile_tests.sh:129-167` prevents PD runtime modules other than the bridge from calling the key-runtime PD lock observer and prevents repo-owned production code other than `layer_ownership.c` from calling `key_runtime_core_layer_lock_set()`.
 
 Why it matters:
 
@@ -96,9 +97,9 @@ The system has both intended ownership in core leases and applied ownership in s
 
 Recommended direction:
 
-- Use the ownership authority map as the contract for the next code split.
-- Add or preserve compile gates and host tests that enforce the declared direction of writes.
-- Reduce direct cross-ledger mutation where one authoritative reducer can project changes.
+- Keep the ownership authority map as the contract for future bridge changes.
+- Keep compile gates and host tests that enforce the declared direction of writes.
+- Treat any new direct cross-ledger mutation as architecture work requiring review-note and compile-gate updates.
 
 ### Resolved: PD Mode Authority Boundary Is Explicit
 
@@ -221,11 +222,9 @@ The highest-value next work is not a broad rewrite. Release behavior and modifie
 
 ## Recommended Next Refactor Sequence
 
-1. Audit and close, or explicitly keep open, the remaining partially resolved areas: runtime accumulator and owner ledgers.
-2. For owner ledgers, decide whether the layer-lock write-back bridge needs the same compile-gate enforcement style as the PD lock bridge.
-3. Continue splitting remaining `runtime.c` and `runtime.h` accumulator concerns only when a clear owner emerges, such as a press/tap orchestration module.
-4. Tighten `qmk_combo_origin` later, after the user is ready to work on combo compatibility.
-5. Clean up low-risk duplication only after the authority and release work is stable.
+1. Continue splitting remaining `runtime.c` and `runtime.h` accumulator concerns only when a clear owner emerges, such as a press/tap orchestration module.
+2. Tighten `qmk_combo_origin` later, after the user is ready to work on combo compatibility.
+3. Clean up low-risk duplication only after the authority and release work is stable.
 
 ## 2026-04-28 Partial Finding Audit
 
@@ -237,9 +236,9 @@ Prompt used: `prompts/follow-up-architecture-audit.md`.
 
 Reconciliation note after remediation: resolved. The audit-time concern was valid when action dispatch still called `keyboard_mod_state_suspend()` and `keyboard_mod_state_apply()` directly. That has now landed behind `keyboard_mod_policy_begin_preserve_all()` and `keyboard_mod_policy_end_preserve_all()` in `users/noah/lib/action/action_dispatch.c:16-50`. Masked synthetic QMK taps use `keyboard_mod_policy_begin_masked_emit()` and `keyboard_mod_policy_end_masked_emit()` in `users/noah/lib/action/action_dispatch.c:64-72`. Delayed replay and process real-mod masking also route through `keyboard_mod_policy` in `users/noah/lib/key/runtime/delayed_action.c:15-20` and `users/noah/lib/key/runtime/process.c:48-75`. `noah_emit_policy_t` remains action-dispatch intent, but it no longer owns modifier preservation mechanics.
 
-#### Should-Fix: Layer-lock write-back is documented but not mechanically guarded like PD lock observation
+#### Resolved: Layer-lock write-back is mechanically guarded like PD lock observation
 
-The owner-ledger direction is much clearer than the original review snapshot: `core/projection.c:21-88` projects effects outward, and `docs/KEY_RUNTIME.md:128-140` documents the authority map. PD lock observation has an explicit bridge in `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c:1-7` plus a compile gate in `tests/host/run_feature_gate_compile_tests.sh:129-152`. Layer lock write-back remains an accepted two-way bridge through `users/noah/lib/state/ownership/layer_ownership.c:116-140`, which calls `key_runtime_core_layer_lock_set()`, but there is no equivalent compile-gate rule limiting that core write-back to the documented bridge. This is not a behavior bug, but it is why the owner-ledger finding should remain partially resolved.
+Reconciliation note after remediation: resolved. The audit-time concern was valid when only the PD lock bridge had mechanical enforcement. `tests/host/run_feature_gate_compile_tests.sh:154-167` now prevents repo-owned production code other than `users/noah/lib/state/ownership/layer_ownership.c` from calling `key_runtime_core_layer_lock_set()`, while still allowing the core declaration/definition in `ownership_state.h/.c`.
 
 #### Optional Cleanup: Runtime core remains broad, but further splitting needs a better target
 
@@ -251,7 +250,7 @@ The owner-ledger direction is much clearer than the original review snapshot: `c
 | --- | --- | --- |
 | Key Runtime Core Is an Ad-Hoc Policy Accumulator | partially resolved | Extracted modules now own release planning, projection, scan planning, ownership state, pending-release queueing, state queries, feedback projection, and PD projection. `runtime.h` still exposes the broad core state shape, and `runtime.c` remains the press/tap orchestration owner. |
 | Release Semantics Are Consolidated | resolved | Code references: `core/release_planner.h`, `core/release_planner.c`, `deferred_release.c`, `core/pending_release_queue.c`, and thin `release.c` adapter. Enforcement references: release matrix, scenario, runtime debug, full host, compile gate, and firmware compile checks recorded in `progress.md`. Exact passed commands: `sh tests/host/run_key_runtime_release_matrix_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
-| Multiple Owner Ledgers Track the Same Runtime Facts | partially resolved | Projection direction and authority docs are much clearer, and PD lock observation is mechanically gated. The layer-lock write-back bridge remains documented but not mechanically guarded in the same way. |
+| Multiple Owner Ledgers Track the Same Runtime Facts | resolved | Code references: `core/projection.c`, `core/ownership_state.c`, `layer_ownership.c`, `pd_mode_key_runtime_bridge.c`, and `pd_mode_state.c`. Enforcement references: ownership authority map in `docs/KEY_RUNTIME.md`, layer-lock bridge and PD-lock bridge checks in `tests/host/run_feature_gate_compile_tests.sh`, layer ownership tests, layer-lock integration tests, runtime debug tests, full host, and firmware compile. Exact passed commands include `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
 | PD Mode Authority Boundary Is Explicit | resolved | Code references: `core/pd_projection.c`, `pd_mode_state.c`, `pd_mode_key_runtime_bridge.c`, and `ownership_state.c`. Enforcement references: `tests/host/run_feature_gate_compile_tests.sh:129-152` plus PD/key-runtime and PD runtime tests recorded in `progress.md`. Exact passed commands: `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
 | Combo Origin Is a Large Shadow Compatibility Patch | open | Not audited in depth in this pass because the user explicitly deferred combo work. The finding remains open. |
 | Modifier Masking and Replay Are Spread Across Subsystems | resolved | Code references: `keyboard_mod_policy.h`, `keyboard_mod_policy.c`, `action_dispatch.c`, `delayed_action.c`, `process.c`, `runtime.c`, `transition.c`, `deferred_release.c`, and `pd_mode_pinch.c`. Enforcement references: direct keyboard mod policy tests in `keyboard_mod_ownership_test.c`, action dispatch tests, delayed action tests, modifier-hold integration, PD mode tests, PD/key-runtime integration, feature gate, full host, and firmware compile. Exact passed commands include `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_action_dispatch_tests.sh`, `sh tests/host/run_delayed_action_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
@@ -260,11 +259,10 @@ The owner-ledger direction is much clearer than the original review snapshot: `c
 
 ### Current Conclusion
 
-After modifier remediation, two partial findings remain accurate: owner ledgers need a decision about layer-lock bridge enforcement, and runtime accumulator cleanup should wait for a clearer next owner boundary. Modifier masking/replay is resolved.
+After modifier and owner-ledger remediation, only the runtime accumulator partial remains accurate. Further runtime accumulator cleanup should wait for a clearer next owner boundary.
 
 ### Remaining Open Findings
 
-- Add or explicitly decline a compile-gate guard for the layer-lock bridge.
 - Keep runtime accumulator cleanup focused on a real owner boundary, not a generic file-size split.
 - Leave combo-origin compatibility work for a later pass, per user preference.
 
