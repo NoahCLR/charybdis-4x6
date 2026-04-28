@@ -58,6 +58,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/transition.c" \
     "$ROOT/users/noah/lib/key/runtime/core/runtime.c" \
+    "$ROOT/users/noah/lib/key/runtime/core/release_planner.c" \
     "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \

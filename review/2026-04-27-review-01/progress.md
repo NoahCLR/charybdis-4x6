@@ -52,9 +52,9 @@ Starting worktree status:
 
 ## Next Steps
 
-1. Continue release consolidation by moving active-release and pending multi-tap effect planning out of `runtime.c`.
+1. Decide whether pending multi-tap release resolution should move behind the release planner too, or stay in `runtime.c` as state-gathering reducer logic.
 2. Write an ownership authority map for core leases and subsystem ledgers.
-3. Split `runtime.c` into smaller internal modules after tests prove parity.
+3. Split more of `runtime.c` into smaller internal modules after tests prove parity.
 4. Tighten the `qmk_combo_origin` compatibility contract and coverage.
 5. Centralize keyboard modifier mask/replay policy.
 6. Clean up low-risk duplicate helpers after the authority and release work is stable.
@@ -85,6 +85,8 @@ Starting worktree status:
 - Still open:
   - active-release and pending multi-tap effect planning still live in `runtime.c`
   - pending-release queue ownership remains in `runtime.c`
+
+Reconciliation note: active-release and pending multi-tap effect planning was moved out of `runtime.c` in the later 2026-04-28 release effect planner extraction recorded below. Pending-release queue ownership remains open.
 
 ## Verification
 
@@ -117,6 +119,66 @@ All listed pass/fail commands passed. The `--no-index` whitespace check returned
 
 ## Next Steps
 
-1. Extract active-release and pending multi-tap effect planning from `runtime.c` into the release planner/internal release module.
-2. Add or preserve host coverage that proves pending-release queue ownership and deferred dispatch ordering during that extraction.
-3. Keep the release finding open until full host tests and firmware compile pass after the effect-planning extraction.
+1. Decide whether pending multi-tap release resolution should move behind the release planner too, or stay in `runtime.c` as state-gathering reducer logic.
+2. Add or preserve host coverage that proves pending-release queue ownership and deferred dispatch ordering before changing the pending-release queue.
+3. Keep the release finding open until full host tests and firmware compile pass after the remaining release resolution or pending-release queue work.
+
+## 2026-04-28 - Release Effect Planner Extraction
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/core/release_planner.c` for active-release and pending multi-tap release effect planning.
+- Removed the corresponding release effect-plan push helpers and release effect planning functions from `users/noah/lib/key/runtime/core/runtime.c`.
+- Exposed narrow internal helpers through `users/noah/lib/key/runtime/core/release_internal.h` so the release planner can validate key positions, inspect tap series, start branch-confirm windows, reset pending multi-tap state, and apply tap-commit feedback policy without duplicating that logic.
+- Wired the new source file into `users/noah/source_manifest.mk`.
+- Updated host source manifests and manual key-runtime integration runners so host compile gates include `release_planner.c`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` to describe the new split.
+
+## Finding Status
+
+- Release semantics remain partially resolved.
+- Resolved in this pass:
+  - active-release effect planning now lives in `release_planner.c`
+  - pending multi-tap release effect planning now lives in `release_planner.c`
+  - source manifests and host runners mechanically include the new planner source
+- Still open:
+  - pending multi-tap release resolution still lives in `runtime.c`
+  - pending-release queue ownership remains in `runtime.c`
+
+## Verification
+
+Pre-change baseline:
+
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+Post-change targeted checks:
+
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/release_planner.c` produced no whitespace diagnostics for the new source file
+
+All listed pass/fail commands passed. The `--no-index` whitespace check returned the expected nonzero diff status for a new file and produced no diagnostics.
+
+## Next Steps
+
+1. Decide whether pending multi-tap release resolution should move behind the release planner too.
+2. Preserve pending-release queue ownership coverage before moving that queue out of `runtime.c`.
+3. Keep `runtime.c` as the orchestration point while extracting remaining release resolution only if the planner can own the contract without duplicating core state facts.

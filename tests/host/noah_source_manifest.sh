@@ -78,6 +78,7 @@ lib/key/runtime/trace.c
 lib/key/runtime/transition.c
 lib/compat/qmk_combo_origin.c
 lib/key/runtime/core/runtime.c
+lib/key/runtime/core/release_planner.c
 lib/state/runtime/runtime_diag.c
 lib/state/runtime/keyboard_mod_state.c
 lib/state/runtime/runtime_shared_state.c
