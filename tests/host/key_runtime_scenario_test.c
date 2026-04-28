@@ -3,8 +3,8 @@
 #include <stdlib.h>
 
 #include "key_runtime_scenario_harness.h"
-#include "users/noah/lib/key/runtime/core/runtime.h"
-#include "users/noah/lib/state/runtime/runtime_debug.h"
+#include "users/noah/lib/key/runtime/reducer/runtime.h"
+#include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/noah_keymap_ids.h"
 
 enum {

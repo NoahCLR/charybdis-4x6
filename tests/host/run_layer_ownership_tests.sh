@@ -20,8 +20,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/layer_ownership_test.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \
     "$ROOT/tests/host/key_runtime_core_state_unit_stub.c" \
     -o "$BIN"
 

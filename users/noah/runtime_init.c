@@ -14,13 +14,13 @@
 
 #include "lib/key/ownership/held_repeat.h"
 #include "lib/key/runtime/api.h"
-#include "lib/key/runtime/origin_registry.h"
+#include "lib/key/runtime/slot/origin_registry.h"
 #include "lib/macro/via_macro_defaults.h"
 #include "lib/compat/qmk_combo_origin.h"
 #include "lib/compat/qmk_via_split_sync.h"
 #include "lib/rgb/core/rgb_runtime.h"
-#include "lib/state/runtime/runtime_diag.h"
-#include "lib/state/runtime/split_runtime_sync.h"
+#include "lib/state/diagnostics/runtime_diag.h"
+#include "lib/split/runtime_sync.h"
 
 typedef void (*noah_runtime_init_stage_fn_t)(void);
 

@@ -4,10 +4,10 @@
 
 #include "deferred_release.h"
 
-#include "core/pending_release_queue.h"
-#include "core/projection.h"
-#include "core/state_query.h"
-#include "../../state/runtime/keyboard_mod_policy.h"
+#include "projection/projection.h"
+#include "queue/pending_release_queue.h"
+#include "reducer/state_query.h"
+#include "../../state/modifiers/keyboard_mod_policy.h"
 
 static bool key_runtime_deferred_release_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;

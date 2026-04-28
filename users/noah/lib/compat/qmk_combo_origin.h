@@ -14,7 +14,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../key/runtime/origin_registry.h"
+#include "../key/runtime/slot/origin_registry.h"
 
 void              noah_qmk_combo_origin_init(void);
 void              noah_qmk_combo_origin_reset(void);

@@ -7,7 +7,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/state/runtime/split_runtime_sync.h"
+#include "users/noah/lib/split/runtime_sync.h"
 
 static inline split_runtime_sync_remote_t host_runtime_fixture_split_remote_init(void) {
     return (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;

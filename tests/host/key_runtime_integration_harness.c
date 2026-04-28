@@ -6,7 +6,7 @@
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/key/runtime/core/trace.h"
+#include "users/noah/lib/key/runtime/trace/core_trace.h"
 #include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/noah_runtime.h"
 

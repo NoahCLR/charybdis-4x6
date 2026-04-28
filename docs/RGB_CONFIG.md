@@ -447,7 +447,7 @@ instead of falling back to another offset key. When the newest owner is
 released, the next-newest still-active owner takes over without restarting its
 flash phase. On split boards, the slave receives the packed semantic map,
 tap-branch map, flash visibility bitmap, and broad owner map through
-[`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c).
+[`split_runtime_sync`](../users/noah/lib/split/runtime_sync.c).
 
 ### `key_behavior_feedback_led_groups`
 

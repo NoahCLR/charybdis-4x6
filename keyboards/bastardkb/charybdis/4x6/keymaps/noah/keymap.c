@@ -16,7 +16,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "keycodes.h"
-#include "lib/key/interaction/key_behavior.h"
+#include "lib/key/behavior/key_behavior.h"
 #include "noah_keymap.h"
 
 // ─── Keymap-Local Custom Keycodes ──────────────────────────────────────────

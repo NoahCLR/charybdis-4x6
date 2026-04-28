@@ -6,7 +6,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "users/noah/lib/state/runtime/runtime_reset.h"
+#include "users/noah/lib/state/shared/runtime_reset.h"
 
 typedef struct {
     uint32_t time32;

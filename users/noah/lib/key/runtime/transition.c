@@ -7,10 +7,10 @@
 #include "transition.h"
 
 #include "trace.h"
-#include "core/effect_plan.h"
-#include "core/projection.h"
-#include "core/runtime.h"
-#include "../../state/runtime/keyboard_mod_policy.h"
+#include "planning/effect_plan.h"
+#include "projection/projection.h"
+#include "reducer/runtime.h"
+#include "../../state/modifiers/keyboard_mod_policy.h"
 
 enum {
     KEY_RUNTIME_TRANSITION_PLAN_FLAG_AUTO_DRAIN = 1u << 0,

@@ -29,7 +29,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/split_runtime_sync_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
-    "$ROOT/users/noah/lib/state/runtime/split_runtime_sync.c" \
+    "$ROOT/users/noah/lib/split/runtime_sync.c" \
     -o "$BIN"
 
 "$BIN"
@@ -49,7 +49,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/split_runtime_sync_test.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
-    "$ROOT/users/noah/lib/state/runtime/split_runtime_sync.c" \
+    "$ROOT/users/noah/lib/split/runtime_sync.c" \
     -o "$BIN_NO_TRIGGER_HALF"
 
 "$BIN_NO_TRIGGER_HALF"

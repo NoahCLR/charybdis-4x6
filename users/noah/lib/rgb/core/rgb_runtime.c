@@ -9,7 +9,7 @@
 #include "../stages/rgb_layer_stage.h"
 #include "../stages/rgb_pd_mode_stage.h"
 #include "../stages/rgb_preview_stage.h"
-#include "../../state/runtime/runtime_diag.h"
+#include "../../state/diagnostics/runtime_diag.h"
 #include "rgb_validation.h"
 
 #ifdef RGB_MATRIX_ENABLE

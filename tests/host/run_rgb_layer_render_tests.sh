@@ -73,7 +73,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN"
 
 "$BIN"
@@ -117,7 +117,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN_FEEDBACK_GROUPS"
 
 "$BIN_FEEDBACK_GROUPS"
@@ -161,7 +161,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN_END_FILL_UNPAINTED"
 
 "$BIN_END_FILL_UNPAINTED"
@@ -205,7 +205,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN_END_OVERRIDE"
 
 "$BIN_END_OVERRIDE"
@@ -249,7 +249,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN_KEY_HALF"
 
 "$BIN_KEY_HALF"
@@ -293,7 +293,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN_KEY"
 
 "$BIN_KEY"
@@ -337,7 +337,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN_KEY_LEFT"
 
 "$BIN_KEY_LEFT"
@@ -381,7 +381,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN_KEY_RIGHT"
 
 "$BIN_KEY_RIGHT"

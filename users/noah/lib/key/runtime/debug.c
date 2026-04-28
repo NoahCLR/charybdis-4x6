@@ -2,11 +2,11 @@
 // Runtime Debug
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "../../state/runtime/runtime_debug.h"
+#include "../../state/diagnostics/runtime_debug.h"
 
-#include "core/ownership_state.h"
-#include "core/pending_release_queue.h"
-#include "core/state_query.h"
+#include "queue/pending_release_queue.h"
+#include "reducer/ownership_state.h"
+#include "reducer/state_query.h"
 
 static bool noah_runtime_debug_key_pos_valid(keypos_t key_pos) {
     return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;

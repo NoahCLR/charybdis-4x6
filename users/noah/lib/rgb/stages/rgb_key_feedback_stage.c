@@ -10,7 +10,7 @@
 
 #    include "../core/rgb_helpers.h"
 #    include "../../key/runtime/feedback.h"
-#    include "../../state/runtime/split_runtime_sync.h"
+#    include "../../split/runtime_sync.h"
 
 extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
 extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;

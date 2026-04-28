@@ -8,7 +8,7 @@
 
 #    include "../../compat/qmk_auto_mouse_contract.h"
 #    include "../../pointing/defs/pd_mode_flags.h"
-#    include "../../state/runtime/split_runtime_sync.h"
+#    include "../../split/runtime_sync.h"
 #    include "rgb_automouse.h"
 
 bool automouse_rgb_should_render(void) {

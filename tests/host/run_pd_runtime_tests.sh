@@ -36,7 +36,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/pd_runtime_test.c" \
-    "$ROOT/users/noah/lib/key/runtime/origin_registry.c" \
+    "$ROOT/users/noah/lib/key/runtime/slot/origin_registry.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_runtime.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
@@ -44,9 +44,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
+    "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \
     "$ROOT/tests/host/key_runtime_core_state_unit_stub.c" \
     -o "$BIN"
 

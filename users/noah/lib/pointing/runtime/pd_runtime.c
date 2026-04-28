@@ -8,7 +8,7 @@
 #include "../policy/pointer_layer_policy.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../compat/qmk_pointing_contract.h"
-#include "../../state/runtime/runtime_diag.h"
+#include "../../state/diagnostics/runtime_diag.h"
 
 #if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
 #    if !defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS)

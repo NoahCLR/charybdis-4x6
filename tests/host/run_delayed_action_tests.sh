@@ -21,8 +21,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/delayed_action.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
-    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_state.c" \
-    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_policy.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \
     -o "$BIN"
 
 "$BIN"

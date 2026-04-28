@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "users/noah/lib/state/runtime/runtime_diag.h"
+#include "users/noah/lib/state/diagnostics/runtime_diag.h"
 
 static uint32_t fake_time32;
 static bool     fake_is_master;

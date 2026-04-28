@@ -5,8 +5,8 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "pd_mode_runtime_shared_state_internal.h"
-#include "../../key/runtime/origin_registry.h"
-#include "../../state/runtime/runtime_trace.h"
+#include "../../key/runtime/slot/origin_registry.h"
+#include "../../state/diagnostics/runtime_trace.h"
 #include "../policy/pd_mode_policy.h"
 #include "pd_mode_key_runtime_bridge.h"
 #include "pd_mode_internal.h"

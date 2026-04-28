@@ -5,7 +5,7 @@
 
 #include "key_runtime_scenario_harness.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/state/runtime/runtime_debug.h"
+#include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/noah_keymap_ids.h"
 
 enum {

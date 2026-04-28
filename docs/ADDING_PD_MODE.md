@@ -84,7 +84,7 @@ These are the rules most likely to break the system if you miss one.
    that mode, so mode keycodes must keep using the manifest-generated symbolic names.
 4. Mode flags use `pd_mode_mask_t`, and split sync mirrors the active and
    locked modes as `pd_mode_id_t` values:
-   [`users/noah/lib/pointing/defs/pd_mode_flags.h`](../users/noah/lib/pointing/defs/pd_mode_flags.h) and [`users/noah/lib/state/runtime/split_runtime_sync.h`](../users/noah/lib/state/runtime/split_runtime_sync.h).
+   [`users/noah/lib/pointing/defs/pd_mode_flags.h`](../users/noah/lib/pointing/defs/pd_mode_flags.h) and [`users/noah/lib/split/runtime_sync.h`](../users/noah/lib/split/runtime_sync.h).
    The current `pd_mode_mask_t` storage caps `PD_MODE_COUNT` at 16.
 
 If you add a 17th mode, you must widen the flag storage and the
@@ -114,7 +114,7 @@ Files you usually do not need to touch:
 - [`users/noah/lib/pointing/runtime/pd_mode_state.c`](../users/noah/lib/pointing/runtime/pd_mode_state.c)
 - [`users/noah/lib/pointing/runtime/pd_runtime.c`](../users/noah/lib/pointing/runtime/pd_runtime.c)
 - [`users/noah/lib/pointing/policy/pointer_layer_policy.c`](../users/noah/lib/pointing/policy/pointer_layer_policy.c)
-- [`users/noah/lib/state/runtime/split_runtime_sync.c`](../users/noah/lib/state/runtime/split_runtime_sync.c)
+- [`users/noah/lib/split/runtime_sync.c`](../users/noah/lib/split/runtime_sync.c)
 - [`users/noah/lib/rgb/core/rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c)
 
 ## Fastest Safe Path
@@ -467,7 +467,7 @@ This is the actual control path for pd modes:
    selected active mode's handler from `pd_modes[]`.
 7. [`users/noah/lib/pointing/policy/pointer_layer_policy.c`](../users/noah/lib/pointing/policy/pointer_layer_policy.c) keeps the configured
    auto-mouse target layer alive while modes are active or locked.
-8. [`users/noah/lib/state/runtime/split_runtime_sync.c`](../users/noah/lib/state/runtime/split_runtime_sync.c) mirrors active and locked
+8. [`users/noah/lib/split/runtime_sync.c`](../users/noah/lib/split/runtime_sync.c) mirrors active and locked
    mode ids, auto-mouse progress, combo feedback, key-feedback semantic and tap-branch state,
    and preview-layer state to the other half, and
    [`pd_mode_state.c`](../users/noah/lib/pointing/runtime/pd_mode_state.c)
@@ -486,7 +486,7 @@ That is why most new modes are mostly a data-registration job, not a runtime rew
 - Forgetting the reset function, which leaves stale accumulators or modifiers behind.
 - Adding side effects in activate / deactivate but forgetting the locked path.
 - Adding a 17th mode without widening the `pd_mode_mask_t` storage and the
-  [`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c) packet.
+  [`split_runtime_sync`](../users/noah/lib/split/runtime_sync.c) packet.
 
 ## Definition Of Done
 

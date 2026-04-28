@@ -6,7 +6,7 @@
 
 #include "delayed_action.h"
 #include "../../action/action_dispatch.h"
-#include "../../state/runtime/keyboard_mod_policy.h"
+#include "../../state/modifiers/keyboard_mod_policy.h"
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     dispatch_delayed_action_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action, mods);

@@ -2,21 +2,21 @@
 // Key Runtime Process Flow
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "../interaction/handled_key.h"
+#include "../behavior/handled_key.h"
 #include "process_internal.h"
 #include "trace.h"
 #include "../../macro/macro_dispatch.h"
 #include "../../pointing/defs/pd_modes.h"
 #include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"
-#include "core/ownership_state.h"
-#include "core/runtime.h"
-#include "core/state_query.h"
+#include "reducer/ownership_state.h"
+#include "reducer/runtime.h"
+#include "reducer/state_query.h"
 #include "../../action/synthetic_record.h"
 #include "../../compat/qmk_combo_origin.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
-#include "../../state/runtime/keyboard_mod_policy.h"
-#include "../../state/runtime/runtime_diag.h"
-#include "origin_registry.h"
+#include "../../state/modifiers/keyboard_mod_policy.h"
+#include "../../state/diagnostics/runtime_diag.h"
+#include "slot/origin_registry.h"
 
 #ifdef NOAH_HOST_TEST_ENV
 bool key_runtime_integration_userspace_feeds_core_key_events(void) {

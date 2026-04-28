@@ -20,7 +20,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_behavior_validation_test.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
-    "$ROOT/users/noah/lib/key/interaction/key_behavior_lookup.c" \
+    "$ROOT/users/noah/lib/key/behavior/key_behavior_lookup.c" \
     -o "$BIN"
 
 "$BIN"

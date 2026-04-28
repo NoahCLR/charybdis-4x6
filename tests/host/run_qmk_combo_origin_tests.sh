@@ -21,7 +21,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     -include "$ROOT/tests/host/include/noah_compile_config.h" \
     "$ROOT/tests/host/qmk_combo_origin_test.c" \
-    "$ROOT/users/noah/lib/key/runtime/origin_registry.c" \
+    "$ROOT/users/noah/lib/key/runtime/slot/origin_registry.c" \
     "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
     -o "$BIN"
 

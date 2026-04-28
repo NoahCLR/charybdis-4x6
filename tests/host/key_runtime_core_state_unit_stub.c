@@ -1,5 +1,5 @@
 #include <stdbool.h>
-#include "users/noah/lib/key/runtime/core/runtime.h"
+#include "users/noah/lib/key/runtime/reducer/runtime.h"
 
 void key_runtime_core_layer_lock_set(uint8_t layer, bool locked) {
     (void)layer;

@@ -11,7 +11,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../runtime/keyboard_mod_state.h"
+#include "../modifiers/keyboard_mod_state.h"
 
 #define KEYBOARD_MOD_OWNERSHIP_MOD_COUNT 8u
 

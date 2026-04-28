@@ -2,7 +2,7 @@
 // Key Runtime Release Flow
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "../interaction/handled_key.h"
+#include "../behavior/handled_key.h"
 #include "deferred_release.h"
 #include "process_internal.h"
 #include "trace.h"

@@ -10,7 +10,7 @@
 #include "../policy/pd_mode_policy.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../compat/qmk_pointing_contract.h"
-#include "../../state/runtime/runtime_trace.h"
+#include "../../state/diagnostics/runtime_trace.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static bool pd_mode_auto_mouse_uses_synthetic_anchor(pd_mode_mask_t mode, bool locked) {

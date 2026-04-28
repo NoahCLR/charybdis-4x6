@@ -13,8 +13,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../interaction/handled_key.h"
-#include "effects/effect_queue.h"
+#include "../behavior/handled_key.h"
+#include "planning/effect_queue.h"
 
 #define KEY_RUNTIME_TRANSITION_PLAN_CAPACITY 16
 

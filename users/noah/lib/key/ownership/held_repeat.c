@@ -10,8 +10,8 @@
 
 #include "../../action/action_dispatch.h"
 #include "../../pointing/policy/pointer_layer_policy.h"
-#include "../../state/runtime/runtime_context_internal.h"
-#include "../interaction/key_behavior.h"
+#include "../../state/shared/runtime_context_internal.h"
+#include "../behavior/key_behavior.h"
 
 static inline bool keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;

@@ -3,11 +3,11 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "process_internal.h"
-#include "../interaction/handled_key.h"
+#include "../behavior/handled_key.h"
 #include "trace.h"
 #include "transition.h"
 #include "../../action/action_dispatch.h"
-#include "core/state_query.h"
+#include "reducer/state_query.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {

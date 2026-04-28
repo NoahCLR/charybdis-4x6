@@ -4,17 +4,17 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/action_dispatch.h"
-#include "users/noah/lib/key/interaction/handled_key.h"
+#include "users/noah/lib/key/behavior/handled_key.h"
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
-#include "users/noah/lib/state/runtime/runtime_debug.h"
-#include "users/noah/lib/state/runtime/runtime_reset.h"
-#include "users/noah/lib/key/runtime/core/ownership_state.h"
-#include "users/noah/lib/key/runtime/core/runtime.h"
+#include "users/noah/lib/state/diagnostics/runtime_debug.h"
+#include "users/noah/lib/state/shared/runtime_reset.h"
+#include "users/noah/lib/key/runtime/reducer/ownership_state.h"
+#include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/noah_runtime.h"
 
 enum {

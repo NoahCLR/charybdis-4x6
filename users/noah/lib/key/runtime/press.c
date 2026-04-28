@@ -2,7 +2,7 @@
 // Key Runtime Press Flow
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "../interaction/handled_key.h"
+#include "../behavior/handled_key.h"
 #include "process_internal.h"
 #include "trace.h"
 #include "transition.h"

@@ -4,8 +4,8 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/action/synthetic_record.h"
-#include "users/noah/lib/key/interaction/handled_key.h"
-#include "users/noah/lib/key/interaction/key_behavior_lookup.h"
+#include "users/noah/lib/key/behavior/handled_key.h"
+#include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 

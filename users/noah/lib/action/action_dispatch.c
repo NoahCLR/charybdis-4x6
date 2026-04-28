@@ -7,7 +7,7 @@
 #include "action_lifecycle.h"
 #include "synthetic_record.h"
 #include "../key/runtime/api.h"
-#include "../state/runtime/keyboard_mod_policy.h"
+#include "../state/modifiers/keyboard_mod_policy.h"
 #include "action_dispatch.h"
 
 typedef void (*noah_emit_tap_fn_t)(uint16_t keycode);

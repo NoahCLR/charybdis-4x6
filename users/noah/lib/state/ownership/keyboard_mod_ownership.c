@@ -7,7 +7,7 @@
 #endif
 
 #include "keyboard_mod_ownership.h"
-#include "../runtime/runtime_context_internal.h"
+#include "../shared/runtime_context_internal.h"
 
 static const uint8_t keyboard_mod_ownership_mod_masks[8] = {
     MOD_BIT(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_SHIFT), MOD_BIT(KC_LEFT_ALT), MOD_BIT(KC_LEFT_GUI), MOD_BIT(KC_RIGHT_CTRL), MOD_BIT(KC_RIGHT_SHIFT), MOD_BIT(KC_RIGHT_ALT), MOD_BIT(KC_RIGHT_GUI),

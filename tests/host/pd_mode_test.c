@@ -4,11 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "users/noah/lib/key/runtime/origin_registry.h"
+#include "users/noah/lib/key/runtime/slot/origin_registry.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_buffered_tap_internal.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_keyboard_event_internal.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
-#include "users/noah/lib/state/runtime/split_runtime_sync.h"
+#include "users/noah/lib/split/runtime_sync.h"
 #include "host_runtime_reset_fixture.h"
 
 static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;

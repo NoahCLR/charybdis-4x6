@@ -19,8 +19,8 @@
 #include <stdint.h>
 
 #include "feedback_kind.h"
-#include "origin_registry.h"
-#include "keypos_codec.h"
+#include "slot/keypos_codec.h"
+#include "slot/origin_registry.h"
 
 #ifndef KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS
 #    define KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS 20

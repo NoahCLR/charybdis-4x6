@@ -9,7 +9,7 @@
 #include "print.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/noah_keymap.h"
-#include "users/noah/lib/key/interaction/keymap_validation.h"
+#include "users/noah/lib/key/behavior/keymap_validation.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 

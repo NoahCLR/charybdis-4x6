@@ -6,11 +6,11 @@
 
 #include <string.h>
 
-#include "../interaction/handled_key_policy.h"
-#include "../interaction/key_behavior_lookup.h"
+#include "../behavior/handled_key_policy.h"
+#include "../behavior/key_behavior_lookup.h"
 #include "../../compat/qmk_combo_origin.h"
-#include "core/ownership_state.h"
-#include "core/state_query.h"
+#include "reducer/ownership_state.h"
+#include "reducer/state_query.h"
 
 #ifdef POINTING_DEVICE_ENABLE
 #    include "../../pointing/defs/pd_modes.h"

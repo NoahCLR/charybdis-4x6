@@ -10,7 +10,7 @@
 #include "users/noah/lib/macro/macro_dispatch.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
-#include "users/noah/lib/key/interaction/keymap_validation.h"
+#include "users/noah/lib/key/behavior/keymap_validation.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/rgb/core/rgb_validation.h"
 

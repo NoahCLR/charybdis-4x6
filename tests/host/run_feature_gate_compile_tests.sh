@@ -94,9 +94,9 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    if repo_owned_code_includes '#include "((users/noah/lib/state/runtime/)?(.*/)?runtime_(context|shared_state)\.h)"' >/dev/null; then
+    if repo_owned_code_includes '#include "(.*/)?runtime_(context|shared_state)\.h"' >/dev/null; then
         echo "repo-owned code must not include removed public runtime aggregate/context headers" >&2
-        repo_owned_code_includes '#include "((users/noah/lib/state/runtime/)?(.*/)?runtime_(context|shared_state)\.h)"' >&2
+        repo_owned_code_includes '#include "(.*/)?runtime_(context|shared_state)\.h"' >&2
         exit 1
     fi
 
@@ -109,7 +109,7 @@ check_runtime_sealing_boundaries() {
     runtime_internal_prod_violations="$(
         repo_owned_production_include_violations \
             '#include "(.*/)?runtime_(context|shared_state)_internal\.h"' \
-            '^(users/noah/lib/state/runtime/|users/noah/lib/state/ownership/|users/noah/lib/key/ownership/)'
+            '^(users/noah/lib/state/shared/|users/noah/lib/state/diagnostics/runtime_trace\.c:|users/noah/lib/state/ownership/|users/noah/lib/key/ownership/)'
     )"
     if [ -n "$runtime_internal_prod_violations" ]; then
         echo "only runtime owner modules may include internal runtime storage headers" >&2
@@ -132,7 +132,7 @@ check_runtime_sealing_boundaries() {
     pd_runtime_internal_prod_violations="$(
         repo_owned_production_include_violations \
             '#include ".*pd_mode_runtime_shared_state_internal\.h"' \
-            '^(users/noah/lib/state/runtime/|users/noah/lib/pointing/runtime/)'
+            '^(users/noah/lib/state/shared/|users/noah/lib/pointing/runtime/)'
     )"
     if [ -n "$pd_runtime_internal_prod_violations" ]; then
         echo "only runtime owner and pd runtime modules may include internal pd runtime storage headers" >&2
@@ -144,7 +144,7 @@ check_runtime_sealing_boundaries() {
     pd_runtime_key_core_include_violations="$(
         (
             cd "$ROOT"
-            rg -n '#include ".*key/runtime/core/runtime\.h"' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
+            rg -n '#include ".*key/runtime/reducer/runtime\.h"' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
         )
     )"
     if [ -n "$pd_runtime_key_core_include_violations" ]; then
@@ -165,7 +165,7 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    layer_lock_core_bridge_allowlist='^(users/noah/lib/key/runtime/core/ownership_state\.(c|h):|users/noah/lib/state/ownership/layer_ownership\.c:)'
+    layer_lock_core_bridge_allowlist='^(users/noah/lib/key/runtime/reducer/ownership_state\.(c|h):|users/noah/lib/state/ownership/layer_ownership\.c:)'
     layer_lock_core_call_violations="$(
         (
             cd "$ROOT"

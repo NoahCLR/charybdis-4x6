@@ -7,11 +7,11 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/owned_keycode.h"
-#include "users/noah/lib/key/interaction/key_behavior_lookup.h"
+#include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
-#include "users/noah/lib/state/runtime/runtime_debug.h"
-#include "users/noah/lib/state/runtime/runtime_reset.h"
+#include "users/noah/lib/state/diagnostics/runtime_debug.h"
+#include "users/noah/lib/state/shared/runtime_reset.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,

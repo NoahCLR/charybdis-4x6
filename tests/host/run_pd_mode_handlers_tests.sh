@@ -25,7 +25,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_brightness.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_zoom.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_arrow.c" \
-    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_state.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
     -o "$BIN"
 
 "$BIN"

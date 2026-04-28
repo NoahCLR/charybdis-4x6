@@ -15,17 +15,17 @@ NOAH_COMMON_SOURCES := \
     lib/action/action_lifecycle.c \
     lib/action/synthetic_record.c \
     lib/compat/split_role.c \
-    lib/key/interaction/handled_key_defaults.c \
-    lib/key/interaction/handled_key_resolution_accessors.c \
-    lib/key/interaction/handled_key_lookup.c \
-    lib/key/interaction/handled_key_transparency.c \
-    lib/key/interaction/handled_key_materialize.c \
-    lib/key/interaction/key_behavior_lookup.c \
-    lib/key/interaction/keymap_validation.c \
+    lib/key/behavior/handled_key_defaults.c \
+    lib/key/behavior/handled_key_resolution_accessors.c \
+    lib/key/behavior/handled_key_lookup.c \
+    lib/key/behavior/handled_key_transparency.c \
+    lib/key/behavior/handled_key_materialize.c \
+    lib/key/behavior/key_behavior_lookup.c \
+    lib/key/behavior/keymap_validation.c \
     lib/key/runtime/api.c \
     lib/key/runtime/preflight.c \
     lib/key/runtime/process.c \
-    lib/key/runtime/origin_registry.c \
+    lib/key/runtime/slot/origin_registry.c \
     lib/key/runtime/press.c \
     lib/key/runtime/release.c \
     lib/key/runtime/deferred_release.c \
@@ -49,27 +49,27 @@ NOAH_COMMON_SOURCES := \
     lib/macro/via_macro_provider.c \
     lib/macro/via_macro_defaults.c \
     lib/key/runtime/feedback.c \
-    lib/state/runtime/keyboard_mod_state.c \
-    lib/state/runtime/keyboard_mod_policy.c \
-    lib/state/runtime/runtime_diag.c \
+    lib/state/modifiers/keyboard_mod_state.c \
+    lib/state/modifiers/keyboard_mod_policy.c \
+    lib/state/diagnostics/runtime_diag.c \
     lib/state/ownership/keyboard_mod_ownership.c \
     lib/state/ownership/layer_ownership.c \
     lib/key/runtime/debug.c \
-    lib/state/runtime/runtime_trace.c \
-    lib/state/runtime/runtime_shared_state.c \
-    lib/state/runtime/split_runtime_sync.c \
-    lib/key/runtime/core/runtime.c \
-    lib/key/runtime/core/effect_plan.c \
-    lib/key/runtime/core/state_query.c \
-    lib/key/runtime/core/ownership_state.c \
-    lib/key/runtime/core/pending_release_queue.c \
-    lib/key/runtime/core/feedback_projection.c \
-    lib/key/runtime/core/pd_projection.c \
-    lib/key/runtime/core/projection.c \
-    lib/key/runtime/core/release_planner.c \
-    lib/key/runtime/core/scan_planner.c \
-    lib/key/runtime/core/tap_series_flush.c \
-    lib/key/runtime/core/trace.c \
+    lib/state/diagnostics/runtime_trace.c \
+    lib/state/shared/runtime_shared_state.c \
+    lib/split/runtime_sync.c \
+    lib/key/runtime/reducer/runtime.c \
+    lib/key/runtime/planning/effect_plan.c \
+    lib/key/runtime/reducer/state_query.c \
+    lib/key/runtime/reducer/ownership_state.c \
+    lib/key/runtime/queue/pending_release_queue.c \
+    lib/key/runtime/projection/feedback_projection.c \
+    lib/key/runtime/projection/pd_projection.c \
+    lib/key/runtime/projection/projection.c \
+    lib/key/runtime/planning/release_planner.c \
+    lib/key/runtime/planning/scan_planner.c \
+    lib/key/runtime/planning/tap_series_flush.c \
+    lib/key/runtime/trace/core_trace.c \
     lib/rgb/core/rgb_runtime.c \
     lib/rgb/stages/rgb_combo_feedback_stage.c \
     lib/rgb/stages/rgb_key_feedback_stage.c \

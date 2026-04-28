@@ -7,7 +7,7 @@
 #if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 
 #    include "../core/rgb_helpers.h"
-#    include "../../key/runtime/origin_registry.h"
+#    include "../../key/runtime/slot/origin_registry.h"
 #    include "../../pointing/defs/pd_modes.h"
 
 extern const pd_mode_color_t            pd_mode_colors[];

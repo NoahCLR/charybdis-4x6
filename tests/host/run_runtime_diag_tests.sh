@@ -19,7 +19,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/runtime_diag_test.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN"
 
 "$BIN"

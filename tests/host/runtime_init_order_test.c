@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "users/noah/lib/state/runtime/runtime_diag.h"
+#include "users/noah/lib/state/diagnostics/runtime_diag.h"
 #include "users/noah/noah_runtime.h"
 
 enum {

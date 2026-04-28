@@ -24,14 +24,14 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/action/action_kind_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
-    "$ROOT/users/noah/lib/key/interaction/handled_key_defaults.c" \
-    "$ROOT/users/noah/lib/key/interaction/handled_key_resolution_accessors.c" \
-    "$ROOT/users/noah/lib/key/interaction/handled_key_lookup.c" \
-    "$ROOT/users/noah/lib/key/interaction/handled_key_transparency.c" \
-    "$ROOT/users/noah/lib/key/interaction/handled_key_materialize.c" \
+    "$ROOT/users/noah/lib/key/behavior/handled_key_defaults.c" \
+    "$ROOT/users/noah/lib/key/behavior/handled_key_resolution_accessors.c" \
+    "$ROOT/users/noah/lib/key/behavior/handled_key_lookup.c" \
+    "$ROOT/users/noah/lib/key/behavior/handled_key_transparency.c" \
+    "$ROOT/users/noah/lib/key/behavior/handled_key_materialize.c" \
     "$ROOT/users/noah/lib/key/runtime/api.c" \
     "$ROOT/users/noah/lib/key/runtime/debug.c" \
-    "$ROOT/users/noah/lib/key/runtime/origin_registry.c" \
+    "$ROOT/users/noah/lib/key/runtime/slot/origin_registry.c" \
     "$ROOT/users/noah/lib/key/runtime/preflight.c" \
     "$ROOT/users/noah/lib/key/runtime/press.c" \
     "$ROOT/users/noah/lib/key/runtime/process.c" \
@@ -40,23 +40,23 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/scan.c" \
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/transition.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/runtime.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/effect_plan.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/state_query.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/ownership_state.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/pending_release_queue.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/feedback_projection.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/pd_projection.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/projection.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/release_planner.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/scan_planner.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/tap_series_flush.c" \
+    "$ROOT/users/noah/lib/key/runtime/reducer/runtime.c" \
+    "$ROOT/users/noah/lib/key/runtime/planning/effect_plan.c" \
+    "$ROOT/users/noah/lib/key/runtime/reducer/state_query.c" \
+    "$ROOT/users/noah/lib/key/runtime/reducer/ownership_state.c" \
+    "$ROOT/users/noah/lib/key/runtime/queue/pending_release_queue.c" \
+    "$ROOT/users/noah/lib/key/runtime/projection/feedback_projection.c" \
+    "$ROOT/users/noah/lib/key/runtime/projection/pd_projection.c" \
+    "$ROOT/users/noah/lib/key/runtime/projection/projection.c" \
+    "$ROOT/users/noah/lib/key/runtime/planning/release_planner.c" \
+    "$ROOT/users/noah/lib/key/runtime/planning/scan_planner.c" \
+    "$ROOT/users/noah/lib/key/runtime/planning/tap_series_flush.c" \
     "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
-    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_state.c" \
-    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_policy.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \
     -o "$BIN"
 
 "$BIN"

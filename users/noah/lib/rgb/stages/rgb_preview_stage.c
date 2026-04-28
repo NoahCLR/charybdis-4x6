@@ -8,7 +8,7 @@
 
 #    include "rgb_layer_stage.h"
 #    include "../../key/runtime/feedback.h"
-#    include "../../state/runtime/split_runtime_sync.h"
+#    include "../../split/runtime_sync.h"
 
 extern const layer_led_group_t *const layer_led_groups;
 extern const uint8_t                  layer_led_group_count;

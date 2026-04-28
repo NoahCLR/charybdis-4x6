@@ -10,7 +10,7 @@
 
 #include "../runtime/pd_mode_registry_internal.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
-#include "../../state/runtime/keyboard_mod_policy.h"
+#include "../../state/modifiers/keyboard_mod_policy.h"
 
 static uint8_t pinch_mode_managed_only_gui_mask(pd_mode_mask_t mode) {
     (void)mode;

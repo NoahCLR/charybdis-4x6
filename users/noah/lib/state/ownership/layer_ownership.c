@@ -9,9 +9,9 @@
 #include "layer_ownership.h"
 
 #include "noah_keymap_ids.h"
-#include "../../key/runtime/core/ownership_state.h"
-#include "../runtime/runtime_context_internal.h"
-#include "../runtime/runtime_trace.h"
+#include "../../key/runtime/reducer/ownership_state.h"
+#include "../diagnostics/runtime_trace.h"
+#include "../shared/runtime_context_internal.h"
 
 static inline layer_state_t layer_ownership_mask_for_layer(uint8_t layer) {
     return (layer_state_t)1u << layer;

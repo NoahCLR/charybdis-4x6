@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 
-#include "users/noah/lib/key/runtime/core/runtime.h"
-#include "users/noah/lib/state/runtime/runtime_debug.h"
+#include "users/noah/lib/key/runtime/reducer/runtime.h"
+#include "users/noah/lib/state/diagnostics/runtime_debug.h"
 
 typedef enum {
     KEY_RUNTIME_INTEGRATION_STEP_PRESS = 0,

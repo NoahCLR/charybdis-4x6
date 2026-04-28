@@ -20,8 +20,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/action_dispatch_test.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
-    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_state.c" \
-    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_policy.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \
     -o "$BIN"
 
 "$BIN"

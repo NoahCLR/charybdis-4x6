@@ -9,7 +9,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../../state/runtime/keyboard_mod_state.h"
+#include "../../state/modifiers/keyboard_mod_state.h"
 
 typedef keyboard_mod_state_t delayed_action_mods_t;
 

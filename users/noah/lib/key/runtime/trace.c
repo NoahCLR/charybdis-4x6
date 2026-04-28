@@ -6,7 +6,7 @@
 
 #include <string.h>
 
-#include "../../state/runtime/runtime_trace.h"
+#include "../../state/diagnostics/runtime_trace.h"
 
 static uint8_t key_runtime_trace_stage_id(const char *stage) {
     if (!stage) {

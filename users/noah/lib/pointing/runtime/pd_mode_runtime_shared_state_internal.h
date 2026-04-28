@@ -9,7 +9,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../../key/runtime/origin_registry.h"
+#include "../../key/runtime/slot/origin_registry.h"
 #include "../defs/pd_mode_flags.h"
 
 #define PD_MODE_OWNER_SLOT_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))

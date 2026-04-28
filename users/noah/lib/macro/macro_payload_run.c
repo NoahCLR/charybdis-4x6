@@ -3,7 +3,7 @@
 #include "send_string.h"
 
 #include "../action/owned_keycode.h"
-#include "../state/runtime/runtime_diag.h"
+#include "../state/diagnostics/runtime_diag.h"
 #include "macro_payload_internal.h"
 
 static void macro_payload_wait_ms(uint16_t delay_ms) {

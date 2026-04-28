@@ -22,7 +22,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/runtime_trace_test.c" \
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
-    "$ROOT/users/noah/lib/key/runtime/origin_registry.c" \
+    "$ROOT/users/noah/lib/key/runtime/slot/origin_registry.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
@@ -35,11 +35,11 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_zoom.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_arrow.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
-    "$ROOT/users/noah/lib/state/runtime/runtime_trace.c" \
-    "$ROOT/users/noah/lib/key/runtime/core/trace.c" \
-    "$ROOT/users/noah/lib/state/runtime/split_runtime_sync.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_trace.c" \
+    "$ROOT/users/noah/lib/key/runtime/trace/core_trace.c" \
+    "$ROOT/users/noah/lib/split/runtime_sync.c" \
     "$ROOT/tests/host/key_runtime_core_state_unit_stub.c" \
     -o "$BIN"
 

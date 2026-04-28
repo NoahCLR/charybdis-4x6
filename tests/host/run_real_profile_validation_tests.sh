@@ -33,8 +33,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c" \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
-    "$ROOT/users/noah/lib/key/interaction/key_behavior_lookup.c" \
-    "$ROOT/users/noah/lib/key/interaction/keymap_validation.c" \
+    "$ROOT/users/noah/lib/key/behavior/key_behavior_lookup.c" \
+    "$ROOT/users/noah/lib/key/behavior/keymap_validation.c" \
     "$ROOT/users/noah/lib/macro/macro_dispatch.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \

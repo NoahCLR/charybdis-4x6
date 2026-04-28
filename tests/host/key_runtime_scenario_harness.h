@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 #include "users/noah/lib/key/runtime/delayed_action.h"
-#include "users/noah/lib/key/interaction/key_behavior_lookup.h"
-#include "users/noah/lib/key/runtime/effects/effect.h"
+#include "users/noah/lib/key/behavior/key_behavior_lookup.h"
+#include "users/noah/lib/key/runtime/planning/effect.h"
 #include "users/noah/lib/key/runtime/feedback_kind.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 

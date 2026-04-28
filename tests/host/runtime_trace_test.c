@@ -8,11 +8,11 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/key/runtime/trace.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/key/runtime/core/trace.h"
-#include "users/noah/lib/state/runtime/keyboard_mod_state.h"
+#include "users/noah/lib/key/runtime/trace/core_trace.h"
+#include "users/noah/lib/state/modifiers/keyboard_mod_state.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
-#include "users/noah/lib/state/runtime/runtime_trace.h"
-#include "users/noah/lib/state/runtime/split_runtime_sync.h"
+#include "users/noah/lib/state/diagnostics/runtime_trace.h"
+#include "users/noah/lib/split/runtime_sync.h"
 #include "host_runtime_reset_fixture.h"
 
 static uint32_t fake_time32;

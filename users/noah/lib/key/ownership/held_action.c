@@ -11,7 +11,7 @@
 #include "../../action/action_dispatch.h"
 #include "../../action/action_lifecycle.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
-#include "../../state/runtime/runtime_context_internal.h"
+#include "../../state/shared/runtime_context_internal.h"
 #include "held_action.h"
 #include "held_repeat.h"
 

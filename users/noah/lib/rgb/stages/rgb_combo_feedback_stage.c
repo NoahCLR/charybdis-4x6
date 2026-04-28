@@ -8,7 +8,7 @@
 
 #    include "../core/rgb_helpers.h"
 #    include "../../key/runtime/feedback.h"
-#    include "../../state/runtime/split_runtime_sync.h"
+#    include "../../split/runtime_sync.h"
 
 extern const combo_feedback_color_config_t combo_feedback_colors;
 extern const combo_feedback_led_group_t *const combo_feedback_led_groups;
