@@ -28,6 +28,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/origin_registry.c \
     lib/key/runtime/press.c \
     lib/key/runtime/release.c \
+    lib/key/runtime/deferred_release.c \
     lib/key/runtime/scan.c \
     lib/key/runtime/transition.c \
     lib/key/runtime/trace.c \

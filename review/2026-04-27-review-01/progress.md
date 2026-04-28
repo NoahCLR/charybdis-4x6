@@ -210,6 +210,8 @@ Starting worktree status:
   - pending-release queue storage and draining remain split across `runtime.c`, `transition.c`, and `release.c`
   - the review finding stays partially open until that transport boundary is either accepted as core-owned or moved behind a smaller release transport API
 
+Reconciliation note: deferred-release deferral and draining moved into `deferred_release.c` in the later 2026-04-28 deferred release transport adapter pass recorded below. Pending-release queue storage remains core-owned state by design.
+
 ## Verification
 
 Pre-change baseline:
@@ -242,3 +244,66 @@ All listed pass/fail commands passed.
 1. Decide whether the pending-release queue/drain path should remain core-owned transport or move behind a smaller release transport API.
 2. Keep `release.c` thin unless the transition/process layers can absorb the release adapter without making event flow harder to read.
 3. Use the current release matrix, modifier-hold, PD-mode, scenario, layer-lock, and full host suite as the guardrail for any pending-release transport cleanup.
+
+## 2026-04-28 - Deferred Release Transport Adapter
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/deferred_release.h` and `users/noah/lib/key/runtime/deferred_release.c` as the release transport adapter.
+- Moved blocked-release dispatch deferral out of `transition.c` and into `deferred_release.c`.
+- Moved deferred-release draining out of `release.c` and into `deferred_release.c`.
+- Kept pending-release queue storage, ordering, token cleanup, and projection primitives core-owned in `runtime.c`.
+- Updated `release.c` and `scan.c` so both call the deferred-release adapter after executing transition plans.
+- Removed deferred-release transport from `transition.h` and removed the old drain declaration from `process_internal.h`.
+- Wired the new source file into `users/noah/source_manifest.mk`, host source manifests, and manual key-runtime integration runners.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` to describe the final release ownership split.
+
+## Finding Status
+
+- Release semantics and release transport are resolved.
+- Resolved in this pass:
+  - release semantics are planner-owned
+  - blocked-release dispatch deferral has one adapter
+  - deferred-release draining has one adapter
+  - `release.c` and `transition.c` no longer own deferred-release queue adaptation
+- Accepted boundary:
+  - `runtime.c` owns pending-release queue storage because it is canonical reducer state tied to press tokens and blocker queries
+
+## Verification
+
+Pre-change baseline:
+
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+Post-change targeted checks:
+
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/deferred_release.c`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/deferred_release.h`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks returned the expected nonzero diff status for new files and produced no diagnostics.
+
+## Next Steps
+
+1. Continue with the broader `runtime.c` accumulator finding: ownership ledgers, PD bridge behavior, feedback projection, and pending multi-tap scan are still candidates for focused internal modules.
+2. Preserve the release matrix and deferred-release debug coverage as guardrails for future runtime splits.
+3. Avoid reintroducing release decisions in transition, press/release wrappers, or slot-owned helpers.

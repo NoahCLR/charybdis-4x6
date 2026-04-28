@@ -30,7 +30,6 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan);
 void key_runtime_transition_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runtime_transition_plan_t *plan);
-void key_runtime_transition_defer_dispatch_actions_until_release(keypos_t key_pos, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan);
 bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan);
 bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan);

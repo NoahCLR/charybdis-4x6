@@ -56,6 +56,7 @@ compile_test() {
     "$ROOT/users/noah/lib/key/runtime/press.c" \
     "$ROOT/users/noah/lib/key/runtime/process.c" \
     "$ROOT/users/noah/lib/key/runtime/release.c" \
+    "$ROOT/users/noah/lib/key/runtime/deferred_release.c" \
     "$ROOT/users/noah/lib/key/runtime/scan.c" \
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/transition.c" \

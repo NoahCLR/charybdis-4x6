@@ -73,6 +73,7 @@ lib/key/runtime/press.c
 lib/key/runtime/process.c
 lib/key/runtime/origin_registry.c
 lib/key/runtime/release.c
+lib/key/runtime/deferred_release.c
 lib/key/runtime/scan.c
 lib/key/runtime/trace.c
 lib/key/runtime/transition.c

@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "api.h"
-#include "process_internal.h"
+#include "deferred_release.h"
 #include "trace.h"
 #include "transition.h"
 #include "../../pointing/defs/pd_modes.h"
@@ -21,6 +21,6 @@ void noah_key_runtime_scan(void) {
     key_runtime_transition_scan(&plan);
     key_runtime_trace_plan("scan", &plan);
     key_runtime_transition_execute_plan(&plan);
-    key_runtime_release_drain_deferred_dispatches();
+    key_runtime_deferred_release_drain_dispatches();
     pd_mode_service_active_dpi_sync();
 }

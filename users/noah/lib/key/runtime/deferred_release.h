@@ -1,17 +1,13 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Key Runtime Process API
+// Key Runtime Deferred Release Transport
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Private orchestration surface shared by the split key-runtime process
-// modules.
+// Adapter between release transition plans and the core-owned pending-release
+// queue.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include QMK_KEYBOARD_H // IWYU pragma: keep
+#include "transition.h"
 
-#include "../interaction/handled_key.h"
-
-bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record);
-bool key_runtime_process_handled_key_press(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution);
-bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution);
-bool key_runtime_process_direct_action_key(uint16_t keycode, keyrecord_t *record);
+void key_runtime_deferred_release_defer_dispatch_actions_until_release(keypos_t key_pos, key_runtime_transition_plan_t *plan);
+void key_runtime_deferred_release_drain_dispatches(void);
