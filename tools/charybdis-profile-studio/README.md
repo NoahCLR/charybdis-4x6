@@ -15,11 +15,15 @@ those two files.
 - separate Layout, Macros & combos, and RGB work areas
 - visual Charybdis 4x6 SVG board using the same physical geometry as the
   profile introspection previews
+- layer previews use `layer_colors[]`, including the base-layer default RGB
+  fallback used by the introspection report
 - click a key, edit it as a normal key label such as `A`, `Enter`, `Space`, or
   `_______`, and patch the matching `LAYOUT()` slot
 - view and save key behavior rows directly from the active layer page; the
   layer filters visible behavior rows by keys currently present on that layer
 - edit `layer_colors[]` HSV values and render mode
+- inspect every active `rgb_config.c` surface, including LED group tables,
+  automouse fade, combo feedback, and key-behavior feedback
 - edit `pd_mode_colors[]` HSV values and locality
 - edit `VIA_MACROS(MACRO)` payload strings
 - append `COMBOS(COMBO)` rows

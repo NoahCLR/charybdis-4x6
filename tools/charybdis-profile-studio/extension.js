@@ -22,6 +22,15 @@ const RGB_RELATIVE_PATH = path.join(
     "noah",
     "rgb_config.c"
 );
+const KEYMAP_CONFIG_RELATIVE_PATH = path.join(
+    "keyboards",
+    "bastardkb",
+    "charybdis",
+    "4x6",
+    "keymaps",
+    "noah",
+    "config.h"
+);
 
 const LAYOUT_SLOT_COUNT = 56;
 const TAP_COUNT_NAMES = ["single", "double", "triple", "quadruple", "quintuple"];
@@ -353,7 +362,12 @@ async function postModel(panel, root, notice) {
 async function buildModel(root) {
     const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
     const rgbPath = path.join(root, RGB_RELATIVE_PATH);
-    const [keymapText, rgbText] = await Promise.all([fs.readFile(keymapPath, "utf8"), fs.readFile(rgbPath, "utf8")]);
+    const configPath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
+    const [keymapText, rgbText, configText] = await Promise.all([
+        fs.readFile(keymapPath, "utf8"),
+        fs.readFile(rgbPath, "utf8"),
+        fs.readFile(configPath, "utf8").catch(() => ""),
+    ]);
 
     const diagnostics = [];
     const safe = (label, fallback, callback) => {
@@ -364,6 +378,7 @@ async function buildModel(root) {
             return fallback;
         }
     };
+    const configMacros = safe("configMacros", {}, () => parseConfigMacros(configText));
 
     return {
         root,
@@ -378,7 +393,7 @@ async function buildModel(root) {
         hardcodedMacros: safe("hardcodedMacros", [], () =>
             parseMacroTable(keymapText, "HARDCODED_MACROS", "MACRO").map((row) => parseMacroSlot(row, "hardcoded"))
         ),
-        rgb: safe("rgb", {}, () => parseRgbConfig(rgbText)),
+        rgb: safe("rgb", {}, () => parseRgbConfig(rgbText, configMacros)),
         diagnostics,
     };
 }
@@ -523,13 +538,38 @@ function parseMacroSlot(row, kind) {
     };
 }
 
-function parseRgbConfig(text) {
+function parseConfigMacros(text) {
+    const macros = {};
+    for (const line of String(text || "").split(/\r?\n/)) {
+        const match = line.match(/^\s*#\s*define\s+([A-Z_][A-Z0-9_]*)\s+(.+?)\s*(?:\/\/.*)?$/);
+        if (match) {
+            macros[match[1]] = normalizeExpr(match[2]);
+        }
+    }
+    return macros;
+}
+
+function parseRgbConfig(text, configMacros = {}) {
     return {
         layerColors: parseLayerColors(text),
+        layerLedGroups: parseRgbLedGroupTable(text, "layer_led_groups_data", ".layer"),
         pdModeColors: parsePdModeColors(text),
+        pdModeLedGroups: parseRgbLedGroupTable(text, "pd_mode_led_groups_data", ".pointing_mode"),
         comboFeedback: parseSimpleColorStruct(text, /combo_feedback_colors\s*=/, [".color", ".locality"]),
+        comboFeedbackLedGroups: parseRgbLedGroupTable(text, "combo_feedback_led_groups_data"),
         automouseFade: parseSimpleColorStruct(text, /automouse_fade_end_config\s*=/, [".mode", ".end_color"]),
         keyBehaviorFeedback: parseKeyBehaviorFeedback(text),
+        keyBehaviorFeedbackLedGroups: parseRgbLedGroupTable(text, "key_behavior_feedback_led_groups_data", ".semantic"),
+        defaultColor: resolveDefaultRgbColor(configMacros),
+    };
+}
+
+function resolveDefaultRgbColor(macros) {
+    return {
+        expression: `HSV(${macros.RGB_MATRIX_DEFAULT_HUE || "0"}, ${macros.RGB_MATRIX_DEFAULT_SAT || "255"}, ${macros.RGB_MATRIX_DEFAULT_VAL || macros.RGB_MATRIX_MAXIMUM_BRIGHTNESS || "255"})`,
+        h: macros.RGB_MATRIX_DEFAULT_HUE || "0",
+        s: macros.RGB_MATRIX_DEFAULT_SAT || "255",
+        v: macros.RGB_MATRIX_DEFAULT_VAL || macros.RGB_MATRIX_MAXIMUM_BRIGHTNESS || "255",
     };
 }
 
@@ -576,6 +616,61 @@ function parsePdModeColors(text) {
             };
         })
         .filter((row) => row.pointingMode);
+}
+
+function parseRgbLedGroupTable(text, tableName, ownerField) {
+    let body;
+    try {
+        body = findCallBody(text, new RegExp(`${escapeRegex(tableName)}\\s*\\[\\]\\s*=\\s*RGB_LED_GROUP_TABLE`));
+    } catch {
+        return [];
+    }
+
+    const macros = parseRgbLedGroupMacros(text);
+    return splitTopLevelWithRanges(body)
+        .map((item) => stripComments(body.slice(item.start, item.end)).trim())
+        .map(trimOuterInitializer)
+        .filter(Boolean)
+        .map((entry) => {
+            const fields = parseDesignatedFields(entry);
+            const ledGroup = parseLedGroupExpression(fields[".led_group"] || "", macros);
+            const row = {
+                color: parseHsv(fields[".color"]),
+                ledGroup: normalizeExpr(fields[".led_group"] || ""),
+                ledIndices: ledGroup,
+            };
+            if (ownerField) {
+                row.owner = normalizeExpr(fields[ownerField] || "");
+                row.ownerField = ownerField.slice(1);
+            }
+            return row;
+        })
+        .filter((row) => row.ledGroup || row.owner || row.color.expression);
+}
+
+function parseRgbLedGroupMacros(text) {
+    const macros = {};
+    const pattern = /#\s*define\s+(RGB_LED_GROUP_[A-Z0-9_]+)\s+RGB_LED_GROUP\s*\(([^)]*)\)/g;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+        macros[match[1]] = splitTopLevel(match[2]).map(normalizeExpr).filter(Boolean);
+    }
+    return macros;
+}
+
+function parseLedGroupExpression(value, macros) {
+    const expression = normalizeExpr(value || "");
+    if (!expression) {
+        return [];
+    }
+    if (macros[expression]) {
+        return macros[expression];
+    }
+    const match = expression.match(/^RGB_LED_GROUP\s*\(([\s\S]*)\)$/);
+    if (!match) {
+        return [];
+    }
+    return splitTopLevel(match[1]).map(normalizeExpr).filter(Boolean);
 }
 
 function parseSimpleColorStruct(text, pattern, fieldNames) {
@@ -973,6 +1068,21 @@ function findInitializerBody(text, pattern) {
     };
 }
 
+function findCallBody(text, pattern) {
+    pattern.lastIndex = 0;
+    const match = pattern.exec(text);
+    if (!match) {
+        throw new Error(`Could not find call for ${pattern}.`);
+    }
+
+    const open = text.indexOf("(", match.index + match[0].length);
+    if (open === -1) {
+        throw new Error(`Could not find call body for ${pattern}.`);
+    }
+    const close = findMatching(text, open, "(", ")");
+    return text.slice(open + 1, close);
+}
+
 function findDesignatedEntry(body, designator) {
     const pattern = new RegExp(`${escapeRegex(designator)}\\s*=\\s*\\{`, "g");
     const match = pattern.exec(body);
@@ -1284,6 +1394,12 @@ function stripInlineLineComment(text) {
     return text;
 }
 
+function stripComments(text) {
+    return String(text || "")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+}
+
 function findMatching(text, openIndex, openChar, closeChar) {
     let depth = 0;
     let quote = "";
@@ -1578,12 +1694,26 @@ function getStudioHtml() {
             display: block;
             padding: 14px;
         }
-        section {
+        section, details.panel {
             border: 1px solid var(--line);
             border-radius: 8px;
             background: var(--panel);
             padding: 14px;
             min-width: 0;
+        }
+        details.panel > summary {
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 650;
+            list-style-position: inside;
+        }
+        details.panel > summary h2,
+        details.panel > summary h3 {
+            display: inline;
+            margin-left: 4px;
+        }
+        details.panel > .panel-body {
+            margin-top: 12px;
         }
         .stack { display: grid; gap: 14px; }
         .view-tabs {
@@ -1628,17 +1758,13 @@ function getStudioHtml() {
             cursor: pointer;
         }
         .svg-key rect {
-            fill: var(--key);
-            stroke: #64717a;
             stroke-width: 1.4;
         }
         .svg-key.selected rect {
-            fill: var(--key-active);
             stroke: var(--accent);
             stroke-width: 3;
         }
         .svg-key text {
-            fill: var(--text);
             font-family: var(--vscode-font-family, system-ui, sans-serif);
             text-anchor: middle;
             dominant-baseline: middle;
@@ -1887,7 +2013,11 @@ function getClientScript() {
         for (const diagnostic of model.diagnostics || []) {
             items.push("<div class='warning'>" + escapeHtml(diagnostic) + "</div>");
         }
-        return items.length ? "<section>" + items.join("") + "</section>" : "";
+        return items.length ? panel("Status", items.join(""), true) : "";
+    }
+
+    function panel(title, body, open = true) {
+        return "<details class='panel' " + (open ? "open" : "") + "><summary><h2>" + escapeHtml(title) + "</h2></summary><div class='panel-body'>" + body + "</div></details>";
     }
 
     function renderViewTabs() {
@@ -1904,27 +2034,13 @@ function getClientScript() {
 
     function renderLayerStudio() {
         const layer = currentLayer();
-        if (!layer) return "<section><h2>Layers</h2><p class='muted'>No LAYOUT blocks found.</p></section>";
+        if (!layer) return panel("Layers", "<p class='muted'>No LAYOUT blocks found.</p>", true);
         const selected = layer.positions[selectedKey] || layer.positions[0];
         return "<div class='stack'>" +
-            "<section>" +
-            "<h2>Layout</h2>" +
-            renderLayerTabs() +
-            renderBoard(layer) +
-            "</section>" +
-            "<section>" +
-            "<h2>Selected Key</h2>" +
-            renderSelectedKeyPanel(layer, selected) +
-            "</section>" +
-            "<section>" +
-            "<h2>Layer Behaviors</h2>" +
-            renderLayerBehaviorTable(layer) +
-            "</section>" +
-            "<section>" +
-            "<h2>Layer Combos & PD Modes</h2>" +
-            renderLayerComboTable(layer) +
-            renderLayerPdModeTable(layer) +
-            "</section>" +
+            panel("Layout", renderLayerTabs() + renderBoard(layer), true) +
+            panel("Selected Key", renderSelectedKeyPanel(layer, selected), true) +
+            panel("Layer Behaviors", renderLayerBehaviorTable(layer), true) +
+            panel("Layer Combos & PD Modes", renderLayerComboTable(layer) + renderLayerPdModeTable(layer), true) +
             "</div>";
     }
 
@@ -2088,7 +2204,9 @@ function getClientScript() {
     function layerColorSubtitle(layerColor) {
         if (!layerColor) return "No layer RGB config parsed";
         const color = layerColor.color || {};
-        return "RGB matrix " + layerColor.mode + " • authored HSV(" + [color.h, color.s, color.v].join(", ") + ")";
+        const fallback = activeLayer === "LAYER_BASE" && numericChannel(color.v) === 0 && model.rgb?.defaultColor;
+        const suffix = fallback ? " • preview uses default RGB " + fallback.expression : "";
+        return "RGB matrix " + layerColor.mode + " • authored HSV(" + [color.h, color.s, color.v].join(", ") + ")" + suffix;
     }
 
     function keyStyle(position) {
@@ -2112,7 +2230,8 @@ function getClientScript() {
         const mode = layerColor.mode;
         const isReal = position.keycode !== "_______" && position.keycode !== "XXXXXXX";
         if (mode === "KEYS_MAPPED_ON_THIS_LAYER_ONLY" && !isReal) return "";
-        const css = hsvToHex(layerColor.color);
+        const previewColor = activeLayer === "LAYER_BASE" && numericChannel(layerColor.color.v) === 0 ? model.rgb?.defaultColor : layerColor.color;
+        const css = hsvToHex(previewColor);
         if (!css) return "";
         return css;
     }
@@ -2278,16 +2397,16 @@ function getClientScript() {
     }
 
     function renderBehaviorStudio() {
-        return "<section>" +
-            "<h2>Behavior Builder</h2>" +
+        return panel("Behavior Builder",
             renderBehaviorForm() +
             "<h3 style='margin-top: 14px'>Existing rows</h3>" +
             "<table><thead><tr><th>Keycode</th><th>Steps</th></tr></thead><tbody>" +
             model.keyBehaviors.map((row) =>
                 "<tr><td>" + escapeHtml(displayAction(row.keycode)) + "<br><code class='muted'>" + escapeHtml(row.keycode) + "</code></td><td>" + row.steps.map(renderStep).join("<br>") + "</td></tr>"
             ).join("") +
-            "</tbody></table>" +
-            "</section>";
+            "</tbody></table>",
+            true
+        );
     }
 
     function renderBehaviorForm() {
@@ -2363,13 +2482,17 @@ function getClientScript() {
 
     function renderRgbStudio() {
         const rgb = model.rgb || {};
-        return "<section>" +
-            "<h2>RGB Studio</h2>" +
-            "<h3>Layer colors</h3>" +
-            "<div class='card-list'>" + (rgb.layerColors || []).map(renderLayerColorCard).join("") + "</div>" +
-            "<h3 style='margin-top: 14px'>Pointing-mode colors</h3>" +
-            "<div class='card-list'>" + (rgb.pdModeColors || []).map(renderPdColorCard).join("") + "</div>" +
-            "</section>";
+        return "<div class='stack'>" +
+            panel("Layer Colors", "<div class='card-list'>" + (rgb.layerColors || []).map(renderLayerColorCard).join("") + "</div>", true) +
+            panel("Layer LED Groups", renderLedGroupTable(rgb.layerLedGroups || [], "Layer"), false) +
+            panel("Auto-mouse Fade", renderAutomouseCard(rgb.automouseFade), false) +
+            panel("Pointing-mode Colors", "<div class='card-list'>" + (rgb.pdModeColors || []).map(renderPdColorCard).join("") + "</div>", true) +
+            panel("Pointing-mode LED Groups", renderLedGroupTable(rgb.pdModeLedGroups || [], "Pointing mode"), false) +
+            panel("Combo Feedback", renderComboFeedbackCard(rgb.comboFeedback), false) +
+            panel("Combo Feedback LED Groups", renderLedGroupTable(rgb.comboFeedbackLedGroups || [], ""), false) +
+            panel("Key Behavior Feedback", renderKeyBehaviorFeedbackCard(rgb.keyBehaviorFeedback), true) +
+            panel("Key Behavior Feedback LED Groups", renderLedGroupTable(rgb.keyBehaviorFeedbackLedGroups || [], "Semantic"), false) +
+            "</div>";
     }
 
     function renderLayerColorCard(row) {
@@ -2394,6 +2517,71 @@ function getClientScript() {
             "</div></div>";
     }
 
+    function renderAutomouseCard(config) {
+        if (!config) {
+            return "<p class='muted'>No active automouse fade config parsed.</p>";
+        }
+        return "<div class='card'>" +
+            "<strong>Fade destination</strong>" +
+            renderSwatch(config.end_color) +
+            "<table><tbody>" +
+            "<tr><th>Mode</th><td><code>" + escapeHtml(config.mode || "") + "</code></td></tr>" +
+            "<tr><th>End color</th><td><code>" + escapeHtml(config.end_color?.expression || "") + "</code></td></tr>" +
+            "</tbody></table>" +
+            "</div>";
+    }
+
+    function renderComboFeedbackCard(config) {
+        if (!config) {
+            return "<p class='muted'>No active combo feedback config parsed.</p>";
+        }
+        return "<div class='card'>" +
+            "<strong>Active combo color</strong>" +
+            renderSwatch(config.color) +
+            "<table><tbody>" +
+            "<tr><th>Color</th><td><code>" + escapeHtml(config.color?.expression || "") + "</code></td></tr>" +
+            "<tr><th>Locality</th><td><code>" + escapeHtml(config.locality || "") + "</code></td></tr>" +
+            "</tbody></table>" +
+            "</div>";
+    }
+
+    function renderKeyBehaviorFeedbackCard(config) {
+        if (!config) {
+            return "<p class='muted'>No active key behavior feedback config parsed.</p>";
+        }
+        const colorRows = [
+            ["Tap pending", config.tapPendingColor],
+            ["Tap committed", config.tapCommittedColor],
+            ["Hold active", config.holdActiveColor],
+            ["Long hold active", config.longHoldActiveColor],
+        ];
+        const branchRows = (config.tapBranchColors || []).map((color, index) => ["Tap branch " + index, color]);
+        return "<div class='card-list'>" +
+            "<div class='card'><table><tbody>" +
+            "<tr><th>Tap commit mode</th><td><code>" + escapeHtml(config.tapCommitMode || "") + "</code></td></tr>" +
+            "<tr><th>Locality</th><td><code>" + escapeHtml(config.locality || "") + "</code></td></tr>" +
+            "</tbody></table></div>" +
+            colorRows.concat(branchRows).map(([label, color]) =>
+                "<div class='card'><strong>" + escapeHtml(label) + "</strong>" + renderSwatch(color) + "<code>" + escapeHtml(color?.expression || "") + "</code></div>"
+            ).join("") +
+            "</div>";
+    }
+
+    function renderLedGroupTable(rows, ownerLabel) {
+        if (!rows.length) {
+            return "<p class='muted'>No active LED group rows are enabled in this table.</p>";
+        }
+        const ownerHeader = ownerLabel ? "<th>" + escapeHtml(ownerLabel) + "</th>" : "";
+        return "<table><thead><tr>" + ownerHeader + "<th>Color</th><th>LED group</th><th>LEDs</th></tr></thead><tbody>" +
+            rows.map((row) => "<tr>" +
+                (ownerLabel ? "<td><code>" + escapeHtml(row.owner || "") + "</code></td>" : "") +
+                "<td>" + renderInlineSwatch(row.color) + "<code>" + escapeHtml(row.color?.expression || "") + "</code></td>" +
+                "<td><code>" + escapeHtml(row.ledGroup || "") + "</code></td>" +
+                "<td><code>" + escapeHtml((row.ledIndices || []).join(", ")) + "</code></td>" +
+                "</tr>").join("") +
+            "</tbody></table>";
+    }
+
     function hsvInputs(color) {
         return "<label><span>h</span><input name='h' value='" + escapeAttr(color.h || "") + "'></label>" +
             "<label><span>s</span><input name='s' value='" + escapeAttr(color.s || "") + "'></label>" +
@@ -2402,7 +2590,7 @@ function getClientScript() {
 
     function renderSwatch(color) {
         const css = hsvToCss(color);
-        return "<div class='swatch' style='background: " + css + "' title='" + escapeAttr(color.expression || "") + "'></div>";
+        return "<div class='swatch' style='background: " + css + "' title='" + escapeAttr(color?.expression || "") + "'></div>";
     }
 
     function renderInlineSwatch(color) {
@@ -2476,16 +2664,18 @@ function getClientScript() {
     }
 
     function renderMacroStudio() {
-        return "<section><h2>VIA Macros</h2>" +
+        return panel("VIA Macros",
             "<table><thead><tr><th>Slot</th><th>Payload</th><th></th></tr></thead><tbody>" +
             model.viaMacros.map((slot) =>
                 "<tr data-keycode='" + escapeAttr(slot.keycode) + "'><td><code>" + escapeHtml(slot.keycode) + "</code></td><td><input value='" + escapeAttr(slot.payload) + "'></td><td><button data-action='updateViaMacro'>Apply</button></td></tr>"
             ).join("") +
-            "</tbody></table></section>";
+            "</tbody></table>",
+            true
+        );
     }
 
     function renderComboStudio() {
-        return "<section><h2>Combo Builder</h2>" +
+        return panel("Combo Builder",
             "<div class='card'><div class='form-grid'>" +
             "<label><span>Output</span><input id='comboOutput' placeholder='Tab'></label>" +
             "<label><span>Inputs</span><input id='comboInputs' placeholder='D, F'></label>" +
@@ -2496,7 +2686,9 @@ function getClientScript() {
             model.combos.map((combo) =>
                 "<tr><td>" + escapeHtml(combo.outputDisplay || combo.output) + "<br><code class='muted'>" + escapeHtml(combo.output) + "</code></td><td>" + escapeHtml((combo.inputDisplays || combo.inputs).join(" + ")) + "<br><code class='muted'>" + escapeHtml(combo.inputs.join(" + ")) + "</code></td></tr>"
             ).join("") +
-            "</tbody></table></section>";
+            "</tbody></table>",
+            true
+        );
     }
 
     function currentLayer() {

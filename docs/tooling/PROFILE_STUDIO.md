@@ -19,6 +19,11 @@ back to the same blocks.
   profile introspection geometry
 - `layer_colors[]`
 - `pd_mode_colors[]`
+- RGB LED group tables
+- auto-mouse fade destination
+- combo feedback color/locality
+- key-behavior feedback colors, tap-branch colors, tap commit mode, and
+  locality
 - `VIA_MACROS(MACRO)`
 - appended `COMBOS(COMBO)` rows
 - appended simple `key_behaviors[]` rows
@@ -31,6 +36,9 @@ key is later changed to an existing behavior-owned keycode.
 Normal keys can be entered as user-facing labels such as `A`, `Enter`, `Space`,
 or the classic transparent token `_______`; advanced QMK expressions still pass
 through when needed.
+
+All major panels are collapsible. The RGB page keeps a panel for every authored
+section in `rgb_config.c`, even when a table currently has no active rows.
 
 For complex behavior rows, direct source editing is still expected after using
 the studio as a starter.
