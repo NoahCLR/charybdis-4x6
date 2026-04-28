@@ -3,9 +3,11 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "runtime.h"
+#include "effect_plan.h"
 #include "feedback_projection.h"
 #include "pd_projection.h"
 #include "release_internal.h"
+#include "tap_series.h"
 
 #include <string.h>
 
@@ -40,7 +42,6 @@ __attribute__((weak)) key_feedback_tap_commit_mode_t key_feedback_tap_commit_mod
     return KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS;
 }
 
-static bool key_runtime_core_pending_multi_tap_flush_resolution(const tap_series_t *series, uint16_t *action, uint8_t *repeat_count);
 static press_token_t *key_runtime_core_press_token_state(key_runtime_core_state_t *state, keypos_t key_pos);
 static bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id);
 
@@ -372,11 +373,11 @@ static void key_runtime_core_effect_plan_push_feedback_pulse_ex(key_runtime_core
                                             });
 }
 
-static void key_runtime_core_effect_plan_push_feedback_pulse(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, key_feedback_pulse_kind_t kind) {
+void key_runtime_core_effect_plan_push_feedback_pulse(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, key_feedback_pulse_kind_t kind) {
     key_runtime_core_effect_plan_push_feedback_pulse_ex(plan, key_pos, kind, 0u);
 }
 
-static void key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, uint8_t tap_count) {
+void key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, uint8_t tap_count) {
     if (key_runtime_core_tap_commit_feedback_allowed(action, tap_count)) {
         key_runtime_core_effect_plan_push_feedback_pulse(plan, key_pos, KEY_FEEDBACK_PULSE_TAP_COMMITTED);
     }
@@ -408,7 +409,7 @@ static void key_runtime_core_effect_plan_push_delayed_action_with_flags(key_runt
                                             });
 }
 
-static void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
+void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
     key_runtime_core_effect_plan_push_delayed_action_with_flags(plan, key_pos, action, mods, repeat_count, 0u);
 }
 
@@ -2060,25 +2061,6 @@ static void key_runtime_core_tap_series_preserve_release(key_runtime_core_state_
     series->feedback_sequence = key_runtime_core_state_next_feedback_sequence(state);
 }
 
-static bool key_runtime_core_pending_multi_tap_flush_resolution(const tap_series_t *series, uint16_t *action, uint8_t *repeat_count) {
-    uint16_t resolved_action;
-    uint8_t  resolved_repeat_count;
-
-    if (!(series && series->active && !series->branch_confirmed && !series->branch_confirming)) {
-        return false;
-    }
-
-    resolved_action       = series->tap_repeat_count > 0u ? series->tap_action : series->single_action;
-    resolved_repeat_count = series->tap_repeat_count > 0u ? series->tap_repeat_count : series->tap_count;
-    if (action) {
-        *action = resolved_action;
-    }
-    if (repeat_count) {
-        *repeat_count = resolved_repeat_count;
-    }
-    return true;
-}
-
 static bool key_runtime_core_branch_confirm_window_active(uint16_t started_at, uint16_t term_ms, uint16_t now) {
     return term_ms != 0u && key_runtime_core_elapsed(started_at, now) < term_ms;
 }
@@ -2129,25 +2111,6 @@ bool key_runtime_core_tap_series_start_delayed_action_branch_confirm(key_runtime
     series->branch_confirm_action_feedback      = action_feedback;
     series->branch_confirm_action_feedback_kind = (uint8_t)action_feedback_kind;
     return true;
-}
-
-static void key_runtime_core_plan_branch_confirm_delayed_action(key_runtime_core_state_t *state, tap_series_t *series, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
-    key_feedback_pulse_kind_t action_feedback_kind;
-
-    if (!(state && series && series->active && series->branch_confirming && plan)) {
-        return;
-    }
-
-    key_runtime_core_effect_plan_push_delayed_action(plan, key_pos, series->branch_confirm_action, series->branch_confirm_mods, series->branch_confirm_repeat_count);
-    if (series->branch_confirm_tap_commit_feedback) {
-        key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, key_pos, series->branch_confirm_action, series->branch_confirm_tap_count);
-    }
-    if (series->branch_confirm_action_feedback) {
-        action_feedback_kind = (key_feedback_pulse_kind_t)series->branch_confirm_action_feedback_kind;
-        key_runtime_core_effect_plan_push_feedback_pulse(plan, key_pos, action_feedback_kind);
-    }
-
-    key_runtime_core_tap_series_clear(state, series);
 }
 
 static void key_runtime_core_plan_same_key_branch_confirm_interruption(key_runtime_core_state_t *state, tap_series_t *series, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
@@ -2952,27 +2915,6 @@ static void key_runtime_core_tap_series_update_for_press(key_runtime_core_state_
     (void)token_key_pos;
 }
 
-static bool key_runtime_core_tap_series_take_flush(tap_series_t *series, uint16_t *action, uint8_t *repeat_count, delayed_action_mods_t *mods) {
-    if (action) {
-        *action = KC_NO;
-    }
-    if (repeat_count) {
-        *repeat_count = 0u;
-    }
-    if (mods) {
-        *mods = (delayed_action_mods_t){0};
-    }
-
-    if (!key_runtime_core_pending_multi_tap_flush_resolution(series, action, repeat_count)) {
-        return false;
-    }
-
-    if (mods) {
-        *mods = series->saved_mod_state;
-    }
-    return true;
-}
-
 static void key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan) {
     keypos_t token_key_pos;
 
@@ -3274,80 +3216,6 @@ void key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key
         if (token->interaction.contract.suppress_tap_on_layer_interrupt) {
             token->momentary_layer_tap_interrupted = true;
         }
-    }
-}
-
-void key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-
-    if (!(state && plan)) {
-        return;
-    }
-
-    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
-        tap_series_t         *series = &state->tap_series[index];
-        press_token_t        *owner;
-        uint16_t              action;
-        uint8_t               repeat_count;
-        delayed_action_mods_t mods;
-        keypos_t              series_key_pos;
-
-        series_key_pos = key_runtime_core_tap_series_resolve_key_pos(state, series);
-        if (!(series->active && !(key_runtime_core_keypos_equal(series_key_pos, key_pos) && series->keycode == keycode))) {
-            continue;
-        }
-
-        owner = key_runtime_core_press_token_state(state, series_key_pos);
-        if (owner && owner->active) {
-            continue;
-        }
-
-        if (series->branch_confirming) {
-            if (series->branch_confirm_kind == KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION) {
-                key_runtime_core_plan_branch_confirm_delayed_action(state, series, series_key_pos, plan);
-            }
-            continue;
-        }
-
-        if (!key_runtime_core_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
-            continue;
-        }
-
-        key_runtime_core_effect_plan_push_delayed_action(plan, series_key_pos, action, mods, repeat_count);
-        key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, series_key_pos, action, series->tap_count);
-        key_runtime_core_tap_series_clear(state, series);
-    }
-}
-
-void key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-
-    if (!(state && plan)) {
-        return;
-    }
-
-    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
-        tap_series_t         *series = &state->tap_series[index];
-        uint16_t              action;
-        uint8_t               repeat_count;
-        delayed_action_mods_t mods;
-        keypos_t              series_key_pos;
-
-        series_key_pos = key_runtime_core_tap_series_resolve_key_pos(state, series);
-        if (series->active && series->branch_confirming) {
-            if (series->branch_confirm_kind == KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION) {
-                key_runtime_core_plan_branch_confirm_delayed_action(state, series, series_key_pos, plan);
-            }
-            continue;
-        }
-
-        if (!key_runtime_core_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
-            continue;
-        }
-
-        key_runtime_core_effect_plan_push_delayed_action(plan, series_key_pos, action, mods, repeat_count);
-        key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, series_key_pos, action, series->tap_count);
-        key_runtime_core_tap_series_clear(state, series);
     }
 }
 

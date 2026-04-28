@@ -601,3 +601,65 @@ diagnostics.
 1. Split one remaining `runtime.c` accumulator concern next: pending multi-tap scan/flush, pending-release queue storage, or projection snapshot comparison.
 2. Keep `feedback_projection.c` limited to feedback pulse projection and queueing; do not let it become a general feedback/RGB renderer.
 3. Preserve runtime debug, trace, scenario, release matrix, full host, compile-gate, and firmware compile coverage for the next runtime split.
+
+## 2026-04-28 - Tap-Series Flush Split
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/core/tap_series.h` and `users/noah/lib/key/runtime/core/tap_series_flush.c`.
+- Moved pending multi-tap flush resolution, tap-series flush extraction, delayed branch-confirm completion, and foreign/global multi-tap flush loops out of `runtime.c`.
+- Added `users/noah/lib/key/runtime/core/effect_plan.h` so internal core modules append delayed-action and feedback effects through the existing core effect-plan helpers instead of hand-editing plan storage.
+- Kept `tap_series_t` storage in `key_runtime_core_state_t`; the new module operates on core state and does not introduce a second tap-series truth.
+- Wired `tap_series_flush.c` into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and the manual key-runtime/PD integration runners that compile `runtime.c`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so pending multi-tap flush planning is documented as an explicit core module.
+
+## Finding Status
+
+- The broader key-runtime accumulator finding remains partially resolved.
+- Resolved in this pass:
+  - foreign and global pending multi-tap flush loops now live in `tap_series_flush.c`
+  - flush resolution and tap-series flush extraction are no longer local helpers inside `runtime.c`
+  - delayed branch-confirm action completion is shared through the tap-series helper instead of being duplicated by flush paths
+  - source manifests and host runners mechanically include the new module
+- Still open:
+  - pending multi-tap scan threshold planning remains in `runtime.c`
+  - pending-release queue storage remains in `runtime.c`
+  - projection snapshot capture/comparison remains in `runtime.c`
+  - broad runtime state/debug surfaces remain in `runtime.h`
+
+## Verification
+
+Post-change targeted checks:
+
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/effect_plan.h`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/tap_series.h`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/tap_series_flush.c`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks
+returned the expected nonzero diff status for new files and produced no
+diagnostics.
+
+## Next Steps
+
+1. Continue with one remaining accumulator concern: pending multi-tap scan threshold planning, pending-release queue storage, or projection snapshot comparison.
+2. Keep `tap_series_flush.c` limited to tap-series flush/branch-confirm delayed-action completion; threshold scan policy should move separately if it is split.
+3. Preserve scenario, release matrix, integration harness, runtime debug/trace, full host, compile-gate, and firmware compile coverage for the next split.

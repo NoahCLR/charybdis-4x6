@@ -64,6 +64,7 @@ compile_test() {
     "$ROOT/users/noah/lib/key/runtime/core/feedback_projection.c" \
     "$ROOT/users/noah/lib/key/runtime/core/pd_projection.c" \
     "$ROOT/users/noah/lib/key/runtime/core/release_planner.c" \
+    "$ROOT/users/noah/lib/key/runtime/core/tap_series_flush.c" \
     "$ROOT/users/noah/lib/key/runtime/core/trace.c" \
     "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
