@@ -61,6 +61,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/core/runtime.c" \
     "$ROOT/users/noah/lib/key/runtime/core/feedback_projection.c" \
     "$ROOT/users/noah/lib/key/runtime/core/pd_projection.c" \
+    "$ROOT/users/noah/lib/key/runtime/core/projection.c" \
     "$ROOT/users/noah/lib/key/runtime/core/release_planner.c" \
     "$ROOT/users/noah/lib/key/runtime/core/tap_series_flush.c" \
     "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \

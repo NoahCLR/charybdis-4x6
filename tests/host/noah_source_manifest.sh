@@ -81,6 +81,7 @@ lib/compat/qmk_combo_origin.c
 lib/key/runtime/core/runtime.c
 lib/key/runtime/core/feedback_projection.c
 lib/key/runtime/core/pd_projection.c
+lib/key/runtime/core/projection.c
 lib/key/runtime/core/release_planner.c
 lib/key/runtime/core/tap_series_flush.c
 lib/state/runtime/runtime_diag.c

@@ -663,3 +663,62 @@ diagnostics.
 1. Continue with one remaining accumulator concern: pending multi-tap scan threshold planning, pending-release queue storage, or projection snapshot comparison.
 2. Keep `tap_series_flush.c` limited to tap-series flush/branch-confirm delayed-action completion; threshold scan policy should move separately if it is split.
 3. Preserve scenario, release matrix, integration harness, runtime debug/trace, full host, compile-gate, and firmware compile coverage for the next split.
+
+## 2026-04-28 - Projection Snapshot Split
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/core/projection.c`.
+- Moved projection snapshot capture, snapshot comparison, and trace projection checkpoint capture out of `runtime.c`.
+- Kept core shadow projection state in `key_runtime_core_state_t`; the new module observes the core state and external debug snapshots without introducing a second projection truth.
+- Updated `users/noah/lib/key/runtime/core/projection.h` so projection snapshot capture/comparison are declared with the projection API.
+- Wired `projection.c` into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and the manual key-runtime/PD integration runners that compile `runtime.c`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so projection snapshot capture/comparison is documented as an explicit core projection module.
+
+## Finding Status
+
+- The broader key-runtime accumulator finding remains partially resolved.
+- Resolved in this pass:
+  - projection snapshot capture and comparison now live in `projection.c`
+  - trace projection checkpoint capture now lives with snapshot capture
+  - `runtime.c` no longer includes the debug snapshot and refcount-mask plumbing used only for projection capture
+  - source manifests and host runners mechanically include the new module
+- Still open:
+  - pending multi-tap scan threshold planning remains in `runtime.c`
+  - pending-release queue storage remains in `runtime.c`
+  - broad runtime state/debug surfaces remain in `runtime.h`
+
+## Verification
+
+Post-change targeted checks:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/projection.c`
+
+All listed pass/fail commands passed. The `--no-index` whitespace check
+returned the expected nonzero diff status for the new file and produced no
+diagnostics.
+
+## Next Steps
+
+1. Continue with one remaining accumulator concern: pending multi-tap scan threshold planning, pending-release queue storage, or broad runtime state/debug surfaces.
+2. Keep `projection.c` limited to projection snapshots, comparison, and trace projection checkpoints; effect projection orchestration remains a separate concern.
+3. Preserve runtime debug, runtime trace, integration harness, PD/key-runtime, scenario, release matrix, full host, compile-gate, and firmware compile coverage for the next split.
