@@ -543,3 +543,61 @@ diagnostics.
 1. Continue reducing the broader `runtime.c` accumulator by choosing one remaining owner: feedback projection, tap-series flush, projection snapshot comparison, or lease projection.
 2. Keep the PD authority boundary fixed: PD runtime owns actual PD state, key runtime owns key-driven PD projection, and the bridge observes local PD lock changes.
 3. Preserve full host and firmware compile checks for further runtime splits.
+
+## 2026-04-28 - Core Feedback Projection Split
+
+Starting worktree status:
+
+- `git status --short` showed the two new `feedback_projection` files already present as untracked working-tree entries from the interrupted pass and no unrelated entries.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/core/feedback_projection.h` and `users/noah/lib/key/runtime/core/feedback_projection.c`.
+- Moved feedback pulse queueing and feedback pulse observation out of `runtime.c`.
+- Kept `runtime.c` as the effect projection orchestrator while delegating `KEY_RUNTIME_EFFECT_FEEDBACK_PULSE` to `feedback_projection.c`.
+- Wired the new source into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and the manual key-runtime/PD integration runners that compile `runtime.c`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so feedback pulse projection is documented as an explicit core projection module.
+
+## Finding Status
+
+- The broader key-runtime accumulator finding remains partially resolved.
+- Resolved in this pass:
+  - feedback pulse projection now has a named internal core module
+  - feedback pulse queueing and observation are no longer local helpers inside `runtime.c`
+  - source manifests and host runners mechanically include the new module
+- Still open:
+  - pending multi-tap scan/flush helpers remain in `runtime.c`
+  - pending-release queue storage remains in `runtime.c`
+  - projection snapshot capture/comparison remains in `runtime.c`
+  - broad runtime state/debug surfaces remain in `runtime.h`
+
+## Verification
+
+Post-change targeted checks:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/feedback_projection.c`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/feedback_projection.h`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks
+returned the expected nonzero diff status for new files and produced no
+diagnostics.
+
+## Next Steps
+
+1. Split one remaining `runtime.c` accumulator concern next: pending multi-tap scan/flush, pending-release queue storage, or projection snapshot comparison.
+2. Keep `feedback_projection.c` limited to feedback pulse projection and queueing; do not let it become a general feedback/RGB renderer.
+3. Preserve runtime debug, trace, scenario, release matrix, full host, compile-gate, and firmware compile coverage for the next runtime split.

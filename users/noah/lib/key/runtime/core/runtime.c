@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "runtime.h"
+#include "feedback_projection.h"
 #include "pd_projection.h"
 #include "release_internal.h"
 
@@ -37,12 +38,6 @@ __attribute__((weak)) uint8_t pd_mode_buffered_tap_masked_real_mods(uint16_t key
 
 __attribute__((weak)) key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {
     return KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS;
-}
-
-__attribute__((weak)) void key_feedback_pulse_observe(keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
-    (void)key_pos;
-    (void)kind;
-    (void)tap_branch;
 }
 
 static bool key_runtime_core_pending_multi_tap_flush_resolution(const tap_series_t *series, uint16_t *action, uint8_t *repeat_count);
@@ -427,38 +422,6 @@ static void key_runtime_core_effect_plan_push_deferred_delayed_action(key_runtim
     key_runtime_core_effect_plan_push_delayed_action_with_flags(plan, key_pos, action, mods, repeat_count, flags);
 }
 
-static void key_runtime_core_set_feedback_pulse(key_runtime_core_state_t *state, keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
-    if (!state) {
-        return;
-    }
-
-    state->feedback_pulse_timer      = timer_read();
-    state->feedback_pulse_sequence   = key_runtime_core_state_next_feedback_sequence(state);
-    state->feedback_pulse_active     = true;
-    state->feedback_pulse_kind       = kind;
-    state->feedback_pulse_key_pos    = key_pos;
-    state->feedback_pulse_tap_branch = tap_branch;
-    state->feedback_pulse_queued     = false;
-    state->feedback_pulse_queued_sequence = 0u;
-}
-
-static void key_runtime_core_queue_feedback_pulse(key_runtime_core_state_t *state, keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
-    if (!state) {
-        return;
-    }
-
-    if (state->feedback_pulse_active) {
-        state->feedback_pulse_queued              = true;
-        state->feedback_pulse_queued_sequence     = key_runtime_core_state_next_feedback_sequence(state);
-        state->feedback_pulse_queued_kind         = kind;
-        state->feedback_pulse_queued_key_pos      = key_pos;
-        state->feedback_pulse_queued_tap_branch   = tap_branch;
-        return;
-    }
-
-    key_runtime_core_set_feedback_pulse(state, key_pos, kind, tap_branch);
-}
-
 void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
     if (!effect) {
         return;
@@ -492,8 +455,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             layer_ownership_momentary_release(effect->data.key_pos);
             return;
         case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
-            key_runtime_core_queue_feedback_pulse(key_runtime_core_state(), effect->data.feedback_pulse.key_pos, effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch);
-            key_feedback_pulse_observe(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch);
+            key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch);
             return;
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
             key_runtime_core_pd_projection_project_lock_tap(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos);
