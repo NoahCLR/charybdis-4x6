@@ -255,7 +255,8 @@ The runtime supports:
 - optional auto-mouse countdown gradient feedback
 - optional truthful key-behavior state feedback on both halves, a fixed half,
   only the key half, or only the key itself, with flashing held/repeat feedback
-  starting its visible window from the key that activated it
+  starting its visible window from the key that activated it; broad modes follow
+  the newest active feedback owner instead of merging offset flash phases
 - optional tap-branch confirmation colors so committed double-tap and higher
   branches can show which branch won before action feedback takes over, while
   base single-tap candidates stay quiet and higher hold tiers replace older

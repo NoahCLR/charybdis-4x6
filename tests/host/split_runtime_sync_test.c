@@ -24,6 +24,7 @@ static uint8_t           fake_pd_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+static uint8_t           fake_key_feedback_broad_owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
 static uint8_t           fake_key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
 static uint8_t           fake_key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_key_preview_layer;
@@ -77,6 +78,10 @@ static void test_reset_stubs(void) {
     fake_combo_overlay_bitmap[0] = 0x24u;
     key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
     key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 0, .col = 0}, KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING);
+    key_feedback_broad_owner_map_clear(fake_key_feedback_broad_owner_map);
+    key_feedback_broad_owner_map_set(fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, (keypos_t){.row = 0, .col = 0});
+    key_feedback_broad_owner_map_set(fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF, (keypos_t){.row = 0, .col = 0});
+    key_feedback_broad_owner_map_set(fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_GROUP_HOLD_ACTIVE, (keypos_t){.row = 0, .col = 0});
     key_feedback_tap_branch_map_clear(fake_key_feedback_tap_branch_map);
     key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
     key_origin_bitmap_add_keypos(fake_key_feedback_flash_visibility_bitmap, (keypos_t){.row = 0, .col = 0});
@@ -162,6 +167,10 @@ void key_feedback_semantic_map(uint8_t *out_map) {
 
 void key_feedback_tap_branch_map(uint8_t *out_map) {
     memcpy(out_map, fake_key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
+}
+
+void key_feedback_broad_owner_map(uint8_t *out_map) {
+    memcpy(out_map, fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
 }
 
 void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
@@ -255,7 +264,7 @@ static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
 #endif
     CHECK(sizeof(split_runtime_combo_feedback_packet_t) == (size_t)(2u * KEY_ORIGIN_BITMAP_SIZE));
     CHECK(sizeof(split_runtime_key_feedback_semantic_packet_t) == (size_t)(KEY_ORIGIN_BITMAP_SIZE + KEY_FEEDBACK_SEMANTIC_MAP_SIZE));
-    CHECK(sizeof(split_runtime_key_feedback_branch_packet_t) == KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
+    CHECK(sizeof(split_runtime_key_feedback_branch_packet_t) == (size_t)(KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE + KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE));
 
     split_runtime_sync_init();
 
@@ -281,6 +290,7 @@ static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     CHECK(memcmp(rpc_last_combo_packet.combo_overlay_bitmap, fake_combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(rpc_last_key_feedback_semantic_packet.key_feedback_flash_visibility_bitmap, fake_key_feedback_flash_visibility_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, fake_key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
+    CHECK(memcmp(rpc_last_key_feedback_branch_packet.key_feedback_broad_owner_map, fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE) == 0);
     CHECK(memcmp(rpc_last_key_feedback_branch_packet.key_feedback_tap_branch_map, fake_key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE) == 0);
     CHECK(split_runtime_sync_remote.key_preview_layer == UINT8_MAX);
 }
@@ -315,11 +325,11 @@ static void test_elapsed_skips_unchanged_packets_until_heartbeat(void) {
 
     fake_time32 += 1u;
     split_runtime_sync_elapsed(fake_auto_mouse_elapsed);
-    CHECK(rpc_send_count == 3u);
+    CHECK(rpc_send_count == 4u);
     CHECK(rpc_send_count_base == 1u);
     CHECK(rpc_send_count_combo == 1u);
     CHECK(rpc_send_count_key_feedback_semantic == 1u);
-    CHECK(rpc_send_count_key_feedback_branch == 0u);
+    CHECK(rpc_send_count_key_feedback_branch == 1u);
 }
 
 static void test_force_sync_sends_all_packets_even_when_unchanged(void) {
@@ -459,6 +469,26 @@ static void test_tick_sends_only_key_feedback_branch_packet_when_only_tap_branch
     CHECK(key_feedback_tap_branch_map_get(rpc_last_key_feedback_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 1, .col = 1}) == 3u);
 }
 
+static void test_tick_sends_only_key_feedback_branch_packet_when_only_broad_owner_changes(void) {
+    test_reset_stubs();
+
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+
+    key_feedback_broad_owner_map_set(fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, (keypos_t){.row = 1, .col = 1});
+    key_feedback_broad_owner_map_set(fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF, (keypos_t){.row = 1, .col = 1});
+
+    split_runtime_sync_tick();
+
+    CHECK(rpc_send_count == 1u);
+    CHECK(rpc_send_count_base == 0u);
+    CHECK(rpc_send_count_combo == 0u);
+    CHECK(rpc_send_count_key_feedback_semantic == 0u);
+    CHECK(rpc_send_count_key_feedback_branch == 1u);
+    CHECK(rpc_last_send_id == PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC);
+    CHECK(memcmp(rpc_last_key_feedback_branch_packet.key_feedback_broad_owner_map, fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE) == 0);
+}
+
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 static void test_tick_sends_base_packet_when_only_pd_owner_bitmap_changes(void) {
     test_reset_stubs();
@@ -492,6 +522,7 @@ static void test_idle_packets_use_idle_heartbeat(void) {
     key_origin_bitmap_clear(fake_combo_underlay_bitmap);
     key_origin_bitmap_clear(fake_combo_overlay_bitmap);
     key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
+    key_feedback_broad_owner_map_clear(fake_key_feedback_broad_owner_map);
     key_feedback_tap_branch_map_clear(fake_key_feedback_tap_branch_map);
 
     split_runtime_sync_init();
@@ -533,6 +564,9 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
     combo_packet.combo_overlay_bitmap[1]  = 0x22u;
     key_origin_bitmap_add_keypos(key_semantic_packet.key_feedback_flash_visibility_bitmap, (keypos_t){.row = 0, .col = 1});
     key_feedback_semantic_map_set(key_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 0, .col = 1}, KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING);
+    key_feedback_broad_owner_map_clear(key_branch_packet.key_feedback_broad_owner_map);
+    key_feedback_broad_owner_map_set(key_branch_packet.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, (keypos_t){.row = 0, .col = 1});
+    key_feedback_broad_owner_map_set(key_branch_packet.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF, (keypos_t){.row = 0, .col = 1});
     key_feedback_tap_branch_map_set(key_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 0, .col = 1}, 2u);
 
     split_runtime_sync_init();
@@ -562,6 +596,7 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
     CHECK(memcmp(split_runtime_sync_remote.combo_overlay_bitmap, combo_packet.combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(split_runtime_sync_remote.key_feedback_flash_visibility_bitmap, key_semantic_packet.key_feedback_flash_visibility_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(split_runtime_sync_remote.key_feedback_semantic_map, key_semantic_packet.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
+    CHECK(memcmp(split_runtime_sync_remote.key_feedback_broad_owner_map, key_branch_packet.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE) == 0);
     CHECK(memcmp(split_runtime_sync_remote.key_feedback_tap_branch_map, key_branch_packet.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE) == 0);
     CHECK(remote_snapshot_apply_count == 1u);
     CHECK(remote_snapshot_active == pd_mode_mask_from_id(base_packet.active_mode_id));
@@ -599,6 +634,7 @@ int main(void) {
     test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();
     test_tick_sends_only_key_feedback_packet_when_only_key_feedback_changes();
     test_tick_sends_only_key_feedback_branch_packet_when_only_tap_branch_changes();
+    test_tick_sends_only_key_feedback_branch_packet_when_only_broad_owner_changes();
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     test_tick_sends_base_packet_when_only_pd_owner_bitmap_changes();
 #endif

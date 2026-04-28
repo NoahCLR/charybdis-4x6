@@ -368,6 +368,7 @@ uint16_t                                    key_runtime_core_tap_action_at(keypo
 uint16_t                                    key_runtime_core_held_action_keycode_at(keypos_t key_pos);
 bool                                        key_runtime_core_repeat_active_at(keypos_t key_pos);
 bool                                        key_runtime_core_flashing_feedback_visible_at(keypos_t key_pos);
+bool                                        key_runtime_core_flashing_feedback_started_at(keypos_t key_pos, uint16_t *out_started_at);
 key_runtime_slot_phase_t                    key_runtime_core_slot_phase_at(keypos_t key_pos);
 bool                                        key_runtime_core_momentary_layer_tap_interrupted_at(keypos_t key_pos);
 uint8_t                                     key_runtime_core_pending_multi_tap_tap_count_at(keypos_t key_pos);

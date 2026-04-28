@@ -20,6 +20,7 @@
 
 #include "feedback_kind.h"
 #include "origin_registry.h"
+#include "keypos_codec.h"
 
 #ifndef KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS
 #    define KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS 20
@@ -59,6 +60,31 @@
 
 #define KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE ((((MATRIX_ROWS * MATRIX_COLS) * KEY_FEEDBACK_TAP_BRANCH_BITS) + 7u) / 8u)
 #define KEY_FEEDBACK_TAP_BRANCH_MASK ((uint16_t)((1u << KEY_FEEDBACK_TAP_BRANCH_BITS) - 1u))
+
+typedef enum {
+    KEY_FEEDBACK_BROAD_OWNER_GLOBAL = 0,
+    KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF,
+    KEY_FEEDBACK_BROAD_OWNER_RIGHT_HALF,
+    KEY_FEEDBACK_BROAD_OWNER_GROUP_UNRESOLVED_TAP_BRANCH,
+    KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_COMMITTED,
+    KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_COMMITTED,
+    KEY_FEEDBACK_BROAD_OWNER_GROUP_HOLD_ACTIVE,
+    KEY_FEEDBACK_BROAD_OWNER_GROUP_LONG_HOLD_ACTIVE,
+    KEY_FEEDBACK_BROAD_OWNER_COUNT,
+} key_feedback_broad_owner_slot_t;
+
+#define KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE ((uint8_t)KEY_FEEDBACK_BROAD_OWNER_COUNT)
+#define KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT       \
+    {                                                  \
+        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
+        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
+        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
+        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
+        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
+        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
+        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
+        KEY_RUNTIME_PACKED_KEYPOS_NONE                 \
+    }
 
 _Static_assert(KEY_FEEDBACK_TAP_BRANCH_BITS <= 8u, "key feedback tap branch values must fit in one byte");
 _Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT <= KEY_FEEDBACK_TAP_BRANCH_MASK, "key feedback tap branch map must represent every authored tap count");
@@ -200,6 +226,46 @@ static inline void key_feedback_tap_branch_map_set(uint8_t *map, keypos_t key_po
     }
 }
 
+static inline void key_feedback_broad_owner_map_clear(uint8_t *map) {
+    if (!map) {
+        return;
+    }
+
+    for (uint8_t index = 0; index < KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE; index++) {
+        map[index] = KEY_RUNTIME_PACKED_KEYPOS_NONE;
+    }
+}
+
+static inline keypos_t key_feedback_broad_owner_map_get(const uint8_t *map, key_feedback_broad_owner_slot_t slot) {
+    if (!(map && slot < KEY_FEEDBACK_BROAD_OWNER_COUNT)) {
+        return (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
+    }
+
+    return key_runtime_keypos_unpack((key_runtime_packed_keypos_t)map[slot]);
+}
+
+static inline void key_feedback_broad_owner_map_set(uint8_t *map, key_feedback_broad_owner_slot_t slot, keypos_t key_pos) {
+    if (!(map && slot < KEY_FEEDBACK_BROAD_OWNER_COUNT)) {
+        return;
+    }
+
+    map[slot] = key_runtime_keypos_pack(key_pos);
+}
+
+static inline bool key_feedback_broad_owner_map_has_any(const uint8_t *map) {
+    if (!map) {
+        return false;
+    }
+
+    for (uint8_t index = 0; index < KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE; index++) {
+        if (map[index] != KEY_RUNTIME_PACKED_KEYPOS_NONE) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static inline bool key_feedback_semantic_map_has_any(const uint8_t *map) {
     if (!map) {
         return false;
@@ -232,6 +298,7 @@ static inline bool key_feedback_semantic_map_has_flashing(const uint8_t *map) {
 
 void    key_feedback_semantic_map(uint8_t *out_map);
 void    key_feedback_tap_branch_map(uint8_t *out_map);
+void    key_feedback_broad_owner_map(uint8_t *out_map);
 void    key_feedback_flash_visibility_bitmap_for_semantic_map(const uint8_t *semantic_map, uint8_t *out_bitmap);
 void    key_feedback_flash_visibility_bitmap(uint8_t *out_bitmap);
 uint8_t key_feedback_preview_layer(void);

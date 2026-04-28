@@ -999,11 +999,11 @@ def parse_combo_feedback_locality(raw_text: str) -> dict[str, object] | None:
 
 def key_behavior_feedback_locality_description(locality: str) -> str:
     descriptions = {
-        "RGB_BOTH_HALVES": "Repaint both halves whenever a key-behavior feedback state is active.",
-        "RGB_KEY_HALF": "Repaint only the half that owns the key or tap series currently driving the feedback state.",
+        "RGB_BOTH_HALVES": "Repaint both halves from the newest active key-behavior feedback owner.",
+        "RGB_KEY_HALF": "Repaint the half owned by the newest active key or tap series on each half.",
         "RGB_KEYS_ONLY": "Repaint only the specific key currently driving the feedback state.",
-        "RGB_LEFT_HALF": "Always repaint the left half using the highest-priority active key-behavior feedback state.",
-        "RGB_RIGHT_HALF": "Always repaint the right half using the highest-priority active key-behavior feedback state.",
+        "RGB_LEFT_HALF": "Always repaint the left half from the newest active key-behavior feedback owner.",
+        "RGB_RIGHT_HALF": "Always repaint the right half from the newest active key-behavior feedback owner.",
     }
     return descriptions.get(locality, "Unknown key-behavior feedback RGB locality.")
 
@@ -2762,7 +2762,7 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
 
     lines.extend(
         [
-            f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics and per-key flash visibility; broadened authored localities intentionally collapse that truth to a half or full-board presentation while ignoring hidden flashing states for priority selection.",
+            f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics, per-key flash visibility, and a broad-surface owner map. `RGB_KEYS_ONLY` stays per-key; broader authored localities follow the newest active owner for that surface and use that owner's real flash phase, so offset held keys do not fill each other's off windows.",
             "",
             "Tap feedback is staged as neutral unresolved pending first, then a model-level branch confirmation from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.",
             "",

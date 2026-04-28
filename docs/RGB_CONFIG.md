@@ -374,11 +374,9 @@ The `tap_commit_mode` field controls which committed tap branches pulse with
 
 The `locality` field controls where the overlay paints:
 
-- `RGB_BOTH_HALVES`: repaint both halves
-- `RGB_LEFT_HALF`: repaint the left half using the highest
-  priority active feedback state.
-- `RGB_RIGHT_HALF`: repaint the right half using the highest
-  priority active feedback state.
+- `RGB_BOTH_HALVES`: repaint both halves from the newest active feedback owner
+- `RGB_LEFT_HALF`: repaint the left half from the newest active feedback owner
+- `RGB_RIGHT_HALF`: repaint the right half from the newest active feedback owner
 - `RGB_KEY_HALF`: repaint only the half that owns the feedback-driving key or
   active tap series. Combo-driven feedback can expand this to both halves when
   the combo footprint spans both sides.
@@ -438,11 +436,15 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keyma
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h). Its flash cadence is controlled by
 `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
 
-The runtime now keeps truthful per-key semantic state plus a per-key flash
-visibility bitmap. Authored `locality` broadens that truth only at paint time,
-and hidden flashing states are ignored when selecting the highest-priority
-state for half or full-board presentation. On split boards, the slave receives
-the packed semantic map, tap-branch map, and flash visibility bitmap through
+The runtime now keeps truthful per-key semantic state, per-key flash
+visibility, and a broad-surface owner map. `RGB_KEYS_ONLY` renders each key
+directly from that per-key truth. Broader localities choose the newest active
+feedback owner for the painted surface first, then use that owner's real
+visibility phase; if that owner is in its off window, the surface stays off
+instead of falling back to another offset key. When the newest owner is
+released, the next-newest still-active owner takes over without restarting its
+flash phase. On split boards, the slave receives the packed semantic map,
+tap-branch map, flash visibility bitmap, and broad owner map through
 [`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c).
 
 ### `key_behavior_feedback_led_groups`

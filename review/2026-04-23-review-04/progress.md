@@ -1498,3 +1498,57 @@ Next steps:
    flash window immediately.
 2. On split hardware, repeat the test from both halves and confirm the remote
    half mirrors the same first visible flash window.
+
+### Broad-Surface Key-Feedback Owner Follow-Up
+
+- Updated key-behavior feedback rendering so `RGB_KEYS_ONLY` remains per-key,
+  while every broader key-feedback surface selects the newest active feedback
+  owner before deciding visibility.
+- Added a broad owner map alongside the existing semantic, tap-branch, and
+  flash-visibility maps. The map gives `RGB_KEY_HALF`, fixed-half,
+  full-board, and key-feedback LED-group rendering one representative owner
+  per compressed surface.
+- Split sync now mirrors the broad owner map in the existing key-feedback
+  branch packet. This keeps the slave half aligned with the master's owner
+  selection without enlarging the already-full semantic packet.
+- New held/repeat activations become the owner for their broad surface and
+  start from their own visible flash window. If that newest owner is released,
+  the next-newest still-active owner takes over using its existing phase; no
+  release-driven restart is created.
+- Updated RGB docs, generated overview text, source comments, and the active
+  architecture note to describe newest-owner broad rendering.
+
+Reconciliation note: this follow-up supersedes the previous per-owner flash
+note's fallback-selection description for broadened key-feedback localities.
+Current broad rendering uses newest-owner selection first, not visible-priority
+fallback.
+
+Verification passed:
+
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and hold two same-half symbol keys with staggered hold thresholds.
+   The broad half should follow the newest held key and should not become
+   steady because an older key is in the opposite flash phase.

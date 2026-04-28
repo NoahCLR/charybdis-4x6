@@ -3274,6 +3274,46 @@ static bool key_runtime_core_flashing_feedback_lease_visible(const lease_t *leas
     return ((timer_elapsed(lease->feedback_started_at) / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0u;
 }
 
+static bool key_runtime_core_time_is_newer_or_equal(uint16_t candidate, uint16_t current) {
+    return (uint16_t)(candidate - current) < 0x8000u;
+}
+
+bool key_runtime_core_flashing_feedback_started_at(keypos_t key_pos, uint16_t *out_started_at) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    bool                      found = false;
+    uint16_t                  newest_started_at = 0;
+
+    if (!(state && out_started_at && key_runtime_core_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
+        const lease_t *lease = &state->leases[index];
+        lease_kind_t   kind;
+
+        if (!(lease->active && key_runtime_core_lease_owner_keypos_equal(lease, key_pos))) {
+            continue;
+        }
+
+        kind = key_runtime_core_lease_kind(lease);
+        if (kind != LEASE_KIND_HELD_ACTION && kind != LEASE_KIND_REPEAT) {
+            continue;
+        }
+
+        if (!found || key_runtime_core_time_is_newer_or_equal(lease->feedback_started_at, newest_started_at)) {
+            newest_started_at = lease->feedback_started_at;
+            found             = true;
+        }
+    }
+
+    if (!found) {
+        return false;
+    }
+
+    *out_started_at = newest_started_at;
+    return true;
+}
+
 bool key_runtime_core_flashing_feedback_visible_at(keypos_t key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 

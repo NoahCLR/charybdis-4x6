@@ -6,7 +6,7 @@
 // is intentionally split into three logical domains:
 // - base runtime state (automouse / pd / preview)
 // - combo RGB locality (underlay + overlay)
-// - authored key-feedback truth (semantic state + tap branch state)
+// - authored key-feedback truth (semantic state + broad owner state + tap branch state)
 //
 // The master periodically re-sends each surface as a heartbeat so a rebooted
 // or rejoined half can recover even if the relevant state did not change.
@@ -45,6 +45,7 @@ typedef struct __attribute__((packed)) {
 } split_runtime_key_feedback_semantic_packet_t;
 
 typedef struct __attribute__((packed)) {
+    uint8_t key_feedback_broad_owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
     uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
 } split_runtime_key_feedback_branch_packet_t;
 
@@ -61,6 +62,7 @@ typedef struct {
     uint8_t combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t key_feedback_broad_owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
     uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
 } split_runtime_sync_remote_t;
 
@@ -77,6 +79,7 @@ typedef struct {
             .combo_overlay_bitmap      = {0},                  \
             .key_feedback_flash_visibility_bitmap = {0},       \
             .key_feedback_semantic_map            = {0},       \
+            .key_feedback_broad_owner_map         = KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT, \
             .key_feedback_tap_branch_map          = {0},       \
         }
 #else
@@ -90,6 +93,7 @@ typedef struct {
             .combo_overlay_bitmap      = {0},             \
             .key_feedback_flash_visibility_bitmap = {0},  \
             .key_feedback_semantic_map            = {0},  \
+            .key_feedback_broad_owner_map         = KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT, \
             .key_feedback_tap_branch_map          = {0},  \
         }
 #endif

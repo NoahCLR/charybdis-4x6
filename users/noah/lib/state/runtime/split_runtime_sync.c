@@ -109,6 +109,7 @@ static split_runtime_key_feedback_semantic_packet_t split_runtime_sync_build_key
 static split_runtime_key_feedback_branch_packet_t split_runtime_sync_build_key_feedback_branch_packet(void) {
     split_runtime_key_feedback_branch_packet_t packet = {0};
 
+    key_feedback_broad_owner_map(packet.key_feedback_broad_owner_map);
     key_feedback_tap_branch_map(packet.key_feedback_tap_branch_map);
 
     return packet;
@@ -137,6 +138,10 @@ static bool split_runtime_key_feedback_semantic_packet_is_active(const split_run
 static bool split_runtime_key_feedback_branch_packet_is_active(const split_runtime_key_feedback_branch_packet_t *pkt) {
     if (!pkt) {
         return false;
+    }
+
+    if (key_feedback_broad_owner_map_has_any(pkt->key_feedback_broad_owner_map)) {
+        return true;
     }
 
     for (uint8_t index = 0; index < KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE; index++) {
@@ -304,6 +309,7 @@ static void split_runtime_sync_slave_key_feedback_branch_rpc(uint8_t initiator2t
         split_runtime_sync_log_packet_size_mismatch("key-feedback branch", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_branch_packet_t));
     }
 
+    memcpy(split_runtime_sync_remote.key_feedback_broad_owner_map, packet->key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
     memcpy(split_runtime_sync_remote.key_feedback_tap_branch_map, packet->key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
 }
 

@@ -312,9 +312,12 @@ with behavior for paths such as `LEFT_THUMB` double-tap hold crossing into
 `LOCK_LAYER(LAYER_NUM)`.
 Flashing held/repeat feedback is now precise per owner. The semantic map still
 names the active state, while a separate visibility bitmap carries the current
-per-key flash window. That lets the first visible window start at activation
-time for each key, and broadened half/full-board rendering skips hidden
-flashing states before selecting the highest-priority visible state.
+per-key flash window and a broad owner map identifies the newest active owner
+for compressed surfaces. That lets the first visible window start at activation
+time for each key. `RGB_KEYS_ONLY` renders the per-key truth directly; half,
+fixed-half, full-board, and feedback LED-group surfaces choose their newest
+active owner first and then follow that owner's real flash phase instead of
+OR-ing offset owners together.
 
 Pending multi-tap dispatch is intentionally split by destination: foreign
 handled keys keep independent authored pending chains, while foreign

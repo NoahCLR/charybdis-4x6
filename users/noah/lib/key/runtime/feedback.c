@@ -4,6 +4,8 @@
 
 #include "feedback.h"
 
+#include <string.h>
+
 #include "../interaction/handled_key_policy.h"
 #include "../interaction/key_behavior_lookup.h"
 #include "../../compat/qmk_combo_origin.h"
@@ -14,6 +16,101 @@
 #endif
 
 static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token);
+
+typedef struct {
+    uint8_t  owners[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
+    uint16_t started_at[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
+    bool     active[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
+} key_feedback_broad_owner_builder_t;
+
+static bool key_feedback_time_is_newer_or_equal(uint16_t candidate, uint16_t current) {
+    return (uint16_t)(candidate - current) < 0x8000u;
+}
+
+static void key_feedback_broad_owner_builder_init(key_feedback_broad_owner_builder_t *builder) {
+    if (!builder) {
+        return;
+    }
+
+    key_feedback_broad_owner_map_clear(builder->owners);
+    for (uint8_t index = 0; index < KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE; index++) {
+        builder->started_at[index] = 0u;
+        builder->active[index]     = false;
+    }
+}
+
+static void key_feedback_broad_owner_builder_set(key_feedback_broad_owner_builder_t *builder, key_feedback_broad_owner_slot_t slot, keypos_t owner_key_pos, uint16_t started_at) {
+    if (!(builder && slot < KEY_FEEDBACK_BROAD_OWNER_COUNT && key_origin_keypos_valid(owner_key_pos))) {
+        return;
+    }
+
+    if (builder->active[slot] && !key_feedback_time_is_newer_or_equal(started_at, builder->started_at[slot])) {
+        return;
+    }
+
+    builder->active[slot]     = true;
+    builder->started_at[slot] = started_at;
+    key_feedback_broad_owner_map_set(builder->owners, slot, owner_key_pos);
+}
+
+static bool key_feedback_broad_owner_group_slot(key_feedback_semantic_t semantic, key_feedback_broad_owner_slot_t *out_slot) {
+    if (!out_slot) {
+        return false;
+    }
+
+    switch (semantic) {
+        case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
+            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_UNRESOLVED_TAP_BRANCH;
+            return true;
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED:
+            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_COMMITTED;
+            return true;
+        case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
+            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_COMMITTED;
+            return true;
+        case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
+        case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
+            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_HOLD_ACTIVE;
+            return true;
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY:
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING:
+            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_LONG_HOLD_ACTIVE;
+            return true;
+        case KEY_FEEDBACK_SEMANTIC_NONE:
+        default:
+            return false;
+    }
+}
+
+static void key_feedback_broad_owner_builder_consider(key_feedback_broad_owner_builder_t *builder, keypos_t owner_key_pos, key_feedback_semantic_t semantic, uint16_t started_at) {
+    uint8_t                         bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    split_side_mask_t               sides;
+    key_feedback_broad_owner_slot_t group_slot;
+
+    if (!(builder && semantic != KEY_FEEDBACK_SEMANTIC_NONE && key_origin_keypos_valid(owner_key_pos))) {
+        return;
+    }
+
+    if (!key_origin_registry_get_bitmap(owner_key_pos, bitmap)) {
+        key_origin_bitmap_fill_single(bitmap, owner_key_pos);
+    }
+
+    if (key_origin_bitmap_has_any(bitmap)) {
+        key_feedback_broad_owner_builder_set(builder, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, owner_key_pos, started_at);
+    }
+
+    sides = key_origin_bitmap_side_mask(bitmap);
+    if ((sides & SPLIT_SIDE_MASK_LEFT) != 0u) {
+        key_feedback_broad_owner_builder_set(builder, KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF, owner_key_pos, started_at);
+    }
+    if ((sides & SPLIT_SIDE_MASK_RIGHT) != 0u) {
+        key_feedback_broad_owner_builder_set(builder, KEY_FEEDBACK_BROAD_OWNER_RIGHT_HALF, owner_key_pos, started_at);
+    }
+
+    if (key_feedback_broad_owner_group_slot(semantic, &group_slot)) {
+        key_feedback_broad_owner_builder_set(builder, group_slot, owner_key_pos, started_at);
+    }
+}
 
 static uint8_t key_feedback_semantic_priority(key_feedback_semantic_t semantic) {
     switch (semantic) {
@@ -362,6 +459,74 @@ void key_feedback_flash_visibility_bitmap(uint8_t *out_bitmap) {
 
     key_feedback_semantic_map(semantic_map);
     key_feedback_flash_visibility_bitmap_for_semantic_map(semantic_map, out_bitmap);
+}
+
+static uint16_t key_feedback_started_at_for_token_semantic(const press_token_t *token, keypos_t key_pos, key_feedback_semantic_t semantic) {
+    uint16_t started_at;
+
+    if (!token) {
+        return 0u;
+    }
+
+    if (key_feedback_semantic_is_flashing(semantic) && key_runtime_core_flashing_feedback_started_at(key_pos, &started_at)) {
+        return started_at;
+    }
+
+    switch (semantic) {
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY:
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING:
+            return (uint16_t)(token->pressed_at + token->interaction.binding.longer_hold_term);
+        case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
+        case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
+            return (uint16_t)(token->pressed_at + token->interaction.binding.tap_hold_term);
+        case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED:
+        case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
+        case KEY_FEEDBACK_SEMANTIC_NONE:
+        default:
+            return token->pressed_at;
+    }
+}
+
+void key_feedback_broad_owner_map(uint8_t *out_map) {
+    key_runtime_core_state_t          *state = key_runtime_core_state();
+    key_feedback_broad_owner_builder_t builder;
+
+    if (!out_map) {
+        return;
+    }
+
+    key_feedback_broad_owner_builder_init(&builder);
+
+    if (key_feedback_pulse_active() && state && key_origin_keypos_valid(state->feedback_pulse_key_pos)) {
+        key_feedback_broad_owner_builder_consider(&builder, state->feedback_pulse_key_pos, key_feedback_semantic_for_pulse(state->feedback_pulse_kind), state->feedback_pulse_timer);
+    }
+
+    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
+        keypos_t key_pos;
+
+        if (key_feedback_tap_series_shows_pending_feedback(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+            key_feedback_broad_owner_builder_consider(&builder, key_pos, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH, state->tap_series[index].last_tap_at);
+        }
+
+        if (key_feedback_tap_series_shows_branch_confirmation(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+            key_feedback_broad_owner_builder_consider(&builder, key_pos, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED, state->tap_series[index].branch_confirm_started_at);
+        }
+    }
+
+    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
+        press_token_t          *token    = &state->press_tokens[index];
+        key_feedback_semantic_t semantic = key_feedback_semantic_for_token(token);
+        keypos_t                key_pos;
+
+        if (semantic == KEY_FEEDBACK_SEMANTIC_NONE || !key_runtime_core_press_token_key_pos(token, &key_pos)) {
+            continue;
+        }
+
+        key_feedback_broad_owner_builder_consider(&builder, key_pos, semantic, key_feedback_started_at_for_token_semantic(token, key_pos, semantic));
+    }
+
+    memcpy(out_map, builder.owners, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
 }
 
 void key_feedback_semantic_map(uint8_t *out_map) {

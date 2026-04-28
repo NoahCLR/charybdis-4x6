@@ -268,14 +268,16 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //     key's held/repeat feedback activates
 //
 // Locality decides where the overlay paints:
-//   - RGB_BOTH_HALVES = mirror the feedback color across both halves
-//   - RGB_LEFT_HALF = always paint the left half
-//   - RGB_RIGHT_HALF = always paint the right half
+//   - RGB_BOTH_HALVES = mirror the newest active feedback owner across both halves
+//   - RGB_LEFT_HALF = always paint the left half from the newest active owner
+//   - RGB_RIGHT_HALF = always paint the right half from the newest active owner
 //   - RGB_KEY_HALF = paint only the half that owns the key or tap series
 //     currently driving the feedback state; combo-driven feedback can broaden
 //     this to both halves
 //   - RGB_KEYS_ONLY = paint only the key footprint currently driving the
 //     feedback state; combo-driven feedback paints every combo key
+// Broadened modes follow the selected owner's real flash phase; offset held
+// keys do not fill each other's off windows.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .tap_pending_color = HSV(0, 0, 150),

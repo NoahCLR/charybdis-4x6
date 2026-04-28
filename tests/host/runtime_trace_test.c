@@ -167,6 +167,10 @@ void key_feedback_tap_branch_map(uint8_t *out_map) {
     key_feedback_tap_branch_map_clear(out_map);
 }
 
+void key_feedback_broad_owner_map(uint8_t *out_map) {
+    key_feedback_broad_owner_map_clear(out_map);
+}
+
 void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
     key_origin_bitmap_clear(out_bitmap);
 }
