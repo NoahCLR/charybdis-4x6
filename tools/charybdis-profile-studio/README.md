@@ -24,6 +24,9 @@ those two files.
 - tap-count tiers in the behavior editor are collapsible, and repeat Hz is
   only shown for hold helpers that can use `REPEAT_WHILE_HELD`
 - edit `layer_colors[]` HSV values and render mode
+- use color pickers with live swatches for editable RGB colors
+- append RGB LED group rows by selecting keys on the physical RGB layout,
+  including layer, pointing-mode, combo, and key-behavior feedback tables
 - inspect every active `rgb_config.c` surface, including LED group tables,
   automouse fade, combo feedback, and key-behavior feedback
 - edit `pd_mode_colors[]` HSV values and locality

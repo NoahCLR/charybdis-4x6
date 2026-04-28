@@ -19,7 +19,8 @@ back to the same blocks.
   profile introspection geometry
 - `layer_colors[]`
 - `pd_mode_colors[]`
-- RGB LED group tables
+- RGB LED group tables, including appending new inline `RGB_LED_GROUP(...)`
+  rows by selecting physical LEDs on the RGB layout
 - auto-mouse fade destination
 - combo feedback color/locality
 - key-behavior feedback colors, tap-branch colors, tap commit mode, and
@@ -41,6 +42,10 @@ All major panels are collapsible. The RGB page keeps a panel for every authored
 section in `rgb_config.c`, even when a table currently has no active rows.
 Tap-count tiers inside the behavior editor are collapsible too; repeat Hz is
 shown only for hold-tier helpers that can use `REPEAT_WHILE_HELD`.
+
+The RGB page includes color-picker controls for editable colors. The picker
+updates the HSV fields and preview swatch; applying a card still writes the
+same `HSV(...)` expressions back to `rgb_config.c`.
 
 For complex behavior rows, direct source editing is still expected after using
 the studio as a starter.

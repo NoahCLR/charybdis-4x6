@@ -44,6 +44,28 @@ const HOLD_HELPERS = [
 const TAP_HELPERS = ["", "TAP_SENDS"];
 const LAYER_COLOR_MODES = ["ALL_KEYS", "KEYS_MAPPED_ON_THIS_LAYER_ONLY"];
 const RGB_LOCALITIES = ["RGB_BOTH_HALVES", "RGB_LEFT_HALF", "RGB_RIGHT_HALF", "RGB_KEY_HALF", "RGB_KEYS_ONLY"];
+const RGB_LED_GROUP_TARGETS = {
+    layer: {
+        tableName: "layer_led_groups_data",
+        ownerField: ".layer",
+        ownerLabel: "layer",
+    },
+    pdMode: {
+        tableName: "pd_mode_led_groups_data",
+        ownerField: ".pointing_mode",
+        ownerLabel: "pointing mode",
+    },
+    combo: {
+        tableName: "combo_feedback_led_groups_data",
+        ownerField: "",
+        ownerLabel: "",
+    },
+    keyBehavior: {
+        tableName: "key_behavior_feedback_led_groups_data",
+        ownerField: ".semantic",
+        ownerLabel: "semantic",
+    },
+};
 const USER_KEY_ALIASES = {
     transparent: "_______",
     trans: "_______",
@@ -326,6 +348,10 @@ async function handleWebviewMessage(panel, root, message) {
         case "updatePdModeColor":
             await patchPdModeColor(root, message.pointingMode, message.hue, message.sat, message.val, message.locality);
             await postModel(panel, root, "Updated rgb_config.c pointing-mode color.");
+            return;
+        case "addRgbLedGroup":
+            await appendRgbLedGroup(root, message.group);
+            await postModel(panel, root, "Added rgb_config.c LED group row.");
             return;
         case "updateViaMacro":
             await patchViaMacro(root, message.keycode, message.payload);
@@ -809,6 +835,56 @@ async function patchPdModeColor(root, pointingMode, hue, sat, val, locality) {
     await writeText(filePath, next);
 }
 
+async function appendRgbLedGroup(root, group) {
+    const target = normalizeExpr(group?.target || "");
+    const config = RGB_LED_GROUP_TARGETS[target];
+    if (!config) {
+        throw new Error(`Invalid RGB LED group target: ${target}`);
+    }
+
+    assertSafeHsv(group?.hue, group?.sat, group?.val);
+    const ledIndices = normalizeLedIndices(group?.ledIndices);
+    if (!ledIndices.length) {
+        throw new Error("Select at least one LED for the RGB group.");
+    }
+
+    const fields = [];
+    if (config.ownerField) {
+        const owner = normalizeExpr(group?.owner || "");
+        assertSafeIdentifier(owner, config.ownerLabel);
+        fields.push(`${config.ownerField} = ${owner}`);
+    }
+    fields.push(`.color = HSV(${normalizeExpr(group?.hue)}, ${normalizeExpr(group?.sat)}, ${normalizeExpr(group?.val)})`);
+    fields.push(`.led_group = RGB_LED_GROUP(${ledIndices.join(", ")})`);
+
+    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const text = await fs.readFile(filePath, "utf8");
+    const call = findCallRange(text, new RegExp(`${escapeRegex(config.tableName)}\\s*\\[\\]\\s*=\\s*RGB_LED_GROUP_TABLE`));
+    const prefix = call.body.endsWith("\n") ? "" : "\n";
+    const insertion = `${prefix}    { ${fields.join(", ")} },\n`;
+    await writeText(filePath, replaceRange(text, call.bodyEnd, call.bodyEnd, insertion));
+}
+
+function normalizeLedIndices(values) {
+    if (!Array.isArray(values)) {
+        throw new Error("LED group indices must be an array.");
+    }
+
+    const seen = new Set();
+    const result = [];
+    for (const value of values) {
+        const index = Number(value);
+        if (!Number.isInteger(index) || index < 0 || index > 56) {
+            throw new Error(`Invalid LED index: ${value}`);
+        }
+        if (!seen.has(index)) {
+            seen.add(index);
+            result.push(index);
+        }
+    }
+    return result;
+}
+
 async function patchViaMacro(root, keycode, payload) {
     assertSafeIdentifier(keycode, "VIA macro keycode");
 
@@ -1069,6 +1145,10 @@ function findInitializerBody(text, pattern) {
 }
 
 function findCallBody(text, pattern) {
+    return findCallRange(text, pattern).body;
+}
+
+function findCallRange(text, pattern) {
     pattern.lastIndex = 0;
     const match = pattern.exec(text);
     if (!match) {
@@ -1080,7 +1160,11 @@ function findCallBody(text, pattern) {
         throw new Error(`Could not find call body for ${pattern}.`);
     }
     const close = findMatching(text, open, "(", ")");
-    return text.slice(open + 1, close);
+    return {
+        bodyStart: open + 1,
+        bodyEnd: close,
+        body: text.slice(open + 1, close),
+    };
 }
 
 function findDesignatedEntry(body, designator) {
@@ -1764,11 +1848,25 @@ function getStudioHtml() {
             stroke: var(--accent);
             stroke-width: 3;
         }
+        .svg-key.rgb-selected rect {
+            stroke: #ffffff;
+            stroke-width: 3;
+        }
         .svg-key text {
             font-family: var(--vscode-font-family, system-ui, sans-serif);
             text-anchor: middle;
             dominant-baseline: middle;
             pointer-events: none;
+        }
+        .extra-led {
+            cursor: pointer;
+        }
+        .extra-led circle {
+            stroke-width: 2;
+        }
+        .extra-led.rgb-selected circle {
+            stroke: #ffffff;
+            stroke-width: 3;
         }
         .source-pill {
             display: inline-block;
@@ -1833,10 +1931,34 @@ function getStudioHtml() {
         }
         .swatch {
             width: 100%;
-            height: 22px;
+            height: 34px;
             border-radius: 5px;
             border: 1px solid rgba(255, 255, 255, 0.2);
             margin: 4px 0 8px;
+        }
+        .color-control {
+            display: grid;
+            gap: 8px;
+        }
+        .color-row {
+            display: grid;
+            grid-template-columns: 58px repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            align-items: end;
+        }
+        input[type="color"] {
+            min-height: 34px;
+            padding: 2px;
+        }
+        .rgb-selected-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .rgb-selected-list code {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 2px 6px;
         }
         .inline-swatch {
             display: inline-block;
@@ -1886,12 +2008,34 @@ function getClientScript() {
     let activeLayer = undefined;
     let selectedKey = 0;
     let activeView = "layout";
+    let rgbGroupTarget = "layer";
+    let rgbGroupOwner = "";
+    let rgbSelectedLeds = [];
+    let rgbBuilderColor = undefined;
     let notice = "";
     const views = [
         ["layout", "Layout"],
         ["macros", "Macros & combos"],
         ["rgb", "RGB"]
     ];
+    const keyBehaviorRgbSemantics = [
+        "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH",
+        "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED",
+        "KEY_FEEDBACK_GROUP_TAP_COMMITTED",
+        "KEY_FEEDBACK_GROUP_HOLD_ACTIVE",
+        "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"
+    ];
+    const layoutToLedIndex = {
+        0: 0, 1: 7, 2: 8, 3: 15, 4: 16, 5: 20,
+        12: 1, 13: 6, 14: 9, 15: 14, 16: 17, 17: 21,
+        24: 2, 25: 5, 26: 10, 27: 13, 28: 18, 29: 22,
+        36: 3, 37: 4, 38: 11, 39: 12, 40: 19, 41: 23,
+        6: 49, 7: 45, 8: 44, 9: 37, 10: 36, 11: 29,
+        18: 50, 19: 46, 20: 43, 21: 38, 22: 35, 23: 30,
+        30: 51, 31: 47, 32: 42, 33: 39, 34: 34, 35: 31,
+        42: 52, 43: 48, 44: 41, 45: 40, 46: 33, 47: 32,
+        48: 26, 49: 27, 50: 28, 51: 53, 52: 54, 53: 25, 54: 24, 55: 55
+    };
     const keyboardGeometry = {
         width: 1120,
         height: 620,
@@ -1930,6 +2074,7 @@ function getClientScript() {
             if (!activeLayer && model.layers.length) {
                 activeLayer = model.layers[0].name;
             }
+            normalizeRgbGroupState();
             render();
         }
         if (event.data.type === "error") {
@@ -1951,6 +2096,15 @@ function getClientScript() {
             render();
         } else if (action === "selectKey") {
             selectedKey = Number(target.dataset.index);
+            render();
+        } else if (action === "toggleRgbLed") {
+            toggleRgbLed(Number(target.dataset.led));
+            render();
+        } else if (action === "toggleRgbTrackball") {
+            toggleRgbLed(56);
+            render();
+        } else if (action === "clearRgbSelection") {
+            rgbSelectedLeds = [];
             render();
         } else if (action === "applyKey") {
             const input = document.getElementById("keycodeInput");
@@ -1975,6 +2129,19 @@ function getClientScript() {
                 val: value(card, "v"),
                 locality: value(card, "locality")
             });
+        } else if (action === "addRgbLedGroup") {
+            const form = document.getElementById("rgbGroupBuilder");
+            post({
+                type: "addRgbLedGroup",
+                group: {
+                    target: value(form, "target"),
+                    owner: value(form, "owner"),
+                    hue: value(form, "h"),
+                    sat: value(form, "s"),
+                    val: value(form, "v"),
+                    ledIndices: rgbSelectedLeds
+                }
+            });
         } else if (action === "updateViaMacro") {
             const row = target.closest("tr");
             post({
@@ -1995,8 +2162,66 @@ function getClientScript() {
         }
     });
 
+    app.addEventListener("change", (event) => {
+        if (event.target?.name === "target" && event.target.closest("#rgbGroupBuilder")) {
+            rgbGroupTarget = event.target.value;
+            rgbGroupOwner = "";
+            rgbBuilderColor = undefined;
+            normalizeRgbGroupState();
+            render();
+            return;
+        }
+        if (event.target?.name === "owner" && event.target.closest("#rgbGroupBuilder")) {
+            rgbGroupOwner = event.target.value;
+            rgbBuilderColor = undefined;
+            render();
+        }
+    });
+
+    app.addEventListener("input", (event) => {
+        const control = event.target?.closest?.("[data-color-control]");
+        if (!control) return;
+        if (event.target.matches("input[type='color'][data-color-picker]")) {
+            const hsv = hexToHsv(event.target.value);
+            if (hsv) {
+                control.querySelector("[name='h']").value = String(hsv.h);
+                control.querySelector("[name='s']").value = String(hsv.s);
+                control.querySelector("[name='v']").value = String(hsv.v);
+            }
+        }
+        updateColorControl(control);
+        if (control.closest("#rgbGroupBuilder")) {
+            rgbBuilderColor = {
+                h: value(control, "h"),
+                s: value(control, "s"),
+                v: value(control, "v")
+            };
+        }
+    });
+
     function value(root, name) {
         return root.querySelector("[name='" + name + "']").value;
+    }
+
+    function toggleRgbLed(ledIndex) {
+        if (!Number.isInteger(ledIndex)) return;
+        if (rgbSelectedLeds.includes(ledIndex)) {
+            rgbSelectedLeds = rgbSelectedLeds.filter((candidate) => candidate !== ledIndex);
+            return;
+        }
+        rgbSelectedLeds = rgbSelectedLeds.concat([ledIndex]);
+    }
+
+    function normalizeRgbGroupState() {
+        if (!["layer", "pdMode", "combo", "keyBehavior"].includes(rgbGroupTarget)) {
+            rgbGroupTarget = "layer";
+        }
+        const owners = rgbGroupOwners(rgbGroupTarget);
+        if (!owners.length) {
+            rgbGroupOwner = "";
+        } else if (!owners.includes(rgbGroupOwner)) {
+            rgbGroupOwner = rgbGroupTarget === "layer" ? activeLayer || owners[0] : owners[0];
+        }
     }
 
     function post(message) {
@@ -2499,6 +2724,7 @@ function getClientScript() {
     function renderRgbStudio() {
         const rgb = model.rgb || {};
         return "<div class='stack'>" +
+            panel("RGB LED Group Builder", renderRgbGroupBuilder(), true) +
             panel("Layer Colors", "<div class='card-list'>" + (rgb.layerColors || []).map(renderLayerColorCard).join("") + "</div>", true) +
             panel("Layer LED Groups", renderLedGroupTable(rgb.layerLedGroups || [], "Layer"), false) +
             panel("Auto-mouse Fade", renderAutomouseCard(rgb.automouseFade), false) +
@@ -2511,12 +2737,119 @@ function getClientScript() {
             "</div>";
     }
 
+    function renderRgbGroupBuilder() {
+        normalizeRgbGroupState();
+        const layer = currentLayer();
+        const targetOptions = [
+            ["layer", "Layer LED groups"],
+            ["pdMode", "Pointing-mode LED groups"],
+            ["combo", "Combo feedback LED groups"],
+            ["keyBehavior", "Key-behavior LED groups"]
+        ];
+        const ownerChoices = rgbGroupOwners(rgbGroupTarget);
+        const ownerControl = ownerChoices.length
+            ? "<label><span>" + escapeHtml(rgbGroupOwnerLabel(rgbGroupTarget)) + "</span><select name='owner'>" + options(ownerChoices, rgbGroupOwner) + "</select></label>"
+            : "<label><span>owner</span><input name='owner' disabled value='combo feedback'></label>";
+        const selected = rgbSelectedLeds.length
+            ? rgbSelectedLeds.map((led) => "<code>" + led + "</code>").join("")
+            : "<span class='muted'>No LEDs selected</span>";
+        return "<div id='rgbGroupBuilder' class='card'>" +
+            "<div class='form-grid four'>" +
+            "<label><span>table</span><select name='target'>" + optionsWithLabels(targetOptions, rgbGroupTarget) + "</select></label>" +
+            ownerControl +
+            "<div><button data-action='addRgbLedGroup' class='primary'>Add LED group row</button></div>" +
+            "</div>" +
+            renderHsvColorControl(defaultRgbBuilderColor()) +
+            "<div class='toolbar' style='margin: 10px 0'>" +
+            "<button data-action='clearRgbSelection'>Clear LEDs</button>" +
+            "<button data-action='toggleRgbTrackball'>Trackball LED 56</button>" +
+            "<div class='rgb-selected-list'>" + selected + "</div>" +
+            "</div>" +
+            renderLayerTabs() +
+            renderRgbGroupBoard(layer) +
+            "</div>";
+    }
+
+    function rgbGroupOwners(target) {
+        if (target === "layer") return model.layers.map((layer) => layer.name);
+        if (target === "pdMode") return (model.rgb?.pdModeColors || []).map((row) => row.pointingMode);
+        if (target === "keyBehavior") return keyBehaviorRgbSemantics;
+        return [];
+    }
+
+    function rgbGroupOwnerLabel(target) {
+        if (target === "pdMode") return "pointing mode";
+        if (target === "keyBehavior") return "semantic";
+        return "layer";
+    }
+
+    function defaultRgbBuilderColor() {
+        if (rgbBuilderColor) {
+            return rgbBuilderColor;
+        }
+        if (rgbGroupTarget === "layer") {
+            return colorForLayer(rgbGroupOwner || activeLayer)?.color || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
+        }
+        if (rgbGroupTarget === "pdMode") {
+            return colorForPdMode(rgbGroupOwner)?.color || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
+        }
+        if (rgbGroupTarget === "combo") {
+            return model.rgb?.comboFeedback?.color || { h: "191", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
+        }
+        const feedback = model.rgb?.keyBehaviorFeedback || {};
+        const semanticColor = {
+            KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH: feedback.tapPendingColor,
+            KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED: (feedback.tapBranchColors || [])[0],
+            KEY_FEEDBACK_GROUP_TAP_COMMITTED: feedback.tapCommittedColor,
+            KEY_FEEDBACK_GROUP_HOLD_ACTIVE: feedback.holdActiveColor,
+            KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: feedback.longHoldActiveColor
+        }[rgbGroupOwner];
+        return semanticColor || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
+    }
+
+    function renderRgbGroupBoard(layer) {
+        if (!layer) {
+            return "<p class='muted'>No layer layout is available for LED selection.</p>";
+        }
+        return "<div class='board'>" +
+            "<svg class='keyboard-svg' viewBox='0 0 " + keyboardGeometry.width + " " + keyboardGeometry.height + "' role='img' aria-label='RGB LED group selector'>" +
+            "<text x='32' y='40' fill='#dbe6e8' font-size='24' font-weight='650'>LED group selector</text>" +
+            "<text x='32' y='68' fill='#a8b2b8' font-size='13'>Physical LED indices - " + escapeHtml(layer.name) + "</text>" +
+            layer.positions.map(renderRgbSvgKey).join("") +
+            renderExtraLed(56, 698, 522) +
+            "</svg>" +
+            "</div>";
+    }
+
+    function renderRgbSvgKey(position) {
+        const ledIndex = layoutToLedIndex[position.layoutIndex];
+        const visual = keyVisual(position.layoutIndex);
+        const selected = rgbSelectedLeds.includes(ledIndex);
+        const style = keyStyle(position);
+        const cx = visual.x + keyboardGeometry.keyWidth / 2;
+        const cy = visual.y + keyboardGeometry.keyHeight / 2;
+        const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
+        return "<g class='svg-key " + (selected ? "rgb-selected" : "") + "' data-action='toggleRgbLed' data-led='" + ledIndex + "'" + transform + ">" +
+            "<title>LED " + ledIndex + " - " + escapeHtml(position.keycode) + "</title>" +
+            "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
+            renderSvgLabel((position.display || position.keycode) + " " + ledIndex, cx, cy, style.text) +
+            "</g>";
+    }
+
+    function renderExtraLed(ledIndex, cx, cy) {
+        const selected = rgbSelectedLeds.includes(ledIndex);
+        return "<g class='extra-led " + (selected ? "rgb-selected" : "") + "' data-action='toggleRgbTrackball'>" +
+            "<title>Trackball LED " + ledIndex + "</title>" +
+            "<circle cx='" + cx + "' cy='" + cy + "' r='13' fill='#20262a' stroke='" + (selected ? "#ffffff" : "#31c6a4") + "'></circle>" +
+            "<text x='" + cx + "' y='" + (cy + 1) + "' fill='#e7ecef' font-size='10' text-anchor='middle' dominant-baseline='middle'>" + ledIndex + "</text>" +
+            "</g>";
+    }
+
     function renderLayerColorCard(row) {
         return "<div class='card' data-layer='" + escapeAttr(row.layer) + "'>" +
             "<strong><code>" + escapeHtml(row.layer) + "</code></strong>" +
-            renderSwatch(row.color) +
+            renderHsvColorControl(row.color) +
             "<div class='form-grid four'>" +
-            hsvInputs(row.color) +
             "<label><span>mode</span><select name='mode'>" + options(["ALL_KEYS", "KEYS_MAPPED_ON_THIS_LAYER_ONLY"], row.mode) + "</select></label>" +
             "<button data-action='updateLayerColor' class='primary'>Apply</button>" +
             "</div></div>";
@@ -2525,9 +2858,8 @@ function getClientScript() {
     function renderPdColorCard(row) {
         return "<div class='card' data-mode='" + escapeAttr(row.pointingMode) + "'>" +
             "<strong><code>" + escapeHtml(row.pointingMode) + "</code></strong>" +
-            renderSwatch(row.color) +
+            renderHsvColorControl(row.color) +
             "<div class='form-grid four'>" +
-            hsvInputs(row.color) +
             "<label><span>locality</span><select name='locality'>" + options(["RGB_BOTH_HALVES", "RGB_LEFT_HALF", "RGB_RIGHT_HALF", "RGB_KEY_HALF", "RGB_KEYS_ONLY"], row.locality) + "</select></label>" +
             "<button data-action='updatePdModeColor' class='primary'>Apply</button>" +
             "</div></div>";
@@ -2598,10 +2930,22 @@ function getClientScript() {
             "</tbody></table>";
     }
 
+    function renderHsvColorControl(color) {
+        const hex = hsvToHex(color) || "#000000";
+        return "<div class='color-control' data-color-control>" +
+            "<div class='swatch' data-color-swatch style='background: " + hex + "' title='" + escapeAttr(color?.expression || "") + "'></div>" +
+            "<div class='color-row'>" +
+            "<label><span>picker</span><input type='color' data-color-picker value='" + hex + "'></label>" +
+            hsvInputs(color) +
+            "</div>" +
+            "<code class='muted' data-color-expression>" + escapeHtml(colorExpression(color)) + "</code>" +
+            "</div>";
+    }
+
     function hsvInputs(color) {
-        return "<label><span>h</span><input name='h' value='" + escapeAttr(color.h || "") + "'></label>" +
-            "<label><span>s</span><input name='s' value='" + escapeAttr(color.s || "") + "'></label>" +
-            "<label><span>v</span><input name='v' value='" + escapeAttr(color.v || "") + "'></label>";
+        return "<label><span>h</span><input name='h' data-hsv-channel='h' value='" + escapeAttr(color?.h || "") + "'></label>" +
+            "<label><span>s</span><input name='s' data-hsv-channel='s' value='" + escapeAttr(color?.s || "") + "'></label>" +
+            "<label><span>v</span><input name='v' data-hsv-channel='v' value='" + escapeAttr(color?.v || "") + "'></label>";
     }
 
     function renderSwatch(color) {
@@ -2619,6 +2963,32 @@ function getClientScript() {
         return hsvToHex(color) || "#111";
     }
 
+    function colorExpression(color) {
+        return color?.expression || "HSV(" + [color?.h || "", color?.s || "", color?.v || ""].join(", ") + ")";
+    }
+
+    function updateColorControl(control) {
+        const color = {
+            h: value(control, "h"),
+            s: value(control, "s"),
+            v: value(control, "v")
+        };
+        const hex = hsvToHex(color) || "#000000";
+        const swatch = control.querySelector("[data-color-swatch]");
+        const picker = control.querySelector("[data-color-picker]");
+        const expression = control.querySelector("[data-color-expression]");
+        if (swatch) {
+            swatch.style.background = hex;
+            swatch.title = colorExpression(color);
+        }
+        if (picker && /^#[0-9a-f]{6}$/i.test(hex)) {
+            picker.value = hex;
+        }
+        if (expression) {
+            expression.textContent = colorExpression(color);
+        }
+    }
+
     function hsvToHex(color) {
         if (!color) return "";
         const h = Number(color.h);
@@ -2627,6 +2997,32 @@ function getClientScript() {
         if (!Number.isFinite(h) || !Number.isFinite(s) || !Number.isFinite(v) || v <= 0) return "";
         const rgb = hsvToRgb(h / 255, s / 255, v / 255);
         return rgbToHex(rgb.r, rgb.g, rgb.b);
+    }
+
+    function hexToHsv(hex) {
+        const match = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+        if (!match) return undefined;
+        const value = match[1];
+        const r = parseInt(value.slice(0, 2), 16) / 255;
+        const g = parseInt(value.slice(2, 4), 16) / 255;
+        const b = parseInt(value.slice(4, 6), 16) / 255;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const delta = max - min;
+        let h = 0;
+        if (delta !== 0) {
+            if (max === r) h = ((g - b) / delta) % 6;
+            else if (max === g) h = (b - r) / delta + 2;
+            else h = (r - g) / delta + 4;
+            h /= 6;
+            if (h < 0) h += 1;
+        }
+        const s = max === 0 ? 0 : delta / max;
+        return {
+            h: Math.round(h * 255),
+            s: Math.round(s * 255),
+            v: Math.round(max * 255)
+        };
     }
 
     function numericChannel(value) {
@@ -2677,6 +3073,10 @@ function getClientScript() {
 
     function options(values, selected) {
         return values.map((value) => "<option value='" + escapeAttr(value) + "' " + (value === selected ? "selected" : "") + ">" + escapeHtml(value) + "</option>").join("");
+    }
+
+    function optionsWithLabels(values, selected) {
+        return values.map(([value, label]) => "<option value='" + escapeAttr(value) + "' " + (value === selected ? "selected" : "") + ">" + escapeHtml(label) + "</option>").join("");
     }
 
     function renderMacroStudio() {
