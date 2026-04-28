@@ -67,9 +67,11 @@ Recommended direction:
 - Treat pending-release queue storage as core-owned state unless a later `runtime.c` split moves it behind an internal core transport module.
 - Keep the existing release matrix, modifier-hold, PD-mode, scenario, layer-lock, runtime-debug, full host, and firmware compile checks as the safety net.
 
-### Should-Fix: Multiple Owner Ledgers Track the Same Runtime Facts
+### Partially Resolved: Multiple Owner Ledgers Track the Same Runtime Facts
 
 Several modules track "who owns this held effect" independently. Some are necessary QMK-facing registries, but the current design makes authority easy to blur.
+
+Status as of 2026-04-28: partially resolved. `docs/KEY_RUNTIME.md` now contains an ownership authority map that labels reducer-owned state, release planner state, pending-release transport, projected ownership registries, PD runtime ownership, feedback projection, and combo-origin compatibility state. The code still has real bridge points, especially layer lock write-back through `layer_ownership_set_lock_state()` and PD lock write-back through `pd_mode_set_lock_state_at()`, so this is not fully resolved yet.
 
 Evidence:
 
@@ -80,6 +82,8 @@ Evidence:
 - Keyboard modifier ownership is tracked in `users/noah/lib/state/ownership/keyboard_mod_ownership.c:86-218`.
 - PD local owners are tracked in `users/noah/lib/pointing/runtime/pd_mode_state.c:117-284`.
 - `users/noah/lib/state/runtime/runtime_context_internal.h:49-56` aggregates these ledgers into one runtime context.
+- `docs/KEY_RUNTIME.md` now states the intended write direction: core reducer state plans effects, projected registries apply QMK/action/layer/modifier/PD side effects, and compatibility bridges must not become independent key-runtime ownership truth.
+- Current two-way bridge points remain in `users/noah/lib/state/ownership/layer_ownership.c:116-140` and `users/noah/lib/pointing/runtime/pd_mode_state.c:687-699`.
 
 Why it matters:
 
@@ -87,7 +91,7 @@ The system has both intended ownership in core leases and applied ownership in s
 
 Recommended direction:
 
-- Write an ownership authority map that labels each ledger as authoritative, projected, or compatibility-only.
+- Use the ownership authority map as the contract for the next code split.
 - Add or preserve compile gates and host tests that enforce the declared direction of writes.
 - Reduce direct cross-ledger mutation where one authoritative reducer can project changes.
 

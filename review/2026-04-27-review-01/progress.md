@@ -307,3 +307,43 @@ All listed pass/fail commands passed. The `--no-index` whitespace checks returne
 1. Continue with the broader `runtime.c` accumulator finding: ownership ledgers, PD bridge behavior, feedback projection, and pending multi-tap scan are still candidates for focused internal modules.
 2. Preserve the release matrix and deferred-release debug coverage as guardrails for future runtime splits.
 3. Avoid reintroducing release decisions in transition, press/release wrappers, or slot-owned helpers.
+
+## 2026-04-28 - Ownership Authority Map
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added an ownership authority map to `docs/KEY_RUNTIME.md`.
+- Labeled reducer-owned press tokens, tap series, leases, persistent intents, pending releases, release planner decisions, feedback pulse state, and shadow projection as the key-runtime authority surface.
+- Labeled `held_action.c`, `held_repeat.c`, `layer_ownership.c`, `keyboard_mod_ownership.c`, `pd_mode_state.c`, pointer layer policy, feedback/RGB projection, and split-facing state as projected or externally authoritative surfaces.
+- Labeled `compat/qmk_combo_origin.c` and `origin_registry.c` as compatibility-only origin recovery, not key-runtime ownership.
+- Updated `userspace-architecture-review.md` so the multiple-owner-ledgers finding is partially resolved instead of fully open.
+
+## Finding Status
+
+- Multiple owner ledgers are partially resolved.
+- Resolved in this pass:
+  - the intended ownership direction is documented
+  - projected registries are named as QMK/action/layer/modifier/PD side-effect sinks, not independent key-runtime truth
+  - combo-origin recovery is documented as compatibility-only
+- Still open:
+  - `layer_ownership_set_lock_state()` still updates external layer lock state and then refreshes core state
+  - `pd_mode_set_lock_state_at()` still updates PD runtime state and then refreshes core state
+  - core effect projection still coordinates several outward writes directly from `runtime.c`
+
+## Verification
+
+- `git diff --check`
+
+Host tests and `qmk compile` are intentionally skipped for this docs/review-only
+pass because no runtime source, authored profile data, build wiring, generated
+firmware input, or behavior changed.
+
+## Next Steps
+
+1. Use the ownership authority map to choose one code target, preferably the PD lock bridge or core lease projection split.
+2. Preserve PD mode integration, PD runtime, pointer layer policy, split sync, modifier-hold, layer-lock, runtime-debug, full host, and firmware compile coverage for any runtime source changes.
+3. Keep future projected registries from adding new key-runtime owner state unless the authority map and tests are updated in the same pass.

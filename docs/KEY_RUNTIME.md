@@ -99,6 +99,35 @@ while pending multi-tap release decisions are owned by `core/release_planner.c`.
 Do not add a second state machine for multi-tap sequencing; new behavior should
 extend the core reducer and its release/scan planning tests.
 
+## Ownership Authority Map
+
+Runtime ownership is intentionally split between reducer-owned intent and
+QMK-facing applied registries. Use these labels when changing runtime behavior:
+
+- Authoritative: the source of truth for key-runtime decisions.
+- Projected: an applied registry or hardware-facing state sink updated from
+  reducer effects.
+- Compatibility-only: a bridge that repairs or normalizes upstream QMK/fork
+  behavior without becoming key-runtime ownership truth.
+
+| Runtime fact | Authoritative owner | Projected or compatibility surface | Write direction and guardrail |
+| --- | --- | --- | --- |
+| Physical press identity and active key phase | `press_token_t` in `key_runtime_core` | debug and trace snapshots | Physical events are observed into core first; other registries must not create or mutate press tokens. Covered by key runtime scenario, release matrix, and integration harness tests. |
+| Pending multi-tap chain state | `tap_series_t` in `key_runtime_core` | release planner reads the state | Core stores the chain; `core/release_planner.c` resolves release decisions over it. Covered by release matrix and scenario tests. |
+| Release semantics | `core/release_planner.c` | `deferred_release.c` adapts blocked dispatches into the core pending-release queue | Planner owns quick release, fallback suppression, buffered base tap, active releases, and pending multi-tap releases; adapters must not re-decide those semantics. |
+| Pending release dispatch queue | `pending_release_t` slots in `key_runtime_core` | `deferred_release.c`, `release.c`, and `scan.c` drain through the adapter | Queue storage and ordering stay core-owned because blockers are press-token facts. Covered by release matrix and runtime debug tests. |
+| Temporary held ownership intent for held actions, repeats, momentary layers, managed modifiers, pd holds, and pointer anchors | `lease_t` in `key_runtime_core` | `held_action.c`, `held_repeat.c`, `layer_ownership.c`, `keyboard_mod_ownership.c`, `pd_mode_state.c`, and pointer layer policy | Core effect projection writes outward; applied registries perform QMK, action, repeat, layer, modifier, or pd-mode side effects. Those registries must not mint independent key-runtime leases. |
+| Lock-like runtime intent | `persistent_intent_t` in `key_runtime_core` | `layer_ownership.c` and `pd_mode_state.c` apply the actual layer or pd-mode lock | Current accepted bridge points are `layer_ownership_set_lock_state()` and `pd_mode_set_lock_state_at()`, which update external state and then refresh core shadow state. Treat new two-way lock writes as architecture work, not local fixes. |
+| Physical keyboard modifier observation | QMK live modifier state plus `keyboard_mod_ownership.c` physical refcounts | core shadow projection stores physical and managed masks for overlap reasoning | `process.c` observes physical modifier events and preflight may suppress default release; core may reason over the shadow but QMK remains the live report sink. Covered by keyboard mod ownership and modifier-hold integration tests. |
+| PD runtime local, display, remote, and split state | `pd_mode_state.c` and split sync runtime | key-runtime leases and persistent intents request local pd behavior | Key runtime may request PD transitions through projected effects; PD runtime owns actual mode state and snapshots. The PD lock write-back into core is the remaining explicit bridge to reduce. |
+| Feedback pulse lifecycle | feedback pulse fields in `key_runtime_core` | `key_feedback_pulse_observe()` and RGB/split feedback snapshots | Core queues key-runtime pulse lifecycle; feedback/RGB surfaces render the projection. Covered by runtime debug, split sync, and RGB render tests. |
+| Combo origin recovery | `compat/qmk_combo_origin.c` plus `origin_registry.c` | key runtime, PD mode, RGB, and split feedback consume normalized origins | Compatibility-only. It repairs QMK combo records and origin bitmaps; it must not become an owner of key-runtime press, lease, or release state. Covered by combo origin, PD mode, RGB render, and real profile integration tests. |
+
+When a future change needs to touch both core state and one of the projected
+registries, update the core plan first and project outward through an explicit
+effect or bridge. If the projected registry has to write back into core, document
+the bridge here and cover it with projection or ownership tests in the same pass.
+
 ## End-To-End Flow
 
 ### 1. Physical key event entry
