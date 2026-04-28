@@ -3,6 +3,10 @@
 This is a maintainer-facing doc about overriding shared userspace hooks without
 accidentally dropping shared runtime behavior.
 
+For the full hook lifecycle and ownership map, see
+[architecture/runtime-flow.md](./architecture/runtime-flow.md) and
+[architecture/README.md](./architecture/README.md).
+
 The `noah` userspace ships weak default QMK hooks in
 [`users/noah/hooks.c`](../users/noah/hooks.c).
 Any stronger definition of the normal QMK hook name will override the weak

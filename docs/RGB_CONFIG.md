@@ -8,6 +8,10 @@ visuals, combo feedback, or key-behavior feedback colors. If you only want to
 see what the current profile looks like, start with
 [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md).
 
+For the cross-system runtime ownership and RGB render flow, see
+[architecture/README.md](./architecture/README.md) and
+[architecture/runtime-flow.md](./architecture/runtime-flow.md).
+
 The interaction feedback stages are individually gated from the active keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
 

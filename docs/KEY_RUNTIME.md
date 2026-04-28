@@ -4,8 +4,11 @@ This document is the maintainer-facing map for the handled-key runtime under
 [`users/noah/lib/key/`](../users/noah/lib/key/).
 
 Use this when you are changing runtime behavior, tests, or debug surfaces. For
-user-facing semantics, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md). For
-the authored profile, see [KEYMAP.md](./KEYMAP.md).
+the wider userspace architecture, start with
+[architecture/README.md](./architecture/README.md) and
+[architecture/runtime-flow.md](./architecture/runtime-flow.md). For user-facing
+semantics, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md). For the authored
+profile, see [KEYMAP.md](./KEYMAP.md).
 
 ## Current Shape
 

@@ -131,3 +131,53 @@ All commands above passed.
 1. Review the large move diff for path-only intent before staging.
 2. Decide whether to close this folder-layout review or keep it open for one
    follow-up audit pass.
+
+## 2026-04-28 - Developer Architecture Documentation Pack
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `docs/architecture/` as the maintainer/agent architecture pack.
+- Added `docs/architecture/README.md` with the high-level runtime model,
+  ownership map, common change routing, and architecture rules.
+- Added `docs/architecture/runtime-flow.md` with Mermaid diagrams for hook
+  lifecycle, key press/release/scan, reducer/planner/projection boundaries, PD
+  flow, RGB render order, split sync, macro/VIA flow, and test coverage.
+- Added `docs/architecture/source-map.md` with top-level runtime entry points,
+  the source-to-doc matrix, package-level file coverage for every package under
+  `users/noah/lib/`, authored profile inputs, and the host runner inventory.
+- Added `docs/architecture/change-guide.md` with common change targets,
+  anti-patterns, verification shortcuts, and stale-path audit guidance.
+- Added cross-links from `docs/KEY_RUNTIME.md`, `docs/ADDING_PD_MODE.md`,
+  `docs/RGB_CONFIG.md`, and `docs/HOOK_OVERRIDES.md`.
+- Left root `README.md` unchanged so it remains end-user focused.
+
+## Finding Status
+
+- Folder-layout findings remain resolved.
+- Developer-facing architecture docs are now split from end-user profile docs.
+
+## Verification
+
+- `git diff --check`
+- `git diff --check --no-index /dev/null docs/architecture/README.md`
+- `git diff --check --no-index /dev/null docs/architecture/runtime-flow.md`
+- `git diff --check --no-index /dev/null docs/architecture/source-map.md`
+- `git diff --check --no-index /dev/null docs/architecture/change-guide.md`
+- `rg -n 'key/runtime/core|key/runtime/effects|key/runtime/interaction\.h|key/interaction|state/runtime|split_runtime_sync\.(c|h)|lib/state/runtime|#include "(core/|effects/)' users/noah tests docs keyboards/bastardkb/charybdis/4x6/keymaps/noah --glob '!docs/architecture/change-guide.md'`
+- `rg -n '^```mermaid|^```$' docs/architecture/README.md docs/architecture/runtime-flow.md`
+
+The regular diff check passed. The `--no-index` checks for the new untracked
+architecture docs produced no whitespace diagnostics; `--no-index` exits
+non-zero for added-file differences, so the output was used as the diagnostic
+signal. The stale-path audit returned no matches; it excludes
+`docs/architecture/change-guide.md` because that file intentionally documents
+the audit pattern itself. The Mermaid fence audit showed balanced diagram
+fences for the architecture overview and runtime-flow diagrams.
+
+Docs-only pass: host tests and firmware compile were intentionally skipped
+because no source, authored profile inputs, build wiring, or generated firmware
+inputs changed.

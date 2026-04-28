@@ -14,6 +14,8 @@ shared invariants, so this guide is optimized around:
 
 If you have not read them yet, also see:
 
+- [architecture/README.md](./architecture/README.md)
+- [architecture/runtime-flow.md](./architecture/runtime-flow.md)
 - [INTERACTION_MODEL.md](./INTERACTION_MODEL.md)
 - [POINTER_MODES.md](./POINTER_MODES.md)
 
