@@ -1,0 +1,46 @@
+{
+  "name": "charybdis-profile-studio",
+  "displayName": "Charybdis Profile Studio",
+  "description": "A standalone VS Code editor for this repo's keymap.c and rgb_config.c authoring surfaces.",
+  "version": "0.0.1",
+  "publisher": "noah",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:charybdisProfileStudio.open",
+    "workspaceContains:keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "charybdisProfileStudio.open",
+        "title": "Open Profile Studio",
+        "category": "Charybdis"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "charybdisProfileStudio.open"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "charybdisProfileStudio.open",
+          "when": "resourceFilename == keymap.c || resourceFilename == rgb_config.c",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "check": "node --check extension.js",
+    "install:local": "sh scripts/install-local.sh"
+  }
+}

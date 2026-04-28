@@ -287,7 +287,7 @@ If you want to change the current profile, start here:
 
 ## Tooling
 
-This repo ships with two small maintenance tools:
+This repo ships with small maintenance tools:
 
 - [`tools/via_to_qmk_layout.py`](./tools/via_to_qmk_layout.py): round-trip the
   VIA-owned parts of the layout back into source. Full workflow:
@@ -295,6 +295,10 @@ This repo ships with two small maintenance tools:
 - [`tools/profile_introspect.py`](./tools/profile_introspect.py): regenerate
   the visual profile report and SVG previews. Full workflow:
   [`docs/tooling/PROFILE_INTROSPECT.md`](./docs/tooling/PROFILE_INTROSPECT.md)
+- [`tools/charybdis-profile-studio/`](./tools/charybdis-profile-studio/):
+  standalone VS Code extension for editing `keymap.c` and `rgb_config.c`
+  directly. Full workflow:
+  [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md)
 
 Useful commands:
 
@@ -312,6 +316,8 @@ Use the docs based on what you need:
   and macro inventory
 - [`docs/tooling/PROFILE_INTROSPECT.md`](./docs/tooling/PROFILE_INTROSPECT.md):
   how the visual profile report is generated and verified
+- [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md): local
+  VS Code GUI for editing `keymap.c` and `rgb_config.c`
 - [`docs/KEYMAP.md`](./docs/KEYMAP.md): the current concrete profile choices
   and how the layers are currently used
 - [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md): the interaction
