@@ -901,3 +901,67 @@ All listed pass/fail commands passed.
 1. Continue with broad runtime state/debug surface cleanup if reducing `runtime.h` remains the priority.
 2. Consider whether lease and persistent-intent mechanics should get an internal module next, because they are the largest remaining state-management block in `runtime.c`.
 3. Preserve runtime debug, scenario, release matrix, PD/key-runtime, layer-lock, modifier-hold, full host, compile-gate, and firmware compile coverage for further runtime splits.
+
+## 2026-04-28 - Ownership State Split
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/core/ownership_state.h` and `users/noah/lib/key/runtime/core/ownership_state.c`.
+- Moved reducer-owned lease helpers, persistent-intent updates, shadow projection recomputation, press/hold lease attachment, held/repeat observation, release-owned-state cleanup, non-handled release finalization, held/repeat feedback visibility queries, layer-lock updates, and PD lock observation out of `users/noah/lib/key/runtime/core/runtime.c`.
+- Kept press-token, lease, persistent-intent, and shadow-projection storage in `key_runtime_core_state_t`; the new module manages the existing core state instead of introducing another ownership truth.
+- Wired `ownership_state.c` into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and the manual key-runtime/PD integration runners that compile `runtime.c`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so the ownership authority map and active review match the current tree.
+
+## Finding Status
+
+- The broader key-runtime accumulator finding remains partially resolved.
+- Resolved in this pass:
+  - reducer-owned lease mechanics now have a named internal core module
+  - persistent-intent mechanics now have a named internal core module
+  - shadow projection recomputation and lock observation updates are no longer embedded in the main reducer file
+  - held/repeat feedback visibility queries now live with the lease mechanics they inspect
+  - source manifests and host runners mechanically include the new module
+- Still open:
+  - broad runtime state/debug surfaces remain in `runtime.h`
+  - `runtime.c` still owns press/tap orchestration, scan orchestration, and effect-plan construction helpers
+  - modifier mask/replay and combo-origin compatibility remain separate review findings
+
+## Verification
+
+First targeted check:
+
+- `sh tests/host/run_runtime_debug_tests.sh` initially failed because `ownership_state.c` used `key_runtime_core_keypos_valid()` before that internal helper was declared outside `runtime.c`.
+- Fixed by declaring `key_runtime_core_keypos_valid()` through `ownership_state.h` and including that header from `release_internal.h`.
+- `sh tests/host/run_runtime_debug_tests.sh` passed after the declaration fix.
+
+Post-change targeted checks:
+
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/ownership_state.c`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/ownership_state.h`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks returned the expected nonzero diff status for new files and produced no diagnostics.
+
+## Next Steps
+
+1. Continue with broad runtime state/debug surface cleanup if reducing `runtime.h` remains the priority.
+2. Keep `ownership_state.c` limited to reducer-owned lease, persistent-intent, shadow projection, and observation mechanics over `key_runtime_core_state_t`.
+3. Preserve runtime debug, scenario, release matrix, PD/key-runtime, layer-lock, modifier-hold, full host, compile-gate, and firmware compile coverage for further runtime splits.

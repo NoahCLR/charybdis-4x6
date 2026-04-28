@@ -18,7 +18,7 @@ No immediate behavior bug was proven from this static pass. The main risk is arc
 
 `users/noah/lib/key/runtime/core/runtime.c` and `runtime.h` are the highest-risk clutter zone in userspace. The header claims a "single-authority handled-key runtime state and reducer surface", but the current state and reducer also own or coordinate press tokens, tap series, leases, pending releases, persistent intents, shadow projection, feedback pulse bridging, preview display bridging, and keyboard event modifier masking.
 
-Status as of 2026-04-28: partially resolved. Release semantics and deferred-release transport were extracted earlier in this thread. Core-side PD held-action preemption and PD lock-tap projection now live in `users/noah/lib/key/runtime/core/pd_projection.c`, core-side feedback pulse projection now lives in `users/noah/lib/key/runtime/core/feedback_projection.c`, pending multi-tap flush planning now lives in `users/noah/lib/key/runtime/core/tap_series_flush.c`, effect execution plus projection snapshot capture/comparison now live in `users/noah/lib/key/runtime/core/projection.c`, pending-release queue mechanics now live in `users/noah/lib/key/runtime/core/pending_release_queue.c`, and scan-time hold/pending multi-tap planning now lives in `users/noah/lib/key/runtime/core/scan_planner.c`. `runtime.c` remains the reducer state owner, effect-plan construction helper surface, and scan orchestration point. The remaining accumulator concerns are broad public state/debug surfaces and some owner-ledger bridge boundaries.
+Status as of 2026-04-28: partially resolved. Release semantics and deferred-release transport were extracted earlier in this thread. Core-side PD held-action preemption and PD lock-tap projection now live in `users/noah/lib/key/runtime/core/pd_projection.c`, core-side feedback pulse projection now lives in `users/noah/lib/key/runtime/core/feedback_projection.c`, pending multi-tap flush planning now lives in `users/noah/lib/key/runtime/core/tap_series_flush.c`, effect execution plus projection snapshot capture/comparison now live in `users/noah/lib/key/runtime/core/projection.c`, pending-release queue mechanics now live in `users/noah/lib/key/runtime/core/pending_release_queue.c`, scan-time hold/pending multi-tap planning now lives in `users/noah/lib/key/runtime/core/scan_planner.c`, and reducer-owned lease/persistent-intent mechanics now live in `users/noah/lib/key/runtime/core/ownership_state.c`. `runtime.c` remains the reducer state owner, press/tap orchestration point, scan orchestration point, and effect-plan construction helper surface. The remaining accumulator concerns are broad public state/debug surfaces, broad reducer state storage in `runtime.h`, and some owner-ledger bridge boundaries.
 
 Evidence:
 
@@ -32,7 +32,8 @@ Evidence:
 - `users/noah/lib/key/runtime/core/projection.c:122-205` now owns projection snapshot capture/comparison and trace projection checkpoints.
 - `users/noah/lib/key/runtime/core/pending_release_queue.c:51-331` now owns pending-release queue allocation, ordering, drain snapshots, and pending-emission token cleanup while using core state storage.
 - `users/noah/lib/key/runtime/core/scan_planner.c:99-604` now owns scan-time hold phase commits, release-hold-pending marking, fallback hold settlement, active scan planning, and pending multi-tap scan outcomes.
-- `users/noah/lib/key/runtime/core/runtime.c:2404-2428` delegates scan planning to `scan_planner.c`.
+- `users/noah/lib/key/runtime/core/ownership_state.c:650-1250` now owns lease release, lease queries, shadow projection recomputation, held/repeat observation, release-owned-state cleanup, non-handled release finalization, held/repeat feedback visibility, layer-lock updates, and PD lock observation over core state storage.
+- `users/noah/lib/key/runtime/core/runtime.c:537-573` now delegates lease release, shadow projection recomputation, and hold-lease attachment to `ownership_state.c`.
 - `users/noah/lib/key/runtime/core/release_planner.c:189-509` resolves active and pending multi-tap releases.
 
 Why it matters:
@@ -73,11 +74,12 @@ Recommended direction:
 
 Several modules track "who owns this held effect" independently. Some are necessary QMK-facing registries, but the current design makes authority easy to blur.
 
-Status as of 2026-04-28: partially resolved. `docs/KEY_RUNTIME.md` now contains an ownership authority map that labels reducer-owned state, release planner state, pending-release transport, projected ownership registries, PD runtime ownership, feedback projection, and combo-origin compatibility state. Runtime effect execution now flows through `users/noah/lib/key/runtime/core/projection.c` instead of a local switch in `runtime.c`. The code still has real bridge points, especially layer lock write-back through `layer_ownership_set_lock_state()` and PD lock observation through `pd_mode_key_runtime_bridge_observe_local_lock_state()`, so this is not fully resolved yet.
+Status as of 2026-04-28: partially resolved. `docs/KEY_RUNTIME.md` now contains an ownership authority map that labels reducer-owned state, release planner state, pending-release transport, projected ownership registries, PD runtime ownership, feedback projection, and combo-origin compatibility state. Runtime effect execution now flows through `users/noah/lib/key/runtime/core/projection.c` instead of a local switch in `runtime.c`, and reducer-owned lease/persistent-intent mechanics now live in `users/noah/lib/key/runtime/core/ownership_state.c` instead of being embedded in the main reducer file. The code still has real bridge points, especially layer lock write-back through `layer_ownership_set_lock_state()` and PD lock observation through `pd_mode_key_runtime_bridge_observe_local_lock_state()`, so this is not fully resolved yet.
 
 Evidence:
 
 - Core effect leases live in `users/noah/lib/key/runtime/core/runtime.h:177-209`.
+- Core effect lease and persistent-intent mechanics live in `users/noah/lib/key/runtime/core/ownership_state.c:650-1250`.
 - Held action ownership is tracked in `users/noah/lib/key/ownership/held_action.c:183-256`.
 - Held repeat ownership is tracked in `users/noah/lib/key/ownership/held_repeat.c:89-141`.
 - Layer ownership is tracked in `users/noah/lib/state/ownership/layer_ownership.c:66-194`.
@@ -112,7 +114,7 @@ Evidence:
 - Local PD lock/unlock state changes route through `pd_mode_apply_local_lock_state_at()` in `users/noah/lib/pointing/runtime/pd_mode_state.c:671-695`.
 - `pd_mode_apply_local_lock_state_at()` observes changed local lock state through `pd_mode_key_runtime_bridge_observe_local_lock_state()` in `users/noah/lib/pointing/runtime/pd_mode_state.c:679-680`.
 - PD lock state is observed into core shadow state through `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c:1-7`.
-- Key-runtime core names the receiving side as observation in `users/noah/lib/key/runtime/core/runtime.c:2687-2711`.
+- Key-runtime core names the receiving side as observation in `users/noah/lib/key/runtime/core/ownership_state.c:1224-1250`.
 - `tests/host/run_feature_gate_compile_tests.sh:129-152` prevents PD runtime modules other than the bridge from including `key/runtime/core/runtime.h` or calling `key_runtime_core_observe_pd_mode_lock_state()`.
 - `users/noah/source_manifest.mk` and `tests/host/noah_source_manifest.sh` include `pd_projection.c`, and manual key-runtime/PD integration runners compile it explicitly.
 
@@ -216,7 +218,7 @@ The highest-value next work is not a broad rewrite. It is to write down and enfo
 1. Freeze current behavior with the relevant host tests before editing runtime code: key runtime release matrix, modifier-hold integration, PD mode integration, PD runtime, pointer layer policy, split sync, combo origin, RGB feedback, and full host suite.
 2. Create an ownership authority map for core leases, held actions, held repeats, layers, keyboard modifiers, and PD owners.
 3. Consolidate release behavior behind one release planner API, then remove transitional release helpers once tests prove parity.
-4. Continue splitting remaining `runtime.c` accumulator concerns into internal modules for lease projection and broad debug/state surfaces.
+4. Continue splitting remaining `runtime.c` and `runtime.h` accumulator concerns into internal modules for broad reducer state/debug surfaces.
 5. Tighten `qmk_combo_origin` with a documented QMK contract and host coverage for same-key combos, pending combo outputs, and RGB partitioning.
 6. Centralize keyboard modifier mask/replay policy so action dispatch, delayed action, key process, and PD modes share one contract.
 7. Clean up low-risk duplication only after the authority and release work is stable.
@@ -315,6 +317,8 @@ Status key:
 | `users/noah/lib/key/runtime/core/effect_plan.h` | clean | Internal effect-plan append helper declarations shared by core modules. |
 | `users/noah/lib/key/runtime/core/feedback_projection.c` | watch | Core-side feedback pulse projection and pulse queueing. |
 | `users/noah/lib/key/runtime/core/feedback_projection.h` | clean | Internal core feedback projection declaration. |
+| `users/noah/lib/key/runtime/core/ownership_state.c` | watch | Reducer-owned lease and persistent-intent mechanics, shadow projection recomputation, held/repeat feedback visibility queries, and lock observation updates over core state storage. |
+| `users/noah/lib/key/runtime/core/ownership_state.h` | clean | Internal ownership-state helper declarations shared by runtime, release, and scan planning code. |
 | `users/noah/lib/key/runtime/core/pending_release_queue.c` | watch | Pending-release queue allocation, ordering, drain snapshots, and released-token pending-emission cleanup over core state storage. |
 | `users/noah/lib/key/runtime/core/pending_release_queue.h` | clean | Internal pending-release queue declaration used by projection and release transport. |
 | `users/noah/lib/key/runtime/core/projection.c` | watch | Runtime effect execution, pending-release dispatch projection, projection snapshot capture/comparison, and trace projection checkpoints. |
@@ -324,7 +328,7 @@ Status key:
 | `users/noah/lib/key/runtime/core/release_internal.h` | watch | Internal release planning declarations and narrow helper exports for the planner. |
 | `users/noah/lib/key/runtime/core/release_planner.c` | watch | Active-release and pending multi-tap release resolution plus effect planning. |
 | `users/noah/lib/key/runtime/core/release_planner.h` | watch | Central release semantics helper introduced on 2026-04-28. |
-| `users/noah/lib/key/runtime/core/runtime.c` | high-risk | Core state reducer, lease/persistent-intent mechanics, effect-plan construction helpers, and scan orchestration. |
+| `users/noah/lib/key/runtime/core/runtime.c` | high-risk | Core state reducer, press/tap orchestration, scan orchestration, and effect-plan construction helpers. |
 | `users/noah/lib/key/runtime/core/runtime.h` | high-risk | Broad state and reducer surface for unrelated runtime concerns. |
 | `users/noah/lib/key/runtime/core/scan_planner.c` | watch | Scan-time hold promotion, fallback hold settlement, release-hold-pending marking, and pending multi-tap scan planning. |
 | `users/noah/lib/key/runtime/core/scan_planner.h` | clean | Internal scan planning declaration and scan resolution contract. |
