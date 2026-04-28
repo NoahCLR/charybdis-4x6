@@ -264,7 +264,8 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - TAP_ON_RELEASE_AFTER_HOLD(...) stays steady while that tier is pending
 //     release
 //   - PRESS_AND_HOLD_UNTIL_RELEASE(...) and REPEAT_WHILE_HELD(...) flash while
-//     that tier stays active
+//     that tier stays active; the first visible flash window starts when that
+//     key's held/repeat feedback activates
 //
 // Locality decides where the overlay paints:
 //   - RGB_BOTH_HALVES = mirror the feedback color across both halves

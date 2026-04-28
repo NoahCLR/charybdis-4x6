@@ -1440,3 +1440,61 @@ Next steps:
    is now just `CUSTOM_MULTI_TAP_TERM` (`150ms`), plus scan scheduling.
 2. Retest `KC_6` double tap and a double-tap hold path to confirm the
    non-base branch-confirm window still exists where it is useful.
+
+### Per-Owner Key-Feedback Flash Follow-Up
+
+- Hardware observation showed held-symbol feedback could emit the symbol while
+  missing the RGB flash if the key crossed the hold threshold during the hidden
+  half of the shared flash phase.
+- Replaced the shared key-feedback flash metadata with per-owner flash
+  visibility. Held-action and repeat leases now record when their feedback
+  becomes active, so the first flash window is visible for that key before it
+  alternates on its own cadence.
+- Split sync still sends key-feedback semantic state in one semantic packet,
+  but that packet now carries a per-key flash visibility bitmap instead of
+  shared flash timing metadata. The slave renders from the same semantic truth
+  and the synced visibility bitmap.
+- Updated key-feedback rendering so hidden flashing states are skipped before
+  selecting fixed-half, key-half, full-board, and LED-group priority. That keeps
+  a hidden long-hold flash from suppressing a lower-priority visible state.
+- Updated RGB docs, generated profile overview text, and source comments to
+  describe per-key flash visibility. Updated the active architecture note with
+  the new split/RGB feedback contract.
+- While rerunning the full suite, the real-profile thumb/layer-lock harness
+  exposed stale `KC_6` expectations: the current authored `KC_6` row is
+  hold-only with no higher tap branch, so quick taps dispatch immediately and
+  should not enter branch feedback. The harness now provides the profile's
+  `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` policy and checks the current
+  hold-only number-key behavior.
+
+Verification passed:
+
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and hold `KC_7`, `KC_8`, and `KC_9` from BASE just past the hold
+   threshold. Each key should show the symbol and begin with a visible RGB
+   flash window immediately.
+2. On split hardware, repeat the test from both halves and confirm the remote
+   half mirrors the same first visible flash window.

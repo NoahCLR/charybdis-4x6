@@ -154,8 +154,9 @@ uint8_t key_feedback_preview_layer(void) {
     return UINT8_MAX;
 }
 
-uint8_t key_feedback_flash_meta(void) {
-    return 0u;
+void key_feedback_flash_visibility_bitmap_for_semantic_map(const uint8_t *semantic_map, uint8_t *out_bitmap) {
+    (void)semantic_map;
+    key_origin_bitmap_clear(out_bitmap);
 }
 
 void key_feedback_semantic_map(uint8_t *out_map) {

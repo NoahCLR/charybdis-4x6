@@ -13,12 +13,6 @@
 #    include "../../pointing/defs/pd_modes.h"
 #endif
 
-#ifdef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
-#    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
-#else
-#    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS 200
-#endif
-
 static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token);
 
 static uint8_t key_feedback_semantic_priority(key_feedback_semantic_t semantic) {
@@ -337,12 +331,37 @@ static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token
     return KEY_FEEDBACK_SEMANTIC_NONE;
 }
 
-uint8_t key_feedback_flash_meta(void) {
-    if (((timer_read() / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0u) {
-        return KEY_FEEDBACK_FLASH_META_PHASE;
+void key_feedback_flash_visibility_bitmap_for_semantic_map(const uint8_t *semantic_map, uint8_t *out_bitmap) {
+    if (!out_bitmap) {
+        return;
     }
 
-    return 0u;
+    key_origin_bitmap_clear(out_bitmap);
+    if (!semantic_map) {
+        return;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            keypos_t                key_pos  = {.row = row, .col = col};
+            key_feedback_semantic_t semantic = key_feedback_semantic_map_get(semantic_map, key_pos);
+
+            if (key_feedback_semantic_is_flashing(semantic) && key_runtime_core_flashing_feedback_visible_at(key_pos)) {
+                key_origin_bitmap_add_keypos(out_bitmap, key_pos);
+            }
+        }
+    }
+}
+
+void key_feedback_flash_visibility_bitmap(uint8_t *out_bitmap) {
+    uint8_t semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+
+    if (!out_bitmap) {
+        return;
+    }
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_flash_visibility_bitmap_for_semantic_map(semantic_map, out_bitmap);
 }
 
 void key_feedback_semantic_map(uint8_t *out_map) {
@@ -444,5 +463,3 @@ void combo_feedback_overlay_bitmap(uint8_t *out_bitmap) {
 #endif
     noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, unused_underlay, out_bitmap);
 }
-
-#undef KEY_FEEDBACK_FLASH_HALF_PERIOD_MS

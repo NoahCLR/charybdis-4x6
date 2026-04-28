@@ -60,7 +60,7 @@ static uint8_t                fake_combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE]
 static uint8_t                fake_combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t                fake_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
 static uint8_t                fake_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
-static uint8_t                fake_feedback_flash_meta = 0;
+static uint8_t                fake_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t                fake_auto_mouse_layer    = LAYER_POINTER;
 static uint16_t               fake_auto_mouse_elapsed  = 0;
 static bool                   fake_auto_mouse_active   = true;
@@ -259,12 +259,20 @@ static void test_local_feedback_tap_branch_add(uint8_t row, uint8_t col, uint8_t
     test_feedback_tap_branch_set(fake_feedback_tap_branch_map, row, col, tap_branch);
 }
 
+static __attribute__((unused)) void test_local_feedback_visibility_add(uint8_t row, uint8_t col) {
+    key_origin_bitmap_add_keypos(fake_feedback_flash_visibility_bitmap, (keypos_t){.row = row, .col = col});
+}
+
 static void test_remote_feedback_semantic_add(uint8_t row, uint8_t col, key_feedback_semantic_t semantic) {
     test_feedback_semantic_set(split_runtime_sync_remote.key_feedback_semantic_map, row, col, semantic);
 }
 
 static void test_remote_feedback_tap_branch_add(uint8_t row, uint8_t col, uint8_t tap_branch) {
     test_feedback_tap_branch_set(split_runtime_sync_remote.key_feedback_tap_branch_map, row, col, tap_branch);
+}
+
+static __attribute__((unused)) void test_remote_feedback_visibility_add(uint8_t row, uint8_t col) {
+    key_origin_bitmap_add_keypos(split_runtime_sync_remote.key_feedback_flash_visibility_bitmap, (keypos_t){.row = row, .col = col});
 }
 
 static rgb_t rgb_blend(rgb_t start, rgb_t end, uint8_t amount) {
@@ -309,7 +317,7 @@ static void test_reset(void) {
     key_origin_bitmap_clear(fake_combo_overlay_bitmap);
     key_feedback_semantic_map_clear(fake_feedback_semantic_map);
     key_feedback_tap_branch_map_clear(fake_feedback_tap_branch_map);
-    fake_feedback_flash_meta = 0;
+    key_origin_bitmap_clear(fake_feedback_flash_visibility_bitmap);
     fake_auto_mouse_layer    = LAYER_POINTER;
     fake_auto_mouse_elapsed  = 0;
     fake_auto_mouse_active   = true;
@@ -385,16 +393,16 @@ uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t colu
     return test_keymap[layer_num][row][column];
 }
 
-uint8_t key_feedback_flash_meta(void) {
-    return fake_feedback_flash_meta;
-}
-
 void key_feedback_semantic_map(uint8_t *out_map) {
     memcpy(out_map, fake_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
 }
 
 void key_feedback_tap_branch_map(uint8_t *out_map) {
     memcpy(out_map, fake_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
+}
+
+void key_feedback_flash_visibility_bitmap(uint8_t *out_bitmap) {
+    key_origin_bitmap_copy(out_bitmap, fake_feedback_flash_visibility_bitmap);
 }
 
 void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
@@ -826,7 +834,7 @@ static void test_slave_tap_commit_feedback_uses_configured_color(void) {
 #endif
 }
 
-static void test_slave_feedback_uses_remote_semantics_and_flash_phase(void) {
+static void test_slave_feedback_uses_remote_semantics_and_visibility_bitmap(void) {
     test_reset();
 
     fake_is_master = false;
@@ -838,7 +846,7 @@ static void test_slave_feedback_uses_remote_semantics_and_flash_phase(void) {
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 
     memset(led_output, 0, sizeof(led_output));
-    split_runtime_sync_remote.key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+    test_remote_feedback_visibility_add(0, 0);
 
     CHECK(render_output());
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
@@ -961,7 +969,7 @@ static void test_key_feedback_led_groups_follow_flash_visibility(void) {
     CHECK(render_output());
     check_led(5, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 
-    fake_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+    test_local_feedback_visibility_add(0, 0);
 
     CHECK(render_output());
     check_led(5, rgb_from_key_feedback_group(3));
@@ -1017,8 +1025,8 @@ static void test_key_half_feedback_uses_independent_priority_per_half(void) {
     test_reset();
 
     layer_state              = (1UL << LAYER_SYM);
-    fake_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING);
+    test_local_feedback_visibility_add(0, 0);
     test_local_feedback_semantic_add(4, 0, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
 
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
@@ -1118,15 +1126,30 @@ static void test_key_left_half_feedback_paints_fixed_left_half_from_any_source_s
 static void test_key_left_half_feedback_uses_global_priority(void) {
     test_reset();
 
-    layer_state              = (1UL << LAYER_SYM);
-    fake_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+    layer_state = (1UL << LAYER_SYM);
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
     test_local_feedback_semantic_add(4, 0, KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING);
+    test_local_feedback_visibility_add(4, 0);
 
     CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
 
     check_led(0, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
     check_led(3, rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
+static void test_key_left_half_feedback_skips_hidden_flashing_priority(void) {
+    test_reset();
+
+    layer_state = (1UL << LAYER_SYM);
+    test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+    test_local_feedback_semantic_add(4, 0, KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING);
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT));
+
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.hold_active_color));
+    check_led(3, rgb_from_hsv(key_behavior_feedback_colors.hold_active_color));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
@@ -1341,8 +1364,8 @@ static void test_flashing_long_hold_wins_global_priority_over_multi_tap_pending(
     test_reset();
 
     layer_state              = (layer_state_t)1u << LAYER_SYM;
-    fake_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING);
+    test_local_feedback_visibility_add(0, 0);
     test_local_feedback_semantic_add(4, 0, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
 
     CHECK(render_output());
@@ -1862,7 +1885,7 @@ int main(void) {
     test_slave_remote_combo_overlay_suppresses_stale_pending_feedback();
     test_slave_remote_combo_underlay_suppresses_stale_pending_feedback();
     test_slave_tap_commit_feedback_uses_configured_color();
-    test_slave_feedback_uses_remote_semantics_and_flash_phase();
+    test_slave_feedback_uses_remote_semantics_and_visibility_bitmap();
     test_multi_tap_pending_uses_pending_color();
     test_tap_branch_commit_uses_branch_color();
     test_tap_branch_commit_color_clamps_to_last_configured_color();
@@ -1888,6 +1911,7 @@ int main(void) {
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF
     test_key_left_half_feedback_paints_fixed_left_half_from_any_source_side();
     test_key_left_half_feedback_uses_global_priority();
+    test_key_left_half_feedback_skips_hidden_flashing_priority();
 #endif
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     test_key_right_half_feedback_paints_fixed_right_half_from_any_source_side();

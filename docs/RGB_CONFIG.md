@@ -421,7 +421,8 @@ The helper decides the RGB behavior shape:
   action feedback follows after confirmation completes so both states get a
   visible window
 - `PRESS_AND_HOLD_UNTIL_RELEASE(...)` and `REPEAT_WHILE_HELD(...)`: flash while
-  that tier remains active
+  that tier remains active; each key starts with a visible flash window when
+  its held/repeat feedback activates, then alternates on its own cadence
 
 When a higher hold tier actually commits, such as a `.long_hold` threshold
 action, that action feedback replaces older lower-tier feedback. RGB should
@@ -437,9 +438,11 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keyma
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h). Its flash cadence is controlled by
 `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
 
-The runtime now keeps truthful per-key semantic state and only broadens that
-truth at paint time when the authored `locality` asks for it. On split boards,
-the slave receives that packed semantic map, tap-branch map, and shared flash metadata through
+The runtime now keeps truthful per-key semantic state plus a per-key flash
+visibility bitmap. Authored `locality` broadens that truth only at paint time,
+and hidden flashing states are ignored when selecting the highest-priority
+state for half or full-board presentation. On split boards, the slave receives
+the packed semantic map, tap-branch map, and flash visibility bitmap through
 [`split_runtime_sync`](../users/noah/lib/state/runtime/split_runtime_sync.c).
 
 ### `key_behavior_feedback_led_groups`

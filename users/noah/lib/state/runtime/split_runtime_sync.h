@@ -40,7 +40,7 @@ typedef struct __attribute__((packed)) {
 } split_runtime_combo_feedback_packet_t;
 
 typedef struct __attribute__((packed)) {
-    uint8_t key_feedback_flash_meta;
+    uint8_t key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
 } split_runtime_key_feedback_semantic_packet_t;
 
@@ -59,7 +59,7 @@ typedef struct {
     uint8_t key_preview_layer;
     uint8_t combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t key_feedback_flash_meta;
+    uint8_t key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
 } split_runtime_sync_remote_t;
@@ -75,9 +75,9 @@ typedef struct {
             .key_preview_layer         = UINT8_MAX,            \
             .combo_underlay_bitmap     = {0},                  \
             .combo_overlay_bitmap      = {0},                  \
-            .key_feedback_flash_meta      = 0,                 \
-            .key_feedback_semantic_map    = {0},               \
-            .key_feedback_tap_branch_map = {0},                \
+            .key_feedback_flash_visibility_bitmap = {0},       \
+            .key_feedback_semantic_map            = {0},       \
+            .key_feedback_tap_branch_map          = {0},       \
         }
 #else
 #    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT          \
@@ -88,9 +88,9 @@ typedef struct {
             .key_preview_layer         = UINT8_MAX,       \
             .combo_underlay_bitmap     = {0},             \
             .combo_overlay_bitmap      = {0},             \
-            .key_feedback_flash_meta      = 0,            \
-            .key_feedback_semantic_map    = {0},          \
-            .key_feedback_tap_branch_map = {0},           \
+            .key_feedback_flash_visibility_bitmap = {0},  \
+            .key_feedback_semantic_map            = {0},  \
+            .key_feedback_tap_branch_map          = {0},  \
         }
 #endif
 

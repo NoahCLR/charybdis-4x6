@@ -25,7 +25,7 @@ static uint8_t           fake_combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
 static uint8_t           fake_key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
-static uint8_t           fake_key_feedback_flash_meta;
+static uint8_t           fake_key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t           fake_key_preview_layer;
 
 static uint8_t                                      rpc_register_count;
@@ -78,7 +78,8 @@ static void test_reset_stubs(void) {
     key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
     key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 0, .col = 0}, KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING);
     key_feedback_tap_branch_map_clear(fake_key_feedback_tap_branch_map);
-    fake_key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+    key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
+    key_origin_bitmap_add_keypos(fake_key_feedback_flash_visibility_bitmap, (keypos_t){.row = 0, .col = 0});
     fake_key_preview_layer       = 3u;
     rpc_register_count           = 0;
     memset(rpc_registered_ids, -1, sizeof(rpc_registered_ids));
@@ -133,8 +134,26 @@ bool pd_mode_local_owner_bitmap_snapshot(uint8_t *out_bitmap) {
     return key_origin_bitmap_has_any(fake_pd_owner_bitmap);
 }
 
-uint8_t key_feedback_flash_meta(void) {
-    return fake_key_feedback_flash_meta;
+void key_feedback_flash_visibility_bitmap_for_semantic_map(const uint8_t *semantic_map, uint8_t *out_bitmap) {
+    if (!out_bitmap) {
+        return;
+    }
+
+    key_origin_bitmap_clear(out_bitmap);
+    if (!semantic_map) {
+        return;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            keypos_t                key_pos  = {.row = row, .col = col};
+            key_feedback_semantic_t semantic = key_feedback_semantic_map_get(semantic_map, key_pos);
+
+            if (key_feedback_semantic_is_flashing(semantic) && key_origin_bitmap_has_keypos(fake_key_feedback_flash_visibility_bitmap, key_pos)) {
+                key_origin_bitmap_add_keypos(out_bitmap, key_pos);
+            }
+        }
+    }
 }
 
 void key_feedback_semantic_map(uint8_t *out_map) {
@@ -235,7 +254,7 @@ static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     CHECK(sizeof(split_runtime_base_sync_packet_t) == 5u);
 #endif
     CHECK(sizeof(split_runtime_combo_feedback_packet_t) == (size_t)(2u * KEY_ORIGIN_BITMAP_SIZE));
-    CHECK(sizeof(split_runtime_key_feedback_semantic_packet_t) == (size_t)(1u + KEY_FEEDBACK_SEMANTIC_MAP_SIZE));
+    CHECK(sizeof(split_runtime_key_feedback_semantic_packet_t) == (size_t)(KEY_ORIGIN_BITMAP_SIZE + KEY_FEEDBACK_SEMANTIC_MAP_SIZE));
     CHECK(sizeof(split_runtime_key_feedback_branch_packet_t) == KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
 
     split_runtime_sync_init();
@@ -260,7 +279,7 @@ static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     CHECK(rpc_last_base_packet.key_preview_layer == fake_key_preview_layer);
     CHECK(memcmp(rpc_last_combo_packet.combo_underlay_bitmap, fake_combo_underlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(rpc_last_combo_packet.combo_overlay_bitmap, fake_combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
-    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == fake_key_feedback_flash_meta);
+    CHECK(memcmp(rpc_last_key_feedback_semantic_packet.key_feedback_flash_visibility_bitmap, fake_key_feedback_flash_visibility_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, fake_key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
     CHECK(memcmp(rpc_last_key_feedback_branch_packet.key_feedback_tap_branch_map, fake_key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE) == 0);
     CHECK(split_runtime_sync_remote.key_preview_layer == UINT8_MAX);
@@ -318,17 +337,18 @@ static void test_force_sync_sends_all_packets_even_when_unchanged(void) {
     CHECK(rpc_send_count_key_feedback_branch == 1u);
 }
 
-static void test_key_feedback_phase_is_ignored_without_flashing_semantics(void) {
+static void test_key_feedback_visibility_is_ignored_without_flashing_semantics(void) {
     test_reset_stubs();
     key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
     key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
-    fake_key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+    key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
+    key_origin_bitmap_add_keypos(fake_key_feedback_flash_visibility_bitmap, (keypos_t){.row = 1, .col = 1});
 
     split_runtime_sync_init();
-    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == 0u);
+    CHECK(!key_origin_bitmap_has_any(rpc_last_key_feedback_semantic_packet.key_feedback_flash_visibility_bitmap));
 
     test_reset_rpc_send_counts();
-    fake_key_feedback_flash_meta = 0u;
+    key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
 
     split_runtime_sync_tick();
     CHECK(rpc_send_count == 0u);
@@ -338,14 +358,14 @@ static void test_key_feedback_phase_is_ignored_without_flashing_semantics(void) 
     CHECK(rpc_send_count_key_feedback_branch == 0u);
 }
 
-static void test_key_feedback_phase_changes_when_flashing_semantics_are_present(void) {
+static void test_key_feedback_visibility_changes_when_flashing_semantics_are_present(void) {
     test_reset_stubs();
 
     split_runtime_sync_init();
-    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == KEY_FEEDBACK_FLASH_META_PHASE);
+    CHECK(key_origin_bitmap_has_keypos(rpc_last_key_feedback_semantic_packet.key_feedback_flash_visibility_bitmap, (keypos_t){.row = 0, .col = 0}));
 
     test_reset_rpc_send_counts();
-    fake_key_feedback_flash_meta = 0u;
+    key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
 
     split_runtime_sync_tick();
     CHECK(rpc_send_count == 1u);
@@ -353,7 +373,7 @@ static void test_key_feedback_phase_changes_when_flashing_semantics_are_present(
     CHECK(rpc_send_count_combo == 0u);
     CHECK(rpc_send_count_key_feedback_semantic == 1u);
     CHECK(rpc_send_count_key_feedback_branch == 0u);
-    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == 0u);
+    CHECK(!key_origin_bitmap_has_any(rpc_last_key_feedback_semantic_packet.key_feedback_flash_visibility_bitmap));
 }
 
 static void test_locked_pd_mode_zeroes_automouse_progress(void) {
@@ -467,15 +487,15 @@ static void test_idle_packets_use_idle_heartbeat(void) {
     fake_pd_locked_flags    = 0;
     fake_pd_owner_sides     = SPLIT_SIDE_MASK_NONE;
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
-    fake_key_preview_layer       = UINT8_MAX;
-    fake_key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
+    fake_key_preview_layer = UINT8_MAX;
+    key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
     key_origin_bitmap_clear(fake_combo_underlay_bitmap);
     key_origin_bitmap_clear(fake_combo_overlay_bitmap);
     key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
     key_feedback_tap_branch_map_clear(fake_key_feedback_tap_branch_map);
 
     split_runtime_sync_init();
-    CHECK(rpc_last_key_feedback_semantic_packet.key_feedback_flash_meta == 0u);
+    CHECK(!key_origin_bitmap_has_any(rpc_last_key_feedback_semantic_packet.key_feedback_flash_visibility_bitmap));
 
     test_reset_rpc_send_counts();
 
@@ -511,8 +531,8 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
     fake_is_master                        = false;
     combo_packet.combo_underlay_bitmap[0] = 0x11u;
     combo_packet.combo_overlay_bitmap[1]  = 0x22u;
-    key_semantic_packet.key_feedback_flash_meta = KEY_FEEDBACK_FLASH_META_PHASE;
-    key_feedback_semantic_map_set(key_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 0, .col = 1}, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    key_origin_bitmap_add_keypos(key_semantic_packet.key_feedback_flash_visibility_bitmap, (keypos_t){.row = 0, .col = 1});
+    key_feedback_semantic_map_set(key_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 0, .col = 1}, KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING);
     key_feedback_tap_branch_map_set(key_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 0, .col = 1}, 2u);
 
     split_runtime_sync_init();
@@ -540,7 +560,7 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
     CHECK(split_runtime_sync_remote.key_preview_layer == base_packet.key_preview_layer);
     CHECK(memcmp(split_runtime_sync_remote.combo_underlay_bitmap, combo_packet.combo_underlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(split_runtime_sync_remote.combo_overlay_bitmap, combo_packet.combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
-    CHECK(split_runtime_sync_remote.key_feedback_flash_meta == key_semantic_packet.key_feedback_flash_meta);
+    CHECK(memcmp(split_runtime_sync_remote.key_feedback_flash_visibility_bitmap, key_semantic_packet.key_feedback_flash_visibility_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     CHECK(memcmp(split_runtime_sync_remote.key_feedback_semantic_map, key_semantic_packet.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
     CHECK(memcmp(split_runtime_sync_remote.key_feedback_tap_branch_map, key_branch_packet.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE) == 0);
     CHECK(remote_snapshot_apply_count == 1u);
@@ -572,8 +592,8 @@ int main(void) {
     test_init_registers_rpcs_without_sending_on_slave();
     test_elapsed_skips_unchanged_packets_until_heartbeat();
     test_force_sync_sends_all_packets_even_when_unchanged();
-    test_key_feedback_phase_is_ignored_without_flashing_semantics();
-    test_key_feedback_phase_changes_when_flashing_semantics_are_present();
+    test_key_feedback_visibility_is_ignored_without_flashing_semantics();
+    test_key_feedback_visibility_changes_when_flashing_semantics_are_present();
     test_locked_pd_mode_zeroes_automouse_progress();
     test_tick_sends_only_base_packet_when_only_automouse_changes();
     test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();

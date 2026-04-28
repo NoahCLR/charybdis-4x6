@@ -33,6 +33,7 @@ enum {
     TEST_THRESHOLD_LONG_KEY    = NOAH_KEYMAP_SAFE_RANGE + 0x15,
     TEST_PENDING_RELEASE_KEY   = NOAH_KEYMAP_SAFE_RANGE + 0x16,
     TEST_FINAL_TAP_ONLY_KEY    = NOAH_KEYMAP_SAFE_RANGE + 0x17,
+    TEST_HELD_ACTION_KEY       = NOAH_KEYMAP_SAFE_RANGE + 0x18,
 };
 
 static uint16_t              fake_time;
@@ -188,6 +189,10 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         flags |= HANDLED_KEY_FLAG_MULTI_TAP;
         step = (key_behavior_step_t){
             .hold = TAP_ON_RELEASE_AFTER_HOLD(TEST_ACTION),
+        };
+    } else if (keycode == TEST_HELD_ACTION_KEY) {
+        step = (key_behavior_step_t){
+            .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_ACTION),
         };
     }
 
@@ -1231,6 +1236,51 @@ static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_bran
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
 }
 
+static void test_key_feedback_flashing_visibility_tracks_each_owner_activation(void) {
+    uint8_t  semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t  visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    keypos_t first_key  = test_keypos(6, 2);
+    keypos_t second_key = test_keypos(6, 3);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_HELD_ACTION_KEY, first_key, fake_time);
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 1u);
+    key_runtime_core_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, fake_time);
+    key_runtime_core_observe_held_action_register(first_key, TEST_ACTION);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_flash_visibility_bitmap_for_semantic_map(semantic_map, visibility_bitmap);
+    CHECK(key_feedback_semantic_map_get(semantic_map, first_key) == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING);
+    CHECK(key_origin_bitmap_has_keypos(visibility_bitmap, first_key));
+
+    fake_time = (uint16_t)(fake_time + KEY_FEEDBACK_FLASH_HALF_PERIOD_MS - 1u);
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_flash_visibility_bitmap_for_semantic_map(semantic_map, visibility_bitmap);
+    CHECK(key_origin_bitmap_has_keypos(visibility_bitmap, first_key));
+
+    fake_time = (uint16_t)(fake_time + 1u);
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_flash_visibility_bitmap_for_semantic_map(semantic_map, visibility_bitmap);
+    CHECK(key_feedback_semantic_map_get(semantic_map, first_key) == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING);
+    CHECK(!key_origin_bitmap_has_keypos(visibility_bitmap, first_key));
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_HELD_ACTION_KEY, second_key, fake_time);
+    key_runtime_core_observe_held_action_register(second_key, TEST_ACTION);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_flash_visibility_bitmap_for_semantic_map(semantic_map, visibility_bitmap);
+    CHECK(!key_origin_bitmap_has_keypos(visibility_bitmap, first_key));
+    CHECK(key_origin_bitmap_has_keypos(visibility_bitmap, second_key));
+
+    fake_time = (uint16_t)(fake_time + KEY_FEEDBACK_FLASH_HALF_PERIOD_MS);
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_flash_visibility_bitmap_for_semantic_map(semantic_map, visibility_bitmap);
+    CHECK(key_origin_bitmap_has_keypos(visibility_bitmap, first_key));
+    CHECK(!key_origin_bitmap_has_keypos(visibility_bitmap, second_key));
+}
+
 static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hold_threshold(void) {
     key_runtime_core_pending_multi_tap_scan_resolution_t resolution;
     const tap_series_t                                  *series;
@@ -2163,6 +2213,7 @@ int main(void) {
     test_base_tap_multi_tap_flush_skips_branch_confirm();
     test_key_feedback_maps_keep_pending_hold_neutral_until_branch_commits();
     test_key_feedback_maps_show_final_tap_only_neutral_pending_then_branch_commit();
+    test_key_feedback_flashing_visibility_tracks_each_owner_activation();
     test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hold_threshold();
     test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_long_hold();
     test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expired_chain();

@@ -189,6 +189,7 @@ typedef struct {
     uint8_t                     kind;
     uint16_t                    owner_token_id;
     key_runtime_packed_keypos_t owner_packed_key_pos;
+    uint16_t                    feedback_started_at;
     union {
         uint8_t layer;
         struct {
@@ -366,6 +367,7 @@ uint16_t                                    key_runtime_core_owner_keycode_at(ke
 uint16_t                                    key_runtime_core_tap_action_at(keypos_t key_pos);
 uint16_t                                    key_runtime_core_held_action_keycode_at(keypos_t key_pos);
 bool                                        key_runtime_core_repeat_active_at(keypos_t key_pos);
+bool                                        key_runtime_core_flashing_feedback_visible_at(keypos_t key_pos);
 key_runtime_slot_phase_t                    key_runtime_core_slot_phase_at(keypos_t key_pos);
 bool                                        key_runtime_core_momentary_layer_tap_interrupted_at(keypos_t key_pos);
 uint8_t                                     key_runtime_core_pending_multi_tap_tap_count_at(keypos_t key_pos);

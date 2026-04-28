@@ -18,7 +18,9 @@ interaction-feedback stage gates, added tap-branch confirmation colors, split
 key-feedback sync into semantic and branch packets, and updated the RGB
 authoring docs. Later follow-up tightened tap-branch feedback semantics so the
 base single-tap candidate stays quiet and only double-tap or higher branches
-emit unresolved or committed branch feedback.
+emit unresolved or committed branch feedback. This pass also replaced the
+shared key-feedback flash phase with per-owner flash visibility so held/repeat
+feedback starts with an on window when each key activates.
 
 ## Findings
 
@@ -145,6 +147,18 @@ None.
   semantic map remains 3 bits per key and still fits one QMK split transaction.
   Split sync treats key feedback as a packet family: semantic state and
   tap-branch state are separate RPC payloads.
+- Flashing held/repeat feedback now uses per-owner visibility instead of one
+  shared global flash phase. Runtime leases store the activation time for
+  held-action and repeat feedback; `key_feedback_flash_visibility_bitmap()`
+  exports which flashing keys are currently visible. Split sync sends that
+  bitmap with the semantic packet, and the RGB key-feedback stage ignores
+  hidden flashing semantics when choosing half/global priority or LED-group
+  visibility. Code references:
+  `users/noah/lib/key/runtime/core/runtime.c`,
+  `users/noah/lib/key/runtime/feedback.c`,
+  `users/noah/lib/state/runtime/split_runtime_sync.c`,
+  `users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`, and
+  `tests/host/runtime_debug_test.c`.
 - Foreign non-handled key presses now flush pending multi-tap actions before
   the key leaves userspace for the normal QMK path. This preserves independent
   authored-key pending chains while making terminal tap-only actions such as
@@ -296,6 +310,11 @@ active, the higher-tier action feedback replaces that older feedback because
 the runtime behavior has already changed. This keeps the visible state aligned
 with behavior for paths such as `LEFT_THUMB` double-tap hold crossing into
 `LOCK_LAYER(LAYER_NUM)`.
+Flashing held/repeat feedback is now precise per owner. The semantic map still
+names the active state, while a separate visibility bitmap carries the current
+per-key flash window. That lets the first visible window start at activation
+time for each key, and broadened half/full-board rendering skips hidden
+flashing states before selecting the highest-priority visible state.
 
 Pending multi-tap dispatch is intentionally split by destination: foreign
 handled keys keep independent authored pending chains, while foreign

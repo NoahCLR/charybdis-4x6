@@ -25,6 +25,12 @@
 #    define KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS 20
 #endif
 
+#ifdef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
+#    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
+#else
+#    define KEY_FEEDBACK_FLASH_HALF_PERIOD_MS 200
+#endif
+
 #define KEY_FEEDBACK_SEMANTIC_BITS 3u
 #define KEY_FEEDBACK_SEMANTIC_MAP_SIZE ((((MATRIX_ROWS * MATRIX_COLS) * KEY_FEEDBACK_SEMANTIC_BITS) + 7u) / 8u)
 #define KEY_FEEDBACK_SEMANTIC_MASK ((uint16_t)((1u << KEY_FEEDBACK_SEMANTIC_BITS) - 1u))
@@ -69,12 +75,6 @@ typedef enum {
 } key_feedback_semantic_t;
 
 _Static_assert(KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED <= KEY_FEEDBACK_SEMANTIC_MASK, "key feedback semantic map must represent every semantic value");
-
-#define KEY_FEEDBACK_FLASH_META_PHASE (1u << 0)
-
-static inline bool key_feedback_flash_meta_phase(uint8_t meta) {
-    return (meta & KEY_FEEDBACK_FLASH_META_PHASE) != 0u;
-}
 
 static inline bool key_feedback_semantic_is_flashing(key_feedback_semantic_t semantic) {
     return semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING || semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING;
@@ -200,8 +200,6 @@ static inline void key_feedback_tap_branch_map_set(uint8_t *map, keypos_t key_po
     }
 }
 
-uint8_t key_feedback_flash_meta(void);
-
 static inline bool key_feedback_semantic_map_has_any(const uint8_t *map) {
     if (!map) {
         return false;
@@ -232,12 +230,10 @@ static inline bool key_feedback_semantic_map_has_flashing(const uint8_t *map) {
     return false;
 }
 
-static inline uint8_t key_feedback_flash_meta_for_semantic_map(const uint8_t *map) {
-    return key_feedback_semantic_map_has_flashing(map) ? key_feedback_flash_meta() : 0u;
-}
-
 void    key_feedback_semantic_map(uint8_t *out_map);
 void    key_feedback_tap_branch_map(uint8_t *out_map);
+void    key_feedback_flash_visibility_bitmap_for_semantic_map(const uint8_t *semantic_map, uint8_t *out_bitmap);
+void    key_feedback_flash_visibility_bitmap(uint8_t *out_bitmap);
 uint8_t key_feedback_preview_layer(void);
 void    combo_feedback_underlay_bitmap(uint8_t *out_bitmap);
 void    combo_feedback_overlay_bitmap(uint8_t *out_bitmap);

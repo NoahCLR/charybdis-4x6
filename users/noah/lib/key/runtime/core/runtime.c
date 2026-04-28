@@ -1446,11 +1446,13 @@ static bool key_runtime_core_pointer_anchor_lease_activate(key_runtime_core_stat
 
 static bool key_runtime_core_held_action_lease_activate(key_runtime_core_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, uint16_t action) {
     lease_t *lease;
+    uint16_t feedback_started_at;
 
     if (!(state && action != KC_NO)) {
         return false;
     }
 
+    feedback_started_at = timer_read();
     lease = key_runtime_core_find_held_action_lease(state, owner_key_pos, action);
     if (lease) {
         if (lease->owner_token_id == owner_token_id && key_runtime_core_lease_owner_keypos_equal(lease, owner_key_pos)) {
@@ -1459,6 +1461,7 @@ static bool key_runtime_core_held_action_lease_activate(key_runtime_core_state_t
 
         lease->owner_token_id       = owner_token_id;
         lease->owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos);
+        lease->feedback_started_at  = feedback_started_at;
         return true;
     }
 
@@ -1472,6 +1475,7 @@ static bool key_runtime_core_held_action_lease_activate(key_runtime_core_state_t
         .kind                 = LEASE_KIND_HELD_ACTION,
         .owner_token_id       = owner_token_id,
         .owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos),
+        .feedback_started_at  = feedback_started_at,
         .data.action          = action,
     };
     return true;
@@ -1479,11 +1483,13 @@ static bool key_runtime_core_held_action_lease_activate(key_runtime_core_state_t
 
 static bool key_runtime_core_repeat_lease_activate(key_runtime_core_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, uint16_t action, uint16_t repeat_hz) {
     lease_t *lease;
+    uint16_t feedback_started_at;
 
     if (!(state && action != KC_NO)) {
         return false;
     }
 
+    feedback_started_at = timer_read();
     lease = key_runtime_core_find_repeat_lease(state, owner_key_pos, action);
     if (lease) {
         if (lease->owner_token_id == owner_token_id && key_runtime_core_lease_owner_keypos_equal(lease, owner_key_pos)) {
@@ -1492,6 +1498,7 @@ static bool key_runtime_core_repeat_lease_activate(key_runtime_core_state_t *sta
 
         lease->owner_token_id        = owner_token_id;
         lease->owner_packed_key_pos  = key_runtime_keypos_pack(owner_key_pos);
+        lease->feedback_started_at   = feedback_started_at;
         lease->data.repeat.repeat_hz = (uint8_t)repeat_hz;
         return true;
     }
@@ -1506,6 +1513,7 @@ static bool key_runtime_core_repeat_lease_activate(key_runtime_core_state_t *sta
         .kind                 = LEASE_KIND_REPEAT,
         .owner_token_id       = owner_token_id,
         .owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos),
+        .feedback_started_at  = feedback_started_at,
         .data.repeat =
             {
                 .action    = action,
@@ -3251,6 +3259,38 @@ static bool key_runtime_core_key_pos_repeat_active(const key_runtime_core_state_
         const lease_t *lease = &state->leases[index];
 
         if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_REPEAT && key_runtime_core_lease_owner_keypos_equal(lease, key_pos)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool key_runtime_core_flashing_feedback_lease_visible(const lease_t *lease) {
+    if (!(lease && lease->active)) {
+        return false;
+    }
+
+    return ((timer_elapsed(lease->feedback_started_at) / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0u;
+}
+
+bool key_runtime_core_flashing_feedback_visible_at(keypos_t key_pos) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!(state && key_runtime_core_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
+        const lease_t *lease = &state->leases[index];
+        lease_kind_t   kind;
+
+        if (!(lease->active && key_runtime_core_lease_owner_keypos_equal(lease, key_pos))) {
+            continue;
+        }
+
+        kind = key_runtime_core_lease_kind(lease);
+        if ((kind == LEASE_KIND_HELD_ACTION || kind == LEASE_KIND_REPEAT) && key_runtime_core_flashing_feedback_lease_visible(lease)) {
             return true;
         }
     }

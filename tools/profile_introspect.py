@@ -2762,7 +2762,7 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
 
     lines.extend(
         [
-            f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics; broadened authored localities intentionally collapse that truth to a half or full-board presentation.",
+            f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics and per-key flash visibility; broadened authored localities intentionally collapse that truth to a half or full-board presentation while ignoring hidden flashing states for priority selection.",
             "",
             "Tap feedback is staged as neutral unresolved pending first, then a model-level branch confirmation from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.",
             "",

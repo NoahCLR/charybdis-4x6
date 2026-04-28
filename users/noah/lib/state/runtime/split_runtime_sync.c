@@ -101,7 +101,7 @@ static split_runtime_key_feedback_semantic_packet_t split_runtime_sync_build_key
     split_runtime_key_feedback_semantic_packet_t packet = {0};
 
     key_feedback_semantic_map(packet.key_feedback_semantic_map);
-    packet.key_feedback_flash_meta = key_feedback_flash_meta_for_semantic_map(packet.key_feedback_semantic_map);
+    key_feedback_flash_visibility_bitmap_for_semantic_map(packet.key_feedback_semantic_map, packet.key_feedback_flash_visibility_bitmap);
 
     return packet;
 }
@@ -131,7 +131,7 @@ static bool split_runtime_combo_packet_is_active(const split_runtime_combo_feedb
 }
 
 static bool split_runtime_key_feedback_semantic_packet_is_active(const split_runtime_key_feedback_semantic_packet_t *pkt) {
-    return pkt && (pkt->key_feedback_flash_meta != 0u || key_feedback_semantic_map_has_any(pkt->key_feedback_semantic_map));
+    return pkt && key_feedback_semantic_map_has_any(pkt->key_feedback_semantic_map);
 }
 
 static bool split_runtime_key_feedback_branch_packet_is_active(const split_runtime_key_feedback_branch_packet_t *pkt) {
@@ -285,7 +285,7 @@ static void split_runtime_sync_slave_key_feedback_semantic_rpc(uint8_t initiator
         split_runtime_sync_log_packet_size_mismatch("key-feedback semantic", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_semantic_packet_t));
     }
 
-    split_runtime_sync_remote.key_feedback_flash_meta = packet->key_feedback_flash_meta;
+    key_origin_bitmap_copy(split_runtime_sync_remote.key_feedback_flash_visibility_bitmap, packet->key_feedback_flash_visibility_bitmap);
     memcpy(split_runtime_sync_remote.key_feedback_semantic_map, packet->key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
 }
 
