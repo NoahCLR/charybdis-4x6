@@ -733,8 +733,6 @@ bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
     return result.handled;
 }
 
-#undef PD_MODE_LOCAL_ACTIVE_FLAGS
-#undef PD_MODE_LOCAL_LOCKED_FLAGS
 #undef PD_MODE_LOCAL_ACTIVE_MODE
 #undef PD_MODE_LOCAL_LOCKED_MODE
 #undef PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE
