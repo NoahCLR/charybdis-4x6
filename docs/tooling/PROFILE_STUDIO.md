@@ -39,6 +39,8 @@ through when needed.
 
 All major panels are collapsible. The RGB page keeps a panel for every authored
 section in `rgb_config.c`, even when a table currently has no active rows.
+Tap-count tiers inside the behavior editor are collapsible too; repeat Hz is
+shown only for hold-tier helpers that can use `REPEAT_WHILE_HELD`.
 
 For complex behavior rows, direct source editing is still expected after using
 the studio as a starter.

@@ -21,6 +21,8 @@ those two files.
   `_______`, and patch the matching `LAYOUT()` slot
 - view and save key behavior rows directly from the active layer page; the
   layer filters visible behavior rows by keys currently present on that layer
+- tap-count tiers in the behavior editor are collapsible, and repeat Hz is
+  only shown for hold helpers that can use `REPEAT_WHILE_HELD`
 - edit `layer_colors[]` HSV values and render mode
 - inspect every active `rgb_config.c` surface, including LED group tables,
   automouse fade, combo feedback, and key-behavior feedback

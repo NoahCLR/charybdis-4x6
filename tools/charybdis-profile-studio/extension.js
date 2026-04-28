@@ -1823,6 +1823,14 @@ function getStudioHtml() {
             padding: 10px;
             background: var(--panel-2);
         }
+        .behavior-step > summary {
+            cursor: pointer;
+            list-style-position: inside;
+        }
+        .behavior-step > summary h3 {
+            display: inline;
+            margin-left: 4px;
+        }
         .swatch {
             width: 100%;
             height: 22px;
@@ -2094,22 +2102,28 @@ function getClientScript() {
     }
 
     function renderBehaviorStepEditor(step) {
-        return "<div class='card'>" +
-            "<h3>" + escapeHtml(step.tapCountName || ("tap " + (step.tapCount + 1))) + "</h3>" +
+        const open = stepHasAction(step) ? " open" : "";
+        return "<details class='card behavior-step'" + open + ">" +
+            "<summary><h3>" + escapeHtml(step.tapCountName || ("tap " + (step.tapCount + 1))) + "</h3></summary>" +
             "<input type='hidden' data-behavior-step='" + step.tapCount + "' value='" + step.tapCount + "'>" +
-            "<div class='form-grid three'>" +
+            "<div class='form-grid three' style='margin-top: 10px'>" +
             renderActionEditor("step" + step.tapCount + "Tap", "Tap", step.tap, ["", "TAP_SENDS"]) +
             renderActionEditor("step" + step.tapCount + "Hold", "Hold", step.hold, ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
             renderActionEditor("step" + step.tapCount + "LongHold", "Long hold", step.longHold, ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
-            "</div></div>";
+            "</div></details>";
     }
 
     function renderActionEditor(id, label, action, helpers) {
+        const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
         return "<div class='stack'>" +
             "<label><span>" + label + " helper</span><select id='" + id + "Helper'>" + options(helpers, action?.helper || "") + "</select></label>" +
             "<label><span>" + label + " action</span><input id='" + id + "Action' value='" + escapeAttr(editableActionValue(action)) + "' placeholder='Esc'></label>" +
-            "<label><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='100'></label>" +
+            (hasRepeat ? "<label><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
             "</div>";
+    }
+
+    function stepHasAction(step) {
+        return Boolean(step?.tap || step?.hold || step?.longHold);
     }
 
     function editableActionValue(action) {
@@ -2423,11 +2437,12 @@ function getClientScript() {
     }
 
     function renderActionInputs(prefix, label, helpers) {
+        const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
         return "<label><span>" + label + " helper</span><select id='" + prefix + "Helper'>" +
             helpers.map((helper) => "<option value='" + escapeAttr(helper) + "'>" + escapeHtml(helper || "none") + "</option>").join("") +
             "</select></label>" +
             "<label><span>" + label + " action</span><input id='" + prefix + "Action' placeholder='Esc'></label>" +
-            "<label><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' placeholder='100'></label>";
+            (hasRepeat ? "<label><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
     }
 
     function renderStep(step) {
@@ -2473,10 +2488,11 @@ function getClientScript() {
     }
 
     function readAction(prefix) {
+        const repeatInput = document.getElementById(prefix + "Repeat");
         return {
             helper: document.getElementById(prefix + "Helper").value,
             action: document.getElementById(prefix + "Action").value,
-            repeatHz: document.getElementById(prefix + "Repeat").value
+            repeatHz: repeatInput ? repeatInput.value : ""
         };
     }
 
