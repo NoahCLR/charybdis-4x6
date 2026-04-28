@@ -37,9 +37,9 @@ two architectural layers.
   [`users/noah/lib/key/runtime/`](../users/noah/lib/key/runtime/) are the
   QMK-facing integration layer. They own process/scan entry flow, preflight,
   effect-plan transport, trace/debug adapters, and effect projection.
-- The old slot/index runtime is no longer a live production subsystem. The
-  only remaining `slot/` file in the production tree is the stateless release
-  resolver helper used by the core adapters.
+- The old slot/index runtime is no longer a live production subsystem. Release
+  semantics now live behind the core release planner instead of a `slot/`
+  helper.
 
 So when you see both layers, read that as "decision layer plus integration
 layer," not "old runtime plus new runtime running side by side."
@@ -61,13 +61,13 @@ layer," not "old runtime plus new runtime running side by side."
 | File | Responsibility |
 | --- | --- |
 | [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h), [`handled_key_lookup.c`](../users/noah/lib/key/interaction/handled_key_lookup.c), [`handled_key_materialize.c`](../users/noah/lib/key/interaction/handled_key_materialize.c) | Resolve authored behavior into `handled_key_resolution_t` and materialize it into runtime interaction contracts. |
-| [`interaction.h`](../users/noah/lib/key/runtime/interaction.h) | Shared interaction contract used by the reducer and release resolver. |
+| [`interaction.h`](../users/noah/lib/key/runtime/interaction.h) | Shared interaction contract cached by the reducer after authored behavior materialization. |
 | [`core/runtime.h`](../users/noah/lib/key/runtime/core/runtime.h), [`core/runtime.c`](../users/noah/lib/key/runtime/core/runtime.c), [`core/projection.h`](../users/noah/lib/key/runtime/core/projection.h) | Single-authority runtime state, reducer entry points, release planning, pending multi-tap state, leases, persistent intents, pending release transport, and projection/debug capture. |
+| [`core/release_planner.h`](../users/noah/lib/key/runtime/core/release_planner.h) | Shared semantic release decision contract for active release and pending multi-tap release planning. |
 | [`process.c`](../users/noah/lib/key/runtime/process.c) | `process_record_user()` entry flow, preflight ordering, release-keycode recovery, and non-handled release finalization. |
 | [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption and default-suppression work before the current press proceeds, while unrelated pending multi-tap chains stay position-owned until timeout or same-key reuse. |
 | [`press.c`](../users/noah/lib/key/runtime/press.c), [`release.c`](../users/noah/lib/key/runtime/release.c), [`scan.c`](../users/noah/lib/key/runtime/scan.c) | Thin press/release/scan orchestration around reducer-owned effect plans. |
-| [`transition.c`](../users/noah/lib/key/runtime/transition.c), [`transition.h`](../users/noah/lib/key/runtime/transition.h) | Effect-plan transport and execution seam. This is the last shared transport layer between reducer decisions and concrete effect projection. |
-| [`slot/release_resolver.h`](../users/noah/lib/key/runtime/slot/release_resolver.h) | Shared stateless release decision contract reused by the core release adapters. |
+| [`transition.c`](../users/noah/lib/key/runtime/transition.c), [`transition.h`](../users/noah/lib/key/runtime/transition.h) | Effect-plan transport and execution seam, including blocked-release dispatch deferral. This is the last shared transport layer between reducer decisions and concrete effect projection. |
 | [`effects/effect.h`](../users/noah/lib/key/runtime/effects/effect.h) | Shared runtime effect vocabulary. |
 | [`held_action.c`](../users/noah/lib/key/ownership/held_action.c), [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c), [`layer_ownership.c`](../users/noah/lib/state/ownership/layer_ownership.c), [`keyboard_mod_ownership.c`](../users/noah/lib/state/ownership/keyboard_mod_ownership.c) | External ownership registries projected by runtime effects. |
 | [`runtime_debug.h`](../users/noah/lib/state/runtime/runtime_debug.h), [`runtime_reset.h`](../users/noah/lib/state/runtime/runtime_reset.h), [`runtime_trace.h`](../users/noah/lib/state/runtime/runtime_trace.h) | Public debug, reset, and tracing seams used by host tests and runtime diagnostics. |

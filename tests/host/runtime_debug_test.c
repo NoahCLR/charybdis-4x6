@@ -851,7 +851,7 @@ static void test_key_runtime_core_active_release_resolution_preserves_tap_window
 
     CHECK(key_runtime_core_resolve_active_release(key_pos, &resolution));
     CHECK(resolution.phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW);
-    CHECK(resolution.decision.outcome == KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION);
+    CHECK(resolution.decision.outcome == KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION);
     CHECK(resolution.decision.action == TEST_ACTION);
     CHECK(!resolution.decision.release_owned_state);
 }
@@ -870,7 +870,7 @@ static void test_key_runtime_core_active_release_resolution_tracks_threshold_hol
 
     CHECK(key_runtime_core_resolve_active_release(key_pos, &resolution));
     CHECK(resolution.phase == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE);
-    CHECK(resolution.decision.outcome == KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE);
+    CHECK(resolution.decision.outcome == KEY_RUNTIME_RELEASE_DECISION_OUTCOME_NONE);
     CHECK(!resolution.decision.release_owned_state);
 
     test_reset_stubs();
@@ -883,7 +883,7 @@ static void test_key_runtime_core_active_release_resolution_tracks_threshold_hol
 
     CHECK(key_runtime_core_resolve_active_release(key_pos, &resolution));
     CHECK(resolution.phase == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE);
-    CHECK(resolution.decision.outcome == KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION);
+    CHECK(resolution.decision.outcome == KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION);
     CHECK(resolution.decision.action == TEST_SECOND_ACTION);
 }
 

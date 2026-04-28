@@ -10,34 +10,6 @@
 
 #include "../interaction/handled_key.h"
 
-typedef enum {
-    KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE = 0,
-    KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION,
-    KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP,
-} key_runtime_slot_release_tap_outcome_t;
-
-typedef struct {
-    key_runtime_slot_release_tap_outcome_t outcome;
-    uint16_t                               action;
-    uint8_t                                repeat_count;
-} key_runtime_slot_release_tap_contract_t;
-
-typedef struct {
-    uint16_t primary_action;
-    uint16_t long_action;
-} key_runtime_slot_release_hold_contract_t;
-
-typedef struct {
-    key_runtime_slot_release_tap_contract_t  tap;
-    key_runtime_slot_release_hold_contract_t hold;
-    pd_mode_mask_t                           quick_tap_pd_mode_lock;
-    bool                                     suppress_tap_on_layer_interrupt;
-    bool                                     buffered_base_tap_dispatches_tap;
-    bool                                     quick_release_of_immediate_hold_dispatches_tap;
-    bool                                     fallback_hold_suppresses_nonquick_release;
-    bool                                     nonquick_release_dispatches_tap;
-} key_runtime_slot_release_contract_t;
-
 typedef struct {
     uint16_t            keycode;
     uint8_t             tap_count;
@@ -90,46 +62,6 @@ static inline key_runtime_slot_binding_t key_runtime_slot_binding_from_materiali
     };
 }
 
-static inline key_runtime_slot_release_tap_contract_t key_runtime_slot_release_tap_contract_build(key_runtime_slot_interaction_t interaction) {
-    if ((interaction.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0) {
-        return (key_runtime_slot_release_tap_contract_t){
-            .outcome      = KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP,
-            .action       = interaction.binding.tap_action,
-            .repeat_count = interaction.binding.tap_repeat_count,
-        };
-    }
-
-    if (interaction.binding.tap_action != KC_NO) {
-        return (key_runtime_slot_release_tap_contract_t){
-            .outcome      = KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION,
-            .action       = interaction.binding.tap_action,
-            .repeat_count = interaction.binding.tap_repeat_count,
-        };
-    }
-
-    return (key_runtime_slot_release_tap_contract_t){0};
-}
-
-static inline key_runtime_slot_release_hold_contract_t key_runtime_slot_release_hold_contract_build(key_runtime_slot_interaction_t interaction) {
-    return (key_runtime_slot_release_hold_contract_t){
-        .primary_action = interaction.contract.hold.release_action,
-        .long_action    = interaction.contract.long_hold.release_action,
-    };
-}
-
-static inline key_runtime_slot_release_contract_t key_runtime_slot_release_contract_build(key_runtime_slot_interaction_t interaction) {
-    return (key_runtime_slot_release_contract_t){
-        .tap                                            = key_runtime_slot_release_tap_contract_build(interaction),
-        .hold                                           = key_runtime_slot_release_hold_contract_build(interaction),
-        .quick_tap_pd_mode_lock                         = interaction.contract.quick_tap_pd_mode_lock,
-        .suppress_tap_on_layer_interrupt                = interaction.contract.suppress_tap_on_layer_interrupt,
-        .buffered_base_tap_dispatches_tap               = interaction.contract.buffered_base_tap_dispatches_tap,
-        .quick_release_of_immediate_hold_dispatches_tap = interaction.contract.quick_release_of_immediate_hold_dispatches_tap,
-        .fallback_hold_suppresses_nonquick_release      = interaction.contract.fallback_hold_suppresses_nonquick_release,
-        .nonquick_release_dispatches_tap                = interaction.contract.nonquick_release_dispatches_tap,
-    };
-}
-
 static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_default(void) {
     return (key_runtime_slot_interaction_t){
         .binding =
@@ -176,32 +108,4 @@ static inline bool key_runtime_slot_interaction_uses_fallback_hold(key_runtime_s
 
 static inline bool key_runtime_slot_interaction_is_momentary_layer(key_runtime_slot_interaction_t interaction) {
     return (interaction.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0;
-}
-
-static inline key_runtime_slot_release_contract_t key_runtime_slot_release_contract(key_runtime_slot_interaction_t interaction) {
-    return key_runtime_slot_release_contract_build(interaction);
-}
-
-static inline bool key_runtime_slot_release_hold_contract_has_primary_action(key_runtime_slot_release_hold_contract_t contract) {
-    return contract.primary_action != KC_NO;
-}
-
-static inline bool key_runtime_slot_release_hold_contract_has_any_action(key_runtime_slot_release_hold_contract_t contract) {
-    return contract.primary_action != KC_NO || contract.long_action != KC_NO;
-}
-
-static inline bool key_runtime_slot_release_hold_contract_long_ready(key_runtime_slot_release_hold_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    return contract.long_action != KC_NO && elapsed >= longer_hold_term;
-}
-
-static inline uint16_t key_runtime_slot_release_hold_contract_select_action(key_runtime_slot_release_hold_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    if (key_runtime_slot_release_hold_contract_long_ready(contract, elapsed, longer_hold_term)) {
-        return contract.long_action;
-    }
-
-    return contract.primary_action;
-}
-
-static inline uint16_t key_runtime_slot_release_contract_select_hold_action(key_runtime_slot_release_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    return key_runtime_slot_release_hold_contract_select_action(contract.hold, elapsed, longer_hold_term);
 }

@@ -2,15 +2,14 @@
 // Key Runtime Core Release Planning Internals
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Internal reducer-owned release-resolution helpers used while the production
-// active-release path migrates away from slot-owned release semantics.
+// Internal reducer-owned release planning surface.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include "runtime.h"
 
 #include "../effects/effect_queue.h"
-#include "../slot/release_resolver.h"
+#include "release_planner.h"
 
 #define KEY_RUNTIME_CORE_RELEASE_EFFECT_PLAN_CAPACITY 6u
 
@@ -25,7 +24,7 @@ typedef struct {
     bool                                quick_immediate_hold;
     bool                                buffered_base_tap;
     pd_mode_mask_t                      lock_tap_mode;
-    key_runtime_slot_release_decision_t decision;
+    key_runtime_release_decision_t      decision;
 } key_runtime_core_active_release_resolution_t;
 
 typedef enum {

@@ -45,15 +45,15 @@ Recommended direction:
 
 ### Should-Fix: Release Semantics Are Duplicated and Transitional
 
-Release behavior is the strongest "same thing in several places" candidate. The codebase has slot-level release flags, a separate release resolver, internal core release helpers, pending release queues, active release planning, pending multi-tap planning, and a post-plan adapter in `release.c`.
+Release behavior is the strongest "same thing in several places" candidate. The 2026-04-28 boundary pass removed the separate slot release resolver and moved derived quick-release, fallback-suppression, buffered-base-tap, and hold-action decision semantics into `users/noah/lib/key/runtime/core/release_planner.h`. The finding remains partially open because pending-release queues plus active and pending multi-tap release effect planning still live in `runtime.c`.
 
 Evidence:
 
-- `users/noah/lib/key/runtime/interaction.h:30-39` gives each handled slot several release flags: buffered base tap, quick release, fallback suppression, and nonquick release.
-- `users/noah/lib/key/runtime/slot/release_resolver.h:26-35`, `55-85`, and `160-225` define another release decision surface.
-- `users/noah/lib/key/runtime/core/release_internal.h:5-7` says these helpers exist while the active path migrates away from slot-owned release semantics.
-- `users/noah/lib/key/runtime/core/runtime.c:2801`, `2854`, `2913`, and `3077` plan active and pending multi-tap releases.
-- `users/noah/lib/key/runtime/release.c:28-56` defers dispatch actions when foreign tap-release slots are still active.
+- `users/noah/lib/key/runtime/core/release_planner.h:30-63` now defines the release contract and semantics surface for buffered base tap, quick release, fallback suppression, and nonquick release.
+- `users/noah/lib/key/runtime/core/release_planner.h:147-317` owns the semantic release decision reducer used by active and pending release paths.
+- `users/noah/lib/key/runtime/core/runtime.c:2866-3188` still maps release decisions into active-release and pending multi-tap release effects.
+- `users/noah/lib/key/runtime/transition.c:175-203` still adapts release dispatch effects into pending-release queue entries when foreign tap-release slots remain active.
+- `users/noah/lib/key/runtime/release.c:11-35` is now a thin release-event adapter, but it still owns deferred-release draining after plan execution.
 
 Why it matters:
 
@@ -61,8 +61,9 @@ This is a real migration smell. The code currently supports both old slot-owned 
 
 Recommended direction:
 
-- Make one release planner API the sole owner of quick-release, fallback suppression, buffered base tap, and pending multi-tap decisions.
-- Treat `release.c` as either a thin adapter to that planner or remove it after the planner owns the full decision.
+- Continue making `release_planner.h` the sole semantic owner of quick-release, fallback suppression, buffered base tap, and pending multi-tap decisions.
+- Move active-release and pending multi-tap release effect planning out of `runtime.c` into the release planner/internal release module once the existing tests prove parity.
+- Keep `release.c` as a thin release-event adapter, or remove it if transition/process ownership makes that wrapper unnecessary.
 - Keep the existing release matrix, modifier-hold, PD-mode, and scenario tests as the safety net for consolidation.
 
 ### Should-Fix: Multiple Owner Ledgers Track the Same Runtime Facts
@@ -298,7 +299,8 @@ Status key:
 | `users/noah/lib/key/runtime/api.c` | clean | Thin public API wrapper. |
 | `users/noah/lib/key/runtime/api.h` | clean | Public runtime API. |
 | `users/noah/lib/key/runtime/core/projection.h` | watch | Projection snapshot helps catch drift but reflects multiple ledgers. |
-| `users/noah/lib/key/runtime/core/release_internal.h` | high-risk | Explicit transitional release helper surface. |
+| `users/noah/lib/key/runtime/core/release_internal.h` | watch | Internal release planning declarations; no longer labels itself transitional. |
+| `users/noah/lib/key/runtime/core/release_planner.h` | watch | Central release semantics helper introduced on 2026-04-28; effect planning still needs extraction from `runtime.c`. |
 | `users/noah/lib/key/runtime/core/runtime.c` | high-risk | Central accumulator for release, PD, feedback, projection, and ownership policy. |
 | `users/noah/lib/key/runtime/core/runtime.h` | high-risk | Broad state and reducer surface for unrelated runtime concerns. |
 | `users/noah/lib/key/runtime/core/trace.c` | clean | Core trace helpers. |
@@ -311,7 +313,7 @@ Status key:
 | `users/noah/lib/key/runtime/feedback.c` | watch | Feedback priority selection could drift from RGB feedback rendering priority. |
 | `users/noah/lib/key/runtime/feedback.h` | watch | Feedback API. |
 | `users/noah/lib/key/runtime/feedback_kind.h` | clean | Feedback kind enum. |
-| `users/noah/lib/key/runtime/interaction.h` | high-risk | Slot release flags overlap with release resolver and core release planning. |
+| `users/noah/lib/key/runtime/interaction.h` | watch | Slot interaction cache no longer exposes derived release contracts; authored behavior contracts still feed release planning. |
 | `users/noah/lib/key/runtime/keypos_codec.h` | clean | Key-position codec helper. |
 | `users/noah/lib/key/runtime/origin_registry.c` | clean | Origin registry helper. |
 | `users/noah/lib/key/runtime/origin_registry.h` | clean | Origin registry API. |
@@ -319,13 +321,12 @@ Status key:
 | `users/noah/lib/key/runtime/press.c` | clean | Press wrapper around core runtime. |
 | `users/noah/lib/key/runtime/process.c` | watch | Process hook handles PD modifier masking and managed modifier restore. |
 | `users/noah/lib/key/runtime/process_internal.h` | clean | Internal process declarations. |
-| `users/noah/lib/key/runtime/release.c` | high-risk | Post-plan release adapter and deferred dispatch path. |
+| `users/noah/lib/key/runtime/release.c` | watch | Thin release-event adapter after 2026-04-28; deferred-release drain remains here. |
 | `users/noah/lib/key/runtime/scan.c` | clean | Scan hook wrapper. |
-| `users/noah/lib/key/runtime/slot/release_resolver.h` | high-risk | Separate release decision helper parallel to core release planning. |
 | `users/noah/lib/key/runtime/trace.c` | clean | Runtime trace helpers. |
 | `users/noah/lib/key/runtime/trace.h` | clean | Runtime trace API. |
-| `users/noah/lib/key/runtime/transition.c` | clean | Transition wrapper around core runtime. |
-| `users/noah/lib/key/runtime/transition.h` | clean | Transition API. |
+| `users/noah/lib/key/runtime/transition.c` | watch | Transition wrapper now owns deferred dispatch adaptation for blocked release plans. |
+| `users/noah/lib/key/runtime/transition.h` | watch | Transition API exposes deferred release dispatch adaptation. |
 | `users/noah/lib/key/runtime/types.h` | clean | Runtime type definitions. |
 
 ### Macro

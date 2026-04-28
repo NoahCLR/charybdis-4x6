@@ -391,7 +391,7 @@ static key_feedback_pulse_kind_t key_runtime_core_hold_feedback_pulse_kind(bool 
 }
 
 static bool key_runtime_core_release_hold_action_feedback_kind(const press_token_t *token, uint16_t action, uint16_t elapsed, key_feedback_pulse_kind_t *out_kind) {
-    key_runtime_slot_release_contract_t contract;
+    key_runtime_release_contract_t contract;
     bool                                long_hold_level;
     uint16_t                            release_action;
 
@@ -403,17 +403,17 @@ static bool key_runtime_core_release_hold_action_feedback_kind(const press_token
         return false;
     }
 
-    contract = key_runtime_slot_release_contract(token->interaction);
-    if (!key_runtime_slot_release_hold_contract_has_any_action(contract.hold)) {
+    contract = key_runtime_release_contract_for_interaction(token->interaction);
+    if (!key_runtime_release_hold_contract_has_any_action(contract.hold)) {
         return false;
     }
 
-    release_action = key_runtime_slot_release_contract_select_hold_action(contract, elapsed, token->interaction.binding.longer_hold_term);
+    release_action = key_runtime_release_contract_select_hold_action(contract, elapsed, token->interaction.binding.longer_hold_term);
     if (release_action != action) {
         return false;
     }
 
-    long_hold_level = key_runtime_slot_release_hold_contract_long_ready(contract.hold, elapsed, token->interaction.binding.longer_hold_term);
+    long_hold_level = key_runtime_release_hold_contract_long_ready(contract.hold, elapsed, token->interaction.binding.longer_hold_term);
     if (out_kind) {
         *out_kind = key_runtime_core_hold_feedback_pulse_kind(long_hold_level);
     }
@@ -2864,13 +2864,13 @@ bool key_runtime_core_finalize_non_handled_release(keypos_t key_pos) {
 }
 
 bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_active_release_resolution_t *out) {
-    key_runtime_core_state_t            *state = key_runtime_core_state();
-    press_token_t                       *token;
-    key_runtime_slot_release_semantics_t semantics;
-    key_runtime_slot_release_query_t     query;
-    uint16_t                             elapsed;
-    bool                                 held_action_active;
-    bool                                 repeat_active;
+    key_runtime_core_state_t        *state = key_runtime_core_state();
+    press_token_t                   *token;
+    key_runtime_release_semantics_t semantics;
+    key_runtime_release_query_t     query;
+    uint16_t                        elapsed;
+    bool                            held_action_active;
+    bool                            repeat_active;
 
     if (out) {
         *out = (key_runtime_core_active_release_resolution_t){0};
@@ -2886,10 +2886,10 @@ bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_
     }
 
     elapsed            = key_runtime_core_elapsed(token->pressed_at, token->released_at);
-    semantics          = key_runtime_slot_release_semantics_for_phase(token->slot_phase);
+    semantics          = key_runtime_release_semantics_for_phase(token->slot_phase);
     held_action_active = key_runtime_core_owner_has_lease_kind(state, token->token_id, LEASE_KIND_HELD_ACTION);
     repeat_active      = key_runtime_core_owner_has_lease_kind(state, token->token_id, LEASE_KIND_REPEAT);
-    query              = (key_runtime_slot_release_query_t){
+    query              = (key_runtime_release_query_t){
         .interaction                     = token->interaction,
         .semantics                       = semantics,
         .elapsed                         = elapsed,
@@ -2907,17 +2907,17 @@ bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_
         .held_action_active              = query.held_action_active,
         .repeat_active                   = query.repeat_active,
         .momentary_layer_tap_interrupted = token->momentary_layer_tap_interrupted,
-        .quick_tap                       = key_runtime_slot_release_query_quick_tap(&query),
-        .quick_immediate_hold            = key_runtime_slot_release_query_quick_immediate_hold(&query),
-        .buffered_base_tap               = key_runtime_slot_release_query_buffered_base_tap(&query),
-        .lock_tap_mode                   = key_runtime_slot_release_query_lock_tap_mode(&query),
-        .decision                        = key_runtime_slot_release_decide(&query),
+        .quick_tap                       = key_runtime_release_query_quick_tap(&query),
+        .quick_immediate_hold            = key_runtime_release_query_quick_immediate_hold(&query),
+        .buffered_base_tap               = key_runtime_release_query_buffered_base_tap(&query),
+        .lock_tap_mode                   = key_runtime_release_query_lock_tap_mode(&query),
+        .decision                        = key_runtime_release_decide(&query),
     };
     return true;
 }
 
 bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t keycode, const key_runtime_core_active_release_resolution_t *resolution, key_runtime_core_release_effect_plan_t *out) {
-    key_runtime_slot_release_contract_t contract;
+    key_runtime_release_contract_t contract;
 
     if (out) {
         *out = (key_runtime_core_release_effect_plan_t){
@@ -2929,7 +2929,7 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
         return false;
     }
 
-    contract = key_runtime_slot_release_contract(resolution->interaction);
+    contract = key_runtime_release_contract_for_interaction(resolution->interaction);
 
     if (key_runtime_slot_interaction_is_momentary_layer(resolution->interaction)) {
         key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);
@@ -2939,9 +2939,9 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
     }
 
     switch (resolution->decision.outcome) {
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_TAP:
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP:
             switch (contract.tap.outcome) {
-                case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP:
+                case KEY_RUNTIME_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP:
                     out->pending_multi_tap_seed = (key_runtime_core_pending_multi_tap_seed_t){
                         .active           = true,
                         .keycode          = keycode,
@@ -2955,40 +2955,40 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
                         .has_more_taps    = resolution->interaction.binding.has_more_taps,
                     };
                     return true;
-                case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
+                case KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
                     key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, contract.tap.action);
                     key_runtime_core_release_effect_plan_push_tap_commit_feedback_pulse(out, key_pos, contract.tap.action, resolution->interaction.selection.tap_count);
                     return true;
-                case KEY_RUNTIME_SLOT_RELEASE_TAP_OUTCOME_NONE:
+                case KEY_RUNTIME_RELEASE_TAP_OUTCOME_NONE:
                 default:
                     return true;
             }
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION:
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION:
             key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, resolution->decision.action);
             return true;
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
             key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(out, key_pos, resolution->decision.pd_mode_lock_tap);
             return true;
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE:
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_NONE:
         default:
             return true;
     }
 }
 
 bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, key_runtime_core_pending_multi_tap_release_resolution_t *out) {
-    key_runtime_core_state_t            *state = key_runtime_core_state();
-    press_token_t                       *token;
-    tap_series_t                        *series;
-    key_runtime_slot_release_semantics_t semantics = {
+    key_runtime_core_state_t        *state = key_runtime_core_state();
+    press_token_t                   *token;
+    tap_series_t                    *series;
+    key_runtime_release_semantics_t semantics = {
         .quick_tap_dispatches_tap        = true,
         .nonquick_release_dispatches_tap = true,
     };
-    key_runtime_slot_release_decision_t decision;
-    uint16_t                            elapsed;
-    uint8_t                             series_tap_count;
-    bool                                preserve_chain;
-    bool                                terminal_tap_only_feedback_window;
-    bool                                tap_branch_feedback_on_release;
+    key_runtime_release_decision_t  decision;
+    uint16_t                        elapsed;
+    uint8_t                         series_tap_count;
+    bool                            preserve_chain;
+    bool                            terminal_tap_only_feedback_window;
+    bool                            tap_branch_feedback_on_release;
 
     if (out) {
         *out = (key_runtime_core_pending_multi_tap_release_resolution_t){0};
@@ -3010,14 +3010,14 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     if (series && series->active && series->branch_confirming && series->branch_confirm_kind != KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION) {
         key_feedback_pulse_kind_t action_feedback_kind = KEY_FEEDBACK_PULSE_HOLD;
 
-        semantics.hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
-        decision                   = key_runtime_slot_release_decide(&(key_runtime_slot_release_query_t){
+        semantics.hold_action_mode = KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
+        decision                   = key_runtime_release_decide(&(key_runtime_release_query_t){
                               .interaction = token->interaction,
                               .semantics   = semantics,
                               .elapsed     = elapsed,
         });
 
-        if (decision.outcome == KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION) {
+        if (decision.outcome == KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION) {
             bool action_feedback = series_tap_count > 1u && key_runtime_core_release_hold_action_feedback_kind(token, decision.action, elapsed, &action_feedback_kind);
 
             series->branch_confirm_kind                 = KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION;
@@ -3040,17 +3040,17 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     tap_branch_feedback_on_release = series_tap_count > 1u && token->slot_phase != KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
 
     if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term) {
-        semantics.hold_action_mode = KEY_RUNTIME_SLOT_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
+        semantics.hold_action_mode = KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
     }
 
-    decision = key_runtime_slot_release_decide(&(key_runtime_slot_release_query_t){
+    decision = key_runtime_release_decide(&(key_runtime_release_query_t){
         .interaction = token->interaction,
         .semantics   = semantics,
         .elapsed     = elapsed,
     });
 
     switch (decision.outcome) {
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_ACTION: {
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION: {
             uint16_t held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, decision.action, elapsed);
             key_feedback_pulse_kind_t action_feedback_kind;
             bool                      action_feedback = series_tap_count > 1u && key_runtime_core_release_hold_action_feedback_kind(token, decision.action, elapsed, &action_feedback_kind);
@@ -3076,7 +3076,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
             };
             return true;
         }
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_TAP: {
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP: {
             uint16_t held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed);
 
             if (held_lifecycle_action != KC_NO) {
@@ -3105,8 +3105,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
             };
             return true;
         }
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
-        case KEY_RUNTIME_SLOT_RELEASE_DECISION_OUTCOME_NONE:
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_NONE:
         default: {
             uint16_t held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed);
 
