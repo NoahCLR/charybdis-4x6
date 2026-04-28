@@ -15,6 +15,7 @@
 #include "users/noah/lib/key/runtime/feedback.h"
 #include "users/noah/lib/key/runtime/origin_registry.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/key/runtime/core/projection.h"
 #include "users/noah/lib/key/runtime/core/runtime.h"
 #include "users/noah/lib/key/runtime/core/trace.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"

@@ -7,6 +7,7 @@
 #include "transition.h"
 
 #include "trace.h"
+#include "core/projection.h"
 #include "core/runtime.h"
 
 enum {

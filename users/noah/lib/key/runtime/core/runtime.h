@@ -374,8 +374,6 @@ uint8_t                                     key_runtime_core_pending_release_cou
 bool                                        key_runtime_core_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback);
 bool                                        key_runtime_core_pending_release_at_order(uint8_t order, pending_release_t *out);
 uint8_t                                     key_runtime_core_take_pending_release_dispatches(pending_release_t *out, uint8_t capacity);
-void                                        key_runtime_core_project_effect(const key_runtime_effect_t *effect);
-void                                        key_runtime_core_project_pending_release_dispatch(const pending_release_t *pending);
 void                                        key_runtime_core_observe_held_action_register(keypos_t key_pos, uint16_t action);
 void                                        key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t action);
 void                                        key_runtime_core_observe_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz);
@@ -414,8 +412,6 @@ void                                        key_runtime_core_layer_lock_set(uint
 void                                        key_runtime_core_observe_pd_mode_lock_state(pd_mode_mask_t mode, bool active);
 void                                        key_runtime_core_observe_release_dispatch_deferred(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
 void                                        key_runtime_core_observe_release_dispatch_drained(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
-projection_snapshot_t                       key_runtime_core_projection_snapshot_capture(void);
-bool                                        key_runtime_core_projection_snapshot_equal(const projection_snapshot_t *lhs, const projection_snapshot_t *rhs);
 
 static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state) {
     if (!state) {

@@ -4,9 +4,6 @@
 
 #include "runtime.h"
 #include "effect_plan.h"
-#include "feedback_projection.h"
-#include "pending_release_queue.h"
-#include "pd_projection.h"
 #include "release_internal.h"
 #include "scan_planner.h"
 #include "tap_series.h"
@@ -14,14 +11,11 @@
 #include "../../../pointing/defs/pd_modes.h"
 #include "../../../pointing/policy/pd_mode_policy.h"
 #include "../../../action/action_dispatch.h"
-#include "../../../action/action_lifecycle.h"
 #include "../../interaction/handled_key_internal.h"
 #include "../../interaction/handled_key_policy.h"
 #include "../../interaction/key_behavior_lookup.h"
 #include "../../ownership/held_action.h"
-#include "../../ownership/held_repeat.h"
 #include "../feedback.h"
-#include "../../../state/ownership/layer_ownership.h"
 #include "trace.h"
 
 __attribute__((weak)) const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
@@ -347,97 +341,6 @@ void key_runtime_core_effect_plan_push_deferred_delayed_action(key_runtime_core_
     }
 
     key_runtime_core_effect_plan_push_delayed_action_with_flags(plan, key_pos, action, mods, repeat_count, flags);
-}
-
-void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
-    if (!effect) {
-        return;
-    }
-
-    switch (effect->kind) {
-        case KEY_RUNTIME_EFFECT_DISPATCH_ACTION:
-            noah_emit_action_tap_at(key_runtime_effect_dispatch_action_key_pos(effect), effect->data.dispatch_action.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
-            return;
-        case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
-            key_runtime_core_pd_projection_preempt_held_action(effect->data.held_action.action);
-            key_runtime_core_observe_held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
-            held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
-            return;
-        case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
-            held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
-            key_runtime_core_observe_held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
-            return;
-        case KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY:
-            key_runtime_core_release_owned_state_by_key(effect->data.key_pos);
-            held_action_release_owned_by_key(effect->data.key_pos);
-            return;
-        case KEY_RUNTIME_EFFECT_REPEAT_START:
-            key_runtime_core_observe_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
-            held_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
-            return;
-        case KEY_RUNTIME_EFFECT_LAYER_PRESS:
-            layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
-            return;
-        case KEY_RUNTIME_EFFECT_LAYER_RELEASE:
-            layer_ownership_momentary_release(effect->data.key_pos);
-            return;
-        case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
-            key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch);
-            return;
-        case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
-            key_runtime_core_pd_projection_project_lock_tap(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos);
-            return;
-        case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
-            for (uint8_t repeat = 0, repeat_count = (uint8_t)(effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK); repeat < repeat_count; repeat++) {
-                keypos_t key_pos             = key_runtime_effect_delayed_action_key_pos(effect);
-                bool     defer_until_release = (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_DEFER_UNTIL_RELEASE) != 0u;
-                bool     tap_commit_feedback = (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_TAP_COMMIT_FEEDBACK) != 0u && repeat == (uint8_t)(repeat_count - 1u);
-
-                if (defer_until_release) {
-                    key_runtime_core_state_t *state = key_runtime_core_state();
-                    press_token_t            *token = state ? key_runtime_core_press_token_state(state, key_pos) : NULL;
-                    uint16_t                  owner = token && token->active ? token->token_id : 0u;
-
-                    if (key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods, tap_commit_feedback, owner)) {
-                        continue;
-                    }
-                }
-
-                dispatch_delayed_action_at(key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods);
-                if (defer_until_release && tap_commit_feedback) {
-                    key_runtime_core_project_effect(&(key_runtime_effect_t){
-                        .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-                        .data.feedback_pulse =
-                            {
-                                .key_pos = key_pos,
-                                .kind    = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
-                            },
-                    });
-                }
-            }
-            return;
-        case KEY_RUNTIME_EFFECT_NONE:
-        default:
-            return;
-    }
-}
-
-void key_runtime_core_project_pending_release_dispatch(const pending_release_t *pending) {
-    if (!pending) {
-        return;
-    }
-
-    dispatch_delayed_action_at(pending->key_pos, pending->action, pending->mods);
-    if (pending->tap_commit_feedback) {
-        key_runtime_core_project_effect(&(key_runtime_effect_t){
-            .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-            .data.feedback_pulse =
-                {
-                    .key_pos = pending->key_pos,
-                    .kind    = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
-                },
-        });
-    }
 }
 
 static uint16_t key_runtime_core_default_hold_term(uint16_t keycode) {

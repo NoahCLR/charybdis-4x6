@@ -4,6 +4,7 @@
 
 #include "deferred_release.h"
 
+#include "core/projection.h"
 #include "core/runtime.h"
 
 static keyboard_mod_state_t key_runtime_deferred_release_keyboard_mod_state_current(void) {

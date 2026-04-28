@@ -840,3 +840,64 @@ All listed pass/fail commands passed. The `--no-index` whitespace checks returne
 1. Continue with broad runtime state/debug surface cleanup if reducing `runtime.h` remains the priority.
 2. Keep `scan_planner.c` limited to scan-time hold, pending multi-tap scan, and fallback-hold settlement mechanics.
 3. Preserve runtime debug, runtime trace, integration harness, PD/key-runtime, scenario, release matrix, full host, compile-gate, and firmware compile coverage for further runtime splits.
+
+## 2026-04-28 - Effect Projection Ownership Split
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Moved runtime effect execution out of `users/noah/lib/key/runtime/core/runtime.c` and into `users/noah/lib/key/runtime/core/projection.c`.
+- Kept reducer-owned press-token, lease, persistent-intent, pending-release, and shadow-projection storage in `key_runtime_core_state_t`; projection only applies planned effects outward.
+- Removed projection execution and snapshot API declarations from `core/runtime.h`; callers now include `core/projection.h` for projection entry points.
+- Updated transition and deferred-release transport code so effect execution and pending-release dispatch projection flow through `core/projection.h`.
+- Updated PD/key-runtime and real-profile integration tests to include the projection API explicitly.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so the effect projection boundary matches the current tree.
+
+## Finding Status
+
+- The broader key-runtime accumulator finding remains partially resolved.
+- Resolved in this pass:
+  - concrete `KEY_RUNTIME_EFFECT_*` execution now lives in `projection.c`
+  - pending-release dispatch projection now lives in `projection.c`
+  - `runtime.h` no longer exposes projection execution or snapshot APIs directly
+  - transition/deferred-release transport no longer depends on projection declarations leaking from `runtime.h`
+- Still open:
+  - broad runtime state/debug surfaces remain in `runtime.h`
+  - lease and persistent-intent mechanics remain in `runtime.c`
+  - layer-lock and PD lock observation bridge points remain accepted but still worth watching
+
+## Verification
+
+Pre-change baseline:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+Post-change targeted checks:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+All listed pass/fail commands passed.
+
+## Next Steps
+
+1. Continue with broad runtime state/debug surface cleanup if reducing `runtime.h` remains the priority.
+2. Consider whether lease and persistent-intent mechanics should get an internal module next, because they are the largest remaining state-management block in `runtime.c`.
+3. Preserve runtime debug, scenario, release matrix, PD/key-runtime, layer-lock, modifier-hold, full host, compile-gate, and firmware compile coverage for further runtime splits.
