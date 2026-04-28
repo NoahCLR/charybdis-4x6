@@ -1284,4 +1284,154 @@ All listed final checks passed. The `--no-index` whitespace check returned the e
 
 ## Next Steps
 
-1. Continue runtime accumulator cleanup only when the next boundary has a real owner, likely press/tap lifecycle rather than a generic file split.
+1. Audit whether press/tap lifecycle is actually a safe next extraction target before moving more runtime code.
+
+## 2026-04-28 - Runtime Boundary Audit
+
+Used `prompts/follow-up-architecture-audit.md`.
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Audited the current `runtime.c` / `runtime.h` shape after the release, projection, queue, scan, ownership, state-query, modifier-policy, owner-ledger, and effect-plan passes.
+- Confirmed no must-fix runtime bug or incomplete migration was found.
+- Decided not to extract press/tap lifecycle yet, because the remaining lifecycle code owns authority-sensitive token, tap-series, timing, cancellation, release-preservation, and scan orchestration over `key_runtime_core_state_t`.
+- Updated `userspace-architecture-review.md` with the runtime boundary audit, prior finding status, current conclusion, and remaining open findings.
+
+## Finding Status
+
+- Key runtime accumulator remains partially resolved.
+- The remaining breadth is now documented as an accepted reducer boundary for the moment, not an immediate extraction target.
+- Press/tap lifecycle should stay in `runtime.c` until a future change proves a smaller owner that does not duplicate runtime truth.
+
+## Verification
+
+- `git diff --check`
+
+`git diff --check` passed. Host tests and firmware compile were intentionally skipped because this pass only updates review notes and does not change runtime source, authored profile data, build wiring, generated firmware input, or behavior.
+
+## Next Steps
+
+1. Keep `key_runtime_core_state_t` as the single state truth.
+2. Combo-origin compatibility was still deferred at this audit point; the later combo-origin contract audit supersedes that status.
+
+## 2026-04-28 - Closure Verification
+
+Used `prompts/closure-verification-review.md`.
+
+Starting worktree status:
+
+- `git status --short` showed in-flight review-note changes from the runtime boundary audit:
+  - `review/2026-04-27-review-01/progress.md`
+  - `review/2026-04-27-review-01/userspace-architecture-review.md`
+
+## Completed
+
+- Checked the active review against the closure prompt.
+- Recorded a `keep thread open` verdict in `userspace-architecture-review.md`.
+- Confirmed that release semantics, owner-ledger bridges, PD authority, and modifier policy are recorded as resolved with code and verification references.
+- Confirmed at closure-verification time that combo-origin compatibility and old Charybdis drag-scroll fallback macros remained open; later cleanup passes supersede both statuses.
+- Confirmed that runtime accumulator remains partially resolved but accepted for now, not closed as resolved.
+
+## Finding Status
+
+- Closure verdict: keep thread open.
+- Not ready to close at closure-verification time because open `should-fix` findings remained.
+
+## Verification
+
+- `git diff --check`
+
+`git diff --check` passed. Host tests and firmware compile were intentionally skipped because this pass only updates review notes and does not change runtime source, authored profile data, build wiring, generated firmware input, or behavior.
+
+## Next Steps
+
+1. Combo-origin compatibility was still open at closure-verification time; the later combo-origin contract audit supersedes that status.
+2. Old Charybdis drag-scroll fallback macros were still open at closure-verification time; the later drag-scroll config surface cleanup supersedes that status.
+
+## 2026-04-28 - Combo Origin Contract Audit
+
+Used `prompts/follow-up-architecture-audit.md`.
+
+Starting worktree status:
+
+- `git status --short` showed in-flight docs/review changes from the runtime boundary and closure-verification passes:
+  - `docs/KEY_RUNTIME.md`
+  - `review/2026-04-27-review-01/progress.md`
+  - `review/2026-04-27-review-01/userspace-architecture-review.md`
+
+## Completed
+
+- Audited `users/noah/lib/compat/qmk_combo_origin.c` as a compatibility adapter rather than a runtime owner.
+- Documented the combo-origin compatibility contract in `docs/KEY_RUNTIME.md`.
+- Reconciled `userspace-architecture-review.md` so combo-origin compatibility is marked resolved by the contract audit instead of remaining open from older audit snapshots.
+- Updated the compatibility inventory so `qmk_combo_origin` is classified as a centralized compatibility adapter with explicit coverage.
+
+## Finding Status
+
+- Combo-origin compatibility is resolved as a documented adapter for repairing QMK `(0,0)` combo origins and origin bitmaps.
+- The adapter may mirror only the QMK combo facts needed for origin repair; it must not own key-runtime press tokens, tap series, release decisions, leases, layer locks, modifier ownership, or PD ownership.
+- Old Charybdis drag-scroll fallback macros remained open at this point; the later drag-scroll config surface cleanup supersedes that status.
+- Runtime accumulator remains partially resolved and accepted for now.
+
+## Verification
+
+- `sh tests/host/run_qmk_combo_origin_tests.sh`
+- `git diff --check`
+
+Both checks passed. Full host tests and firmware compile were intentionally skipped because this pass only updates docs and review notes and does not change runtime source, authored profile data, build wiring, generated firmware input, or behavior.
+
+## Next Steps
+
+1. Old Charybdis drag-scroll fallback macros remained open at this point; the later drag-scroll config surface cleanup supersedes that status.
+2. Rerun closure verification after the later cleanup and final checks pass.
+
+## 2026-04-28 - Dragscroll Config Surface Cleanup
+
+Starting worktree status:
+
+- `git status --short` showed in-flight docs/review changes from the combo-origin pass:
+  - `docs/KEY_RUNTIME.md`
+  - `review/2026-04-27-review-01/progress.md`
+  - `review/2026-04-27-review-01/userspace-architecture-review.md`
+
+## Completed
+
+- Removed old local `CHARYBDIS_*` drag-scroll tuning defines from `users/noah/config.h`.
+- Moved reverse direction, rate limit, and buffer-expiry tuning onto the `NOAH_DRAGSCROLL_*` surface.
+- Removed the local Charybdis-to-Noah fallback mapping from `users/noah/lib/pointing/modes/pd_mode_dragscroll.c`.
+- Added a feature-gate check that rejects old local drag-scroll fallback aliases in repo-owned production code.
+- Regenerated profile introspection output after changing `users/noah/config.h`.
+- Updated `userspace-architecture-review.md` so the fallback finding is resolved and older open statuses are reconciled as audit-time history.
+
+## Finding Status
+
+- Local drag-scroll fallback macros are resolved.
+- Local drag-scroll behavior now has one config surface: `NOAH_DRAGSCROLL_*`.
+- Remaining `CHARYBDIS_*` pointing config names are upstream QMK/fork contracts, not local drag-scroll fallback aliases.
+
+## Verification
+
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `git diff --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+All listed checks passed.
+
+## Next Steps
+
+1. Rerun closure verification.
+2. Keep runtime accumulator as partially resolved but accepted unless a later pass changes the reducer boundary.

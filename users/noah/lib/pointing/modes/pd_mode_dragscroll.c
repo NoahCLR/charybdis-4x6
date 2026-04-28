@@ -11,51 +11,38 @@
 #    include <stdbool.h>
 #    include <limits.h>
 
-#    ifndef CHARYBDIS_DRAGSCROLL_BUFFER_SIZE
-#        define CHARYBDIS_DRAGSCROLL_BUFFER_SIZE 6
-#    endif
-#    ifndef CHARYBDIS_SCROLL_RATE_LIMIT_MS
-#        define CHARYBDIS_SCROLL_RATE_LIMIT_MS 16
-#    endif
-#    ifndef CHARYBDIS_SCROLL_SNAP_RATIO
-#        define CHARYBDIS_SCROLL_SNAP_RATIO 3
-#    endif
-#    ifndef CHARYBDIS_SCROLL_STEP_DIVISOR
-#        define CHARYBDIS_SCROLL_STEP_DIVISOR 8
-#    endif
-#    ifndef CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS
-#        define CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS 100
-#    endif
 #    ifndef NOAH_DRAGSCROLL_THRESHOLD_H
-#        define NOAH_DRAGSCROLL_THRESHOLD_H CHARYBDIS_DRAGSCROLL_BUFFER_SIZE
+#        define NOAH_DRAGSCROLL_THRESHOLD_H 6
 #    endif
 #    ifndef NOAH_DRAGSCROLL_THRESHOLD_V
-#        define NOAH_DRAGSCROLL_THRESHOLD_V CHARYBDIS_DRAGSCROLL_BUFFER_SIZE
+#        define NOAH_DRAGSCROLL_THRESHOLD_V 6
 #    endif
 #    ifndef NOAH_DRAGSCROLL_DIVISOR_H
-#        define NOAH_DRAGSCROLL_DIVISOR_H CHARYBDIS_SCROLL_STEP_DIVISOR
+#        define NOAH_DRAGSCROLL_DIVISOR_H 8
 #    endif
 #    ifndef NOAH_DRAGSCROLL_DIVISOR_V
-#        define NOAH_DRAGSCROLL_DIVISOR_V CHARYBDIS_SCROLL_STEP_DIVISOR
+#        define NOAH_DRAGSCROLL_DIVISOR_V 8
+#    endif
+#    ifndef NOAH_DRAGSCROLL_RATE_LIMIT_MS
+#        define NOAH_DRAGSCROLL_RATE_LIMIT_MS 16
+#    endif
+#    ifndef NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS
+#        define NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS 100
 #    endif
 #    ifndef NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM
-#        define NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM CHARYBDIS_SCROLL_SNAP_RATIO
+#        define NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM 3
 #    endif
 #    ifndef NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN
 #        define NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN 1
 #    endif
 #    ifndef NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM
-#        define NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM CHARYBDIS_SCROLL_SNAP_RATIO
+#        define NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM 3
 #    endif
 #    ifndef NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN
 #        define NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN 1
 #    endif
 #    ifndef NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS
-#        ifdef NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS
-#            define NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS
-#        else
-#            define NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS 40
-#        endif
+#        define NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS 40
 #    endif
 #    ifndef NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR
 #        define NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR 2
@@ -249,13 +236,13 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
     uint32_t now        = timer_read32();
 
     if (had_motion) {
-#    ifdef CHARYBDIS_DRAGSCROLL_REVERSE_X
+#    ifdef NOAH_DRAGSCROLL_REVERSE_X
         dragscroll_state.buffer_x -= mouse_report.x;
 #    else
         dragscroll_state.buffer_x += mouse_report.x;
 #    endif
 
-#    ifdef CHARYBDIS_DRAGSCROLL_REVERSE_Y
+#    ifdef NOAH_DRAGSCROLL_REVERSE_Y
         dragscroll_state.buffer_y -= mouse_report.y;
 #    else
         dragscroll_state.buffer_y += mouse_report.y;
@@ -268,7 +255,7 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
     mouse_report.y = 0;
 
     if (dragscroll_state.buffer_x != 0 || dragscroll_state.buffer_y != 0) {
-        if (timer_elapsed32(dragscroll_state.last_motion_time) > CHARYBDIS_SCROLL_BUFFER_EXPIRE_MS) {
+        if (timer_elapsed32(dragscroll_state.last_motion_time) > NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS) {
             dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
             dragscroll_state.buffer_x    = 0;
             dragscroll_state.buffer_y    = 0;
@@ -276,7 +263,7 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
         }
     }
 
-    if (timer_elapsed32(dragscroll_state.last_scroll_time) < CHARYBDIS_SCROLL_RATE_LIMIT_MS) {
+    if (timer_elapsed32(dragscroll_state.last_scroll_time) < NOAH_DRAGSCROLL_RATE_LIMIT_MS) {
         return mouse_report;
     }
 

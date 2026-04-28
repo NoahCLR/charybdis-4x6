@@ -131,9 +131,11 @@ Recommended direction:
 - Keep key-runtime PD effect projection in `pd_projection.c`.
 - Keep the feature gate and PD mode integration, PD runtime, pointer layer policy, split sync, runtime debug, scenario, full host, and firmware compile checks as the boundary guardrail.
 
-### Should-Fix: Combo Origin Is a Large Shadow Compatibility Patch
+### Resolved: Combo Origin Is a Documented Compatibility Adapter
 
 `users/noah/lib/compat/qmk_combo_origin.c` is deliberately centralized, but it is still the largest compatibility patch in the tree. It shadows physical key state because QMK emits combo records with `(0,0)` origin positions.
+
+Status as of 2026-04-28: resolved. The module remains necessary compatibility glue, but its contract is now explicit in `docs/KEY_RUNTIME.md`: it may mirror QMK combo origin facts needed to repair combo events and origin bitmaps, and it must not own key-runtime press tokens, tap series, release decisions, leases, layer locks, modifier ownership, or PD mode ownership. Dedicated host coverage already models the risky behavior: reference-layer lookup, stable owner selection, active and pending combo bitmaps, pending output after member release, cached release footprints, cross-half combos, three-key combos, duplicate-output union, reset behavior, and RGB underlay/overlay partitioning.
 
 Evidence:
 
@@ -146,6 +148,8 @@ Evidence:
 - `users/noah/lib/compat/qmk_combo_origin.c:555-594` normalizes combo records and sets origin bitmaps.
 - `users/noah/lib/compat/qmk_combo_origin.c:626-650` matches pending combo outputs.
 - `users/noah/lib/compat/qmk_combo_origin.c:653-682` partitions combo bitmaps for RGB feedback.
+- `docs/KEY_RUNTIME.md` contains the combo-origin compatibility contract and states the adapter is compatibility-only.
+- `tests/host/qmk_combo_origin_test.c:188-508` covers reference-layer lookup, stable owners, active and pending bitmaps, member-release timing, cached releases, split-side footprints, duplicate outputs, reset behavior, and preview/PD owner partitioning.
 
 Why it matters:
 
@@ -154,8 +158,9 @@ This module is a necessary bridge today, but it reproduces QMK combo state local
 Recommended direction:
 
 - Keep this code centralized in `lib/compat`.
-- Add a short contract document or review subsection that states exactly which QMK internals it mirrors.
-- Prefer host tests that model same-key combos, fallback owners, pending outputs, and RGB partitioning.
+- Keep `docs/KEY_RUNTIME.md` as the source of truth for what QMK/fork combo facts this adapter may mirror.
+- Extend `run_qmk_combo_origin_tests.sh` whenever the adapter starts mirroring another QMK combo behavior or exposes another normalized-origin consumer.
+- Do not split or rewrite the adapter without first preserving current combo-origin host coverage.
 
 ### Resolved: Modifier Masking and Replay Are Centralized Behind Policy
 
@@ -186,23 +191,28 @@ Recommended direction:
 - Keep `noah_emit_policy_t` limited to action-dispatch intent such as "settle fallback holds" and "request modifier preservation"; do not let it own modifier mechanics.
 - Keep modifier-hold, PD-mode integration, action dispatch, delayed action, and keyboard mod ownership tests around future changes.
 
-### Should-Fix: Compatibility Fallback Macros Keep Old Charybdis Names Alive
+### Resolved: Local Drag-Scroll Uses the Noah Config Surface
 
-The drag-scroll configuration still supports old Charybdis macro names as fallbacks.
+The local drag-scroll configuration no longer supports old Charybdis scroll-tuning names as fallbacks.
+
+Status as of 2026-04-28: resolved. Local drag-scroll tuning now uses only the `NOAH_DRAGSCROLL_*` surface. Remaining `CHARYBDIS_*` pointing defines are limited to upstream Charybdis/QMK contracts such as DPI and auto-sniping, not the local drag-scroll gesture handler.
 
 Evidence:
 
-- `users/noah/config.h:122-145` says repo-owned `NOAH_DRAGSCROLL_*` macros control gesture feel, while old `CHARYBDIS_*` names remain compatibility fallbacks.
-- `users/noah/lib/pointing/modes/pd_mode_dragscroll.c:14-62` maps old macros to new repo-owned names.
+- `users/noah/config.h:122-141` defines local drag-scroll tuning through `NOAH_DRAGSCROLL_*`.
+- `users/noah/lib/pointing/modes/pd_mode_dragscroll.c:14-49` provides direct `NOAH_DRAGSCROLL_*` defaults instead of mapping old Charybdis names.
+- `users/noah/lib/pointing/modes/pd_mode_dragscroll.c:239-267` reads `NOAH_DRAGSCROLL_REVERSE_*`, `NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS`, and `NOAH_DRAGSCROLL_RATE_LIMIT_MS`.
+- `tests/host/run_feature_gate_compile_tests.sh:76-88` rejects old local drag-scroll fallback aliases in repo-owned production code.
 
 Why it matters:
 
-This is not a current behavior risk, but it is configuration clutter. New readers must understand both old and new naming systems.
+This was not a behavior bug, but it was configuration clutter. New readers had to understand both old and new naming systems for one local handler. The single `NOAH_DRAGSCROLL_*` surface removes that ambiguity.
 
 Recommended direction:
 
-- Keep the fallbacks until all authored config has migrated.
-- Then remove the old-name compatibility layer in one small cleanup with docs and tests.
+- Keep local drag-scroll behavior on `NOAH_DRAGSCROLL_*`.
+- Keep upstream-required Charybdis/QMK names only where they are genuine fork contracts.
+- Keep the feature gate so old local fallback aliases do not return.
 
 ### Optional Cleanup: Repeated Small Helpers
 
@@ -217,15 +227,15 @@ These can be cleaned up opportunistically after higher-risk authority and releas
 
 ## Current Architecture Assessment
 
-The userspace is not a random patch pile. Most compatibility behavior is centralized under `users/noah/lib/compat`, authored profile behavior is outside userspace, and RGB and macro modules are comparatively cohesive. The clutter is concentrated around runtime authority: key release planning, effect ownership, PD mode ownership, modifier masking, and combo origin recovery.
+The userspace is not a random patch pile. Most compatibility behavior is centralized under `users/noah/lib/compat`, authored profile behavior is outside userspace, and RGB and macro modules are comparatively cohesive. The remaining clutter is concentrated around the accepted runtime reducer breadth. Combo origin recovery remains large, but is now documented and tested as a compatibility adapter rather than an unresolved runtime authority problem.
 
 The highest-value next work is not a broad rewrite. Release behavior and modifier filtering now have smaller owner APIs. The remaining priority is to avoid calling partially resolved architecture findings done before their remaining bridge and API questions are either closed with enforcement or explicitly accepted as stable boundaries.
 
 ## Recommended Next Refactor Sequence
 
-1. Continue splitting remaining `runtime.c` and `runtime.h` accumulator concerns only when a clear owner emerges, such as a press/tap orchestration module.
-2. Tighten `qmk_combo_origin` later, after the user is ready to work on combo compatibility.
-3. Clean up low-risk duplication only after the authority and release work is stable.
+1. Do not split press/tap lifecycle or `key_runtime_core_state_t` storage yet. Keep them as one reducer-owned truth unless a stronger owner boundary emerges.
+2. Rerun closure verification now that combo-origin compatibility and local drag-scroll fallback cleanup have landed.
+3. Clean up low-risk duplication only after the authority and compatibility decisions are stable.
 
 ## 2026-04-28 Partial Finding Audit
 
@@ -243,7 +253,7 @@ Reconciliation note after remediation: resolved. The audit-time concern was vali
 
 #### Optional Cleanup: Runtime core remains broad, but further splitting needs a better target
 
-`users/noah/lib/key/runtime/core/runtime.h:298-333` still stores the whole reducer state shape, and `users/noah/lib/key/runtime/core/runtime.c` is still 1099 lines with press-token lifecycle, tap-series lifecycle, event observation, active interruption, press handling, release handling, and scan entry points. The previous splits removed clear owner APIs for release planning, pending-release queueing, projection, scan planning, ownership state, state queries, feedback projection, and PD projection. The remaining breadth is real, but a mechanical split without a strong owner would mostly add indirection. Keep this partially resolved until a clear next module boundary appears.
+`users/noah/lib/key/runtime/core/runtime.h:298-333` still stores the whole reducer state shape, and `users/noah/lib/key/runtime/core/runtime.c` still owns press-token lifecycle, tap-series lifecycle, event observation, active interruption, press handling, release handling, and scan entry points. The previous splits removed clear owner APIs for release planning, effect-plan construction, pending-release queueing, projection, scan planning, ownership state, state queries, feedback projection, and PD projection. The remaining breadth is real, but a mechanical split without a strong owner would mostly add indirection. Keep this partially resolved until a clear next module boundary appears.
 
 ### Prior Finding Status
 
@@ -253,19 +263,167 @@ Reconciliation note after remediation: resolved. The audit-time concern was vali
 | Release Semantics Are Consolidated | resolved | Code references: `core/release_planner.h`, `core/release_planner.c`, `deferred_release.c`, `core/pending_release_queue.c`, and thin `release.c` adapter. Enforcement references: release matrix, scenario, runtime debug, full host, compile gate, and firmware compile checks recorded in `progress.md`. Exact passed commands: `sh tests/host/run_key_runtime_release_matrix_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
 | Multiple Owner Ledgers Track the Same Runtime Facts | resolved | Code references: `core/projection.c`, `core/ownership_state.c`, `layer_ownership.c`, `pd_mode_key_runtime_bridge.c`, and `pd_mode_state.c`. Enforcement references: ownership authority map in `docs/KEY_RUNTIME.md`, layer-lock bridge and PD-lock bridge checks in `tests/host/run_feature_gate_compile_tests.sh`, layer ownership tests, layer-lock integration tests, runtime debug tests, full host, and firmware compile. Exact passed commands include `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
 | PD Mode Authority Boundary Is Explicit | resolved | Code references: `core/pd_projection.c`, `pd_mode_state.c`, `pd_mode_key_runtime_bridge.c`, and `ownership_state.c`. Enforcement references: `tests/host/run_feature_gate_compile_tests.sh:129-152` plus PD/key-runtime and PD runtime tests recorded in `progress.md`. Exact passed commands: `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
-| Combo Origin Is a Large Shadow Compatibility Patch | open | Not audited in depth in this pass because the user explicitly deferred combo work. The finding remains open. |
+| Combo Origin Is a Large Shadow Compatibility Patch | resolved | Code references: `qmk_combo_origin.c`, `qmk_combo_origin.h`, `origin_registry.c`, and the combo-origin compatibility contract in `docs/KEY_RUNTIME.md`. Enforcement references: `tests/host/qmk_combo_origin_test.c` and `tests/host/run_qmk_combo_origin_tests.sh`. Exact passed command: `sh tests/host/run_qmk_combo_origin_tests.sh`. |
 | Modifier Masking and Replay Are Spread Across Subsystems | resolved | Code references: `keyboard_mod_policy.h`, `keyboard_mod_policy.c`, `action_dispatch.c`, `delayed_action.c`, `process.c`, `runtime.c`, `transition.c`, `deferred_release.c`, and `pd_mode_pinch.c`. Enforcement references: direct keyboard mod policy tests in `keyboard_mod_ownership_test.c`, action dispatch tests, delayed action tests, modifier-hold integration, PD mode tests, PD/key-runtime integration, feature gate, full host, and firmware compile. Exact passed commands include `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_action_dispatch_tests.sh`, `sh tests/host/run_delayed_action_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
-| Compatibility Fallback Macros Keep Old Charybdis Names Alive | open | Still open and intentionally lower priority than the partial runtime findings. |
+| Compatibility Fallback Macros Keep Old Charybdis Names Alive | resolved | Code references: `users/noah/config.h`, `users/noah/lib/pointing/modes/pd_mode_dragscroll.c`, and `docs/KEYMAP-OVERVIEW.md`. Enforcement references: `tests/host/run_feature_gate_compile_tests.sh`, drag-scroll handler tests, profile introspection check, full host, and firmware compile. |
 | Repeated Small Helpers | open | Optional cleanup only; not part of this audit pass. |
 
 ### Current Conclusion
 
-After modifier and owner-ledger remediation, only the runtime accumulator partial remains accurate. Further runtime accumulator cleanup should wait for a clearer next owner boundary.
+After modifier and owner-ledger remediation, only the runtime accumulator partial remains accurate. The later runtime boundary audit below recommends accepting the current press/tap lifecycle boundary for now instead of splitting it just to reduce file size.
 
 ### Remaining Open Findings
 
 - Keep runtime accumulator cleanup focused on a real owner boundary, not a generic file-size split.
-- Leave combo-origin compatibility work for a later pass, per user preference.
+- Combo-origin compatibility was still deferred at this audit point; the later combo-origin contract audit supersedes that status.
+
+## 2026-04-28 Runtime Boundary Audit
+
+Prompt used: `prompts/follow-up-architecture-audit.md`.
+
+### Findings
+
+#### Must-Fix: None
+
+No current runtime bug or incomplete migration was found in this audit. The extracted modules own the domains they claimed to own, and `runtime.c` no longer contains release semantics, projection execution, pending-release queue mechanics, state queries, ownership-state mechanics, scan planning, or effect-plan construction.
+
+#### Should-Fix: Do not extract press/tap lifecycle yet
+
+The remaining broad code is exactly the single-truth reducer path: `key_runtime_core_state_t` stores press tokens, tap series, leases, pending releases, persistent intents, shadow projection, feedback state, preview bridge state, and keyboard-event mask state in `users/noah/lib/key/runtime/core/runtime.h:298-333`. `runtime.c` still owns physical press begin and cancellation in `users/noah/lib/key/runtime/core/runtime.c:269-359`, tap-series note/preserve/seed/update helpers in `users/noah/lib/key/runtime/core/runtime.c:361-489` and `638-705`, event observation in `users/noah/lib/key/runtime/core/runtime.c:528-577`, active interruption and flush coordination in `users/noah/lib/key/runtime/core/runtime.c:707-761`, handled press/release coordination in `users/noah/lib/key/runtime/core/runtime.c:763-862`, and scan orchestration in `users/noah/lib/key/runtime/core/runtime.c:864-888`. Splitting that into a separate lifecycle module now would move the most authority-sensitive state transitions behind another internal API without removing a second source of truth. The safer architecture is to keep this partially resolved and explicitly accepted for now.
+
+#### Optional Cleanup: Extract only pure helpers if they become noisy
+
+Small helper shapes such as key-position indexing and slot-to-key-position resolution in `users/noah/lib/key/runtime/core/runtime.c:37-128` could move later if they start serving multiple modules, but that would be cleanup rather than architecture closure. Do not treat helper movement as resolving the runtime accumulator finding.
+
+### Prior Finding Status
+
+| Prior finding | Status | Audit result |
+| --- | --- | --- |
+| Key Runtime Core Is an Ad-Hoc Policy Accumulator | partially resolved | Current code matches the intended post-refactor shape: extracted modules own release planning, effect-plan construction, projection, scan planning, ownership state, pending-release queueing, state queries, feedback projection, and PD projection. `runtime.h` still exposes the broad core state shape, and `runtime.c` intentionally remains the press/tap lifecycle and orchestration owner. |
+| Release Semantics Are Consolidated | resolved | Code references: `core/release_planner.h`, `core/release_planner.c`, `deferred_release.c`, `core/pending_release_queue.c`, and thin `release.c` adapter. Enforcement references: release matrix, scenario, runtime debug, full host, compile gate, and firmware compile checks recorded in `progress.md`. Exact passed commands: `sh tests/host/run_key_runtime_release_matrix_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Multiple Owner Ledgers Track the Same Runtime Facts | resolved | Code references: `core/projection.c`, `core/ownership_state.c`, `layer_ownership.c`, `pd_mode_key_runtime_bridge.c`, and `pd_mode_state.c`. Enforcement references: ownership authority map in `docs/KEY_RUNTIME.md`, layer-lock bridge and PD-lock bridge checks in `tests/host/run_feature_gate_compile_tests.sh`, layer ownership tests, layer-lock integration tests, runtime debug tests, full host, and firmware compile. Exact passed commands include `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| PD Mode Authority Boundary Is Explicit | resolved | Code references: `core/pd_projection.c`, `pd_mode_state.c`, `pd_mode_key_runtime_bridge.c`, and `ownership_state.c`. Enforcement references: `tests/host/run_feature_gate_compile_tests.sh:129-152` plus PD/key-runtime and PD runtime tests recorded in `progress.md`. Exact passed commands: `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Combo Origin Is a Large Shadow Compatibility Patch | resolved | Superseded by the later combo-origin contract audit. |
+| Modifier Masking and Replay Are Spread Across Subsystems | resolved | Code references: `keyboard_mod_policy.h`, `keyboard_mod_policy.c`, `action_dispatch.c`, `delayed_action.c`, `process.c`, `transition.c`, `deferred_release.c`, and `pd_mode_pinch.c`. Enforcement references: direct keyboard mod policy tests in `keyboard_mod_ownership_test.c`, action dispatch tests, delayed action tests, modifier-hold integration, PD mode tests, PD/key-runtime integration, feature gate, full host, and firmware compile. Exact passed commands include `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_action_dispatch_tests.sh`, `sh tests/host/run_delayed_action_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Compatibility Fallback Macros Keep Old Charybdis Names Alive | resolved | Superseded by the later drag-scroll config surface cleanup. |
+| Repeated Small Helpers | open | Optional cleanup only. Helper movement must not be used as evidence that runtime authority is resolved. |
+
+### Current Conclusion
+
+The runtime accumulator finding remains partially resolved, but the remaining breadth is currently an accepted reducer boundary rather than a refactor target. Press/tap lifecycle should stay in `runtime.c` until a future change proves a smaller owner that does not duplicate runtime truth.
+
+### Remaining Open Findings
+
+- Keep `key_runtime_core_state_t` as the single state truth.
+- Do not extract press/tap lifecycle as the next step unless the extraction owns mechanics over the existing state without creating a second lifecycle authority.
+- Combo-origin compatibility was still deferred at this audit point; the later combo-origin contract audit supersedes that status.
+
+## 2026-04-28 Closure Verification
+
+Prompt used: `prompts/closure-verification-review.md`.
+
+### Findings
+
+#### Must-Fix: None
+
+No runtime behavior regression, incomplete release migration, modifier-policy regression, or owner-ledger bridge regression was found while checking the active review state.
+
+#### Should-Fix: Thread still has open major findings
+
+Audit-time status: the thread was not ready to close because combo-origin compatibility remained undocumented, old Charybdis drag-scroll fallback macros remained in `users/noah/config.h:122-145` and `users/noah/lib/pointing/modes/pd_mode_dragscroll.c:14-62`, and the runtime accumulator was still marked partially resolved. Reconciliation note after later remediation: combo-origin compatibility is resolved by the later contract audit, and local drag-scroll fallback macros are resolved by the later config-surface cleanup. The closure verdict remains a historical audit-time snapshot until closure is rerun.
+
+#### Optional Cleanup: Runtime helper movement should not block closure later
+
+The runtime boundary audit identifies helper extraction as optional cleanup only. Small helper movement, such as key-position indexing or slot-to-key-position resolution, should not be required before a future closure pass.
+
+### Prior Finding Status
+
+| Prior finding | Status | Closure verification |
+| --- | --- | --- |
+| Key Runtime Core Is an Ad-Hoc Policy Accumulator | partially resolved | Current design is coherent and intentionally keeps `key_runtime_core_state_t` plus press/tap lifecycle in `runtime.c`, but the finding remains partially resolved rather than closed. |
+| Release Semantics Are Consolidated | resolved | Code references: `core/release_planner.h`, `core/release_planner.c`, `deferred_release.c`, `core/pending_release_queue.c`, and thin `release.c`. Enforcement references: release matrix, scenario, runtime debug, feature gate, full host, and firmware compile checks recorded in `progress.md`. |
+| Multiple Owner Ledgers Track Runtime Facts Through Explicit Bridges | resolved | Code references: `core/projection.c`, `core/ownership_state.c`, `layer_ownership.c`, `pd_mode_key_runtime_bridge.c`, and `pd_mode_state.c`. Enforcement references: ownership authority docs, feature-gated bridge direction checks, layer ownership, layer-lock integration, runtime debug, full host, and firmware compile checks recorded in `progress.md`. |
+| PD Mode Authority Boundary Is Explicit | resolved | Code references: `core/pd_projection.c`, `pd_mode_state.c`, `pd_mode_key_runtime_bridge.c`, and `ownership_state.c`. Enforcement references: PD bridge compile gate plus PD/key-runtime, PD runtime, full host, and firmware compile checks recorded in `progress.md`. |
+| Combo Origin Is a Large Shadow Compatibility Patch | resolved | Superseded by the later combo-origin contract audit. |
+| Modifier Masking and Replay Are Centralized Behind Policy | resolved | Code references: `keyboard_mod_policy.h`, `keyboard_mod_policy.c`, `action_dispatch.c`, `delayed_action.c`, `process.c`, `transition.c`, `deferred_release.c`, and `pd_mode_pinch.c`. Enforcement references: keyboard mod ownership, action dispatch, delayed action, modifier-hold, PD mode, PD/key-runtime, feature gate, full host, and firmware compile checks recorded in `progress.md`. |
+| Compatibility Fallback Macros Keep Old Charybdis Names Alive | resolved | Superseded by the later drag-scroll config surface cleanup. |
+| Repeated Small Helpers | open | Optional cleanup only; not a closure blocker once major findings are resolved or consciously deferred. |
+
+### Closure Verdict
+
+Keep thread open.
+
+### Remaining Open Findings
+
+- Rerun closure verification now that combo-origin compatibility and local drag-scroll fallback cleanup have landed.
+- Keep runtime accumulator as partially resolved but accepted for now; do not close it as resolved unless a future pass changes the state boundary or explicitly reclassifies the remaining breadth.
+
+## 2026-04-28 Combo Origin Contract Audit
+
+Prompt used: `prompts/follow-up-architecture-audit.md`.
+
+### Findings
+
+#### Must-Fix: None
+
+No behavior bug or incomplete migration was found in combo-origin recovery. The large adapter is still compatibility glue, but its state is scoped to repairing QMK combo event origins and bitmaps.
+
+#### Resolved: Combo-origin compatibility has an explicit contract and coverage
+
+`docs/KEY_RUNTIME.md` now states that `compat/qmk_combo_origin.c` may mirror only the QMK combo facts needed to repair `(0,0)` combo events: live physical member state, `key_combos[]`, `noah_combo_count`, QMK active/disabled combo state including `EXTRA_SHORT_COMBOS`, combo reference-layer lookup, active and pending combo-output caches, and fallback owner recovery. It also states that the adapter must not own key-runtime press tokens, tap series, release decisions, leases, layer locks, modifier ownership, or PD mode ownership. The test surface in `tests/host/qmk_combo_origin_test.c:188-508` covers the contract directly.
+
+#### Optional Cleanup: Do not split the adapter without a behavior reason
+
+`qmk_combo_origin.c` remains large because it centralizes the QMK compatibility patch. Splitting it only for size would make the compatibility contract harder to audit. Future changes should extend tests first when new QMK/fork combo facts are mirrored.
+
+### Prior Finding Status
+
+| Prior finding | Status | Audit result |
+| --- | --- | --- |
+| Key Runtime Core Is an Ad-Hoc Policy Accumulator | partially resolved | Unchanged by this pass. Runtime state and press/tap lifecycle remain an accepted reducer boundary for now. |
+| Release Semantics Are Consolidated | resolved | Unchanged. Prior code and verification references still apply. |
+| Multiple Owner Ledgers Track Runtime Facts Through Explicit Bridges | resolved | Unchanged. Prior code and verification references still apply. |
+| PD Mode Authority Boundary Is Explicit | resolved | Unchanged. Prior code and verification references still apply. |
+| Combo Origin Is a Large Shadow Compatibility Patch | resolved | Code references: `users/noah/lib/compat/qmk_combo_origin.c`, `users/noah/lib/compat/qmk_combo_origin.h`, `users/noah/lib/key/runtime/origin_registry.c`, and `docs/KEY_RUNTIME.md`. Enforcement references: `tests/host/qmk_combo_origin_test.c:188-508` and `tests/host/run_qmk_combo_origin_tests.sh`. Exact passed command: `sh tests/host/run_qmk_combo_origin_tests.sh`. |
+| Modifier Masking and Replay Are Centralized Behind Policy | resolved | Unchanged. Prior code and verification references still apply. |
+| Compatibility Fallback Macros Keep Old Charybdis Names Alive | resolved | Superseded by the later drag-scroll config surface cleanup. |
+| Repeated Small Helpers | open | Optional cleanup only. |
+
+### Current Conclusion
+
+Combo-origin compatibility is resolved as a documented compatibility adapter with direct host coverage. The later drag-scroll config surface cleanup resolves the old Charybdis fallback macro finding. Runtime accumulator remains partially resolved but accepted for now.
+
+### Remaining Open Findings
+
+- Rerun closure verification now that combo-origin compatibility and local drag-scroll fallback cleanup have landed.
+- Keep runtime accumulator as partially resolved but accepted for now.
+
+## 2026-04-28 Dragscroll Config Surface Cleanup
+
+### Findings
+
+#### Must-Fix: None
+
+No runtime behavior bug was found. The cleanup removes only the local compatibility aliases that let old Charybdis scroll-tuning names configure the Noah drag-scroll handler.
+
+#### Resolved: Local drag-scroll no longer accepts old Charybdis fallback names
+
+`users/noah/config.h` now defines the local gesture behavior through `NOAH_DRAGSCROLL_*`, including reverse direction, rate limit, and buffer-expiry settings. `users/noah/lib/pointing/modes/pd_mode_dragscroll.c` provides direct `NOAH_DRAGSCROLL_*` defaults and reads only that surface for the local handler. `tests/host/run_feature_gate_compile_tests.sh` now rejects the old local fallback aliases in repo-owned production code.
+
+### Prior Finding Status
+
+| Prior finding | Status | Audit result |
+| --- | --- | --- |
+| Compatibility Fallback Macros Keep Old Charybdis Names Alive | resolved | Code references: `users/noah/config.h:122-141`, `users/noah/lib/pointing/modes/pd_mode_dragscroll.c:14-49` and `239-267`, and generated `docs/KEYMAP-OVERVIEW.md`. Enforcement references: `tests/host/run_feature_gate_compile_tests.sh:76-88`, `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `python3 tools/profile_introspect.py --check`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+
+### Current Conclusion
+
+The local drag-scroll fallback finding is resolved. Remaining `CHARYBDIS_*` pointing defines are upstream QMK/fork contracts, not fallback aliases for the local handler.
+
+### Remaining Open Findings
+
+- Rerun closure verification.
+- Keep runtime accumulator as partially resolved but accepted for now unless a later pass changes the reducer boundary.
 
 ## Per-File Inventory
 
@@ -280,7 +438,7 @@ Status key:
 
 | File | Status | Notes |
 | --- | --- | --- |
-| `users/noah/config.h` | watch | Repo-owned config plus old Charybdis drag-scroll fallback names. |
+| `users/noah/config.h` | watch | Repo-owned config; local drag-scroll now uses `NOAH_DRAGSCROLL_*`, while upstream Charybdis/QMK names remain only for fork contracts. |
 | `users/noah/hooks.c` | clean | Weak QMK hook chainers; intentional boundary surface. |
 | `users/noah/keymap_materialize.h` | clean | Data materialization macros; no policy conflict seen. |
 | `users/noah/noah_keymap.h` | clean | Keymap authoring bundle; should remain out of runtime modules. |
@@ -311,8 +469,8 @@ Status key:
 | File | Status | Notes |
 | --- | --- | --- |
 | `users/noah/lib/compat/qmk_auto_mouse_contract.h` | compat | Compile-time auto mouse contract. |
-| `users/noah/lib/compat/qmk_combo_origin.c` | high-risk | Large shadow state bridge for QMK combo origin recovery. |
-| `users/noah/lib/compat/qmk_combo_origin.h` | high-risk | Public combo origin contract for the shadow bridge. |
+| `users/noah/lib/compat/qmk_combo_origin.c` | compat | Central QMK combo origin adapter. Large by design, with a documented compatibility contract and host coverage. |
+| `users/noah/lib/compat/qmk_combo_origin.h` | compat | Public combo origin adapter contract for normalized combo event origins. |
 | `users/noah/lib/compat/qmk_contract.c` | compat | Centralized QMK contract checks. |
 | `users/noah/lib/compat/qmk_mod_contract.c` | watch | QMK modifier contract surface tied to runtime modifier policy. |
 | `users/noah/lib/compat/qmk_mod_contract.h` | watch | Modifier contract declarations. |
@@ -439,7 +597,7 @@ Status key:
 | `users/noah/lib/pointing/defs/pd_modes.h` | watch | Broad PD mode public declarations. |
 | `users/noah/lib/pointing/modes/pd_mode_arrow.c` | watch | Local Alt/Shift modifier policy during pointing mode. |
 | `users/noah/lib/pointing/modes/pd_mode_brightness.c` | clean | Brightness pointing mode. |
-| `users/noah/lib/pointing/modes/pd_mode_dragscroll.c` | watch | Old Charybdis macro fallback mapping. |
+| `users/noah/lib/pointing/modes/pd_mode_dragscroll.c` | clean | Local drag-scroll handler uses the `NOAH_DRAGSCROLL_*` config surface directly. |
 | `users/noah/lib/pointing/modes/pd_mode_handler_common.h` | clean | Shared handler helper declarations. |
 | `users/noah/lib/pointing/modes/pd_mode_handlers.h` | clean | Handler API. |
 | `users/noah/lib/pointing/modes/pd_mode_pinch.c` | watch | Local GUI modifier masking policy. |

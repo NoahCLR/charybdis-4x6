@@ -73,6 +73,20 @@ check_profile_build_validation_gate() {
     fi
 }
 
+check_dragscroll_config_surface() {
+    legacy_dragscroll_violations="$(
+        (
+            cd "$ROOT"
+            rg -n 'CHARYBDIS_(DRAGSCROLL_(BUFFER_SIZE|REVERSE_X|REVERSE_Y)|SCROLL_(STEP_DIVISOR|RATE_LIMIT_MS|SNAP_RATIO|BUFFER_EXPIRE_MS))|NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS' users/noah keyboards/bastardkb/charybdis/4x6/keymaps/noah || true
+        )
+    )"
+    if [ -n "$legacy_dragscroll_violations" ]; then
+        echo "local drag-scroll tuning must use the NOAH_DRAGSCROLL_* config surface, not old fallback aliases" >&2
+        printf '%s\n' "$legacy_dragscroll_violations" >&2
+        exit 1
+    fi
+}
+
 check_runtime_sealing_boundaries() {
     if host_test_includes '#include ".*host_runtime_fixture\.h"' >/dev/null; then
         echo "host tests must not include removed umbrella runtime fixture header" >&2
@@ -275,4 +289,5 @@ compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD $PO
 
 check_header_boundaries
 check_profile_build_validation_gate
+check_dragscroll_config_surface
 check_runtime_sealing_boundaries
