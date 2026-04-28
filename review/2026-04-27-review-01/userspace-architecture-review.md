@@ -71,7 +71,7 @@ Recommended direction:
 
 Several modules track "who owns this held effect" independently. Some are necessary QMK-facing registries, but the current design makes authority easy to blur.
 
-Status as of 2026-04-28: partially resolved. `docs/KEY_RUNTIME.md` now contains an ownership authority map that labels reducer-owned state, release planner state, pending-release transport, projected ownership registries, PD runtime ownership, feedback projection, and combo-origin compatibility state. The code still has real bridge points, especially layer lock write-back through `layer_ownership_set_lock_state()` and PD lock write-back through `pd_mode_set_lock_state_at()`, so this is not fully resolved yet.
+Status as of 2026-04-28: partially resolved. `docs/KEY_RUNTIME.md` now contains an ownership authority map that labels reducer-owned state, release planner state, pending-release transport, projected ownership registries, PD runtime ownership, feedback projection, and combo-origin compatibility state. The code still has real bridge points, especially layer lock write-back through `layer_ownership_set_lock_state()` and PD lock write-back through `pd_mode_key_runtime_bridge_observe_lock_state()`, so this is not fully resolved yet.
 
 Evidence:
 
@@ -83,7 +83,7 @@ Evidence:
 - PD local owners are tracked in `users/noah/lib/pointing/runtime/pd_mode_state.c:117-284`.
 - `users/noah/lib/state/runtime/runtime_context_internal.h:49-56` aggregates these ledgers into one runtime context.
 - `docs/KEY_RUNTIME.md` now states the intended write direction: core reducer state plans effects, projected registries apply QMK/action/layer/modifier/PD side effects, and compatibility bridges must not become independent key-runtime ownership truth.
-- Current two-way bridge points remain in `users/noah/lib/state/ownership/layer_ownership.c:116-140` and `users/noah/lib/pointing/runtime/pd_mode_state.c:687-699`.
+- Current two-way bridge points remain in `users/noah/lib/state/ownership/layer_ownership.c:116-140` and `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`.
 
 Why it matters:
 
@@ -95,17 +95,21 @@ Recommended direction:
 - Add or preserve compile gates and host tests that enforce the declared direction of writes.
 - Reduce direct cross-ledger mutation where one authoritative reducer can project changes.
 
-### Should-Fix: PD Mode Authority Is Split Between Key Runtime and PD Runtime
+### Partially Resolved: PD Mode Authority Is Split Between Key Runtime and PD Runtime
 
 PD mode behavior is enforced from both key runtime and PD runtime. This appears intentional, but the current two-way coupling is high-risk.
 
+Status as of 2026-04-28: partially resolved. The PD runtime no longer includes `users/noah/lib/key/runtime/core/runtime.h` directly from `pd_mode_state.c`, and the only production PD-runtime call to `key_runtime_core_pd_mode_lock_set()` is isolated in `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`. The feature-gate compile check now enforces that direction. This is a boundary extraction only; key-runtime intent and PD-runtime hardware/mode state are not fully separated yet.
+
 Evidence:
 
-- Key runtime preempts PD-held behavior in `users/noah/lib/key/runtime/core/runtime.c:558-616`.
-- Key runtime projects PD lock and toggle effects in `users/noah/lib/key/runtime/core/runtime.c:651-727`.
+- Key runtime preempts PD-held behavior in `users/noah/lib/key/runtime/core/runtime.c:462-486`.
+- Key runtime projects PD lock and toggle effects in `users/noah/lib/key/runtime/core/runtime.c:561-565`.
 - PD runtime stores local owner slots and exclusive ownership in `users/noah/lib/pointing/runtime/pd_mode_state.c:287-351`.
 - PD runtime clears owner state and commands in `users/noah/lib/pointing/runtime/pd_mode_state.c:537-627`.
-- PD lock state writes back into core shadow state in `users/noah/lib/pointing/runtime/pd_mode_state.c:687-699`.
+- `pd_mode_set_lock_state_at()` writes changed PD lock state through `pd_mode_key_runtime_bridge_observe_lock_state()` in `users/noah/lib/pointing/runtime/pd_mode_state.c:687-697`.
+- PD lock state writes back into core shadow state through `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c:1-7`.
+- `tests/host/run_feature_gate_compile_tests.sh:129-152` prevents PD runtime modules other than the bridge from including `key/runtime/core/runtime.h` or calling `key_runtime_core_pd_mode_lock_set()`.
 
 Why it matters:
 
@@ -378,6 +382,8 @@ Status key:
 | `users/noah/lib/pointing/policy/pointer_layer_policy.h` | clean | Pointer layer policy API. |
 | `users/noah/lib/pointing/runtime/pd_mode_buffered_tap_internal.h` | watch | Internal buffered tap surface tied to release behavior. |
 | `users/noah/lib/pointing/runtime/pd_mode_internal.h` | watch | Internal PD runtime surface. |
+| `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c` | watch | Narrow PD lock write-back bridge into key runtime. |
+| `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.h` | watch | Public declaration for the PD/key-runtime bridge. |
 | `users/noah/lib/pointing/runtime/pd_mode_keyboard_event_internal.h` | watch | Keyboard event bridge into PD behavior. |
 | `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c` | clean | PD lifecycle helper. |
 | `users/noah/lib/pointing/runtime/pd_mode_registry.c` | clean | PD registry. |

@@ -100,6 +100,7 @@ lib/state/runtime/runtime_trace.c'
     pointing_additions='
 lib/pointing/policy/pointer_layer_policy.c
 lib/pointing/runtime/pd_mode_snapshot.c
+lib/pointing/runtime/pd_mode_key_runtime_bridge.c
 lib/pointing/runtime/pd_mode_state.c'
     base_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$base_sources")"
     common_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$common_additions")"

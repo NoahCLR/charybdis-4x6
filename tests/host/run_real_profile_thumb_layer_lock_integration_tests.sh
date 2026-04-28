@@ -65,6 +65,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_runtime.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \

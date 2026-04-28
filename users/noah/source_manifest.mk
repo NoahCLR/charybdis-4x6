@@ -73,6 +73,7 @@ NOAH_COMMON_SOURCES := \
 NOAH_POINTING_SOURCES := \
     lib/pointing/runtime/pd_runtime.c \
     lib/pointing/runtime/pd_mode_snapshot.c \
+    lib/pointing/runtime/pd_mode_key_runtime_bridge.c \
     lib/pointing/runtime/pd_mode_state.c \
     lib/pointing/runtime/pd_mode_registry.c \
     lib/pointing/runtime/pd_mode_lifecycle.c \

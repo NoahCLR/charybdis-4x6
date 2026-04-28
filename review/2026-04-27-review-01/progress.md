@@ -347,3 +347,70 @@ firmware input, or behavior changed.
 1. Use the ownership authority map to choose one code target, preferably the PD lock bridge or core lease projection split.
 2. Preserve PD mode integration, PD runtime, pointer layer policy, split sync, modifier-hold, layer-lock, runtime-debug, full host, and firmware compile coverage for any runtime source changes.
 3. Keep future projected registries from adding new key-runtime owner state unless the authority map and tests are updated in the same pass.
+
+## 2026-04-28 - PD Key-Runtime Bridge Extraction
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.h` and `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`.
+- Moved the PD lock write-back call to `key_runtime_core_pd_mode_lock_set()` out of `pd_mode_state.c` and into the bridge.
+- Updated `pd_mode_state.c` so it no longer includes `users/noah/lib/key/runtime/core/runtime.h` directly.
+- Wired the new bridge source into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and the manual host runners that compile `pd_mode_state.c`.
+- Added feature-gate checks so production PD runtime code outside `pd_mode_key_runtime_bridge.c` cannot include `key/runtime/core/runtime.h` or call `key_runtime_core_pd_mode_lock_set()`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` to describe the bridge as an explicit transition point.
+
+## Finding Status
+
+- PD mode authority is partially resolved.
+- Resolved in this pass:
+  - the direct PD runtime dependency on key-runtime core is isolated behind one bridge file
+  - compile gates mechanically enforce that `pd_mode_state.c` does not reintroduce the direct write-back
+  - the active review and key-runtime docs name the remaining bridge
+- Still open:
+  - PD runtime still owns actual PD mode state while key runtime owns PD intent
+  - lock state still writes back into core after PD runtime changes local state
+  - core effect projection still calls PD lock/toggle behavior directly
+
+## Verification
+
+Pre-change baseline:
+
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+Post-change targeted checks:
+
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`
+- `git diff --check --no-index /dev/null users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.h`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks
+returned the expected nonzero diff status for new files and produced no
+diagnostics.
+
+## Next Steps
+
+1. Decide whether the remaining PD lock write-back should become a core-owned command completion event or a PD-owned snapshot observation.
+2. Split core PD effect projection only after the bridge semantics are covered by PD mode integration, PD runtime, pointer policy, split sync, runtime debug, full host, and firmware compile checks.
+3. Keep `pd_mode_state.c` free of direct key-runtime core includes and direct core lock-shadow writes.

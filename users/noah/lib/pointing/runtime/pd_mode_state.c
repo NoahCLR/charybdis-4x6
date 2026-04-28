@@ -5,10 +5,10 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "pd_mode_runtime_shared_state_internal.h"
-#include "../../key/runtime/core/runtime.h"
 #include "../../key/runtime/origin_registry.h"
 #include "../../state/runtime/runtime_trace.h"
 #include "../policy/pd_mode_policy.h"
+#include "pd_mode_key_runtime_bridge.h"
 #include "pd_mode_internal.h"
 
 static pd_mode_runtime_shared_state_t *pd_mode_shared_state(void) {
@@ -693,7 +693,7 @@ bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_po
     });
 
     if (result.local_state_changed) {
-        key_runtime_core_pd_mode_lock_set(mode, locked);
+        pd_mode_key_runtime_bridge_observe_lock_state(mode, locked);
     }
 
     return result.local_state_changed;

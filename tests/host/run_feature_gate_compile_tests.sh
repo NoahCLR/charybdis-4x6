@@ -126,6 +126,31 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
+    pd_runtime_key_core_bridge_allowlist='^users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge\.c:'
+    pd_runtime_key_core_include_violations="$(
+        (
+            cd "$ROOT"
+            rg -n '#include ".*key/runtime/core/runtime\.h"' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
+        )
+    )"
+    if [ -n "$pd_runtime_key_core_include_violations" ]; then
+        echo "pd runtime modules must reach key-runtime core through pd_mode_key_runtime_bridge.c" >&2
+        printf '%s\n' "$pd_runtime_key_core_include_violations" >&2
+        exit 1
+    fi
+
+    pd_runtime_key_core_call_violations="$(
+        (
+            cd "$ROOT"
+            rg -n 'key_runtime_core_pd_mode_lock_set' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
+        )
+    )"
+    if [ -n "$pd_runtime_key_core_call_violations" ]; then
+        echo "pd runtime modules must write back pd lock state through pd_mode_key_runtime_bridge.c" >&2
+        printf '%s\n' "$pd_runtime_key_core_call_violations" >&2
+        exit 1
+    fi
+
     if repo_owned_code_includes '#include ".*key_runtime_(state|process|index|admission)\.h"' >/dev/null; then
         echo "repo-owned code must not include removed key-runtime aggregate/index/admission headers" >&2
         repo_owned_code_includes '#include ".*key_runtime_(state|process|index|admission)\.h"' >&2
