@@ -966,7 +966,7 @@ static void test_authored_layer_hold_dispatches_authored_plain_tap_immediately(v
     CHECK(delayed_action_count == 0);
 }
 
-static void test_interrupted_locked_pd_mode_press_still_toggles_lock_on_release(void) {
+static void test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_momentary_hold(void) {
     keypos_t                             key_pos               = test_keypos(1, 2);
     const key_runtime_integration_step_t press_and_interrupt[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
@@ -987,9 +987,11 @@ static void test_interrupted_locked_pd_mode_press_still_toggles_lock_on_release(
 
     key_runtime_integration_run(&fake_time, press_and_interrupt, ARRAY_SIZE(press_and_interrupt));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
-    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
+    CHECK(reset_volume_count == 1);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
     CHECK(pd_mode_local_active_snapshot() == 0);
@@ -998,7 +1000,7 @@ static void test_interrupted_locked_pd_mode_press_still_toggles_lock_on_release(
     CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
-    CHECK(reset_volume_count == 1);
+    CHECK(reset_volume_count == 2);
 }
 
 static void test_authored_pd_mode_hold_dispatches_authored_tap_key_immediately(void) {
@@ -1878,7 +1880,7 @@ int main(void) {
     test_raw_lt_hold_dispatches_authored_plain_tap_immediately();
     test_authored_layer_hold_dispatches_authored_tap_key_immediately();
     test_authored_layer_hold_dispatches_authored_plain_tap_immediately();
-    test_interrupted_locked_pd_mode_press_still_toggles_lock_on_release();
+    test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_momentary_hold();
     test_authored_pd_mode_hold_dispatches_authored_tap_key_immediately();
     test_authored_layer_hold_releases_authored_pd_mode_child_cleanly();
     test_authored_pd_mode_hold_releases_authored_pd_mode_child_cleanly();

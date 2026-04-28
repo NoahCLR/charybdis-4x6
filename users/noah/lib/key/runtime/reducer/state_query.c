@@ -129,7 +129,7 @@ static bool key_runtime_core_query_press_token_quick_tap_suppressed(const press_
 }
 
 static bool key_runtime_core_query_press_token_has_pd_mode_quick_lock_candidate(const press_token_t *token) {
-    return token && token->interaction.contract.quick_tap_pd_mode_lock != 0 && token->pd_mode_was_locked_on_press && !key_runtime_core_query_press_token_quick_tap_suppressed(token);
+    return token && token->interaction.contract.quick_tap_pd_mode_lock != 0 && token->pd_mode_was_locked_on_press && !token->pd_mode_lock_consumed_on_press && !key_runtime_core_query_press_token_quick_tap_suppressed(token);
 }
 
 static bool key_runtime_core_query_press_token_owned_state_active(const key_runtime_core_state_t *state, const press_token_t *token) {

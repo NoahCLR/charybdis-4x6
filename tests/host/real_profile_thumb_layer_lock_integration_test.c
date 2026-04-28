@@ -1899,6 +1899,43 @@ static void test_pointer_dragscroll_repeated_quick_taps_stay_quiescent(void) {
     test_direct_dragscroll_repeated_quick_taps_stay_quiescent(LAYER_POINTER);
 }
 
+static void test_same_locked_nav_dragscroll_press_unlocks_and_holds_until_release(void) {
+    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, DRAGSCROLL);
+    uint16_t previous_tap_count;
+
+    CHECK(test_keypos_valid(dragscroll_pos));
+
+    test_reset_state();
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_NAV));
+    CHECK(test_resolve_keycode(dragscroll_pos) == DRAGSCROLL);
+
+    CHECK(pd_mode_set_lock_state(PD_MODE_DRAGSCROLL, true));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_DRAGSCROLL);
+    CHECK(reset_dragscroll_count == 0u);
+
+    previous_tap_count = test_tap_code16_count;
+    test_press_resolved(dragscroll_pos);
+
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == DRAGSCROLL);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == DRAGSCROLL);
+    CHECK(test_tap_code16_count == previous_tap_count);
+    CHECK(reset_dragscroll_count == 1u);
+
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
+    key_runtime_integration_scan();
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(test_tap_code16_count == previous_tap_count);
+
+    test_release_resolved(dragscroll_pos);
+    key_runtime_integration_scan();
+    CHECK(test_tap_code16_count == previous_tap_count);
+    test_assert_direct_dragscroll_quiescent(dragscroll_pos, 2u);
+}
+
 static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool requires_parent_scan) {
     keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, DRAGSCROLL);
     keypos_t follow_on_pos  = test_find_keypos_on_layer(LAYER_BASE, KC_C);
@@ -2887,6 +2924,7 @@ int main(void) {
     test_right_thumb_nav_hold_enters_dragscroll_mode_cleanly();
     test_nav_dragscroll_repeated_quick_taps_stay_quiescent();
     test_pointer_dragscroll_repeated_quick_taps_stay_quiescent();
+    test_same_locked_nav_dragscroll_press_unlocks_and_holds_until_release();
     test_gui_triple_tap_osm_flushes_before_next_plain_key();
     test_raw_nav_dragscroll_hold_keeps_arrow_taps_immediate();
     test_right_thumb_dragscroll_hold_keeps_arrow_taps_immediate();

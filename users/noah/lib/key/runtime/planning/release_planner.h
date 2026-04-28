@@ -71,6 +71,7 @@ typedef struct {
     bool                            other_press_interrupted;
     bool                            momentary_layer_tap_interrupted;
     bool                            pd_mode_was_locked_on_press;
+    bool                            pd_mode_lock_consumed_on_press;
 } key_runtime_release_query_t;
 
 typedef struct {
@@ -207,7 +208,7 @@ static inline pd_mode_mask_t key_runtime_release_query_lock_tap_mode(const key_r
         return 0;
     }
 
-    if (!query->pd_mode_was_locked_on_press || query->elapsed >= query->interaction.binding.tap_hold_term) {
+    if (query->pd_mode_lock_consumed_on_press || !query->pd_mode_was_locked_on_press || query->elapsed >= query->interaction.binding.tap_hold_term) {
         return 0;
     }
 
@@ -265,6 +266,10 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
     buffered_base_tap    = key_runtime_release_query_buffered_base_tap(query);
     quick_immediate_hold = key_runtime_release_query_quick_immediate_hold(query);
     lock_tap_mode        = key_runtime_release_query_lock_tap_mode(query);
+
+    if (query->pd_mode_lock_consumed_on_press) {
+        return key_runtime_release_decision_base(query);
+    }
 
     if (query->semantics.buffered_base_tap_dispatches_tap && buffered_base_tap) {
         return key_runtime_release_decision_tap(query);

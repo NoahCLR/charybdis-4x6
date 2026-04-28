@@ -18,6 +18,8 @@ Across the current pd-mode runtime:
 - unlocked modes are exclusive while held: the newest active mode wins
 - locked modes are exclusive: activating or locking a different mode clears the
   previous lock
+- pressing the same runtime-handled mode key while that mode is locked clears
+  the lock immediately, then behaves as a normal momentary hold until release
 - active modes can render a mode-specific RGB overlay
 
 One important non-rule:

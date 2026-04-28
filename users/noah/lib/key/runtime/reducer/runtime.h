@@ -94,6 +94,7 @@ typedef struct {
     bool                           handled_key;
     bool                           tap_outcome_available;
     bool                           pd_mode_was_locked_on_press;
+    bool                           pd_mode_lock_consumed_on_press;
     bool                           other_press_interrupted;
     bool                           momentary_layer_tap_interrupted;
     bool                           resolved_from_transparent;

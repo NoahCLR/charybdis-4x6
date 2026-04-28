@@ -293,6 +293,11 @@ Common lockable patterns are:
 
 `TAP_SENDS(...)` actions are tap outcomes, so they settle on release or pending
 tap-series expiry rather than on the press that first reaches that tap count.
+Once a runtime-handled mode key's own mode is already locked, pressing that
+same mode key clears the lock immediately and keeps the mode active only as the
+current physical hold until release. That generic unlock-on-press rule does not
+change explicit generated `EXAMPLE_MODE_LOCK` actions, which still toggle
+through the action path.
 
 Example:
 
@@ -456,6 +461,9 @@ This is the actual control path for pd modes:
    Held pd-mode keycodes flow through [`users/noah/lib/action/action_lifecycle.c`](../users/noah/lib/action/action_lifecycle.c),
    which routes them to `pd_mode_handle_keycode_press()` and
    `pd_mode_handle_keycode_release()`.
+   If a held pd-mode key matches the currently locked mode, key-runtime planning
+   first projects an explicit unlock request and then keeps the held-action
+   registration as the momentary owner.
 3. [`users/noah/lib/pointing/runtime/pd_mode_state.c`](../users/noah/lib/pointing/runtime/pd_mode_state.c) owns active and locked mode state,
    local-vs-display snapshots, and split-applied mirrored UI state.
 4. [`users/noah/lib/pointing/runtime/pd_mode_registry.c`](../users/noah/lib/pointing/runtime/pd_mode_registry.c) materializes the mode table

@@ -255,6 +255,17 @@ bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
     return pd_mode_toggle_lock_state(mode);
 }
 
+bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
+    (void)mode;
+    (void)locked;
+    return false;
+}
+
+bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+    (void)key_pos;
+    return pd_mode_set_lock_state(mode, locked);
+}
+
 void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
     (void)kind;
 }

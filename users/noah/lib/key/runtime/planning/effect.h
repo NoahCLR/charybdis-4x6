@@ -28,6 +28,7 @@ typedef enum {
     KEY_RUNTIME_EFFECT_LAYER_RELEASE,
     KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
     KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
+    KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE,
     KEY_RUNTIME_EFFECT_DELAYED_ACTION,
 } key_runtime_effect_kind_t;
 
@@ -68,6 +69,11 @@ typedef struct {
             pd_mode_mask_t pd_mode;
             keypos_t       key_pos;
         } pd_mode_lock_tap;
+        struct {
+            pd_mode_mask_t pd_mode;
+            keypos_t       key_pos;
+            bool           locked;
+        } pd_mode_lock_state;
         struct {
             uint16_t                    action;
             key_runtime_packed_keypos_t packed_key_pos;

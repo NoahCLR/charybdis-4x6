@@ -223,6 +223,10 @@ The current runtime supports these mode families:
 
 Those are runtime capabilities. The keymap decides where they live, which ones
 stay as simple holds, which ones gain alternate taps, and which ones can lock.
+When a mode is already locked, pressing that same runtime-handled mode key
+clears the lock immediately; if you keep holding the key, the mode remains
+active only as a momentary hold until release. Dedicated `*_LOCK` actions still
+toggle locks explicitly.
 
 For the raw mode behavior and pointer-layer policy, see
 [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md).

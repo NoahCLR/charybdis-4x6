@@ -91,6 +91,8 @@ static const char *key_runtime_trace_effect_name(key_runtime_effect_kind_t kind)
             return "feedback_pulse";
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
             return "pd_mode_lock_tap";
+        case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE:
+            return "pd_mode_lock_state";
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
             return "delayed_action";
         case KEY_RUNTIME_EFFECT_NONE:
@@ -225,6 +227,9 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
                 break;
             case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
                 uprintf("  [%u] %s key=(%u,%u) mode=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pd_mode_lock_tap.key_pos.row, (unsigned int)effect->data.pd_mode_lock_tap.key_pos.col, (unsigned int)effect->data.pd_mode_lock_tap.pd_mode);
+                break;
+            case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE:
+                uprintf("  [%u] %s key=(%u,%u) mode=0x%04X locked=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pd_mode_lock_state.key_pos.row, (unsigned int)effect->data.pd_mode_lock_state.key_pos.col, (unsigned int)effect->data.pd_mode_lock_state.pd_mode, effect->data.pd_mode_lock_state.locked ? 1u : 0u);
                 break;
             case KEY_RUNTIME_EFFECT_DELAYED_ACTION: {
                 uint8_t repeat_count        = (uint8_t)(effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK);

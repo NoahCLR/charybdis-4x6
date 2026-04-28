@@ -223,6 +223,7 @@ bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_
         .other_press_interrupted         = token->other_press_interrupted,
         .momentary_layer_tap_interrupted = token->momentary_layer_tap_interrupted,
         .pd_mode_was_locked_on_press     = token->pd_mode_was_locked_on_press,
+        .pd_mode_lock_consumed_on_press  = token->pd_mode_lock_consumed_on_press,
     };
 
     *out = (key_runtime_core_active_release_resolution_t){

@@ -76,8 +76,15 @@ In plain terms:
 
 Foreign-key interruption only cancels the quick tap for true momentary-layer
 taps. Other authored hold families, such as press-registering modifier holds
-and pd-mode quick-lock taps, keep their own release contract instead of
-borrowing the momentary-layer interrupt rule.
+and pd-mode lock gestures, keep their own release contract instead of borrowing
+the momentary-layer interrupt rule.
+
+For runtime-handled pd-mode keys, pressing the same mode that is currently
+locked consumes that lock on press. The physical key still registers its normal
+momentary hold, so the mode stays active while the key remains down and
+deactivates on release. That unlock press does not later reopen the key's tap
+fallback or re-toggle the lock on release. Explicit `*_LOCK` actions remain
+normal tap actions and keep their toggle semantics.
 
 Immediate-hold keys still remember that another physical key overlapped them,
 but that overlap fact is separate from momentary-layer cancellation. Its job is

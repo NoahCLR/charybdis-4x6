@@ -452,6 +452,29 @@ bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
     return true;
 }
 
+bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+    if (locked) {
+        key_runtime_scenario_pd_locked_modes |= mode;
+    } else {
+        key_runtime_scenario_pd_locked_modes &= (pd_mode_mask_t)~mode;
+    }
+    key_runtime_core_observe_pd_mode_lock_state(mode, locked);
+    key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
+        .kind = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE,
+        .data.pd_mode_lock_state =
+            {
+                .pd_mode = mode,
+                .key_pos = key_pos,
+                .locked  = locked,
+            },
+    });
+    return true;
+}
+
+bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
+    return pd_mode_set_lock_state_at(mode, locked, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS});
+}
+
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     for (uint8_t index = 0; index < key_runtime_scenario_pd_mode_count; index++) {
         if (key_runtime_scenario_pd_modes[index].keycode == keycode) {

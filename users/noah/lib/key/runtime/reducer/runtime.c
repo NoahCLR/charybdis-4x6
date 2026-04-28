@@ -602,6 +602,10 @@ static bool key_runtime_core_press_token_allows_tap_release(const press_token_t 
     return token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW;
 }
 
+static bool key_runtime_core_press_token_should_unlock_pd_lock_on_press(const press_token_t *token) {
+    return token && token->handled_key && token->pd_mode_was_locked_on_press && token->interaction.pd_mode != 0;
+}
+
 static void key_runtime_core_apply_release_settlement(key_runtime_core_state_t *state, keypos_t key_pos, const key_runtime_core_release_effect_plan_t *release_plan) {
     press_token_t *token;
     uint8_t        lease_count_before;
@@ -792,6 +796,11 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
         } else {
             key_runtime_core_tap_series_clear(state, series);
         }
+    }
+
+    if (key_runtime_core_press_token_should_unlock_pd_lock_on_press(token)) {
+        key_runtime_core_effect_plan_push_pd_mode_lock_state(plan, token_key_pos, token->interaction.pd_mode, false);
+        token->pd_mode_lock_consumed_on_press = true;
     }
 
     if (key_runtime_core_tap_series_can_accept_press(state, series, keycode, state->current_time)) {

@@ -882,8 +882,8 @@ static void test_release_with_interrupted_layer_tap_sibling_dispatches_immediate
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == sibling_layer_tap_key);
 }
 
-static void test_release_with_interrupted_pd_mode_press_keeps_lock_tap_immediate(void) {
-    static const char                       *case_name     = "release with interrupted pd-mode press keeps lock tap immediate";
+static void test_release_with_interrupted_consumed_pd_lock_does_not_relock(void) {
+    static const char                       *case_name     = "release with interrupted consumed pd lock does not relock";
     static const key_runtime_scenario_step_t setup_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
@@ -903,17 +903,14 @@ static void test_release_with_interrupted_pd_mode_press_keeps_lock_tap_immediate
     test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
+    CHECK_CASE(case_name, !pd_mode_local_locked(PD_MODE_VOLUME));
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
 
-    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 2);
+    CHECK_CASE(case_name, key_runtime_scenario_effect_count() == 1);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.row == 1);
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.key_pos.col == 1);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.pd_mode_lock_tap.pd_mode == PD_MODE_VOLUME);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.pd_mode_lock_tap.key_pos.row == 1);
-    CHECK_CASE(case_name, key_runtime_scenario_effect_at(1)->data.pd_mode_lock_tap.key_pos.col == 1);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
     CHECK_CASE(case_name, key_runtime_scenario_slot_owner_keycode(test_keypos(1, 2)) == TEST_SIBLING_KEY);
 
@@ -978,7 +975,7 @@ int main(void) {
     test_release_with_live_tap_release_sibling_splits_owned_cleanup_and_deferred_action();
     test_release_with_live_tap_release_sibling_keeps_layer_release_immediate();
     test_release_with_interrupted_layer_tap_sibling_dispatches_immediately();
-    test_release_with_interrupted_pd_mode_press_keeps_lock_tap_immediate();
+    test_release_with_interrupted_consumed_pd_lock_does_not_relock();
     test_pending_multi_tap_release_with_live_tap_release_sibling_keeps_held_lifecycle_immediate();
     return 0;
 }

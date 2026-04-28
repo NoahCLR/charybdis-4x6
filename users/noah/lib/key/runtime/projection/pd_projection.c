@@ -89,3 +89,11 @@ void key_runtime_core_pd_projection_project_lock_tap(pd_mode_mask_t mode, keypos
 
     (void)pd_mode_toggle_lock_state_at(mode, key_pos);
 }
+
+void key_runtime_core_pd_projection_project_lock_state(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+    if (locked && key_runtime_core_pd_projection_lock_tap_will_activate(mode)) {
+        key_runtime_core_pd_projection_preempt_held_actions_for_mode(mode);
+    }
+
+    (void)pd_mode_set_lock_state_at(mode, locked, key_pos);
+}

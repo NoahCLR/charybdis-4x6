@@ -123,6 +123,22 @@ void key_runtime_core_effect_plan_push_layer_release(key_runtime_core_effect_pla
                                             });
 }
 
+void key_runtime_core_effect_plan_push_pd_mode_lock_state(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, pd_mode_mask_t mode, bool locked) {
+    if (!(plan && mode != 0)) {
+        return;
+    }
+
+    key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
+                                                .kind = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE,
+                                                .data.pd_mode_lock_state =
+                                                    {
+                                                        .pd_mode = mode,
+                                                        .key_pos = key_pos,
+                                                        .locked  = locked,
+                                                    },
+                                            });
+}
+
 static bool key_runtime_core_tap_commit_feedback_mode_allows(uint8_t tap_count) {
     switch (key_feedback_tap_commit_mode()) {
         case KEY_FEEDBACK_TAP_COMMIT_OFF:

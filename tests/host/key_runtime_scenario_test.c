@@ -706,46 +706,68 @@ static void test_repeat_hold_with_intermediate_scans_starts_once_and_releases_on
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 0)) == KC_NO);
 }
 
-static void test_pd_mode_quick_tap_with_intermediate_scan_toggles_once(void) {
-    static const key_runtime_scenario_step_t scenario[] = {
+static void test_same_locked_pd_mode_quick_tap_unlocks_on_press_without_tap_release(void) {
+    static const key_runtime_scenario_step_t press_steps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 6, 1),
-        KEY_RUNTIME_SCENARIO_ADVANCE(100),
-        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 6, 1),
     };
 
     key_runtime_scenario_reset();
     key_runtime_scenario_define_pd_mode_key(TEST_PD_MODE_KEY, PD_MODE_VOLUME, true);
-    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
 
-    CHECK(key_runtime_scenario_effect_count() == 3);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
-    CHECK(key_runtime_scenario_effect_at(0)->data.held_action.action == TEST_PD_MODE_KEY);
-    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
-    CHECK(key_runtime_scenario_effect_at(1)->data.key_pos.row == 6);
-    CHECK(key_runtime_scenario_effect_at(1)->data.key_pos.col == 1);
-    CHECK(key_runtime_scenario_effect_at(2)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP);
-    CHECK(key_runtime_scenario_effect_at(2)->data.pd_mode_lock_tap.pd_mode == PD_MODE_VOLUME);
-    CHECK(key_runtime_scenario_effect_at(2)->data.pd_mode_lock_tap.key_pos.row == 6);
-    CHECK(key_runtime_scenario_effect_at(2)->data.pd_mode_lock_tap.key_pos.col == 1);
+    key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
+    CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK(key_runtime_scenario_effect_count() == 2);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE);
+    CHECK(key_runtime_scenario_effect_at(0)->data.pd_mode_lock_state.pd_mode == PD_MODE_VOLUME);
+    CHECK(!key_runtime_scenario_effect_at(0)->data.pd_mode_lock_state.locked);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
+    CHECK(key_runtime_scenario_effect_at(1)->data.held_action.action == TEST_PD_MODE_KEY);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+    CHECK(key_runtime_scenario_effect_count() == 1);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK(key_runtime_scenario_effect_at(0)->data.key_pos.row == 6);
+    CHECK(key_runtime_scenario_effect_at(0)->data.key_pos.col == 1);
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 1)) == KC_NO);
 }
 
-static void test_pd_mode_hold_with_intermediate_scan_does_not_toggle_lock(void) {
-    static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 6, 2), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 6, 2),
+static void test_same_locked_pd_mode_hold_becomes_momentary_until_release(void) {
+    static const key_runtime_scenario_step_t press_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 6, 2),
+    };
+    static const key_runtime_scenario_step_t hold_steps[] = {
+        KEY_RUNTIME_SCENARIO_ADVANCE(CUSTOM_TAP_HOLD_TERM + 1),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 6, 2),
     };
 
     key_runtime_scenario_reset();
     key_runtime_scenario_define_pd_mode_key(TEST_PD_MODE_KEY, PD_MODE_VOLUME, true);
-    key_runtime_scenario_run(scenario, ARRAY_SIZE(scenario));
 
+    key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
+    CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_PD_MODE_KEY);
     CHECK(key_runtime_scenario_effect_count() == 2);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
-    CHECK(key_runtime_scenario_effect_at(0)->data.held_action.action == TEST_PD_MODE_KEY);
-    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
-    CHECK(key_runtime_scenario_effect_at(1)->data.key_pos.row == 6);
-    CHECK(key_runtime_scenario_effect_at(1)->data.key_pos.col == 2);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE);
+    CHECK(!key_runtime_scenario_effect_at(0)->data.pd_mode_lock_state.locked);
+    CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(hold_steps, ARRAY_SIZE(hold_steps));
+    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_PD_MODE_KEY);
+    CHECK(key_runtime_scenario_effect_count() == 0);
+
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+    CHECK(key_runtime_scenario_effect_count() == 1);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK(key_runtime_scenario_effect_at(0)->data.key_pos.row == 6);
+    CHECK(key_runtime_scenario_effect_at(0)->data.key_pos.col == 2);
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == KC_NO);
 }
 
@@ -769,8 +791,8 @@ int main(void) {
     test_double_tap_hold_can_toggle_same_layer_lock_twice();
     test_double_tap_threshold_hold_with_intermediate_scan_registers_once();
     test_repeat_hold_with_intermediate_scans_starts_once_and_releases_once();
-    test_pd_mode_quick_tap_with_intermediate_scan_toggles_once();
-    test_pd_mode_hold_with_intermediate_scan_does_not_toggle_lock();
+    test_same_locked_pd_mode_quick_tap_unlocks_on_press_without_tap_release();
+    test_same_locked_pd_mode_hold_becomes_momentary_until_release();
 
     puts("key_runtime_scenario host tests passed");
     return 0;

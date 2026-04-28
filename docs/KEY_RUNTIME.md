@@ -79,7 +79,7 @@ layer," not "old runtime plus new runtime running side by side."
 | [`planning/effect_plan.h`](../users/noah/lib/key/runtime/planning/effect_plan.h), [`planning/effect_plan.c`](../users/noah/lib/key/runtime/planning/effect_plan.c) | Internal effect-plan initialization, sink buffering, append helpers, tap-commit feedback filtering, and release-plan transfer shared by planning modules. |
 | [`projection/feedback_projection.h`](../users/noah/lib/key/runtime/projection/feedback_projection.h), [`projection/feedback_projection.c`](../users/noah/lib/key/runtime/projection/feedback_projection.c) | Feedback pulse projection and pulse queueing for key-runtime effects. |
 | [`reducer/ownership_state.h`](../users/noah/lib/key/runtime/reducer/ownership_state.h), [`reducer/ownership_state.c`](../users/noah/lib/key/runtime/reducer/ownership_state.c) | Reducer-owned lease and persistent-intent mechanics, shadow projection recomputation, held/repeat feedback visibility queries, and lock observation updates over `key_runtime_core_state_t` storage. |
-| [`projection/pd_projection.h`](../users/noah/lib/key/runtime/projection/pd_projection.h), [`projection/pd_projection.c`](../users/noah/lib/key/runtime/projection/pd_projection.c) | Key-runtime PD projection for held-action preemption and PD lock-tap effects; actual PD mode state remains PD-runtime-owned. |
+| [`projection/pd_projection.h`](../users/noah/lib/key/runtime/projection/pd_projection.h), [`projection/pd_projection.c`](../users/noah/lib/key/runtime/projection/pd_projection.c) | Key-runtime PD projection for held-action preemption, PD lock-tap effects, and explicit lock-state requests; actual PD mode state remains PD-runtime-owned. |
 | [`queue/pending_release_queue.h`](../users/noah/lib/key/runtime/queue/pending_release_queue.h), [`queue/pending_release_queue.c`](../users/noah/lib/key/runtime/queue/pending_release_queue.c) | Pending-release queue mechanics: allocation, ordering, drain snapshots, and released-token pending-emission markers over `key_runtime_core_state_t` storage. |
 | [`projection/projection.h`](../users/noah/lib/key/runtime/projection/projection.h), [`projection/projection.c`](../users/noah/lib/key/runtime/projection/projection.c) | Runtime effect execution into QMK-facing registries, pending-release dispatch projection, projection snapshot capture/comparison, and trace projection checkpoints. |
 | [`planning/release_planner.h`](../users/noah/lib/key/runtime/planning/release_planner.h), [`planning/release_planner.c`](../users/noah/lib/key/runtime/planning/release_planner.c) | Shared release decision contract, active-release resolution, pending multi-tap release resolution, and release effect planning. |
@@ -229,6 +229,7 @@ The reducer owns:
 - same-key multi-tap reuse
 - foreign active-key interruption
 - independent pending-multi-tap retention across foreign presses
+- same-locked-pd-mode unlock requests before momentary held-action registration
 - press-time lease activation
 
 ### 4. Release routing
@@ -242,6 +243,8 @@ The release path now owns:
 - active release resolution
 - pending-multi-tap release resolution
 - release-time lease cleanup
+- suppression of release-time fallback or lock retoggle after a same-mode pd
+  lock was consumed on press
 - pending release dispatch queueing
 - token retirement and pending-series seeding
 

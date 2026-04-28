@@ -56,6 +56,9 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
             key_runtime_core_pd_projection_project_lock_tap(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos);
             return;
+        case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE:
+            key_runtime_core_pd_projection_project_lock_state(effect->data.pd_mode_lock_state.pd_mode, effect->data.pd_mode_lock_state.locked, effect->data.pd_mode_lock_state.key_pos);
+            return;
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
             for (uint8_t repeat = 0, repeat_count = (uint8_t)(effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK); repeat < repeat_count; repeat++) {
                 keypos_t             key_pos             = key_runtime_effect_delayed_action_key_pos(effect);

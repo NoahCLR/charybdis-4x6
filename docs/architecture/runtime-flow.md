@@ -52,7 +52,10 @@ flowchart TD
 ```
 
 The reducer owns active press identity by physical `keypos_t`. Layer changes or
-transparent resolution do not move that identity.
+transparent resolution do not move that identity. If a runtime-handled pd-mode
+key matches the currently locked mode, press planning emits an explicit
+unlock request before registering the held action, so the key becomes a
+momentary owner for the rest of the physical hold.
 
 ## Key Release Flow
 
@@ -73,8 +76,9 @@ flowchart TD
 
 Quick release, fallback suppression, buffered base tap, active release, and
 pending multi-tap release decisions belong to `key/runtime/planning/`. The
-deferred release adapter may queue or drain effects but must not re-decide
-release semantics.
+release planner also suppresses fallback or lock retoggle when a same-mode
+pd lock was already consumed on press. The deferred release adapter may queue
+or drain effects but must not re-decide release semantics.
 
 ## Matrix Scan Flow
 
@@ -119,7 +123,7 @@ trace read state but do not mutate reducer facts.
 ```mermaid
 flowchart TD
     key["PD keycode or authored key behavior"] --> key_runtime["Key runtime effect planning"]
-    key_runtime --> pd_projection["Projected: pd_projection lock tap or held action preemption"]
+    key_runtime --> pd_projection["Projected: pd_projection lock tap, explicit lock state, or held action preemption"]
     pd_projection --> pd_state["Authoritative: pd_mode_state local/display/remote mode state"]
     pointer["pointing_device_task_user report"] --> pd_runtime["pd_runtime.c"]
     pd_runtime --> snapshot["pd_mode_snapshot"]
