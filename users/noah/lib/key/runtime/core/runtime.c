@@ -15,6 +15,7 @@
 #include "../../interaction/handled_key_policy.h"
 #include "../../interaction/key_behavior_lookup.h"
 #include "../../ownership/held_action.h"
+#include "../../../state/runtime/keyboard_mod_policy.h"
 #include "../feedback.h"
 #include "trace.h"
 
@@ -597,15 +598,9 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     branch_confirm_term_ms = CUSTOM_TAP_BRANCH_CONFIRM_TERM;
     tap_term_ms      = key_runtime_core_default_multi_tap_term();
     tap_count        = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u);
-    saved_mod_state  = reuse_existing ? series->saved_mod_state
-                                      : (keyboard_mod_state_t){
-                                            .real           = get_mods(),
-                                            .weak           = get_weak_mods(),
-                                            .oneshot        = get_oneshot_mods(),
-                                            .oneshot_locked = get_oneshot_locked_mods(),
-                                        };
+    saved_mod_state = reuse_existing ? series->saved_mod_state : keyboard_mod_policy_current_state();
     if (!reuse_existing) {
-        saved_mod_state.real &= (uint8_t)~pd_mode_buffered_tap_masked_real_mods(token->resolved_keycode);
+        saved_mod_state = keyboard_mod_policy_without_real_mods(saved_mod_state, pd_mode_buffered_tap_masked_real_mods(token->resolved_keycode));
     }
 
     if (token->handled_key) {

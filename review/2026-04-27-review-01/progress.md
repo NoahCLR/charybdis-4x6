@@ -1026,3 +1026,75 @@ All listed pass/fail commands passed. The `--no-index` whitespace checks returne
 1. Continue with broad `key_runtime_core_state_t` storage cleanup only if a clear smaller owner emerges.
 2. Consider the separate modifier mask/replay finding next because it remains one behavior domain split across action dispatch, delayed actions, key process, and PD modes.
 3. Keep `state_query.c` read-only over reducer-owned state; do not let it become a second owner of press, tap, lease, or pending-release storage.
+
+## 2026-04-28 - Keyboard Modifier Policy Split
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/state/runtime/keyboard_mod_policy.h` and `users/noah/lib/state/runtime/keyboard_mod_policy.c`.
+- Moved shared QMK modifier current-state capture, all-bucket filtering, real-mod-only filtering/restoration, and delayed action one-shot replay restoration into the new policy surface.
+- Updated action dispatch, delayed actions, process-record modifier masking, deferred release, transition release snapshots, and tap-series saved-mod capture to call `keyboard_mod_policy.h` instead of open-coding QMK modifier snapshots or filters.
+- Updated PD pinch managed-only GUI masking to call `keyboard_mod_policy_managed_only_mask()` while keeping PD pinch's actual GUI hold lifecycle in `keyboard_mod_ownership.c`.
+- Wired `keyboard_mod_policy.c` into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and manual host runners that compile the affected runtime/action sources directly.
+- Added direct host coverage for `keyboard_mod_policy_current_state()`, modifier filtering helpers, and one-shot replay restoration in `tests/host/keyboard_mod_ownership_test.c`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so the active architecture notes match the new modifier policy surface.
+
+## Finding Status
+
+- The modifier masking/replay finding is partially resolved.
+- Resolved in this pass:
+  - raw current-mod snapshots are no longer repeated in action dispatch, delayed action, deferred release, transition release handling, tap-series saved-mod capture, or key-runtime process masking
+  - masked synthetic QMK taps use `keyboard_mod_policy_without_mods()`
+  - key-runtime PD keyboard-event masking uses `keyboard_mod_policy_without_real_mods()`, `keyboard_mod_policy_with_real_mods()`, and `keyboard_mod_policy_managed_only_mask()`
+  - delayed replay one-shot preservation has one shared helper instead of a delayed-action-local special case
+  - source manifests and host runners mechanically include the new policy module where needed
+- Still open:
+  - `noah_emit_policy_t` remains an action-dispatch public policy surface for fallback settlement and full modifier preservation
+  - PD arrow still owns mode-specific Shift lifecycle, though its masked vertical taps route through action dispatch and the shared policy below it
+  - this is not yet a single high-level modifier planner; it is a shared policy layer over the existing behavior
+
+## Verification
+
+Pre-change baseline checks:
+
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_delayed_action_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+
+Post-change targeted checks:
+
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_delayed_action_tests.sh`
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+
+All listed post-change checks passed after runner wiring fixes.
+
+Final checks:
+
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/state/runtime/keyboard_mod_policy.c`
+- `git diff --check --no-index /dev/null users/noah/lib/state/runtime/keyboard_mod_policy.h`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks returned the expected nonzero diff status for new files and produced no diagnostics.
+
+## Next Steps
+
+1. Keep future modifier behavior changes behind `keyboard_mod_policy.h` unless they intentionally change the architecture.
+2. Decide separately whether action emit policy flags should remain action-owned or move behind a higher-level runtime replay planner.
+3. Continue with the remaining open architecture findings, likely combo-origin compatibility contract cleanup or broad `key_runtime_core_state_t` storage shape cleanup.

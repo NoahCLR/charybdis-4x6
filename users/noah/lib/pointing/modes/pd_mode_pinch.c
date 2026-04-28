@@ -10,6 +10,7 @@
 
 #include "../runtime/pd_mode_registry_internal.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
+#include "../../state/runtime/keyboard_mod_policy.h"
 
 static uint8_t pinch_mode_managed_only_gui_mask(pd_mode_mask_t mode) {
     (void)mode;
@@ -17,7 +18,7 @@ static uint8_t pinch_mode_managed_only_gui_mask(pd_mode_mask_t mode) {
     // Pinch's GUI hold belongs to the mode, not to unrelated keyboard events.
     // Keep user-held GUI visible, but hide the mode-owned subset from keyboard
     // replay and concurrent key processing.
-    return keyboard_mod_ownership_managed_only_mask(MOD_BIT(KC_LEFT_GUI));
+    return keyboard_mod_policy_managed_only_mask(MOD_BIT(KC_LEFT_GUI));
 }
 
 static void pinch_mode_register_command(pd_mode_mask_t mode) {

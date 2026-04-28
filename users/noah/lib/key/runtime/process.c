@@ -14,8 +14,8 @@
 #include "../../action/synthetic_record.h"
 #include "../../compat/qmk_combo_origin.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
+#include "../../state/runtime/keyboard_mod_policy.h"
 #include "../../state/runtime/runtime_diag.h"
-#include "../../state/runtime/keyboard_mod_state.h"
 #include "origin_registry.h"
 
 #ifdef NOAH_HOST_TEST_ENV
@@ -45,15 +45,6 @@ struct key_runtime_process_ctx_t {
     bool                     resolution_loaded;
 };
 
-static keyboard_mod_state_t key_runtime_keyboard_mod_state_current(void) {
-    return (keyboard_mod_state_t){
-        .real           = get_mods(),
-        .weak           = get_weak_mods(),
-        .oneshot        = get_oneshot_mods(),
-        .oneshot_locked = get_oneshot_locked_mods(),
-    };
-}
-
 static void key_runtime_process_end_keyboard_event_mod_mask(void) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     keyboard_mod_state_t      restored;
@@ -62,8 +53,8 @@ static void key_runtime_process_end_keyboard_event_mod_mask(void) {
         return;
     }
 
-    restored      = key_runtime_keyboard_mod_state_current();
-    restored.real = (uint8_t)(restored.real | keyboard_mod_ownership_managed_only_mask(state->keyboard_event_masked_real_mods));
+    restored = keyboard_mod_policy_current_state();
+    restored = keyboard_mod_policy_with_real_mods(restored, keyboard_mod_policy_managed_only_mask(state->keyboard_event_masked_real_mods));
     keyboard_mod_state_apply(restored);
     state->keyboard_event_mask_active      = false;
     state->keyboard_event_masked_real_mods = 0u;
@@ -83,12 +74,12 @@ static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
         return;
     }
 
-    filtered = key_runtime_keyboard_mod_state_current();
+    filtered = keyboard_mod_policy_current_state();
     if ((filtered.real & masked_real_mods) == 0u) {
         return;
     }
 
-    filtered.real &= (uint8_t)~masked_real_mods;
+    filtered = keyboard_mod_policy_without_real_mods(filtered, masked_real_mods);
     keyboard_mod_state_apply(filtered);
     state->keyboard_event_masked_real_mods = masked_real_mods;
     state->keyboard_event_mask_active      = true;

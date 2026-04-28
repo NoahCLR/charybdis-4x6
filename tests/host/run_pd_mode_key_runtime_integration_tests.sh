@@ -81,6 +81,7 @@ compile_test() {
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_policy.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_trace.c" \
     -o "$bin"

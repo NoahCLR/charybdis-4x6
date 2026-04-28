@@ -9,6 +9,7 @@
 #include "trace.h"
 #include "core/projection.h"
 #include "core/runtime.h"
+#include "../../state/runtime/keyboard_mod_policy.h"
 
 enum {
     KEY_RUNTIME_TRANSITION_PLAN_FLAG_AUTO_DRAIN = 1u << 0,
@@ -114,15 +115,6 @@ static void key_runtime_transition_append_unmatched_release_effects(keypos_t key
                                            });
 }
 
-static keyboard_mod_state_t key_runtime_transition_keyboard_mod_state_current(void) {
-    return (keyboard_mod_state_t){
-        .real           = get_mods(),
-        .weak           = get_weak_mods(),
-        .oneshot        = get_oneshot_mods(),
-        .oneshot_locked = get_oneshot_locked_mods(),
-    };
-}
-
 void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
     if (!plan) {
         return;
@@ -195,7 +187,7 @@ bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *r
     }
 
     key_runtime_core_effect_plan_init(&core_plan);
-    if (key_runtime_core_handle_handled_key_release(keycode, record->event.key, resolution, key_runtime_transition_keyboard_mod_state_current(), &core_plan)) {
+    if (key_runtime_core_handle_handled_key_release(keycode, record->event.key, resolution, keyboard_mod_policy_current_state(), &core_plan)) {
         key_runtime_transition_plan_append_core_plan(plan, &core_plan);
         return true;
     }

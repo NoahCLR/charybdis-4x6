@@ -50,6 +50,7 @@ NOAH_COMMON_SOURCES := \
     lib/macro/via_macro_defaults.c \
     lib/key/runtime/feedback.c \
     lib/state/runtime/keyboard_mod_state.c \
+    lib/state/runtime/keyboard_mod_policy.c \
     lib/state/runtime/runtime_diag.c \
     lib/state/ownership/keyboard_mod_ownership.c \
     lib/state/ownership/layer_ownership.c \

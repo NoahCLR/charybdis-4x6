@@ -7,15 +7,7 @@
 #include "core/pending_release_queue.h"
 #include "core/projection.h"
 #include "core/state_query.h"
-
-static keyboard_mod_state_t key_runtime_deferred_release_keyboard_mod_state_current(void) {
-    return (keyboard_mod_state_t){
-        .real           = get_mods(),
-        .weak           = get_weak_mods(),
-        .oneshot        = get_oneshot_mods(),
-        .oneshot_locked = get_oneshot_locked_mods(),
-    };
-}
+#include "../../state/runtime/keyboard_mod_policy.h"
 
 static bool key_runtime_deferred_release_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
@@ -33,7 +25,7 @@ void key_runtime_deferred_release_defer_dispatch_actions_until_release(keypos_t 
         return;
     }
 
-    mods = key_runtime_deferred_release_keyboard_mod_state_current();
+    mods = keyboard_mod_policy_current_state();
     for (uint8_t read_index = 0; read_index < plan->count; read_index++) {
         const key_runtime_effect_t effect = plan->items[read_index];
 

@@ -159,14 +159,18 @@ Recommended direction:
 
 Keyboard modifier replay is intentionally careful, but the policy is scattered across action dispatch, key processing, delayed actions, and PD modes.
 
+Status as of 2026-04-28: partially resolved. Shared snapshot, filtering, managed-only masking, and delayed replay restoration now route through `users/noah/lib/state/runtime/keyboard_mod_policy.h` and `keyboard_mod_policy.c`. Action dispatch, delayed actions, key-runtime process masking, deferred release, transition release snapshots, tap-series saved-mod capture, and PD pinch managed-only masking now call that policy surface instead of open-coding local snapshot/filter helpers. The action-level public emit policy flags remain in `users/noah/lib/action/action_dispatch.h`, and PD arrow still owns mode-specific Shift lifecycle while using action dispatch for masked vertical taps, so the domain is improved but not fully collapsed into one high-level planner.
+
 Evidence:
 
 - `users/noah/lib/state/runtime/keyboard_mod_state.c:7-30` suspends and reapplies keyboard modifiers.
-- `users/noah/lib/action/action_dispatch.c:24-56` and `72-87` wrap emitted actions with modifier preservation and settling.
+- `users/noah/lib/state/runtime/keyboard_mod_policy.h:17-24` and `keyboard_mod_policy.c:7-49` provide the shared current-state, filtering, managed-only masking, and replay-restoration policy surface.
+- `users/noah/lib/action/action_dispatch.c:16-74` wraps emitted actions with modifier preservation and settling, and uses `keyboard_mod_policy_without_mods()` for masked synthetic QMK taps.
 - `users/noah/lib/action/action_dispatch.h:29-34` and `186-190` expose action-level modifier policies.
-- `users/noah/lib/key/runtime/process.c:55-93` masks active PD real modifiers and restores managed-only modifiers.
-- `users/noah/lib/key/runtime/delayed_action.c:19-45` special-cases one-shot modifier preservation.
-- `users/noah/lib/pointing/modes/pd_mode_pinch.c:14-42` masks GUI during pinch behavior.
+- `users/noah/lib/key/runtime/process.c:48-85` masks active PD real modifiers and restores managed-only modifiers through `keyboard_mod_policy.h`.
+- `users/noah/lib/key/runtime/delayed_action.c:15-22` restores replayed one-shot modifier output through `keyboard_mod_policy_restore_after_action_replay()`.
+- `users/noah/lib/key/runtime/core/runtime.c:601-603` captures buffered tap-series modifier state through `keyboard_mod_policy.h`.
+- `users/noah/lib/pointing/modes/pd_mode_pinch.c:15-43` masks GUI during pinch behavior through `keyboard_mod_policy_managed_only_mask()`.
 - `users/noah/lib/pointing/modes/pd_mode_arrow.c:29-47` and `83-120` mask Alt and own Shift during arrow behavior.
 
 Why it matters:
@@ -175,9 +179,9 @@ This is one behavior domain with several local policies. That makes it hard to r
 
 Recommended direction:
 
-- Centralize modifier mask/replay policy behind one runtime API.
-- Make PD mode and action dispatch call that API instead of encoding local decisions.
-- Keep modifier-hold, PD-mode integration, and keyboard mod ownership tests around this change.
+- Keep `keyboard_mod_policy.h` as the shared modifier mask/replay API and avoid adding new raw QMK snapshot/filter helpers in action dispatch, delayed actions, process flow, or PD modes.
+- Decide separately whether action-level `noah_emit_policy_t` flags should remain in action dispatch or move behind a higher-level runtime modifier replay planner.
+- Keep modifier-hold, PD-mode integration, action dispatch, delayed action, and keyboard mod ownership tests around future changes.
 
 ### Should-Fix: Compatibility Fallback Macros Keep Old Charybdis Names Alive
 

@@ -78,6 +78,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
+    "$ROOT/users/noah/lib/state/runtime/keyboard_mod_policy.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_shared_state.c" \
     "$ROOT/users/noah/lib/state/runtime/runtime_trace.c" \

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
+#include "users/noah/lib/state/runtime/keyboard_mod_policy.h"
 #include "users/noah/lib/state/runtime/keyboard_mod_state.h"
 
 static uint8_t fake_mods;
@@ -160,10 +161,85 @@ static void test_managed_only_mask_keeps_physically_held_gui_visible(void) {
     CHECK(keyboard_mod_ownership_managed_only_mask(gui_mask) == 0);
 }
 
+static void test_keyboard_mod_policy_reads_current_state(void) {
+    keyboard_mod_state_t current;
+
+    test_reset_state();
+
+    fake_mods                = 0x01;
+    fake_weak_mods           = 0x02;
+    fake_oneshot_mods        = 0x04;
+    fake_oneshot_locked_mods = 0x08;
+
+    current = keyboard_mod_policy_current_state();
+
+    CHECK(current.real == 0x01);
+    CHECK(current.weak == 0x02);
+    CHECK(current.oneshot == 0x04);
+    CHECK(current.oneshot_locked == 0x08);
+}
+
+static void test_keyboard_mod_policy_filters_replay_state(void) {
+    keyboard_mod_state_t state = {
+        .real           = 0x0F,
+        .weak           = 0xF0,
+        .oneshot        = 0x33,
+        .oneshot_locked = 0xCC,
+    };
+    keyboard_mod_state_t without_all  = keyboard_mod_policy_without_mods(state, 0x03);
+    keyboard_mod_state_t without_real = keyboard_mod_policy_without_real_mods(state, 0x05);
+    keyboard_mod_state_t with_real    = keyboard_mod_policy_with_real_mods((keyboard_mod_state_t){.real = 0x01}, 0x04);
+
+    CHECK(without_all.real == 0x0C);
+    CHECK(without_all.weak == 0xF0);
+    CHECK(without_all.oneshot == 0x30);
+    CHECK(without_all.oneshot_locked == 0xCC);
+
+    CHECK(without_real.real == 0x0A);
+    CHECK(without_real.weak == state.weak);
+    CHECK(without_real.oneshot == state.oneshot);
+    CHECK(without_real.oneshot_locked == state.oneshot_locked);
+
+    CHECK(with_real.real == 0x05);
+}
+
+static void test_keyboard_mod_policy_preserves_oneshot_emitted_by_replay(void) {
+    keyboard_mod_state_t saved = {
+        .real           = 0x01,
+        .weak           = 0x02,
+        .oneshot        = 0x04,
+        .oneshot_locked = 0x08,
+    };
+    keyboard_mod_state_t restored;
+
+    test_reset_state();
+
+    fake_mods                = 0x10;
+    fake_weak_mods           = 0x20;
+    fake_oneshot_mods        = 0x40;
+    fake_oneshot_locked_mods = 0x80;
+
+    restored = keyboard_mod_policy_restore_after_action_replay(OSM(MOD_LCTL), saved);
+
+    CHECK(restored.real == saved.real);
+    CHECK(restored.weak == saved.weak);
+    CHECK(restored.oneshot == (uint8_t)(saved.oneshot | fake_oneshot_mods));
+    CHECK(restored.oneshot_locked == (uint8_t)(saved.oneshot_locked | fake_oneshot_locked_mods));
+
+    restored = keyboard_mod_policy_restore_after_action_replay(KC_C, saved);
+    CHECK(restored.real == saved.real);
+    CHECK(restored.weak == saved.weak);
+    CHECK(restored.oneshot == saved.oneshot);
+    CHECK(restored.oneshot_locked == saved.oneshot_locked);
+}
+
 int main(void) {
     test_suspend_allows_nested_same_mod_registration();
     test_managed_only_mask_reports_managed_gui_without_physical_owner();
     test_managed_only_mask_keeps_physically_held_gui_visible();
+    test_keyboard_mod_policy_reads_current_state();
+    test_keyboard_mod_policy_filters_replay_state();
+    test_keyboard_mod_policy_preserves_oneshot_emitted_by_replay();
     puts("keyboard_mod_ownership host tests passed");
     return 0;
 }
