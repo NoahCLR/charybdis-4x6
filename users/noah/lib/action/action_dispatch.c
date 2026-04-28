@@ -21,13 +21,13 @@ static void noah_emit_run(uint16_t keycode, noah_emit_tap_fn_t emit, noah_emit_p
     }
 
     if (policy.preserve_keyboard_mod_state) {
-        saved_mod_state = keyboard_mod_state_suspend();
+        saved_mod_state = keyboard_mod_policy_begin_preserve_all();
     }
 
     emit(keycode);
 
     if (policy.preserve_keyboard_mod_state) {
-        keyboard_mod_state_apply(saved_mod_state);
+        keyboard_mod_policy_end_preserve_all(saved_mod_state);
     }
 }
 
@@ -39,13 +39,13 @@ static void noah_emit_run_at(keypos_t key_pos, uint16_t keycode, noah_emit_tap_a
     }
 
     if (policy.preserve_keyboard_mod_state) {
-        saved_mod_state = keyboard_mod_state_suspend();
+        saved_mod_state = keyboard_mod_policy_begin_preserve_all();
     }
 
     emit(key_pos, keycode);
 
     if (policy.preserve_keyboard_mod_state) {
-        keyboard_mod_state_apply(saved_mod_state);
+        keyboard_mod_policy_end_preserve_all(saved_mod_state);
     }
 }
 
@@ -66,12 +66,10 @@ void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uin
         noah_key_runtime_settle_pending_fallback_hold();
     }
 
-    keyboard_mod_state_t saved_mod_state    = keyboard_mod_policy_current_state();
-    keyboard_mod_state_t filtered_mod_state = keyboard_mod_policy_without_mods(saved_mod_state, masked_mods);
+    keyboard_mod_state_t saved_mod_state = keyboard_mod_policy_begin_masked_emit(masked_mods);
 
-    keyboard_mod_state_apply(filtered_mod_state);
     noah_dispatch_synthetic_qmk_tap(keycode);
-    keyboard_mod_state_apply(saved_mod_state);
+    keyboard_mod_policy_end_masked_emit(saved_mod_state);
 }
 
 void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {

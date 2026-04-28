@@ -13,11 +13,9 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
-    keyboard_mod_state_t saved = keyboard_mod_state_suspend();
-
-    keyboard_mod_state_apply(mods);
+    keyboard_mod_state_t saved = keyboard_mod_policy_begin_action_replay(mods);
 
     noah_emit_action_tap_at(key_pos, action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
 
-    keyboard_mod_state_apply(keyboard_mod_policy_restore_after_action_replay(action, saved));
+    keyboard_mod_policy_end_action_replay(action, saved);
 }

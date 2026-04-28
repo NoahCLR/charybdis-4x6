@@ -1098,3 +1098,91 @@ All listed pass/fail commands passed. The `--no-index` whitespace checks returne
 1. Keep future modifier behavior changes behind `keyboard_mod_policy.h` unless they intentionally change the architecture.
 2. Decide separately whether action emit policy flags should remain action-owned or move behind a higher-level runtime replay planner.
 3. Continue with the remaining open architecture findings, likely combo-origin compatibility contract cleanup or broad `key_runtime_core_state_t` storage shape cleanup.
+
+## 2026-04-28 - Partial Finding Audit
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Used `prompts/follow-up-architecture-audit.md` for a focused audit of the partially resolved findings.
+- Audited the runtime accumulator, owner-ledger, and modifier masking/replay findings against the current tree.
+- Updated `userspace-architecture-review.md` with findings-first audit notes, a `Prior Finding Status` table, current conclusion, and remaining open findings.
+- Updated the recommended next refactor sequence so it no longer treats already-landed release consolidation as future work and so combo-origin work remains deferred per user preference.
+
+## Finding Status
+
+- Key runtime accumulator remains partially resolved. The extracted modules are real improvements, but `runtime.h` still stores broad reducer state and `runtime.c` still owns press/tap orchestration.
+- Owner ledgers remain partially resolved. Projection direction is documented and PD lock observation is gated, but layer-lock write-back lacks an equivalent compile-gate boundary.
+- Audit-time status: modifier masking/replay remained partially resolved because `noah_emit_policy_t` still owned a separate preservation path. This was superseded by the following `Modifier Policy Closure` pass.
+- Audit-time status: no partial finding was marked resolved in this audit. This was superseded for modifier masking/replay by the following `Modifier Policy Closure` pass.
+
+## Verification
+
+- `git diff --check`
+
+Host tests and firmware compile were intentionally skipped because this pass only changed review notes. Runtime and build behavior were not changed.
+
+## Next Steps
+
+1. Decide whether to add a compile-gate guard for the layer-lock bridge.
+2. Decide whether `noah_emit_policy_t` stays action-owned or moves behind a higher-level modifier replay planner.
+3. Avoid generic `runtime.c` splitting unless a clear next owner boundary emerges.
+
+## 2026-04-28 - Modifier Policy Closure
+
+Starting worktree status:
+
+- `git status --short` showed only the review-note audit edits from the prior pass.
+
+## Completed
+
+- Added modifier policy helpers for preserve-all windows, masked emit windows, delayed action replay windows, and process-record real-mod mask windows.
+- Updated `users/noah/lib/action/action_dispatch.c` so `noah_emit_policy_t` still declares action-dispatch intent, but modifier preservation mechanics now call `keyboard_mod_policy_begin_preserve_all()` and `keyboard_mod_policy_end_preserve_all()`.
+- Updated masked synthetic QMK taps to use `keyboard_mod_policy_begin_masked_emit()` and `keyboard_mod_policy_end_masked_emit()`.
+- Updated `users/noah/lib/key/runtime/delayed_action.c` to use `keyboard_mod_policy_begin_action_replay()` and `keyboard_mod_policy_end_action_replay()`.
+- Updated `users/noah/lib/key/runtime/process.c` to use `keyboard_mod_policy_begin_real_mod_mask()` and `keyboard_mod_policy_end_real_mod_mask()`.
+- Extended `tests/host/keyboard_mod_ownership_test.c` with direct coverage for preserve-all windows, masked emit windows, action replay windows, and real-mod mask windows.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md`; the modifier masking/replay finding is now marked resolved.
+
+## Finding Status
+
+- Modifier masking/replay is resolved.
+- `noah_emit_policy_t` remains action-owned intent, but no longer owns modifier preservation mechanics.
+- Remaining partial findings are key runtime accumulator and owner-ledger bridge enforcement.
+
+## Verification
+
+Post-change targeted checks:
+
+- `sh tests/host/run_keyboard_mod_ownership_tests.sh`
+- `sh tests/host/run_action_dispatch_tests.sh`
+- `sh tests/host/run_delayed_action_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+All listed post-change targeted checks passed.
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/state/runtime/keyboard_mod_policy.c`
+- `git diff --check --no-index /dev/null users/noah/lib/state/runtime/keyboard_mod_policy.h`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks returned the expected nonzero diff status for new files and produced no diagnostics.
+
+## Next Steps
+
+1. Continue with owner-ledger bridge enforcement or runtime accumulator cleanup.
+2. Keep `keyboard_mod_policy.h` as the modifier replay/preserve owner for future action dispatch, delayed action, process, and PD-mode changes.

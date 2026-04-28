@@ -47,22 +47,18 @@ struct key_runtime_process_ctx_t {
 
 static void key_runtime_process_end_keyboard_event_mod_mask(void) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    keyboard_mod_state_t      restored;
 
     if (!(state && state->keyboard_event_mask_active)) {
         return;
     }
 
-    restored = keyboard_mod_policy_current_state();
-    restored = keyboard_mod_policy_with_real_mods(restored, keyboard_mod_policy_managed_only_mask(state->keyboard_event_masked_real_mods));
-    keyboard_mod_state_apply(restored);
+    keyboard_mod_policy_end_real_mod_mask(state->keyboard_event_masked_real_mods);
     state->keyboard_event_mask_active      = false;
     state->keyboard_event_masked_real_mods = 0u;
 }
 
 static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    keyboard_mod_state_t      filtered;
     uint8_t                   masked_real_mods;
 
     if (!(state && !state->keyboard_event_mask_active)) {
@@ -70,17 +66,10 @@ static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
     }
 
     masked_real_mods = pd_mode_active_keyboard_event_masked_real_mods();
-    if (masked_real_mods == 0u) {
+    if (!keyboard_mod_policy_begin_real_mod_mask(masked_real_mods)) {
         return;
     }
 
-    filtered = keyboard_mod_policy_current_state();
-    if ((filtered.real & masked_real_mods) == 0u) {
-        return;
-    }
-
-    filtered = keyboard_mod_policy_without_real_mods(filtered, masked_real_mods);
-    keyboard_mod_state_apply(filtered);
     state->keyboard_event_masked_real_mods = masked_real_mods;
     state->keyboard_event_mask_active      = true;
 }

@@ -155,23 +155,24 @@ Recommended direction:
 - Add a short contract document or review subsection that states exactly which QMK internals it mirrors.
 - Prefer host tests that model same-key combos, fallback owners, pending outputs, and RGB partitioning.
 
-### Should-Fix: Modifier Masking and Replay Are Spread Across Subsystems
+### Resolved: Modifier Masking and Replay Are Centralized Behind Policy
 
 Keyboard modifier replay is intentionally careful, but the policy is scattered across action dispatch, key processing, delayed actions, and PD modes.
 
-Status as of 2026-04-28: partially resolved. Shared snapshot, filtering, managed-only masking, and delayed replay restoration now route through `users/noah/lib/state/runtime/keyboard_mod_policy.h` and `keyboard_mod_policy.c`. Action dispatch, delayed actions, key-runtime process masking, deferred release, transition release snapshots, tap-series saved-mod capture, and PD pinch managed-only masking now call that policy surface instead of open-coding local snapshot/filter helpers. The action-level public emit policy flags remain in `users/noah/lib/action/action_dispatch.h`, and PD arrow still owns mode-specific Shift lifecycle while using action dispatch for masked vertical taps, so the domain is improved but not fully collapsed into one high-level planner.
+Status as of 2026-04-28: resolved. Shared snapshot, filtering, preservation windows, masked emit windows, action replay restoration, managed-only masking, and real-mod masking now route through `users/noah/lib/state/runtime/keyboard_mod_policy.h` and `keyboard_mod_policy.c`. Action dispatch still exposes `noah_emit_policy_t` to decide whether an emitted action needs fallback settlement or modifier preservation, but the modifier preservation mechanics are now owned by `keyboard_mod_policy`. Delayed actions, key-runtime process masking, deferred release, transition release snapshots, tap-series saved-mod capture, and PD pinch managed-only masking also call that policy surface instead of open-coding local snapshot/filter/preserve helpers. PD arrow still owns mode-specific Shift lifecycle, which is mode state rather than modifier replay policy, and its masked vertical taps route through action dispatch and the shared policy below it.
 
 Evidence:
 
 - `users/noah/lib/state/runtime/keyboard_mod_state.c:7-30` suspends and reapplies keyboard modifiers.
-- `users/noah/lib/state/runtime/keyboard_mod_policy.h:17-24` and `keyboard_mod_policy.c:7-49` provide the shared current-state, filtering, managed-only masking, and replay-restoration policy surface.
-- `users/noah/lib/action/action_dispatch.c:16-74` wraps emitted actions with modifier preservation and settling, and uses `keyboard_mod_policy_without_mods()` for masked synthetic QMK taps.
+- `users/noah/lib/state/runtime/keyboard_mod_policy.h:17-39` and `keyboard_mod_policy.c:7-93` provide the shared current-state, filtering, preservation-window, masked-emit, action-replay, real-mod masking, managed-only masking, and replay-restoration policy surface.
+- `users/noah/lib/action/action_dispatch.c:16-72` wraps emitted actions with modifier preservation and settling, and uses `keyboard_mod_policy_begin_preserve_all()`, `keyboard_mod_policy_end_preserve_all()`, `keyboard_mod_policy_begin_masked_emit()`, and `keyboard_mod_policy_end_masked_emit()` for modifier behavior.
 - `users/noah/lib/action/action_dispatch.h:29-34` and `186-190` expose action-level modifier policies.
-- `users/noah/lib/key/runtime/process.c:48-85` masks active PD real modifiers and restores managed-only modifiers through `keyboard_mod_policy.h`.
-- `users/noah/lib/key/runtime/delayed_action.c:15-22` restores replayed one-shot modifier output through `keyboard_mod_policy_restore_after_action_replay()`.
+- `users/noah/lib/key/runtime/process.c:48-75` masks active PD real modifiers and restores managed-only modifiers through `keyboard_mod_policy_begin_real_mod_mask()` and `keyboard_mod_policy_end_real_mod_mask()`.
+- `users/noah/lib/key/runtime/delayed_action.c:15-20` runs delayed replay through `keyboard_mod_policy_begin_action_replay()` and `keyboard_mod_policy_end_action_replay()`.
 - `users/noah/lib/key/runtime/core/runtime.c:601-603` captures buffered tap-series modifier state through `keyboard_mod_policy.h`.
 - `users/noah/lib/pointing/modes/pd_mode_pinch.c:15-43` masks GUI during pinch behavior through `keyboard_mod_policy_managed_only_mask()`.
 - `users/noah/lib/pointing/modes/pd_mode_arrow.c:29-47` and `83-120` mask Alt and own Shift during arrow behavior.
+- `tests/host/keyboard_mod_ownership_test.c:164-368` covers current-state capture, filtering, replay restoration, preserve-all windows, masked emit windows, action replay windows, and real-mod mask windows.
 
 Why it matters:
 
@@ -179,8 +180,8 @@ This is one behavior domain with several local policies. That makes it hard to r
 
 Recommended direction:
 
-- Keep `keyboard_mod_policy.h` as the shared modifier mask/replay API and avoid adding new raw QMK snapshot/filter helpers in action dispatch, delayed actions, process flow, or PD modes.
-- Decide separately whether action-level `noah_emit_policy_t` flags should remain in action dispatch or move behind a higher-level runtime modifier replay planner.
+- Keep `keyboard_mod_policy.h` as the shared modifier mask/replay/preserve API and avoid adding new raw QMK snapshot/filter/preserve helpers in action dispatch, delayed actions, process flow, or PD modes.
+- Keep `noah_emit_policy_t` limited to action-dispatch intent such as "settle fallback holds" and "request modifier preservation"; do not let it own modifier mechanics.
 - Keep modifier-hold, PD-mode integration, action dispatch, delayed action, and keyboard mod ownership tests around future changes.
 
 ### Should-Fix: Compatibility Fallback Macros Keep Old Charybdis Names Alive
@@ -216,17 +217,56 @@ These can be cleaned up opportunistically after higher-risk authority and releas
 
 The userspace is not a random patch pile. Most compatibility behavior is centralized under `users/noah/lib/compat`, authored profile behavior is outside userspace, and RGB and macro modules are comparatively cohesive. The clutter is concentrated around runtime authority: key release planning, effect ownership, PD mode ownership, modifier masking, and combo origin recovery.
 
-The highest-value next work is not a broad rewrite. It is to write down and enforce who owns each runtime fact, then consolidate release and modifier behavior into smaller APIs that the current tests can verify.
+The highest-value next work is not a broad rewrite. Release behavior and modifier filtering now have smaller owner APIs. The remaining priority is to avoid calling partially resolved architecture findings done before their remaining bridge and API questions are either closed with enforcement or explicitly accepted as stable boundaries.
 
 ## Recommended Next Refactor Sequence
 
-1. Freeze current behavior with the relevant host tests before editing runtime code: key runtime release matrix, modifier-hold integration, PD mode integration, PD runtime, pointer layer policy, split sync, combo origin, RGB feedback, and full host suite.
-2. Create an ownership authority map for core leases, held actions, held repeats, layers, keyboard modifiers, and PD owners.
-3. Consolidate release behavior behind one release planner API, then remove transitional release helpers once tests prove parity.
-4. Continue splitting remaining `runtime.c` and `runtime.h` accumulator concerns into internal modules for broad reducer state surfaces.
-5. Tighten `qmk_combo_origin` with a documented QMK contract and host coverage for same-key combos, pending combo outputs, and RGB partitioning.
-6. Centralize keyboard modifier mask/replay policy so action dispatch, delayed action, key process, and PD modes share one contract.
-7. Clean up low-risk duplication only after the authority and release work is stable.
+1. Audit and close, or explicitly keep open, the remaining partially resolved areas: runtime accumulator and owner ledgers.
+2. For owner ledgers, decide whether the layer-lock write-back bridge needs the same compile-gate enforcement style as the PD lock bridge.
+3. Continue splitting remaining `runtime.c` and `runtime.h` accumulator concerns only when a clear owner emerges, such as a press/tap orchestration module.
+4. Tighten `qmk_combo_origin` later, after the user is ready to work on combo compatibility.
+5. Clean up low-risk duplication only after the authority and release work is stable.
+
+## 2026-04-28 Partial Finding Audit
+
+Prompt used: `prompts/follow-up-architecture-audit.md`.
+
+### Findings
+
+#### Should-Fix: Modifier emit preservation still has an action-owned policy surface
+
+Reconciliation note after remediation: resolved. The audit-time concern was valid when action dispatch still called `keyboard_mod_state_suspend()` and `keyboard_mod_state_apply()` directly. That has now landed behind `keyboard_mod_policy_begin_preserve_all()` and `keyboard_mod_policy_end_preserve_all()` in `users/noah/lib/action/action_dispatch.c:16-50`. Masked synthetic QMK taps use `keyboard_mod_policy_begin_masked_emit()` and `keyboard_mod_policy_end_masked_emit()` in `users/noah/lib/action/action_dispatch.c:64-72`. Delayed replay and process real-mod masking also route through `keyboard_mod_policy` in `users/noah/lib/key/runtime/delayed_action.c:15-20` and `users/noah/lib/key/runtime/process.c:48-75`. `noah_emit_policy_t` remains action-dispatch intent, but it no longer owns modifier preservation mechanics.
+
+#### Should-Fix: Layer-lock write-back is documented but not mechanically guarded like PD lock observation
+
+The owner-ledger direction is much clearer than the original review snapshot: `core/projection.c:21-88` projects effects outward, and `docs/KEY_RUNTIME.md:128-140` documents the authority map. PD lock observation has an explicit bridge in `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c:1-7` plus a compile gate in `tests/host/run_feature_gate_compile_tests.sh:129-152`. Layer lock write-back remains an accepted two-way bridge through `users/noah/lib/state/ownership/layer_ownership.c:116-140`, which calls `key_runtime_core_layer_lock_set()`, but there is no equivalent compile-gate rule limiting that core write-back to the documented bridge. This is not a behavior bug, but it is why the owner-ledger finding should remain partially resolved.
+
+#### Optional Cleanup: Runtime core remains broad, but further splitting needs a better target
+
+`users/noah/lib/key/runtime/core/runtime.h:298-333` still stores the whole reducer state shape, and `users/noah/lib/key/runtime/core/runtime.c` is still 1099 lines with press-token lifecycle, tap-series lifecycle, event observation, active interruption, press handling, release handling, and scan entry points. The previous splits removed clear owner APIs for release planning, pending-release queueing, projection, scan planning, ownership state, state queries, feedback projection, and PD projection. The remaining breadth is real, but a mechanical split without a strong owner would mostly add indirection. Keep this partially resolved until a clear next module boundary appears.
+
+### Prior Finding Status
+
+| Prior finding | Status | Audit result |
+| --- | --- | --- |
+| Key Runtime Core Is an Ad-Hoc Policy Accumulator | partially resolved | Extracted modules now own release planning, projection, scan planning, ownership state, pending-release queueing, state queries, feedback projection, and PD projection. `runtime.h` still exposes the broad core state shape, and `runtime.c` remains the press/tap orchestration owner. |
+| Release Semantics Are Consolidated | resolved | Code references: `core/release_planner.h`, `core/release_planner.c`, `deferred_release.c`, `core/pending_release_queue.c`, and thin `release.c` adapter. Enforcement references: release matrix, scenario, runtime debug, full host, compile gate, and firmware compile checks recorded in `progress.md`. Exact passed commands: `sh tests/host/run_key_runtime_release_matrix_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Multiple Owner Ledgers Track the Same Runtime Facts | partially resolved | Projection direction and authority docs are much clearer, and PD lock observation is mechanically gated. The layer-lock write-back bridge remains documented but not mechanically guarded in the same way. |
+| PD Mode Authority Boundary Is Explicit | resolved | Code references: `core/pd_projection.c`, `pd_mode_state.c`, `pd_mode_key_runtime_bridge.c`, and `ownership_state.c`. Enforcement references: `tests/host/run_feature_gate_compile_tests.sh:129-152` plus PD/key-runtime and PD runtime tests recorded in `progress.md`. Exact passed commands: `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Combo Origin Is a Large Shadow Compatibility Patch | open | Not audited in depth in this pass because the user explicitly deferred combo work. The finding remains open. |
+| Modifier Masking and Replay Are Spread Across Subsystems | resolved | Code references: `keyboard_mod_policy.h`, `keyboard_mod_policy.c`, `action_dispatch.c`, `delayed_action.c`, `process.c`, `runtime.c`, `transition.c`, `deferred_release.c`, and `pd_mode_pinch.c`. Enforcement references: direct keyboard mod policy tests in `keyboard_mod_ownership_test.c`, action dispatch tests, delayed action tests, modifier-hold integration, PD mode tests, PD/key-runtime integration, feature gate, full host, and firmware compile. Exact passed commands include `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_action_dispatch_tests.sh`, `sh tests/host/run_delayed_action_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Compatibility Fallback Macros Keep Old Charybdis Names Alive | open | Still open and intentionally lower priority than the partial runtime findings. |
+| Repeated Small Helpers | open | Optional cleanup only; not part of this audit pass. |
+
+### Current Conclusion
+
+After modifier remediation, two partial findings remain accurate: owner ledgers need a decision about layer-lock bridge enforcement, and runtime accumulator cleanup should wait for a clearer next owner boundary. Modifier masking/replay is resolved.
+
+### Remaining Open Findings
+
+- Add or explicitly decline a compile-gate guard for the layer-lock bridge.
+- Keep runtime accumulator cleanup focused on a real owner boundary, not a generic file-size split.
+- Leave combo-origin compatibility work for a later pass, per user preference.
 
 ## Per-File Inventory
 

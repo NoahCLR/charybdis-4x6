@@ -31,6 +31,52 @@ keyboard_mod_state_t keyboard_mod_policy_with_real_mods(keyboard_mod_state_t sta
     return state;
 }
 
+keyboard_mod_state_t keyboard_mod_policy_begin_preserve_all(void) {
+    return keyboard_mod_state_suspend();
+}
+
+void keyboard_mod_policy_end_preserve_all(keyboard_mod_state_t saved) {
+    keyboard_mod_state_apply(saved);
+}
+
+keyboard_mod_state_t keyboard_mod_policy_begin_masked_emit(uint8_t masked_mods) {
+    keyboard_mod_state_t saved = keyboard_mod_policy_current_state();
+
+    keyboard_mod_state_apply(keyboard_mod_policy_without_mods(saved, masked_mods));
+    return saved;
+}
+
+void keyboard_mod_policy_end_masked_emit(keyboard_mod_state_t saved) {
+    keyboard_mod_state_apply(saved);
+}
+
+keyboard_mod_state_t keyboard_mod_policy_begin_action_replay(keyboard_mod_state_t replay_mods) {
+    keyboard_mod_state_t saved = keyboard_mod_state_suspend();
+
+    keyboard_mod_state_apply(replay_mods);
+    return saved;
+}
+
+void keyboard_mod_policy_end_action_replay(uint16_t action, keyboard_mod_state_t saved) {
+    keyboard_mod_state_apply(keyboard_mod_policy_restore_after_action_replay(action, saved));
+}
+
+bool keyboard_mod_policy_begin_real_mod_mask(uint8_t masked_real_mods) {
+    keyboard_mod_state_t filtered;
+
+    if (masked_real_mods == 0u) {
+        return false;
+    }
+
+    filtered = keyboard_mod_policy_current_state();
+    if ((filtered.real & masked_real_mods) == 0u) {
+        return false;
+    }
+
+    keyboard_mod_state_apply(keyboard_mod_policy_without_real_mods(filtered, masked_real_mods));
+    return true;
+}
+
 keyboard_mod_state_t keyboard_mod_policy_restore_after_action_replay(uint16_t action, keyboard_mod_state_t saved) {
     keyboard_mod_state_t emitted;
 
