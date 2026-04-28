@@ -1,5 +1,7 @@
 #include "pd_projection.h"
 
+#include "ownership_state.h"
+
 #include "../../../pointing/defs/pd_modes.h"
 #include "../../../state/runtime/runtime_trace.h"
 #include "../../ownership/held_action.h"

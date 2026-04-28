@@ -9,7 +9,7 @@
 #include "layer_ownership.h"
 
 #include "noah_keymap_ids.h"
-#include "../../key/runtime/core/runtime.h"
+#include "../../key/runtime/core/ownership_state.h"
 #include "../runtime/runtime_context_internal.h"
 #include "../runtime/runtime_trace.h"
 

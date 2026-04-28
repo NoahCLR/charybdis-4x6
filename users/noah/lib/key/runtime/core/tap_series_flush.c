@@ -1,6 +1,7 @@
 #include "tap_series.h"
 
 #include "effect_plan.h"
+#include "state_query.h"
 
 #include "../../../compat/qmk_combo_origin.h"
 

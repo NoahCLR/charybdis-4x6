@@ -2,6 +2,8 @@
 
 #include "release_internal.h"
 
+#include "state_query.h"
+
 #include "../../../pointing/defs/pd_modes.h"
 
 static void key_runtime_core_release_effect_plan_push(key_runtime_core_release_effect_plan_t *plan, key_runtime_effect_t effect) {

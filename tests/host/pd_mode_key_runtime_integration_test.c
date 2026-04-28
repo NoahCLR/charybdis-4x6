@@ -13,6 +13,7 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/key/runtime/core/projection.h"
 #include "users/noah/lib/key/runtime/core/runtime.h"
+#include "users/noah/lib/key/runtime/core/state_query.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"
 #include "users/noah/lib/state/runtime/runtime_reset.h"
 #include "users/noah/noah_runtime.h"

@@ -1,8 +1,10 @@
 #include "projection.h"
 
 #include "feedback_projection.h"
+#include "ownership_state.h"
 #include "pd_projection.h"
 #include "pending_release_queue.h"
+#include "state_query.h"
 #include "trace.h"
 
 #include <string.h>

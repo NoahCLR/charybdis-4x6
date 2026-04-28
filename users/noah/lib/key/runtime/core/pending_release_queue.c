@@ -1,5 +1,7 @@
 #include "pending_release_queue.h"
 
+#include "state_query.h"
+
 static keypos_t key_runtime_core_pending_release_invalid_keypos(void) {
     return (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
 }

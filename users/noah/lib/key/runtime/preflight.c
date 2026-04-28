@@ -7,7 +7,7 @@
 #include "trace.h"
 #include "transition.h"
 #include "../../action/action_dispatch.h"
-#include "core/runtime.h"
+#include "core/state_query.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {

@@ -61,6 +61,7 @@ compile_test() {
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/transition.c" \
     "$ROOT/users/noah/lib/key/runtime/core/runtime.c" \
+    "$ROOT/users/noah/lib/key/runtime/core/state_query.c" \
     "$ROOT/users/noah/lib/key/runtime/core/ownership_state.c" \
     "$ROOT/users/noah/lib/key/runtime/core/pending_release_queue.c" \
     "$ROOT/users/noah/lib/key/runtime/core/feedback_projection.c" \
