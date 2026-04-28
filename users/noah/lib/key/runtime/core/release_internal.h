@@ -47,24 +47,6 @@ typedef struct {
 } key_runtime_core_pending_multi_tap_release_resolution_t;
 
 typedef enum {
-    KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_NONE = 0,
-    KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD,
-    KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD,
-    KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH,
-    KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_RELEASE_HOLD_PENDING,
-} key_runtime_core_pending_multi_tap_scan_outcome_t;
-
-typedef struct {
-    key_runtime_core_pending_multi_tap_scan_outcome_t outcome;
-    hold_behavior_t                                   hold;
-    handled_key_hold_semantics_t                      semantics;
-    bool                                              completes_hold;
-    uint16_t                                          action;
-    uint8_t                                           repeat_count;
-    uint8_t                                           tap_count;
-} key_runtime_core_pending_multi_tap_scan_resolution_t;
-
-typedef enum {
     KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_NONE = 0,
     KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_RESET,
     KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_CLEAR_ACTIVE_PRESERVE_PENDING_MULTI_TAP,
@@ -95,7 +77,6 @@ bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_
 bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t keycode, const key_runtime_core_active_release_resolution_t *resolution, key_runtime_core_release_effect_plan_t *out);
 bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, key_runtime_core_pending_multi_tap_release_resolution_t *out);
 bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, bool is_momentary_layer, const key_runtime_core_pending_multi_tap_release_resolution_t *resolution, delayed_action_mods_t mods, key_runtime_core_release_effect_plan_t *out);
-bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runtime_core_pending_multi_tap_scan_resolution_t *out);
 
 bool          key_runtime_core_keypos_valid(keypos_t key_pos);
 bool          key_runtime_core_owner_has_lease_kind(const key_runtime_core_state_t *state, uint16_t owner_token_id, lease_kind_t kind);

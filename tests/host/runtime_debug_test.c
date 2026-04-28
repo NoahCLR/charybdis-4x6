@@ -17,6 +17,7 @@
 #include "users/noah/lib/key/runtime/core/runtime.h"
 #include "users/noah/lib/key/runtime/core/projection.h"
 #include "users/noah/lib/key/runtime/core/release_internal.h"
+#include "users/noah/lib/key/runtime/core/scan_planner.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/runtime/runtime_debug.h"

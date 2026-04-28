@@ -779,3 +779,64 @@ All listed pass/fail commands passed. The `--no-index` whitespace checks returne
 1. Continue with pending multi-tap scan threshold planning if reducing `runtime.c` remains the priority.
 2. Keep `pending_release_queue.c` limited to queue mechanics; release decisions stay in `release_planner.c` and blocked-release adaptation stays in `deferred_release.c`.
 3. Preserve release matrix, modifier-hold, PD/key-runtime, scenario, layer-lock, runtime-debug, full host, compile-gate, and firmware compile coverage for the next runtime split.
+
+## 2026-04-28 - Scan Planner Split
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/core/scan_planner.h` and `users/noah/lib/key/runtime/core/scan_planner.c`.
+- Moved pending multi-tap scan resolution, active scan hold promotion, release-hold-pending marking, branch-confirm completion, threshold hold effect planning, and pending fallback hold settlement out of `runtime.c`.
+- Kept press-token, tap-series, and lease storage in `key_runtime_core_state_t`; the new module plans over core state and does not introduce a second scan state truth.
+- Moved branch-confirm window setup and same-key branch-confirm interruption into `tap_series_flush.c`, alongside existing tap-series flush mechanics.
+- Moved the pending multi-tap scan resolution contract from `release_internal.h` to `scan_planner.h`.
+- Expanded `effect_plan.h` so internal core modules append dispatch, held-action, repeat, release-owned-state, and deferred delayed-action effects through shared helpers.
+- Wired `scan_planner.c` into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and the manual key-runtime/PD integration runners that compile `runtime.c`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so scan-time hold and pending multi-tap planning are documented as an explicit core module.
+
+## Finding Status
+
+- The broader key-runtime accumulator finding remains partially resolved.
+- Resolved in this pass:
+  - scan-time active hold promotion now lives in `scan_planner.c`
+  - pending multi-tap scan outcomes now live in `scan_planner.c`
+  - fallback hold settlement now lives in `scan_planner.c`
+  - branch-confirm window setup/completion is split between tap-series helpers and scan planning instead of local `runtime.c` helpers
+  - source manifests and host runners mechanically include the new module
+- Still open:
+  - broad runtime state/debug surfaces remain in `runtime.h`
+  - effect projection and some owner-ledger boundaries remain in `runtime.c`
+
+## Verification
+
+Post-change targeted checks:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/scan_planner.c`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/scan_planner.h`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks returned the expected nonzero diff status for new files and produced no diagnostics.
+
+## Next Steps
+
+1. Continue with broad runtime state/debug surface cleanup if reducing `runtime.h` remains the priority.
+2. Keep `scan_planner.c` limited to scan-time hold, pending multi-tap scan, and fallback-hold settlement mechanics.
+3. Preserve runtime debug, runtime trace, integration harness, PD/key-runtime, scenario, release matrix, full host, compile-gate, and firmware compile coverage for further runtime splits.
