@@ -437,7 +437,9 @@ The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keyma
 `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`.
 
 The runtime now keeps truthful per-key semantic state, per-key flash
-visibility, and a broad-surface owner map. `RGB_KEYS_ONLY` renders each key
+visibility, and a broad-surface owner map. Owner ordering uses a 32-bit runtime
+feedback activation sequence, while flash visibility still uses each owner's
+activation timer for its own on/off phase. `RGB_KEYS_ONLY` renders each key
 directly from that per-key truth. Broader localities choose the newest active
 feedback owner for the painted surface first, then use that owner's real
 visibility phase; if that owner is in its off window, the surface stays off

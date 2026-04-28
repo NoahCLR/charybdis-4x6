@@ -1552,3 +1552,47 @@ Next steps:
 1. Flash and hold two same-half symbol keys with staggered hold thresholds.
    The broad half should follow the newest held key and should not become
    steady because an older key is in the opposite flash phase.
+
+### Broad-Surface Owner Sequence Follow-Up
+
+- Replaced broad key-feedback owner ordering based on 16-bit activation times
+  with an explicit 32-bit runtime feedback activation sequence. Timers still
+  drive the visible flash phase, but owner choice no longer depends on wrapped
+  timer comparison.
+- Added sequence storage for feedback pulses, tap-series branch feedback,
+  press-token threshold feedback, and held/repeat leases. Broad surfaces choose
+  the newest active owner from that shared sequence; flashing keys still render
+  from each owner's own phase.
+- Kept `RGB_KEYS_ONLY` as direct per-key truth and kept split sync's broad
+  owner payload shape unchanged.
+- Added a runtime-debug regression that crosses a 16-bit timer wrap gap between
+  two held-action activations and asserts the newer activation still owns the
+  broad surface.
+
+Verification passed:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_rgb_validation_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_validation_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No required checks were skipped.
+
+Next steps:
+
+1. Flash and repeat the staggered same-half symbol-key hold test. The broad
+   surface should follow the newest activation even after long uptime or timer
+   wrap, and releasing the newest key should fall back to the older key's
+   existing phase.

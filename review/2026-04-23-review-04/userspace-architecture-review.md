@@ -20,7 +20,9 @@ authoring docs. Later follow-up tightened tap-branch feedback semantics so the
 base single-tap candidate stays quiet and only double-tap or higher branches
 emit unresolved or committed branch feedback. This pass also replaced the
 shared key-feedback flash phase with per-owner flash visibility so held/repeat
-feedback starts with an on window when each key activates.
+feedback starts with an on window when each key activates. Broad key-feedback
+surfaces now use a 32-bit runtime activation sequence for newest-owner
+ordering, so their owner choice is independent from wrapped timer phase.
 
 ## Findings
 
@@ -149,7 +151,8 @@ None.
   tap-branch state are separate RPC payloads.
 - Flashing held/repeat feedback now uses per-owner visibility instead of one
   shared global flash phase. Runtime leases store the activation time for
-  held-action and repeat feedback; `key_feedback_flash_visibility_bitmap()`
+  held-action and repeat feedback phase and a separate 32-bit activation
+  sequence for newest-owner ordering; `key_feedback_flash_visibility_bitmap()`
   exports which flashing keys are currently visible. Split sync sends that
   bitmap with the semantic packet, and the RGB key-feedback stage ignores
   hidden flashing semantics when choosing half/global priority or LED-group
@@ -313,11 +316,13 @@ with behavior for paths such as `LEFT_THUMB` double-tap hold crossing into
 Flashing held/repeat feedback is now precise per owner. The semantic map still
 names the active state, while a separate visibility bitmap carries the current
 per-key flash window and a broad owner map identifies the newest active owner
-for compressed surfaces. That lets the first visible window start at activation
-time for each key. `RGB_KEYS_ONLY` renders the per-key truth directly; half,
-fixed-half, full-board, and feedback LED-group surfaces choose their newest
-active owner first and then follow that owner's real flash phase instead of
-OR-ing offset owners together.
+for compressed surfaces. Newest-owner ordering is based on the 32-bit runtime
+feedback activation sequence, not the 16-bit timer value used for flash phase.
+That lets the first visible window start at activation time for each key.
+`RGB_KEYS_ONLY` renders the per-key truth directly; half, fixed-half,
+full-board, and feedback LED-group surfaces choose their newest active owner
+first and then follow that owner's real flash phase instead of OR-ing offset
+owners together.
 
 Pending multi-tap dispatch is intentionally split by destination: foreign
 handled keys keep independent authored pending chains, while foreign

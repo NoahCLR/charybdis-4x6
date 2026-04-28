@@ -14,6 +14,7 @@ static noah_runtime_context_t noah_runtime_singleton = {
                 {
                     .next_token_id                 = 1u,
                     .next_pending_release_sequence = 1u,
+                    .next_feedback_sequence        = 1u,
                 },
         },
 };

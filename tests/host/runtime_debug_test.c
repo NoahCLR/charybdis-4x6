@@ -1334,6 +1334,30 @@ static void test_key_feedback_broad_owner_follows_newest_activation_without_rele
     CHECK(key_origin_bitmap_has_keypos(visibility_bitmap, first_key));
 }
 
+static void test_key_feedback_broad_owner_uses_activation_sequence_across_timer_wrap(void) {
+    uint8_t  owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
+    keypos_t first_key  = test_keypos(6, 2);
+    keypos_t second_key = test_keypos(6, 3);
+    keypos_t owner;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_HELD_ACTION_KEY, first_key, fake_time);
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 1u);
+    key_runtime_core_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, fake_time);
+    key_runtime_core_observe_held_action_register(first_key, TEST_ACTION);
+
+    fake_time = (uint16_t)(fake_time + 0x9000u);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_HELD_ACTION_KEY, second_key, fake_time);
+    key_runtime_core_observe_held_action_register(second_key, TEST_ACTION);
+
+    key_feedback_broad_owner_map(owner_map);
+    owner = key_feedback_broad_owner_map_get(owner_map, KEY_FEEDBACK_BROAD_OWNER_GLOBAL);
+    CHECK(owner.row == second_key.row);
+    CHECK(owner.col == second_key.col);
+}
+
 static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hold_threshold(void) {
     key_runtime_core_pending_multi_tap_scan_resolution_t resolution;
     const tap_series_t                                  *series;
@@ -2268,6 +2292,7 @@ int main(void) {
     test_key_feedback_maps_show_final_tap_only_neutral_pending_then_branch_commit();
     test_key_feedback_flashing_visibility_tracks_each_owner_activation();
     test_key_feedback_broad_owner_follows_newest_activation_without_release_restart();
+    test_key_feedback_broad_owner_uses_activation_sequence_across_timer_wrap();
     test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hold_threshold();
     test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_long_hold();
     test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expired_chain();

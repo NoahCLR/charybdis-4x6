@@ -88,7 +88,9 @@ typedef struct {
     uint16_t                       released_at;
     uint16_t                       hold_term_ms;
     uint16_t                       longer_hold_term_ms;
+    uint32_t                       feedback_sequence;
     press_token_phase_t            phase;
+    uint8_t                        feedback_level;
     bool                           handled_key;
     bool                           tap_outcome_available;
     bool                           pd_mode_was_locked_on_press;
@@ -137,6 +139,7 @@ typedef struct {
     uint16_t             last_action;
     uint16_t             last_tap_at;
     uint16_t             tap_term_ms;
+    uint32_t             feedback_sequence;
     keyboard_mod_state_t saved_mod_state;
 } tap_series_t;
 
@@ -190,6 +193,7 @@ typedef struct {
     uint16_t                    owner_token_id;
     key_runtime_packed_keypos_t owner_packed_key_pos;
     uint16_t                    feedback_started_at;
+    uint32_t                    feedback_sequence;
     union {
         uint8_t layer;
         struct {
@@ -209,7 +213,7 @@ typedef struct {
     } data;
 } lease_t;
 
-_Static_assert(sizeof(lease_t) <= 12u, "lease_t must stay compact");
+_Static_assert(sizeof(lease_t) <= 16u, "lease_t must stay compact");
 
 typedef enum {
     PERSISTENT_INTENT_KIND_NONE = 0,
@@ -301,6 +305,7 @@ typedef struct {
     uint16_t                             current_time;
     uint16_t                             next_token_id;
     uint16_t                             next_pending_release_sequence;
+    uint32_t                             next_feedback_sequence;
     uint8_t                              press_token_count;
     uint8_t                              tap_series_count;
     uint8_t                              lease_count;
@@ -310,11 +315,13 @@ typedef struct {
     uint8_t                              orphan_release_count;
     uint8_t                              cancelled_press_count;
     uint16_t                             feedback_pulse_timer;
+    uint32_t                             feedback_pulse_sequence;
     bool                                 feedback_pulse_active;
     key_feedback_pulse_kind_t            feedback_pulse_kind;
     keypos_t                             feedback_pulse_key_pos;
     uint8_t                              feedback_pulse_tap_branch;
     bool                                 feedback_pulse_queued;
+    uint32_t                             feedback_pulse_queued_sequence;
     key_feedback_pulse_kind_t            feedback_pulse_queued_kind;
     keypos_t                             feedback_pulse_queued_key_pos;
     uint8_t                              feedback_pulse_queued_tap_branch;
@@ -325,6 +332,26 @@ typedef struct {
     uint8_t                              keyboard_event_masked_real_mods;
     bool                                 keyboard_event_mask_active;
 } key_runtime_core_state_t;
+
+static inline uint32_t key_runtime_core_state_next_feedback_sequence(key_runtime_core_state_t *state) {
+    uint32_t sequence;
+
+    if (!state) {
+        return 0u;
+    }
+
+    sequence = state->next_feedback_sequence;
+    if (sequence == 0u) {
+        sequence = 1u;
+    }
+
+    state->next_feedback_sequence = sequence + 1u;
+    if (state->next_feedback_sequence == 0u) {
+        state->next_feedback_sequence = 1u;
+    }
+
+    return sequence;
+}
 
 key_runtime_core_state_t                   *key_runtime_core_state(void);
 void                                        key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan);
@@ -369,6 +396,7 @@ uint16_t                                    key_runtime_core_held_action_keycode
 bool                                        key_runtime_core_repeat_active_at(keypos_t key_pos);
 bool                                        key_runtime_core_flashing_feedback_visible_at(keypos_t key_pos);
 bool                                        key_runtime_core_flashing_feedback_started_at(keypos_t key_pos, uint16_t *out_started_at);
+bool                                        key_runtime_core_flashing_feedback_sequence_at(keypos_t key_pos, uint32_t *out_sequence);
 key_runtime_slot_phase_t                    key_runtime_core_slot_phase_at(keypos_t key_pos);
 bool                                        key_runtime_core_momentary_layer_tap_interrupted_at(keypos_t key_pos);
 uint8_t                                     key_runtime_core_pending_multi_tap_tap_count_at(keypos_t key_pos);
@@ -397,6 +425,7 @@ static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state)
     *state                                     = (key_runtime_core_state_t){0};
     state->next_token_id                       = 1u;
     state->next_pending_release_sequence       = 1u;
+    state->next_feedback_sequence              = 1u;
     state->preview_display_last_semantic_layer = UINT8_MAX;
     state->preview_display_bridge_layer        = UINT8_MAX;
 }
