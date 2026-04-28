@@ -411,7 +411,7 @@ const key_runtime_core_shadow_projection_t *key_runtime_core_shadow_projection(v
 uint8_t                                     key_runtime_core_pending_release_count_for_keypos(keypos_t key_pos);
 uint8_t                                     key_runtime_core_deferred_release_blocker_count_for_keypos(keypos_t key_pos);
 void                                        key_runtime_core_layer_lock_set(uint8_t layer, bool active);
-void                                        key_runtime_core_pd_mode_lock_set(pd_mode_mask_t mode, bool active);
+void                                        key_runtime_core_observe_pd_mode_lock_state(pd_mode_mask_t mode, bool active);
 void                                        key_runtime_core_observe_release_dispatch_deferred(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
 void                                        key_runtime_core_observe_release_dispatch_drained(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
 projection_snapshot_t                       key_runtime_core_projection_snapshot_capture(void);

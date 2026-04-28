@@ -142,11 +142,11 @@ check_runtime_sealing_boundaries() {
     pd_runtime_key_core_call_violations="$(
         (
             cd "$ROOT"
-            rg -n 'key_runtime_core_pd_mode_lock_set' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
+            rg -n 'key_runtime_core_observe_pd_mode_lock_state' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
         )
     )"
     if [ -n "$pd_runtime_key_core_call_violations" ]; then
-        echo "pd runtime modules must write back pd lock state through pd_mode_key_runtime_bridge.c" >&2
+        echo "pd runtime modules must observe pd lock state through pd_mode_key_runtime_bridge.c" >&2
         printf '%s\n' "$pd_runtime_key_core_call_violations" >&2
         exit 1
     fi

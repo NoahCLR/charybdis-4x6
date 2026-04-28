@@ -4,4 +4,6 @@
 
 #include "../defs/pd_mode_flags.h"
 
-void pd_mode_key_runtime_bridge_observe_lock_state(pd_mode_mask_t mode, bool locked);
+// PD runtime owns the actual local PD lock state. Key runtime observes changed
+// local lock state here to keep its shadow projection coherent.
+void pd_mode_key_runtime_bridge_observe_local_lock_state(pd_mode_mask_t mode, bool locked);

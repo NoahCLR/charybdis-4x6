@@ -3911,7 +3911,7 @@ void key_runtime_core_layer_lock_set(uint8_t layer, bool active) {
     }
 }
 
-void key_runtime_core_pd_mode_lock_set(pd_mode_mask_t mode, bool active) {
+void key_runtime_core_observe_pd_mode_lock_state(pd_mode_mask_t mode, bool active) {
     key_runtime_core_state_t *state   = key_runtime_core_state();
     bool                      changed = false;
 

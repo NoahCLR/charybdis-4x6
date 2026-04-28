@@ -357,10 +357,10 @@ Starting worktree status:
 ## Completed
 
 - Added `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.h` and `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`.
-- Moved the PD lock write-back call to `key_runtime_core_pd_mode_lock_set()` out of `pd_mode_state.c` and into the bridge.
+- Moved the direct PD lock write-back out of `pd_mode_state.c` and into the bridge.
 - Updated `pd_mode_state.c` so it no longer includes `users/noah/lib/key/runtime/core/runtime.h` directly.
 - Wired the new bridge source into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and the manual host runners that compile `pd_mode_state.c`.
-- Added feature-gate checks so production PD runtime code outside `pd_mode_key_runtime_bridge.c` cannot include `key/runtime/core/runtime.h` or call `key_runtime_core_pd_mode_lock_set()`.
+- Added feature-gate checks so production PD runtime code outside `pd_mode_key_runtime_bridge.c` cannot include `key/runtime/core/runtime.h` or write directly into key-runtime core.
 - Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` to describe the bridge as an explicit transition point.
 
 ## Finding Status
@@ -414,3 +414,64 @@ diagnostics.
 1. Decide whether the remaining PD lock write-back should become a core-owned command completion event or a PD-owned snapshot observation.
 2. Split core PD effect projection only after the bridge semantics are covered by PD mode integration, PD runtime, pointer policy, split sync, runtime debug, full host, and firmware compile checks.
 3. Keep `pd_mode_state.c` free of direct key-runtime core includes and direct core lock-shadow writes.
+
+## 2026-04-28 - PD Lock Observation Contract
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Renamed the key-runtime receiver from `key_runtime_core_pd_mode_lock_set()` to `key_runtime_core_observe_pd_mode_lock_state()`.
+- Renamed the bridge entrypoint to `pd_mode_key_runtime_bridge_observe_local_lock_state()`.
+- Centralized local PD lock/unlock handling through `pd_mode_apply_local_lock_state_at()` so public set/toggle and internal lock/unlock helpers observe changed local lock state through the same bridge.
+- Updated feature-gate checks so PD runtime code outside the bridge cannot call `key_runtime_core_observe_pd_mode_lock_state()` directly.
+- Updated scenario/stub tests, key-runtime docs, and the active architecture review to describe the Option 1 contract: PD runtime owns actual local PD state; key runtime observes changed local lock state for projection.
+
+## Finding Status
+
+- PD mode authority remains partially resolved, but the intended direction is now explicit in code names and enforcement.
+- Resolved in this pass:
+  - the core API is named as an observation, not an ownership setter
+  - all local PD lock entrypoints share one observation path
+  - feature gates enforce the bridge as the only PD-runtime caller of the key-runtime observation API
+- Still open:
+  - key runtime still directly projects PD lock/toggle effects from `runtime.c`
+  - PD held-action preemption still lives in `runtime.c`
+  - the next split should move core-side PD projection/preemption behind a small internal module without changing PD runtime ownership
+
+## Verification
+
+Pre-change baseline:
+
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Post-change targeted checks:
+
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+All listed pass/fail commands passed.
+
+## Next Steps
+
+1. Split the core-side PD projection/preemption code out of `runtime.c` behind an internal key-runtime PD projection module.
+2. Keep PD runtime as the owner of actual local/display/remote/split mode state.
+3. Preserve PD mode integration, PD runtime, pointer policy, split sync, runtime debug, scenario, full host, and firmware compile coverage for that split.

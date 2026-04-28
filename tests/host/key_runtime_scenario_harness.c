@@ -213,7 +213,7 @@ void key_runtime_scenario_define_pd_mode_key(uint16_t keycode, pd_mode_mask_t mo
     key_runtime_scenario_add_pd_mode(keycode, mode);
     if (locked) {
         key_runtime_scenario_pd_locked_modes |= mode;
-        key_runtime_core_pd_mode_lock_set(mode, true);
+        key_runtime_core_observe_pd_mode_lock_state(mode, true);
     }
 }
 
@@ -225,7 +225,7 @@ void key_runtime_scenario_set_pd_locked_modes(pd_mode_mask_t modes) {
             continue;
         }
 
-        key_runtime_core_pd_mode_lock_set(bit, (modes & bit) != 0u);
+        key_runtime_core_observe_pd_mode_lock_state(bit, (modes & bit) != 0u);
         changed &= (pd_mode_mask_t)~bit;
     }
 
@@ -433,7 +433,7 @@ bool is_pd_mode_lock_action(uint16_t action) {
 
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     key_runtime_scenario_pd_locked_modes ^= mode;
-    key_runtime_core_pd_mode_lock_set(mode, (key_runtime_scenario_pd_locked_modes & mode) != 0u);
+    key_runtime_core_observe_pd_mode_lock_state(mode, (key_runtime_scenario_pd_locked_modes & mode) != 0u);
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind                  = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
         .data.pd_mode_lock_tap = {.pd_mode = mode, .key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS}},
@@ -443,7 +443,7 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
 
 bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
     key_runtime_scenario_pd_locked_modes ^= mode;
-    key_runtime_core_pd_mode_lock_set(mode, (key_runtime_scenario_pd_locked_modes & mode) != 0u);
+    key_runtime_core_observe_pd_mode_lock_state(mode, (key_runtime_scenario_pd_locked_modes & mode) != 0u);
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind                  = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
         .data.pd_mode_lock_tap = {.pd_mode = mode, .key_pos = key_pos},

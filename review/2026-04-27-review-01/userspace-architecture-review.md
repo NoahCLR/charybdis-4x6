@@ -71,7 +71,7 @@ Recommended direction:
 
 Several modules track "who owns this held effect" independently. Some are necessary QMK-facing registries, but the current design makes authority easy to blur.
 
-Status as of 2026-04-28: partially resolved. `docs/KEY_RUNTIME.md` now contains an ownership authority map that labels reducer-owned state, release planner state, pending-release transport, projected ownership registries, PD runtime ownership, feedback projection, and combo-origin compatibility state. The code still has real bridge points, especially layer lock write-back through `layer_ownership_set_lock_state()` and PD lock write-back through `pd_mode_key_runtime_bridge_observe_lock_state()`, so this is not fully resolved yet.
+Status as of 2026-04-28: partially resolved. `docs/KEY_RUNTIME.md` now contains an ownership authority map that labels reducer-owned state, release planner state, pending-release transport, projected ownership registries, PD runtime ownership, feedback projection, and combo-origin compatibility state. The code still has real bridge points, especially layer lock write-back through `layer_ownership_set_lock_state()` and PD lock observation through `pd_mode_key_runtime_bridge_observe_local_lock_state()`, so this is not fully resolved yet.
 
 Evidence:
 
@@ -99,7 +99,7 @@ Recommended direction:
 
 PD mode behavior is enforced from both key runtime and PD runtime. This appears intentional, but the current two-way coupling is high-risk.
 
-Status as of 2026-04-28: partially resolved. The PD runtime no longer includes `users/noah/lib/key/runtime/core/runtime.h` directly from `pd_mode_state.c`, and the only production PD-runtime call to `key_runtime_core_pd_mode_lock_set()` is isolated in `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`. The feature-gate compile check now enforces that direction. This is a boundary extraction only; key-runtime intent and PD-runtime hardware/mode state are not fully separated yet.
+Status as of 2026-04-28: partially resolved. The PD runtime no longer includes `users/noah/lib/key/runtime/core/runtime.h` directly from `pd_mode_state.c`, and the only production PD-runtime call to `key_runtime_core_observe_pd_mode_lock_state()` is isolated in `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`. Local PD lock and unlock entrypoints now route through one local-lock helper before observing changed state into core. The feature-gate compile check enforces that direction. This is a boundary extraction only; key-runtime intent and PD-runtime hardware/mode state are not fully separated yet.
 
 Evidence:
 
@@ -107,9 +107,11 @@ Evidence:
 - Key runtime projects PD lock and toggle effects in `users/noah/lib/key/runtime/core/runtime.c:561-565`.
 - PD runtime stores local owner slots and exclusive ownership in `users/noah/lib/pointing/runtime/pd_mode_state.c:287-351`.
 - PD runtime clears owner state and commands in `users/noah/lib/pointing/runtime/pd_mode_state.c:537-627`.
-- `pd_mode_set_lock_state_at()` writes changed PD lock state through `pd_mode_key_runtime_bridge_observe_lock_state()` in `users/noah/lib/pointing/runtime/pd_mode_state.c:687-697`.
-- PD lock state writes back into core shadow state through `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c:1-7`.
-- `tests/host/run_feature_gate_compile_tests.sh:129-152` prevents PD runtime modules other than the bridge from including `key/runtime/core/runtime.h` or calling `key_runtime_core_pd_mode_lock_set()`.
+- Local PD lock/unlock state changes route through `pd_mode_apply_local_lock_state_at()` in `users/noah/lib/pointing/runtime/pd_mode_state.c:671-695`.
+- `pd_mode_apply_local_lock_state_at()` observes changed local lock state through `pd_mode_key_runtime_bridge_observe_local_lock_state()` in `users/noah/lib/pointing/runtime/pd_mode_state.c:679-680`.
+- PD lock state is observed into core shadow state through `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c:1-7`.
+- Key-runtime core names the receiving side as observation in `users/noah/lib/key/runtime/core/runtime.c:3914-3940`.
+- `tests/host/run_feature_gate_compile_tests.sh:129-152` prevents PD runtime modules other than the bridge from including `key/runtime/core/runtime.h` or calling `key_runtime_core_observe_pd_mode_lock_state()`.
 
 Why it matters:
 

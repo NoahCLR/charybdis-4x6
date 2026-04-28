@@ -642,22 +642,6 @@ void pd_mode_deactivate(pd_mode_mask_t mode) {
     });
 }
 
-void pd_mode_lock(pd_mode_mask_t mode) {
-    (void)pd_mode_apply_command((pd_mode_command_t){
-        .kind          = PD_MODE_COMMAND_LOCK,
-        .mode          = mode,
-        .owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
-    });
-}
-
-void pd_mode_unlock(pd_mode_mask_t mode) {
-    (void)pd_mode_apply_command((pd_mode_command_t){
-        .kind          = PD_MODE_COMMAND_UNLOCK,
-        .mode          = mode,
-        .owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
-    });
-}
-
 void pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_side_mask_t owner_sides) {
     pd_mode_apply_remote_mode_ids_with_owner_bitmap(active_mode_id, locked_mode_id, owner_sides, NULL);
 }
@@ -684,7 +668,7 @@ bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
     return pd_mode_set_lock_state_at(mode, locked, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS});
 }
 
-bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+static bool pd_mode_apply_local_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
     pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
         .kind          = locked ? PD_MODE_COMMAND_LOCK : PD_MODE_COMMAND_UNLOCK,
         .mode          = mode,
@@ -693,10 +677,22 @@ bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_po
     });
 
     if (result.local_state_changed) {
-        pd_mode_key_runtime_bridge_observe_lock_state(mode, locked);
+        pd_mode_key_runtime_bridge_observe_local_lock_state(mode, locked);
     }
 
     return result.local_state_changed;
+}
+
+bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+    return pd_mode_apply_local_lock_state_at(mode, locked, key_pos);
+}
+
+void pd_mode_lock(pd_mode_mask_t mode) {
+    (void)pd_mode_apply_local_lock_state_at(mode, true, pd_mode_invalid_owner_key_pos());
+}
+
+void pd_mode_unlock(pd_mode_mask_t mode) {
+    (void)pd_mode_apply_local_lock_state_at(mode, false, pd_mode_invalid_owner_key_pos());
 }
 
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
