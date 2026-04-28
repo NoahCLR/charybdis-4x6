@@ -14,18 +14,20 @@ No firmware source changes were made in this pass. The active review folder befo
 
 No immediate behavior bug was proven from this static pass. The main risk is architectural overlap: several subsystems maintain their own view of runtime ownership, release planning, modifier masking, or QMK compatibility state. These are the areas most likely to produce future regressions or hard-to-debug behavior conflicts.
 
-### Should-Fix: Key Runtime Core Is an Ad-Hoc Policy Accumulator
+### Partially Resolved: Key Runtime Core Is an Ad-Hoc Policy Accumulator
 
 `users/noah/lib/key/runtime/core/runtime.c` and `runtime.h` are the highest-risk clutter zone in userspace. The header claims a "single-authority handled-key runtime state and reducer surface", but the current state and reducer also own or coordinate press tokens, tap series, leases, pending releases, persistent intents, shadow projection, feedback pulse bridging, preview display bridging, and keyboard event modifier masking.
+
+Status as of 2026-04-28: partially resolved. Release semantics and deferred-release transport were extracted earlier in this thread. Core-side PD held-action preemption and PD lock-tap projection now live in `users/noah/lib/key/runtime/core/pd_projection.c`, while `runtime.c` remains the effect projection orchestrator. The remaining accumulator concerns are feedback pulse projection, pending multi-tap scan/flush helpers, pending-release queue storage, projection snapshot comparison, and broad public state/debug surfaces.
 
 Evidence:
 
 - `users/noah/lib/key/runtime/core/runtime.h:5` describes the module as the single runtime authority.
 - `users/noah/lib/key/runtime/core/runtime.h:293-326` stores press tokens, tap series, leases, pending releases, persistent intents, shadow state, feedback state, and keyboard event modifier state together.
 - `users/noah/lib/key/runtime/core/runtime.h:328-387` exposes a broad public surface for many unrelated runtime concerns.
-- `users/noah/lib/key/runtime/core/runtime.c:558-616` handles PD-held preemption.
-- `users/noah/lib/key/runtime/core/runtime.c:622-648` manages feedback pulse queueing.
-- `users/noah/lib/key/runtime/core/runtime.c:651-727` projects QMK effects and calls action, held-action, repeat, layer, PD, and feedback behavior.
+- `users/noah/lib/key/runtime/core/pd_projection.c:19-89` now owns core-side PD held-action preemption and PD lock-tap projection.
+- `users/noah/lib/key/runtime/core/runtime.c:462-500` now delegates PD-specific projection to `pd_projection.c` while still orchestrating all effect projection.
+- `users/noah/lib/key/runtime/core/runtime.c:494-496` still manages feedback pulse queueing and feedback observation from the central effect projection switch.
 - `users/noah/lib/key/runtime/core/runtime.c:785-893` and `2537-2637` maintain pending release queues.
 - `users/noah/lib/key/runtime/core/runtime.c:2310-2384` and `3499-3606` handle branch confirmation.
 - `users/noah/lib/key/runtime/core/release_planner.c:189-509` resolves active and pending multi-tap releases.
@@ -39,7 +41,7 @@ The runtime core is not just a reducer anymore; it is also a compatibility bridg
 
 Recommended direction:
 
-- Keep `runtime.c` as the orchestration entry point, but split release planning, tap-series flushing, lease projection, feedback projection, and PD bridge behavior into explicit internal modules.
+- Keep `runtime.c` as the orchestration entry point, but continue splitting tap-series flushing, lease projection, feedback projection, and projection snapshot comparison into explicit internal modules.
 - Define which state is authoritative in core and which state is only projected into QMK-facing registries.
 - Preserve behavior with targeted host tests before moving code.
 
@@ -95,33 +97,34 @@ Recommended direction:
 - Add or preserve compile gates and host tests that enforce the declared direction of writes.
 - Reduce direct cross-ledger mutation where one authoritative reducer can project changes.
 
-### Partially Resolved: PD Mode Authority Is Split Between Key Runtime and PD Runtime
+### Resolved: PD Mode Authority Boundary Is Explicit
 
 PD mode behavior is enforced from both key runtime and PD runtime. This appears intentional, but the current two-way coupling is high-risk.
 
-Status as of 2026-04-28: partially resolved. The PD runtime no longer includes `users/noah/lib/key/runtime/core/runtime.h` directly from `pd_mode_state.c`, and the only production PD-runtime call to `key_runtime_core_observe_pd_mode_lock_state()` is isolated in `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`. Local PD lock and unlock entrypoints now route through one local-lock helper before observing changed state into core. The feature-gate compile check enforces that direction. This is a boundary extraction only; key-runtime intent and PD-runtime hardware/mode state are not fully separated yet.
+Status as of 2026-04-28: resolved. PD runtime owns actual local/display/remote/split PD mode state. Key runtime owns key-driven PD intent, held-action preemption, and projection through `users/noah/lib/key/runtime/core/pd_projection.c`. Changed local PD lock state is observed into key-runtime shadow projection through `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`. Feature gates enforce the bridge direction.
 
 Evidence:
 
-- Key runtime preempts PD-held behavior in `users/noah/lib/key/runtime/core/runtime.c:462-486`.
-- Key runtime projects PD lock and toggle effects in `users/noah/lib/key/runtime/core/runtime.c:561-565`.
+- Key runtime preempts PD-held behavior and projects PD lock-tap effects in `users/noah/lib/key/runtime/core/pd_projection.c:19-89`.
+- `users/noah/lib/key/runtime/core/runtime.c:471-499` delegates held-action preemption and PD lock-tap projection to `pd_projection.c`.
 - PD runtime stores local owner slots and exclusive ownership in `users/noah/lib/pointing/runtime/pd_mode_state.c:287-351`.
 - PD runtime clears owner state and commands in `users/noah/lib/pointing/runtime/pd_mode_state.c:537-627`.
 - Local PD lock/unlock state changes route through `pd_mode_apply_local_lock_state_at()` in `users/noah/lib/pointing/runtime/pd_mode_state.c:671-695`.
 - `pd_mode_apply_local_lock_state_at()` observes changed local lock state through `pd_mode_key_runtime_bridge_observe_local_lock_state()` in `users/noah/lib/pointing/runtime/pd_mode_state.c:679-680`.
 - PD lock state is observed into core shadow state through `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c:1-7`.
-- Key-runtime core names the receiving side as observation in `users/noah/lib/key/runtime/core/runtime.c:3914-3940`.
+- Key-runtime core names the receiving side as observation in `users/noah/lib/key/runtime/core/runtime.c:3848-3874`.
 - `tests/host/run_feature_gate_compile_tests.sh:129-152` prevents PD runtime modules other than the bridge from including `key/runtime/core/runtime.h` or calling `key_runtime_core_observe_pd_mode_lock_state()`.
+- `users/noah/source_manifest.mk` and `tests/host/noah_source_manifest.sh` include `pd_projection.c`, and manual key-runtime/PD integration runners compile it explicitly.
 
 Why it matters:
 
-The key runtime can request and track PD transitions, while the PD runtime can also mutate key-runtime lock shadow state. Same-key PD holds, stacked PD modes, lock toggles, and pending releases are the areas most likely to expose ordering bugs.
+The authority split is now intentional rather than implicit: PD runtime applies actual mode state; key runtime projects key-driven PD effects and observes changed local lock state for key-runtime shadow reasoning.
 
 Recommended direction:
 
-- Pick one module to own PD mode intent and one module to own PD hardware/mode projection.
-- Convert the other direction into explicit events or snapshot inputs.
-- Cover the boundary with PD mode integration, PD runtime, pointer layer policy, and split sync tests.
+- Keep PD runtime as the owner of actual local/display/remote/split PD state.
+- Keep key-runtime PD effect projection in `pd_projection.c`.
+- Keep the feature gate and PD mode integration, PD runtime, pointer layer policy, split sync, runtime debug, scenario, full host, and firmware compile checks as the boundary guardrail.
 
 ### Should-Fix: Combo Origin Is a Large Shadow Compatibility Patch
 
@@ -310,6 +313,8 @@ Status key:
 | `users/noah/lib/key/runtime/api.c` | clean | Thin public API wrapper. |
 | `users/noah/lib/key/runtime/api.h` | clean | Public runtime API. |
 | `users/noah/lib/key/runtime/core/projection.h` | watch | Projection snapshot helps catch drift but reflects multiple ledgers. |
+| `users/noah/lib/key/runtime/core/pd_projection.c` | watch | Core-side PD held-action preemption and PD lock-tap projection. |
+| `users/noah/lib/key/runtime/core/pd_projection.h` | clean | Internal core PD projection declarations. |
 | `users/noah/lib/key/runtime/core/release_internal.h` | watch | Internal release planning declarations and narrow helper exports for the planner. |
 | `users/noah/lib/key/runtime/core/release_planner.c` | watch | Active-release and pending multi-tap release resolution plus effect planning. |
 | `users/noah/lib/key/runtime/core/release_planner.h` | watch | Central release semantics helper introduced on 2026-04-28. |
@@ -384,8 +389,8 @@ Status key:
 | `users/noah/lib/pointing/policy/pointer_layer_policy.h` | clean | Pointer layer policy API. |
 | `users/noah/lib/pointing/runtime/pd_mode_buffered_tap_internal.h` | watch | Internal buffered tap surface tied to release behavior. |
 | `users/noah/lib/pointing/runtime/pd_mode_internal.h` | watch | Internal PD runtime surface. |
-| `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c` | watch | Narrow PD lock write-back bridge into key runtime. |
-| `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.h` | watch | Public declaration for the PD/key-runtime bridge. |
+| `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c` | watch | Narrow local PD lock observation bridge into key runtime. |
+| `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.h` | watch | Public declaration for the PD/key-runtime observation bridge. |
 | `users/noah/lib/pointing/runtime/pd_mode_keyboard_event_internal.h` | watch | Keyboard event bridge into PD behavior. |
 | `users/noah/lib/pointing/runtime/pd_mode_lifecycle.c` | clean | PD lifecycle helper. |
 | `users/noah/lib/pointing/runtime/pd_mode_registry.c` | clean | PD registry. |

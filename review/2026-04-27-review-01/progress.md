@@ -475,3 +475,71 @@ All listed pass/fail commands passed.
 1. Split the core-side PD projection/preemption code out of `runtime.c` behind an internal key-runtime PD projection module.
 2. Keep PD runtime as the owner of actual local/display/remote/split mode state.
 3. Preserve PD mode integration, PD runtime, pointer policy, split sync, runtime debug, scenario, full host, and firmware compile coverage for that split.
+
+## 2026-04-28 - Core PD Projection Split
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/core/pd_projection.h` and `users/noah/lib/key/runtime/core/pd_projection.c`.
+- Moved core-side PD held-action preemption and PD lock-tap projection out of `runtime.c`.
+- Kept `runtime.c` as the effect projection orchestrator while delegating PD-specific effect projection to `pd_projection.c`.
+- Wired the new source into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and the manual key-runtime/PD integration runners that compile `runtime.c`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so the active review now treats the PD authority boundary as explicit and resolved.
+
+## Finding Status
+
+- PD mode authority is resolved.
+- Resolved in this pass:
+  - PD runtime remains the owner of actual local/display/remote/split PD state
+  - key runtime owns key-driven PD intent/projection through `pd_projection.c`
+  - changed local PD lock state is still observed into key runtime through the PD/key-runtime bridge
+  - source manifests and host runners mechanically include the new module
+- Still open:
+  - the broader key-runtime accumulator finding remains partially resolved
+  - feedback projection, tap-series flushing, projection snapshot comparison, and some owner-ledger boundaries remain in or near `runtime.c`
+
+## Verification
+
+Pre-change baseline:
+
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Post-change targeted checks:
+
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/pd_projection.c`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/pd_projection.h`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks
+returned the expected nonzero diff status for new files and produced no
+diagnostics.
+
+## Next Steps
+
+1. Continue reducing the broader `runtime.c` accumulator by choosing one remaining owner: feedback projection, tap-series flush, projection snapshot comparison, or lease projection.
+2. Keep the PD authority boundary fixed: PD runtime owns actual PD state, key runtime owns key-driven PD projection, and the bridge observes local PD lock changes.
+3. Preserve full host and firmware compile checks for further runtime splits.
