@@ -58,6 +58,7 @@ NOAH_COMMON_SOURCES := \
     lib/state/runtime/runtime_shared_state.c \
     lib/state/runtime/split_runtime_sync.c \
     lib/key/runtime/core/runtime.c \
+    lib/key/runtime/core/pending_release_queue.c \
     lib/key/runtime/core/feedback_projection.c \
     lib/key/runtime/core/pd_projection.c \
     lib/key/runtime/core/projection.c \

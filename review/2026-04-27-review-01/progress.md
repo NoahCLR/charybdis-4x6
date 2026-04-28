@@ -722,3 +722,60 @@ diagnostics.
 1. Continue with one remaining accumulator concern: pending multi-tap scan threshold planning, pending-release queue storage, or broad runtime state/debug surfaces.
 2. Keep `projection.c` limited to projection snapshots, comparison, and trace projection checkpoints; effect projection orchestration remains a separate concern.
 3. Preserve runtime debug, runtime trace, integration harness, PD/key-runtime, scenario, release matrix, full host, compile-gate, and firmware compile coverage for the next split.
+
+## 2026-04-28 - Pending Release Queue Split
+
+Starting worktree status:
+
+- `git status --short` showed an in-flight pending-release queue split: `runtime.c` modified and the new `pending_release_queue` source/header untracked.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/core/pending_release_queue.h` and `users/noah/lib/key/runtime/core/pending_release_queue.c`.
+- Moved pending-release slot helpers, allocation, ordering, snapshots, drain, per-key counting, deferred/drained observations, and released-token pending-emission cleanup out of `runtime.c`.
+- Kept `pending_release_slot_t` storage in `key_runtime_core_state_t`; the new module owns queue mechanics over the existing single core state truth.
+- Kept release semantics in `release_planner.c` and deferred-release adaptation in `deferred_release.c`.
+- Wired `pending_release_queue.c` into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and the manual key-runtime/PD integration runners that compile `runtime.c`.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so pending-release queue mechanics are documented as an explicit core module.
+
+## Finding Status
+
+- The broader key-runtime accumulator finding remains partially resolved.
+- Resolved in this pass:
+  - pending-release queue mechanics now have a named internal core module
+  - queue allocation, ordering, drain snapshots, and pending-emission token cleanup are no longer local helpers inside `runtime.c`
+  - source manifests and host runners mechanically include the new module
+- Still open:
+  - pending multi-tap scan threshold planning remains in `runtime.c`
+  - broad runtime state/debug surfaces remain in `runtime.h`
+  - effect projection orchestration and some owner-ledger boundaries remain in `runtime.c`
+
+## Verification
+
+Post-change targeted checks:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/pending_release_queue.c`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/pending_release_queue.h`
+
+All listed pass/fail commands passed. The `--no-index` whitespace checks returned the expected nonzero diff status for new files and produced no diagnostics.
+
+## Next Steps
+
+1. Continue with pending multi-tap scan threshold planning if reducing `runtime.c` remains the priority.
+2. Keep `pending_release_queue.c` limited to queue mechanics; release decisions stay in `release_planner.c` and blocked-release adaptation stays in `deferred_release.c`.
+3. Preserve release matrix, modifier-hold, PD/key-runtime, scenario, layer-lock, runtime-debug, full host, compile-gate, and firmware compile coverage for the next runtime split.

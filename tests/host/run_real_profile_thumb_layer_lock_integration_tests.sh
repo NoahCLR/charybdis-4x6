@@ -59,6 +59,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/transition.c" \
     "$ROOT/users/noah/lib/key/runtime/core/runtime.c" \
+    "$ROOT/users/noah/lib/key/runtime/core/pending_release_queue.c" \
     "$ROOT/users/noah/lib/key/runtime/core/feedback_projection.c" \
     "$ROOT/users/noah/lib/key/runtime/core/pd_projection.c" \
     "$ROOT/users/noah/lib/key/runtime/core/projection.c" \
