@@ -234,7 +234,7 @@ The highest-value next work is not a broad rewrite. Release behavior and modifie
 ## Recommended Next Refactor Sequence
 
 1. Do not split press/tap lifecycle or `key_runtime_core_state_t` storage yet. Keep them as one reducer-owned truth unless a stronger owner boundary emerges.
-2. Rerun closure verification now that combo-origin compatibility and local drag-scroll fallback cleanup have landed.
+2. Treat any future architecture/refactor work as a new review thread now that final closure verification has landed.
 3. Clean up low-risk duplication only after the authority and compatibility decisions are stable.
 
 ## 2026-04-28 Partial Finding Audit
@@ -351,11 +351,11 @@ The runtime boundary audit identifies helper extraction as optional cleanup only
 
 ### Closure Verdict
 
-Keep thread open.
+Audit-time verdict: keep thread open. Superseded by the final closure verification at the end of this document.
 
 ### Remaining Open Findings
 
-- Rerun closure verification now that combo-origin compatibility and local drag-scroll fallback cleanup have landed.
+- Audit-time next step: rerun closure verification after combo-origin compatibility and local drag-scroll fallback cleanup landed. Completed by the final closure verification at the end of this document.
 - Keep runtime accumulator as partially resolved but accepted for now; do not close it as resolved unless a future pass changes the state boundary or explicitly reclassifies the remaining breadth.
 
 ## 2026-04-28 Combo Origin Contract Audit
@@ -395,7 +395,7 @@ Combo-origin compatibility is resolved as a documented compatibility adapter wit
 
 ### Remaining Open Findings
 
-- Rerun closure verification now that combo-origin compatibility and local drag-scroll fallback cleanup have landed.
+- Audit-time next step: rerun closure verification after combo-origin compatibility and local drag-scroll fallback cleanup landed. Completed by the final closure verification at the end of this document.
 - Keep runtime accumulator as partially resolved but accepted for now.
 
 ## 2026-04-28 Dragscroll Config Surface Cleanup
@@ -422,7 +422,7 @@ The local drag-scroll fallback finding is resolved. Remaining `CHARYBDIS_*` poin
 
 ### Remaining Open Findings
 
-- Rerun closure verification.
+- Audit-time next step: rerun closure verification. Completed by the final closure verification at the end of this document.
 - Keep runtime accumulator as partially resolved but accepted for now unless a later pass changes the reducer boundary.
 
 ## Per-File Inventory
@@ -666,3 +666,47 @@ Status key:
 | `users/noah/lib/state/runtime/runtime_trace.h` | clean | Runtime trace API. |
 | `users/noah/lib/state/runtime/split_runtime_sync.c` | watch | Intentional multi-surface split mirror for base, combo, key feedback, and heartbeat packets. |
 | `users/noah/lib/state/runtime/split_runtime_sync.h` | watch | Split runtime sync packet contract. |
+
+## 2026-04-28 Final Closure Verification
+
+Prompt used: `prompts/closure-verification-review.md`.
+
+### Findings
+
+#### Must-Fix: None
+
+No active major finding remains open or regressed. Release semantics, owner-ledger bridges, PD authority, modifier policy, combo-origin compatibility, and local drag-scroll config ownership all have code references, enforcement references, and passing verification recorded below.
+
+#### Should-Fix: None
+
+The runtime accumulator finding remains partially resolved, but the remaining breadth is now a conscious reducer boundary rather than an active refactor target. `key_runtime_core_state_t` remains the single state truth, while extracted modules own release planning, effect-plan construction, projection, scan planning, ownership-state mechanics, pending-release queueing, state queries, feedback projection, and PD projection. Splitting press/tap lifecycle now would add another authority-sensitive API without removing a second source of truth.
+
+#### Optional Cleanup: Deferred
+
+Repeated helper cleanup remains optional only. Helper movement is not required for this review thread because it does not affect ownership authority, release semantics, compatibility boundaries, or runtime behavior.
+
+### Prior Finding Status
+
+| Prior finding | Status | Closure verification |
+| --- | --- | --- |
+| Key Runtime Core Is an Ad-Hoc Policy Accumulator | partially resolved, consciously deferred | Current code matches the intended stable boundary. Code references: `users/noah/lib/key/runtime/core/runtime.h`, `users/noah/lib/key/runtime/core/runtime.c`, `users/noah/lib/key/runtime/core/release_planner.c`, `users/noah/lib/key/runtime/core/effect_plan.c`, `users/noah/lib/key/runtime/core/projection.c`, `users/noah/lib/key/runtime/core/scan_planner.c`, `users/noah/lib/key/runtime/core/ownership_state.c`, `users/noah/lib/key/runtime/core/pending_release_queue.c`, `users/noah/lib/key/runtime/core/state_query.c`, `users/noah/lib/key/runtime/core/feedback_projection.c`, and `users/noah/lib/key/runtime/core/pd_projection.c`. Enforcement references: runtime debug, release matrix, scenario, layer-lock, modifier-hold, PD/key-runtime, feature gate, full host, and firmware compile. Exact passed commands: `sh tests/host/run_all_host_tests.sh` and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Release Semantics Are Consolidated | resolved | Code references: `users/noah/lib/key/runtime/core/release_planner.h`, `users/noah/lib/key/runtime/core/release_planner.c`, `users/noah/lib/key/runtime/deferred_release.c`, `users/noah/lib/key/runtime/core/pending_release_queue.c`, and `users/noah/lib/key/runtime/release.c`. Enforcement references: release matrix, scenario, runtime debug, feature gate, full host, and firmware compile. Exact passed commands: `sh tests/host/run_key_runtime_release_matrix_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Multiple Owner Ledgers Track Runtime Facts Through Explicit Bridges | resolved | Code references: `users/noah/lib/key/runtime/core/projection.c`, `users/noah/lib/key/runtime/core/ownership_state.c`, `users/noah/lib/state/ownership/layer_ownership.c`, `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`, `users/noah/lib/pointing/runtime/pd_mode_state.c`, and `docs/KEY_RUNTIME.md`. Enforcement references: feature-gated bridge direction checks, layer ownership tests, layer-lock integration tests, runtime debug tests, full host, and firmware compile. Exact passed commands: `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| PD Mode Authority Boundary Is Explicit | resolved | Code references: `users/noah/lib/key/runtime/core/pd_projection.c`, `users/noah/lib/pointing/runtime/pd_mode_state.c`, `users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c`, and `users/noah/lib/key/runtime/core/ownership_state.c`. Enforcement references: `tests/host/run_feature_gate_compile_tests.sh`, PD mode tests, PD runtime tests, PD/key-runtime integration tests, full host, and firmware compile. Exact passed commands: `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Combo Origin Is a Large Shadow Compatibility Patch | resolved | Code references: `users/noah/lib/compat/qmk_combo_origin.c`, `users/noah/lib/compat/qmk_combo_origin.h`, `users/noah/lib/key/runtime/origin_registry.c`, and `docs/KEY_RUNTIME.md`. Enforcement references: `tests/host/qmk_combo_origin_test.c`, `tests/host/run_qmk_combo_origin_tests.sh`, full host, and firmware compile. Exact passed commands: `sh tests/host/run_qmk_combo_origin_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Modifier Masking and Replay Are Centralized Behind Policy | resolved | Code references: `users/noah/lib/state/runtime/keyboard_mod_policy.h`, `users/noah/lib/state/runtime/keyboard_mod_policy.c`, `users/noah/lib/action/action_dispatch.c`, `users/noah/lib/key/runtime/delayed_action.c`, `users/noah/lib/key/runtime/process.c`, `users/noah/lib/key/runtime/transition.c`, `users/noah/lib/key/runtime/deferred_release.c`, and `users/noah/lib/pointing/modes/pd_mode_pinch.c`. Enforcement references: keyboard mod ownership, action dispatch, delayed action, modifier-hold integration, PD mode, PD runtime, PD/key-runtime integration, feature gate, full host, and firmware compile. Exact passed commands: `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_action_dispatch_tests.sh`, `sh tests/host/run_delayed_action_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Compatibility Fallback Macros Keep Old Charybdis Names Alive | resolved | Code references: `users/noah/config.h`, `users/noah/lib/pointing/modes/pd_mode_dragscroll.c`, `docs/KEYMAP-OVERVIEW.md`, and `tests/host/run_feature_gate_compile_tests.sh`. Enforcement references: drag-scroll handler tests, PD mode tests, profile introspection check, feature gate, full host, and firmware compile. Exact passed commands: `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_pd_mode_tests.sh`, `python3 tools/profile_introspect.py --check`, `sh tests/host/run_feature_gate_compile_tests.sh`, `sh tests/host/run_all_host_tests.sh`, and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`. |
+| Repeated Small Helpers | open, optional cleanup | Still optional. This is not a closure blocker because it is low-risk duplication and not an unresolved authority, release, compatibility, or behavior boundary. |
+
+### Closure Verdict
+
+close thread
+
+### Remaining Open Findings
+
+None.
+
+Deferred optional cleanup, not part of this closed thread:
+
+- Keep `key_runtime_core_state_t` and press/tap lifecycle together until a future change proves a smaller owner that does not duplicate runtime truth.
+- Clean up repeated tiny helpers only opportunistically.

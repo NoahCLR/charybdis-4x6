@@ -1387,7 +1387,7 @@ Both checks passed. Full host tests and firmware compile were intentionally skip
 ## Next Steps
 
 1. Old Charybdis drag-scroll fallback macros remained open at this point; the later drag-scroll config surface cleanup supersedes that status.
-2. Rerun closure verification after the later cleanup and final checks pass.
+2. Audit-time next step: rerun closure verification after the later cleanup and final checks pass. Completed by the final closure verification below.
 
 ## 2026-04-28 - Dragscroll Config Surface Cleanup
 
@@ -1433,5 +1433,40 @@ All listed checks passed.
 
 ## Next Steps
 
-1. Rerun closure verification.
+1. Audit-time next step: rerun closure verification. Completed by the final closure verification below.
 2. Keep runtime accumulator as partially resolved but accepted unless a later pass changes the reducer boundary.
+
+## 2026-04-28 - Final Closure Verification
+
+Used `prompts/closure-verification-review.md`.
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Rechecked every major finding in the active review thread.
+- Confirmed release semantics, owner-ledger bridges, PD authority, modifier policy, combo-origin compatibility, and local drag-scroll config ownership are resolved with code and enforcement references.
+- Confirmed the remaining runtime accumulator breadth is consciously deferred as a stable reducer boundary, not an active closure blocker.
+- Confirmed repeated helper cleanup is optional and not a closure blocker.
+- Recorded a final `close thread` verdict in `userspace-architecture-review.md`.
+
+## Finding Status
+
+- Closure verdict: close thread.
+- No remaining active open findings.
+- Future architecture or refactor work after this point should open a new sortable review folder rather than appending to this closed review history.
+
+## Verification
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+All listed checks passed.
+
+## Next Steps
+
+1. Treat this review folder as closed history.
+2. Open a new review folder for any later architecture/refactor work.
