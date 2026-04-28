@@ -28,7 +28,7 @@ Evidence:
 - `users/noah/lib/key/runtime/core/runtime.c:651-727` projects QMK effects and calls action, held-action, repeat, layer, PD, and feedback behavior.
 - `users/noah/lib/key/runtime/core/runtime.c:785-893` and `2537-2637` maintain pending release queues.
 - `users/noah/lib/key/runtime/core/runtime.c:2310-2384` and `3499-3606` handle branch confirmation.
-- `users/noah/lib/key/runtime/core/runtime.c:2801-3124` resolve active and pending multi-tap releases.
+- `users/noah/lib/key/runtime/core/release_planner.c:189-509` resolves active and pending multi-tap releases.
 - `users/noah/lib/key/runtime/core/runtime.c:3412-3425` and `3949-3968` settle fallback hold activation.
 - `users/noah/lib/key/runtime/core/runtime.c:3716-3788` has two similar multi-tap flush paths.
 - `users/noah/lib/key/runtime/core/runtime.c:4301-4373` compares projection snapshots to check shadow state.
@@ -45,25 +45,25 @@ Recommended direction:
 
 ### Should-Fix: Release Semantics Are Duplicated and Transitional
 
-Release behavior was the strongest "same thing in several places" candidate. The 2026-04-28 boundary passes removed the separate slot release resolver, moved derived quick-release, fallback-suppression, buffered-base-tap, and hold-action decision semantics into `users/noah/lib/key/runtime/core/release_planner.h`, and moved active and pending multi-tap release effect planning into `users/noah/lib/key/runtime/core/release_planner.c`. The finding remains partially open because pending multi-tap release resolution and pending-release queues still live in `runtime.c`.
+Release behavior was the strongest "same thing in several places" candidate. The 2026-04-28 boundary passes removed the separate slot release resolver, moved derived quick-release, fallback-suppression, buffered-base-tap, hold-action decision semantics, active-release resolution, pending multi-tap release resolution, and release effect planning into `users/noah/lib/key/runtime/core/release_planner.h` and `users/noah/lib/key/runtime/core/release_planner.c`. The finding remains partially open only for release transport cleanup: pending-release queues still live in `runtime.c`, deferred dispatch adaptation still lives in `transition.c`, and deferred-release draining still lives in `release.c`.
 
 Evidence:
 
 - `users/noah/lib/key/runtime/core/release_planner.h:30-63` now defines the release contract and semantics surface for buffered base tap, quick release, fallback suppression, and nonquick release.
 - `users/noah/lib/key/runtime/core/release_planner.h:147-317` owns the semantic release decision reducer used by active and pending release paths.
-- `users/noah/lib/key/runtime/core/release_planner.c:128-234` now maps active-release and pending multi-tap release decisions into effect plans.
-- `users/noah/lib/key/runtime/core/runtime.c:2740-2955` still resolves active and pending multi-tap release state around core-owned press tokens and tap series.
+- `users/noah/lib/key/runtime/core/release_planner.c:189-509` now resolves active releases, resolves pending multi-tap releases, and maps those decisions into effect plans.
+- `users/noah/lib/key/runtime/core/runtime.c:2422-2521` still owns pending-release queue storage and draining.
 - `users/noah/lib/key/runtime/transition.c:175-203` still adapts release dispatch effects into pending-release queue entries when foreign tap-release slots remain active.
 - `users/noah/lib/key/runtime/release.c:11-35` is now a thin release-event adapter, but it still owns deferred-release draining after plan execution.
 
 Why it matters:
 
-This is a real migration smell. The code currently supports both old slot-owned release decisions and newer core-owned release planning. That makes it easy for future changes to update one release path and miss another.
+This was a real migration smell: the code previously supported both old slot-owned release decisions and newer core-owned release planning. The semantic decision owner is now consolidated, so the remaining risk is transport drift between planner-owned release outcomes and the pending-release queue/drain adapters.
 
 Recommended direction:
 
-- Continue making `release_planner.h` the sole semantic owner of quick-release, fallback suppression, buffered base tap, and pending multi-tap decisions.
-- Decide whether pending multi-tap release resolution should move behind the release planner too, or whether `runtime.c` should remain the state-gathering reducer while the planner owns semantic decisions and effects.
+- Keep `release_planner.h` and `release_planner.c` as the sole semantic owner of quick-release, fallback suppression, buffered base tap, active-release decisions, and pending multi-tap release decisions.
+- Decide whether pending-release queue storage/drain should stay core-owned transport or move behind a smaller release transport API.
 - Keep `release.c` as a thin release-event adapter, or remove it if transition/process ownership makes that wrapper unnecessary.
 - Keep the existing release matrix, modifier-hold, PD-mode, and scenario tests as the safety net for consolidation.
 
@@ -301,9 +301,9 @@ Status key:
 | `users/noah/lib/key/runtime/api.h` | clean | Public runtime API. |
 | `users/noah/lib/key/runtime/core/projection.h` | watch | Projection snapshot helps catch drift but reflects multiple ledgers. |
 | `users/noah/lib/key/runtime/core/release_internal.h` | watch | Internal release planning declarations and narrow helper exports for the planner. |
-| `users/noah/lib/key/runtime/core/release_planner.c` | watch | Active-release and pending multi-tap release effect planning. |
+| `users/noah/lib/key/runtime/core/release_planner.c` | watch | Active-release and pending multi-tap release resolution plus effect planning. |
 | `users/noah/lib/key/runtime/core/release_planner.h` | watch | Central release semantics helper introduced on 2026-04-28. |
-| `users/noah/lib/key/runtime/core/runtime.c` | high-risk | Central accumulator for release resolution, pending-release queues, PD, feedback, projection, and ownership policy. |
+| `users/noah/lib/key/runtime/core/runtime.c` | high-risk | Central accumulator for pending-release queues, pending multi-tap scan, PD, feedback, projection, and ownership policy. |
 | `users/noah/lib/key/runtime/core/runtime.h` | high-risk | Broad state and reducer surface for unrelated runtime concerns. |
 | `users/noah/lib/key/runtime/core/trace.c` | clean | Core trace helpers. |
 | `users/noah/lib/key/runtime/core/trace.h` | clean | Core trace API. |

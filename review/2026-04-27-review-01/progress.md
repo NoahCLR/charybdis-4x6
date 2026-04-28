@@ -149,6 +149,8 @@ Starting worktree status:
   - pending multi-tap release resolution still lives in `runtime.c`
   - pending-release queue ownership remains in `runtime.c`
 
+Reconciliation note: active-release and pending multi-tap release resolution moved out of `runtime.c` in the later 2026-04-28 release resolver consolidation recorded below. Pending-release queue ownership remains open.
+
 ## Verification
 
 Pre-change baseline:
@@ -182,3 +184,61 @@ All listed pass/fail commands passed. The `--no-index` whitespace check returned
 1. Decide whether pending multi-tap release resolution should move behind the release planner too.
 2. Preserve pending-release queue ownership coverage before moving that queue out of `runtime.c`.
 3. Keep `runtime.c` as the orchestration point while extracting remaining release resolution only if the planner can own the contract without duplicating core state facts.
+
+## 2026-04-28 - Release Resolver Consolidation
+
+Starting worktree status:
+
+- This pass continued the in-flight release consolidation diff from the release effect planner extraction.
+
+## Completed
+
+- Moved active-release resolution from `users/noah/lib/key/runtime/core/runtime.c` into `users/noah/lib/key/runtime/core/release_planner.c`.
+- Moved pending multi-tap release resolution from `runtime.c` into `release_planner.c`.
+- Left `runtime.c` as the canonical state owner for press tokens, tap series, pending multi-tap scan progression, and pending-release queue transport.
+- Exposed `key_runtime_core_owner_has_lease_kind()` through `release_internal.h` so the planner can resolve active release decisions without duplicating lease traversal.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so they describe release decisions as planner-owned.
+
+## Finding Status
+
+- Release semantics are now consolidated behind the core release planner.
+- Resolved in this pass:
+  - active-release resolution now lives in `release_planner.c`
+  - pending multi-tap release resolution now lives in `release_planner.c`
+  - `runtime.c` no longer calls the release semantic reducer directly
+- Still open:
+  - pending-release queue storage and draining remain split across `runtime.c`, `transition.c`, and `release.c`
+  - the review finding stays partially open until that transport boundary is either accepted as core-owned or moved behind a smaller release transport API
+
+## Verification
+
+Pre-change baseline:
+
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+
+Post-change targeted checks:
+
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+All listed pass/fail commands passed.
+
+## Next Steps
+
+1. Decide whether the pending-release queue/drain path should remain core-owned transport or move behind a smaller release transport API.
+2. Keep `release.c` thin unless the transition/process layers can absorb the release adapter without making event flow harder to read.
+3. Use the current release matrix, modifier-hold, PD-mode, scenario, layer-lock, and full host suite as the guardrail for any pending-release transport cleanup.

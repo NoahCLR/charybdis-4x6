@@ -62,8 +62,8 @@ layer," not "old runtime plus new runtime running side by side."
 | --- | --- |
 | [`handled_key.h`](../users/noah/lib/key/interaction/handled_key.h), [`handled_key_lookup.c`](../users/noah/lib/key/interaction/handled_key_lookup.c), [`handled_key_materialize.c`](../users/noah/lib/key/interaction/handled_key_materialize.c) | Resolve authored behavior into `handled_key_resolution_t` and materialize it into runtime interaction contracts. |
 | [`interaction.h`](../users/noah/lib/key/runtime/interaction.h) | Shared interaction contract cached by the reducer after authored behavior materialization. |
-| [`core/runtime.h`](../users/noah/lib/key/runtime/core/runtime.h), [`core/runtime.c`](../users/noah/lib/key/runtime/core/runtime.c), [`core/projection.h`](../users/noah/lib/key/runtime/core/projection.h) | Single-authority runtime state, reducer entry points, release resolution inputs, pending multi-tap state, leases, persistent intents, pending release transport, and projection/debug capture. |
-| [`core/release_planner.h`](../users/noah/lib/key/runtime/core/release_planner.h), [`core/release_planner.c`](../users/noah/lib/key/runtime/core/release_planner.c) | Shared release decision contract and effect planning for active release and pending multi-tap release. |
+| [`core/runtime.h`](../users/noah/lib/key/runtime/core/runtime.h), [`core/runtime.c`](../users/noah/lib/key/runtime/core/runtime.c), [`core/projection.h`](../users/noah/lib/key/runtime/core/projection.h) | Single-authority runtime state, reducer entry points, pending multi-tap scan state, leases, persistent intents, pending release transport, and projection/debug capture. |
+| [`core/release_planner.h`](../users/noah/lib/key/runtime/core/release_planner.h), [`core/release_planner.c`](../users/noah/lib/key/runtime/core/release_planner.c) | Shared release decision contract, active-release resolution, pending multi-tap release resolution, and release effect planning. |
 | [`process.c`](../users/noah/lib/key/runtime/process.c) | `process_record_user()` entry flow, preflight ordering, release-keycode recovery, and non-handled release finalization. |
 | [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption and default-suppression work before the current press proceeds, while unrelated pending multi-tap chains stay position-owned until timeout or same-key reuse. |
 | [`press.c`](../users/noah/lib/key/runtime/press.c), [`release.c`](../users/noah/lib/key/runtime/release.c), [`scan.c`](../users/noah/lib/key/runtime/scan.c) | Thin press/release/scan orchestration around reducer-owned effect plans. |
@@ -93,7 +93,8 @@ If a future change needs new runtime state, it belongs in `key_runtime_core` unl
 it is purely an external ownership registry or a stateless authored-behavior
 helper.
 
-Pending multi-tap behavior is owned by `tap_series_t` inside `key_runtime_core`.
+Pending multi-tap state is owned by `tap_series_t` inside `key_runtime_core`,
+while pending multi-tap release decisions are owned by `core/release_planner.c`.
 Do not add a second state machine for multi-tap sequencing; new behavior should
 extend the core reducer and its release/scan planning tests.
 
