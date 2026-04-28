@@ -1230,3 +1230,58 @@ All listed final checks passed.
 
 1. Keep new cross-ledger write-backs behind documented bridge points and compile-gate updates.
 2. Continue runtime accumulator cleanup only if a clear owner boundary emerges.
+
+## 2026-04-28 - Effect Plan Construction Extraction
+
+Starting worktree status:
+
+- `git status --short` returned no entries at the start of the pass.
+
+## Completed
+
+- Added `users/noah/lib/key/runtime/core/effect_plan.c`.
+- Moved effect-plan initialization, sink buffering, typed effect appends, tap-commit feedback filtering, and release-plan transfer out of `users/noah/lib/key/runtime/core/runtime.c`.
+- Kept reducer-owned state storage and press/tap orchestration in `runtime.c`; the new module only builds effect plans and does not own runtime facts.
+- Moved effect-plan initialization declarations from `runtime.h` to `effect_plan.h`, and updated direct callers to include the effect-plan header.
+- Wired `effect_plan.c` into `users/noah/source_manifest.mk`, `tests/host/noah_source_manifest.sh`, and manual key-runtime integration runners that compile core runtime sources directly.
+- Updated `docs/KEY_RUNTIME.md` and `userspace-architecture-review.md` so the runtime accumulator finding and module inventory match the current tree.
+
+## Finding Status
+
+- Key runtime accumulator remains partially resolved.
+- Resolved in this pass:
+  - effect-plan construction is no longer local helper code inside `runtime.c`
+  - `runtime.h` no longer exposes effect-plan initialization directly
+  - source manifests and direct host runners mechanically include the new effect-plan source
+- Still open:
+  - `runtime.h` still stores the broad reducer state shape
+  - `runtime.c` still owns press/tap orchestration and event observation
+
+## Verification
+
+Post-change targeted checks:
+
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`
+
+All listed post-change targeted checks passed.
+
+Final checks:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+- `git diff --check --no-index /dev/null users/noah/lib/key/runtime/core/effect_plan.c` produced no whitespace diagnostics for the new source file
+
+All listed final checks passed. The `--no-index` whitespace check returned the expected nonzero diff status for a new file and produced no diagnostics.
+
+## Next Steps
+
+1. Continue runtime accumulator cleanup only when the next boundary has a real owner, likely press/tap lifecycle rather than a generic file split.

@@ -79,4 +79,5 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
 bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, key_runtime_core_pending_multi_tap_release_resolution_t *out);
 bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, bool is_momentary_layer, const key_runtime_core_pending_multi_tap_release_resolution_t *resolution, delayed_action_mods_t mods, key_runtime_core_release_effect_plan_t *out);
 
-bool          key_runtime_core_tap_commit_feedback_allowed(uint16_t action, uint8_t tap_count);
+void key_runtime_core_effect_plan_append_release_plan(key_runtime_core_effect_plan_t *plan, const key_runtime_core_release_effect_plan_t *release_plan);
+bool key_runtime_core_tap_commit_feedback_allowed(uint16_t action, uint8_t tap_count);

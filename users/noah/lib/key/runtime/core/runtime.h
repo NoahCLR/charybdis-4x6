@@ -354,8 +354,6 @@ static inline uint32_t key_runtime_core_state_next_feedback_sequence(key_runtime
 }
 
 key_runtime_core_state_t                   *key_runtime_core_state(void);
-void                                        key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan);
-void                                        key_runtime_core_effect_plan_init_with_sink(key_runtime_core_effect_plan_t *plan, void (*sink)(void *ctx, key_runtime_effect_t effect), void *sink_ctx);
 void                                        key_runtime_core_apply_event(const runtime_event_t *event, uint16_t event_time);
 void                                        key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
 void                                        key_runtime_core_observe_scan_cycle(uint16_t now);

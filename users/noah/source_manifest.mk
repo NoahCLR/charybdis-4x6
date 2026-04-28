@@ -59,6 +59,7 @@ NOAH_COMMON_SOURCES := \
     lib/state/runtime/runtime_shared_state.c \
     lib/state/runtime/split_runtime_sync.c \
     lib/key/runtime/core/runtime.c \
+    lib/key/runtime/core/effect_plan.c \
     lib/key/runtime/core/state_query.c \
     lib/key/runtime/core/ownership_state.c \
     lib/key/runtime/core/pending_release_queue.c \

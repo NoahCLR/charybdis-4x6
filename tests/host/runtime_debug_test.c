@@ -14,6 +14,7 @@
 #include "users/noah/lib/key/runtime/transition.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
+#include "users/noah/lib/key/runtime/core/effect_plan.h"
 #include "users/noah/lib/key/runtime/core/ownership_state.h"
 #include "users/noah/lib/key/runtime/core/pending_release_queue.h"
 #include "users/noah/lib/key/runtime/core/runtime.h"

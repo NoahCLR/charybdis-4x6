@@ -79,6 +79,7 @@ lib/key/runtime/trace.c
 lib/key/runtime/transition.c
 lib/compat/qmk_combo_origin.c
 lib/key/runtime/core/runtime.c
+lib/key/runtime/core/effect_plan.c
 lib/key/runtime/core/state_query.c
 lib/key/runtime/core/ownership_state.c
 lib/key/runtime/core/pending_release_queue.c
