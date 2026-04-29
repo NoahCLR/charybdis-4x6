@@ -47,6 +47,9 @@ All major panels are collapsible. The RGB page keeps a panel for every authored
 section in `rgb_config.c`, even when a table currently has no active rows.
 Nested RGB submenus such as layer colors, pointing-mode colors, auto-mouse
 fade, combo feedback, and key-behavior tap branches are collapsible too.
+LED group tables are nested under their owning RGB section: layer groups under
+Layer Colors, pointing-mode groups under Pointing-mode Colors, combo groups
+under Combo Feedback, and key-behavior groups under Key Behavior Feedback.
 Named tap branch sections inside the behavior editor are collapsible; repeat Hz
 is shown only when the selected hold-tier helper is `REPEAT_WHILE_HELD`.
 

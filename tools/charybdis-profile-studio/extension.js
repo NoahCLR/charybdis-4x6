@@ -3449,15 +3449,11 @@ function getClientScript() {
         const rgb = model.rgb || {};
         return "<div class='stack'>" +
             panel("RGB LED Group Builder", renderRgbGroupBuilder(), true) +
-            panel("Layer Colors", "<div class='card-list'>" + (rgb.layerColors || []).map(renderLayerColorCard).join("") + "</div>", true) +
-            panel("Layer LED Groups", renderLedGroupTable(rgb.layerLedGroups || [], "Layer"), false) +
+            panel("Layer Colors", renderLayerRgbSection(rgb), true) +
             panel("Auto-mouse Fade", renderAutomouseCard(rgb.automouseFade), false) +
-            panel("Pointing-mode Colors", "<div class='card-list'>" + (rgb.pdModeColors || []).map(renderPdColorCard).join("") + "</div>", true) +
-            panel("Pointing-mode LED Groups", renderLedGroupTable(rgb.pdModeLedGroups || [], "Pointing mode"), false) +
-            panel("Combo Feedback", renderComboFeedbackCard(rgb.comboFeedback), false) +
-            panel("Combo Feedback LED Groups", renderLedGroupTable(rgb.comboFeedbackLedGroups || [], ""), false) +
-            panel("Key Behavior Feedback", renderKeyBehaviorFeedbackCard(rgb.keyBehaviorFeedback), true) +
-            panel("Key Behavior Feedback LED Groups", renderLedGroupTable(rgb.keyBehaviorFeedbackLedGroups || [], "Semantic"), false) +
+            panel("Pointing-mode Colors", renderPdModeRgbSection(rgb), true) +
+            panel("Combo Feedback", renderComboFeedbackSection(rgb), false) +
+            panel("Key Behavior Feedback", renderKeyBehaviorFeedbackSection(rgb), true) +
             "</div>";
     }
 
@@ -3596,6 +3592,34 @@ function getClientScript() {
             "</g>";
     }
 
+    function renderLayerRgbSection(rgb) {
+        return "<div class='card-list'>" +
+            (rgb.layerColors || []).map(renderLayerColorCard).join("") +
+            renderLedGroupSubsection("Layer LED Groups", rgb.layerLedGroups || [], "Layer") +
+            "</div>";
+    }
+
+    function renderPdModeRgbSection(rgb) {
+        return "<div class='card-list'>" +
+            (rgb.pdModeColors || []).map(renderPdColorCard).join("") +
+            renderLedGroupSubsection("Pointing-mode LED Groups", rgb.pdModeLedGroups || [], "Pointing mode") +
+            "</div>";
+    }
+
+    function renderComboFeedbackSection(rgb) {
+        return "<div class='card-list'>" +
+            renderComboFeedbackCard(rgb.comboFeedback) +
+            renderLedGroupSubsection("Combo Feedback LED Groups", rgb.comboFeedbackLedGroups || [], "") +
+            "</div>";
+    }
+
+    function renderKeyBehaviorFeedbackSection(rgb) {
+        return "<div class='card-list'>" +
+            renderKeyBehaviorFeedbackCard(rgb.keyBehaviorFeedback) +
+            renderLedGroupSubsection("Key Behavior Feedback LED Groups", rgb.keyBehaviorFeedbackLedGroups || [], "Semantic") +
+            "</div>";
+    }
+
     function renderLayerColorCard(row) {
         return "<details class='card rgb-subsection collapsible-card' data-layer='" + escapeAttr(row.layer) + "'>" +
             renderRgbConfigSummary(row.layer, row.color, row.mode) +
@@ -3702,6 +3726,13 @@ function getClientScript() {
         return "<svg class='rgb-summary-swatch' viewBox='0 0 80 26' role='img' aria-label='" + escapeAttr(label) + "' data-tooltip='" + escapeAttr(label) + "'>" +
             "<rect data-summary-swatch x='1' y='1' width='78' height='24' rx='5' fill='" + fill + "' stroke='#ffffff' stroke-opacity='0.38' stroke-width='1'></rect>" +
             "</svg>";
+    }
+
+    function renderLedGroupSubsection(title, rows, ownerLabel) {
+        return "<details class='card collapsible-card'>" +
+            "<summary><h3>" + escapeHtml(title) + "</h3></summary>" +
+            "<div class='rgb-subsection-body'>" + renderLedGroupTable(rows, ownerLabel) + "</div>" +
+            "</details>";
     }
 
     function renderLedGroupTable(rows, ownerLabel) {

@@ -32,6 +32,8 @@ those two files.
   `REPEAT_WHILE_HELD`
 - RGB submenus such as layer colors, pointing-mode colors, auto-mouse fade,
   combo feedback, and key-behavior feedback colors are collapsible
+- LED group tables are nested under their owning RGB section instead of shown
+  as separate top-level panels
 - edit `layer_colors[]` HSV values and render mode
 - use compact color pickers for editable RGB colors, including a dedicated
   preview column in collapsed section summaries
