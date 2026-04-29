@@ -31,6 +31,7 @@ const KEYMAP_CONFIG_RELATIVE_PATH = path.join(
     "noah",
     "config.h"
 );
+const QMK_KEYCODE_DATA_RELATIVE_PATH = path.join("data", "constants", "keycodes");
 
 const LAYOUT_SLOT_COUNT = 56;
 const TAP_COUNT_NAMES = ["single tap branch", "double tap branch", "triple tap branch", "quadruple tap branch", "quintuple tap branch"];
@@ -51,6 +52,122 @@ const KEY_FEEDBACK_TAP_COMMIT_MODES = [
     "KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS",
 ];
 const KEY_FEEDBACK_GROUP_ALL = "KEY_FEEDBACK_GROUP_ALL";
+const QMK_KEYCODE_SECTION_GROUPS = [
+    { id: "qmk-media", label: "Media", groups: ["media", "system"] },
+    { id: "qmk-lighting", label: "Lighting", groups: ["rgb", "rgb_matrix", "led_matrix", "backlight", "underglow"] },
+    { id: "qmk-magic", label: "Magic", groups: ["magic"] },
+    { id: "qmk-other", label: "Other QMK", groups: ["quantum", "sequencer", "swap_hands", "audio", "midi", "steno", "joystick", "programmable_button"] },
+];
+const KEY_PICKER_KEYBOARD_SVG_LAYOUT = {
+    width: 1563.3125,
+    height: 466.2,
+    keys: [
+        [24.658, 24.929, 61.203, 61.203, "KC_ESC", "Esc"],
+        [159.658, 24.929, 61.203, 61.203, "KC_F1", "F1"],
+        [227.161, 24.929, 61.203, 61.203, "KC_F2", "F2"],
+        [294.664, 24.929, 61.203, 61.203, "KC_F3", "F3"],
+        [362.167, 24.929, 61.203, 61.203, "KC_F4", "F4"],
+        [463.408, 24.929, 61.203, 61.203, "KC_F5", "F5"],
+        [530.911, 24.929, 61.203, 61.203, "KC_F6", "F6"],
+        [598.414, 24.929, 61.203, 61.203, "KC_F7", "F7"],
+        [665.917, 24.929, 61.203, 61.203, "KC_F8", "F8"],
+        [767.158, 24.929, 61.203, 61.203, "KC_F9", "F9"],
+        [834.661, 24.929, 61.203, 61.203, "KC_F10", "F10"],
+        [902.164, 24.929, 61.203, 61.203, "KC_F11", "F11"],
+        [969.667, 24.929, 61.203, 61.203, "KC_F12", "F12"],
+        [24.658, 110.069, 61.203, 61.203, "KC_GRV", ["`", "~"]],
+        [92.161, 110.069, 61.203, 61.203, "KC_1", ["1", "!"]],
+        [159.664, 110.069, 61.203, 61.203, "KC_2", ["2", "@"]],
+        [227.167, 110.069, 61.203, 61.203, "KC_3", ["3", "#"]],
+        [294.67, 110.069, 61.203, 61.203, "KC_4", ["4", "$"]],
+        [362.173, 110.069, 61.203, 61.203, "KC_5", ["5", "%"]],
+        [429.676, 110.069, 61.203, 61.203, "KC_6", ["6", "^"]],
+        [497.179, 110.069, 61.203, 61.203, "KC_7", ["7", "&"]],
+        [564.682, 110.069, 61.203, 61.203, "KC_8", ["8", "*"]],
+        [632.185, 110.069, 61.203, 61.203, "KC_9", ["9", "("]],
+        [699.688, 110.069, 61.203, 61.203, "KC_0", ["0", ")"]],
+        [767.191, 110.069, 61.203, 61.203, "KC_MINS", ["-", "_"]],
+        [834.694, 110.069, 61.203, 61.203, "KC_EQL", ["=", "+"]],
+        [902.197, 110.069, 128.703, 61.203, "KC_BSPC", ["Backspace", "⇦"]],
+        [24.658, 177.569, 95.943, 61.203, "KC_TAB", ["Tab", "↹"]],
+        [126.898, 177.569, 61.203, 61.203, "KC_Q", "Q"],
+        [194.401, 177.569, 61.203, 61.203, "KC_W", "W"],
+        [261.904, 177.569, 61.203, 61.203, "KC_E", "E"],
+        [329.407, 177.569, 61.203, 61.203, "KC_R", "R"],
+        [396.91, 177.569, 61.203, 61.203, "KC_T", "T"],
+        [464.413, 177.569, 61.203, 61.203, "KC_Y", "Y"],
+        [531.916, 177.569, 61.203, 61.203, "KC_U", "U"],
+        [599.419, 177.569, 61.203, 61.203, "KC_I", "I"],
+        [666.922, 177.569, 61.203, 61.203, "KC_O", "O"],
+        [734.425, 177.569, 61.203, 61.203, "KC_P", "P"],
+        [801.928, 177.569, 61.203, 61.203, "KC_LBRC", ["[", "{"]],
+        [869.431, 177.569, 61.203, 61.203, "KC_RBRC", ["]", "}"]],
+        [936.934, 177.569, 93.963, 61.203, "KC_BSLS", ["\\", "|"]],
+        [24.658, 245.069, 112.593, 61.203, "KC_CAPS", "Caps"],
+        [143.548, 245.069, 61.203, 61.203, "KC_A", "A"],
+        [211.051, 245.069, 61.203, 61.203, "KC_S", "S"],
+        [278.554, 245.069, 61.203, 61.203, "KC_D", "D"],
+        [346.057, 245.069, 61.203, 61.203, "KC_F", "F"],
+        [413.56, 245.069, 61.203, 61.203, "KC_G", "G"],
+        [481.063, 245.069, 61.203, 61.203, "KC_H", "H"],
+        [548.566, 245.069, 61.203, 61.203, "KC_J", "J"],
+        [616.069, 245.069, 61.203, 61.203, "KC_K", "K"],
+        [683.572, 245.069, 61.203, 61.203, "KC_L", "L"],
+        [751.075, 245.069, 61.203, 61.203, "KC_SCLN", [";", ":"]],
+        [818.578, 245.069, 61.203, 61.203, "KC_QUOT", ["'", "\""]],
+        [886.081, 245.069, 144.813, 61.203, "KC_ENT", ["Enter", "↵"]],
+        [24.658, 312.569, 146.343, 61.203, "KC_LSFT", ["Shift", "⇧"]],
+        [177.298, 312.569, 61.203, 61.203, "KC_Z", "Z"],
+        [244.801, 312.569, 61.203, 61.203, "KC_X", "X"],
+        [312.304, 312.569, 61.203, 61.203, "KC_C", "C"],
+        [379.807, 312.569, 61.203, 61.203, "KC_V", "V"],
+        [447.31, 312.569, 61.203, 61.203, "KC_B", "B"],
+        [514.813, 312.569, 61.203, 61.203, "KC_N", "N"],
+        [582.316, 312.569, 61.203, 61.203, "KC_M", "M"],
+        [649.819, 312.569, 61.203, 61.203, "KC_COMM", [",", "<"]],
+        [717.322, 312.569, 61.203, 61.203, "KC_DOT", [".", ">"]],
+        [784.825, 312.569, 61.203, 61.203, "KC_SLSH", ["/", "?"]],
+        [852.328, 312.569, 178.563, 61.203, "KC_RSFT", ["Shift", "⇧"]],
+        [24.658, 380.069, 74.703, 61.203, "KC_LCTL", "Ctrl"],
+        [105.661, 380.069, 74.703, 61.203, "KC_LGUI", "Cmd"],
+        [186.664, 380.069, 74.703, 61.203, "KC_LALT", "Alt"],
+        [267.667, 380.069, 439.203, 61.203, "KC_SPC", "Space"],
+        [713.158, 380.069, 74.703, 61.203, "KC_RALT", "AltGr"],
+        [794.161, 380.069, 74.703, 61.203, "KC_APP", "Menu"],
+        [875.164, 380.069, 74.703, 61.203, "KC_RCTL", "Ctrl"],
+        [956.164, 380.069, 74.703, 61.203, "KC_RGUI", "Cmd"],
+        [1054.64, 24.939, 61.452, 61.359, "KC_PSCR", "PrtSc"],
+        [1122.14, 24.896, 61.452, 61.402, "KC_SCRL", "ScrLk"],
+        [1189.64, 24.896, 61.452, 61.402, "KC_PAUS", "Pause"],
+        [1054.64, 110.015, 61.452, 61.402, "KC_INS", "Insert"],
+        [1122.14, 110.015, 61.452, 61.402, "KC_HOME", "Home"],
+        [1189.64, 110.015, 61.452, 61.402, "KC_PGUP", "PgUp"],
+        [1054.64, 177.515, 61.452, 61.402, "KC_DEL", "Delete"],
+        [1122.14, 177.515, 61.452, 61.402, "KC_END", "End"],
+        [1189.64, 177.515, 61.452, 61.402, "KC_PGDN", "PgDn"],
+        [1122.14, 312.515, 61.452, 61.402, "KC_UP", "↑"],
+        [1054.64, 380.015, 61.452, 61.402, "KC_LEFT", "←"],
+        [1122.14, 380.015, 61.452, 61.402, "KC_DOWN", "↓"],
+        [1189.64, 380.015, 61.452, 61.402, "KC_RGHT", "→"],
+        [1274.78, 110.015, 61.452, 61.402, "KC_NUM", "NumL"],
+        [1342.28, 110.015, 61.452, 61.402, "KC_PSLS", "/"],
+        [1409.78, 110.015, 61.452, 61.402, "KC_PAST", "*"],
+        [1477.28, 110.015, 61.452, 61.402, "KC_PMNS", "-"],
+        [1274.78, 177.515, 61.452, 61.402, "KC_P7", ["7", "Hme"]],
+        [1342.28, 177.515, 61.452, 61.402, "KC_P8", ["8", "↑"]],
+        [1409.78, 177.515, 61.452, 61.402, "KC_P9", ["9", "PgU"]],
+        [1477.28, 177.481, 61.452, 129.032, "KC_PPLS", "+"],
+        [1274.78, 245.015, 61.452, 61.359, "KC_P4", ["4", "←"]],
+        [1342.28, 245.015, 61.452, 61.359, "KC_P5", "5"],
+        [1409.78, 245.015, 61.452, 61.359, "KC_P6", ["6", "→"]],
+        [1274.78, 312.537, 61.452, 61.359, "KC_P1", ["1", "End"]],
+        [1342.28, 312.537, 61.452, 61.359, "KC_P2", ["2", "↓"]],
+        [1409.78, 312.537, 61.452, 61.359, "KC_P3", ["3", "PgD"]],
+        [1477.28, 312.524, 61.452, 129.032, "KC_PENT", "Enter"],
+        [1274.643, 380.058, 129.227, 61.359, "KC_P0", ["0", "Ins"]],
+        [1409.78, 380.058, 61.452, 61.359, "KC_PDOT", [".", "Del"]],
+    ].map(([x, y, w, h, value, label]) => ({ x, y, w, h, value, label })),
+};
 const MOD_WRAPPER_LABELS = {
     C: ["Ctrl"],
     S: ["Shift"],
@@ -457,6 +574,10 @@ async function buildModel(root) {
         }
     };
     const configMacros = safe("configMacros", {}, () => parseConfigMacros(configText));
+    const qmkKeycodeCatalog = await loadQmkKeycodeCatalog(root).catch((error) => {
+        diagnostics.push(`qmkKeycodes: ${error instanceof Error ? error.message : String(error)}`);
+        return fallbackQmkKeycodeCatalog();
+    });
 
     return {
         root,
@@ -473,8 +594,156 @@ async function buildModel(root) {
         ),
         behaviorTimingDefaults: safe("behaviorTimingDefaults", {}, () => resolveBehaviorTimingDefaults(configMacros)),
         rgb: safe("rgb", {}, () => parseRgbConfig(rgbText, configMacros)),
+        qmkKeycodes: qmkKeycodeCatalog.entries,
+        qmkKeyLabels: qmkKeycodeCatalog.labels,
+        qmkKeycodeSource: qmkKeycodeCatalog.source,
         diagnostics,
     };
+}
+
+async function loadQmkKeycodeCatalog(root) {
+    const qmkRoot = await findQmkRoot(root);
+    if (!qmkRoot) {
+        return fallbackQmkKeycodeCatalog();
+    }
+
+    const keycodeDir = path.join(qmkRoot, QMK_KEYCODE_DATA_RELATIVE_PATH);
+    const names = await fs.readdir(keycodeDir);
+    const entriesByValue = new Map();
+
+    for (const name of names.filter((candidate) => candidate.endsWith(".hjson")).sort()) {
+        const text = await fs.readFile(path.join(keycodeDir, name), "utf8");
+        for (const entry of parseQmkKeycodeHjsonEntries(text)) {
+            const value = preferredQmkKeycodeValue(entry);
+            if (!value || entriesByValue.has(value) || shouldSkipQmkKeycode(entry)) {
+                continue;
+            }
+            entriesByValue.set(value, {
+                ...entry,
+                value,
+                search: [value, entry.key, entry.label].concat(entry.aliases || []).filter(Boolean).join(" ").toLowerCase(),
+            });
+        }
+    }
+
+    const entries = Array.from(entriesByValue.values()).sort(compareQmkKeycodes);
+    return {
+        source: path.join(keycodeDir, "*.hjson"),
+        entries,
+        labels: qmkKeyLabelsFromEntries(entries),
+    };
+}
+
+async function findQmkRoot(root) {
+    const candidates = [
+        path.resolve(root, "..", "bastardkb-qmk"),
+        path.resolve(root, "..", "qmk_firmware"),
+        root,
+    ];
+    for (const folder of vscode.workspace.workspaceFolders || []) {
+        candidates.push(folder.uri.fsPath);
+    }
+    for (const candidate of uniqueStrings(candidates)) {
+        if (await fileExists(path.join(candidate, QMK_KEYCODE_DATA_RELATIVE_PATH))) {
+            return candidate;
+        }
+    }
+    return undefined;
+}
+
+function parseQmkKeycodeHjsonEntries(text) {
+    const entries = [];
+    const pattern = /"0x[0-9A-Fa-f]+"\s*:\s*\{([\s\S]*?)\n\s*\}/g;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+        const body = match[1];
+        const key = extractHjsonStringField(body, "key");
+        if (!key) {
+            continue;
+        }
+        entries.push({
+            key,
+            label: extractHjsonStringField(body, "label") || key,
+            group: extractHjsonStringField(body, "group") || "other",
+            aliases: extractHjsonStringListField(body, "aliases").filter((alias) => !alias.startsWith("!")),
+        });
+    }
+    return entries;
+}
+
+function extractHjsonStringField(body, field) {
+    return body.match(new RegExp(`"${escapeRegex(field)}"\\s*:\\s*"([^"]+)"`))?.[1] || "";
+}
+
+function extractHjsonStringListField(body, field) {
+    const match = body.match(new RegExp(`"${escapeRegex(field)}"\\s*:\\s*\\[([\\s\\S]*?)\\]`));
+    if (!match) {
+        return [];
+    }
+    return Array.from(match[1].matchAll(/"([^"]+)"/g)).map((item) => item[1]);
+}
+
+function shouldSkipQmkKeycode(entry) {
+    if (!entry.key || entry.key === "SAFE_RANGE") {
+        return true;
+    }
+    if (entry.key.endsWith("_MIN") || entry.key.endsWith("_MAX")) {
+        return true;
+    }
+    if (entry.key.startsWith("QK_") && !(entry.aliases || []).some((alias) => !alias.startsWith("!"))) {
+        return entry.key !== "QK_LAYER_LOCK";
+    }
+    return false;
+}
+
+function preferredQmkKeycodeValue(entry) {
+    if (!entry.key.startsWith("QK_")) {
+        return entry.key;
+    }
+    return (entry.aliases || []).find((alias) => !alias.startsWith("!")) || entry.key;
+}
+
+function qmkKeyLabelsFromEntries(entries) {
+    const labels = {};
+    for (const entry of entries) {
+        const label = entry.label || entry.value;
+        labels[entry.value] = label;
+        labels[entry.key] = label;
+        for (const alias of entry.aliases || []) {
+            labels[alias] = label;
+        }
+    }
+    return labels;
+}
+
+function fallbackQmkKeycodeCatalog() {
+    const entries = Object.entries(QMK_KEY_LABELS).map(([value, label]) => ({
+        value,
+        key: value,
+        label,
+        group: value === "_______" || value === "XXXXXXX" ? "internal" : "basic",
+        aliases: [],
+        search: [value, label].join(" ").toLowerCase(),
+    }));
+    return {
+        source: "built-in fallback",
+        entries,
+        labels: {...QMK_KEY_LABELS},
+    };
+}
+
+function compareQmkKeycodes(left, right) {
+    const groupOrder = ["internal", "basic", "modifiers", "media", "system", "mouse", "rgb", "rgb_matrix", "led_matrix", "backlight", "underglow", "magic", "quantum"];
+    const leftGroup = groupOrder.indexOf(left.group);
+    const rightGroup = groupOrder.indexOf(right.group);
+    if (leftGroup !== rightGroup) {
+        return (leftGroup === -1 ? 999 : leftGroup) - (rightGroup === -1 ? 999 : rightGroup);
+    }
+    return String(left.label || left.value).localeCompare(String(right.label || right.value), undefined, {numeric: true});
+}
+
+function uniqueStrings(values) {
+    return Array.from(new Set(values.filter(Boolean)));
 }
 
 function parseLayers(text) {
@@ -2400,20 +2669,20 @@ function getStudioHtml() {
             z-index: 40;
             display: grid;
             place-items: center;
-            padding: 24px;
+            padding: 12px;
             background: rgba(7, 10, 12, 0.58);
         }
         .key-picker {
             display: grid;
             grid-template-rows: auto auto minmax(0, 1fr) auto;
             gap: 12px;
-            width: min(920px, calc(100vw - 48px));
-            max-height: calc(100vh - 48px);
+            width: min(1280px, calc(100vw - 24px));
+            max-height: calc(100vh - 24px);
             border: 1px solid var(--line);
             border-radius: 8px;
             background: var(--panel);
             box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44);
-            padding: 14px;
+            padding: 12px;
         }
         .key-picker-head,
         .key-picker-actions {
@@ -2424,7 +2693,7 @@ function getStudioHtml() {
         }
         .key-picker-body {
             display: grid;
-            grid-template-columns: 170px minmax(0, 1fr);
+            grid-template-columns: 150px minmax(0, 1fr);
             gap: 12px;
             min-height: 0;
         }
@@ -2440,6 +2709,9 @@ function getStudioHtml() {
         }
         .key-picker-tab {
             text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .key-picker-tab.active {
             border-color: var(--accent);
@@ -2455,9 +2727,86 @@ function getStudioHtml() {
             gap: 6px;
         }
         .key-picker-key {
+            flex: 0 0 calc(var(--key-units, 1) * 42px);
             min-width: 46px;
             min-height: 38px;
             padding: 6px 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+        }
+        .key-picker-keyboard {
+            min-width: 0;
+        }
+        .key-picker-grid:not(.key-picker-keyboard) .key-picker-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+            gap: 6px;
+        }
+        .key-picker-grid:not(.key-picker-keyboard) .key-picker-key {
+            flex: initial;
+            width: 100%;
+            min-width: 0;
+            justify-content: center;
+        }
+        .key-picker-spacer {
+            flex: 0 0 calc(var(--key-units, 1) * 42px);
+            min-height: 1px;
+        }
+        .key-picker-search {
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        .key-picker-keyboard-svg-wrap {
+            overflow: auto;
+            padding: 8px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #20262a;
+        }
+        .key-picker-keyboard-svg {
+            display: block;
+            width: max(100%, 1120px);
+            height: auto;
+        }
+        .key-picker-svg-key {
+            cursor: pointer;
+            outline: none;
+        }
+        .key-picker-svg-key rect {
+            fill: #1c2226;
+            stroke: #60707a;
+            stroke-width: 2;
+        }
+        .key-picker-svg-key:hover rect,
+        .key-picker-svg-key:focus rect {
+            stroke: var(--accent);
+        }
+        .key-picker-svg-key.selected rect {
+            fill: #1f5d52;
+            stroke: var(--accent);
+            stroke-width: 3;
+        }
+        .key-picker-svg-key text {
+            fill: var(--text);
+            font-family: var(--vscode-font-family, system-ui, sans-serif);
+            font-size: 15px;
+            font-weight: 650;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+        }
+        .key-picker-svg-key .secondary {
+            fill: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .key-picker-empty {
+            padding: 14px;
+            border: 1px dashed rgba(168, 178, 184, 0.34);
+            border-radius: 6px;
+            background: rgba(32, 38, 42, 0.42);
         }
         .key-picker-key.selected,
         .key-picker-mod.selected {
@@ -2622,6 +2971,8 @@ function getClientScript() {
         "reachable via": "The visible key or behavior action that can reach this pointing mode."
     };
     const qmkKeyLabels = ${JSON.stringify(QMK_KEY_LABELS)};
+    const qmkKeycodeSectionGroups = ${JSON.stringify(QMK_KEYCODE_SECTION_GROUPS)};
+    const keyPickerKeyboardSvgLayout = ${JSON.stringify(KEY_PICKER_KEYBOARD_SVG_LAYOUT)};
     const modWrapperLabels = ${JSON.stringify(MOD_WRAPPER_LABELS)};
     const keyBehaviorAllGroups = ${JSON.stringify(KEY_FEEDBACK_GROUP_ALL)};
     const rgbLocalities = ${JSON.stringify(RGB_LOCALITIES)};
@@ -2647,22 +2998,17 @@ function getClientScript() {
     const keyPickerSections = [
         {
             id: "qwerty",
-            label: "QWERTY",
-            rows: [
-                ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-                ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-                ["Z", "X", "C", "V", "B", "N", "M"],
-                ["Esc", "Tab", "Enter", "Space", "Backspace", "Delete"]
-            ]
+            label: "Keyboard",
+            kind: "keyboard",
+            layout: keyPickerKeyboardSvgLayout
         },
         {
-            id: "numbers",
-            label: "Numbers",
+            id: "symbols",
+            label: "Symbols",
             rows: [
-                ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-                ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"],
-                ["-", "_", "=", "+", "[", "]", "{", "}", "\\\\", "|"],
-                [";", ":", "'", "\\\"", ",", ".", "/", "<", ">", "\`", "~"]
+                ["KC_EXLM", "KC_AT", "KC_HASH", "KC_DLR", "KC_PERC", "KC_CIRC", "KC_AMPR", "KC_ASTR", "KC_LPRN", "KC_RPRN"],
+                ["KC_UNDS", "KC_PLUS", "KC_LCBR", "KC_RCBR", "KC_PIPE", "KC_COLN", "KC_DQUO", "KC_LABK", "KC_RABK", "KC_TILD"],
+                ["KC_MINS", "KC_EQL", "KC_LBRC", "KC_RBRC", "KC_BSLS", "KC_SCLN", "KC_QUOT", "KC_COMM", "KC_DOT", "KC_SLSH"]
             ]
         },
         {
@@ -2670,17 +3016,51 @@ function getClientScript() {
             label: "Navigation",
             rows: [
                 ["Left", "Down", "Up", "Right"],
-                ["Home", "End", "Page Up", "Page Down"],
-                ["Caps Lock", "Play", "Previous", "Next", "Mute"]
+                ["KC_HOME", "KC_END", "KC_PGUP", "KC_PGDN", "KC_INS", "KC_DEL"],
+                ["KC_PSCR", "KC_SCRL", "KC_PAUS", "KC_CAPS", "KC_NUM"]
+            ]
+        },
+        {
+            id: "numpad",
+            label: "Numpad",
+            rows: [
+                ["KC_NUM", "KC_PSLS", "KC_PAST", "KC_PMNS"],
+                ["KC_P7", "KC_P8", "KC_P9", "KC_PPLS"],
+                ["KC_P4", "KC_P5", "KC_P6", "KC_PENT"],
+                ["KC_P1", "KC_P2", "KC_P3", "KC_PEQL"],
+                ["KC_P0", "KC_PDOT", "KC_PCMM"]
+            ]
+        },
+        {
+            id: "keyboard-extras",
+            label: "More keys",
+            rows: [
+                ["KC_F13", "KC_F14", "KC_F15", "KC_F16", "KC_F17", "KC_F18"],
+                ["KC_F19", "KC_F20", "KC_F21", "KC_F22", "KC_F23", "KC_F24"],
+                ["KC_INT1", "KC_INT2", "KC_INT3", "KC_INT4", "KC_INT5", "KC_INT6", "KC_INT7", "KC_INT8", "KC_INT9"],
+                ["KC_LNG1", "KC_LNG2", "KC_LNG3", "KC_LNG4", "KC_LNG5", "KC_LNG6", "KC_LNG7", "KC_LNG8", "KC_LNG9"],
+                ["KC_EXEC", "KC_HELP", "KC_MENU", "KC_SLCT", "KC_STOP", "KC_AGIN"],
+                ["KC_UNDO", "KC_CUT", "KC_COPY", "KC_PSTE", "KC_FIND", "KC_ERAS"],
+                ["KC_LCAP", "KC_LNUM", "KC_LSCR", "KC_SYRQ", "KC_CNCL", "KC_CLR"],
+                ["KC_NUBS", "KC_KB_POWER", "KC_SEPR", "KC_OUT", "KC_OPER", "KC_CLAG", "KC_CRSL", "KC_EXSL"]
             ]
         },
         {
             id: "mouse",
             label: "Mouse",
             rows: [
-                ["Mouse 1", "Mouse 2", "Mouse 3"],
-                ["MS_BTN1", "MS_BTN2", "MS_BTN3"]
+                ["KC_MS_U", "KC_MS_D", "KC_MS_L", "KC_MS_R"],
+                ["KC_BTN1", "KC_BTN2", "KC_BTN3", "KC_BTN4", "KC_BTN5"],
+                ["KC_BTN6", "KC_BTN7", "KC_BTN8"],
+                ["KC_WH_U", "KC_WH_D", "KC_WH_L", "KC_WH_R"],
+                ["KC_ACL0", "KC_ACL1", "KC_ACL2"]
             ]
+        },
+        {
+            id: "qmk-all",
+            label: "All QMK",
+            kind: "qmkSearch",
+            rows: []
         },
         {
             id: "layers",
@@ -2790,10 +3170,33 @@ function getClientScript() {
             confirmKeyPicker();
         }
     });
+    keyPickerHost.addEventListener("keydown", (event) => {
+        const target = event.target.closest("[data-picker-action='key']");
+        if (!target || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        choosePickerKey(target.dataset.value);
+    });
+    keyPickerHost.addEventListener("input", (event) => {
+        if (!keyPicker || !event.target.matches("[data-picker-search]")) return;
+        keyPicker.search = event.target.value || "";
+        const sectionHost = keyPickerHost.querySelector(".key-picker-section");
+        if (!sectionHost) {
+            renderKeyPicker();
+            return;
+        }
+        sectionHost.innerHTML = renderKeyPickerSection();
+        hydrateTooltips();
+        const input = sectionHost.querySelector("[data-picker-search]");
+        if (input) {
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
+        }
+    });
 
     window.addEventListener("message", (event) => {
         if (event.data.type === "model") {
             model = event.data.model;
+            Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
             notice = event.data.notice || "";
             if (!activeLayer && model.layers.length) {
                 activeLayer = model.layers[0].name;
@@ -3363,6 +3766,7 @@ function getClientScript() {
             targetId,
             mode: mode === "list" ? "list" : "single",
             section: "qwerty",
+            search: "",
             mods: [],
             keys: []
         };
@@ -3434,7 +3838,8 @@ function getClientScript() {
     }
 
     function keyPickerResolvedSections() {
-        return keyPickerSections.map((section) => {
+        const qmkSections = qmkKeyPickerSections();
+        return keyPickerSections.concat(qmkSections).map((section) => {
             if (section.id === "layers") {
                 return {
                     ...section,
@@ -3461,20 +3866,115 @@ function getClientScript() {
                     ]
                 };
             }
+            if (section.kind === "qmkSearch") {
+                return {
+                    ...section,
+                    rows: qmkKeyRows(filterQmkKeycodes(model.qmkKeycodes || [], keyPicker.search), 8),
+                };
+            }
             return section;
         });
     }
 
     function renderKeyPickerSection() {
         const section = keyPickerResolvedSections().find((candidate) => candidate.id === keyPicker.section) || keyPickerResolvedSections()[0];
-        return "<div class='key-picker-grid'>" + (section.rows || []).map((row) =>
+        const search = section.kind === "qmkSearch"
+            ? "<input class='key-picker-search' data-picker-search value='" + escapeAttr(keyPicker.search || "") + "' placeholder='Search QMK keycodes, labels, or aliases'>"
+            : "";
+        if (section.kind === "keyboard") {
+            return renderKeyPickerKeyboard(section);
+        }
+        const empty = !(section.rows || []).some((row) => row.length)
+            ? "<div class='key-picker-empty muted'>" + escapeHtml(section.kind === "qmkSearch" ? "Search to browse the full QMK catalog." : "No keys in this section.") + "</div>"
+            : "";
+        return search + empty + "<div class='key-picker-grid " + (section.kind === "keyboard" ? "key-picker-keyboard" : "") + "'>" + (section.rows || []).map((row) =>
             "<div class='key-picker-row'>" + row.map((value) => renderKeyPickerKey(value)).join("") + "</div>"
         ).join("") + "</div>";
     }
 
-    function renderKeyPickerKey(value) {
+    function renderKeyPickerKeyboard(section) {
+        const layout = section.layout || keyPickerKeyboardSvgLayout;
+        return "<div class='key-picker-keyboard'>" +
+            "<div class='key-picker-keyboard-svg-wrap'>" +
+            "<svg class='key-picker-keyboard-svg' viewBox='0 0 " + escapeAttr(layout.width) + " " + escapeAttr(layout.height) + "' role='group' aria-label='Full keyboard key picker'>" +
+            "<rect x='0.75' y='0.75' width='" + escapeAttr(layout.width - 1.5) + "' height='" + escapeAttr(layout.height - 1.5) + "' rx='6' fill='none' stroke='rgba(96,112,122,0.34)' stroke-width='1.5'></rect>" +
+            (layout.keys || []).map((key) => renderKeyPickerSvgKey(key)).join("") +
+            "</svg>" +
+            "</div>" +
+            "</div>";
+    }
+
+    function renderKeyPickerSvgKey(key) {
+        const selected = keyPicker.keys.includes(key.value);
+        const lines = keyPickerSvgLabelLines(key.label || displayKeyExpression(key.value));
+        const centerX = key.x + key.w / 2;
+        const firstY = key.y + key.h / 2 - (lines.length - 1) * 8;
+        const tooltip = displayKeyExpression(key.value) + " (" + key.value + ")";
+        return "<g class='key-picker-svg-key " + (selected ? "selected" : "") + "' tabindex='0' role='button' data-picker-action='key' data-value='" + escapeAttr(key.value) + "' data-tooltip='" + escapeAttr(tooltip) + "'>" +
+            "<rect x='" + escapeAttr(key.x) + "' y='" + escapeAttr(key.y) + "' width='" + escapeAttr(key.w) + "' height='" + escapeAttr(key.h) + "' rx='3' ry='3'></rect>" +
+            "<text x='" + escapeAttr(centerX) + "' y='" + escapeAttr(firstY) + "'>" +
+            lines.map((line, index) => "<tspan x='" + escapeAttr(centerX) + "' dy='" + (index === 0 ? "0" : "16") + "' class='" + (index === 0 ? "primary" : "secondary") + "'>" + escapeHtml(line) + "</tspan>").join("") +
+            "</text>" +
+            "</g>";
+    }
+
+    function keyPickerSvgLabelLines(label) {
+        return (Array.isArray(label) ? label : String(label || "").split("\\n"))
+            .map((line) => String(line || "").trim())
+            .filter(Boolean);
+    }
+
+    function renderKeyPickerKey(item) {
+        if (item && typeof item === "object" && item.spacer) {
+            return "<span class='key-picker-spacer' style='--key-units: " + escapeAttr(item.spacer) + "'></span>";
+        }
+        const value = keyPickerItemValue(item);
+        const label = keyPickerItemLabel(item);
         const selected = keyPicker.keys.includes(value);
-        return "<button class='key-picker-key " + (selected ? "selected" : "") + "' data-picker-action='key' data-value='" + escapeAttr(value) + "'>" + escapeHtml(displayKeyExpression(value)) + "</button>";
+        const width = item && typeof item === "object" && item.w ? item.w : 1;
+        const tooltip = item && typeof item === "object" && item.tooltip ? item.tooltip : value;
+        return "<button class='key-picker-key " + (selected ? "selected" : "") + "' style='--key-units: " + escapeAttr(width) + "' data-picker-action='key' data-value='" + escapeAttr(value) + "' data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(label) + "</button>";
+    }
+
+    function keyPickerItemValue(item) {
+        return item && typeof item === "object" ? item.value || "" : item;
+    }
+
+    function keyPickerItemLabel(item) {
+        if (item && typeof item === "object" && item.label) return item.label;
+        return displayKeyExpression(keyPickerItemValue(item));
+    }
+
+    function qmkKeyPickerSections() {
+        const entries = model.qmkKeycodes || [];
+        return qmkKeycodeSectionGroups.map((config) => {
+            const groupEntries = entries.filter((entry) => config.groups.includes(entry.group));
+            return {
+                id: config.id,
+                label: config.label,
+                rows: qmkKeyRows(groupEntries, 6)
+            };
+        }).filter((section) => section.rows.length);
+    }
+
+    function qmkKeyRows(entries, columns) {
+        const rows = [];
+        const items = entries.map((entry) => ({
+            value: entry.value,
+            label: entry.label || entry.value,
+            tooltip: (entry.value || "") + (entry.key && entry.key !== entry.value ? " / " + entry.key : "") + ((entry.aliases || []).length ? " / " + entry.aliases.join(", ") : "")
+        }));
+        for (let index = 0; index < items.length; index += columns) {
+            rows.push(items.slice(index, index + columns));
+        }
+        return rows;
+    }
+
+    function filterQmkKeycodes(entries, query) {
+        const text = String(query || "").trim().toLowerCase();
+        const source = entries || [];
+        if (!text) return [];
+        return source.filter((entry) => (entry.search || "").includes(text)).slice(0, 160);
     }
 
     function togglePickerModifier(modifier) {
