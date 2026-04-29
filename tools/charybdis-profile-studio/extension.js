@@ -50,6 +50,7 @@ const KEY_FEEDBACK_TAP_COMMIT_MODES = [
     "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS",
     "KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS",
 ];
+const KEY_FEEDBACK_GROUP_ALL = "KEY_FEEDBACK_GROUP_ALL";
 const MOD_WRAPPER_LABELS = {
     C: ["Ctrl"],
     S: ["Shift"],
@@ -979,11 +980,12 @@ async function appendRgbLedGroup(root, group) {
         throw new Error(`Invalid RGB LED group target: ${target}`);
     }
 
-    assertSafeHsv(group?.hue, group?.sat, group?.val);
     const ledIndices = normalizeLedIndices(group?.ledIndices);
     if (!ledIndices.length) {
         throw new Error("Select at least one LED for the RGB group.");
     }
+
+    assertSafeHsv(group?.hue, group?.sat, group?.val);
 
     const fields = [];
     if (config.ownerField) {
@@ -2319,6 +2321,28 @@ function getStudioHtml() {
             border-radius: 999px;
             padding: 2px 6px;
         }
+        .rgb-all-color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 8px;
+        }
+        .rgb-all-color-chip {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 3px 8px;
+            align-items: center;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 8px;
+            background: #20282d;
+        }
+        .rgb-all-color-chip code {
+            grid-column: 2;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .inline-swatch {
             display: inline-block;
             width: 34px;
@@ -2568,16 +2592,26 @@ function getClientScript() {
     };
     const qmkKeyLabels = ${JSON.stringify(QMK_KEY_LABELS)};
     const modWrapperLabels = ${JSON.stringify(MOD_WRAPPER_LABELS)};
+    const keyBehaviorAllGroups = ${JSON.stringify(KEY_FEEDBACK_GROUP_ALL)};
     const rgbLocalities = ${JSON.stringify(RGB_LOCALITIES)};
     const automouseFadeModes = ${JSON.stringify(AUTOMOUSE_FADE_MODES)};
     const keyFeedbackTapCommitModes = ${JSON.stringify(KEY_FEEDBACK_TAP_COMMIT_MODES)};
     const keyBehaviorRgbSemantics = [
+        keyBehaviorAllGroups,
         "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH",
         "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED",
         "KEY_FEEDBACK_GROUP_TAP_COMMITTED",
         "KEY_FEEDBACK_GROUP_HOLD_ACTIVE",
         "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"
     ];
+    const keyBehaviorRgbSemanticLabels = {
+        KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH: "Tap pending",
+        KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED: "Tap branch committed",
+        KEY_FEEDBACK_GROUP_TAP_COMMITTED: "Tap committed",
+        KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "Hold active",
+        KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "Long hold active"
+    };
+    keyBehaviorRgbSemanticLabels[keyBehaviorAllGroups] = "All feedback groups";
     const keyPickerModifiers = ["Ctrl", "Shift", "Alt", "Cmd", "Right Ctrl", "Right Shift", "Right Alt", "Right Cmd"];
     const keyPickerSections = [
         {
@@ -2826,14 +2860,7 @@ function getClientScript() {
             const form = document.getElementById("rgbGroupBuilder");
             post({
                 type: "addRgbLedGroup",
-                group: {
-                    target: value(form, "target"),
-                    owner: value(form, "owner"),
-                    hue: value(form, "h"),
-                    sat: value(form, "s"),
-                    val: value(form, "v"),
-                    ledIndices: rgbSelectedLeds
-                }
+                group: readRgbLedGroupBuilder(form)
             });
         } else if (action === "updateViaMacro") {
             const row = target.closest("tr");
@@ -3886,6 +3913,20 @@ function getClientScript() {
         };
     }
 
+    function readRgbLedGroupBuilder(form) {
+        const target = value(form, "target");
+        const owner = value(form, "owner");
+        const allKeyBehavior = target === "keyBehavior" && owner === keyBehaviorAllGroups;
+        return {
+            target,
+            owner,
+            hue: allKeyBehavior ? "0" : value(form, "h"),
+            sat: allKeyBehavior ? "0" : value(form, "s"),
+            val: allKeyBehavior ? "0" : value(form, "v"),
+            ledIndices: rgbSelectedLeds
+        };
+    }
+
     function renderRgbStudio() {
         const rgb = model.rgb || {};
         return "<div class='stack'>" +
@@ -3907,9 +3948,9 @@ function getClientScript() {
             ["combo", "Combo feedback LED groups"],
             ["keyBehavior", "Key-behavior LED groups"]
         ];
-        const ownerChoices = rgbGroupOwners(rgbGroupTarget);
+        const ownerChoices = rgbGroupOwnerOptions(rgbGroupTarget);
         const ownerControl = ownerChoices.length
-            ? "<label><span>" + escapeHtml(rgbGroupOwnerLabel(rgbGroupTarget)) + "</span><select name='owner'>" + options(ownerChoices, rgbGroupOwner) + "</select></label>"
+            ? "<label><span>" + escapeHtml(rgbGroupOwnerLabel(rgbGroupTarget)) + "</span><select name='owner'>" + optionsWithLabels(ownerChoices, rgbGroupOwner) + "</select></label>"
             : "<label><span>owner</span><input name='owner' disabled value='combo feedback'></label>";
         const selected = rgbSelectedLeds.length
             ? rgbSelectedLeds.map((led) => "<code>" + led + "</code>").join("")
@@ -3920,7 +3961,7 @@ function getClientScript() {
             ownerControl +
             "<div><button data-action='addRgbLedGroup' class='primary'>Add LED group row</button></div>" +
             "</div>" +
-            renderHsvColorControl(defaultRgbBuilderColor()) +
+            renderRgbBuilderColorControl() +
             "<div class='toolbar' style='margin: 10px 0'>" +
             "<button data-action='clearRgbSelection'>Clear LEDs</button>" +
             "<button data-action='toggleRgbTrackball'>Trackball LED 56</button>" +
@@ -3938,10 +3979,34 @@ function getClientScript() {
         return [];
     }
 
+    function rgbGroupOwnerOptions(target) {
+        if (target === "keyBehavior") {
+            return keyBehaviorRgbSemantics.map((semantic) => [semantic, keyBehaviorRgbSemanticLabel(semantic)]);
+        }
+        return rgbGroupOwners(target).map((owner) => [owner, owner]);
+    }
+
     function rgbGroupOwnerLabel(target) {
         if (target === "pdMode") return "pointing mode";
         if (target === "keyBehavior") return "semantic";
         return "layer";
+    }
+
+    function renderRgbBuilderColorControl() {
+        if (rgbGroupTarget === "keyBehavior" && rgbGroupOwner === keyBehaviorAllGroups) {
+            const rows = keyBehaviorRgbSemanticColorRows();
+            return "<div class='color-control'>" +
+                "<div class='muted'>All mode writes one low-level KEY_FEEDBACK_GROUP_ALL row. The firmware uses the active feedback semantic's configured color at render time.</div>" +
+                "<div class='rgb-all-color-grid'>" + rows.map((row) =>
+                    "<div class='rgb-all-color-chip'>" +
+                    renderInlineSwatch(row.color) +
+                    "<span>" + escapeHtml(row.label) + "</span>" +
+                    "<code class='muted'>" + escapeHtml(colorExpression(row.color)) + "</code>" +
+                    "</div>"
+                ).join("") + "</div>" +
+                "</div>";
+        }
+        return renderHsvColorControl(defaultRgbBuilderColor());
     }
 
     function defaultRgbBuilderColor() {
@@ -3957,15 +4022,35 @@ function getClientScript() {
         if (rgbGroupTarget === "combo") {
             return model.rgb?.comboFeedback?.color || { h: "191", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
         }
+        if (rgbGroupTarget === "keyBehavior" && rgbGroupOwner === keyBehaviorAllGroups) {
+            return keyBehaviorSemanticColor("KEY_FEEDBACK_GROUP_TAP_COMMITTED") || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
+        }
+        return keyBehaviorSemanticColor(rgbGroupOwner) || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
+    }
+
+    function keyBehaviorRgbSemanticLabel(semantic) {
+        return keyBehaviorRgbSemanticLabels[semantic] || semantic;
+    }
+
+    function keyBehaviorRgbSemanticColorRows() {
+        return keyBehaviorRgbSemantics
+            .filter((semantic) => semantic !== keyBehaviorAllGroups)
+            .map((semantic) => ({
+                semantic,
+                label: keyBehaviorRgbSemanticLabel(semantic),
+                color: keyBehaviorSemanticColor(semantic) || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" }
+            }));
+    }
+
+    function keyBehaviorSemanticColor(semantic) {
         const feedback = model.rgb?.keyBehaviorFeedback || {};
-        const semanticColor = {
+        return {
             KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH: feedback.tapPendingColor,
             KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED: (feedback.tapBranchColors || [])[0],
             KEY_FEEDBACK_GROUP_TAP_COMMITTED: feedback.tapCommittedColor,
             KEY_FEEDBACK_GROUP_HOLD_ACTIVE: feedback.holdActiveColor,
             KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: feedback.longHoldActiveColor
-        }[rgbGroupOwner];
-        return semanticColor || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
+        }[semantic];
     }
 
     function rgbBuilderHex() {
@@ -4057,7 +4142,7 @@ function getClientScript() {
     function renderKeyBehaviorFeedbackSection(rgb) {
         return "<div class='card-list'>" +
             renderKeyBehaviorFeedbackCard(rgb.keyBehaviorFeedback) +
-            renderLedGroupSubsection("Key Behavior Feedback LED Groups", rgb.keyBehaviorFeedbackLedGroups || [], "Semantic") +
+            renderLedGroupSubsection("Key Behavior Feedback LED Groups", rgb.keyBehaviorFeedbackLedGroups || [], "Semantic", "keyBehavior") +
             "</div>";
     }
 
@@ -4202,14 +4287,14 @@ function getClientScript() {
             "</svg>";
     }
 
-    function renderLedGroupSubsection(title, rows, ownerLabel) {
+    function renderLedGroupSubsection(title, rows, ownerLabel, tableKind = "") {
         return "<details class='card collapsible-card'>" +
             "<summary><h3>" + escapeHtml(title) + "</h3></summary>" +
-            "<div class='rgb-subsection-body'>" + renderLedGroupTable(rows, ownerLabel) + "</div>" +
+            "<div class='rgb-subsection-body'>" + renderLedGroupTable(rows, ownerLabel, tableKind) + "</div>" +
             "</details>";
     }
 
-    function renderLedGroupTable(rows, ownerLabel) {
+    function renderLedGroupTable(rows, ownerLabel, tableKind = "") {
         if (!rows.length) {
             return "<p class='muted'>No active LED group rows are enabled in this table.</p>";
         }
@@ -4217,11 +4302,18 @@ function getClientScript() {
         return "<table><thead><tr>" + ownerHeader + "<th>Color</th><th>LED group</th><th>LEDs</th></tr></thead><tbody>" +
             rows.map((row) => "<tr>" +
                 (ownerLabel ? "<td><code>" + escapeHtml(row.owner || "") + "</code></td>" : "") +
-                "<td>" + renderInlineSwatch(row.color) + "<code>" + escapeHtml(row.color?.expression || "") + "</code></td>" +
+                renderLedGroupColorCell(row, tableKind) +
                 "<td><code>" + escapeHtml(row.ledGroup || "") + "</code></td>" +
                 "<td><code>" + escapeHtml((row.ledIndices || []).join(", ")) + "</code></td>" +
                 "</tr>").join("") +
             "</tbody></table>";
+    }
+
+    function renderLedGroupColorCell(row, tableKind = "") {
+        if (tableKind === "keyBehavior" && row.owner === keyBehaviorAllGroups) {
+            return "<td><div class='toolbar'>" + keyBehaviorRgbSemanticColorRows().map((semanticRow) => renderInlineSwatch(semanticRow.color)).join("") + "</div><code class='muted'>runtime feedback color</code></td>";
+        }
+        return "<td>" + renderInlineSwatch(row.color) + "<code>" + escapeHtml(row.color?.expression || "") + "</code></td>";
     }
 
     function renderHsvColorControl(color, id, extraAttrs = "", options = {}) {

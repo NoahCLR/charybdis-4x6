@@ -95,6 +95,7 @@ typedef enum {
     KEY_FEEDBACK_GROUP_TAP_COMMITTED,
     KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
     KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
+    KEY_FEEDBACK_GROUP_ALL,
 } key_behavior_feedback_group_semantic_t;
 
 typedef struct {

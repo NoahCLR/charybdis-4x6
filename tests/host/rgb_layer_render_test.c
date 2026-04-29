@@ -177,7 +177,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 #endif
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, );
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(99, 99, 99), .led_group = RGB_LED_GROUP(6)}, );
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #endif
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
@@ -224,6 +224,31 @@ static rgb_t rgb_from_combo_feedback_group(uint8_t index) {
 
 static rgb_t rgb_from_key_feedback_group(uint8_t index) {
     return rgb_from_hsv(key_behavior_feedback_led_groups[index].color);
+}
+
+static rgb_t rgb_from_feedback_semantic(key_feedback_semantic_t semantic, uint8_t tap_branch) {
+    switch (semantic) {
+        case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
+            return rgb_from_hsv(key_behavior_feedback_colors.tap_pending_color);
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED: {
+            uint8_t index = tap_branch <= 1u ? 0u : (uint8_t)(tap_branch - 1u);
+            if (index >= key_behavior_feedback_colors.tap_branch_color_count) {
+                index = (uint8_t)(key_behavior_feedback_colors.tap_branch_color_count - 1u);
+            }
+            return rgb_from_tap_branch_color(index);
+        }
+        case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
+            return rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color);
+        case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
+        case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
+            return rgb_from_hsv(key_behavior_feedback_colors.hold_active_color);
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY:
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING:
+            return rgb_from_hsv(key_behavior_feedback_colors.long_hold_active_color);
+        case KEY_FEEDBACK_SEMANTIC_NONE:
+        default:
+            return (rgb_t){0};
+    }
 }
 #endif
 
@@ -972,6 +997,7 @@ static void test_key_feedback_led_groups_repaint_after_feedback_locality(void) {
 
     check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_pending_color));
     check_led(5, rgb_from_key_feedback_group(0));
+    check_led(6, rgb_from_feedback_semantic(KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH, 0u));
 }
 
 static void test_key_feedback_tap_branch_commit_led_group_repaints_after_feedback_locality(void) {
@@ -983,6 +1009,7 @@ static void test_key_feedback_tap_branch_commit_led_group_repaints_after_feedbac
     CHECK(render_output());
 
     check_led(5, rgb_from_key_feedback_group(1));
+    check_led(6, rgb_from_feedback_semantic(KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED, 0u));
 }
 
 static void test_key_feedback_tap_commit_led_group_repaints_after_feedback_locality(void) {
@@ -994,6 +1021,18 @@ static void test_key_feedback_tap_commit_led_group_repaints_after_feedback_local
     CHECK(render_output());
 
     check_led(5, rgb_from_key_feedback_group(2));
+    check_led(6, rgb_from_feedback_semantic(KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED, 0u));
+}
+
+static void test_key_feedback_all_led_group_uses_hold_color(void) {
+    test_reset();
+
+    layer_state = (1UL << LAYER_SYM);
+    test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+
+    CHECK(render_output());
+
+    check_led(6, rgb_from_feedback_semantic(KEY_FEEDBACK_SEMANTIC_HOLD_PENDING, 0u));
 }
 
 static void test_key_feedback_led_groups_follow_flash_visibility(void) {
@@ -1009,6 +1048,7 @@ static void test_key_feedback_led_groups_follow_flash_visibility(void) {
 
     CHECK(render_output());
     check_led(5, rgb_from_key_feedback_group(3));
+    check_led(6, rgb_from_feedback_semantic(KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING, 0u));
 }
 #endif
 
@@ -1946,6 +1986,7 @@ int main(void) {
     test_key_feedback_led_groups_repaint_after_feedback_locality();
     test_key_feedback_tap_branch_commit_led_group_repaints_after_feedback_locality();
     test_key_feedback_tap_commit_led_group_repaints_after_feedback_locality();
+    test_key_feedback_all_led_group_uses_hold_color();
     test_key_feedback_led_groups_follow_flash_visibility();
 #endif
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF

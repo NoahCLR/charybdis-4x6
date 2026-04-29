@@ -137,7 +137,7 @@ static void rgb_validation_log_invalid_key_behavior_feedback_tap_branch_colors(v
 
 static void rgb_validation_log_invalid_key_behavior_feedback_group_semantic(uint8_t group_index, uint8_t semantic) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_led_groups[%u].semantic %u; expected KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH (0), KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED (1), KEY_FEEDBACK_GROUP_TAP_COMMITTED (2), KEY_FEEDBACK_GROUP_HOLD_ACTIVE (3), or KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE (4)\n", (unsigned int)group_index, (unsigned int)semantic);
+    uprintf("Invalid key_behavior_feedback_led_groups[%u].semantic %u; expected KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH (0), KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED (1), KEY_FEEDBACK_GROUP_TAP_COMMITTED (2), KEY_FEEDBACK_GROUP_HOLD_ACTIVE (3), KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE (4), or KEY_FEEDBACK_GROUP_ALL (5)\n", (unsigned int)group_index, (unsigned int)semantic);
 #        else
     (void)group_index;
     (void)semantic;
@@ -274,7 +274,7 @@ static void rgb_validation_validate_key_behavior_feedback_led_groups(void) {
         const key_behavior_feedback_led_group_t *group    = &key_behavior_feedback_led_groups[group_index];
         uint8_t                                  semantic = (uint8_t)group->semantic;
 
-        if (semantic > KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE) {
+        if (semantic > KEY_FEEDBACK_GROUP_ALL) {
             rgb_validation_log_invalid_key_behavior_feedback_group_semantic(group_index, semantic);
         }
 
