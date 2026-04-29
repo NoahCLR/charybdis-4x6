@@ -608,11 +608,11 @@ async function loadQmkKeycodeCatalog(root) {
     }
 
     const keycodeDir = path.join(qmkRoot, QMK_KEYCODE_DATA_RELATIVE_PATH);
-    const names = await fs.readdir(keycodeDir);
+    const files = await listQmkKeycodeDataFiles(keycodeDir);
     const entriesByValue = new Map();
 
-    for (const name of names.filter((candidate) => candidate.endsWith(".hjson")).sort()) {
-        const text = await fs.readFile(path.join(keycodeDir, name), "utf8");
+    for (const file of files) {
+        const text = await fs.readFile(file, "utf8");
         for (const entry of parseQmkKeycodeHjsonEntries(text)) {
             const value = preferredQmkKeycodeValue(entry);
             if (!value || entriesByValue.has(value) || shouldSkipQmkKeycode(entry)) {
@@ -621,17 +621,32 @@ async function loadQmkKeycodeCatalog(root) {
             entriesByValue.set(value, {
                 ...entry,
                 value,
-                search: [value, entry.key, entry.label].concat(entry.aliases || []).filter(Boolean).join(" ").toLowerCase(),
+                ...buildQmkKeycodeSearch(entry, value),
             });
         }
     }
 
     const entries = Array.from(entriesByValue.values()).sort(compareQmkKeycodes);
     return {
-        source: path.join(keycodeDir, "*.hjson"),
+        source: `${path.join(keycodeDir, "*.hjson")} + ${path.join(keycodeDir, "extras", "keycodes_us_*.hjson")}`,
         entries,
         labels: qmkKeyLabelsFromEntries(entries),
     };
+}
+
+async function listQmkKeycodeDataFiles(root) {
+    const entries = await fs.readdir(root, { withFileTypes: true });
+    const files = entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".hjson"))
+        .map((entry) => path.join(root, entry.name));
+
+    const extrasDir = path.join(root, "extras");
+    const extraEntries = await fs.readdir(extrasDir, { withFileTypes: true }).catch(() => []);
+    files.push(...extraEntries
+        .filter((entry) => entry.isFile() && /^keycodes_us_\d+\.\d+\.\d+\.hjson$/.test(entry.name))
+        .map((entry) => path.join(extrasDir, entry.name)));
+
+    return files.sort();
 }
 
 async function findQmkRoot(root) {
@@ -652,21 +667,37 @@ async function findQmkRoot(root) {
 }
 
 function parseQmkKeycodeHjsonEntries(text) {
+    return parseQmkKeycodeHjsonSectionEntries(text, "keycodes")
+        .concat(parseQmkKeycodeHjsonSectionEntries(text, "aliases"));
+}
+
+function parseQmkKeycodeHjsonSectionEntries(text, sectionName) {
+    let section;
+    try {
+        section = findInitializerBody(text, new RegExp(`"${escapeRegex(sectionName)}"\\s*:`)).body;
+    } catch {
+        return [];
+    }
+
     const entries = [];
-    const pattern = /"0x[0-9A-Fa-f]+"\s*:\s*\{([\s\S]*?)\n\s*\}/g;
+    const pattern = /"([^"]+)"\s*:\s*\{/g;
     let match;
-    while ((match = pattern.exec(text)) !== null) {
-        const body = match[1];
+    while ((match = pattern.exec(section)) !== null) {
+        const open = section.indexOf("{", match.index + match[0].length - 1);
+        const close = findMatching(section, open, "{", "}");
+        const body = section.slice(open + 1, close);
         const key = extractHjsonStringField(body, "key");
         if (!key) {
+            pattern.lastIndex = close + 1;
             continue;
         }
         entries.push({
             key,
             label: extractHjsonStringField(body, "label") || key,
             group: extractHjsonStringField(body, "group") || "other",
-            aliases: extractHjsonStringListField(body, "aliases").filter((alias) => !alias.startsWith("!")),
+            aliases: uniqueStrings(extractHjsonStringListField(body, "aliases").filter((alias) => !alias.startsWith("!"))),
         });
+        pattern.lastIndex = close + 1;
     }
     return entries;
 }
@@ -716,6 +747,40 @@ function qmkKeyLabelsFromEntries(entries) {
     return labels;
 }
 
+function buildQmkKeycodeSearch(entry, value) {
+    const terms = uniqueStrings([value, entry.key, entry.label, QMK_KEY_LABELS[value], QMK_KEY_LABELS[entry.key], displayKeyExpression(value)]
+        .concat(entry.aliases || [])
+        .flatMap(qmkSearchTermVariants));
+    return {
+        searchTerms: terms,
+        search: terms.join(" "),
+        searchCompact: uniqueStrings(terms.map(compactSearchToken)).join(" "),
+    };
+}
+
+function qmkSearchTermVariants(value) {
+    const term = String(value || "").trim().toLowerCase();
+    if (!term) {
+        return [];
+    }
+
+    const variants = [term];
+    const prefixed = term.match(/^kc_(.+)$/);
+    if (prefixed) {
+        variants.push(prefixed[1]);
+    }
+
+    const compact = compactSearchToken(term);
+    if (compact && compact !== term) {
+        variants.push(compact);
+    }
+    return uniqueStrings(variants);
+}
+
+function compactSearchToken(value) {
+    return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 function fallbackQmkKeycodeCatalog() {
     const entries = Object.entries(QMK_KEY_LABELS).map(([value, label]) => ({
         value,
@@ -723,7 +788,7 @@ function fallbackQmkKeycodeCatalog() {
         label,
         group: value === "_______" || value === "XXXXXXX" ? "internal" : "basic",
         aliases: [],
-        search: [value, label].join(" ").toLowerCase(),
+        ...buildQmkKeycodeSearch({ key: value, label, aliases: [] }, value),
     }));
     return {
         source: "built-in fallback",
@@ -2035,6 +2100,10 @@ function normalizeUserKeyExpression(value) {
         return `KC_${raw}`;
     }
 
+    if (/^[a-z][a-z0-9_]*$/i.test(compact) && compact.includes("_")) {
+        return compact.toUpperCase();
+    }
+
     return compact;
 }
 
@@ -3060,12 +3129,6 @@ function getClientScript() {
             ]
         },
         {
-            id: "qmk-all",
-            label: "All QMK",
-            kind: "allQmk",
-            rows: []
-        },
-        {
             id: "layers",
             label: "Layers",
             rows: []
@@ -3855,7 +3918,14 @@ function getClientScript() {
 
     function keyPickerResolvedSections() {
         const qmkSections = qmkKeyPickerSections();
-        return keyPickerSections.concat(qmkSections).map((section) => {
+        const allQmkSection = {
+            id: "qmk-all",
+            label: "All QMK",
+            kind: "allQmk",
+            qmkEntries: model.qmkKeycodes || [],
+            rows: qmkKeyRows(model.qmkKeycodes || [], 8)
+        };
+        return keyPickerSections.concat(qmkSections, [allQmkSection]).map((section) => {
             if (section.id === "layers") {
                 return {
                     ...section,
@@ -3884,6 +3954,7 @@ function getClientScript() {
             if (section.kind === "allQmk") {
                 return {
                     ...section,
+                    qmkEntries: model.qmkKeycodes || [],
                     rows: qmkKeyRows(model.qmkKeycodes || [], 8)
                 };
             }
@@ -3911,7 +3982,7 @@ function getClientScript() {
         const section = keyPickerResolvedSections().find((candidate) => candidate.id === keyPicker.section) || keyPickerResolvedSections()[0];
         const query = keyPickerSearchQuery();
         if (query) {
-            return renderKeyPickerSearch() + renderQmkSearchResults(query);
+            return renderKeyPickerSearch() + renderKeyPickerSectionSearchResults(section, query);
         }
         if (section.kind === "keyboard") {
             return renderKeyPickerKeyboard(section);
@@ -3919,9 +3990,7 @@ function getClientScript() {
         const empty = !(section.rows || []).some((row) => row.length)
             ? "<div class='key-picker-empty muted'>No keys in this section.</div>"
             : "";
-        return renderKeyPickerSearch() + empty + "<div class='key-picker-grid'>" + (section.rows || []).map((row) =>
-            "<div class='key-picker-row'>" + row.map((value) => renderKeyPickerKey(value)).join("") + "</div>"
-        ).join("") + "</div>";
+        return renderKeyPickerSearch() + empty + renderKeyPickerGrid(section.rows || []);
     }
 
     function renderKeyPickerKeyboard(section) {
@@ -3938,15 +4007,63 @@ function getClientScript() {
     }
 
     function renderKeyPickerSearch() {
-        return "<input class='key-picker-search' data-picker-search value='" + escapeAttr(keyPicker.search || "") + "' placeholder='Search all QMK keycodes, labels, or aliases'>";
+        return "<input class='key-picker-search' data-picker-search value='" + escapeAttr(keyPicker.search || "") + "' placeholder='Search keys; categories narrow results'>";
     }
 
-    function renderQmkSearchResults(query) {
-        const rows = qmkKeyRows(filterQmkKeycodes(model.qmkKeycodes || [], query), 8);
-        const empty = rows.length ? "" : "<div class='key-picker-empty muted'>No matching QMK keycodes.</div>";
-        return empty + "<div class='key-picker-grid'>" + rows.map((row) =>
+    function renderKeyPickerSectionSearchResults(section, query) {
+        const rows = keyPickerSectionSearchRows(section, query);
+        const empty = rows.length ? "" : "<div class='key-picker-empty muted'>No matching keys in " + escapeHtml(section.label || "this section") + ".</div>";
+        return empty + renderKeyPickerGrid(rows);
+    }
+
+    function renderKeyPickerGrid(rows) {
+        return "<div class='key-picker-grid'>" + (rows || []).map((row) =>
             "<div class='key-picker-row'>" + row.map((value) => renderKeyPickerKey(value)).join("") + "</div>"
         ).join("") + "</div>";
+    }
+
+    function keyPickerSectionSearchRows(section, query) {
+        if (section.kind === "allQmk" || section.kind === "qmkCategory") {
+            return qmkKeyRows(filterQmkKeycodes(section.qmkEntries || [], query), 8);
+        }
+        if (section.kind === "keyboard") {
+            return qmkKeyRows(filterQmkKeycodes(model.qmkKeycodes || [], query), 8);
+        }
+        const text = keyPickerSearchNeedle(query);
+        const items = flattenKeyPickerRows(section.rows || [])
+            .filter((item) => keyPickerItemSearchText(item).includes(text))
+            .slice(0, 160);
+        return chunkKeyPickerItems(items, 8);
+    }
+
+    function flattenKeyPickerRows(rows) {
+        const items = [];
+        (rows || []).forEach((row) => {
+            (row || []).forEach((item) => {
+                if (item && typeof item === "object" && item.spacer) return;
+                items.push(item);
+            });
+        });
+        return items;
+    }
+
+    function chunkKeyPickerItems(items, columns) {
+        const rows = [];
+        for (let index = 0; index < items.length; index += columns) {
+            rows.push(items.slice(index, index + columns));
+        }
+        return rows;
+    }
+
+    function keyPickerItemSearchText(item) {
+        const value = keyPickerItemValue(item);
+        const label = keyPickerItemLabel(item);
+        const tooltip = item && typeof item === "object" && item.tooltip ? item.tooltip : "";
+        return keyPickerSearchNeedle([value, label, displayKeyExpression(value), tooltip].join(" "));
+    }
+
+    function keyPickerSearchNeedle(value) {
+        return String(value || "").trim().toLowerCase();
     }
 
     function renderKeyPickerSvgKey(key) {
@@ -4003,6 +4120,8 @@ function getClientScript() {
             return {
                 id: config.id,
                 label: config.label,
+                kind: "qmkCategory",
+                qmkEntries: groupEntries,
                 rows: qmkKeyRows(groupEntries, 6)
             };
         }).filter((section) => section.rows.length);
@@ -4022,10 +4141,48 @@ function getClientScript() {
     }
 
     function filterQmkKeycodes(entries, query) {
-        const text = String(query || "").trim().toLowerCase();
+        const variants = keyPickerQmkSearchVariants(query);
         const source = entries || [];
-        if (!text) return [];
-        return source.filter((entry) => (entry.search || "").includes(text)).slice(0, 160);
+        if (!variants.length) return [];
+        return source
+            .map((entry, index) => ({entry, index, score: qmkKeycodeSearchScore(entry, variants)}))
+            .filter((candidate) => candidate.score < Number.POSITIVE_INFINITY)
+            .sort((left, right) => left.score - right.score || left.index - right.index)
+            .map((candidate) => candidate.entry);
+    }
+
+    function keyPickerQmkSearchVariants(query) {
+        const term = String(query || "").trim().toLowerCase();
+        if (!term) return [];
+        const variants = [term];
+        const compact = compactKeyPickerSearchToken(term);
+        if (compact && compact !== term) {
+            variants.push(compact);
+        }
+        return Array.from(new Set(variants));
+    }
+
+    function qmkKeycodeSearchScore(entry, variants) {
+        const terms = entry.searchTerms || [];
+        const search = entry.search || "";
+        const compact = entry.searchCompact || "";
+        for (const variant of variants) {
+            if (terms.includes(variant)) return 0;
+        }
+        for (const variant of variants) {
+            if (terms.some((term) => term.startsWith(variant))) return 1;
+        }
+        for (const variant of variants) {
+            if (search.includes(variant)) return 2;
+        }
+        for (const variant of variants.map(compactKeyPickerSearchToken).filter(Boolean)) {
+            if (compact.includes(variant)) return 3;
+        }
+        return Number.POSITIVE_INFINITY;
+    }
+
+    function compactKeyPickerSearchToken(value) {
+        return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
     }
 
     function keyPickerSearchQuery() {

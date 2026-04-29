@@ -20,9 +20,11 @@ those two files.
 - click a key, edit it as a normal key label such as `A`, `Enter`, `Space`, or
   `_______`, and patch the matching `LAYOUT()` slot
 - use a VIA-style picker for key fields, with an SVG-based full-size keyboard tab,
-  global QMK search in every section, symbol/navigation/numpad/more-keys menus,
+  a shared search box where Keyboard and All QMK search the full catalog while
+  category tabs narrow the results, symbol/navigation/numpad/more-keys menus,
   layer/pointing-mode/macro/custom sections, and QMK-sourced keycode menus from
-  the sibling QMK keycode metadata
+  the sibling QMK keycode metadata, including US extra aliases; search accepts
+  both raw QMK tokens like `KC_X` and user-facing labels like `X`
 - choose modifier chords from picker buttons and confirm the pending keycode
   with OK before it changes the field
 - build `LT(layer, key)` values from the Layers picker by selecting the layer

@@ -47,9 +47,12 @@ Normal keys can be entered as user-facing labels such as `A`, `Enter`, `Space`,
 the classic transparent token `_______`, or modifier chords such as
 `Shift+\`` and `Alt+Cmd+Esc`; advanced QMK expressions still pass through when
 needed. Key fields also have a VIA-style picker with an SVG-based full-size keyboard tab,
-global QMK search in every section, symbol/navigation/numpad/more-keys menus,
-layer, pointing-mode, macro, custom, and QMK-sourced keycode sections. The QMK
-sections are read from the sibling `bastardkb-qmk` keycode metadata when available.
+a shared search box where Keyboard and All QMK search the full catalog while
+category tabs narrow the results, symbol/navigation/numpad/more-keys menus,
+layer, pointing-mode, macro, custom, and QMK-sourced keycode sections. Search
+accepts both raw QMK tokens like `KC_X` and user-facing labels like `X`. The QMK
+sections are read from the sibling `bastardkb-qmk` keycode metadata, including
+US extra aliases, when available.
 The picker keeps selections pending until OK, supports modifier buttons
 for chorded keys, supports multi-key selection where the field expects a
 comma-separated key list, and builds `LT(layer, key)` values by selecting the
