@@ -202,17 +202,17 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
     }
 
     return (handled_key_resolution_t){
-        .keycode          = keycode,
-        .tap_count        = tap_count,
-        .step             = step,
-        .tap_hold_term    = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
-        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-        .multi_tap_term   = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
+        .keycode             = keycode,
+        .tap_count           = tap_count,
+        .step                = step,
+        .tap_hold_term       = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
+        .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM,
+        .multi_tap_term      = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
         .branch_confirm_term = CUSTOM_TAP_BRANCH_CONFIRM_TERM,
-        .layer            = layer,
-        .pd_mode          = pd_mode_for_keycode(keycode),
-        .has_more_taps    = has_more_taps,
-        .flags            = flags,
+        .layer               = layer,
+        .pd_mode             = pd_mode_for_keycode(keycode),
+        .has_more_taps       = has_more_taps,
+        .flags               = flags,
     };
 }
 

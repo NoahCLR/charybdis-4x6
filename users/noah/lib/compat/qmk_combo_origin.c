@@ -42,10 +42,10 @@ static combo_origin_physical_key_state_t physical_key_states[MATRIX_ROWS * MATRI
 #        define COMBO_BUFFER_LENGTH 4
 #    endif
 
-static combo_origin_active_cache_entry_t combo_active_cache[COMBO_BUFFER_LENGTH];
+static combo_origin_active_cache_entry_t   combo_active_cache[COMBO_BUFFER_LENGTH];
 static combo_origin_pending_output_entry_t combo_pending_output_cache[COMBO_BUFFER_LENGTH];
-static uint32_t                          combo_origin_press_sequence       = 0;
-static keypos_t                          combo_origin_last_pressed_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
+static uint32_t                            combo_origin_press_sequence       = 0;
+static keypos_t                            combo_origin_last_pressed_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
 
 static uint16_t combo_origin_combo_keycode_for_record(keyrecord_t *record) {
     uint16_t keycode = get_record_keycode(record, true);
@@ -111,10 +111,10 @@ static bool combo_origin_combo_is_disabled(const combo_t *combo) {
 
 static bool combo_origin_combo_build_from_pressed_keys(uint16_t combo_index, uint8_t *out_bitmap, keypos_t *out_owner_key_pos, uint16_t *out_complete_at) {
     combo_t *combo;
-    keypos_t owner_key_pos        = {0};
+    keypos_t owner_key_pos         = {0};
     uint32_t latest_press_sequence = 0;
-    uint16_t complete_at          = 0;
-    bool     found_any            = false;
+    uint16_t complete_at           = 0;
+    bool     found_any             = false;
 
     if (out_bitmap) {
         key_origin_bitmap_clear(out_bitmap);
@@ -636,7 +636,7 @@ bool noah_qmk_combo_origin_pressed_combo_matches(uint16_t keycode, keypos_t owne
         combo_t *combo = combo_origin_combo_get(combo_index);
         uint8_t  combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
         keypos_t combo_owner_key_pos = {0};
-        uint16_t combo_complete_at    = 0;
+        uint16_t combo_complete_at   = 0;
 
         if (!combo || combo_origin_combo_is_disabled(combo) || combo->keycode != keycode) {
             continue;

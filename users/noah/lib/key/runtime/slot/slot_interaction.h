@@ -66,9 +66,9 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
     return (key_runtime_slot_interaction_t){
         .binding =
             {
-                .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-                .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-                .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+                .tap_hold_term       = CUSTOM_TAP_HOLD_TERM,
+                .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM,
+                .multi_tap_term      = CUSTOM_MULTI_TAP_TERM,
                 .branch_confirm_term = CUSTOM_TAP_BRANCH_CONFIRM_TERM,
             },
         .layer = UINT8_MAX,

@@ -63,7 +63,7 @@ typedef struct {
 } key_runtime_release_semantics_t;
 
 typedef struct {
-    key_runtime_slot_interaction_t interaction;
+    key_runtime_slot_interaction_t  interaction;
     key_runtime_release_semantics_t semantics;
     uint16_t                        elapsed;
     bool                            held_action_active;
@@ -232,21 +232,21 @@ static inline key_runtime_release_decision_t key_runtime_release_decision_base(c
 
 static inline key_runtime_release_decision_t key_runtime_release_decision_tap(const key_runtime_release_query_t *query) {
     key_runtime_release_decision_t decision = key_runtime_release_decision_base(query);
-    decision.outcome                       = KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP;
+    decision.outcome                        = KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP;
     return decision;
 }
 
 static inline key_runtime_release_decision_t key_runtime_release_decision_action(const key_runtime_release_query_t *query, uint16_t action) {
     key_runtime_release_decision_t decision = key_runtime_release_decision_base(query);
-    decision.outcome                       = KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION;
-    decision.action                        = action;
+    decision.outcome                        = KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION;
+    decision.action                         = action;
     return decision;
 }
 
 static inline key_runtime_release_decision_t key_runtime_release_decision_pd_mode_lock_tap(const key_runtime_release_query_t *query, pd_mode_mask_t mode) {
     key_runtime_release_decision_t decision = key_runtime_release_decision_base(query);
-    decision.outcome                       = KEY_RUNTIME_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP;
-    decision.pd_mode_lock_tap              = mode;
+    decision.outcome                        = KEY_RUNTIME_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP;
+    decision.pd_mode_lock_tap               = mode;
     return decision;
 }
 

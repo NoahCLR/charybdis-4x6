@@ -16,17 +16,17 @@
 #define KEY_RUNTIME_CORE_RELEASE_EFFECT_PLAN_CAPACITY 6u
 
 typedef struct {
-    key_runtime_slot_interaction_t      interaction;
-    key_runtime_slot_phase_t            phase;
-    uint16_t                            elapsed;
-    bool                                held_action_active;
-    bool                                repeat_active;
-    bool                                momentary_layer_tap_interrupted;
-    bool                                quick_tap;
-    bool                                quick_immediate_hold;
-    bool                                buffered_base_tap;
-    pd_mode_mask_t                      lock_tap_mode;
-    key_runtime_release_decision_t      decision;
+    key_runtime_slot_interaction_t interaction;
+    key_runtime_slot_phase_t       phase;
+    uint16_t                       elapsed;
+    bool                           held_action_active;
+    bool                           repeat_active;
+    bool                           momentary_layer_tap_interrupted;
+    bool                           quick_tap;
+    bool                           quick_immediate_hold;
+    bool                           buffered_base_tap;
+    pd_mode_mask_t                 lock_tap_mode;
+    key_runtime_release_decision_t decision;
 } key_runtime_core_active_release_resolution_t;
 
 typedef enum {

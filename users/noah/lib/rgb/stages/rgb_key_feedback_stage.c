@@ -12,16 +12,16 @@
 #    include "../../key/runtime/feedback.h"
 #    include "../../split/runtime_sync.h"
 
-extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
+extern const key_behavior_feedback_color_config_t     key_behavior_feedback_colors;
 extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 
-static rgb_t key_behavior_feedback_tap_pending_rgb;
-static rgb_t key_behavior_feedback_tap_branch_rgb[KEY_BEHAVIOR_MAX_TAP_COUNT];
+static rgb_t   key_behavior_feedback_tap_pending_rgb;
+static rgb_t   key_behavior_feedback_tap_branch_rgb[KEY_BEHAVIOR_MAX_TAP_COUNT];
 static uint8_t key_behavior_feedback_tap_branch_rgb_count;
-static rgb_t key_behavior_feedback_tap_committed_rgb;
-static rgb_t key_behavior_feedback_hold_active_rgb;
-static rgb_t key_behavior_feedback_long_hold_active_rgb;
+static rgb_t   key_behavior_feedback_tap_committed_rgb;
+static rgb_t   key_behavior_feedback_hold_active_rgb;
+static rgb_t   key_behavior_feedback_long_hold_active_rgb;
 
 typedef struct {
     key_feedback_semantic_t semantic;
@@ -33,7 +33,7 @@ typedef struct {
 #    endif
 
 void rgb_runtime_key_feedback_stage_post_init(void) {
-    key_behavior_feedback_tap_pending_rgb       = hsv_to_rgb(key_behavior_feedback_colors.tap_pending_color);
+    key_behavior_feedback_tap_pending_rgb      = hsv_to_rgb(key_behavior_feedback_colors.tap_pending_color);
     key_behavior_feedback_tap_branch_rgb_count = key_behavior_feedback_colors.tap_branch_colors ? key_behavior_feedback_colors.tap_branch_color_count : 0u;
     if (key_behavior_feedback_tap_branch_rgb_count > KEY_BEHAVIOR_MAX_TAP_COUNT) {
         key_behavior_feedback_tap_branch_rgb_count = KEY_BEHAVIOR_MAX_TAP_COUNT;

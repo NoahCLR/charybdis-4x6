@@ -85,26 +85,26 @@ static void test_reset_stubs(void) {
     key_feedback_tap_branch_map_clear(fake_key_feedback_tap_branch_map);
     key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
     key_origin_bitmap_add_keypos(fake_key_feedback_flash_visibility_bitmap, (keypos_t){.row = 0, .col = 0});
-    fake_key_preview_layer       = 3u;
-    rpc_register_count           = 0;
+    fake_key_preview_layer = 3u;
+    rpc_register_count     = 0;
     memset(rpc_registered_ids, -1, sizeof(rpc_registered_ids));
     memset(rpc_registered_callbacks, 0, sizeof(rpc_registered_callbacks));
-    rpc_send_count               = 0;
-    rpc_send_count_base          = 0;
-    rpc_send_count_combo         = 0;
-    rpc_send_count_key_feedback_semantic = 0;
-    rpc_send_count_key_feedback_branch   = 0;
-    rpc_last_send_id             = -1;
-    rpc_last_send_size           = 0;
-    rpc_last_base_packet         = (split_runtime_base_sync_packet_t){0};
-    rpc_last_combo_packet        = (split_runtime_combo_feedback_packet_t){0};
+    rpc_send_count                        = 0;
+    rpc_send_count_base                   = 0;
+    rpc_send_count_combo                  = 0;
+    rpc_send_count_key_feedback_semantic  = 0;
+    rpc_send_count_key_feedback_branch    = 0;
+    rpc_last_send_id                      = -1;
+    rpc_last_send_size                    = 0;
+    rpc_last_base_packet                  = (split_runtime_base_sync_packet_t){0};
+    rpc_last_combo_packet                 = (split_runtime_combo_feedback_packet_t){0};
     rpc_last_key_feedback_semantic_packet = (split_runtime_key_feedback_semantic_packet_t){0};
     rpc_last_key_feedback_branch_packet   = (split_runtime_key_feedback_branch_packet_t){0};
-    fake_rpc_send_result         = true;
-    remote_snapshot_apply_count  = 0;
-    remote_snapshot_active       = 0;
-    remote_snapshot_locked       = 0;
-    remote_snapshot_owner_sides  = SPLIT_SIDE_MASK_NONE;
+    fake_rpc_send_result                  = true;
+    remote_snapshot_apply_count           = 0;
+    remote_snapshot_active                = 0;
+    remote_snapshot_locked                = 0;
+    remote_snapshot_owner_sides           = SPLIT_SIDE_MASK_NONE;
     key_origin_bitmap_clear(remote_snapshot_owner_bitmap);
 }
 
@@ -400,7 +400,7 @@ static void test_tick_sends_only_base_packet_when_only_automouse_changes(void) {
 
     split_runtime_sync_init();
     test_reset_rpc_send_counts();
-    fake_auto_mouse_elapsed     = 91u;
+    fake_auto_mouse_elapsed = 91u;
 
     split_runtime_sync_tick();
 

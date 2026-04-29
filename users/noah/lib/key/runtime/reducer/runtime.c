@@ -171,8 +171,7 @@ static uint16_t key_runtime_core_elapsed(uint16_t start, uint16_t end) {
 }
 
 static bool key_runtime_core_tap_series_can_accept_press(const key_runtime_core_state_t *state, const tap_series_t *series, uint16_t keycode, uint16_t now) {
-    return series && series->active && !series->branch_confirmed && !series->branch_confirming && series->keycode == keycode && key_behavior_has_more_taps(series->keycode, series->tap_count) &&
-           (key_runtime_core_elapsed(series->last_tap_at, now) <= series->tap_term_ms || key_runtime_core_tap_series_pending_combo_output(state, series));
+    return series && series->active && !series->branch_confirmed && !series->branch_confirming && series->keycode == keycode && key_behavior_has_more_taps(series->keycode, series->tap_count) && (key_runtime_core_elapsed(series->last_tap_at, now) <= series->tap_term_ms || key_runtime_core_tap_series_pending_combo_output(state, series));
 }
 
 static layer_state_t key_runtime_core_resolution_layers(const key_runtime_core_state_t *state) {
@@ -386,18 +385,18 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
         return;
     }
 
-    reuse_existing   = key_runtime_core_tap_series_can_accept_press(state, series, token->resolved_keycode, now);
-    single_action    = reuse_existing ? series->single_action : token->resolved_keycode;
-    tap_action       = token->resolved_keycode;
-    tap_repeat_count = 0u;
-    has_more_taps    = false;
-    hold             = hold_behavior_none();
-    long_hold        = hold_behavior_none();
-    tap_hold_term_ms = key_runtime_core_default_hold_term(token->resolved_keycode);
+    reuse_existing         = key_runtime_core_tap_series_can_accept_press(state, series, token->resolved_keycode, now);
+    single_action          = reuse_existing ? series->single_action : token->resolved_keycode;
+    tap_action             = token->resolved_keycode;
+    tap_repeat_count       = 0u;
+    has_more_taps          = false;
+    hold                   = hold_behavior_none();
+    long_hold              = hold_behavior_none();
+    tap_hold_term_ms       = key_runtime_core_default_hold_term(token->resolved_keycode);
     branch_confirm_term_ms = CUSTOM_TAP_BRANCH_CONFIRM_TERM;
-    tap_term_ms      = key_runtime_core_default_multi_tap_term();
-    tap_count        = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u);
-    saved_mod_state = reuse_existing ? series->saved_mod_state : keyboard_mod_policy_current_state();
+    tap_term_ms            = key_runtime_core_default_multi_tap_term();
+    tap_count              = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u);
+    saved_mod_state        = reuse_existing ? series->saved_mod_state : keyboard_mod_policy_current_state();
     if (!reuse_existing) {
         saved_mod_state = keyboard_mod_policy_without_real_mods(saved_mod_state, pd_mode_buffered_tap_masked_real_mods(token->resolved_keycode));
     }
@@ -405,16 +404,16 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     if (token->handled_key) {
         uint16_t handled_tap_action = token->interaction.binding.tap_action;
 
-        single_action    = reuse_existing ? series->single_action : handled_tap_action;
-        tap_action       = handled_tap_action;
-        tap_repeat_count = token->interaction.binding.tap_repeat_count;
-        has_more_taps    = token->interaction.binding.has_more_taps;
-        hold             = token->interaction.binding.hold;
-        long_hold        = token->interaction.binding.long_hold;
-        pending_hold     = reuse_existing && (hold.present || long_hold.present);
-        tap_hold_term_ms = token->interaction.binding.tap_hold_term;
+        single_action          = reuse_existing ? series->single_action : handled_tap_action;
+        tap_action             = handled_tap_action;
+        tap_repeat_count       = token->interaction.binding.tap_repeat_count;
+        has_more_taps          = token->interaction.binding.has_more_taps;
+        hold                   = token->interaction.binding.hold;
+        long_hold              = token->interaction.binding.long_hold;
+        pending_hold           = reuse_existing && (hold.present || long_hold.present);
+        tap_hold_term_ms       = token->interaction.binding.tap_hold_term;
         branch_confirm_term_ms = token->interaction.binding.branch_confirm_term;
-        tap_term_ms      = token->interaction.binding.multi_tap_term;
+        tap_term_ms            = token->interaction.binding.multi_tap_term;
         if (token->interaction.selection.tap_count != 0u) {
             tap_count = token->interaction.selection.tap_count;
         }
@@ -430,23 +429,23 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     }
 
     *series = (tap_series_t){
-        .active           = true,
-        .keycode          = token->resolved_keycode,
-        .tap_count        = tap_count,
-        .pending_hold     = pending_hold,
-        .single_action    = single_action,
-        .tap_action       = tap_action,
-        .tap_repeat_count = tap_repeat_count,
-        .has_more_taps    = has_more_taps,
-        .hold             = hold,
-        .long_hold        = long_hold,
-        .tap_hold_term_ms = tap_hold_term_ms,
+        .active                 = true,
+        .keycode                = token->resolved_keycode,
+        .tap_count              = tap_count,
+        .pending_hold           = pending_hold,
+        .single_action          = single_action,
+        .tap_action             = tap_action,
+        .tap_repeat_count       = tap_repeat_count,
+        .has_more_taps          = has_more_taps,
+        .hold                   = hold,
+        .long_hold              = long_hold,
+        .tap_hold_term_ms       = tap_hold_term_ms,
         .branch_confirm_term_ms = branch_confirm_term_ms,
-        .last_action      = tap_action,
-        .last_tap_at      = now,
-        .tap_term_ms      = tap_term_ms,
-        .feedback_sequence = key_runtime_core_state_next_feedback_sequence(state),
-        .saved_mod_state  = saved_mod_state,
+        .last_action            = tap_action,
+        .last_tap_at            = now,
+        .tap_term_ms            = tap_term_ms,
+        .feedback_sequence      = key_runtime_core_state_next_feedback_sequence(state),
+        .saved_mod_state        = saved_mod_state,
     };
 }
 
@@ -656,23 +655,23 @@ static void key_runtime_core_tap_series_seed(key_runtime_core_state_t *state, co
     }
 
     *series = (tap_series_t){
-        .active           = true,
-        .keycode          = seed->keycode,
-        .tap_count        = seed->tap_count == 0u ? 1u : seed->tap_count,
-        .pending_hold     = false,
-        .single_action    = seed->tap_action,
-        .tap_action       = seed->tap_action,
-        .tap_repeat_count = seed->tap_repeat_count,
-        .has_more_taps    = seed->has_more_taps,
-        .hold             = hold_behavior_none(),
-        .long_hold        = hold_behavior_none(),
-        .tap_hold_term_ms = seed->tap_hold_term,
+        .active                 = true,
+        .keycode                = seed->keycode,
+        .tap_count              = seed->tap_count == 0u ? 1u : seed->tap_count,
+        .pending_hold           = false,
+        .single_action          = seed->tap_action,
+        .tap_action             = seed->tap_action,
+        .tap_repeat_count       = seed->tap_repeat_count,
+        .has_more_taps          = seed->has_more_taps,
+        .hold                   = hold_behavior_none(),
+        .long_hold              = hold_behavior_none(),
+        .tap_hold_term_ms       = seed->tap_hold_term,
         .branch_confirm_term_ms = seed->branch_confirm_term,
-        .last_action      = seed->tap_action,
-        .last_tap_at      = state->current_time,
-        .tap_term_ms      = seed->multi_tap_term,
-        .feedback_sequence = key_runtime_core_state_next_feedback_sequence(state),
-        .saved_mod_state  = mods,
+        .last_action            = seed->tap_action,
+        .last_tap_at            = state->current_time,
+        .tap_term_ms            = seed->multi_tap_term,
+        .feedback_sequence      = key_runtime_core_state_next_feedback_sequence(state),
+        .saved_mod_state        = mods,
     };
 }
 
@@ -689,22 +688,22 @@ static void key_runtime_core_tap_series_update_for_press(key_runtime_core_state_
         state->tap_series_count++;
     }
 
-    series->active           = true;
-    series->keycode          = token->resolved_keycode;
-    series->tap_count        = token->interaction.selection.tap_count ? token->interaction.selection.tap_count : (uint8_t)(series->tap_count + 1u);
-    series->pending_hold     = token->interaction.binding.hold.present || token->interaction.binding.long_hold.present;
-    series->single_action    = series->single_action == KC_NO ? token->interaction.binding.tap_action : series->single_action;
-    series->tap_action       = token->interaction.binding.tap_action;
-    series->tap_repeat_count = token->interaction.binding.tap_repeat_count;
-    series->has_more_taps    = token->interaction.binding.has_more_taps;
-    series->hold             = token->interaction.binding.hold;
-    series->long_hold        = token->interaction.binding.long_hold;
-    series->tap_hold_term_ms = token->interaction.binding.tap_hold_term;
+    series->active                 = true;
+    series->keycode                = token->resolved_keycode;
+    series->tap_count              = token->interaction.selection.tap_count ? token->interaction.selection.tap_count : (uint8_t)(series->tap_count + 1u);
+    series->pending_hold           = token->interaction.binding.hold.present || token->interaction.binding.long_hold.present;
+    series->single_action          = series->single_action == KC_NO ? token->interaction.binding.tap_action : series->single_action;
+    series->tap_action             = token->interaction.binding.tap_action;
+    series->tap_repeat_count       = token->interaction.binding.tap_repeat_count;
+    series->has_more_taps          = token->interaction.binding.has_more_taps;
+    series->hold                   = token->interaction.binding.hold;
+    series->long_hold              = token->interaction.binding.long_hold;
+    series->tap_hold_term_ms       = token->interaction.binding.tap_hold_term;
     series->branch_confirm_term_ms = token->interaction.binding.branch_confirm_term;
-    series->last_action      = token->interaction.binding.tap_action;
-    series->last_tap_at      = state->current_time;
-    series->tap_term_ms      = token->interaction.binding.multi_tap_term;
-    series->feedback_sequence = key_runtime_core_state_next_feedback_sequence(state);
+    series->last_action            = token->interaction.binding.tap_action;
+    series->last_tap_at            = state->current_time;
+    series->tap_term_ms            = token->interaction.binding.multi_tap_term;
+    series->feedback_sequence      = key_runtime_core_state_next_feedback_sequence(state);
     (void)token_key_pos;
 }
 

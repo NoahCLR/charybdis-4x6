@@ -112,36 +112,36 @@ typedef enum {
 } key_runtime_tap_series_branch_confirm_kind_t;
 
 typedef struct {
-    bool                 active;
-    uint16_t             keycode;
-    uint8_t              tap_count;
-    bool                 pending_hold;
-    bool                 branch_confirmed;
-    bool                 branch_confirming;
-    uint8_t              branch_confirm_kind;
-    uint8_t              branch_confirm_tap_count;
-    uint16_t             branch_confirm_started_at;
-    uint16_t             branch_confirm_duration_ms;
-    uint16_t             branch_confirm_action;
-    uint8_t              branch_confirm_repeat_count;
+    bool                  active;
+    uint16_t              keycode;
+    uint8_t               tap_count;
+    bool                  pending_hold;
+    bool                  branch_confirmed;
+    bool                  branch_confirming;
+    uint8_t               branch_confirm_kind;
+    uint8_t               branch_confirm_tap_count;
+    uint16_t              branch_confirm_started_at;
+    uint16_t              branch_confirm_duration_ms;
+    uint16_t              branch_confirm_action;
+    uint8_t               branch_confirm_repeat_count;
     delayed_action_mods_t branch_confirm_mods;
-    bool                 branch_confirm_tap_commit_feedback;
-    bool                 branch_confirm_action_feedback;
-    uint8_t              branch_confirm_action_feedback_kind;
-    bool                 branch_confirm_long_hold_level;
-    uint16_t             single_action;
-    uint16_t             tap_action;
-    uint8_t              tap_repeat_count;
-    bool                 has_more_taps;
-    hold_behavior_t      hold;
-    hold_behavior_t      long_hold;
-    uint16_t             tap_hold_term_ms;
-    uint16_t             branch_confirm_term_ms;
-    uint16_t             last_action;
-    uint16_t             last_tap_at;
-    uint16_t             tap_term_ms;
-    uint32_t             feedback_sequence;
-    keyboard_mod_state_t saved_mod_state;
+    bool                  branch_confirm_tap_commit_feedback;
+    bool                  branch_confirm_action_feedback;
+    uint8_t               branch_confirm_action_feedback_kind;
+    bool                  branch_confirm_long_hold_level;
+    uint16_t              single_action;
+    uint16_t              tap_action;
+    uint8_t               tap_repeat_count;
+    bool                  has_more_taps;
+    hold_behavior_t       hold;
+    hold_behavior_t       long_hold;
+    uint16_t              tap_hold_term_ms;
+    uint16_t              branch_confirm_term_ms;
+    uint16_t              last_action;
+    uint16_t              last_tap_at;
+    uint16_t              tap_term_ms;
+    uint32_t              feedback_sequence;
+    keyboard_mod_state_t  saved_mod_state;
 } tap_series_t;
 
 typedef struct {
@@ -354,18 +354,18 @@ static inline uint32_t key_runtime_core_state_next_feedback_sequence(key_runtime
     return sequence;
 }
 
-key_runtime_core_state_t                   *key_runtime_core_state(void);
-void                                        key_runtime_core_apply_event(const runtime_event_t *event, uint16_t event_time);
-void                                        key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
-void                                        key_runtime_core_observe_scan_cycle(uint16_t now);
-void                                        key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
-void                                        key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
-void                                        key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan);
-void                                        key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
-bool                                        key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_core_effect_plan_t *plan);
-bool                                        key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);
-void                                        key_runtime_core_scan(key_runtime_core_effect_plan_t *plan, uint16_t now);
-bool                                        key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan);
+key_runtime_core_state_t *key_runtime_core_state(void);
+void                      key_runtime_core_apply_event(const runtime_event_t *event, uint16_t event_time);
+void                      key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
+void                      key_runtime_core_observe_scan_cycle(uint16_t now);
+void                      key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
+void                      key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
+void                      key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan);
+void                      key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
+bool                      key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_core_effect_plan_t *plan);
+bool                      key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);
+void                      key_runtime_core_scan(key_runtime_core_effect_plan_t *plan, uint16_t now);
+bool                      key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan);
 
 static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state) {
     if (!state) {

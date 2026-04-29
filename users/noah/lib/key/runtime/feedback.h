@@ -74,17 +74,7 @@ typedef enum {
 } key_feedback_broad_owner_slot_t;
 
 #define KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE ((uint8_t)KEY_FEEDBACK_BROAD_OWNER_COUNT)
-#define KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT       \
-    {                                                  \
-        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
-        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
-        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
-        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
-        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
-        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
-        KEY_RUNTIME_PACKED_KEYPOS_NONE,                \
-        KEY_RUNTIME_PACKED_KEYPOS_NONE                 \
-    }
+#define KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT {KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE}
 
 _Static_assert(KEY_FEEDBACK_TAP_BRANCH_BITS <= 8u, "key feedback tap branch values must fit in one byte");
 _Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT <= KEY_FEEDBACK_TAP_BRANCH_MASK, "key feedback tap branch map must represent every authored tap count");

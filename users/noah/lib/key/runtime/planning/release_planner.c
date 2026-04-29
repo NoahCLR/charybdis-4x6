@@ -189,8 +189,8 @@ static uint16_t key_runtime_core_pending_multi_tap_release_held_lifecycle_action
 }
 
 bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_active_release_resolution_t *out) {
-    key_runtime_core_state_t        *state = key_runtime_core_state();
-    const press_token_t             *token;
+    key_runtime_core_state_t       *state = key_runtime_core_state();
+    const press_token_t            *token;
     key_runtime_release_semantics_t semantics;
     key_runtime_release_query_t     query;
     uint16_t                        elapsed;
@@ -302,9 +302,9 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
 }
 
 bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, key_runtime_core_pending_multi_tap_release_resolution_t *out) {
-    key_runtime_core_state_t        *state = key_runtime_core_state();
-    const press_token_t             *token;
-    tap_series_t                    *series;
+    key_runtime_core_state_t       *state = key_runtime_core_state();
+    const press_token_t            *token;
+    tap_series_t                   *series;
     key_runtime_release_semantics_t semantics = {
         .quick_tap_dispatches_tap        = true,
         .nonquick_release_dispatches_tap = true,
@@ -391,14 +391,14 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
             }
 
             *out = (key_runtime_core_pending_multi_tap_release_resolution_t){
-                .outcome             = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
-                .action              = decision.action,
-                .repeat_count        = decision.action == KC_NO ? 0u : 1u,
-                .tap_branch_feedback = tap_branch_feedback_on_release,
-                .tap_commit_feedback = false,
+                .outcome              = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
+                .action               = decision.action,
+                .repeat_count         = decision.action == KC_NO ? 0u : 1u,
+                .tap_branch_feedback  = tap_branch_feedback_on_release,
+                .tap_commit_feedback  = false,
                 .action_feedback      = action_feedback,
                 .action_feedback_kind = action_feedback_kind,
-                .tap_count           = series_tap_count,
+                .tap_count            = series_tap_count,
             };
             return true;
         }

@@ -31,7 +31,7 @@ static bool key_runtime_core_pd_projection_find_preempted_held_action(key_runtim
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
-        const lease_t  *lease = &state->leases[index];
+        const lease_t *lease = &state->leases[index];
         pd_mode_mask_t held_mode;
 
         if (!(lease->active && key_runtime_core_pd_projection_lease_kind(lease) == LEASE_KIND_HELD_ACTION)) {

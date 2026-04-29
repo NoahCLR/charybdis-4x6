@@ -277,15 +277,13 @@ static bool key_feedback_pulse_active(void) {
     }
 
     if (state->feedback_pulse_queued) {
-        state->feedback_pulse_timer      = timer_read();
-        state->feedback_pulse_sequence   = state->feedback_pulse_queued_sequence != 0u
-                                               ? state->feedback_pulse_queued_sequence
-                                               : key_runtime_core_state_next_feedback_sequence(state);
-        state->feedback_pulse_active     = true;
-        state->feedback_pulse_kind       = state->feedback_pulse_queued_kind;
-        state->feedback_pulse_key_pos    = state->feedback_pulse_queued_key_pos;
-        state->feedback_pulse_tap_branch = state->feedback_pulse_queued_tap_branch;
-        state->feedback_pulse_queued     = false;
+        state->feedback_pulse_timer           = timer_read();
+        state->feedback_pulse_sequence        = state->feedback_pulse_queued_sequence != 0u ? state->feedback_pulse_queued_sequence : key_runtime_core_state_next_feedback_sequence(state);
+        state->feedback_pulse_active          = true;
+        state->feedback_pulse_kind            = state->feedback_pulse_queued_kind;
+        state->feedback_pulse_key_pos         = state->feedback_pulse_queued_key_pos;
+        state->feedback_pulse_tap_branch      = state->feedback_pulse_queued_tap_branch;
+        state->feedback_pulse_queued          = false;
         state->feedback_pulse_queued_sequence = 0u;
         return true;
     }

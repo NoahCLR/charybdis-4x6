@@ -28,15 +28,15 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_groups[] = 
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
     [LAYER_BASE] = {.color = HSV(0, 0, 0), .mode = (uint8_t)0xFFu},
 };
-const layer_led_group_t *const    layer_led_groups          = layer_groups;
-const uint8_t                     layer_led_group_count     = (uint8_t)ARRAY_SIZE(layer_groups);
-const pd_mode_led_group_t *const  pd_mode_led_groups        = pd_mode_groups;
-const uint8_t                     pd_mode_led_group_count   = (uint8_t)ARRAY_SIZE(pd_mode_groups);
-const combo_feedback_led_group_t *const combo_feedback_led_groups      = combo_feedback_groups;
-const uint8_t                           combo_feedback_led_group_count = (uint8_t)ARRAY_SIZE(combo_feedback_groups);
+const layer_led_group_t *const                 layer_led_groups                      = layer_groups;
+const uint8_t                                  layer_led_group_count                 = (uint8_t)ARRAY_SIZE(layer_groups);
+const pd_mode_led_group_t *const               pd_mode_led_groups                    = pd_mode_groups;
+const uint8_t                                  pd_mode_led_group_count               = (uint8_t)ARRAY_SIZE(pd_mode_groups);
+const combo_feedback_led_group_t *const        combo_feedback_led_groups             = combo_feedback_groups;
+const uint8_t                                  combo_feedback_led_group_count        = (uint8_t)ARRAY_SIZE(combo_feedback_groups);
 const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups      = key_behavior_feedback_groups;
 const uint8_t                                  key_behavior_feedback_led_group_count = (uint8_t)ARRAY_SIZE(key_behavior_feedback_groups);
-const automouse_fade_end_config_t automouse_fade_end_config = {
+const automouse_fade_end_config_t              automouse_fade_end_config             = {
     .mode      = (automouse_fade_end_mode_t)0xFFu,
     .end_color = HSV(3, 3, 3),
 };
@@ -53,13 +53,13 @@ const pd_mode_color_t pd_mode_colors[] = {
 };
 const uint8_t                              pd_mode_color_count          = (uint8_t)ARRAY_SIZE(pd_mode_colors);
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    .tap_pending_color       = HSV(0, 0, 0),
+    .tap_pending_color = HSV(0, 0, 0),
     RGB_TAP_BRANCH_COLORS(HSV(0, 0, 1)),
-    .tap_committed_color     = HSV(0, 0, 2),
-    .hold_active_color       = HSV(0, 0, 3),
-    .long_hold_active_color  = HSV(0, 0, 4),
-    .tap_commit_mode         = (key_feedback_tap_commit_mode_t)0xFFu,
-    .locality                = (rgb_locality_t)0xFFu,
+    .tap_committed_color    = HSV(0, 0, 2),
+    .hold_active_color      = HSV(0, 0, 3),
+    .long_hold_active_color = HSV(0, 0, 4),
+    .tap_commit_mode        = (key_feedback_tap_commit_mode_t)0xFFu,
+    .locality               = (rgb_locality_t)0xFFu,
 };
 
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {

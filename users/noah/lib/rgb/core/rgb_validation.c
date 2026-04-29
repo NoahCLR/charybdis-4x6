@@ -21,13 +21,13 @@ extern const automouse_fade_end_config_t automouse_fade_end_config;
 #    endif
 
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
-extern const combo_feedback_color_config_t combo_feedback_colors;
+extern const combo_feedback_color_config_t     combo_feedback_colors;
 extern const combo_feedback_led_group_t *const combo_feedback_led_groups;
-extern const uint8_t                          combo_feedback_led_group_count;
+extern const uint8_t                           combo_feedback_led_group_count;
 #    endif
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-extern const key_behavior_feedback_color_config_t key_behavior_feedback_colors;
+extern const key_behavior_feedback_color_config_t     key_behavior_feedback_colors;
 extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 #    endif

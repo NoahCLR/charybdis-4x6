@@ -236,13 +236,7 @@ static void test_base_tap_commit_feedback_can_be_suppressed(void) {
 
 static void test_non_base_tap_commit_feedback_still_pulses(void) {
     static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 4),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 4),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 4),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 4),
-        KEY_RUNTIME_SCENARIO_ADVANCE(121),
-        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 4), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 4), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 4), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 4), KEY_RUNTIME_SCENARIO_ADVANCE(121), KEY_RUNTIME_SCENARIO_SCAN(),
     };
 
     key_runtime_scenario_reset();
@@ -265,11 +259,7 @@ static void test_non_base_tap_commit_feedback_still_pulses(void) {
 
 static void test_non_base_release_resolved_tap_commit_feedback_still_pulses(void) {
     static const key_runtime_scenario_step_t scenario[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
     };
 
     key_runtime_scenario_reset();
@@ -292,11 +282,7 @@ static void test_non_base_release_resolved_tap_commit_feedback_still_pulses(void
 
 static void test_terminal_tap_branch_does_not_accept_undefined_higher_branch(void) {
     static const key_runtime_scenario_step_t first_two_taps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),
     };
     static const key_runtime_scenario_step_t third_tap[] = {
         KEY_RUNTIME_SCENARIO_ADVANCE(40),
@@ -328,11 +314,7 @@ static void test_terminal_tap_branch_does_not_accept_undefined_higher_branch(voi
 
 static void test_same_key_terminal_tap_interruption_defers_previous_branch_action(void) {
     static const key_runtime_scenario_step_t first_two_taps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1),
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
     };
     static const key_runtime_scenario_step_t third_press[] = {
         KEY_RUNTIME_SCENARIO_ADVANCE(40),

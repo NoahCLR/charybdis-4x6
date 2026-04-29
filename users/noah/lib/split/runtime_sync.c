@@ -23,20 +23,20 @@
 #    include "runtime_sync.h"
 #    include "transactions.h" // QMK
 
-split_runtime_sync_remote_t                           split_runtime_sync_remote                     = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
-static split_runtime_base_sync_packet_t               split_runtime_base_last_sent                  = {0};
-static split_runtime_combo_feedback_packet_t          split_runtime_combo_last_sent                 = {0};
-static split_runtime_key_feedback_semantic_packet_t   split_runtime_key_feedback_semantic_last_sent = {0};
-static split_runtime_key_feedback_branch_packet_t     split_runtime_key_feedback_branch_last_sent   = {0};
-static bool                                           split_runtime_base_sent_once                  = false;
-static bool                                           split_runtime_combo_sent_once                 = false;
-static bool                                           split_runtime_key_feedback_semantic_sent_once = false;
-static bool                                           split_runtime_key_feedback_branch_sent_once   = false;
-static bool                                           split_runtime_sync_initialized                = false;
-static uint32_t                                       split_runtime_base_last_send                  = 0;
-static uint32_t                                       split_runtime_combo_last_send                 = 0;
-static uint32_t                                       split_runtime_key_feedback_semantic_last_send = 0;
-static uint32_t                                       split_runtime_key_feedback_branch_last_send   = 0;
+split_runtime_sync_remote_t                         split_runtime_sync_remote                     = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
+static split_runtime_base_sync_packet_t             split_runtime_base_last_sent                  = {0};
+static split_runtime_combo_feedback_packet_t        split_runtime_combo_last_sent                 = {0};
+static split_runtime_key_feedback_semantic_packet_t split_runtime_key_feedback_semantic_last_sent = {0};
+static split_runtime_key_feedback_branch_packet_t   split_runtime_key_feedback_branch_last_sent   = {0};
+static bool                                         split_runtime_base_sent_once                  = false;
+static bool                                         split_runtime_combo_sent_once                 = false;
+static bool                                         split_runtime_key_feedback_semantic_sent_once = false;
+static bool                                         split_runtime_key_feedback_branch_sent_once   = false;
+static bool                                         split_runtime_sync_initialized                = false;
+static uint32_t                                     split_runtime_base_last_send                  = 0;
+static uint32_t                                     split_runtime_combo_last_send                 = 0;
+static uint32_t                                     split_runtime_key_feedback_semantic_last_send = 0;
+static uint32_t                                     split_runtime_key_feedback_branch_last_send   = 0;
 
 #    ifndef SPLIT_RUNTIME_SYNC_ACTIVE_HEARTBEAT_MS
 #        define SPLIT_RUNTIME_SYNC_ACTIVE_HEARTBEAT_MS 250
@@ -350,10 +350,10 @@ void split_runtime_sync_tick(void) {
 }
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force) {
-    split_runtime_base_sync_packet_t                    base_packet;
-    split_runtime_combo_feedback_packet_t               combo_packet;
-    split_runtime_key_feedback_semantic_packet_t        key_feedback_semantic_packet;
-    split_runtime_key_feedback_branch_packet_t          key_feedback_branch_packet;
+    split_runtime_base_sync_packet_t             base_packet;
+    split_runtime_combo_feedback_packet_t        combo_packet;
+    split_runtime_key_feedback_semantic_packet_t key_feedback_semantic_packet;
+    split_runtime_key_feedback_branch_packet_t   key_feedback_branch_packet;
 
     if (!split_runtime_sync_initialized || !is_keyboard_master()) {
         return;

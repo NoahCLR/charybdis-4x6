@@ -22,29 +22,29 @@
     const pd_mode_led_group_t *const pd_mode_led_groups      = (groups_); \
     const uint8_t                    pd_mode_led_group_count = (uint8_t)(sizeof(groups_) / sizeof((groups_)[0]))
 
-#define EXPORT_COMBO_FEEDBACK_LED_GROUPS(groups_)                                            \
-    const combo_feedback_led_group_t *const combo_feedback_led_groups      = (groups_);       \
+#define EXPORT_COMBO_FEEDBACK_LED_GROUPS(groups_)                                       \
+    const combo_feedback_led_group_t *const combo_feedback_led_groups      = (groups_); \
     const uint8_t                           combo_feedback_led_group_count = (uint8_t)(sizeof(groups_) / sizeof((groups_)[0]))
 
-#define EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(groups_)                                                       \
-    const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups      = (groups_);          \
+#define EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(groups_)                                              \
+    const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups      = (groups_); \
     const uint8_t                                  key_behavior_feedback_led_group_count = (uint8_t)(sizeof(groups_) / sizeof((groups_)[0]))
 
-#define EXPORT_LAYER_LED_GROUP_TABLE(groups_)                      \
-    const layer_led_group_t *const layer_led_groups = (groups_);   \
-    const uint8_t layer_led_group_count             = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
+#define EXPORT_LAYER_LED_GROUP_TABLE(groups_)                         \
+    const layer_led_group_t *const layer_led_groups      = (groups_); \
+    const uint8_t                  layer_led_group_count = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
 
-#define EXPORT_PD_MODE_LED_GROUP_TABLE(groups_)                      \
-    const pd_mode_led_group_t *const pd_mode_led_groups = (groups_); \
-    const uint8_t pd_mode_led_group_count               = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
+#define EXPORT_PD_MODE_LED_GROUP_TABLE(groups_)                           \
+    const pd_mode_led_group_t *const pd_mode_led_groups      = (groups_); \
+    const uint8_t                    pd_mode_led_group_count = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
 
-#define EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(groups_)                                      \
-    const combo_feedback_led_group_t *const combo_feedback_led_groups = (groups_);          \
-    const uint8_t combo_feedback_led_group_count                      = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
+#define EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(groups_)                                  \
+    const combo_feedback_led_group_t *const combo_feedback_led_groups      = (groups_); \
+    const uint8_t                           combo_feedback_led_group_count = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
 
-#define EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(groups_)                                            \
-    const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups = (groups_);         \
-    const uint8_t key_behavior_feedback_led_group_count                            = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
+#define EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(groups_)                                         \
+    const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups      = (groups_); \
+    const uint8_t                                  key_behavior_feedback_led_group_count = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
 
 #if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 #    define _RGB_PD_MODE_COLOR_COUNT_DATA() const uint8_t pd_mode_color_count = (uint8_t)ARRAY_SIZE(pd_mode_colors);
@@ -61,9 +61,9 @@
 #endif
 
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-#    define _RGB_KEY_BEHAVIOR_FEEDBACK_POLICY_DATA()                           \
-        key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {    \
-            return key_behavior_feedback_colors.tap_commit_mode;               \
+#    define _RGB_KEY_BEHAVIOR_FEEDBACK_POLICY_DATA()                        \
+        key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) { \
+            return key_behavior_feedback_colors.tap_commit_mode;            \
         }
 #    define _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA() EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #else
@@ -71,10 +71,10 @@
 #    define _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA()
 #endif
 
-#define MATERIALIZE_RGB_CONFIG()                                                \
-    _RGB_PD_MODE_COLOR_COUNT_DATA()                                             \
-    _RGB_PD_MODE_LED_GROUP_DATA()                                               \
-    _RGB_COMBO_FEEDBACK_LED_GROUP_DATA()                                        \
-    _RGB_KEY_BEHAVIOR_FEEDBACK_POLICY_DATA()                                    \
-    _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA()                                 \
+#define MATERIALIZE_RGB_CONFIG()                \
+    _RGB_PD_MODE_COLOR_COUNT_DATA()             \
+    _RGB_PD_MODE_LED_GROUP_DATA()               \
+    _RGB_COMBO_FEEDBACK_LED_GROUP_DATA()        \
+    _RGB_KEY_BEHAVIOR_FEEDBACK_POLICY_DATA()    \
+    _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA() \
     EXPORT_LAYER_LED_GROUP_TABLE(layer_led_groups_data)

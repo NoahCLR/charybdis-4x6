@@ -465,8 +465,8 @@ static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_afte
 
     CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
     pd_mode_service_active_dpi_sync();
-    current_cpi     = 0;
-    cpi_set_count   = 0;
+    current_cpi   = 0;
+    cpi_set_count = 0;
     pd_mode_set_auto_sniping_layer_active(true);
 
     layer_state_t next = noah_layer_state_set_user((layer_state_t)1u << 0);

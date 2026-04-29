@@ -185,17 +185,17 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     uint16_t branch_term = config && config->branch_confirm_term.set ? config->branch_confirm_term.term : CUSTOM_TAP_BRANCH_CONFIRM_TERM;
 
     return (key_behavior_view_t){
-        .config             = config,
-        .keycode            = keycode,
-        .handled            = config || noah_action_desc_is_runtime_handled_keycode(desc),
-        .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc) || custom_lt,
-        .is_layer_tap       = custom_lt,
-        .has_multi_tap      = key_behavior_has_multi_tap_in_config(config),
-        .tap_hold_term      = tap_term,
-        .longer_hold_term   = longer_term,
-        .multi_tap_term     = multi_term,
+        .config              = config,
+        .keycode             = keycode,
+        .handled             = config || noah_action_desc_is_runtime_handled_keycode(desc),
+        .is_momentary_layer  = noah_action_desc_is_momentary_layer_keycode(desc) || custom_lt,
+        .is_layer_tap        = custom_lt,
+        .has_multi_tap       = key_behavior_has_multi_tap_in_config(config),
+        .tap_hold_term       = tap_term,
+        .longer_hold_term    = longer_term,
+        .multi_tap_term      = multi_term,
         .branch_confirm_term = branch_term,
-        .single             = config ? config->tap_counts[0] : key_behavior_step_none(),
+        .single              = config ? config->tap_counts[0] : key_behavior_step_none(),
     };
 }
 

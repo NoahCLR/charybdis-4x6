@@ -1268,8 +1268,8 @@ static void test_left_thumb_double_tap_hold_escape_release_during_branch_keeps_h
 }
 
 static void test_left_thumb_double_tap_long_hold_num_feedback_replaces_branch(void) {
-    keypos_t key_pos      = test_left_thumb_pos();
-    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+    keypos_t key_pos             = test_left_thumb_pos();
+    uint16_t base_keycode        = test_keycode_at(LAYER_BASE, key_pos);
     uint16_t branch_scan_elapsed = (uint16_t)(CUSTOM_TAP_HOLD_TERM + 100u);
 
     test_reset_state();
@@ -1851,7 +1851,7 @@ static void test_assert_direct_dragscroll_quiescent(keypos_t dragscroll_pos, uin
 }
 
 static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t layer_num) {
-    keypos_t dragscroll_pos = test_find_keypos_on_layer(layer_num, DRAGSCROLL);
+    keypos_t dragscroll_pos       = test_find_keypos_on_layer(layer_num, DRAGSCROLL);
     uint8_t  expected_reset_count = 0u;
 
     CHECK(test_keypos_valid(dragscroll_pos));

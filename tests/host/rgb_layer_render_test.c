@@ -62,10 +62,10 @@ static uint8_t                fake_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_M
 static uint8_t                fake_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
 static uint8_t                fake_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 static uint8_t                fake_feedback_broad_owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
-static uint8_t                fake_auto_mouse_layer    = LAYER_POINTER;
-static uint16_t               fake_auto_mouse_elapsed  = 0;
-static bool                   fake_auto_mouse_active   = true;
-static host_runtime_fixture_t runtime_fixture          = HOST_RUNTIME_FIXTURE_INIT;
+static uint8_t                fake_auto_mouse_layer   = LAYER_POINTER;
+static uint16_t               fake_auto_mouse_elapsed = 0;
+static bool                   fake_auto_mouse_active  = true;
+static host_runtime_fixture_t runtime_fixture         = HOST_RUNTIME_FIXTURE_INIT;
 #define fake_is_master runtime_fixture.is_master
 static pd_mode_mask_t    fake_pd_active_mode = 0;
 static pd_mode_mask_t    fake_pd_locked_mode = 0;
@@ -137,9 +137,7 @@ const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .locality = RGB_RIGHT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .locality = RGB_BOTH_HALVES}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .locality = RGB_KEY_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(233, 234, 235), .locality = RGB_KEYS_ONLY},
 };
 const uint8_t                    pd_mode_color_count       = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
-static const pd_mode_led_group_t pd_mode_led_groups_data[] = RGB_LED_GROUP_TABLE(
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .led_group = RGB_LED_GROUP(1, 6)},
-);
+static const pd_mode_led_group_t pd_mode_led_groups_data[] = RGB_LED_GROUP_TABLE({.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .led_group = RGB_LED_GROUP(1, 6)}, );
 EXPORT_PD_MODE_LED_GROUP_TABLE(pd_mode_led_groups_data);
 const automouse_fade_end_config_t automouse_fade_end_config = {
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
@@ -156,18 +154,16 @@ const combo_feedback_color_config_t combo_feedback_colors = {
     .locality = RGB_KEYS_ONLY,
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
-    {.color = HSV(153, 154, 155), .led_group = RGB_LED_GROUP(3)},
-);
+static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(153, 154, 155), .led_group = RGB_LED_GROUP(3)}, );
 EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 #endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    .tap_pending_color       = HSV(1, 2, 3),
+    .tap_pending_color = HSV(1, 2, 3),
     RGB_TAP_BRANCH_COLORS(HSV(13, 14, 15), HSV(16, 17, 18), HSV(19, 20, 21)),
-    .tap_committed_color     = HSV(4, 5, 6),
-    .hold_active_color       = HSV(7, 8, 9),
-    .long_hold_active_color  = HSV(10, 11, 12),
-    .tap_commit_mode         = KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS,
+    .tap_committed_color    = HSV(4, 5, 6),
+    .hold_active_color      = HSV(7, 8, 9),
+    .long_hold_active_color = HSV(10, 11, 12),
+    .tap_commit_mode        = KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS,
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
     .locality = RGB_KEYS_ONLY,
 #elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
@@ -181,12 +177,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 #endif
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
-    {.semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)},
-    {.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)},
-    {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)},
-    {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)},
-);
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, );
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #endif
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
@@ -273,7 +264,7 @@ static key_feedback_broad_owner_slot_t test_feedback_group_slot_for_semantic(key
 }
 
 static void test_feedback_broad_owner_add(uint8_t *owner_map, uint8_t row, uint8_t col, key_feedback_semantic_t semantic) {
-    keypos_t                         key_pos = {.row = row, .col = col};
+    keypos_t                        key_pos = {.row = row, .col = col};
     key_feedback_broad_owner_slot_t group_slot;
 
     key_feedback_broad_owner_map_set(owner_map, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, key_pos);
@@ -359,12 +350,12 @@ static void test_reset(void) {
     key_feedback_tap_branch_map_clear(fake_feedback_tap_branch_map);
     key_origin_bitmap_clear(fake_feedback_flash_visibility_bitmap);
     key_feedback_broad_owner_map_clear(fake_feedback_broad_owner_map);
-    fake_auto_mouse_layer    = LAYER_POINTER;
-    fake_auto_mouse_elapsed  = 0;
-    fake_auto_mouse_active   = true;
-    fake_pd_active_mode      = 0;
-    fake_pd_locked_mode      = 0;
-    fake_pd_owner_sides      = SPLIT_SIDE_MASK_NONE;
+    fake_auto_mouse_layer   = LAYER_POINTER;
+    fake_auto_mouse_elapsed = 0;
+    fake_auto_mouse_active  = true;
+    fake_pd_active_mode     = 0;
+    fake_pd_locked_mode     = 0;
+    fake_pd_owner_sides     = SPLIT_SIDE_MASK_NONE;
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
     split_runtime_sync_remote = host_runtime_fixture_split_remote_init();
 
@@ -1069,7 +1060,7 @@ static void test_key_half_feedback_paints_both_halves_for_combo_footprint(void) 
 static void test_key_half_feedback_uses_independent_priority_per_half(void) {
     test_reset();
 
-    layer_state              = (1UL << LAYER_SYM);
+    layer_state = (1UL << LAYER_SYM);
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING);
     test_local_feedback_visibility_add(0, 0);
     test_local_feedback_semantic_add(4, 0, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
@@ -1424,7 +1415,7 @@ static void test_hold_pending_feedback_overrides_preview_and_pd_mode(void) {
 static void test_newest_global_feedback_owner_wins_over_older_higher_priority(void) {
     test_reset();
 
-    layer_state              = (layer_state_t)1u << LAYER_SYM;
+    layer_state = (layer_state_t)1u << LAYER_SYM;
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING);
     test_local_feedback_visibility_add(0, 0);
     test_local_feedback_semantic_add(4, 0, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);

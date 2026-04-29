@@ -67,34 +67,34 @@ typedef struct {
 } split_runtime_sync_remote_t;
 
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-#    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT               \
-        {                                                      \
-            .automouse_progress        = 0,                    \
-            .active_mode_id            = PD_MODE_ID_NONE,      \
-            .locked_mode_id            = PD_MODE_ID_NONE,      \
-            .pd_mode_owner_sides       = SPLIT_SIDE_MASK_NONE, \
-            .pd_mode_owner_bitmap      = {0},                  \
-            .key_preview_layer         = UINT8_MAX,            \
-            .combo_underlay_bitmap     = {0},                  \
-            .combo_overlay_bitmap      = {0},                  \
-            .key_feedback_flash_visibility_bitmap = {0},       \
-            .key_feedback_semantic_map            = {0},       \
+#    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
+        {                                                                                    \
+            .automouse_progress                   = 0,                                       \
+            .active_mode_id                       = PD_MODE_ID_NONE,                         \
+            .locked_mode_id                       = PD_MODE_ID_NONE,                         \
+            .pd_mode_owner_sides                  = SPLIT_SIDE_MASK_NONE,                    \
+            .pd_mode_owner_bitmap                 = {0},                                     \
+            .key_preview_layer                    = UINT8_MAX,                               \
+            .combo_underlay_bitmap                = {0},                                     \
+            .combo_overlay_bitmap                 = {0},                                     \
+            .key_feedback_flash_visibility_bitmap = {0},                                     \
+            .key_feedback_semantic_map            = {0},                                     \
             .key_feedback_broad_owner_map         = KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT, \
-            .key_feedback_tap_branch_map          = {0},       \
+            .key_feedback_tap_branch_map          = {0},                                     \
         }
 #else
-#    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT          \
-        {                                                 \
-            .automouse_progress        = 0,               \
-            .active_mode_id            = PD_MODE_ID_NONE, \
-            .locked_mode_id            = PD_MODE_ID_NONE, \
-            .key_preview_layer         = UINT8_MAX,       \
-            .combo_underlay_bitmap     = {0},             \
-            .combo_overlay_bitmap      = {0},             \
-            .key_feedback_flash_visibility_bitmap = {0},  \
-            .key_feedback_semantic_map            = {0},  \
+#    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
+        {                                                                                    \
+            .automouse_progress                   = 0,                                       \
+            .active_mode_id                       = PD_MODE_ID_NONE,                         \
+            .locked_mode_id                       = PD_MODE_ID_NONE,                         \
+            .key_preview_layer                    = UINT8_MAX,                               \
+            .combo_underlay_bitmap                = {0},                                     \
+            .combo_overlay_bitmap                 = {0},                                     \
+            .key_feedback_flash_visibility_bitmap = {0},                                     \
+            .key_feedback_semantic_map            = {0},                                     \
             .key_feedback_broad_owner_map         = KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT, \
-            .key_feedback_tap_branch_map          = {0},  \
+            .key_feedback_tap_branch_map          = {0},                                     \
         }
 #endif
 

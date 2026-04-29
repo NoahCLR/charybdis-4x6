@@ -125,9 +125,9 @@ typedef struct {
 
 typedef struct {
     uint16_t                     keycode;
-    uint16_t                     tap_hold_term;    // 0 = TAPPING_TERM for LT(), CUSTOM_TAP_HOLD_TERM otherwise
-    uint16_t                     longer_hold_term; // 0 = CUSTOM_LONGER_HOLD_TERM
-    uint16_t                     multi_tap_term;   // 0 = CUSTOM_MULTI_TAP_TERM
+    uint16_t                     tap_hold_term;       // 0 = TAPPING_TERM for LT(), CUSTOM_TAP_HOLD_TERM otherwise
+    uint16_t                     longer_hold_term;    // 0 = CUSTOM_LONGER_HOLD_TERM
+    uint16_t                     multi_tap_term;      // 0 = CUSTOM_MULTI_TAP_TERM
     key_behavior_optional_term_t branch_confirm_term; // omitted = CUSTOM_TAP_BRANCH_CONFIRM_TERM; KEY_BEHAVIOR_TERM(0) = skip
     key_behavior_step_t          tap_counts[KEY_BEHAVIOR_MAX_TAP_COUNT];
 } key_behavior_t;

@@ -119,9 +119,9 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 static key_behavior_view_t test_pressable_handled_key(uint16_t keycode) {
     key_behavior_view_t behavior = key_runtime_scenario_pressable_handled_key(keycode);
 
-    behavior.tap_hold_term    = TEST_TAP_HOLD_TERM_MS;
-    behavior.longer_hold_term = TEST_LONGER_HOLD_TERM_MS;
-    behavior.multi_tap_term   = TEST_MULTI_TAP_TERM_MS;
+    behavior.tap_hold_term       = TEST_TAP_HOLD_TERM_MS;
+    behavior.longer_hold_term    = TEST_LONGER_HOLD_TERM_MS;
+    behavior.multi_tap_term      = TEST_MULTI_TAP_TERM_MS;
     behavior.branch_confirm_term = 0;
     return behavior;
 }

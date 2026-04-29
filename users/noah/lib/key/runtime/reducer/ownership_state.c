@@ -388,8 +388,8 @@ static bool key_runtime_core_held_action_lease_activate(key_runtime_core_state_t
             return false;
         }
 
-        feedback_started_at        = timer_read();
-        feedback_sequence          = key_runtime_core_state_next_feedback_sequence(state);
+        feedback_started_at         = timer_read();
+        feedback_sequence           = key_runtime_core_state_next_feedback_sequence(state);
         lease->owner_token_id       = owner_token_id;
         lease->owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos);
         lease->feedback_started_at  = feedback_started_at;
@@ -404,7 +404,7 @@ static bool key_runtime_core_held_action_lease_activate(key_runtime_core_state_t
 
     feedback_started_at = timer_read();
     feedback_sequence   = key_runtime_core_state_next_feedback_sequence(state);
-    *lease = (lease_t){
+    *lease              = (lease_t){
         .active               = true,
         .kind                 = LEASE_KIND_HELD_ACTION,
         .owner_token_id       = owner_token_id,
@@ -431,8 +431,8 @@ static bool key_runtime_core_repeat_lease_activate(key_runtime_core_state_t *sta
             return false;
         }
 
-        feedback_started_at         = timer_read();
-        feedback_sequence           = key_runtime_core_state_next_feedback_sequence(state);
+        feedback_started_at          = timer_read();
+        feedback_sequence            = key_runtime_core_state_next_feedback_sequence(state);
         lease->owner_token_id        = owner_token_id;
         lease->owner_packed_key_pos  = key_runtime_keypos_pack(owner_key_pos);
         lease->feedback_started_at   = feedback_started_at;
@@ -448,7 +448,7 @@ static bool key_runtime_core_repeat_lease_activate(key_runtime_core_state_t *sta
 
     feedback_started_at = timer_read();
     feedback_sequence   = key_runtime_core_state_next_feedback_sequence(state);
-    *lease = (lease_t){
+    *lease              = (lease_t){
         .active               = true,
         .kind                 = LEASE_KIND_REPEAT,
         .owner_token_id       = owner_token_id,
@@ -1102,10 +1102,10 @@ static bool key_runtime_core_feedback_sequence_is_newer_or_equal(uint32_t candid
 }
 
 bool key_runtime_core_flashing_feedback_started_at(keypos_t key_pos, uint16_t *out_started_at) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-    bool                      found = false;
+    key_runtime_core_state_t *state             = key_runtime_core_state();
+    bool                      found             = false;
     uint16_t                  newest_started_at = 0;
-    uint32_t                  newest_sequence = 0;
+    uint32_t                  newest_sequence   = 0;
 
     if (!(state && out_started_at && key_runtime_core_keypos_valid(key_pos))) {
         return false;
@@ -1140,8 +1140,8 @@ bool key_runtime_core_flashing_feedback_started_at(keypos_t key_pos, uint16_t *o
 }
 
 bool key_runtime_core_flashing_feedback_sequence_at(keypos_t key_pos, uint32_t *out_sequence) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-    bool                      found = false;
+    key_runtime_core_state_t *state           = key_runtime_core_state();
+    bool                      found           = false;
     uint32_t                  newest_sequence = 0;
 
     if (!(state && out_sequence && key_runtime_core_keypos_valid(key_pos))) {

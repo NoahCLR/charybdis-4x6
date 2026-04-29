@@ -10,17 +10,17 @@ handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t 
     bool                more     = key_behavior_has_more_taps(keycode, tap_count);
 
     return (handled_key_resolution_t){
-        .keycode          = keycode,
-        .tap_count        = tap_count,
-        .step             = step,
-        .tap_hold_term    = behavior.tap_hold_term,
-        .longer_hold_term = behavior.longer_hold_term,
-        .multi_tap_term   = behavior.multi_tap_term,
+        .keycode             = keycode,
+        .tap_count           = tap_count,
+        .step                = step,
+        .tap_hold_term       = behavior.tap_hold_term,
+        .longer_hold_term    = behavior.longer_hold_term,
+        .multi_tap_term      = behavior.multi_tap_term,
         .branch_confirm_term = behavior.branch_confirm_term,
-        .layer            = behavior.is_momentary_layer ? behavior_get_layer(behavior.keycode) : UINT8_MAX,
-        .pd_mode          = handled_key_pd_mode_for_behavior(behavior),
-        .has_more_taps    = more,
-        .flags            = handled_key_flags_from_behavior(behavior),
+        .layer               = behavior.is_momentary_layer ? behavior_get_layer(behavior.keycode) : UINT8_MAX,
+        .pd_mode             = handled_key_pd_mode_for_behavior(behavior),
+        .has_more_taps       = more,
+        .flags               = handled_key_flags_from_behavior(behavior),
     };
 }
 
