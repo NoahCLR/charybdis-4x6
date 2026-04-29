@@ -2168,6 +2168,9 @@ function getStudioHtml() {
             color: var(--muted);
         }
         label span { font-size: 11px; }
+        [data-tooltip] {
+            cursor: help;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -2274,6 +2277,19 @@ function getStudioHtml() {
             vertical-align: middle;
             margin-right: 6px;
         }
+        .tooltip {
+            position: fixed;
+            z-index: 50;
+            max-width: 340px;
+            padding: 7px 9px;
+            border: 1px solid #6b7c85;
+            border-radius: 6px;
+            background: #151a1d;
+            color: var(--text);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
+            pointer-events: none;
+            white-space: normal;
+        }
         .toolbar {
             display: flex;
             gap: 8px;
@@ -2298,6 +2314,7 @@ function getStudioHtml() {
         </div>
     </header>
     <main id="app"></main>
+    <div id="tooltip" class="tooltip" hidden></div>
     <script nonce="${nonce}">
 ${getClientScript()}
     </script>
@@ -2323,6 +2340,86 @@ function getClientScript() {
         ["macros", "Macros & combos"],
         ["rgb", "RGB"]
     ];
+    const headerTooltips = {
+        openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
+        openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
+        refresh: "Re-read keymap.c and rgb_config.c from disk and rebuild the studio model."
+    };
+    const viewTooltips = {
+        layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
+        macros: "Edit VIA macro payloads and append combo rows in keymap.c.",
+        rgb: "Edit rgb_config.c colors, feedback policies, and LED group tables."
+    };
+    const panelTooltips = {
+        Status: "Parser messages, write status, and warnings from the current studio model.",
+        Layout: "Physical keyboard preview for the active layer. Click a key to edit it.",
+        "Selected Key": "Edit the selected LAYOUT slot and the key behavior row attached to that keycode.",
+        "Layer Behaviors": "Behavior rows whose keycode is currently present on the active layer.",
+        "Layer Combos & PD Modes": "Combos and pointing modes reachable from keys on the active layer.",
+        "VIA Macros": "Payload strings for the VIA_MACROS(MACRO) table in keymap.c.",
+        "Combo Builder": "Append a new COMBOS(COMBO) row to keymap.c.",
+        "RGB LED Group Builder": "Select physical LEDs and append a row to one of the rgb_config.c LED group tables.",
+        "Layer Colors": "Edit layer_colors[] HSV values and layer render mode.",
+        "Layer LED Groups": "Inspect layer-specific LED group rows from rgb_config.c.",
+        "Auto-mouse Fade": "Edit the auto-mouse fade destination color and fade mode.",
+        "Pointing-mode Colors": "Edit pd_mode_colors[] HSV values and locality.",
+        "Pointing-mode LED Groups": "Inspect pointing-mode-specific LED group rows from rgb_config.c.",
+        "Combo Feedback": "Edit combo feedback color and locality.",
+        "Combo Feedback LED Groups": "Inspect combo feedback LED group rows from rgb_config.c.",
+        "Key Behavior Feedback": "Edit tap, hold, long-hold, and tap-branch feedback colors and policy.",
+        "Key Behavior Feedback LED Groups": "Inspect key-behavior feedback LED group rows from rgb_config.c."
+    };
+    const actionTooltips = {
+        applyKey: "Write the selected key value back to this layer's LAYOUT() slot in keymap.c.",
+        saveSelectedBehavior: "Create or replace the key_behaviors[] row for this selected keycode.",
+        addBehavior: "Append a simple key_behaviors[] row to keymap.c.",
+        updateLayerColor: "Write this layer color and render mode back to rgb_config.c.",
+        updatePdModeColor: "Write this pointing-mode color and locality back to rgb_config.c.",
+        updateAutomouseFade: "Write the auto-mouse fade color and mode back to rgb_config.c.",
+        updateComboFeedback: "Write combo feedback color and locality back to rgb_config.c.",
+        updateKeyBehaviorFeedback: "Write all key behavior feedback colors and policy fields back to rgb_config.c.",
+        addRgbLedGroup: "Append a new LED group row using the selected LEDs and current color.",
+        clearRgbSelection: "Remove all currently selected LEDs from the group builder.",
+        toggleRgbTrackball: "Add or remove the trackball LED index 56 from the group builder.",
+        updateViaMacro: "Write this VIA macro payload string back to keymap.c.",
+        addCombo: "Append a combo row with the entered output and input keys.",
+        selectKey: "Select this physical key so its keycode and behavior can be edited.",
+        toggleRgbLed: "Add or remove this physical LED from the new RGB group."
+    };
+    const fieldTooltips = {
+        layer: "The active firmware layer. This is read from the LAYOUT() block and is not edited here.",
+        "layout index": "The physical LAYOUT() slot index for the selected key. It is fixed by the keyboard geometry.",
+        key: "User-facing key label or expression to write into the selected LAYOUT() slot, for example A, Enter, Space, _______, or Shift+Esc.",
+        source: "The raw C expression currently stored in keymap.c.",
+        tap_hold_term: "Optional milliseconds before a tap can become a hold for this behavior row. Empty uses the runtime default.",
+        longer_hold_term: "Optional milliseconds before a hold can become a long hold. Empty uses the runtime default.",
+        multi_tap_term: "Optional milliseconds used to detect repeated taps. Empty uses the runtime default.",
+        branch_confirm_term: "Optional milliseconds before a tap branch is committed. Plain numbers are written as KEY_BEHAVIOR_TERM(ms).",
+        table: "Choose which rgb_config.c LED group table will receive the new row.",
+        owner: "The owner value for the target LED group table. Combo feedback groups do not need one.",
+        "pointing mode": "The pointing mode whose color or LED group is being edited.",
+        semantic: "The key-behavior feedback semantic that owns this LED group.",
+        mode: "Select the authored mode for this row, such as layer render mode or auto-mouse fade mode.",
+        locality: "Choose which keyboard half or key region receives this RGB feedback.",
+        "tap commit mode": "Choose when tap commit feedback is shown for key behavior taps.",
+        picker: "Pick an approximate RGB color. The studio converts it into HSV channel values.",
+        h: "HSV hue channel as QMK stores it, usually 0-255.",
+        s: "HSV saturation channel as QMK stores it, usually 0-255.",
+        v: "HSV value/brightness channel. Constants such as RGB_MATRIX_MAXIMUM_BRIGHTNESS are allowed.",
+        output: "The key or action produced by a combo.",
+        inputs: "Comma-separated combo input keys, such as D, F.",
+        slot: "The VIA macro keycode slot.",
+        payload: "The string payload sent by this VIA macro slot.",
+        leds: "The physical RGB LED indices contained in this group.",
+        "led group": "The authored LED group expression in rgb_config.c.",
+        color: "The HSV color expression used by this row.",
+        rgb: "The RGB color and locality associated with this reachable pointing mode.",
+        badge: "The small badge shown on the layout preview for this combo.",
+        behavior: "The key behavior row attached to this keycode.",
+        steps: "Tap branch actions for this behavior row.",
+        "key on layer": "Keys on the active layer that use this behavior row.",
+        "reachable via": "The visible key or behavior action that can reach this pointing mode."
+    };
     const qmkKeyLabels = ${JSON.stringify(QMK_KEY_LABELS)};
     const modWrapperLabels = ${JSON.stringify(MOD_WRAPPER_LABELS)};
     const rgbLocalities = ${JSON.stringify(RGB_LOCALITIES)};
@@ -2372,10 +2469,29 @@ function getClientScript() {
 
     const app = document.getElementById("app");
     const subtitle = document.getElementById("subtitle");
+    const tooltip = document.getElementById("tooltip");
+    let activeTooltipTarget = undefined;
 
     document.getElementById("refresh").addEventListener("click", () => post({ type: "refresh" }));
     document.getElementById("openKeymap").addEventListener("click", () => post({ type: "openSource", file: "keymap" }));
     document.getElementById("openRgb").addEventListener("click", () => post({ type: "openSource", file: "rgb" }));
+    document.addEventListener("pointerover", (event) => {
+        const target = tooltipTarget(event.target);
+        if (target) showTooltip(target, event);
+    });
+    document.addEventListener("pointermove", (event) => {
+        if (activeTooltipTarget) positionTooltip(event.clientX, event.clientY);
+    });
+    document.addEventListener("pointerout", (event) => {
+        if (activeTooltipTarget && !activeTooltipTarget.contains(event.relatedTarget)) {
+            hideTooltip();
+        }
+    });
+    document.addEventListener("focusin", (event) => {
+        const target = tooltipTarget(event.target);
+        if (target) showTooltip(target);
+    });
+    document.addEventListener("focusout", hideTooltip);
 
     window.addEventListener("message", (event) => {
         if (event.data.type === "model") {
@@ -2505,6 +2621,11 @@ function getClientScript() {
     });
 
     app.addEventListener("change", (event) => {
+        const colorControl = event.target?.closest?.("[data-color-control]");
+        if (colorControl) {
+            syncColorControl(event, colorControl);
+            return;
+        }
         if (event.target?.name === "target" && event.target.closest("#rgbGroupBuilder")) {
             rgbGroupTarget = event.target.value;
             rgbGroupOwner = "";
@@ -2525,7 +2646,10 @@ function getClientScript() {
 
     app.addEventListener("input", (event) => {
         const control = event.target?.closest?.("[data-color-control]");
-        if (!control) return;
+        if (control) syncColorControl(event, control);
+    });
+
+    function syncColorControl(event, control) {
         if (event.target.matches("input[type='color'][data-color-picker]")) {
             const hsv = hexToHsv(event.target.value);
             if (hsv) {
@@ -2541,8 +2665,9 @@ function getClientScript() {
                 s: value(control, "s"),
                 v: value(control, "v")
             };
+            updateRgbSelectionPreview();
         }
-    });
+    }
 
     function value(root, name) {
         return root.querySelector("[name='" + name + "']").value;
@@ -2590,11 +2715,165 @@ function getClientScript() {
     function render() {
         if (!model) {
             app.innerHTML = "<section>Loading...</section>";
+            hydrateTooltips();
             return;
         }
 
         subtitle.textContent = model.root;
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
+        hydrateTooltips();
+    }
+
+    function hydrateTooltips() {
+        for (const [id, text] of Object.entries(headerTooltips)) {
+            setTooltip(document.getElementById(id), text, true);
+        }
+        for (const button of document.querySelectorAll("button")) {
+            setTooltip(button, tooltipForButton(button), true);
+        }
+        for (const summary of document.querySelectorAll("summary")) {
+            setTooltip(summary, tooltipForSummary(summary), true);
+        }
+        for (const label of document.querySelectorAll("label")) {
+            const text = tooltipForLabel(label);
+            setTooltip(label, text, false);
+            for (const control of label.querySelectorAll("input, select, textarea")) {
+                setTooltip(control, text, true);
+            }
+        }
+        for (const control of document.querySelectorAll("input, select, textarea")) {
+            setTooltip(control, tooltipForControl(control), true);
+        }
+        for (const header of document.querySelectorAll("th")) {
+            setTooltip(header, tooltipForField(header.textContent), false);
+        }
+        for (const source of document.querySelectorAll(".source-pill")) {
+            setTooltip(source, fieldTooltips.source, false);
+        }
+        for (const swatch of document.querySelectorAll("[data-color-swatch], .inline-swatch")) {
+            setTooltip(swatch, swatch.getAttribute("data-tooltip") || "Color preview for this HSV expression.", false);
+        }
+        for (const swatch of document.querySelectorAll(".rgb-summary-swatch")) {
+            const expression = swatch.closest(".rgb-subsection")?.querySelector("[data-summary-expression]")?.textContent || "";
+            setTooltip(swatch, expression ? "Collapsed color preview: " + expression : "Collapsed color preview.", true);
+        }
+    }
+
+    function tooltipForButton(button) {
+        if (!button) return "";
+        if (button.id && headerTooltips[button.id]) return headerTooltips[button.id];
+        const action = button.dataset.action;
+        if (action === "selectView") {
+            return viewTooltips[button.dataset.view] || "Switch to this studio view.";
+        }
+        if (action === "selectLayer") {
+            return "Show layer " + (button.dataset.layer || button.textContent.trim()) + " in the layout and RGB previews.";
+        }
+        if (action === "selectKey") {
+            return "Select this key on the layout for editing.";
+        }
+        if (action === "toggleRgbLed") {
+            return "Add or remove LED " + (button.dataset.led || "") + " from the pending RGB group.";
+        }
+        return actionTooltips[action] || button.textContent.trim();
+    }
+
+    function tooltipForSummary(summary) {
+        const title =
+            summary.querySelector("h2, h3, .rgb-summary-title")?.textContent?.trim() ||
+            summary.textContent.trim();
+        if (panelTooltips[title]) return panelTooltips[title] + " Click to expand or collapse.";
+        if (summary.closest(".rgb-subsection")) {
+            return "RGB color row for " + title + ". Click to expand the HSV picker and channel fields.";
+        }
+        if (summary.closest(".behavior-step")) {
+            return "Behavior actions for the " + title + ". Click to expand or collapse this tap branch.";
+        }
+        return "Click to expand or collapse this section.";
+    }
+
+    function tooltipForLabel(label) {
+        const span = label.querySelector("span");
+        const text = (span?.textContent || label.textContent || "").trim();
+        return tooltipForField(text);
+    }
+
+    function tooltipForControl(control) {
+        const label = control.closest("label");
+        if (label) {
+            return tooltipForLabel(label);
+        }
+        return tooltipForField(control.getAttribute("aria-label") || control.name || control.id || control.placeholder || "");
+    }
+
+    function tooltipForField(text) {
+        const key = normalizeTooltipKey(text);
+        if (!key) return "";
+        if (fieldTooltips[key]) return fieldTooltips[key];
+        if (key.endsWith(" helper")) {
+            return "Choose the helper that controls this behavior action. Select none to leave the action empty.";
+        }
+        if (key.endsWith(" action")) {
+            return "User-facing key or action for this behavior branch, for example Esc, Shift+\`, Cmd+Q, or a pointing-mode key.";
+        }
+        if (key.endsWith(" repeat hz")) {
+            return "Repeat frequency used only when the helper is REPEAT_WHILE_HELD.";
+        }
+        return "";
+    }
+
+    function normalizeTooltipKey(text) {
+        return String(text || "").replace(/\\s+/g, " ").trim().toLowerCase();
+    }
+
+    function setTooltip(element, text, aria = false) {
+        if (!element || !text) return;
+        element.setAttribute("data-tooltip", text);
+        element.removeAttribute("title");
+        if (aria && !element.getAttribute("aria-label")) {
+            element.setAttribute("aria-label", text);
+        }
+    }
+
+    function tooltipTarget(target) {
+        const element = target?.nodeType === 1 ? target : target?.parentElement;
+        return element?.closest?.("[data-tooltip]");
+    }
+
+    function showTooltip(target, event) {
+        const text = target?.getAttribute("data-tooltip") || "";
+        if (!text || !tooltip) return;
+        activeTooltipTarget = target;
+        tooltip.textContent = text;
+        tooltip.hidden = false;
+        if (event) {
+            positionTooltip(event.clientX, event.clientY);
+            return;
+        }
+        const box = target.getBoundingClientRect();
+        positionTooltip(box.left + Math.min(24, box.width / 2), box.bottom);
+    }
+
+    function positionTooltip(clientX, clientY) {
+        if (!tooltip || tooltip.hidden) return;
+        const gap = 14;
+        const margin = 8;
+        const box = tooltip.getBoundingClientRect();
+        let left = clientX + gap;
+        let top = clientY + gap;
+        if (left + box.width > window.innerWidth - margin) {
+            left = Math.max(margin, clientX - box.width - gap);
+        }
+        if (top + box.height > window.innerHeight - margin) {
+            top = Math.max(margin, clientY - box.height - gap);
+        }
+        tooltip.style.left = left + "px";
+        tooltip.style.top = top + "px";
+    }
+
+    function hideTooltip() {
+        activeTooltipTarget = undefined;
+        if (tooltip) tooltip.hidden = true;
     }
 
     function renderDiagnostics() {
@@ -2749,8 +3028,8 @@ function getClientScript() {
         const cx = visual.x + keyboardGeometry.keyWidth / 2;
         const cy = visual.y + keyboardGeometry.keyHeight / 2;
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
-        return "<g class='svg-key " + (selected ? "selected" : "") + "' data-action='selectKey' data-index='" + position.layoutIndex + "'" + transform + ">" +
-            "<title>" + escapeHtml(position.keycode) + "</title>" +
+        const tooltipText = "Click to edit layout index " + position.layoutIndex + ": " + label + " (" + position.keycode + ")";
+        return "<g class='svg-key " + (selected ? "selected" : "") + "' data-action='selectKey' data-index='" + position.layoutIndex + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
             renderSvgLabel(label, cx, cy, style.text) +
             renderBehaviorDots(dots, visual, style.text) +
@@ -3178,6 +3457,29 @@ function getClientScript() {
         return semanticColor || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
     }
 
+    function rgbBuilderHex() {
+        return hsvToHex(defaultRgbBuilderColor()) || "#000000";
+    }
+
+    function updateRgbSelectionPreview() {
+        const builder = document.getElementById("rgbGroupBuilder");
+        if (!builder) return;
+        const fill = rgbBuilderHex();
+        const text = idealText(fill);
+        for (const key of builder.querySelectorAll(".svg-key.rgb-selected")) {
+            key.querySelector("[data-rgb-led-preview]")?.setAttribute("fill", fill);
+            for (const label of key.querySelectorAll("text, tspan")) {
+                label.setAttribute("fill", text);
+            }
+        }
+        for (const led of builder.querySelectorAll(".extra-led.rgb-selected")) {
+            led.querySelector("[data-rgb-led-preview]")?.setAttribute("fill", fill);
+            for (const label of led.querySelectorAll("text")) {
+                label.setAttribute("fill", text);
+            }
+        }
+    }
+
     function renderRgbGroupBoard(layer) {
         if (!layer) {
             return "<p class='muted'>No layer layout is available for LED selection.</p>";
@@ -3199,20 +3501,24 @@ function getClientScript() {
         const style = keyStyle(position);
         const cx = visual.x + keyboardGeometry.keyWidth / 2;
         const cy = visual.y + keyboardGeometry.keyHeight / 2;
+        const selectedFill = selected ? rgbBuilderHex() : style.fill;
+        const selectedText = selected ? idealText(selectedFill) : style.text;
+        const tooltipText = "Click to add or remove LED " + ledIndex + " for " + (position.display || position.keycode) + " (" + position.keycode + ")";
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
-        return "<g class='svg-key " + (selected ? "rgb-selected" : "") + "' data-action='toggleRgbLed' data-led='" + ledIndex + "'" + transform + ">" +
-            "<title>LED " + ledIndex + " - " + escapeHtml(position.keycode) + "</title>" +
-            "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
-            renderSvgLabel((position.display || position.keycode) + " " + ledIndex, cx, cy, style.text) +
+        return "<g class='svg-key " + (selected ? "rgb-selected" : "") + "' data-action='toggleRgbLed' data-led='" + ledIndex + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
+            "<rect data-rgb-led-preview x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + selectedFill + "' stroke='" + (selected ? "#ffffff" : style.stroke) + "'></rect>" +
+            renderSvgLabel((position.display || position.keycode) + " " + ledIndex, cx, cy, selectedText) +
             "</g>";
     }
 
     function renderExtraLed(ledIndex, cx, cy) {
         const selected = rgbSelectedLeds.includes(ledIndex);
-        return "<g class='extra-led " + (selected ? "rgb-selected" : "") + "' data-action='toggleRgbTrackball'>" +
-            "<title>Trackball LED " + ledIndex + "</title>" +
-            "<circle cx='" + cx + "' cy='" + cy + "' r='13' fill='#20262a' stroke='" + (selected ? "#ffffff" : "#31c6a4") + "'></circle>" +
-            "<text x='" + cx + "' y='" + (cy + 1) + "' fill='#e7ecef' font-size='10' text-anchor='middle' dominant-baseline='middle'>" + ledIndex + "</text>" +
+        const fill = selected ? rgbBuilderHex() : "#20262a";
+        const textColor = selected ? idealText(fill) : "#e7ecef";
+        const tooltipText = "Click to add or remove trackball LED " + ledIndex + " from the group builder.";
+        return "<g class='extra-led " + (selected ? "rgb-selected" : "") + "' data-action='toggleRgbTrackball' data-tooltip='" + escapeAttr(tooltipText) + "'>" +
+            "<circle data-rgb-led-preview cx='" + cx + "' cy='" + cy + "' r='13' fill='" + fill + "' stroke='" + (selected ? "#ffffff" : "#31c6a4") + "'></circle>" +
+            "<text x='" + cx + "' y='" + (cy + 1) + "' fill='" + textColor + "' font-size='10' text-anchor='middle' dominant-baseline='middle'>" + ledIndex + "</text>" +
             "</g>";
     }
 
@@ -3305,7 +3611,8 @@ function getClientScript() {
 
     function renderSummarySwatch(color) {
         const fill = hsvToHex(color) || "#000000";
-        return "<svg class='rgb-summary-swatch' viewBox='0 0 80 26' role='img' aria-label='Color preview'>" +
+        const label = "Collapsed color preview: " + colorExpression(color);
+        return "<svg class='rgb-summary-swatch' viewBox='0 0 80 26' role='img' aria-label='" + escapeAttr(label) + "' data-tooltip='" + escapeAttr(label) + "'>" +
             "<rect data-summary-swatch x='1' y='1' width='78' height='24' rx='5' fill='" + fill + "' stroke='#ffffff' stroke-opacity='0.38' stroke-width='1'></rect>" +
             "</svg>";
     }
@@ -3328,8 +3635,9 @@ function getClientScript() {
     function renderHsvColorControl(color, id, extraAttrs = "") {
         const hex = hsvToHex(color) || "#000000";
         const idAttr = id ? " data-color-id='" + escapeAttr(id) + "'" : "";
+        const swatchTooltip = "Color preview: " + colorExpression(color);
         return "<div class='color-control' data-color-control" + idAttr + extraAttrs + ">" +
-            "<div class='swatch' data-color-swatch style='background: " + hex + "' title='" + escapeAttr(color?.expression || "") + "'></div>" +
+            "<div class='swatch' data-color-swatch data-tooltip='" + escapeAttr(swatchTooltip) + "' style='background: " + hex + "'></div>" +
             "<div class='color-row'>" +
             "<label><span>picker</span><input type='color' data-color-picker value='" + hex + "'></label>" +
             hsvInputs(color) +
@@ -3346,12 +3654,12 @@ function getClientScript() {
 
     function renderSwatch(color) {
         const css = hsvToCss(color);
-        return "<div class='swatch' style='background: " + css + "' title='" + escapeAttr(color?.expression || "") + "'></div>";
+        return "<div class='swatch' style='background: " + css + "' data-tooltip='" + escapeAttr("Color preview: " + colorExpression(color)) + "'></div>";
     }
 
     function renderInlineSwatch(color, extraAttrs = "") {
         const fill = hsvToHex(color) || "#000000";
-        return "<span class='inline-swatch' style='background: " + fill + "' title='" + escapeAttr(colorExpression(color)) + "'" + extraAttrs + "></span>";
+        return "<span class='inline-swatch' style='background: " + fill + "' data-tooltip='" + escapeAttr("Color preview: " + colorExpression(color)) + "'" + extraAttrs + "></span>";
     }
 
     function hsvToCss(color) {
@@ -3374,7 +3682,7 @@ function getClientScript() {
         const expression = control.querySelector("[data-color-expression]");
         if (swatch) {
             swatch.style.background = hex;
-            swatch.title = colorExpression(color);
+            swatch.setAttribute("data-tooltip", "Color preview: " + colorExpression(color));
         }
         if (picker && /^#[0-9a-f]{6}$/i.test(hex)) {
             picker.value = hex;
@@ -3388,6 +3696,12 @@ function getClientScript() {
             const summaryExpression = subsection.querySelector("[data-summary-expression]");
             if (summarySwatch) {
                 summarySwatch.setAttribute("fill", hex);
+                const summaryPreview = summarySwatch.closest("svg");
+                if (summaryPreview) {
+                    const label = "Collapsed color preview: " + colorExpression(color);
+                    summaryPreview.setAttribute("data-tooltip", label);
+                    summaryPreview.setAttribute("aria-label", label);
+                }
             }
             if (summaryExpression) {
                 summaryExpression.textContent = colorExpression(color);

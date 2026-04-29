@@ -51,6 +51,9 @@ preview swatches, including the dedicated swatch column in collapsed section
 summaries; applying a card still writes the same `HSV(...)` expressions back to
 `rgb_config.c`.
 
+Most visible controls, tables, collapsed summaries, color previews, and SVG
+keys expose hover tooltips that describe what the field edits or displays.
+
 For complex behavior rows, direct source editing is still expected after using
 the studio as a starter.
 

@@ -43,6 +43,8 @@ those two files.
 - append `COMBOS(COMBO)` rows
 - append simple `key_behaviors[]` rows for tap, hold, and long-hold actions
 - open the backing source file from the studio
+- hover panels, tabs, controls, tables, color previews, and SVG keys for
+  tooltips that explain what each part edits or displays
 
 ## Native Workspace Use
 
