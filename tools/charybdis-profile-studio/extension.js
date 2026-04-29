@@ -2613,6 +2613,7 @@ function getStudioHtml() {
         .field-error {
             display: block;
             margin-top: 4px;
+            min-height: 14px;
             color: var(--danger);
             font-size: 11px;
             line-height: 1.25;
@@ -2628,6 +2629,7 @@ function getStudioHtml() {
         .form-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
         label {
             display: grid;
+            grid-template-rows: auto auto 14px;
             gap: 4px;
             min-width: 0;
             color: var(--muted);
@@ -3920,16 +3922,12 @@ function getClientScript() {
         if (!label) return;
         label.classList.toggle("invalid", Boolean(message));
         let error = label.querySelector(".field-error");
-        if (message) {
-            if (!error) {
-                error = document.createElement("span");
-                error.className = "field-error";
-                label.appendChild(error);
-            }
-            error.textContent = message;
-        } else if (error) {
-            error.remove();
+        if (!error) {
+            error = document.createElement("span");
+            error.className = "field-error";
+            label.appendChild(error);
         }
+        error.textContent = message || "";
     }
 
     function clearFieldError(control) {

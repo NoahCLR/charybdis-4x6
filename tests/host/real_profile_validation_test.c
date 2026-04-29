@@ -166,7 +166,11 @@ int main(void) {
     CHECK(noah_combo_output_count > 0);
     CHECK(pd_mode_color_count == PD_MODE_COUNT);
 
-    CHECK(noah_keymap_validate() == 0u);
+    uint8_t keymap_validation_errors = noah_keymap_validate();
+    if (keymap_validation_errors != 0u && log_buffer[0] != '\0') {
+        fputs(log_buffer, stderr);
+    }
+    CHECK(keymap_validation_errors == 0u);
     CHECK(macro_dispatch_validate_all() == 0u);
     noah_rgb_validate_config();
 
