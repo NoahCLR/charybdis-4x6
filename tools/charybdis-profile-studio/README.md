@@ -37,6 +37,9 @@ those two files.
 - layer combo rows show any key behavior row triggered by the combo output
 - behavior timing fields show the resolved default milliseconds in their
   placeholder text when a row leaves the override empty
+- numeric-only fields such as HSV hue/saturation channels, behavior timing
+  overrides, and repeat-Hz values are validated inline before writes are sent;
+  the extension validates again before patching the backing `.c` file
 - named tap branch sections in the behavior editor are collapsible, and
   repeat Hz is only shown when the selected hold helper is
   `REPEAT_WHILE_HELD`

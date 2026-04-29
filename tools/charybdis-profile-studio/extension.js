@@ -2326,15 +2326,26 @@ function assertSafeExpression(value, label) {
 }
 
 function assertSafeHsv(hue, sat, val) {
-    for (const [label, value] of [
-        ["hue", hue],
-        ["saturation", sat],
-        ["value", val],
-    ]) {
-        const text = normalizeExpr(value);
-        if (!/^[A-Z0-9_()+\-*/ ]+$/.test(text)) {
-            throw new Error(`Invalid HSV ${label}: ${value}`);
-        }
+    assertUint8Channel(hue, "HSV hue");
+    assertUint8Channel(sat, "HSV saturation");
+    const value = normalizeExpr(val);
+    if (/^\d+$/.test(value)) {
+        assertUint8Channel(value, "HSV value");
+        return;
+    }
+    if (!/^[A-Z_][A-Z0-9_]*(?:\s*[-+*/]\s*(?:\d+|[A-Z_][A-Z0-9_]*))*$/.test(value)) {
+        throw new Error(`HSV value must be an integer from 0 to 255 or a safe constant expression: ${val}`);
+    }
+}
+
+function assertUint8Channel(value, label) {
+    const text = normalizeExpr(value);
+    if (!/^\d+$/.test(text)) {
+        throw new Error(`${label} must be an integer from 0 to 255: ${value}`);
+    }
+    const number = Number(text);
+    if (!Number.isInteger(number) || number < 0 || number > 255) {
+        throw new Error(`${label} must be an integer from 0 to 255: ${value}`);
     }
 }
 
@@ -2428,6 +2439,10 @@ function getStudioHtml() {
             border-color: #60707a;
             background: #20262a;
             box-shadow: inset 0 0 0 1px rgba(49, 198, 164, 0.08);
+        }
+        input.invalid, select.invalid {
+            border-color: var(--danger);
+            box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.36), 0 0 0 1px rgba(255, 107, 107, 0.24);
         }
         input:disabled, select:disabled {
             border-style: dashed;
@@ -2595,6 +2610,13 @@ function getStudioHtml() {
         .muted { color: var(--muted); }
         .notice { color: var(--accent); }
         .error { color: var(--danger); }
+        .field-error {
+            display: block;
+            margin-top: 4px;
+            color: var(--danger);
+            font-size: 11px;
+            line-height: 1.25;
+        }
         .warning { color: var(--warn); }
         .form-grid {
             display: grid;
@@ -3099,6 +3121,19 @@ function getClientScript() {
         toggleRgbLed: "Add or remove this physical LED from the new RGB group.",
         openKeyPicker: "Open a VIA-style keycode picker with sections, QWERTY keys, modifiers, and OK/Cancel confirmation."
     };
+    const writeActions = new Set([
+        "applyKey",
+        "saveSelectedBehavior",
+        "addBehavior",
+        "updateLayerColor",
+        "updatePdModeColor",
+        "updateAutomouseFade",
+        "updateComboFeedback",
+        "updateKeyBehaviorFeedback",
+        "addRgbLedGroup",
+        "updateViaMacro",
+        "addCombo"
+    ]);
     const fieldTooltips = {
         layer: "The active firmware layer. This is read from the LAYOUT() block and is not edited here.",
         "layout index": "The physical LAYOUT() slot index for the selected key. It is fixed by the keyboard geometry.",
@@ -3395,6 +3430,9 @@ function getClientScript() {
         const target = event.target.closest("[data-action]");
         if (!target) return;
         const action = target.dataset.action;
+        if (writeActions.has(action) && !validateWriteTarget(target)) {
+            return;
+        }
         if (action === "selectLayer") {
             activeLayer = target.dataset.layer;
             selectedKey = 0;
@@ -3511,6 +3549,7 @@ function getClientScript() {
         const colorControl = event.target?.closest?.("[data-color-control]");
         if (colorControl) {
             syncColorControl(event, colorControl);
+            validateControl(event.target);
             updateDirtyFromEvent(event);
             commitLocalHistory(before);
             return;
@@ -3534,6 +3573,7 @@ function getClientScript() {
         if (event.target?.matches("[data-helper-select]")) {
             updateHelperFields(event.target.id.replace(/Helper$/, ""));
         }
+        validateControl(event.target);
         updateDirtyFromEvent(event);
         commitLocalHistory(before);
     });
@@ -3542,6 +3582,7 @@ function getClientScript() {
         const before = currentLocalSnapshot || serializeLocalState();
         const control = event.target?.closest?.("[data-color-control]");
         if (control) syncColorControl(event, control);
+        validateControl(event.target);
         updateDirtyFromEvent(event);
         commitLocalHistory(before);
     });
@@ -3747,6 +3788,7 @@ function getClientScript() {
     function initializeDirtyTracking() {
         for (const section of document.querySelectorAll("[data-dirty-section]")) {
             section.dataset.dirtyBaseline = dirtySnapshot(section);
+            validateSection(section, false);
             updateDirtySection(section);
         }
     }
@@ -3791,6 +3833,107 @@ function getClientScript() {
             }
         });
         return JSON.stringify(values);
+    }
+
+    function validateWriteTarget(target) {
+        const section = target.closest("[data-dirty-section]") || target.closest(".card") || app;
+        const valid = validateSection(section, true);
+        if (!valid) {
+            notice = "Fix invalid fields before writing.";
+        }
+        return valid;
+    }
+
+    function validateSection(section, focusFirst) {
+        let firstInvalid = undefined;
+        for (const control of section.querySelectorAll("input, select, textarea")) {
+            const valid = validateControl(control);
+            if (!valid && !firstInvalid) {
+                firstInvalid = control;
+            }
+        }
+        if (firstInvalid && focusFirst) {
+            firstInvalid.focus();
+            firstInvalid.reportValidity?.();
+        }
+        return !firstInvalid;
+    }
+
+    function validateControl(control) {
+        if (!control || control.disabled || control.closest("[hidden]")) return true;
+        const rule = control.dataset.validate || "";
+        if (!rule) {
+            clearFieldError(control);
+            return true;
+        }
+        const value = String(control.value || "").trim();
+        let error = "";
+        if (rule === "uint8") {
+            error = validateUint8(value, "Enter an integer from 0 to 255.");
+        } else if (rule === "hsv-value") {
+            error = validateHsvValue(value);
+        } else if (rule === "optional-term") {
+            error = validateOptionalTerm(value, "Enter a positive integer or KEY_BEHAVIOR_TERM(ms).");
+        } else if (rule === "optional-branch-term") {
+            error = validateOptionalTerm(value, "Enter a positive integer, or KEY_BEHAVIOR_TERM(ms).");
+        } else if (rule === "positive-int") {
+            error = validatePositiveInteger(value, "Enter a positive integer.");
+        }
+        setFieldError(control, error);
+        return !error;
+    }
+
+    function validateUint8(value, message) {
+        if (!/^\\d+$/.test(value)) return message;
+        const number = Number(value);
+        return Number.isInteger(number) && number >= 0 && number <= 255 ? "" : message;
+    }
+
+    function validateHsvValue(value) {
+        if (/^\\d+$/.test(value)) {
+            return validateUint8(value, "Enter an integer from 0 to 255, or a safe constant like RGB_MATRIX_MAXIMUM_BRIGHTNESS.");
+        }
+        if (/^[A-Z_][A-Z0-9_]*(?:\\s*[-+*/]\\s*(?:\\d+|[A-Z_][A-Z0-9_]*))*$/.test(value)) {
+            return "";
+        }
+        return "Enter an integer from 0 to 255, or a safe constant like RGB_MATRIX_MAXIMUM_BRIGHTNESS.";
+    }
+
+    function validateOptionalTerm(value, message) {
+        if (!value) return "";
+        if (/^\\d+$/.test(value)) return validatePositiveInteger(value, message);
+        const wrapped = value.match(/^KEY_BEHAVIOR_TERM\\((\\d+)\\)$/);
+        if (wrapped) return validatePositiveInteger(wrapped[1], message);
+        return message;
+    }
+
+    function validatePositiveInteger(value, message) {
+        if (!/^\\d+$/.test(value)) return message;
+        return Number(value) > 0 ? "" : message;
+    }
+
+    function setFieldError(control, message) {
+        const label = control.closest("label");
+        control.classList.toggle("invalid", Boolean(message));
+        control.toggleAttribute("aria-invalid", Boolean(message));
+        control.setCustomValidity?.(message || "");
+        if (!label) return;
+        label.classList.toggle("invalid", Boolean(message));
+        let error = label.querySelector(".field-error");
+        if (message) {
+            if (!error) {
+                error = document.createElement("span");
+                error.className = "field-error";
+                label.appendChild(error);
+            }
+            error.textContent = message;
+        } else if (error) {
+            error.remove();
+        }
+    }
+
+    function clearFieldError(control) {
+        setFieldError(control, "");
     }
 
     function hydrateTooltips() {
@@ -4071,7 +4214,8 @@ function getClientScript() {
         const fallback = behaviorTimingDefault(field, keycode);
         const placeholder = "default: " + fallback.label;
         const tooltip = timingTooltip(field, fallback);
-        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>" + field + "</span><input id='" + id + "' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder) + "' data-tooltip='" + escapeAttr(tooltip) + "'></label>";
+        const validation = field === "branch_confirm_term" ? "optional-branch-term" : "optional-term";
+        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>" + field + "</span><input id='" + id + "' data-validate='" + validation + "' inputmode='numeric' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder) + "' data-tooltip='" + escapeAttr(tooltip) + "'></label>";
     }
 
     function behaviorTimingDefault(field, keycode) {
@@ -4127,7 +4271,7 @@ function getClientScript() {
         return "<div class='stack behavior-action-editor'>" +
             "<label><span>" + label + " helper</span><select id='" + id + "Helper' data-helper-select>" + helperOptions(helpers, action?.helper || "") + "</select></label>" +
             renderKeyPickerInput(id + "Action", label + " action", editableActionValue(action), "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(id) + "'" + actionHidden) +
-            (hasRepeat ? "<label data-helper-field data-helper-prefix='" + id + "' data-helper-value='REPEAT_WHILE_HELD'" + repeatHidden + "><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
+            (hasRepeat ? "<label data-helper-field data-helper-prefix='" + id + "' data-helper-value='REPEAT_WHILE_HELD'" + repeatHidden + "><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' data-validate='positive-int' inputmode='numeric' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
             "</div>";
     }
 
@@ -4566,12 +4710,20 @@ function getClientScript() {
             const visible = Boolean(helper);
             field.hidden = !visible;
             field.style.display = visible ? "" : "none";
+            for (const control of field.querySelectorAll("input, select, textarea")) {
+                if (visible) validateControl(control);
+                else clearFieldError(control);
+            }
         }
         for (const field of document.querySelectorAll("[data-helper-prefix='" + prefix + "']")) {
             const values = String(field.dataset.helperValue || "").split(" ");
             const visible = values.includes(helper);
             field.hidden = !visible;
             field.style.display = visible ? "" : "none";
+            for (const control of field.querySelectorAll("input, select, textarea")) {
+                if (visible) validateControl(control);
+                else clearFieldError(control);
+            }
         }
     }
 
@@ -4932,7 +5084,7 @@ function getClientScript() {
             helperOptions(helpers, "") +
             "</select></label>" +
             renderKeyPickerInput(prefix + "Action", label + " action", "", "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(prefix) + "' hidden") +
-            (hasRepeat ? "<label data-helper-field data-helper-prefix='" + prefix + "' data-helper-value='REPEAT_WHILE_HELD' hidden><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
+            (hasRepeat ? "<label data-helper-field data-helper-prefix='" + prefix + "' data-helper-value='REPEAT_WHILE_HELD' hidden><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' data-validate='positive-int' inputmode='numeric' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
     }
 
     function renderStep(step) {
@@ -5571,9 +5723,9 @@ function getClientScript() {
     }
 
     function hsvInputs(color) {
-        return "<label><span>h</span><input name='h' data-hsv-channel='h' value='" + escapeAttr(color?.h || "") + "'></label>" +
-            "<label><span>s</span><input name='s' data-hsv-channel='s' value='" + escapeAttr(color?.s || "") + "'></label>" +
-            "<label><span>v</span><input name='v' data-hsv-channel='v' value='" + escapeAttr(color?.v || "") + "'></label>";
+        return "<label><span>h</span><input name='h' data-hsv-channel='h' data-validate='uint8' inputmode='numeric' value='" + escapeAttr(color?.h || "") + "'></label>" +
+            "<label><span>s</span><input name='s' data-hsv-channel='s' data-validate='uint8' inputmode='numeric' value='" + escapeAttr(color?.s || "") + "'></label>" +
+            "<label><span>v</span><input name='v' data-hsv-channel='v' data-validate='hsv-value' value='" + escapeAttr(color?.v || "") + "'></label>";
     }
 
     function renderInlineSwatch(color, extraAttrs = "") {

@@ -60,6 +60,10 @@ layer target first and then selecting the tap key. Read-only controls are styled
 separately from editable controls.
 Behavior timing override fields show the resolved default milliseconds in their
 placeholder text when the authored row leaves the override empty.
+Numeric-only fields such as HSV hue/saturation channels, timing overrides, and
+repeat-Hz values are validated inline before the studio sends a write request;
+the extension validates the request again before patching the backing `.c`
+file.
 
 All major panels are collapsible. The RGB page keeps a panel for every authored
 section in `rgb_config.c`, even when a table currently has no active rows.
