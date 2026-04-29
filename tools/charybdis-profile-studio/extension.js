@@ -4056,22 +4056,47 @@ function getClientScript() {
 
     function rgbBuilderDefinedPreviewForLed(ledIndex) {
         const rows = rgbBuilderDefinedRows();
-        let row = undefined;
-        for (let index = rows.length - 1; index >= 0; index -= 1) {
-            const candidate = rows[index];
-            if ((candidate.ledIndices || []).some((led) => Number(led) === ledIndex)) {
-                row = candidate;
-                break;
+        const matchingRows = rows.filter((row) => rgbLedRowContainsLed(row, ledIndex));
+        if (!matchingRows.length) return undefined;
+        if (rgbGroupTarget === "keyBehavior") {
+            const gradientRows = rgbBuilderDefinedFeedbackGradientRows(ledIndex);
+            if (gradientRows.length > 1) {
+                return {
+                    fill: "url(#rgb-feedback-defined-gradient-" + ledIndex + ")",
+                    text: "#ffffff",
+                    allFeedback: true
+                };
             }
         }
-        if (!row) return undefined;
-        const allFeedback = rgbGroupTarget === "keyBehavior" && row.owner === keyBehaviorAllGroups;
-        const fill = allFeedback ? "url(#rgb-feedback-all-gradient)" : hsvToHex(row.color) || rgbBuilderHex();
+        const row = matchingRows[matchingRows.length - 1];
+        const fill = hsvToHex(row.color) || rgbBuilderHex();
         return {
             fill,
-            text: allFeedback ? "#ffffff" : idealText(fill),
-            allFeedback
+            text: idealText(fill),
+            allFeedback: false
         };
+    }
+
+    function rgbLedRowContainsLed(row, ledIndex) {
+        return (row.ledIndices || []).some((led) => Number(led) === ledIndex);
+    }
+
+    function rgbBuilderDefinedFeedbackGradientRows(ledIndex) {
+        if (rgbGroupTarget !== "keyBehavior") return [];
+        const matchingRows = rgbBuilderDefinedRows().filter((row) => rgbLedRowContainsLed(row, ledIndex));
+        if (!matchingRows.length) return [];
+        const hasAll = matchingRows.some((row) => row.owner === keyBehaviorAllGroups);
+        const specificRows = matchingRows.filter((row) => row.owner !== keyBehaviorAllGroups);
+        if (!hasAll && specificRows.length < 2) return [];
+        const rows = hasAll
+            ? keyBehaviorRgbSemanticColorRows()
+            : keyBehaviorRgbSemanticColorRows().filter((row) => specificRows.some((specific) => specific.owner === row.semantic));
+        for (const specific of specificRows) {
+            for (const target of rows.filter((row) => row.semantic === specific.owner)) {
+                target.color = specific.color;
+            }
+        }
+        return rows;
     }
 
     function renderRgbBuilderColorControl() {
@@ -4115,13 +4140,49 @@ function getClientScript() {
     }
 
     function keyBehaviorRgbSemanticColorRows() {
-        return keyBehaviorRgbSemantics
-            .filter((semantic) => semantic !== keyBehaviorAllGroups)
-            .map((semantic) => ({
-                semantic,
-                label: keyBehaviorRgbSemanticLabel(semantic),
-                color: keyBehaviorSemanticColor(semantic) || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" }
-            }));
+        const feedback = model.rgb?.keyBehaviorFeedback || {};
+        const fallback = { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
+        const rows = [
+            {
+                semantic: "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH",
+                label: keyBehaviorRgbSemanticLabel("KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH"),
+                color: feedback.tapPendingColor || fallback
+            }
+        ];
+        const branchColors = feedback.tapBranchColors || [];
+        if (branchColors.length) {
+            for (let index = 0; index < branchColors.length; index += 1) {
+                rows.push({
+                    semantic: "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED",
+                    label: "Tap branch " + index + " committed",
+                    color: branchColors[index] || fallback
+                });
+            }
+        } else {
+            rows.push({
+                semantic: "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED",
+                label: keyBehaviorRgbSemanticLabel("KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED"),
+                color: fallback
+            });
+        }
+        rows.push(
+            {
+                semantic: "KEY_FEEDBACK_GROUP_TAP_COMMITTED",
+                label: keyBehaviorRgbSemanticLabel("KEY_FEEDBACK_GROUP_TAP_COMMITTED"),
+                color: feedback.tapCommittedColor || fallback
+            },
+            {
+                semantic: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE",
+                label: keyBehaviorRgbSemanticLabel("KEY_FEEDBACK_GROUP_HOLD_ACTIVE"),
+                color: feedback.holdActiveColor || fallback
+            },
+            {
+                semantic: "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE",
+                label: keyBehaviorRgbSemanticLabel("KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"),
+                color: feedback.longHoldActiveColor || fallback
+            }
+        );
+        return rows;
     }
 
     function keyBehaviorSemanticColor(semantic) {
@@ -4152,8 +4213,21 @@ function getClientScript() {
     }
 
     function renderRgbAllFeedbackGradientDefs() {
-        if (!rgbBuilderUsesAllFeedbackPreview() && !rgbBuilderDefinedRows().some((row) => row.owner === keyBehaviorAllGroups)) return "";
-        const rows = keyBehaviorRgbSemanticColorRows();
+        const defs = [];
+        if (rgbBuilderUsesAllFeedbackPreview()) {
+            defs.push(renderRgbGradientDef("rgb-feedback-all-gradient", keyBehaviorRgbSemanticColorRows()));
+        }
+        for (const ledIndex of rgbBuilderDefinedLedIndices()) {
+            const rows = rgbBuilderDefinedFeedbackGradientRows(ledIndex);
+            if (rows.length > 1) {
+                defs.push(renderRgbGradientDef("rgb-feedback-defined-gradient-" + ledIndex, rows));
+            }
+        }
+        if (!defs.length) return "";
+        return "<defs>" + defs.join("") + "</defs>";
+    }
+
+    function renderRgbGradientDef(id, rows) {
         if (!rows.length) return "";
         const step = 100 / rows.length;
         const stops = rows.map((row, index) => {
@@ -4163,7 +4237,7 @@ function getClientScript() {
             return "<stop offset='" + start + "' stop-color='" + color + "'></stop>" +
                 "<stop offset='" + end + "' stop-color='" + color + "'></stop>";
         }).join("");
-        return "<defs><linearGradient id='rgb-feedback-all-gradient' x1='0%' y1='0%' x2='100%' y2='0%'>" + stops + "</linearGradient></defs>";
+        return "<linearGradient id='" + escapeAttr(id) + "' x1='0%' y1='0%' x2='100%' y2='0%'>" + stops + "</linearGradient>";
     }
 
     function formatPercent(value) {

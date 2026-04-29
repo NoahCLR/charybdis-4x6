@@ -323,7 +323,11 @@ Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAP
 | `Hold Active` | Used for authored hold-tier pending / active states and commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff6c00.svg" width="96" height="28" /> |
 | `Long Hold Active` | Used for authored long-hold-tier active states and commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-0084ff.svg" width="96" height="28" /> |
 
-No active authored key-feedback LED group rows are configured.
+Authored key-feedback LED groups repaint after the feedback locality render inside this stage.
+
+| Semantic Group | LEDs | Count | Authored HSV | Preview Color |
+| --- | --- | --- | --- | --- |
+| `KEY_FEEDBACK_GROUP_ALL` | `26,27,28,25,24,55,53,54` | `8` | `HSV(0, 0, 0)` | <img alt="All group color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
 
 ## Macro Inventory
 
@@ -399,7 +403,7 @@ No active authored layer LED group rows are configured.
 | `layer_led_group_count` | `0` |
 | `pd_mode_led_group_count` | `0` |
 | `combo_feedback_led_group_count` | `0` |
-| `key_behavior_feedback_led_group_count` | `0` |
+| `key_behavior_feedback_led_group_count` | `1` |
 | `combo_feedback_configured` | `1` |
 
 ## Config Defines

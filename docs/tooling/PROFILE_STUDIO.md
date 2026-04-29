@@ -25,8 +25,9 @@ back to the same blocks.
   selected table while keeping the pending new-row selection separate
 - a key-behavior LED group all-feedback mode that writes
   `KEY_FEEDBACK_GROUP_ALL` and lets firmware resolve the active semantic's
-  configured feedback color at render time; selected LEDs preview this mode as
-  equal vertical bands for each feedback semantic
+  configured feedback color at render time; specific feedback group rows
+  override that all-feedback base, and selected LEDs preview this mode as equal
+  vertical bands including every configured tap-branch color
 - auto-mouse fade destination color and fade mode
 - combo feedback color/locality
 - key-behavior feedback colors, tap-branch colors, tap commit mode, and

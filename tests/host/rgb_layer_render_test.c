@@ -177,7 +177,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 #endif
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(99, 99, 99), .led_group = RGB_LED_GROUP(6)}, );
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(99, 99, 99), .led_group = RGB_LED_GROUP(5, 6)}, );
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #endif
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
@@ -1032,6 +1032,7 @@ static void test_key_feedback_all_led_group_uses_hold_color(void) {
 
     CHECK(render_output());
 
+    check_led(5, rgb_from_feedback_semantic(KEY_FEEDBACK_SEMANTIC_HOLD_PENDING, 0u));
     check_led(6, rgb_from_feedback_semantic(KEY_FEEDBACK_SEMANTIC_HOLD_PENDING, 0u));
 }
 
