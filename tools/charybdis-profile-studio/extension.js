@@ -113,6 +113,14 @@ const USER_KEY_ALIASES = {
     right: "KC_RIGHT",
     up: "KC_UP",
     down: "KC_DOWN",
+    home: "KC_HOME",
+    end: "KC_END",
+    pageup: "KC_PGUP",
+    "page up": "KC_PGUP",
+    pgup: "KC_PGUP",
+    pagedown: "KC_PGDN",
+    "page down": "KC_PGDN",
+    pgdn: "KC_PGDN",
     "left shift": "KC_LEFT_SHIFT",
     lshift: "KC_LEFT_SHIFT",
     shift: "KC_LEFT_SHIFT",
@@ -200,6 +208,10 @@ const QMK_KEY_LABELS = {
     KC_RIGHT: "Right",
     KC_UP: "Up",
     KC_DOWN: "Down",
+    KC_HOME: "Home",
+    KC_END: "End",
+    KC_PGUP: "Page Up",
+    KC_PGDN: "Page Down",
     KC_LEFT_SHIFT: "Left Shift",
     KC_RIGHT_SHIFT: "Right Shift",
     KC_LEFT_CTRL: "Left Ctrl",
@@ -1782,7 +1794,11 @@ function normalizeFriendlyChord(value) {
 
     const wrapper = wrapperForModifiers(modifiers);
     if (!wrapper) {
-        return "";
+        const wrappers = wrappersForModifierLabels(modifiers);
+        if (wrappers.length !== modifiers.length) {
+            return "";
+        }
+        return wrappers.reduceRight((expression, candidate) => `${candidate}(${expression})`, key);
     }
     return `${wrapper}(${key})`;
 }
@@ -1831,6 +1847,22 @@ function wrapperForModifiers(modifiers) {
     return "";
 }
 
+function wrappersForModifierLabels(modifiers) {
+    return modifiers.map((modifier) => {
+        switch (normalizeFriendlyModifier(modifier)) {
+            case "Ctrl": return "C";
+            case "Shift": return "S";
+            case "Alt": return "A";
+            case "Cmd": return "G";
+            case "Right Ctrl": return "RCTL";
+            case "Right Shift": return "RSFT";
+            case "Right Alt": return "RALT";
+            case "Right Cmd": return "RGUI";
+            default: return "";
+        }
+    }).filter(Boolean);
+}
+
 function displayKeycode(keycode) {
     const normalized = normalizeExpr(keycode);
     return displayKeyExpression(normalized);
@@ -1856,6 +1888,11 @@ function displayKeyExpression(expression) {
     match = normalized.match(/^MO\(LAYER_([^)]+)\)$/);
     if (match) {
         return `Hold ${titleCase(match[1])}`;
+    }
+
+    match = normalized.match(/^LOCK_LAYER\(LAYER_([^)]+)\)$/);
+    if (match) {
+        return `Lock ${titleCase(match[1])}`;
     }
 
     match = normalized.match(/^([A-Z][A-Z0-9_]*)\((.+)\)$/);
@@ -2302,6 +2339,99 @@ function getStudioHtml() {
             pointer-events: none;
             white-space: normal;
         }
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            background: rgba(7, 10, 12, 0.58);
+        }
+        .key-picker {
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            gap: 12px;
+            width: min(920px, calc(100vw - 48px));
+            max-height: calc(100vh - 48px);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel);
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44);
+            padding: 14px;
+        }
+        .key-picker-head,
+        .key-picker-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .key-picker-body {
+            display: grid;
+            grid-template-columns: 170px minmax(0, 1fr);
+            gap: 12px;
+            min-height: 0;
+        }
+        .key-picker-tabs,
+        .key-picker-section {
+            min-height: 0;
+            overflow: auto;
+        }
+        .key-picker-tabs {
+            display: grid;
+            align-content: start;
+            gap: 6px;
+        }
+        .key-picker-tab {
+            text-align: left;
+        }
+        .key-picker-tab.active {
+            border-color: var(--accent);
+            background: #1f5d52;
+        }
+        .key-picker-grid {
+            display: grid;
+            gap: 6px;
+        }
+        .key-picker-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .key-picker-key {
+            min-width: 46px;
+            min-height: 38px;
+            padding: 6px 8px;
+        }
+        .key-picker-key.selected,
+        .key-picker-mod.selected {
+            border-color: var(--accent);
+            background: #1f5d52;
+        }
+        .key-picker-mods,
+        .key-picker-selection {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+        .key-picker-expression {
+            display: block;
+            min-height: 32px;
+            padding: 7px 9px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: #20262a;
+        }
+        .input-with-button {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+        }
+        .input-with-button button {
+            white-space: nowrap;
+        }
         .toolbar {
             display: flex;
             gap: 8px;
@@ -2327,6 +2457,7 @@ function getStudioHtml() {
     </header>
     <main id="app"></main>
     <div id="tooltip" class="tooltip" hidden></div>
+    <div id="keyPickerHost"></div>
     <script nonce="${nonce}">
 ${getClientScript()}
     </script>
@@ -2346,6 +2477,7 @@ function getClientScript() {
     let rgbGroupOwner = "";
     let rgbSelectedLeds = [];
     let rgbBuilderColor = undefined;
+    let keyPicker = undefined;
     let notice = "";
     const views = [
         ["layout", "Layout"],
@@ -2396,7 +2528,8 @@ function getClientScript() {
         updateViaMacro: "Write this VIA macro payload string back to keymap.c.",
         addCombo: "Append a combo row with the entered output and input keys.",
         selectKey: "Select this physical key so its keycode and behavior can be edited.",
-        toggleRgbLed: "Add or remove this physical LED from the new RGB group."
+        toggleRgbLed: "Add or remove this physical LED from the new RGB group.",
+        openKeyPicker: "Open a VIA-style keycode picker with sections, QWERTY keys, modifiers, and OK/Cancel confirmation."
     };
     const fieldTooltips = {
         layer: "The active firmware layer. This is read from the LAYOUT() block and is not edited here.",
@@ -2445,6 +2578,69 @@ function getClientScript() {
         "KEY_FEEDBACK_GROUP_HOLD_ACTIVE",
         "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"
     ];
+    const keyPickerModifiers = ["Ctrl", "Shift", "Alt", "Cmd", "Right Ctrl", "Right Shift", "Right Alt", "Right Cmd"];
+    const keyPickerSections = [
+        {
+            id: "qwerty",
+            label: "QWERTY",
+            rows: [
+                ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+                ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+                ["Z", "X", "C", "V", "B", "N", "M"],
+                ["Esc", "Tab", "Enter", "Space", "Backspace", "Delete"]
+            ]
+        },
+        {
+            id: "numbers",
+            label: "Numbers",
+            rows: [
+                ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+                ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"],
+                ["-", "_", "=", "+", "[", "]", "{", "}", "\\\\", "|"],
+                [";", ":", "'", "\\\"", ",", ".", "/", "<", ">", "\`", "~"]
+            ]
+        },
+        {
+            id: "navigation",
+            label: "Navigation",
+            rows: [
+                ["Left", "Down", "Up", "Right"],
+                ["Home", "End", "Page Up", "Page Down"],
+                ["Caps Lock", "Play", "Previous", "Next", "Mute"]
+            ]
+        },
+        {
+            id: "mouse",
+            label: "Mouse",
+            rows: [
+                ["Mouse 1", "Mouse 2", "Mouse 3"],
+                ["MS_BTN1", "MS_BTN2", "MS_BTN3"]
+            ]
+        },
+        {
+            id: "layers",
+            label: "Layers",
+            rows: []
+        },
+        {
+            id: "modes",
+            label: "PD modes",
+            rows: []
+        },
+        {
+            id: "macros",
+            label: "Macros",
+            rows: []
+        },
+        {
+            id: "custom",
+            label: "Custom",
+            rows: [
+                ["_______", "XXXXXXX"],
+                ["LEFT_THUMB", "RIGHT_THUMB", "CLICK_SPAM"]
+            ]
+        }
+    ];
     const layoutToLedIndex = {
         0: 0, 1: 7, 2: 8, 3: 15, 4: 16, 5: 20,
         12: 1, 13: 6, 14: 9, 15: 14, 16: 17, 17: 21,
@@ -2483,6 +2679,7 @@ function getClientScript() {
     const app = document.getElementById("app");
     const subtitle = document.getElementById("subtitle");
     const tooltip = document.getElementById("tooltip");
+    const keyPickerHost = document.getElementById("keyPickerHost");
     let activeTooltipTarget = undefined;
 
     document.getElementById("refresh").addEventListener("click", () => post({ type: "refresh" }));
@@ -2505,6 +2702,29 @@ function getClientScript() {
         if (target) showTooltip(target);
     });
     document.addEventListener("focusout", hideTooltip);
+    keyPickerHost.addEventListener("click", (event) => {
+        const target = event.target.closest("[data-picker-action]");
+        if (!target) return;
+        const action = target.dataset.pickerAction;
+        if (action === "section") {
+            keyPicker.section = target.dataset.section;
+            renderKeyPicker();
+        } else if (action === "modifier") {
+            togglePickerModifier(target.dataset.modifier);
+        } else if (action === "key") {
+            choosePickerKey(target.dataset.value);
+        } else if (action === "removeKey") {
+            removePickerKey(Number(target.dataset.index));
+        } else if (action === "clear") {
+            keyPicker.mods = [];
+            keyPicker.keys = [];
+            renderKeyPicker();
+        } else if (action === "cancel") {
+            closeKeyPicker();
+        } else if (action === "ok") {
+            confirmKeyPicker();
+        }
+    });
 
     window.addEventListener("message", (event) => {
         if (event.data.type === "model") {
@@ -2545,6 +2765,8 @@ function getClientScript() {
         } else if (action === "clearRgbSelection") {
             rgbSelectedLeds = [];
             render();
+        } else if (action === "openKeyPicker") {
+            openKeyPicker(target.dataset.target, target.dataset.mode || "single");
         } else if (action === "applyKey") {
             const input = document.getElementById("keycodeInput");
             post({ type: "updateLayoutKey", layer: activeLayer, layoutIndex: selectedKey, keycode: input.value });
@@ -2788,7 +3010,36 @@ function getClientScript() {
         if (action === "toggleRgbLed") {
             return "Add or remove LED " + (button.dataset.led || "") + " from the pending RGB group.";
         }
+        if (button.dataset.pickerAction) {
+            return tooltipForPickerButton(button);
+        }
         return actionTooltips[action] || button.textContent.trim();
+    }
+
+    function tooltipForPickerButton(button) {
+        const action = button.dataset.pickerAction;
+        if (action === "section") {
+            return "Show the " + button.textContent.trim() + " keycode section in the picker.";
+        }
+        if (action === "modifier") {
+            return "Toggle the " + (button.dataset.modifier || button.textContent.trim()) + " modifier for the selected key.";
+        }
+        if (action === "key") {
+            return "Select " + displayKeyExpression(button.dataset.value || button.textContent.trim()) + " as the pending keycode.";
+        }
+        if (action === "removeKey") {
+            return "Remove this key from the pending picker value.";
+        }
+        if (action === "clear") {
+            return "Clear the pending modifiers and selected keys.";
+        }
+        if (action === "ok") {
+            return "Write the pending picker value into the field.";
+        }
+        if (action === "cancel") {
+            return "Close the picker without changing the field.";
+        }
+        return button.textContent.trim();
     }
 
     function tooltipForSummary(summary) {
@@ -2940,7 +3191,7 @@ function getClientScript() {
             "<div class='form-grid'>" +
             "<label><span>Layer</span><input disabled value='" + escapeAttr(layer.name) + "'></label>" +
             "<label><span>Layout index</span><input disabled value='" + selected.layoutIndex + "'></label>" +
-            "<label style='grid-column: 1 / -1'><span>Key</span><input id='keycodeInput' value='" + escapeAttr(selected.editLabel || selected.display || selected.keycode) + "' placeholder='A, Enter, Space, _______'></label>" +
+            renderKeyPickerInput("keycodeInput", "Key", selected.editLabel || selected.display || selected.keycode, "A, Enter, Space, _______", "single", "grid-column: 1 / -1") +
             "<div style='grid-column: 1 / -1'><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(selected.keycode) + "</code></div>" +
             "<button data-action='applyKey' class='primary'>Apply key</button>" +
             "</div>" +
@@ -3034,9 +3285,184 @@ function getClientScript() {
         const repeatHidden = action?.helper === "REPEAT_WHILE_HELD" ? "" : " hidden";
         return "<div class='stack'>" +
             "<label><span>" + label + " helper</span><select id='" + id + "Helper' data-helper-select>" + options(helpers, action?.helper || "") + "</select></label>" +
-            "<label><span>" + label + " action</span><input id='" + id + "Action' value='" + escapeAttr(editableActionValue(action)) + "' placeholder='Esc, Shift+\`, Cmd+Q'></label>" +
+            renderKeyPickerInput(id + "Action", label + " action", editableActionValue(action), "Esc, Shift+\`, Cmd+Q", "single") +
             (hasRepeat ? "<label data-helper-field data-helper-prefix='" + id + "' data-helper-value='REPEAT_WHILE_HELD'" + repeatHidden + "><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
             "</div>";
+    }
+
+    function renderKeyPickerInput(id, label, value, placeholder, mode = "single", style = "") {
+        const styleAttr = style ? " style='" + escapeAttr(style) + "'" : "";
+        return "<label" + styleAttr + "><span>" + escapeHtml(label) + "</span><span class='input-with-button'>" +
+            "<input id='" + escapeAttr(id) + "' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder || "") + "'>" +
+            "<button type='button' data-action='openKeyPicker' data-target='" + escapeAttr(id) + "' data-mode='" + escapeAttr(mode) + "'>Pick...</button>" +
+            "</span></label>";
+    }
+
+    function openKeyPicker(targetId, mode) {
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        keyPicker = {
+            targetId,
+            mode: mode === "list" ? "list" : "single",
+            section: "qwerty",
+            mods: [],
+            keys: []
+        };
+        seedKeyPickerFromValue(input.value || "");
+        renderKeyPicker();
+    }
+
+    function seedKeyPickerFromValue(value) {
+        const text = String(value || "").trim();
+        if (!text || !keyPicker) return;
+        if (keyPicker.mode === "list") {
+            keyPicker.keys = text.split(",").map((part) => part.trim()).filter(Boolean);
+            return;
+        }
+        const parts = text.split("+").map((part) => part.trim()).filter(Boolean);
+        if (parts.length > 1) {
+            const mods = parts.slice(0, -1).filter((part) => keyPickerModifiers.includes(part));
+            if (mods.length === parts.length - 1) {
+                keyPicker.mods = mods;
+                keyPicker.keys = [parts[parts.length - 1]];
+                return;
+            }
+        }
+        keyPicker.keys = [text];
+    }
+
+    function closeKeyPicker() {
+        keyPicker = undefined;
+        keyPickerHost.innerHTML = "";
+    }
+
+    function renderKeyPicker() {
+        if (!keyPicker) {
+            keyPickerHost.innerHTML = "";
+            return;
+        }
+        keyPickerHost.innerHTML = "<div class='modal-backdrop'>" +
+            "<div class='key-picker' role='dialog' aria-label='Keycode picker'>" +
+            "<div class='key-picker-head'>" +
+            "<div><h2>Pick Keycode</h2><div class='muted'>" + escapeHtml(keyPicker.mode === "list" ? "Select one or more keys for a comma-separated combo input list." : "Select one key, optionally with modifiers.") + "</div></div>" +
+            "<button data-picker-action='cancel'>Close</button>" +
+            "</div>" +
+            (keyPicker.mode === "list" ? "" : (
+                "<div class='key-picker-mods'>" +
+                "<span class='muted'>Mods</span>" +
+                keyPickerModifiers.map((modifier) => "<button class='key-picker-mod " + (keyPicker.mods.includes(modifier) ? "selected" : "") + "' data-picker-action='modifier' data-modifier='" + escapeAttr(modifier) + "'>" + escapeHtml(modifier) + "</button>").join("") +
+                "</div>"
+            )) +
+            "<div class='key-picker-body'>" +
+            "<div class='key-picker-tabs'>" + keyPickerResolvedSections().map((section) =>
+                "<button class='key-picker-tab " + (section.id === keyPicker.section ? "active" : "") + "' data-picker-action='section' data-section='" + escapeAttr(section.id) + "'>" + escapeHtml(section.label) + "</button>"
+            ).join("") + "</div>" +
+            "<div class='key-picker-section'>" + renderKeyPickerSection() + "</div>" +
+            "</div>" +
+            "<div class='stack'>" +
+            "<div class='key-picker-selection'>" +
+            "<span class='muted'>Selected</span>" +
+            keyPicker.keys.map((key, index) => "<button data-picker-action='removeKey' data-index='" + index + "'>" + escapeHtml(displayKeyExpression(key)) + "</button>").join("") +
+            (keyPicker.keys.length ? "" : "<span class='muted'>No key selected</span>") +
+            "</div>" +
+            "<code class='key-picker-expression'>" + escapeHtml(keyPickerExpression() || "Select a key") + "</code>" +
+            "</div>" +
+            "<div class='key-picker-actions'>" +
+            "<button data-picker-action='clear'>Clear</button>" +
+            "<span class='toolbar'><button data-picker-action='cancel'>Cancel</button><button data-picker-action='ok' class='primary'>OK</button></span>" +
+            "</div>" +
+            "</div></div>";
+        hydrateTooltips();
+    }
+
+    function keyPickerResolvedSections() {
+        return keyPickerSections.map((section) => {
+            if (section.id === "layers") {
+                return {
+                    ...section,
+                    rows: model.layers.map((layer) => [
+                        "MO(" + layer.name + ")",
+                        "LOCK_LAYER(" + layer.name + ")",
+                        "LT(" + layer.name + ", KC_SPC)"
+                    ])
+                };
+            }
+            if (section.id === "modes") {
+                const modes = (model.rgb?.pdModeColors || []).map((row) => row.pointingMode.replace(/^PD_MODE_/, ""));
+                return {
+                    ...section,
+                    rows: modes.map((mode) => [mode + "_MODE", mode + "_MODE_LOCK"])
+                };
+            }
+            if (section.id === "macros") {
+                return {
+                    ...section,
+                    rows: [
+                        (model.viaMacros || []).map((slot) => slot.keycode),
+                        (model.hardcodedMacros || []).map((slot) => slot.keycode)
+                    ]
+                };
+            }
+            return section;
+        });
+    }
+
+    function renderKeyPickerSection() {
+        const section = keyPickerResolvedSections().find((candidate) => candidate.id === keyPicker.section) || keyPickerResolvedSections()[0];
+        return "<div class='key-picker-grid'>" + (section.rows || []).map((row) =>
+            "<div class='key-picker-row'>" + row.map((value) => renderKeyPickerKey(value)).join("") + "</div>"
+        ).join("") + "</div>";
+    }
+
+    function renderKeyPickerKey(value) {
+        const selected = keyPicker.keys.includes(value);
+        return "<button class='key-picker-key " + (selected ? "selected" : "") + "' data-picker-action='key' data-value='" + escapeAttr(value) + "'>" + escapeHtml(displayKeyExpression(value)) + "</button>";
+    }
+
+    function togglePickerModifier(modifier) {
+        if (!keyPicker || !modifier) return;
+        keyPicker.mods = keyPicker.mods.includes(modifier)
+            ? keyPicker.mods.filter((candidate) => candidate !== modifier)
+            : keyPicker.mods.concat([modifier]);
+        renderKeyPicker();
+    }
+
+    function choosePickerKey(value) {
+        if (!keyPicker || !value) return;
+        if (keyPicker.mode === "list") {
+            keyPicker.keys = keyPicker.keys.includes(value)
+                ? keyPicker.keys.filter((candidate) => candidate !== value)
+                : keyPicker.keys.concat([value]);
+        } else {
+            keyPicker.keys = [value];
+        }
+        renderKeyPicker();
+    }
+
+    function removePickerKey(index) {
+        if (!keyPicker || !Number.isInteger(index)) return;
+        keyPicker.keys = keyPicker.keys.filter((_, candidateIndex) => candidateIndex !== index);
+        renderKeyPicker();
+    }
+
+    function keyPickerExpression() {
+        if (!keyPicker) return "";
+        if (keyPicker.mode === "list") {
+            return keyPicker.keys.join(", ");
+        }
+        const key = keyPicker.keys[0] || "";
+        if (!key) return "";
+        return keyPicker.mods.concat([key]).join("+");
+    }
+
+    function confirmKeyPicker() {
+        if (!keyPicker) return;
+        const input = document.getElementById(keyPicker.targetId);
+        if (input) {
+            input.value = keyPickerExpression();
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        closeKeyPicker();
     }
 
     function updateHelperFields(prefix) {
@@ -3141,11 +3567,25 @@ function getClientScript() {
         return (model.rgb?.layerColors || []).find((row) => row.layer === layerName);
     }
 
+    function layerColorIsPassthrough(color) {
+        return numericChannel(color?.s) === 0 && numericChannel(color?.v) === 0;
+    }
+
+    function layerPreviewColor(layerColor) {
+        if (!layerColor?.color) return undefined;
+        if (!layerColorIsPassthrough(layerColor.color)) return layerColor.color;
+        if (layerColor.layer === "LAYER_BASE") return model.rgb?.defaultColor || layerColor.color;
+        return undefined;
+    }
+
     function layerColorSubtitle(layerColor) {
         if (!layerColor) return "No layer RGB config parsed";
         const color = layerColor.color || {};
-        const fallback = activeLayer === "LAYER_BASE" && numericChannel(color.v) === 0 && model.rgb?.defaultColor;
-        const suffix = fallback ? " • preview uses default RGB " + fallback.expression : "";
+        const passthrough = layerColorIsPassthrough(color);
+        const fallback = layerColor.layer === "LAYER_BASE" && passthrough && model.rgb?.defaultColor;
+        const suffix = passthrough
+            ? (fallback ? " • pass-through, showing default RGB " + fallback.expression : " • pass-through to lower/default RGB")
+            : "";
         return "RGB matrix " + layerColor.mode + " • authored HSV(" + [color.h, color.s, color.v].join(", ") + ")" + suffix;
     }
 
@@ -3170,7 +3610,8 @@ function getClientScript() {
         const mode = layerColor.mode;
         const isReal = position.keycode !== "_______" && position.keycode !== "XXXXXXX";
         if (mode === "KEYS_MAPPED_ON_THIS_LAYER_ONLY" && !isReal) return "";
-        const previewColor = activeLayer === "LAYER_BASE" && numericChannel(layerColor.color.v) === 0 ? model.rgb?.defaultColor : layerColor.color;
+        const previewColor = layerPreviewColor(layerColor);
+        if (!previewColor) return "";
         const css = hsvToHex(previewColor);
         if (!css) return "";
         return css;
@@ -3390,7 +3831,7 @@ function getClientScript() {
         return "<label><span>" + label + " helper</span><select id='" + prefix + "Helper' data-helper-select>" +
             helpers.map((helper) => "<option value='" + escapeAttr(helper) + "'>" + escapeHtml(helper || "none") + "</option>").join("") +
             "</select></label>" +
-            "<label><span>" + label + " action</span><input id='" + prefix + "Action' placeholder='Esc, Shift+\`, Cmd+Q'></label>" +
+            renderKeyPickerInput(prefix + "Action", label + " action", "", "Esc, Shift+\`, Cmd+Q", "single") +
             (hasRepeat ? "<label data-helper-field data-helper-prefix='" + prefix + "' data-helper-value='REPEAT_WHILE_HELD' hidden><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
     }
 
@@ -3622,9 +4063,10 @@ function getClientScript() {
 
     function renderLayerColorCard(row) {
         return "<details class='card rgb-subsection collapsible-card' data-layer='" + escapeAttr(row.layer) + "'>" +
-            renderRgbConfigSummary(row.layer, row.color, row.mode) +
+            renderRgbConfigSummary(row.layer, row.color, row.mode, layerRgbSummaryOptions(row)) +
             "<div class='rgb-subsection-body'>" +
-            renderHsvColorControl(row.color) +
+            renderHsvColorControl(row.color, "", "", { pickerColor: layerPreviewColor(row) || row.color }) +
+            layerPassthroughNote(row) +
             "<div class='form-grid four'>" +
             "<label><span>mode</span><select name='mode'>" + options(["ALL_KEYS", "KEYS_MAPPED_ON_THIS_LAYER_ONLY"], row.mode) + "</select></label>" +
             "<button data-action='updateLayerColor' class='primary'>Apply</button>" +
@@ -3709,20 +4151,52 @@ function getClientScript() {
             "</details>";
     }
 
-    function renderRgbConfigSummary(label, color, meta = "") {
+    function layerRgbSummaryOptions(row) {
+        if (!layerColorIsPassthrough(row.color)) return {};
+        const defaultColor = model.rgb?.defaultColor;
+        const previewColor = row.layer === "LAYER_BASE" && defaultColor ? defaultColor : undefined;
+        const behavior = row.layer === "LAYER_BASE"
+            ? "HSV(0, 0, 0) leaves the base layer unpainted, so the default RGB Matrix effect shows."
+            : "HSV(0, 0, 0) leaves this layer unpainted, so lower active layers or the default RGB Matrix effect show.";
+        return {
+            previewColor: previewColor || row.color,
+            extraMeta: row.layer === "LAYER_BASE" ? "default RGB" : "pass-through",
+            passThroughSwatch: !previewColor,
+            swatchTooltip: behavior + (previewColor ? " Preview uses " + colorExpression(previewColor) + "." : "")
+        };
+    }
+
+    function layerPassthroughNote(row) {
+        if (!layerColorIsPassthrough(row.color)) return "";
+        if (row.layer === "LAYER_BASE" && model.rgb?.defaultColor) {
+            return "<p class='muted'>HSV(0, 0, 0) leaves the base layer unpainted; the preview swatch shows the default RGB Matrix color " + escapeHtml(colorExpression(model.rgb.defaultColor)) + ".</p>";
+        }
+        return "<p class='muted'>HSV(0, 0, 0) leaves this layer unpainted, so lower active layers or the default RGB Matrix effect show through.</p>";
+    }
+
+    function renderRgbConfigSummary(label, color, meta = "", options = {}) {
+        const expression = options.expression || colorExpression(color);
+        const previewColor = options.previewColor || color;
         return "<summary><span class='rgb-summary'>" +
             "<span class='rgb-summary-title'>" + escapeHtml(label) + "</span>" +
-            renderSummarySwatch(color) +
+            renderSummarySwatch(previewColor, options.swatchTooltip || ("Collapsed color preview: " + expression), options) +
             "<span class='rgb-summary-meta'>" +
-            "<code class='muted' data-summary-expression>" + escapeHtml(colorExpression(color)) + "</code>" +
+            "<code class='muted' data-summary-expression>" + escapeHtml(expression) + "</code>" +
             (meta ? "<code class='muted'>" + escapeHtml(meta) + "</code>" : "") +
+            (options.extraMeta ? "<code class='muted'>" + escapeHtml(options.extraMeta) + "</code>" : "") +
             "</span>" +
             "</span></summary>";
     }
 
-    function renderSummarySwatch(color) {
+    function renderSummarySwatch(color, tooltip, options = {}) {
         const fill = hsvToHex(color) || "#000000";
-        const label = "Collapsed color preview: " + colorExpression(color);
+        const label = tooltip || "Collapsed color preview: " + colorExpression(color);
+        if (options.passThroughSwatch) {
+            return "<svg class='rgb-summary-swatch' viewBox='0 0 80 26' role='img' aria-label='" + escapeAttr(label) + "' data-tooltip='" + escapeAttr(label) + "'>" +
+                "<rect x='1' y='1' width='78' height='24' rx='5' fill='#323d43' stroke='#ffffff' stroke-opacity='0.38' stroke-width='1'></rect>" +
+                "<path d='M-8 26 L26 -8 M10 34 L52 -8 M36 34 L78 -8 M60 34 L88 6' stroke='#b9c4c9' stroke-opacity='0.58' stroke-width='3'></path>" +
+                "</svg>";
+        }
         return "<svg class='rgb-summary-swatch' viewBox='0 0 80 26' role='img' aria-label='" + escapeAttr(label) + "' data-tooltip='" + escapeAttr(label) + "'>" +
             "<rect data-summary-swatch x='1' y='1' width='78' height='24' rx='5' fill='" + fill + "' stroke='#ffffff' stroke-opacity='0.38' stroke-width='1'></rect>" +
             "</svg>";
@@ -3750,8 +4224,8 @@ function getClientScript() {
             "</tbody></table>";
     }
 
-    function renderHsvColorControl(color, id, extraAttrs = "") {
-        const hex = hsvToHex(color) || "#000000";
+    function renderHsvColorControl(color, id, extraAttrs = "", options = {}) {
+        const hex = hsvToHex(options.pickerColor || color) || "#000000";
         const idAttr = id ? " data-color-id='" + escapeAttr(id) + "'" : "";
         return "<div class='color-control' data-color-control" + idAttr + extraAttrs + ">" +
             "<div class='color-row'>" +
@@ -3786,7 +4260,9 @@ function getClientScript() {
             s: value(control, "s"),
             v: value(control, "v")
         };
-        const hex = hsvToHex(color) || "#000000";
+        const preview = previewOptionsForColorControl(control, color);
+        const previewColor = preview.previewColor || color;
+        const hex = hsvToHex(previewColor) || "#000000";
         const picker = control.querySelector("[data-color-picker]");
         const expression = control.querySelector("[data-color-expression]");
         if (picker && /^#[0-9a-f]{6}$/i.test(hex)) {
@@ -3803,7 +4279,7 @@ function getClientScript() {
                 summarySwatch.setAttribute("fill", hex);
                 const summaryPreview = summarySwatch.closest("svg");
                 if (summaryPreview) {
-                    const label = "Collapsed color preview: " + colorExpression(color);
+                    const label = preview.swatchTooltip || "Collapsed color preview: " + colorExpression(color);
                     summaryPreview.setAttribute("data-tooltip", label);
                     summaryPreview.setAttribute("aria-label", label);
                 }
@@ -3812,6 +4288,15 @@ function getClientScript() {
                 summaryExpression.textContent = colorExpression(color);
             }
         }
+    }
+
+    function previewOptionsForColorControl(control, color) {
+        const layerCard = control.closest(".rgb-subsection[data-layer]");
+        if (!layerCard) return { previewColor: color };
+        return layerRgbSummaryOptions({
+            layer: layerCard.dataset.layer || "",
+            color
+        });
     }
 
     function hsvToHex(color) {
@@ -3918,8 +4403,8 @@ function getClientScript() {
     function renderComboStudio() {
         return panel("Combo Builder",
             "<div class='card'><div class='form-grid'>" +
-            "<label><span>Output</span><input id='comboOutput' placeholder='Tab'></label>" +
-            "<label><span>Inputs</span><input id='comboInputs' placeholder='D, F'></label>" +
+            renderKeyPickerInput("comboOutput", "Output", "", "Tab", "single") +
+            renderKeyPickerInput("comboInputs", "Inputs", "", "D, F", "list") +
             "<button data-action='addCombo' class='primary'>Append combo row</button>" +
             "</div></div>" +
             "<h3 style='margin-top: 14px'>Existing combos</h3>" +
@@ -3959,6 +4444,9 @@ function getClientScript() {
 
         match = normalized.match(/^MO\\(LAYER_([^)]+)\\)$/);
         if (match) return "Hold " + titleCase(match[1]);
+
+        match = normalized.match(/^LOCK_LAYER\\(LAYER_([^)]+)\\)$/);
+        if (match) return "Lock " + titleCase(match[1]);
 
         match = normalized.match(/^([A-Z][A-Z0-9_]*)\\((.+)\\)$/);
         if (match && modWrapperLabels[match[1]]) {

@@ -39,7 +39,11 @@ so combo-driven key behaviors are visible from the active layer view.
 Normal keys can be entered as user-facing labels such as `A`, `Enter`, `Space`,
 the classic transparent token `_______`, or modifier chords such as
 `Shift+\`` and `Alt+Cmd+Esc`; advanced QMK expressions still pass through when
-needed. Read-only controls are styled separately from editable controls.
+needed. Key fields also have a VIA-style picker with QWERTY, symbol,
+navigation, mouse, layer, pointing-mode, macro, and custom sections. The picker
+keeps selections pending until OK, supports modifier buttons for chorded keys,
+and supports multi-key selection where the field expects a comma-separated key
+list. Read-only controls are styled separately from editable controls.
 Behavior timing override fields show the resolved default milliseconds in their
 placeholder text when the authored row leaves the override empty.
 
@@ -56,7 +60,10 @@ is shown only when the selected hold-tier helper is `REPEAT_WHILE_HELD`.
 The RGB page includes compact color-picker controls for editable colors and
 dropdowns for fields with known option sets. The picker updates the HSV fields
 and the dedicated swatch column in collapsed section summaries; applying a card
-still writes the same `HSV(...)` expressions back to `rgb_config.c`.
+still writes the same `HSV(...)` expressions back to `rgb_config.c`. Layer
+color summaries follow the firmware pass-through rule for `HSV(0, 0, 0)`: the
+base layer preview uses the configured default RGB Matrix color, and higher
+layers are marked as pass-through instead of previewing literal black.
 
 Most visible controls, tables, collapsed summaries, color previews, and SVG
 keys expose hover tooltips that describe what the field edits or displays.

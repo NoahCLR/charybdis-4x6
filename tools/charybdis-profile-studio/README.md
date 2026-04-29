@@ -19,6 +19,10 @@ those two files.
   fallback used by the introspection report
 - click a key, edit it as a normal key label such as `A`, `Enter`, `Space`, or
   `_______`, and patch the matching `LAYOUT()` slot
+- use a VIA-style picker for key fields, with QWERTY, symbol, navigation,
+  mouse, layer, pointing-mode, macro, and custom sections
+- choose modifier chords from picker buttons and confirm the pending keycode
+  with OK before it changes the field
 - edit modifier chords as user-facing labels such as `Shift+\`` or
   `Alt+Cmd+Esc`
 - disabled/read-only fields are visually distinct from editable controls
@@ -37,6 +41,9 @@ those two files.
 - edit `layer_colors[]` HSV values and render mode
 - use compact color pickers for editable RGB colors, including a dedicated
   preview column in collapsed section summaries
+- layer color previews treat `HSV(0, 0, 0)` as the firmware pass-through
+  sentinel, so the base layer swatch shows the configured default RGB Matrix
+  color instead of literal black
 - use dropdowns for RGB fields with fixed option sets, including auto-mouse
   fade mode, combo locality, and key-behavior feedback policy
 - append RGB LED group rows by selecting keys on the physical RGB layout,
