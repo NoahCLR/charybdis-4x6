@@ -2412,6 +2412,12 @@ function getStudioHtml() {
             border-color: #2aa88e;
             background: #217a6a;
         }
+        button.dirty {
+            border-color: var(--warn);
+            background: #7a5b1f;
+            color: #fff4d2;
+            box-shadow: 0 0 0 1px rgba(242, 184, 75, 0.28);
+        }
         button:hover { border-color: var(--accent); }
         input, select {
             min-height: 32px;
@@ -3472,6 +3478,7 @@ function getClientScript() {
         const colorControl = event.target?.closest?.("[data-color-control]");
         if (colorControl) {
             syncColorControl(event, colorControl);
+            updateDirtyFromEvent(event);
             return;
         }
         if (event.target?.name === "target" && event.target.closest("#rgbGroupBuilder")) {
@@ -3486,15 +3493,18 @@ function getClientScript() {
             rgbGroupOwner = event.target.value;
             rgbBuilderColor = undefined;
             render();
+            return;
         }
         if (event.target?.matches("[data-helper-select]")) {
             updateHelperFields(event.target.id.replace(/Helper$/, ""));
         }
+        updateDirtyFromEvent(event);
     });
 
     app.addEventListener("input", (event) => {
         const control = event.target?.closest?.("[data-color-control]");
         if (control) syncColorControl(event, control);
+        updateDirtyFromEvent(event);
     });
 
     function syncColorControl(event, control) {
@@ -3569,7 +3579,57 @@ function getClientScript() {
 
         subtitle.textContent = model.root;
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
+        initializeDirtyTracking();
         hydrateTooltips();
+    }
+
+    function initializeDirtyTracking() {
+        for (const section of document.querySelectorAll("[data-dirty-section]")) {
+            section.dataset.dirtyBaseline = dirtySnapshot(section);
+            updateDirtySection(section);
+        }
+    }
+
+    function updateDirtyFromEvent(event) {
+        const section = event.target?.closest?.("[data-dirty-section]");
+        if (section) {
+            updateDirtySection(section);
+        }
+    }
+
+    function updateDirtySection(section) {
+        const dirty = dirtySnapshot(section) !== (section.dataset.dirtyBaseline || "") || sectionHasCustomDirtyState(section);
+        section.classList.toggle("dirty", dirty);
+        for (const button of section.querySelectorAll("[data-dirty-button]")) {
+            setDirtyButtonState(button, dirty);
+        }
+    }
+
+    function sectionHasCustomDirtyState(section) {
+        return section.id === "rgbGroupBuilder" && rgbSelectedLeds.length > 0;
+    }
+
+    function setDirtyButtonState(button, dirty) {
+        const cleanLabel = button.dataset.cleanLabel || button.textContent.trim();
+        button.dataset.cleanLabel = cleanLabel;
+        button.textContent = dirty ? "Unsaved - " + cleanLabel : cleanLabel;
+        button.classList.toggle("dirty", dirty);
+        button.setAttribute("aria-label", dirty ? "Unsaved changes: " + cleanLabel : cleanLabel);
+    }
+
+    function dirtySnapshot(section) {
+        const values = [];
+        const controls = Array.from(section.querySelectorAll("input, select, textarea"))
+            .filter((control) => !control.disabled && !control.closest("[hidden]"));
+        controls.forEach((control, index) => {
+            const key = control.name || control.id || String(index);
+            if (control.type === "checkbox" || control.type === "radio") {
+                values.push([key, control.checked ? "1" : "0"]);
+            } else {
+                values.push([key, control.value || ""]);
+            }
+        });
+        return JSON.stringify(values);
     }
 
     function hydrateTooltips() {
@@ -3807,14 +3867,14 @@ function getClientScript() {
     }
 
     function renderSelectedKeyEditor(layer, selected) {
-        return "<div class='card selected-key-edit-card'>" +
+        return "<div class='card selected-key-edit-card' data-dirty-section>" +
             "<h3>" + escapeHtml(selected.display || selected.keycode) + "</h3>" +
             "<div class='selected-key-edit-fields'>" +
             "<label><span>Layer</span><input disabled value='" + escapeAttr(layer.name) + "'></label>" +
             "<label><span>Layout index</span><input disabled value='" + selected.layoutIndex + "'></label>" +
             renderKeyPickerInput("keycodeInput", "Key", selected.editLabel || selected.display || selected.keycode, "A, Enter, Space, _______", "single") +
             "<div><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(selected.keycode) + "</code></div>" +
-            "<button data-action='applyKey' class='primary'>Apply key</button>" +
+            "<button data-action='applyKey' data-dirty-button class='primary'>Apply key</button>" +
             "</div>" +
             "</div>";
     }
@@ -3832,7 +3892,7 @@ function getClientScript() {
         for (let index = 0; index < 5; index += 1) {
             steps.push(row.steps.find((step) => step.tapCount === index) || { tapCount: index, tapCountName: tapBranchName(index) });
         }
-        return "<div class='selected-behavior-editor'><h3>Behavior on this key</h3>" +
+        return "<div class='selected-behavior-editor' data-dirty-section><h3>Behavior on this key</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
             "<div class='form-grid four'>" +
             renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
@@ -3843,7 +3903,7 @@ function getClientScript() {
             "<div class='behavior-branch-grid'>" +
             steps.map(renderBehaviorStepEditor).join("") +
             "</div>" +
-            "<button data-action='saveSelectedBehavior' class='primary'>Save behavior row</button></div>";
+            "<button data-action='saveSelectedBehavior' data-dirty-button class='primary'>Save behavior row</button></div>";
     }
 
     function renderTimingInput(id, field, value, keycode) {
@@ -3901,17 +3961,19 @@ function getClientScript() {
 
     function renderActionEditor(id, label, action, helpers) {
         const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
+        const actionHidden = action?.helper ? "" : " hidden";
         const repeatHidden = action?.helper === "REPEAT_WHILE_HELD" ? "" : " hidden";
         return "<div class='stack behavior-action-editor'>" +
             "<label><span>" + label + " helper</span><select id='" + id + "Helper' data-helper-select>" + helperOptions(helpers, action?.helper || "") + "</select></label>" +
-            renderKeyPickerInput(id + "Action", label + " action", editableActionValue(action), "Esc, Shift+\`, Cmd+Q", "single") +
+            renderKeyPickerInput(id + "Action", label + " action", editableActionValue(action), "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(id) + "'" + actionHidden) +
             (hasRepeat ? "<label data-helper-field data-helper-prefix='" + id + "' data-helper-value='REPEAT_WHILE_HELD'" + repeatHidden + "><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
             "</div>";
     }
 
-    function renderKeyPickerInput(id, label, value, placeholder, mode = "single", style = "") {
+    function renderKeyPickerInput(id, label, value, placeholder, mode = "single", style = "", attrs = "") {
         const styleAttr = style ? " style='" + escapeAttr(style) + "'" : "";
-        return "<label" + styleAttr + "><span>" + escapeHtml(label) + "</span><span class='input-with-button'>" +
+        const extraAttrs = attrs ? " " + attrs : "";
+        return "<label" + styleAttr + extraAttrs + "><span>" + escapeHtml(label) + "</span><span class='input-with-button'>" +
             "<input id='" + escapeAttr(id) + "' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder || "") + "'>" +
             "<button type='button' data-action='openKeyPicker' data-target='" + escapeAttr(id) + "' data-mode='" + escapeAttr(mode) + "'>Pick keycode</button>" +
             "</span></label>";
@@ -4339,6 +4401,11 @@ function getClientScript() {
 
     function updateHelperFields(prefix) {
         const helper = document.getElementById(prefix + "Helper")?.value || "";
+        for (const field of document.querySelectorAll("[data-helper-action-prefix='" + prefix + "']")) {
+            const visible = Boolean(helper);
+            field.hidden = !visible;
+            field.style.display = visible ? "" : "none";
+        }
         for (const field of document.querySelectorAll("[data-helper-prefix='" + prefix + "']")) {
             const values = String(field.dataset.helperValue || "").split(" ");
             const visible = values.includes(helper);
@@ -4686,7 +4753,7 @@ function getClientScript() {
     }
 
     function renderBehaviorForm() {
-        return "<div class='card'>" +
+        return "<div class='card' data-dirty-section>" +
             "<h3>Append simple single tap branch row</h3>" +
             "<div class='form-grid'>" +
             "<label><span>Key</span><input id='behaviorKeycode' placeholder='A'></label>" +
@@ -4694,16 +4761,16 @@ function getClientScript() {
             renderActionInputs("tap", "Tap", ["", "TAP_SENDS"]) +
             renderActionInputs("hold", "Hold", ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
             renderActionInputs("longHold", "Long hold", ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
-            "<button data-action='addBehavior' class='primary'>Append behavior row</button>" +
+            "<button data-action='addBehavior' data-dirty-button class='primary'>Append behavior row</button>" +
             "</div></div>";
     }
 
     function renderActionInputs(prefix, label, helpers) {
         const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
         return "<label><span>" + label + " helper</span><select id='" + prefix + "Helper' data-helper-select>" +
-            helpers.map((helper) => "<option value='" + escapeAttr(helper) + "'>" + escapeHtml(helper || "none") + "</option>").join("") +
+            helperOptions(helpers, "") +
             "</select></label>" +
-            renderKeyPickerInput(prefix + "Action", label + " action", "", "Esc, Shift+\`, Cmd+Q", "single") +
+            renderKeyPickerInput(prefix + "Action", label + " action", "", "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(prefix) + "' hidden") +
             (hasRepeat ? "<label data-helper-field data-helper-prefix='" + prefix + "' data-helper-value='REPEAT_WHILE_HELD' hidden><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
     }
 
@@ -4750,9 +4817,17 @@ function getClientScript() {
     }
 
     function readAction(prefix) {
+        const helper = document.getElementById(prefix + "Helper").value;
+        if (!helper) {
+            return {
+                helper: "",
+                action: "",
+                repeatHz: ""
+            };
+        }
         const repeatInput = document.getElementById(prefix + "Repeat");
         return {
-            helper: document.getElementById(prefix + "Helper").value,
+            helper,
             action: document.getElementById(prefix + "Action").value,
             repeatHz: repeatInput ? repeatInput.value : ""
         };
@@ -4804,11 +4879,11 @@ function getClientScript() {
         const defined = definedLedIndices.length
             ? definedLedIndices.map((led) => "<code>" + led + "</code>").join("")
             : "<span class='muted'>No defined LEDs for this table</span>";
-        return "<div id='rgbGroupBuilder' class='card'>" +
+        return "<div id='rgbGroupBuilder' class='card' data-dirty-section>" +
             "<div class='form-grid four'>" +
             "<label><span>table</span><select name='target'>" + optionsWithLabels(targetOptions, rgbGroupTarget) + "</select></label>" +
             ownerControl +
-            "<div><button data-action='addRgbLedGroup' class='primary'>Add LED group row</button></div>" +
+            "<div><button data-action='addRgbLedGroup' data-dirty-button class='primary'>Add LED group row</button></div>" +
             "</div>" +
             renderRgbBuilderColorControl() +
             "<div class='toolbar' style='margin: 10px 0'>" +
@@ -5153,25 +5228,25 @@ function getClientScript() {
     }
 
     function renderLayerColorCard(row) {
-        return "<details class='card rgb-subsection collapsible-card' data-layer='" + escapeAttr(row.layer) + "'>" +
+        return "<details class='card rgb-subsection collapsible-card' data-dirty-section data-layer='" + escapeAttr(row.layer) + "'>" +
             renderRgbConfigSummary(row.layer, row.color, row.mode, layerRgbSummaryOptions(row)) +
             "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(row.color, "", "", { pickerColor: layerPreviewColor(row) || row.color }) +
             layerPassthroughNote(row) +
             "<div class='form-grid four'>" +
             "<label><span>mode</span><select name='mode'>" + options(["ALL_KEYS", "KEYS_MAPPED_ON_THIS_LAYER_ONLY"], row.mode) + "</select></label>" +
-            "<button data-action='updateLayerColor' class='primary'>Apply</button>" +
+            "<button data-action='updateLayerColor' data-dirty-button class='primary'>Apply</button>" +
             "</div></div></details>";
     }
 
     function renderPdColorCard(row) {
-        return "<details class='card rgb-subsection collapsible-card' data-mode='" + escapeAttr(row.pointingMode) + "'>" +
+        return "<details class='card rgb-subsection collapsible-card' data-dirty-section data-mode='" + escapeAttr(row.pointingMode) + "'>" +
             renderRgbConfigSummary(row.pointingMode, row.color, row.locality) +
             "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(row.color) +
             "<div class='form-grid four'>" +
             "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, row.locality) + "</select></label>" +
-            "<button data-action='updatePdModeColor' class='primary'>Apply</button>" +
+            "<button data-action='updatePdModeColor' data-dirty-button class='primary'>Apply</button>" +
             "</div></div></details>";
     }
 
@@ -5179,13 +5254,13 @@ function getClientScript() {
         if (!config) {
             return "<p class='muted'>No active automouse fade config parsed.</p>";
         }
-        return "<details class='card rgb-subsection collapsible-card'>" +
+        return "<details class='card rgb-subsection collapsible-card' data-dirty-section>" +
             renderRgbConfigSummary("Fade destination", config.end_color, config.mode) +
             "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(config.end_color) +
             "<div class='form-grid four'>" +
             "<label><span>mode</span><select name='mode'>" + options(automouseFadeModes, config.mode) + "</select></label>" +
-            "<button data-action='updateAutomouseFade' class='primary'>Apply</button>" +
+            "<button data-action='updateAutomouseFade' data-dirty-button class='primary'>Apply</button>" +
             "</div>" +
             "</div></details>";
     }
@@ -5194,13 +5269,13 @@ function getClientScript() {
         if (!config) {
             return "<p class='muted'>No active combo feedback config parsed.</p>";
         }
-        return "<details class='card rgb-subsection collapsible-card'>" +
+        return "<details class='card rgb-subsection collapsible-card' data-dirty-section>" +
             renderRgbConfigSummary("Active combo color", config.color, config.locality) +
             "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(config.color) +
             "<div class='form-grid four'>" +
             "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, config.locality) + "</select></label>" +
-            "<button data-action='updateComboFeedback' class='primary'>Apply</button>" +
+            "<button data-action='updateComboFeedback' data-dirty-button class='primary'>Apply</button>" +
             "</div>" +
             "</div></details>";
     }
@@ -5216,7 +5291,7 @@ function getClientScript() {
             ["Long hold active", "longHoldActiveColor", config.longHoldActiveColor],
         ];
         const branchRows = (config.tapBranchColors || []).map((color, index) => ["Tap branch " + index, "tapBranchColor" + index, color]);
-        return "<div id='keyBehaviorFeedbackCard' class='card-list'>" +
+        return "<div id='keyBehaviorFeedbackCard' class='card-list' data-dirty-section>" +
             "<details class='card collapsible-card'>" +
             "<summary><h3>Policy</h3></summary>" +
             "<div class='rgb-subsection-body'>" +
@@ -5231,7 +5306,7 @@ function getClientScript() {
             branchRows.map(([label, id, color]) =>
                 renderRgbColorSubpanel(label, id, color, " data-tap-branch-color")
             ).join("") +
-            "<button data-action='updateKeyBehaviorFeedback' class='primary'>Apply key behavior feedback</button>" +
+            "<button data-action='updateKeyBehaviorFeedback' data-dirty-button class='primary'>Apply key behavior feedback</button>" +
             "</div>";
     }
 
@@ -5489,7 +5564,7 @@ function getClientScript() {
 
     function helperLabel(value) {
         return {
-            "": "",
+            "": "None",
             TAP_SENDS: "Tap sends",
             PRESS_AND_HOLD_UNTIL_RELEASE: "Press and hold until release",
             TAP_AT_HOLD_THRESHOLD: "Tap at hold threshold",
@@ -5506,7 +5581,7 @@ function getClientScript() {
         return panel("VIA Macros",
             "<table><thead><tr><th>Slot</th><th>Payload</th><th></th></tr></thead><tbody>" +
             model.viaMacros.map((slot) =>
-                "<tr data-keycode='" + escapeAttr(slot.keycode) + "'><td><code>" + escapeHtml(slot.keycode) + "</code></td><td><input value='" + escapeAttr(slot.payload) + "'></td><td><button data-action='updateViaMacro'>Apply</button></td></tr>"
+                "<tr data-dirty-section data-keycode='" + escapeAttr(slot.keycode) + "'><td><code>" + escapeHtml(slot.keycode) + "</code></td><td><input value='" + escapeAttr(slot.payload) + "'></td><td><button data-action='updateViaMacro' data-dirty-button>Apply</button></td></tr>"
             ).join("") +
             "</tbody></table>",
             true
@@ -5515,10 +5590,10 @@ function getClientScript() {
 
     function renderComboStudio() {
         return panel("Combo Builder",
-            "<div class='card'><div class='form-grid'>" +
+            "<div class='card' data-dirty-section><div class='form-grid'>" +
             renderKeyPickerInput("comboOutput", "Output", "", "Tab", "single") +
             renderKeyPickerInput("comboInputs", "Inputs", "", "D, F", "list") +
-            "<button data-action='addCombo' class='primary'>Append combo row</button>" +
+            "<button data-action='addCombo' data-dirty-button class='primary'>Append combo row</button>" +
             "</div></div>" +
             "<h3 style='margin-top: 14px'>Existing combos</h3>" +
             "<table><thead><tr><th>Output</th><th>Inputs</th></tr></thead><tbody>" +
