@@ -34,7 +34,7 @@ const KEYMAP_CONFIG_RELATIVE_PATH = path.join(
 const QMK_KEYCODE_DATA_RELATIVE_PATH = path.join("data", "constants", "keycodes");
 
 const LAYOUT_SLOT_COUNT = 56;
-const TAP_COUNT_NAMES = ["single tap branch", "double tap branch", "triple tap branch", "quadruple tap branch", "quintuple tap branch"];
+const TAP_COUNT_NAMES = ["Single Tap Branch", "Double Tap Branch", "Triple Tap Branch", "Quadruple Tap Branch", "Quintuple Tap Branch"];
 const HOLD_HELPERS = [
     "",
     "PRESS_AND_HOLD_UNTIL_RELEASE",
@@ -2488,6 +2488,34 @@ function getStudioHtml() {
             overflow-x: auto;
             padding: 4px 0 8px;
         }
+        .layout-with-key-editor {
+            display: grid;
+            grid-template-columns: minmax(760px, 1120px) minmax(360px, 1fr);
+            gap: 24px;
+            align-items: stretch;
+        }
+        .layout-selected-key-column {
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            min-height: 100%;
+        }
+        .selected-key-edit-card {
+            display: grid;
+            gap: 12px;
+            width: 100%;
+            max-width: 420px;
+        }
+        .selected-key-edit-card h3 {
+            margin: 0;
+        }
+        .selected-key-edit-fields {
+            display: grid;
+            gap: 12px;
+        }
+        .selected-key-edit-card button.primary {
+            width: 100%;
+        }
         .keyboard-svg {
             display: block;
             min-width: 760px;
@@ -2614,6 +2642,49 @@ function getStudioHtml() {
         .collapsible-card > summary h3 {
             display: inline;
             margin-left: 4px;
+        }
+        .behavior-branch-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(340px, 1fr));
+            gap: 14px;
+            align-items: start;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            margin-top: 14px;
+        }
+        .behavior-step {
+            min-width: 0;
+            padding: 12px;
+        }
+        .behavior-step-actions {
+            display: grid;
+            gap: 16px;
+            margin-top: 14px;
+        }
+        .behavior-action-editor {
+            gap: 10px;
+            padding-top: 14px;
+            border-top: 1px solid var(--line);
+        }
+        .behavior-action-editor:first-child {
+            padding-top: 0;
+            border-top: 0;
+        }
+        .behavior-action-editor select,
+        .behavior-action-editor input {
+            font-size: 12px;
+        }
+        .behavior-action-editor .input-with-button {
+            grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
+            gap: 10px;
+        }
+        .selected-behavior-editor {
+            display: grid;
+            gap: 14px;
+            margin-top: 20px;
+        }
+        .selected-behavior-editor h3 {
+            margin: 0;
         }
         .rgb-subsection > summary {
             cursor: pointer;
@@ -2901,10 +2972,14 @@ function getStudioHtml() {
         }
         .input-with-button {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
+            grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
             gap: 8px;
         }
         .input-with-button button {
+            min-height: 38px;
+            padding-inline: 8px;
+            font-size: 11px;
+            font-weight: 650;
             white-space: nowrap;
         }
         .toolbar {
@@ -2913,8 +2988,14 @@ function getStudioHtml() {
             align-items: center;
             flex-wrap: wrap;
         }
-        @media (max-width: 980px) {
+        @media (max-width: 1240px) {
             .view-tab { min-width: 0; }
+            .layout-with-key-editor {
+                grid-template-columns: 1fr;
+            }
+            .layout-selected-key-column {
+                padding: 8px 0 0;
+            }
         }
     </style>
 </head>
@@ -2954,6 +3035,7 @@ function getClientScript() {
     let rgbBuilderColor = undefined;
     let keyPicker = undefined;
     let notice = "";
+    const tapCountNames = ${JSON.stringify(TAP_COUNT_NAMES)};
     const views = [
         ["layout", "Layout"],
         ["macros", "Macros & combos"],
@@ -2972,7 +3054,7 @@ function getClientScript() {
     const panelTooltips = {
         Status: "Parser messages, write status, and warnings from the current studio model.",
         Layout: "Physical keyboard preview for the active layer. Click a key to edit it.",
-        "Selected Key": "Edit the selected LAYOUT slot and the key behavior row attached to that keycode.",
+        "Selected Key Behavior": "Edit the key behavior row attached to the selected keycode.",
         "Layer Behaviors": "Behavior rows whose keycode is currently present on the active layer.",
         "Layer Combos & PD Modes": "Combos and pointing modes reachable from keys on the active layer.",
         "VIA Macros": "Payload strings for the VIA_MACROS(MACRO) table in keymap.c.",
@@ -3702,8 +3784,8 @@ function getClientScript() {
         if (!layer) return panel("Layers", "<p class='muted'>No LAYOUT blocks found.</p>", true);
         const selected = layer.positions[selectedKey] || layer.positions[0];
         return "<div class='stack'>" +
-            panel("Layout", renderLayerTabs() + renderBoard(layer), true) +
-            panel("Selected Key", renderSelectedKeyPanel(layer, selected), true) +
+            panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected), true) +
+            panel("Selected Key Behavior", renderSelectedBehaviorEditor(selected, behaviorForKey(selected.keycode)), true) +
             panel("Layer Behaviors", renderLayerBehaviorTable(layer), true) +
             panel("Layer Combos & PD Modes", renderLayerComboTable(layer) + renderLayerPdModeTable(layer), true) +
             "</div>";
@@ -3715,19 +3797,25 @@ function getClientScript() {
         ).join("") + "</div>";
     }
 
-    function renderSelectedKeyPanel(layer, selected) {
-        const behavior = behaviorForKey(selected.keycode);
-        return "<div class='card'>" +
+    function renderLayoutWithSelectedKeyEditor(layer, selected) {
+        return "<div class='layout-with-key-editor'>" +
+            renderBoard(layer) +
+            "<div class='layout-selected-key-column'>" +
+            renderSelectedKeyEditor(layer, selected) +
+            "</div>" +
+            "</div>";
+    }
+
+    function renderSelectedKeyEditor(layer, selected) {
+        return "<div class='card selected-key-edit-card'>" +
             "<h3>" + escapeHtml(selected.display || selected.keycode) + "</h3>" +
-            "<div class='form-grid'>" +
+            "<div class='selected-key-edit-fields'>" +
             "<label><span>Layer</span><input disabled value='" + escapeAttr(layer.name) + "'></label>" +
             "<label><span>Layout index</span><input disabled value='" + selected.layoutIndex + "'></label>" +
-            renderKeyPickerInput("keycodeInput", "Key", selected.editLabel || selected.display || selected.keycode, "A, Enter, Space, _______", "single", "grid-column: 1 / -1") +
-            "<div style='grid-column: 1 / -1'><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(selected.keycode) + "</code></div>" +
+            renderKeyPickerInput("keycodeInput", "Key", selected.editLabel || selected.display || selected.keycode, "A, Enter, Space, _______", "single") +
+            "<div><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(selected.keycode) + "</code></div>" +
             "<button data-action='applyKey' class='primary'>Apply key</button>" +
             "</div>" +
-            "<div style='height: 14px'></div>" +
-            renderSelectedBehaviorEditor(selected, behavior) +
             "</div>";
     }
 
@@ -3744,7 +3832,7 @@ function getClientScript() {
         for (let index = 0; index < 5; index += 1) {
             steps.push(row.steps.find((step) => step.tapCount === index) || { tapCount: index, tapCountName: tapBranchName(index) });
         }
-        return "<h3>Behavior on this key</h3>" +
+        return "<div class='selected-behavior-editor'><h3>Behavior on this key</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
             "<div class='form-grid four'>" +
             renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
@@ -3752,10 +3840,10 @@ function getClientScript() {
             renderTimingInput("selectedMultiTapTerm", "multi_tap_term", row.multiTapTerm || "", row.keycode) +
             renderTimingInput("selectedBranchConfirmTerm", "branch_confirm_term", row.branchConfirmTerm || "", row.keycode) +
             "</div>" +
-            "<div class='card-list' style='margin-top: 10px'>" +
+            "<div class='behavior-branch-grid'>" +
             steps.map(renderBehaviorStepEditor).join("") +
             "</div>" +
-            "<button data-action='saveSelectedBehavior' class='primary' style='margin-top: 10px'>Save behavior row</button>";
+            "<button data-action='saveSelectedBehavior' class='primary'>Save behavior row</button></div>";
     }
 
     function renderTimingInput(id, field, value, keycode) {
@@ -3796,7 +3884,7 @@ function getClientScript() {
     }
 
     function tapBranchName(index) {
-        return ["single", "double", "triple", "quadruple", "quintuple"][index] + " tap branch";
+        return tapCountNames[index] || ("Tap " + (index + 1) + " Branch");
     }
 
     function renderBehaviorStepEditor(step) {
@@ -3804,7 +3892,7 @@ function getClientScript() {
         return "<details class='card behavior-step'" + open + ">" +
             "<summary><h3>" + escapeHtml(step.tapCountName || ("tap " + (step.tapCount + 1))) + "</h3></summary>" +
             "<input type='hidden' data-behavior-step='" + step.tapCount + "' value='" + step.tapCount + "'>" +
-            "<div class='form-grid three' style='margin-top: 10px'>" +
+            "<div class='behavior-step-actions'>" +
             renderActionEditor("step" + step.tapCount + "Tap", "Tap", step.tap, ["", "TAP_SENDS"]) +
             renderActionEditor("step" + step.tapCount + "Hold", "Hold", step.hold, ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
             renderActionEditor("step" + step.tapCount + "LongHold", "Long hold", step.longHold, ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
@@ -3814,8 +3902,8 @@ function getClientScript() {
     function renderActionEditor(id, label, action, helpers) {
         const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
         const repeatHidden = action?.helper === "REPEAT_WHILE_HELD" ? "" : " hidden";
-        return "<div class='stack'>" +
-            "<label><span>" + label + " helper</span><select id='" + id + "Helper' data-helper-select>" + options(helpers, action?.helper || "") + "</select></label>" +
+        return "<div class='stack behavior-action-editor'>" +
+            "<label><span>" + label + " helper</span><select id='" + id + "Helper' data-helper-select>" + helperOptions(helpers, action?.helper || "") + "</select></label>" +
             renderKeyPickerInput(id + "Action", label + " action", editableActionValue(action), "Esc, Shift+\`, Cmd+Q", "single") +
             (hasRepeat ? "<label data-helper-field data-helper-prefix='" + id + "' data-helper-value='REPEAT_WHILE_HELD'" + repeatHidden + "><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
             "</div>";
@@ -3825,7 +3913,7 @@ function getClientScript() {
         const styleAttr = style ? " style='" + escapeAttr(style) + "'" : "";
         return "<label" + styleAttr + "><span>" + escapeHtml(label) + "</span><span class='input-with-button'>" +
             "<input id='" + escapeAttr(id) + "' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder || "") + "'>" +
-            "<button type='button' data-action='openKeyPicker' data-target='" + escapeAttr(id) + "' data-mode='" + escapeAttr(mode) + "'>Pick...</button>" +
+            "<button type='button' data-action='openKeyPicker' data-target='" + escapeAttr(id) + "' data-mode='" + escapeAttr(mode) + "'>Pick keycode</button>" +
             "</span></label>";
     }
 
@@ -5393,6 +5481,21 @@ function getClientScript() {
 
     function options(values, selected) {
         return values.map((value) => "<option value='" + escapeAttr(value) + "' " + (value === selected ? "selected" : "") + ">" + escapeHtml(value) + "</option>").join("");
+    }
+
+    function helperOptions(values, selected) {
+        return values.map((value) => "<option value='" + escapeAttr(value) + "' " + (value === selected ? "selected" : "") + ">" + escapeHtml(helperLabel(value)) + "</option>").join("");
+    }
+
+    function helperLabel(value) {
+        return {
+            "": "",
+            TAP_SENDS: "Tap sends",
+            PRESS_AND_HOLD_UNTIL_RELEASE: "Press and hold until release",
+            TAP_AT_HOLD_THRESHOLD: "Tap at hold threshold",
+            TAP_ON_RELEASE_AFTER_HOLD: "Tap on release after hold",
+            REPEAT_WHILE_HELD: "Repeat while held"
+        }[value] || titleCase(value);
     }
 
     function optionsWithLabels(values, selected) {
