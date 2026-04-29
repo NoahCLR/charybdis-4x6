@@ -19,9 +19,10 @@ those two files.
   fallback used by the introspection report
 - click a key, edit it as a normal key label such as `A`, `Enter`, `Space`, or
   `_______`, and patch the matching `LAYOUT()` slot
-- use a VIA-style picker for key fields, with an SVG-based full-size keyboard tab,
-  symbol/navigation/numpad/more-keys menus, layer/pointing-mode/macro/custom sections,
-  and QMK-sourced keycode menus/search from the sibling QMK keycode metadata
+- use a VIA-style picker for key fields, with an SVG-based full-size keyboard tab
+  that also hosts QMK-wide search, plus symbol/navigation/numpad/more-keys menus,
+  layer/pointing-mode/macro/custom sections, and QMK-sourced keycode menus from
+  the sibling QMK keycode metadata
 - choose modifier chords from picker buttons and confirm the pending keycode
   with OK before it changes the field
 - edit modifier chords as user-facing labels such as `Shift+\`` or

@@ -2737,6 +2737,8 @@ function getStudioHtml() {
             text-align: center;
         }
         .key-picker-keyboard {
+            display: grid;
+            gap: 8px;
             min-width: 0;
         }
         .key-picker-grid:not(.key-picker-keyboard) .key-picker-row {
@@ -3055,12 +3057,6 @@ function getClientScript() {
                 ["KC_WH_U", "KC_WH_D", "KC_WH_L", "KC_WH_R"],
                 ["KC_ACL0", "KC_ACL1", "KC_ACL2"]
             ]
-        },
-        {
-            id: "qmk-all",
-            label: "All QMK",
-            kind: "qmkSearch",
-            rows: []
         },
         {
             id: "layers",
@@ -3866,35 +3862,40 @@ function getClientScript() {
                     ]
                 };
             }
-            if (section.kind === "qmkSearch") {
-                return {
-                    ...section,
-                    rows: qmkKeyRows(filterQmkKeycodes(model.qmkKeycodes || [], keyPicker.search), 8),
-                };
-            }
             return section;
         });
     }
 
     function renderKeyPickerSection() {
         const section = keyPickerResolvedSections().find((candidate) => candidate.id === keyPicker.section) || keyPickerResolvedSections()[0];
-        const search = section.kind === "qmkSearch"
-            ? "<input class='key-picker-search' data-picker-search value='" + escapeAttr(keyPicker.search || "") + "' placeholder='Search QMK keycodes, labels, or aliases'>"
-            : "";
         if (section.kind === "keyboard") {
             return renderKeyPickerKeyboard(section);
         }
         const empty = !(section.rows || []).some((row) => row.length)
-            ? "<div class='key-picker-empty muted'>" + escapeHtml(section.kind === "qmkSearch" ? "Search to browse the full QMK catalog." : "No keys in this section.") + "</div>"
+            ? "<div class='key-picker-empty muted'>No keys in this section.</div>"
             : "";
-        return search + empty + "<div class='key-picker-grid " + (section.kind === "keyboard" ? "key-picker-keyboard" : "") + "'>" + (section.rows || []).map((row) =>
+        return empty + "<div class='key-picker-grid'>" + (section.rows || []).map((row) =>
             "<div class='key-picker-row'>" + row.map((value) => renderKeyPickerKey(value)).join("") + "</div>"
         ).join("") + "</div>";
     }
 
     function renderKeyPickerKeyboard(section) {
         const layout = section.layout || keyPickerKeyboardSvgLayout;
+        const query = String(keyPicker.search || "").trim();
+        const search = "<input class='key-picker-search' data-picker-search value='" + escapeAttr(keyPicker.search || "") + "' placeholder='Search all QMK keycodes, labels, or aliases'>";
+        if (query) {
+            const rows = qmkKeyRows(filterQmkKeycodes(model.qmkKeycodes || [], query), 8);
+            const empty = rows.length ? "" : "<div class='key-picker-empty muted'>No matching QMK keycodes.</div>";
+            return "<div class='key-picker-keyboard'>" +
+                search +
+                empty +
+                "<div class='key-picker-grid'>" + rows.map((row) =>
+                    "<div class='key-picker-row'>" + row.map((value) => renderKeyPickerKey(value)).join("") + "</div>"
+                ).join("") + "</div>" +
+                "</div>";
+        }
         return "<div class='key-picker-keyboard'>" +
+            search +
             "<div class='key-picker-keyboard-svg-wrap'>" +
             "<svg class='key-picker-keyboard-svg' viewBox='0 0 " + escapeAttr(layout.width) + " " + escapeAttr(layout.height) + "' role='group' aria-label='Full keyboard key picker'>" +
             "<rect x='0.75' y='0.75' width='" + escapeAttr(layout.width - 1.5) + "' height='" + escapeAttr(layout.height - 1.5) + "' rx='6' fill='none' stroke='rgba(96,112,122,0.34)' stroke-width='1.5'></rect>" +
