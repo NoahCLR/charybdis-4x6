@@ -21,9 +21,12 @@ back to the same blocks.
 - `pd_mode_colors[]`
 - RGB LED group tables, including appending new inline `RGB_LED_GROUP(...)`
   rows by selecting physical LEDs on the RGB layout
+- the LED group builder previews already-defined groups for the currently
+  selected table while keeping the pending new-row selection separate
 - a key-behavior LED group all-feedback mode that writes
   `KEY_FEEDBACK_GROUP_ALL` and lets firmware resolve the active semantic's
-  configured feedback color at render time
+  configured feedback color at render time; selected LEDs preview this mode as
+  equal vertical bands for each feedback semantic
 - auto-mouse fade destination color and fade mode
 - combo feedback color/locality
 - key-behavior feedback colors, tap-branch colors, tap commit mode, and

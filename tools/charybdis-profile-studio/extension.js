@@ -2174,6 +2174,20 @@ function getStudioHtml() {
             stroke: #ffffff;
             stroke-width: 3;
         }
+        .svg-key.rgb-defined rect {
+            stroke: #f0c857;
+            stroke-width: 3;
+        }
+        .svg-key.rgb-selected.rgb-defined rect {
+            stroke: #ffffff;
+        }
+        .svg-key.rgb-all-preview text,
+        .extra-led.rgb-all-preview text {
+            paint-order: stroke;
+            stroke: rgba(0, 0, 0, 0.58);
+            stroke-width: 3px;
+            stroke-linejoin: round;
+        }
         .svg-key text {
             font-family: var(--vscode-font-family, system-ui, sans-serif);
             text-anchor: middle;
@@ -2189,6 +2203,13 @@ function getStudioHtml() {
         .extra-led.rgb-selected circle {
             stroke: #ffffff;
             stroke-width: 3;
+        }
+        .extra-led.rgb-defined circle {
+            stroke: #f0c857;
+            stroke-width: 3;
+        }
+        .extra-led.rgb-selected.rgb-defined circle {
+            stroke: #ffffff;
         }
         .source-pill {
             display: inline-block;
@@ -2315,11 +2336,21 @@ function getStudioHtml() {
             display: flex;
             flex-wrap: wrap;
             gap: 5px;
+            align-items: center;
         }
         .rgb-selected-list code {
             border: 1px solid var(--line);
             border-radius: 999px;
             padding: 2px 6px;
+        }
+        .rgb-led-list-label {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 2px;
+        }
+        .rgb-defined-list code {
+            border-color: rgba(240, 200, 87, 0.76);
         }
         .rgb-all-color-grid {
             display: grid;
@@ -3955,6 +3986,10 @@ function getClientScript() {
         const selected = rgbSelectedLeds.length
             ? rgbSelectedLeds.map((led) => "<code>" + led + "</code>").join("")
             : "<span class='muted'>No LEDs selected</span>";
+        const definedLedIndices = rgbBuilderDefinedLedIndices();
+        const defined = definedLedIndices.length
+            ? definedLedIndices.map((led) => "<code>" + led + "</code>").join("")
+            : "<span class='muted'>No defined LEDs for this table</span>";
         return "<div id='rgbGroupBuilder' class='card'>" +
             "<div class='form-grid four'>" +
             "<label><span>table</span><select name='target'>" + optionsWithLabels(targetOptions, rgbGroupTarget) + "</select></label>" +
@@ -3965,7 +4000,8 @@ function getClientScript() {
             "<div class='toolbar' style='margin: 10px 0'>" +
             "<button data-action='clearRgbSelection'>Clear LEDs</button>" +
             "<button data-action='toggleRgbTrackball'>Trackball LED 56</button>" +
-            "<div class='rgb-selected-list'>" + selected + "</div>" +
+            "<div class='rgb-selected-list'><span class='rgb-led-list-label'>new row</span>" + selected + "</div>" +
+            "<div class='rgb-selected-list rgb-defined-list'><span class='rgb-led-list-label'>defined</span>" + defined + "</div>" +
             "</div>" +
             renderLayerTabs() +
             renderRgbGroupBoard(layer) +
@@ -3990,6 +4026,52 @@ function getClientScript() {
         if (target === "pdMode") return "pointing mode";
         if (target === "keyBehavior") return "semantic";
         return "layer";
+    }
+
+    function rgbBuilderGroupRowsForTarget(target) {
+        const rgb = model.rgb || {};
+        if (target === "layer") return rgb.layerLedGroups || [];
+        if (target === "pdMode") return rgb.pdModeLedGroups || [];
+        if (target === "combo") return rgb.comboFeedbackLedGroups || [];
+        if (target === "keyBehavior") return rgb.keyBehaviorFeedbackLedGroups || [];
+        return [];
+    }
+
+    function rgbBuilderDefinedRows() {
+        return rgbBuilderGroupRowsForTarget(rgbGroupTarget);
+    }
+
+    function rgbBuilderDefinedLedIndices() {
+        const seen = new Set();
+        for (const row of rgbBuilderDefinedRows()) {
+            for (const led of row.ledIndices || []) {
+                const ledIndex = Number(led);
+                if (Number.isInteger(ledIndex)) {
+                    seen.add(ledIndex);
+                }
+            }
+        }
+        return Array.from(seen).sort((left, right) => left - right);
+    }
+
+    function rgbBuilderDefinedPreviewForLed(ledIndex) {
+        const rows = rgbBuilderDefinedRows();
+        let row = undefined;
+        for (let index = rows.length - 1; index >= 0; index -= 1) {
+            const candidate = rows[index];
+            if ((candidate.ledIndices || []).some((led) => Number(led) === ledIndex)) {
+                row = candidate;
+                break;
+            }
+        }
+        if (!row) return undefined;
+        const allFeedback = rgbGroupTarget === "keyBehavior" && row.owner === keyBehaviorAllGroups;
+        const fill = allFeedback ? "url(#rgb-feedback-all-gradient)" : hsvToHex(row.color) || rgbBuilderHex();
+        return {
+            fill,
+            text: allFeedback ? "#ffffff" : idealText(fill),
+            allFeedback
+        };
     }
 
     function renderRgbBuilderColorControl() {
@@ -4057,11 +4139,42 @@ function getClientScript() {
         return hsvToHex(defaultRgbBuilderColor()) || "#000000";
     }
 
+    function rgbBuilderUsesAllFeedbackPreview() {
+        return rgbGroupTarget === "keyBehavior" && rgbGroupOwner === keyBehaviorAllGroups;
+    }
+
+    function rgbBuilderPreviewFill() {
+        return rgbBuilderUsesAllFeedbackPreview() ? "url(#rgb-feedback-all-gradient)" : rgbBuilderHex();
+    }
+
+    function rgbBuilderPreviewText() {
+        return rgbBuilderUsesAllFeedbackPreview() ? "#ffffff" : idealText(rgbBuilderHex());
+    }
+
+    function renderRgbAllFeedbackGradientDefs() {
+        if (!rgbBuilderUsesAllFeedbackPreview() && !rgbBuilderDefinedRows().some((row) => row.owner === keyBehaviorAllGroups)) return "";
+        const rows = keyBehaviorRgbSemanticColorRows();
+        if (!rows.length) return "";
+        const step = 100 / rows.length;
+        const stops = rows.map((row, index) => {
+            const color = hsvToHex(row.color) || "#000000";
+            const start = formatPercent(index * step);
+            const end = formatPercent((index + 1) * step);
+            return "<stop offset='" + start + "' stop-color='" + color + "'></stop>" +
+                "<stop offset='" + end + "' stop-color='" + color + "'></stop>";
+        }).join("");
+        return "<defs><linearGradient id='rgb-feedback-all-gradient' x1='0%' y1='0%' x2='100%' y2='0%'>" + stops + "</linearGradient></defs>";
+    }
+
+    function formatPercent(value) {
+        return Number(value.toFixed(4)) + "%";
+    }
+
     function updateRgbSelectionPreview() {
         const builder = document.getElementById("rgbGroupBuilder");
         if (!builder) return;
-        const fill = rgbBuilderHex();
-        const text = idealText(fill);
+        const fill = rgbBuilderPreviewFill();
+        const text = rgbBuilderPreviewText();
         for (const key of builder.querySelectorAll(".svg-key.rgb-selected")) {
             key.querySelector("[data-rgb-led-preview]")?.setAttribute("fill", fill);
             for (const label of key.querySelectorAll("text, tspan")) {
@@ -4082,6 +4195,7 @@ function getClientScript() {
         }
         return "<div class='board'>" +
             "<svg class='keyboard-svg' viewBox='0 0 " + keyboardGeometry.width + " " + keyboardGeometry.height + "' role='img' aria-label='RGB LED group selector'>" +
+            renderRgbAllFeedbackGradientDefs() +
             "<text x='32' y='40' fill='#dbe6e8' font-size='24' font-weight='650'>LED group selector</text>" +
             "<text x='32' y='68' fill='#a8b2b8' font-size='13'>Physical LED indices - " + escapeHtml(layer.name) + "</text>" +
             layer.positions.map(renderRgbSvgKey).join("") +
@@ -4094,14 +4208,16 @@ function getClientScript() {
         const ledIndex = layoutToLedIndex[position.layoutIndex];
         const visual = keyVisual(position.layoutIndex);
         const selected = rgbSelectedLeds.includes(ledIndex);
+        const definedPreview = rgbBuilderDefinedPreviewForLed(ledIndex);
         const style = keyStyle(position);
         const cx = visual.x + keyboardGeometry.keyWidth / 2;
         const cy = visual.y + keyboardGeometry.keyHeight / 2;
-        const selectedFill = selected ? rgbBuilderHex() : style.fill;
-        const selectedText = selected ? idealText(selectedFill) : style.text;
+        const allPreview = selected ? rgbBuilderUsesAllFeedbackPreview() : Boolean(definedPreview?.allFeedback);
+        const selectedFill = selected ? rgbBuilderPreviewFill() : definedPreview?.fill || style.fill;
+        const selectedText = selected ? rgbBuilderPreviewText() : definedPreview?.text || style.text;
         const tooltipText = "Click to add or remove LED " + ledIndex + " for " + (position.display || position.keycode) + " (" + position.keycode + ")";
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
-        return "<g class='svg-key " + (selected ? "rgb-selected" : "") + "' data-action='toggleRgbLed' data-led='" + ledIndex + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
+        return "<g class='svg-key " + (selected ? "rgb-selected" : "") + (definedPreview ? " rgb-defined" : "") + (allPreview ? " rgb-all-preview" : "") + "' data-action='toggleRgbLed' data-led='" + ledIndex + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect data-rgb-led-preview x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + selectedFill + "' stroke='" + (selected ? "#ffffff" : style.stroke) + "'></rect>" +
             renderSvgLabel((position.display || position.keycode) + " " + ledIndex, cx, cy, selectedText) +
             "</g>";
@@ -4109,10 +4225,12 @@ function getClientScript() {
 
     function renderExtraLed(ledIndex, cx, cy) {
         const selected = rgbSelectedLeds.includes(ledIndex);
-        const fill = selected ? rgbBuilderHex() : "#20262a";
-        const textColor = selected ? idealText(fill) : "#e7ecef";
+        const definedPreview = rgbBuilderDefinedPreviewForLed(ledIndex);
+        const allPreview = selected ? rgbBuilderUsesAllFeedbackPreview() : Boolean(definedPreview?.allFeedback);
+        const fill = selected ? rgbBuilderPreviewFill() : definedPreview?.fill || "#20262a";
+        const textColor = selected ? rgbBuilderPreviewText() : definedPreview?.text || "#e7ecef";
         const tooltipText = "Click to add or remove trackball LED " + ledIndex + " from the group builder.";
-        return "<g class='extra-led " + (selected ? "rgb-selected" : "") + "' data-action='toggleRgbTrackball' data-tooltip='" + escapeAttr(tooltipText) + "'>" +
+        return "<g class='extra-led " + (selected ? "rgb-selected" : "") + (definedPreview ? " rgb-defined" : "") + (allPreview ? " rgb-all-preview" : "") + "' data-action='toggleRgbTrackball' data-tooltip='" + escapeAttr(tooltipText) + "'>" +
             "<circle data-rgb-led-preview cx='" + cx + "' cy='" + cy + "' r='13' fill='" + fill + "' stroke='" + (selected ? "#ffffff" : "#31c6a4") + "'></circle>" +
             "<text x='" + cx + "' y='" + (cy + 1) + "' fill='" + textColor + "' font-size='10' text-anchor='middle' dominant-baseline='middle'>" + ledIndex + "</text>" +
             "</g>";
