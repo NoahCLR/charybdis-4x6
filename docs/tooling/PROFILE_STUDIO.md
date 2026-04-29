@@ -21,7 +21,7 @@ back to the same blocks.
 - `pd_mode_colors[]`
 - RGB LED group tables, including appending new inline `RGB_LED_GROUP(...)`
   rows by selecting physical LEDs on the RGB layout
-- auto-mouse fade destination
+- auto-mouse fade destination color and fade mode
 - combo feedback color/locality
 - key-behavior feedback colors, tap-branch colors, tap commit mode, and
   locality
@@ -35,17 +35,21 @@ an authored `key_behaviors[]` row, the behavior appears there, including when a
 key is later changed to an existing behavior-owned keycode.
 
 Normal keys can be entered as user-facing labels such as `A`, `Enter`, `Space`,
-or the classic transparent token `_______`; advanced QMK expressions still pass
-through when needed.
+the classic transparent token `_______`, or modifier chords such as
+`Shift+\`` and `Alt+Cmd+Esc`; advanced QMK expressions still pass through when
+needed. Read-only controls are styled separately from editable controls.
 
 All major panels are collapsible. The RGB page keeps a panel for every authored
 section in `rgb_config.c`, even when a table currently has no active rows.
-Tap-count tiers inside the behavior editor are collapsible too; repeat Hz is
-shown only for hold-tier helpers that can use `REPEAT_WHILE_HELD`.
+Nested color sections such as key-behavior tap branches are collapsible too.
+Named tap branch sections inside the behavior editor are collapsible; repeat Hz
+is shown only when the selected hold-tier helper is `REPEAT_WHILE_HELD`.
 
-The RGB page includes color-picker controls for editable colors. The picker
-updates the HSV fields and preview swatch; applying a card still writes the
-same `HSV(...)` expressions back to `rgb_config.c`.
+The RGB page includes color-picker controls for editable colors and dropdowns
+for fields with known option sets. The picker updates the HSV fields and
+preview swatches, including the dedicated swatch column in collapsed section
+summaries; applying a card still writes the same `HSV(...)` expressions back to
+`rgb_config.c`.
 
 For complex behavior rows, direct source editing is still expected after using
 the studio as a starter.

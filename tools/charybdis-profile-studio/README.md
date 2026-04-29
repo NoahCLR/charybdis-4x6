@@ -19,12 +19,21 @@ those two files.
   fallback used by the introspection report
 - click a key, edit it as a normal key label such as `A`, `Enter`, `Space`, or
   `_______`, and patch the matching `LAYOUT()` slot
+- edit modifier chords as user-facing labels such as `Shift+\`` or
+  `Alt+Cmd+Esc`
+- disabled/read-only fields are visually distinct from editable controls
 - view and save key behavior rows directly from the active layer page; the
   layer filters visible behavior rows by keys currently present on that layer
-- tap-count tiers in the behavior editor are collapsible, and repeat Hz is
-  only shown for hold helpers that can use `REPEAT_WHILE_HELD`
+- named tap branch sections in the behavior editor are collapsible, and
+  repeat Hz is only shown when the selected hold helper is
+  `REPEAT_WHILE_HELD`
+- key-behavior feedback color sections, including tap branch colors, are
+  collapsible
 - edit `layer_colors[]` HSV values and render mode
-- use color pickers with live swatches for editable RGB colors
+- use color pickers with live swatches for editable RGB colors, including a
+  dedicated preview column in collapsed section summaries
+- use dropdowns for RGB fields with fixed option sets, including auto-mouse
+  fade mode, combo locality, and key-behavior feedback policy
 - append RGB LED group rows by selecting keys on the physical RGB layout,
   including layer, pointing-mode, combo, and key-behavior feedback tables
 - inspect every active `rgb_config.c` surface, including LED group tables,

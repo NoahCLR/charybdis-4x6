@@ -33,7 +33,7 @@ const KEYMAP_CONFIG_RELATIVE_PATH = path.join(
 );
 
 const LAYOUT_SLOT_COUNT = 56;
-const TAP_COUNT_NAMES = ["single", "double", "triple", "quadruple", "quintuple"];
+const TAP_COUNT_NAMES = ["single tap branch", "double tap branch", "triple tap branch", "quadruple tap branch", "quintuple tap branch"];
 const HOLD_HELPERS = [
     "",
     "PRESS_AND_HOLD_UNTIL_RELEASE",
@@ -44,6 +44,31 @@ const HOLD_HELPERS = [
 const TAP_HELPERS = ["", "TAP_SENDS"];
 const LAYER_COLOR_MODES = ["ALL_KEYS", "KEYS_MAPPED_ON_THIS_LAYER_ONLY"];
 const RGB_LOCALITIES = ["RGB_BOTH_HALVES", "RGB_LEFT_HALF", "RGB_RIGHT_HALF", "RGB_KEY_HALF", "RGB_KEYS_ONLY"];
+const AUTOMOUSE_FADE_MODES = ["FOLLOW_REAL_DESTINATION", "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "END_COLOR_ON_ALL_KEYS"];
+const KEY_FEEDBACK_TAP_COMMIT_MODES = [
+    "KEY_FEEDBACK_TAP_COMMIT_OFF",
+    "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS",
+    "KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS",
+];
+const MOD_WRAPPER_LABELS = {
+    C: ["Ctrl"],
+    S: ["Shift"],
+    A: ["Alt"],
+    G: ["Cmd"],
+    LCTL: ["Ctrl"],
+    LSFT: ["Shift"],
+    LALT: ["Alt"],
+    LGUI: ["Cmd"],
+    RCTL: ["Right Ctrl"],
+    RSFT: ["Right Shift"],
+    RALT: ["Right Alt"],
+    RGUI: ["Right Cmd"],
+    LAG: ["Alt", "Cmd"],
+    LSG: ["Shift", "Cmd"],
+    LCAG: ["Ctrl", "Alt", "Cmd"],
+    MEH: ["Ctrl", "Shift", "Alt"],
+    HYPR: ["Ctrl", "Shift", "Alt", "Cmd"],
+};
 const RGB_LED_GROUP_TARGETS = {
     layer: {
         tableName: "layer_led_groups_data",
@@ -141,6 +166,8 @@ const USER_KEY_ALIASES = {
     "<": "KC_LABK",
     ">": "KC_RABK",
     "`": "KC_GRV",
+    grave: "KC_GRV",
+    backtick: "KC_GRV",
     "~": "KC_TILD",
     "!": "KC_EXLM",
     "@": "KC_AT",
@@ -348,6 +375,18 @@ async function handleWebviewMessage(panel, root, message) {
         case "updatePdModeColor":
             await patchPdModeColor(root, message.pointingMode, message.hue, message.sat, message.val, message.locality);
             await postModel(panel, root, "Updated rgb_config.c pointing-mode color.");
+            return;
+        case "updateAutomouseFade":
+            await patchAutomouseFade(root, message.mode, message.hue, message.sat, message.val);
+            await postModel(panel, root, "Updated rgb_config.c auto-mouse fade.");
+            return;
+        case "updateComboFeedback":
+            await patchComboFeedback(root, message.hue, message.sat, message.val, message.locality);
+            await postModel(panel, root, "Updated rgb_config.c combo feedback.");
+            return;
+        case "updateKeyBehaviorFeedback":
+            await patchKeyBehaviorFeedback(root, message.config);
+            await postModel(panel, root, "Updated rgb_config.c key behavior feedback.");
             return;
         case "addRgbLedGroup":
             await appendRgbLedGroup(root, message.group);
@@ -726,8 +765,15 @@ function parseKeyBehaviorFeedback(text) {
     }
 
     const fields = parseDesignatedFields(initializer.body);
-    const branchMatch = initializer.body.match(/RGB_TAP_BRANCH_COLORS\s*\(([\s\S]*?)\)\s*,/);
-    const branchColors = branchMatch ? splitTopLevel(branchMatch[1]).map(parseHsv).filter((color) => color.expression) : [];
+    let branchColors = [];
+    try {
+        branchColors = splitTopLevel(findCallBody(initializer.body, /RGB_TAP_BRANCH_COLORS\s*/))
+            .map(stripComments)
+            .map(parseHsv)
+            .filter((color) => color.expression);
+    } catch {
+        branchColors = [];
+    }
     return {
         tapPendingColor: parseHsv(fields[".tap_pending_color"]),
         tapBranchColors: branchColors,
@@ -833,6 +879,74 @@ async function patchPdModeColor(root, pointingMode, hue, sat, val, locality) {
         `HSV(${hue}, ${sat}, ${val})`
     );
     await writeText(filePath, next);
+}
+
+async function patchAutomouseFade(root, mode, hue, sat, val) {
+    assertAllowed(mode, AUTOMOUSE_FADE_MODES, "auto-mouse fade mode");
+    assertSafeHsv(hue, sat, val);
+
+    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const text = await fs.readFile(filePath, "utf8");
+    const initializer = findInitializerBody(text, /automouse_fade_end_config\s*=/);
+    let next = patchFieldExpressionInRange(text, initializer.bodyStart, initializer.bodyEnd, ".mode", mode);
+    next = patchFieldInInitializer(next, /automouse_fade_end_config\s*=/, ".end_color", hsvExpression(hue, sat, val));
+    await writeText(filePath, next);
+}
+
+async function patchComboFeedback(root, hue, sat, val, locality) {
+    assertSafeHsv(hue, sat, val);
+    assertAllowed(locality, RGB_LOCALITIES, "combo feedback locality");
+
+    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const text = await fs.readFile(filePath, "utf8");
+    const initializer = findInitializerBody(text, /combo_feedback_colors\s*=/);
+    let next = patchFieldExpressionInRange(text, initializer.bodyStart, initializer.bodyEnd, ".locality", locality);
+    next = patchFieldInInitializer(next, /combo_feedback_colors\s*=/, ".color", hsvExpression(hue, sat, val));
+    await writeText(filePath, next);
+}
+
+async function patchKeyBehaviorFeedback(root, config) {
+    const colors = {
+        tapPendingColor: normalizeHsvRequest(config?.tapPendingColor, "tap pending color"),
+        tapCommittedColor: normalizeHsvRequest(config?.tapCommittedColor, "tap committed color"),
+        holdActiveColor: normalizeHsvRequest(config?.holdActiveColor, "hold active color"),
+        longHoldActiveColor: normalizeHsvRequest(config?.longHoldActiveColor, "long-hold active color"),
+        tapBranchColors: Array.isArray(config?.tapBranchColors)
+            ? config.tapBranchColors.map((color, index) => normalizeHsvRequest(color, `tap branch ${index} color`))
+            : [],
+    };
+    const tapCommitMode = normalizeExpr(config?.tapCommitMode || "");
+    const locality = normalizeExpr(config?.locality || "");
+    assertAllowed(tapCommitMode, KEY_FEEDBACK_TAP_COMMIT_MODES, "tap commit mode");
+    assertAllowed(locality, RGB_LOCALITIES, "key behavior feedback locality");
+
+    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    let text = await fs.readFile(filePath, "utf8");
+    text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_pending_color", colors.tapPendingColor.expression);
+    text = patchRgbTapBranchColorsInInitializer(text, /key_behavior_feedback_colors\s*=/, colors.tapBranchColors);
+    text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_committed_color", colors.tapCommittedColor.expression);
+    text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_commit_mode", tapCommitMode);
+    text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".hold_active_color", colors.holdActiveColor.expression);
+    text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".long_hold_active_color", colors.longHoldActiveColor.expression);
+    text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".locality", locality);
+    await writeText(filePath, text);
+}
+
+function normalizeHsvRequest(color, label) {
+    const hue = color?.hue;
+    const sat = color?.sat;
+    const val = color?.val;
+    assertSafeHsv(hue, sat, val);
+    return {
+        hue: normalizeExpr(hue),
+        sat: normalizeExpr(sat),
+        val: normalizeExpr(val),
+        expression: hsvExpression(hue, sat, val),
+    };
+}
+
+function hsvExpression(hue, sat, val) {
+    return `HSV(${normalizeExpr(hue)}, ${normalizeExpr(sat)}, ${normalizeExpr(val)})`;
 }
 
 async function appendRgbLedGroup(root, group) {
@@ -1206,9 +1320,56 @@ function patchFieldExpressionInRange(text, start, end, field, replacement) {
     return replaceRange(text, valueStart, valueEnd, replacement);
 }
 
+function patchFieldInInitializer(text, initializerPattern, field, replacement) {
+    const initializer = findInitializerBody(text, initializerPattern);
+    return patchFieldExpressionInRange(text, initializer.bodyStart, initializer.bodyEnd, field, replacement);
+}
+
+function patchRgbTapBranchColorsInInitializer(text, initializerPattern, colors) {
+    if (!colors.length) {
+        return text;
+    }
+
+    const initializer = findInitializerBody(text, initializerPattern);
+    const slice = text.slice(initializer.bodyStart, initializer.bodyEnd);
+    const pattern = /RGB_TAP_BRANCH_COLORS\s*/;
+    const match = pattern.exec(slice);
+    if (!match) {
+        throw new Error("Could not find RGB_TAP_BRANCH_COLORS(...).");
+    }
+    const open = slice.indexOf("(", match.index + match[0].length);
+    if (open === -1) {
+        throw new Error("Could not find RGB_TAP_BRANCH_COLORS(...) arguments.");
+    }
+    const close = findMatching(slice, open, "(", ")");
+    const args = slice.slice(open + 1, close);
+    const items = splitTopLevelWithRanges(args);
+    if (items.length !== colors.length) {
+        throw new Error(`Expected ${items.length} tap branch colors, got ${colors.length}.`);
+    }
+
+    let next = text;
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+        const item = items[index];
+        const itemText = args.slice(item.start, item.end);
+        const hsvMatch = /HSV\s*\([^)]*\)/.exec(itemText);
+        if (!hsvMatch) {
+            throw new Error(`Could not patch tap branch color ${index}.`);
+        }
+        const absoluteStart = initializer.bodyStart + open + 1 + item.start + hsvMatch.index;
+        const absoluteEnd = absoluteStart + hsvMatch[0].length;
+        next = replaceRange(next, absoluteStart, absoluteEnd, colors[index].expression);
+    }
+    return next;
+}
+
 function parseDesignatedFields(body) {
     const fields = {};
-    for (const item of splitTopLevel(body)) {
+    for (const rawItem of splitTopLevel(body)) {
+        const item = stripComments(rawItem).trim();
+        if (!item) {
+            continue;
+        }
         const eq = findTopLevelEquals(item);
         if (eq === -1) {
             continue;
@@ -1567,6 +1728,11 @@ function normalizeUserKeyExpression(value) {
         return alias;
     }
 
+    const chord = normalizeFriendlyChord(compact);
+    if (chord) {
+        return chord;
+    }
+
     if (/^[a-zA-Z]$/.test(raw)) {
         return `KC_${raw.toUpperCase()}`;
     }
@@ -1578,6 +1744,82 @@ function normalizeUserKeyExpression(value) {
     return compact;
 }
 
+function normalizeFriendlyChord(value) {
+    const parts = String(value || "")
+        .split("+")
+        .map((part) => part.trim())
+        .filter(Boolean);
+    if (parts.length < 2) {
+        return "";
+    }
+
+    const key = normalizeUserKeyExpression(parts[parts.length - 1]);
+    if (!key) {
+        return "";
+    }
+
+    const modifiers = [];
+    for (const part of parts.slice(0, -1)) {
+        const modifier = normalizeFriendlyModifier(part);
+        if (!modifier) {
+            return "";
+        }
+        if (!modifiers.includes(modifier)) {
+            modifiers.push(modifier);
+        }
+    }
+
+    const wrapper = wrapperForModifiers(modifiers);
+    if (!wrapper) {
+        return "";
+    }
+    return `${wrapper}(${key})`;
+}
+
+function normalizeFriendlyModifier(value) {
+    const normalized = String(value || "").toLowerCase().replace(/[\s_-]+/g, "");
+    return {
+        ctrl: "Ctrl",
+        control: "Ctrl",
+        lctrl: "Ctrl",
+        leftctrl: "Ctrl",
+        shift: "Shift",
+        lshift: "Shift",
+        leftshift: "Shift",
+        alt: "Alt",
+        option: "Alt",
+        lalt: "Alt",
+        leftalt: "Alt",
+        ralt: "Right Alt",
+        rightalt: "Right Alt",
+        cmd: "Cmd",
+        command: "Cmd",
+        gui: "Cmd",
+        win: "Cmd",
+        meta: "Cmd",
+        lgui: "Cmd",
+        leftgui: "Cmd",
+        rctrl: "Right Ctrl",
+        rightctrl: "Right Ctrl",
+        rshift: "Right Shift",
+        rightshift: "Right Shift",
+        rgui: "Right Cmd",
+        rightgui: "Right Cmd",
+        rightcmd: "Right Cmd",
+    }[normalized] || "";
+}
+
+function wrapperForModifiers(modifiers) {
+    const key = modifiers.map(normalizeFriendlyModifier).filter(Boolean).sort().join("+");
+    for (const [wrapper, labels] of Object.entries(MOD_WRAPPER_LABELS)) {
+        const candidate = labels.map(normalizeFriendlyModifier).filter(Boolean).sort().join("+");
+        if (candidate === key) {
+            return wrapper;
+        }
+    }
+    return "";
+}
+
 function displayKeycode(keycode) {
     const normalized = normalizeExpr(keycode);
     return displayKeyExpression(normalized);
@@ -1586,7 +1828,7 @@ function displayKeycode(keycode) {
 function editLabelForKeycode(keycode) {
     const normalized = normalizeExpr(keycode);
     const simple = QMK_KEY_LABELS[normalized];
-    return simple || normalized;
+    return simple || editableKeyExpression(normalized);
 }
 
 function displayKeyExpression(expression) {
@@ -1605,10 +1847,12 @@ function displayKeyExpression(expression) {
         return `Hold ${titleCase(match[1])}`;
     }
 
-    match = normalized.match(/^([GAS])\((.+)\)$/);
+    match = normalized.match(/^([A-Z][A-Z0-9_]*)\((.+)\)$/);
     if (match) {
-        const modifier = { G: "Cmd", A: "Alt", S: "Shift" }[match[1]];
-        return `${modifier}+${displayKeyExpression(match[2])}`;
+        const modifiers = MOD_WRAPPER_LABELS[match[1]];
+        if (modifiers) {
+            return `${modifiers.join("+")}+${displayKeyExpression(match[2])}`;
+        }
     }
 
     match = normalized.match(/^VIA_MACRO_(\d+)$/);
@@ -1635,6 +1879,15 @@ function displayKeyExpression(expression) {
         return titleCase(normalized.slice(3));
     }
 
+    return normalized;
+}
+
+function editableKeyExpression(expression) {
+    const normalized = normalizeExpr(expression);
+    const match = normalized.match(/^([A-Z][A-Z0-9_]*)\((.+)\)$/);
+    if (match && MOD_WRAPPER_LABELS[match[1]]) {
+        return displayKeyExpression(normalized);
+    }
     return normalized;
 }
 
@@ -1731,6 +1984,9 @@ function getStudioHtml() {
             --key-active: #245d55;
         }
         * { box-sizing: border-box; }
+        [hidden] {
+            display: none !important;
+        }
         body {
             margin: 0;
             background: var(--bg);
@@ -1773,6 +2029,22 @@ function getStudioHtml() {
             min-height: 32px;
             padding: 5px 8px;
             width: 100%;
+        }
+        input:not(:disabled), select:not(:disabled) {
+            border-color: #60707a;
+            background: #20262a;
+            box-shadow: inset 0 0 0 1px rgba(49, 198, 164, 0.08);
+        }
+        input:disabled, select:disabled {
+            border-style: dashed;
+            border-color: rgba(168, 178, 184, 0.38);
+            background: rgba(32, 38, 42, 0.46);
+            color: rgba(168, 178, 184, 0.72);
+            cursor: not-allowed;
+            opacity: 1;
+        }
+        input:disabled::selection {
+            background: transparent;
         }
         main {
             display: block;
@@ -1929,6 +2201,39 @@ function getStudioHtml() {
             display: inline;
             margin-left: 4px;
         }
+        .rgb-subsection > summary {
+            cursor: pointer;
+            list-style-position: outside;
+        }
+        .rgb-summary {
+            display: inline-grid;
+            grid-template-columns: minmax(110px, 180px) 84px minmax(0, 1fr);
+            align-items: center;
+            gap: 10px;
+            width: calc(100% - 22px);
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+        .rgb-summary-title {
+            color: var(--text);
+            font-weight: 650;
+            min-width: 0;
+        }
+        .rgb-summary-swatch {
+            display: block;
+            width: 80px;
+            height: 26px;
+        }
+        .rgb-summary code {
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            overflow-wrap: normal;
+        }
+        .rgb-subsection > .rgb-subsection-body {
+            margin-top: 10px;
+        }
         .swatch {
             width: 100%;
             height: 34px;
@@ -2018,6 +2323,11 @@ function getClientScript() {
         ["macros", "Macros & combos"],
         ["rgb", "RGB"]
     ];
+    const qmkKeyLabels = ${JSON.stringify(QMK_KEY_LABELS)};
+    const modWrapperLabels = ${JSON.stringify(MOD_WRAPPER_LABELS)};
+    const rgbLocalities = ${JSON.stringify(RGB_LOCALITIES)};
+    const automouseFadeModes = ${JSON.stringify(AUTOMOUSE_FADE_MODES)};
+    const keyFeedbackTapCommitModes = ${JSON.stringify(KEY_FEEDBACK_TAP_COMMIT_MODES)};
     const keyBehaviorRgbSemantics = [
         "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH",
         "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED",
@@ -2129,6 +2439,38 @@ function getClientScript() {
                 val: value(card, "v"),
                 locality: value(card, "locality")
             });
+        } else if (action === "updateAutomouseFade") {
+            const card = target.closest(".card");
+            post({
+                type: "updateAutomouseFade",
+                mode: value(card, "mode"),
+                hue: value(card, "h"),
+                sat: value(card, "s"),
+                val: value(card, "v")
+            });
+        } else if (action === "updateComboFeedback") {
+            const card = target.closest(".card");
+            post({
+                type: "updateComboFeedback",
+                hue: value(card, "h"),
+                sat: value(card, "s"),
+                val: value(card, "v"),
+                locality: value(card, "locality")
+            });
+        } else if (action === "updateKeyBehaviorFeedback") {
+            const card = document.getElementById("keyBehaviorFeedbackCard");
+            post({
+                type: "updateKeyBehaviorFeedback",
+                config: {
+                    tapPendingColor: readColorControl(card, "tapPendingColor"),
+                    tapBranchColors: Array.from(card.querySelectorAll("[data-tap-branch-color]")).map(readColorControlFromNode),
+                    tapCommittedColor: readColorControl(card, "tapCommittedColor"),
+                    holdActiveColor: readColorControl(card, "holdActiveColor"),
+                    longHoldActiveColor: readColorControl(card, "longHoldActiveColor"),
+                    tapCommitMode: value(card, "tapCommitMode"),
+                    locality: value(card, "locality")
+                }
+            });
         } else if (action === "addRgbLedGroup") {
             const form = document.getElementById("rgbGroupBuilder");
             post({
@@ -2176,6 +2518,9 @@ function getClientScript() {
             rgbBuilderColor = undefined;
             render();
         }
+        if (event.target?.matches("[data-helper-select]")) {
+            updateHelperFields(event.target.id.replace(/Helper$/, ""));
+        }
     });
 
     app.addEventListener("input", (event) => {
@@ -2201,6 +2546,18 @@ function getClientScript() {
 
     function value(root, name) {
         return root.querySelector("[name='" + name + "']").value;
+    }
+
+    function readColorControl(root, id) {
+        return readColorControlFromNode(root.querySelector("[data-color-id='" + id + "']"));
+    }
+
+    function readColorControlFromNode(control) {
+        return {
+            hue: value(control, "h"),
+            sat: value(control, "s"),
+            val: value(control, "v")
+        };
     }
 
     function toggleRgbLed(ledIndex) {
@@ -2310,7 +2667,7 @@ function getClientScript() {
         };
         const steps = [];
         for (let index = 0; index < 5; index += 1) {
-            steps.push(row.steps.find((step) => step.tapCount === index) || { tapCount: index, tapCountName: ["single", "double", "triple", "quadruple", "quintuple"][index] });
+            steps.push(row.steps.find((step) => step.tapCount === index) || { tapCount: index, tapCountName: tapBranchName(index) });
         }
         return "<h3>Behavior on this key</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
@@ -2324,6 +2681,10 @@ function getClientScript() {
             steps.map(renderBehaviorStepEditor).join("") +
             "</div>" +
             "<button data-action='saveSelectedBehavior' class='primary' style='margin-top: 10px'>Save behavior row</button>";
+    }
+
+    function tapBranchName(index) {
+        return ["single", "double", "triple", "quadruple", "quintuple"][index] + " tap branch";
     }
 
     function renderBehaviorStepEditor(step) {
@@ -2340,11 +2701,22 @@ function getClientScript() {
 
     function renderActionEditor(id, label, action, helpers) {
         const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
+        const repeatHidden = action?.helper === "REPEAT_WHILE_HELD" ? "" : " hidden";
         return "<div class='stack'>" +
-            "<label><span>" + label + " helper</span><select id='" + id + "Helper'>" + options(helpers, action?.helper || "") + "</select></label>" +
-            "<label><span>" + label + " action</span><input id='" + id + "Action' value='" + escapeAttr(editableActionValue(action)) + "' placeholder='Esc'></label>" +
-            (hasRepeat ? "<label><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
+            "<label><span>" + label + " helper</span><select id='" + id + "Helper' data-helper-select>" + options(helpers, action?.helper || "") + "</select></label>" +
+            "<label><span>" + label + " action</span><input id='" + id + "Action' value='" + escapeAttr(editableActionValue(action)) + "' placeholder='Esc, Shift+\`, Cmd+Q'></label>" +
+            (hasRepeat ? "<label data-helper-field data-helper-prefix='" + id + "' data-helper-value='REPEAT_WHILE_HELD'" + repeatHidden + "><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
             "</div>";
+    }
+
+    function updateHelperFields(prefix) {
+        const helper = document.getElementById(prefix + "Helper")?.value || "";
+        for (const field of document.querySelectorAll("[data-helper-prefix='" + prefix + "']")) {
+            const values = String(field.dataset.helperValue || "").split(" ");
+            const visible = values.includes(helper);
+            field.hidden = !visible;
+            field.style.display = visible ? "" : "none";
+        }
     }
 
     function stepHasAction(step) {
@@ -2353,8 +2725,7 @@ function getClientScript() {
 
     function editableActionValue(action) {
         if (!action) return "";
-        const display = displayAction(action.action);
-        return display === action.action ? action.action : display;
+        return editableActionExpression(action.action);
     }
 
     function renderBoard(layer) {
@@ -2650,7 +3021,7 @@ function getClientScript() {
 
     function renderBehaviorForm() {
         return "<div class='card'>" +
-            "<h3>Append simple single-tap row</h3>" +
+            "<h3>Append simple single tap branch row</h3>" +
             "<div class='form-grid'>" +
             "<label><span>Key</span><input id='behaviorKeycode' placeholder='A'></label>" +
             "<label><span>tap_hold_term</span><input id='behaviorTapHoldTerm' placeholder='150'></label>" +
@@ -2663,11 +3034,11 @@ function getClientScript() {
 
     function renderActionInputs(prefix, label, helpers) {
         const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
-        return "<label><span>" + label + " helper</span><select id='" + prefix + "Helper'>" +
+        return "<label><span>" + label + " helper</span><select id='" + prefix + "Helper' data-helper-select>" +
             helpers.map((helper) => "<option value='" + escapeAttr(helper) + "'>" + escapeHtml(helper || "none") + "</option>").join("") +
             "</select></label>" +
-            "<label><span>" + label + " action</span><input id='" + prefix + "Action' placeholder='Esc'></label>" +
-            (hasRepeat ? "<label><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
+            "<label><span>" + label + " action</span><input id='" + prefix + "Action' placeholder='Esc, Shift+\`, Cmd+Q'></label>" +
+            (hasRepeat ? "<label data-helper-field data-helper-prefix='" + prefix + "' data-helper-value='REPEAT_WHILE_HELD' hidden><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
     }
 
     function renderStep(step) {
@@ -2860,7 +3231,7 @@ function getClientScript() {
             "<strong><code>" + escapeHtml(row.pointingMode) + "</code></strong>" +
             renderHsvColorControl(row.color) +
             "<div class='form-grid four'>" +
-            "<label><span>locality</span><select name='locality'>" + options(["RGB_BOTH_HALVES", "RGB_LEFT_HALF", "RGB_RIGHT_HALF", "RGB_KEY_HALF", "RGB_KEYS_ONLY"], row.locality) + "</select></label>" +
+            "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, row.locality) + "</select></label>" +
             "<button data-action='updatePdModeColor' class='primary'>Apply</button>" +
             "</div></div>";
     }
@@ -2871,11 +3242,11 @@ function getClientScript() {
         }
         return "<div class='card'>" +
             "<strong>Fade destination</strong>" +
-            renderSwatch(config.end_color) +
-            "<table><tbody>" +
-            "<tr><th>Mode</th><td><code>" + escapeHtml(config.mode || "") + "</code></td></tr>" +
-            "<tr><th>End color</th><td><code>" + escapeHtml(config.end_color?.expression || "") + "</code></td></tr>" +
-            "</tbody></table>" +
+            renderHsvColorControl(config.end_color) +
+            "<div class='form-grid four'>" +
+            "<label><span>mode</span><select name='mode'>" + options(automouseFadeModes, config.mode) + "</select></label>" +
+            "<button data-action='updateAutomouseFade' class='primary'>Apply</button>" +
+            "</div>" +
             "</div>";
     }
 
@@ -2885,11 +3256,11 @@ function getClientScript() {
         }
         return "<div class='card'>" +
             "<strong>Active combo color</strong>" +
-            renderSwatch(config.color) +
-            "<table><tbody>" +
-            "<tr><th>Color</th><td><code>" + escapeHtml(config.color?.expression || "") + "</code></td></tr>" +
-            "<tr><th>Locality</th><td><code>" + escapeHtml(config.locality || "") + "</code></td></tr>" +
-            "</tbody></table>" +
+            renderHsvColorControl(config.color) +
+            "<div class='form-grid four'>" +
+            "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, config.locality) + "</select></label>" +
+            "<button data-action='updateComboFeedback' class='primary'>Apply</button>" +
+            "</div>" +
             "</div>";
     }
 
@@ -2898,21 +3269,45 @@ function getClientScript() {
             return "<p class='muted'>No active key behavior feedback config parsed.</p>";
         }
         const colorRows = [
-            ["Tap pending", config.tapPendingColor],
-            ["Tap committed", config.tapCommittedColor],
-            ["Hold active", config.holdActiveColor],
-            ["Long hold active", config.longHoldActiveColor],
+            ["Tap pending", "tapPendingColor", config.tapPendingColor],
+            ["Tap committed", "tapCommittedColor", config.tapCommittedColor],
+            ["Hold active", "holdActiveColor", config.holdActiveColor],
+            ["Long hold active", "longHoldActiveColor", config.longHoldActiveColor],
         ];
-        const branchRows = (config.tapBranchColors || []).map((color, index) => ["Tap branch " + index, color]);
-        return "<div class='card-list'>" +
-            "<div class='card'><table><tbody>" +
-            "<tr><th>Tap commit mode</th><td><code>" + escapeHtml(config.tapCommitMode || "") + "</code></td></tr>" +
-            "<tr><th>Locality</th><td><code>" + escapeHtml(config.locality || "") + "</code></td></tr>" +
-            "</tbody></table></div>" +
-            colorRows.concat(branchRows).map(([label, color]) =>
-                "<div class='card'><strong>" + escapeHtml(label) + "</strong>" + renderSwatch(color) + "<code>" + escapeHtml(color?.expression || "") + "</code></div>"
+        const branchRows = (config.tapBranchColors || []).map((color, index) => ["Tap branch " + index, "tapBranchColor" + index, color]);
+        return "<div id='keyBehaviorFeedbackCard' class='card-list'>" +
+            "<div class='card'>" +
+            "<div class='form-grid four'>" +
+            "<label><span>tap commit mode</span><select name='tapCommitMode'>" + options(keyFeedbackTapCommitModes, config.tapCommitMode) + "</select></label>" +
+            "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, config.locality) + "</select></label>" +
+            "<button data-action='updateKeyBehaviorFeedback' class='primary'>Apply</button>" +
+            "</div>" +
+            "</div>" +
+            colorRows.map(([label, id, color]) =>
+                renderRgbColorSubpanel(label, id, color)
+            ).join("") +
+            branchRows.map(([label, id, color]) =>
+                renderRgbColorSubpanel(label, id, color, " data-tap-branch-color")
             ).join("") +
             "</div>";
+    }
+
+    function renderRgbColorSubpanel(label, id, color, extraAttrs = "") {
+        return "<details class='card rgb-subsection'>" +
+            "<summary><span class='rgb-summary'>" +
+            "<span class='rgb-summary-title'>" + escapeHtml(label) + "</span>" +
+            renderSummarySwatch(color) +
+            "<code class='muted' data-summary-expression>" + escapeHtml(colorExpression(color)) + "</code>" +
+            "</span></summary>" +
+            "<div class='rgb-subsection-body'>" + renderHsvColorControl(color, id, extraAttrs) + "</div>" +
+            "</details>";
+    }
+
+    function renderSummarySwatch(color) {
+        const fill = hsvToHex(color) || "#000000";
+        return "<svg class='rgb-summary-swatch' viewBox='0 0 80 26' role='img' aria-label='Color preview'>" +
+            "<rect data-summary-swatch x='1' y='1' width='78' height='24' rx='5' fill='" + fill + "' stroke='#ffffff' stroke-opacity='0.38' stroke-width='1'></rect>" +
+            "</svg>";
     }
 
     function renderLedGroupTable(rows, ownerLabel) {
@@ -2930,9 +3325,10 @@ function getClientScript() {
             "</tbody></table>";
     }
 
-    function renderHsvColorControl(color) {
+    function renderHsvColorControl(color, id, extraAttrs = "") {
         const hex = hsvToHex(color) || "#000000";
-        return "<div class='color-control' data-color-control>" +
+        const idAttr = id ? " data-color-id='" + escapeAttr(id) + "'" : "";
+        return "<div class='color-control' data-color-control" + idAttr + extraAttrs + ">" +
             "<div class='swatch' data-color-swatch style='background: " + hex + "' title='" + escapeAttr(color?.expression || "") + "'></div>" +
             "<div class='color-row'>" +
             "<label><span>picker</span><input type='color' data-color-picker value='" + hex + "'></label>" +
@@ -2953,10 +3349,9 @@ function getClientScript() {
         return "<div class='swatch' style='background: " + css + "' title='" + escapeAttr(color?.expression || "") + "'></div>";
     }
 
-    function renderInlineSwatch(color) {
-        const fill = hsvToHex(color);
-        if (!fill) return "";
-        return "<span class='inline-swatch' style='background: " + fill + "'></span>";
+    function renderInlineSwatch(color, extraAttrs = "") {
+        const fill = hsvToHex(color) || "#000000";
+        return "<span class='inline-swatch' style='background: " + fill + "' title='" + escapeAttr(colorExpression(color)) + "'" + extraAttrs + "></span>";
     }
 
     function hsvToCss(color) {
@@ -2987,6 +3382,17 @@ function getClientScript() {
         if (expression) {
             expression.textContent = colorExpression(color);
         }
+        const subsection = control.closest(".rgb-subsection");
+        if (subsection) {
+            const summarySwatch = subsection.querySelector("[data-summary-swatch]");
+            const summaryExpression = subsection.querySelector("[data-summary-expression]");
+            if (summarySwatch) {
+                summarySwatch.setAttribute("fill", hex);
+            }
+            if (summaryExpression) {
+                summaryExpression.textContent = colorExpression(color);
+            }
+        }
     }
 
     function hsvToHex(color) {
@@ -2994,7 +3400,7 @@ function getClientScript() {
         const h = Number(color.h);
         const s = Number(color.s);
         const v = numericChannel(color.v);
-        if (!Number.isFinite(h) || !Number.isFinite(s) || !Number.isFinite(v) || v <= 0) return "";
+        if (!Number.isFinite(h) || !Number.isFinite(s) || !Number.isFinite(v) || v < 0) return "";
         const rgb = hsvToRgb(h / 255, s / 255, v / 255);
         return rgbToHex(rgb.r, rgb.g, rgb.b);
     }
@@ -3112,42 +3518,59 @@ function getClientScript() {
     }
 
     function displayAction(value) {
-        const text = String(value || "");
-        if (!text) return "";
-        if (!text.startsWith("KC_") && !text.includes("_") && !text.includes("(")) return text;
-        const simple = {
-            "_______": "_______",
-            "XXXXXXX": "Disabled",
-            "KC_ESC": "Esc",
-            "KC_TAB": "Tab",
-            "KC_ENT": "Enter",
-            "KC_SPC": "Space",
-            "KC_BSPC": "Backspace",
-            "KC_DEL": "Delete",
-            "KC_CAPS": "Caps Lock",
-            "KC_LEFT": "Left",
-            "KC_RIGHT": "Right",
-            "KC_RGHT": "Right",
-            "KC_UP": "Up",
-            "KC_DOWN": "Down",
-            "KC_LEFT_SHIFT": "Left Shift",
-            "KC_RIGHT_ALT": "Right Alt",
-            "KC_LEFT_GUI": "Left Cmd",
-            "KC_MPLY": "Play",
-            "KC_MNXT": "Next",
-            "KC_MPRV": "Previous",
-            "KC_MUTE": "Mute",
-            "MS_BTN1": "Mouse 1",
-            "MS_BTN2": "Mouse 2",
-            "MS_BTN3": "Mouse 3"
-        };
-        for (let index = 0; index <= 9; index += 1) simple["KC_" + index] = String(index);
-        for (let code = 65; code <= 90; code += 1) {
-            const letter = String.fromCharCode(code);
-            simple["KC_" + letter] = letter;
+        return displayKeyExpression(value);
+    }
+
+    function editableActionExpression(value) {
+        const normalized = normalizeDisplayExpression(value);
+        const match = normalized.match(/^([A-Z][A-Z0-9_]*)\\((.+)\\)$/);
+        if (match && modWrapperLabels[match[1]]) {
+            return displayKeyExpression(normalized);
         }
-        if (simple[text]) return simple[text];
-        return text.replace(/^KC_/, "").replace(/_/g, " ").toLowerCase().replace(/\\b\\w/g, (char) => char.toUpperCase());
+        return qmkKeyLabels[normalized] || normalized;
+    }
+
+    function displayKeyExpression(value) {
+        const normalized = normalizeDisplayExpression(value);
+        if (!normalized) return "";
+        if (qmkKeyLabels[normalized]) return qmkKeyLabels[normalized];
+
+        let match = normalized.match(/^LT\\(LAYER_([^,]+),\\s*(.+)\\)$/);
+        if (match) return displayKeyExpression(match[2]) + " / hold " + titleCase(match[1]);
+
+        match = normalized.match(/^MO\\(LAYER_([^)]+)\\)$/);
+        if (match) return "Hold " + titleCase(match[1]);
+
+        match = normalized.match(/^([A-Z][A-Z0-9_]*)\\((.+)\\)$/);
+        if (match && modWrapperLabels[match[1]]) {
+            return modWrapperLabels[match[1]].join("+") + "+" + displayKeyExpression(match[2]);
+        }
+        if (match) return normalized;
+
+        match = normalized.match(/^VIA_MACRO_(\\d+)$/);
+        if (match) return "VIA Macro " + match[1];
+
+        match = normalized.match(/^MACRO_(\\d+)$/);
+        if (match) return "Macro " + match[1];
+
+        if (normalized.endsWith("_MODE_LOCK")) return titleCase(normalized.replace(/_MODE_LOCK$/, "")) + " Lock";
+        if (normalized.endsWith("_MODE")) return titleCase(normalized.replace(/_MODE$/, ""));
+        if (normalized.endsWith("_LOCK")) return titleCase(normalized.replace(/_LOCK$/, "")) + " Lock";
+        if (normalized.startsWith("KC_")) return titleCase(normalized.slice(3));
+        return normalized;
+    }
+
+    function normalizeDisplayExpression(value) {
+        return String(value || "").replace(/\\s+/g, " ").replace(/\\s*,\\s*/g, ", ").trim();
+    }
+
+    function titleCase(value) {
+        return String(value || "")
+            .toLowerCase()
+            .split("_")
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(" ");
     }
 
     function escapeHtml(value) {
