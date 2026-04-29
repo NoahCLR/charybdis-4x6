@@ -2997,6 +2997,7 @@ function getClientScript() {
     };
     keyBehaviorRgbSemanticLabels[keyBehaviorAllGroups] = "All feedback groups";
     const keyPickerModifiers = ["Ctrl", "Shift", "Alt", "Cmd", "Right Ctrl", "Right Shift", "Right Alt", "Right Cmd"];
+    const keyPickerLayerTapPrefix = "__LT_LAYER__:";
     const keyPickerSections = [
         {
             id: "qwerty",
@@ -3057,6 +3058,12 @@ function getClientScript() {
                 ["KC_WH_U", "KC_WH_D", "KC_WH_L", "KC_WH_R"],
                 ["KC_ACL0", "KC_ACL1", "KC_ACL2"]
             ]
+        },
+        {
+            id: "qmk-all",
+            label: "All QMK",
+            kind: "allQmk",
+            rows: []
         },
         {
             id: "layers",
@@ -3156,9 +3163,13 @@ function getClientScript() {
             choosePickerKey(target.dataset.value);
         } else if (action === "removeKey") {
             removePickerKey(Number(target.dataset.index));
+        } else if (action === "clearLayerTap") {
+            keyPicker.layerTapLayer = "";
+            renderKeyPicker();
         } else if (action === "clear") {
             keyPicker.mods = [];
             keyPicker.keys = [];
+            keyPicker.layerTapLayer = "";
             renderKeyPicker();
         } else if (action === "cancel") {
             closeKeyPicker();
@@ -3763,6 +3774,7 @@ function getClientScript() {
             mode: mode === "list" ? "list" : "single",
             section: "qwerty",
             search: "",
+            layerTapLayer: "",
             mods: [],
             keys: []
         };
@@ -3775,6 +3787,13 @@ function getClientScript() {
         if (!text || !keyPicker) return;
         if (keyPicker.mode === "list") {
             keyPicker.keys = text.split(",").map((part) => part.trim()).filter(Boolean);
+            return;
+        }
+        const layerTap = text.match(/^LT\((LAYER_[A-Z0-9_]+),\s*(.+)\)$/);
+        if (layerTap) {
+            keyPicker.section = "layers";
+            keyPicker.layerTapLayer = layerTap[1];
+            keyPicker.keys = [layerTap[2].trim()];
             return;
         }
         const parts = text.split("+").map((part) => part.trim()).filter(Boolean);
@@ -3805,7 +3824,7 @@ function getClientScript() {
             "<div><h2>Pick Keycode</h2><div class='muted'>" + escapeHtml(keyPicker.mode === "list" ? "Select one or more keys for a comma-separated combo input list." : "Select one key, optionally with modifiers.") + "</div></div>" +
             "<button data-picker-action='cancel'>Close</button>" +
             "</div>" +
-            (keyPicker.mode === "list" ? "" : (
+            (keyPicker.mode === "list" || keyPicker.layerTapLayer ? "" : (
                 "<div class='key-picker-mods'>" +
                 "<span class='muted'>Mods</span>" +
                 keyPickerModifiers.map((modifier) => "<button class='key-picker-mod " + (keyPicker.mods.includes(modifier) ? "selected" : "") + "' data-picker-action='modifier' data-modifier='" + escapeAttr(modifier) + "'>" + escapeHtml(modifier) + "</button>").join("") +
@@ -3820,6 +3839,7 @@ function getClientScript() {
             "<div class='stack'>" +
             "<div class='key-picker-selection'>" +
             "<span class='muted'>Selected</span>" +
+            (keyPicker.layerTapLayer ? "<button data-picker-action='clearLayerTap' data-tooltip='Layer-tap target layer. Pick a tap key from any section to build LT(layer, key).'>LT " + escapeHtml(layerShortName(keyPicker.layerTapLayer)) + "</button>" : "") +
             keyPicker.keys.map((key, index) => "<button data-picker-action='removeKey' data-index='" + index + "'>" + escapeHtml(displayKeyExpression(key)) + "</button>").join("") +
             (keyPicker.keys.length ? "" : "<span class='muted'>No key selected</span>") +
             "</div>" +
@@ -3839,11 +3859,32 @@ function getClientScript() {
             if (section.id === "layers") {
                 return {
                     ...section,
-                    rows: model.layers.map((layer) => [
-                        "MO(" + layer.name + ")",
-                        "LOCK_LAYER(" + layer.name + ")",
-                        "LT(" + layer.name + ", KC_SPC)"
-                    ])
+                    rows: model.layers.map((layer) => {
+                        const actions = [{
+                            value: "MO(" + layer.name + ")",
+                            label: "Hold " + layerShortName(layer.name),
+                            tooltip: "Momentary access to " + layer.name + " while held."
+                        },
+                        {
+                            value: "LOCK_LAYER(" + layer.name + ")",
+                            label: "Lock " + layerShortName(layer.name),
+                            tooltip: "Toggle persistent lock for " + layer.name + "."
+                        }];
+                        if (keyPicker.mode !== "list") {
+                            actions.push({
+                                value: keyPickerLayerTapPrefix + layer.name,
+                                label: "LT " + layerShortName(layer.name),
+                                tooltip: "Choose this layer, then pick the tap key from any section."
+                            });
+                        }
+                        return actions;
+                    })
+                };
+            }
+            if (section.kind === "allQmk") {
+                return {
+                    ...section,
+                    rows: qmkKeyRows(model.qmkKeycodes || [], 8)
                 };
             }
             if (section.id === "modes") {
@@ -3868,34 +3909,25 @@ function getClientScript() {
 
     function renderKeyPickerSection() {
         const section = keyPickerResolvedSections().find((candidate) => candidate.id === keyPicker.section) || keyPickerResolvedSections()[0];
+        const query = keyPickerSearchQuery();
+        if (query) {
+            return renderKeyPickerSearch() + renderQmkSearchResults(query);
+        }
         if (section.kind === "keyboard") {
             return renderKeyPickerKeyboard(section);
         }
         const empty = !(section.rows || []).some((row) => row.length)
             ? "<div class='key-picker-empty muted'>No keys in this section.</div>"
             : "";
-        return empty + "<div class='key-picker-grid'>" + (section.rows || []).map((row) =>
+        return renderKeyPickerSearch() + empty + "<div class='key-picker-grid'>" + (section.rows || []).map((row) =>
             "<div class='key-picker-row'>" + row.map((value) => renderKeyPickerKey(value)).join("") + "</div>"
         ).join("") + "</div>";
     }
 
     function renderKeyPickerKeyboard(section) {
         const layout = section.layout || keyPickerKeyboardSvgLayout;
-        const query = String(keyPicker.search || "").trim();
-        const search = "<input class='key-picker-search' data-picker-search value='" + escapeAttr(keyPicker.search || "") + "' placeholder='Search all QMK keycodes, labels, or aliases'>";
-        if (query) {
-            const rows = qmkKeyRows(filterQmkKeycodes(model.qmkKeycodes || [], query), 8);
-            const empty = rows.length ? "" : "<div class='key-picker-empty muted'>No matching QMK keycodes.</div>";
-            return "<div class='key-picker-keyboard'>" +
-                search +
-                empty +
-                "<div class='key-picker-grid'>" + rows.map((row) =>
-                    "<div class='key-picker-row'>" + row.map((value) => renderKeyPickerKey(value)).join("") + "</div>"
-                ).join("") + "</div>" +
-                "</div>";
-        }
         return "<div class='key-picker-keyboard'>" +
-            search +
+            renderKeyPickerSearch() +
             "<div class='key-picker-keyboard-svg-wrap'>" +
             "<svg class='key-picker-keyboard-svg' viewBox='0 0 " + escapeAttr(layout.width) + " " + escapeAttr(layout.height) + "' role='group' aria-label='Full keyboard key picker'>" +
             "<rect x='0.75' y='0.75' width='" + escapeAttr(layout.width - 1.5) + "' height='" + escapeAttr(layout.height - 1.5) + "' rx='6' fill='none' stroke='rgba(96,112,122,0.34)' stroke-width='1.5'></rect>" +
@@ -3903,6 +3935,18 @@ function getClientScript() {
             "</svg>" +
             "</div>" +
             "</div>";
+    }
+
+    function renderKeyPickerSearch() {
+        return "<input class='key-picker-search' data-picker-search value='" + escapeAttr(keyPicker.search || "") + "' placeholder='Search all QMK keycodes, labels, or aliases'>";
+    }
+
+    function renderQmkSearchResults(query) {
+        const rows = qmkKeyRows(filterQmkKeycodes(model.qmkKeycodes || [], query), 8);
+        const empty = rows.length ? "" : "<div class='key-picker-empty muted'>No matching QMK keycodes.</div>";
+        return empty + "<div class='key-picker-grid'>" + rows.map((row) =>
+            "<div class='key-picker-row'>" + row.map((value) => renderKeyPickerKey(value)).join("") + "</div>"
+        ).join("") + "</div>";
     }
 
     function renderKeyPickerSvgKey(key) {
@@ -3931,7 +3975,9 @@ function getClientScript() {
         }
         const value = keyPickerItemValue(item);
         const label = keyPickerItemLabel(item);
-        const selected = keyPicker.keys.includes(value);
+        const selected = value.startsWith(keyPickerLayerTapPrefix)
+            ? keyPicker.layerTapLayer === value.slice(keyPickerLayerTapPrefix.length)
+            : keyPicker.keys.includes(value);
         const width = item && typeof item === "object" && item.w ? item.w : 1;
         const tooltip = item && typeof item === "object" && item.tooltip ? item.tooltip : value;
         return "<button class='key-picker-key " + (selected ? "selected" : "") + "' style='--key-units: " + escapeAttr(width) + "' data-picker-action='key' data-value='" + escapeAttr(value) + "' data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(label) + "</button>";
@@ -3944,6 +3990,10 @@ function getClientScript() {
     function keyPickerItemLabel(item) {
         if (item && typeof item === "object" && item.label) return item.label;
         return displayKeyExpression(keyPickerItemValue(item));
+    }
+
+    function layerShortName(layer) {
+        return titleCase(String(layer || "").replace(/^LAYER_/, ""));
     }
 
     function qmkKeyPickerSections() {
@@ -3978,8 +4028,13 @@ function getClientScript() {
         return source.filter((entry) => (entry.search || "").includes(text)).slice(0, 160);
     }
 
+    function keyPickerSearchQuery() {
+        return String(keyPicker?.search || "").trim();
+    }
+
     function togglePickerModifier(modifier) {
         if (!keyPicker || !modifier) return;
+        if (keyPicker.layerTapLayer) return;
         keyPicker.mods = keyPicker.mods.includes(modifier)
             ? keyPicker.mods.filter((candidate) => candidate !== modifier)
             : keyPicker.mods.concat([modifier]);
@@ -3988,6 +4043,16 @@ function getClientScript() {
 
     function choosePickerKey(value) {
         if (!keyPicker || !value) return;
+        if (value.startsWith(keyPickerLayerTapPrefix)) {
+            if (keyPicker.mode === "list") return;
+            keyPicker.layerTapLayer = value.slice(keyPickerLayerTapPrefix.length);
+            keyPicker.mods = [];
+            renderKeyPicker();
+            return;
+        }
+        if (/^(MO|LOCK_LAYER|LT)\\(/.test(value)) {
+            keyPicker.layerTapLayer = "";
+        }
         if (keyPicker.mode === "list") {
             keyPicker.keys = keyPicker.keys.includes(value)
                 ? keyPicker.keys.filter((candidate) => candidate !== value)
@@ -4011,6 +4076,9 @@ function getClientScript() {
         }
         const key = keyPicker.keys[0] || "";
         if (!key) return "";
+        if (keyPicker.layerTapLayer) {
+            return "LT(" + keyPicker.layerTapLayer + ", " + key + ")";
+        }
         return keyPicker.mods.concat([key]).join("+");
     }
 

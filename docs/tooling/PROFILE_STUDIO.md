@@ -46,14 +46,15 @@ so combo-driven key behaviors are visible from the active layer view.
 Normal keys can be entered as user-facing labels such as `A`, `Enter`, `Space`,
 the classic transparent token `_______`, or modifier chords such as
 `Shift+\`` and `Alt+Cmd+Esc`; advanced QMK expressions still pass through when
-needed. Key fields also have a VIA-style picker with an SVG-based full-size keyboard tab
-that also hosts QMK-wide search, symbol/navigation/numpad/more-keys menus, layer,
-pointing-mode, macro, custom, and QMK-sourced keycode sections. The QMK sections
-are read from the sibling `bastardkb-qmk` keycode metadata when available.
+needed. Key fields also have a VIA-style picker with an SVG-based full-size keyboard tab,
+global QMK search in every section, symbol/navigation/numpad/more-keys menus,
+layer, pointing-mode, macro, custom, and QMK-sourced keycode sections. The QMK
+sections are read from the sibling `bastardkb-qmk` keycode metadata when available.
 The picker keeps selections pending until OK, supports modifier buttons
-for chorded keys, and supports multi-key selection where the field expects a
-comma-separated key list. Read-only controls are styled separately from editable
-controls.
+for chorded keys, supports multi-key selection where the field expects a
+comma-separated key list, and builds `LT(layer, key)` values by selecting the
+layer target first and then selecting the tap key. Read-only controls are styled
+separately from editable controls.
 Behavior timing override fields show the resolved default milliseconds in their
 placeholder text when the authored row leaves the override empty.
 
