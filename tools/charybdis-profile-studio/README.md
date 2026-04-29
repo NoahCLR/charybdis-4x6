@@ -24,14 +24,17 @@ those two files.
 - disabled/read-only fields are visually distinct from editable controls
 - view and save key behavior rows directly from the active layer page; the
   layer filters visible behavior rows by keys currently present on that layer
+- layer combo rows show any key behavior row triggered by the combo output
+- behavior timing fields show the resolved default milliseconds in their
+  placeholder text when a row leaves the override empty
 - named tap branch sections in the behavior editor are collapsible, and
   repeat Hz is only shown when the selected hold helper is
   `REPEAT_WHILE_HELD`
-- key-behavior feedback color sections, including tap branch colors, are
-  collapsible
+- RGB submenus such as layer colors, pointing-mode colors, auto-mouse fade,
+  combo feedback, and key-behavior feedback colors are collapsible
 - edit `layer_colors[]` HSV values and render mode
-- use color pickers with live swatches for editable RGB colors, including a
-  dedicated preview column in collapsed section summaries
+- use compact color pickers for editable RGB colors, including a dedicated
+  preview column in collapsed section summaries
 - use dropdowns for RGB fields with fixed option sets, including auto-mouse
   fade mode, combo locality, and key-behavior feedback policy
 - append RGB LED group rows by selecting keys on the physical RGB layout,

@@ -33,23 +33,27 @@ The UI is split into Layout, Macros & combos, and RGB work areas. The Layout
 page owns layer-filtered key behavior editing: if a key on the active layer has
 an authored `key_behaviors[]` row, the behavior appears there, including when a
 key is later changed to an existing behavior-owned keycode.
+Layer combo rows also show behavior rows triggered by the combo output keycode,
+so combo-driven key behaviors are visible from the active layer view.
 
 Normal keys can be entered as user-facing labels such as `A`, `Enter`, `Space`,
 the classic transparent token `_______`, or modifier chords such as
 `Shift+\`` and `Alt+Cmd+Esc`; advanced QMK expressions still pass through when
 needed. Read-only controls are styled separately from editable controls.
+Behavior timing override fields show the resolved default milliseconds in their
+placeholder text when the authored row leaves the override empty.
 
 All major panels are collapsible. The RGB page keeps a panel for every authored
 section in `rgb_config.c`, even when a table currently has no active rows.
-Nested color sections such as key-behavior tap branches are collapsible too.
+Nested RGB submenus such as layer colors, pointing-mode colors, auto-mouse
+fade, combo feedback, and key-behavior tap branches are collapsible too.
 Named tap branch sections inside the behavior editor are collapsible; repeat Hz
 is shown only when the selected hold-tier helper is `REPEAT_WHILE_HELD`.
 
-The RGB page includes color-picker controls for editable colors and dropdowns
-for fields with known option sets. The picker updates the HSV fields and
-preview swatches, including the dedicated swatch column in collapsed section
-summaries; applying a card still writes the same `HSV(...)` expressions back to
-`rgb_config.c`.
+The RGB page includes compact color-picker controls for editable colors and
+dropdowns for fields with known option sets. The picker updates the HSV fields
+and the dedicated swatch column in collapsed section summaries; applying a card
+still writes the same `HSV(...)` expressions back to `rgb_config.c`.
 
 Most visible controls, tables, collapsed summaries, color previews, and SVG
 keys expose hover tooltips that describe what the field edits or displays.

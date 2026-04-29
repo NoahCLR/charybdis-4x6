@@ -458,6 +458,7 @@ async function buildModel(root) {
         hardcodedMacros: safe("hardcodedMacros", [], () =>
             parseMacroTable(keymapText, "HARDCODED_MACROS", "MACRO").map((row) => parseMacroSlot(row, "hardcoded"))
         ),
+        behaviorTimingDefaults: safe("behaviorTimingDefaults", {}, () => resolveBehaviorTimingDefaults(configMacros)),
         rgb: safe("rgb", {}, () => parseRgbConfig(rgbText, configMacros)),
         diagnostics,
     };
@@ -612,6 +613,16 @@ function parseConfigMacros(text) {
         }
     }
     return macros;
+}
+
+function resolveBehaviorTimingDefaults(macros) {
+    return {
+        tappingTerm: normalizeExpr(macros.TAPPING_TERM || ""),
+        tapHoldTerm: normalizeExpr(macros.CUSTOM_TAP_HOLD_TERM || ""),
+        longerHoldTerm: normalizeExpr(macros.CUSTOM_LONGER_HOLD_TERM || ""),
+        multiTapTerm: normalizeExpr(macros.CUSTOM_MULTI_TAP_TERM || ""),
+        branchConfirmTerm: normalizeExpr(macros.CUSTOM_TAP_BRANCH_CONFIRM_TERM || ""),
+    };
 }
 
 function parseRgbConfig(text, configMacros = {}) {
@@ -2196,11 +2207,13 @@ function getStudioHtml() {
             padding: 10px;
             background: var(--panel-2);
         }
-        .behavior-step > summary {
+        .behavior-step > summary,
+        .collapsible-card > summary {
             cursor: pointer;
             list-style-position: inside;
         }
-        .behavior-step > summary h3 {
+        .behavior-step > summary h3,
+        .collapsible-card > summary h3 {
             display: inline;
             margin-left: 4px;
         }
@@ -2222,27 +2235,28 @@ function getStudioHtml() {
             font-weight: 650;
             min-width: 0;
         }
+        .rgb-summary-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            min-width: 0;
+        }
         .rgb-summary-swatch {
             display: block;
             width: 80px;
             height: 26px;
         }
-        .rgb-summary code {
+        .rgb-summary code,
+        .rgb-summary-meta code {
             min-width: 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             overflow-wrap: normal;
         }
-        .rgb-subsection > .rgb-subsection-body {
+        .rgb-subsection-body {
             margin-top: 10px;
-        }
-        .swatch {
-            width: 100%;
-            height: 34px;
-            border-radius: 5px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            margin: 4px 0 8px;
         }
         .color-control {
             display: grid;
@@ -2271,9 +2285,7 @@ function getStudioHtml() {
         .inline-swatch {
             display: inline-block;
             width: 34px;
-            height: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.28);
-            border-radius: 4px;
+            height: 16px;
             vertical-align: middle;
             margin-right: 6px;
         }
@@ -2391,9 +2403,9 @@ function getClientScript() {
         "layout index": "The physical LAYOUT() slot index for the selected key. It is fixed by the keyboard geometry.",
         key: "User-facing key label or expression to write into the selected LAYOUT() slot, for example A, Enter, Space, _______, or Shift+Esc.",
         source: "The raw C expression currently stored in keymap.c.",
-        tap_hold_term: "Optional milliseconds before a tap can become a hold for this behavior row. Empty uses the runtime default.",
-        longer_hold_term: "Optional milliseconds before a hold can become a long hold. Empty uses the runtime default.",
-        multi_tap_term: "Optional milliseconds used to detect repeated taps. Empty uses the runtime default.",
+        tap_hold_term: "Optional milliseconds before a tap can become a hold for this behavior row.",
+        longer_hold_term: "Optional milliseconds before a hold can become a long hold.",
+        multi_tap_term: "Optional milliseconds used to detect repeated taps.",
         branch_confirm_term: "Optional milliseconds before a tap branch is committed. Plain numbers are written as KEY_BEHAVIOR_TERM(ms).",
         table: "Choose which rgb_config.c LED group table will receive the new row.",
         owner: "The owner value for the target LED group table. Combo feedback groups do not need one.",
@@ -2407,6 +2419,7 @@ function getClientScript() {
         s: "HSV saturation channel as QMK stores it, usually 0-255.",
         v: "HSV value/brightness channel. Constants such as RGB_MATRIX_MAXIMUM_BRIGHTNESS are allowed.",
         output: "The key or action produced by a combo.",
+        "output behavior": "The key behavior row that runs when this combo output keycode has authored behavior.",
         inputs: "Comma-separated combo input keys, such as D, F.",
         slot: "The VIA macro keycode slot.",
         payload: "The string payload sent by this VIA macro slot.",
@@ -2750,7 +2763,7 @@ function getClientScript() {
         for (const source of document.querySelectorAll(".source-pill")) {
             setTooltip(source, fieldTooltips.source, false);
         }
-        for (const swatch of document.querySelectorAll("[data-color-swatch], .inline-swatch")) {
+        for (const swatch of document.querySelectorAll(".inline-swatch")) {
             setTooltip(swatch, swatch.getAttribute("data-tooltip") || "Color preview for this HSV expression.", false);
         }
         for (const swatch of document.querySelectorAll(".rgb-summary-swatch")) {
@@ -2828,10 +2841,11 @@ function getClientScript() {
 
     function setTooltip(element, text, aria = false) {
         if (!element || !text) return;
-        element.setAttribute("data-tooltip", text);
+        const tooltipText = element.getAttribute("data-tooltip") || text;
+        element.setAttribute("data-tooltip", tooltipText);
         element.removeAttribute("title");
         if (aria && !element.getAttribute("aria-label")) {
-            element.setAttribute("aria-label", text);
+            element.setAttribute("aria-label", tooltipText);
         }
     }
 
@@ -2951,15 +2965,52 @@ function getClientScript() {
         return "<h3>Behavior on this key</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
             "<div class='form-grid four'>" +
-            "<label><span>tap_hold_term</span><input id='selectedTapHoldTerm' value='" + escapeAttr(row.tapHoldTerm || "") + "' placeholder='default'></label>" +
-            "<label><span>longer_hold_term</span><input id='selectedLongerHoldTerm' value='" + escapeAttr(row.longerHoldTerm || "") + "' placeholder='default'></label>" +
-            "<label><span>multi_tap_term</span><input id='selectedMultiTapTerm' value='" + escapeAttr(row.multiTapTerm || "") + "' placeholder='default'></label>" +
-            "<label><span>branch_confirm_term</span><input id='selectedBranchConfirmTerm' value='" + escapeAttr(row.branchConfirmTerm || "") + "' placeholder='default'></label>" +
+            renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
+            renderTimingInput("selectedLongerHoldTerm", "longer_hold_term", row.longerHoldTerm || "", row.keycode) +
+            renderTimingInput("selectedMultiTapTerm", "multi_tap_term", row.multiTapTerm || "", row.keycode) +
+            renderTimingInput("selectedBranchConfirmTerm", "branch_confirm_term", row.branchConfirmTerm || "", row.keycode) +
             "</div>" +
             "<div class='card-list' style='margin-top: 10px'>" +
             steps.map(renderBehaviorStepEditor).join("") +
             "</div>" +
             "<button data-action='saveSelectedBehavior' class='primary' style='margin-top: 10px'>Save behavior row</button>";
+    }
+
+    function renderTimingInput(id, field, value, keycode) {
+        const fallback = behaviorTimingDefault(field, keycode);
+        const placeholder = "default: " + fallback.label;
+        const tooltip = timingTooltip(field, fallback);
+        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>" + field + "</span><input id='" + id + "' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder) + "' data-tooltip='" + escapeAttr(tooltip) + "'></label>";
+    }
+
+    function behaviorTimingDefault(field, keycode) {
+        const defaults = model.behaviorTimingDefaults || {};
+        const useLtTapTerm = field === "tap_hold_term" && /^LT\\(/.test(normalizeDisplayExpression(keycode));
+        const expression = {
+            tap_hold_term: useLtTapTerm ? defaults.tappingTerm : defaults.tapHoldTerm,
+            longer_hold_term: defaults.longerHoldTerm,
+            multi_tap_term: defaults.multiTapTerm,
+            branch_confirm_term: defaults.branchConfirmTerm
+        }[field] || "";
+        return {
+            expression,
+            label: formatMsExpression(expression) + (useLtTapTerm ? " via TAPPING_TERM for LT()" : "")
+        };
+    }
+
+    function timingTooltip(field, fallback) {
+        const base = fieldTooltips[field] || "";
+        const suffix = fallback.expression ? " Empty uses " + fallback.label + "." : " Empty uses the runtime default.";
+        return base + suffix;
+    }
+
+    function formatMsExpression(expression) {
+        const text = normalizeDisplayExpression(expression);
+        if (!text) return "runtime default";
+        if (/^\\d+$/.test(text)) return text + " ms";
+        const wrapped = text.match(/^KEY_BEHAVIOR_TERM\\((\\d+)\\)$/);
+        if (wrapped) return wrapped[1] + " ms";
+        return text;
     }
 
     function tapBranchName(index) {
@@ -3224,9 +3275,24 @@ function getClientScript() {
         if (!combos.length) {
             return "<h3>Combos</h3><p class='muted'>No combos resolve entirely from keys on this layer.</p>";
         }
-        return "<h3>Combos</h3><table><thead><tr><th>Badge</th><th>Inputs</th><th>Output</th></tr></thead><tbody>" +
-            combos.map((combo) => "<tr><td><code>" + combo.badge + "</code></td><td>" + escapeHtml((combo.inputDisplays || combo.inputs).join(" + ")) + "</td><td>" + escapeHtml(combo.outputDisplay || combo.output) + "</td></tr>").join("") +
+        return "<h3>Combos</h3><table><thead><tr><th>Badge</th><th>Inputs</th><th>Output</th><th>Output behavior</th></tr></thead><tbody>" +
+            combos.map(renderLayerComboRow).join("") +
             "</tbody></table>";
+    }
+
+    function renderLayerComboRow(combo) {
+        const behavior = behaviorForKey(combo.output);
+        return "<tr><td><code>" + combo.badge + "</code></td>" +
+            "<td>" + escapeHtml((combo.inputDisplays || combo.inputs).join(" + ")) + "</td>" +
+            "<td>" + escapeHtml(combo.outputDisplay || combo.output) + "<br><code class='muted'>" + escapeHtml(combo.output) + "</code></td>" +
+            "<td>" + renderComboOutputBehavior(behavior) + "</td></tr>";
+    }
+
+    function renderComboOutputBehavior(behavior) {
+        if (!behavior) {
+            return "<span class='muted'>No key behavior row for this output.</span>";
+        }
+        return behavior.steps.map(renderStep).join("<br>");
     }
 
     function renderLayerPdModeTable(layer) {
@@ -3245,15 +3311,23 @@ function getClientScript() {
         for (const position of layer.positions) {
             addPdModeCandidate(rows, seen, position.keycode, position.display);
             const behavior = behaviorForKey(position.keycode);
-            for (const step of behavior?.steps || []) {
-                for (const action of [step.tap, step.hold, step.longHold]) {
-                    if (action?.action) {
-                        addPdModeCandidate(rows, seen, action.action, position.display + " via " + step.tapCountName + " " + action.helper);
-                    }
+            addBehaviorPdModeCandidates(rows, seen, behavior, position.display);
+        }
+        for (const combo of layerCombos(layer)) {
+            addPdModeCandidate(rows, seen, combo.output, combo.badge + " output " + (combo.outputDisplay || combo.output));
+            addBehaviorPdModeCandidates(rows, seen, behaviorForKey(combo.output), combo.badge + " output " + (combo.outputDisplay || combo.output));
+        }
+        return rows;
+    }
+
+    function addBehaviorPdModeCandidates(rows, seen, behavior, sourcePrefix) {
+        for (const step of behavior?.steps || []) {
+            for (const action of [step.tap, step.hold, step.longHold]) {
+                if (action?.action) {
+                    addPdModeCandidate(rows, seen, action.action, sourcePrefix + " via " + step.tapCountName + " " + action.helper);
                 }
             }
         }
-        return rows;
     }
 
     function addPdModeCandidate(rows, seen, keycode, source) {
@@ -3303,7 +3377,7 @@ function getClientScript() {
             "<h3>Append simple single tap branch row</h3>" +
             "<div class='form-grid'>" +
             "<label><span>Key</span><input id='behaviorKeycode' placeholder='A'></label>" +
-            "<label><span>tap_hold_term</span><input id='behaviorTapHoldTerm' placeholder='150'></label>" +
+            renderTimingInput("behaviorTapHoldTerm", "tap_hold_term", "", "") +
             renderActionInputs("tap", "Tap", ["", "TAP_SENDS"]) +
             renderActionInputs("hold", "Hold", ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
             renderActionInputs("longHold", "Long hold", ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
@@ -3523,51 +3597,55 @@ function getClientScript() {
     }
 
     function renderLayerColorCard(row) {
-        return "<div class='card' data-layer='" + escapeAttr(row.layer) + "'>" +
-            "<strong><code>" + escapeHtml(row.layer) + "</code></strong>" +
+        return "<details class='card rgb-subsection collapsible-card' data-layer='" + escapeAttr(row.layer) + "'>" +
+            renderRgbConfigSummary(row.layer, row.color, row.mode) +
+            "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(row.color) +
             "<div class='form-grid four'>" +
             "<label><span>mode</span><select name='mode'>" + options(["ALL_KEYS", "KEYS_MAPPED_ON_THIS_LAYER_ONLY"], row.mode) + "</select></label>" +
             "<button data-action='updateLayerColor' class='primary'>Apply</button>" +
-            "</div></div>";
+            "</div></div></details>";
     }
 
     function renderPdColorCard(row) {
-        return "<div class='card' data-mode='" + escapeAttr(row.pointingMode) + "'>" +
-            "<strong><code>" + escapeHtml(row.pointingMode) + "</code></strong>" +
+        return "<details class='card rgb-subsection collapsible-card' data-mode='" + escapeAttr(row.pointingMode) + "'>" +
+            renderRgbConfigSummary(row.pointingMode, row.color, row.locality) +
+            "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(row.color) +
             "<div class='form-grid four'>" +
             "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, row.locality) + "</select></label>" +
             "<button data-action='updatePdModeColor' class='primary'>Apply</button>" +
-            "</div></div>";
+            "</div></div></details>";
     }
 
     function renderAutomouseCard(config) {
         if (!config) {
             return "<p class='muted'>No active automouse fade config parsed.</p>";
         }
-        return "<div class='card'>" +
-            "<strong>Fade destination</strong>" +
+        return "<details class='card rgb-subsection collapsible-card'>" +
+            renderRgbConfigSummary("Fade destination", config.end_color, config.mode) +
+            "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(config.end_color) +
             "<div class='form-grid four'>" +
             "<label><span>mode</span><select name='mode'>" + options(automouseFadeModes, config.mode) + "</select></label>" +
             "<button data-action='updateAutomouseFade' class='primary'>Apply</button>" +
             "</div>" +
-            "</div>";
+            "</div></details>";
     }
 
     function renderComboFeedbackCard(config) {
         if (!config) {
             return "<p class='muted'>No active combo feedback config parsed.</p>";
         }
-        return "<div class='card'>" +
-            "<strong>Active combo color</strong>" +
+        return "<details class='card rgb-subsection collapsible-card'>" +
+            renderRgbConfigSummary("Active combo color", config.color, config.locality) +
+            "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(config.color) +
             "<div class='form-grid four'>" +
             "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, config.locality) + "</select></label>" +
             "<button data-action='updateComboFeedback' class='primary'>Apply</button>" +
             "</div>" +
-            "</div>";
+            "</div></details>";
     }
 
     function renderKeyBehaviorFeedbackCard(config) {
@@ -3582,31 +3660,40 @@ function getClientScript() {
         ];
         const branchRows = (config.tapBranchColors || []).map((color, index) => ["Tap branch " + index, "tapBranchColor" + index, color]);
         return "<div id='keyBehaviorFeedbackCard' class='card-list'>" +
-            "<div class='card'>" +
+            "<details class='card collapsible-card'>" +
+            "<summary><h3>Policy</h3></summary>" +
+            "<div class='rgb-subsection-body'>" +
             "<div class='form-grid four'>" +
             "<label><span>tap commit mode</span><select name='tapCommitMode'>" + options(keyFeedbackTapCommitModes, config.tapCommitMode) + "</select></label>" +
             "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, config.locality) + "</select></label>" +
-            "<button data-action='updateKeyBehaviorFeedback' class='primary'>Apply</button>" +
             "</div>" +
-            "</div>" +
+            "</div></details>" +
             colorRows.map(([label, id, color]) =>
                 renderRgbColorSubpanel(label, id, color)
             ).join("") +
             branchRows.map(([label, id, color]) =>
                 renderRgbColorSubpanel(label, id, color, " data-tap-branch-color")
             ).join("") +
+            "<button data-action='updateKeyBehaviorFeedback' class='primary'>Apply key behavior feedback</button>" +
             "</div>";
     }
 
     function renderRgbColorSubpanel(label, id, color, extraAttrs = "") {
         return "<details class='card rgb-subsection'>" +
-            "<summary><span class='rgb-summary'>" +
-            "<span class='rgb-summary-title'>" + escapeHtml(label) + "</span>" +
-            renderSummarySwatch(color) +
-            "<code class='muted' data-summary-expression>" + escapeHtml(colorExpression(color)) + "</code>" +
-            "</span></summary>" +
+            renderRgbConfigSummary(label, color) +
             "<div class='rgb-subsection-body'>" + renderHsvColorControl(color, id, extraAttrs) + "</div>" +
             "</details>";
+    }
+
+    function renderRgbConfigSummary(label, color, meta = "") {
+        return "<summary><span class='rgb-summary'>" +
+            "<span class='rgb-summary-title'>" + escapeHtml(label) + "</span>" +
+            renderSummarySwatch(color) +
+            "<span class='rgb-summary-meta'>" +
+            "<code class='muted' data-summary-expression>" + escapeHtml(colorExpression(color)) + "</code>" +
+            (meta ? "<code class='muted'>" + escapeHtml(meta) + "</code>" : "") +
+            "</span>" +
+            "</span></summary>";
     }
 
     function renderSummarySwatch(color) {
@@ -3635,9 +3722,7 @@ function getClientScript() {
     function renderHsvColorControl(color, id, extraAttrs = "") {
         const hex = hsvToHex(color) || "#000000";
         const idAttr = id ? " data-color-id='" + escapeAttr(id) + "'" : "";
-        const swatchTooltip = "Color preview: " + colorExpression(color);
         return "<div class='color-control' data-color-control" + idAttr + extraAttrs + ">" +
-            "<div class='swatch' data-color-swatch data-tooltip='" + escapeAttr(swatchTooltip) + "' style='background: " + hex + "'></div>" +
             "<div class='color-row'>" +
             "<label><span>picker</span><input type='color' data-color-picker value='" + hex + "'></label>" +
             hsvInputs(color) +
@@ -3652,18 +3737,12 @@ function getClientScript() {
             "<label><span>v</span><input name='v' data-hsv-channel='v' value='" + escapeAttr(color?.v || "") + "'></label>";
     }
 
-    function renderSwatch(color) {
-        const css = hsvToCss(color);
-        return "<div class='swatch' style='background: " + css + "' data-tooltip='" + escapeAttr("Color preview: " + colorExpression(color)) + "'></div>";
-    }
-
     function renderInlineSwatch(color, extraAttrs = "") {
         const fill = hsvToHex(color) || "#000000";
-        return "<span class='inline-swatch' style='background: " + fill + "' data-tooltip='" + escapeAttr("Color preview: " + colorExpression(color)) + "'" + extraAttrs + "></span>";
-    }
-
-    function hsvToCss(color) {
-        return hsvToHex(color) || "#111";
+        const label = "Color preview: " + colorExpression(color);
+        return "<svg class='inline-swatch' viewBox='0 0 34 16' role='img' aria-label='" + escapeAttr(label) + "' data-tooltip='" + escapeAttr(label) + "'" + extraAttrs + ">" +
+            "<rect x='1' y='1' width='32' height='14' rx='4' fill='" + fill + "' stroke='#ffffff' stroke-opacity='0.32'></rect>" +
+            "</svg>";
     }
 
     function colorExpression(color) {
@@ -3677,13 +3756,8 @@ function getClientScript() {
             v: value(control, "v")
         };
         const hex = hsvToHex(color) || "#000000";
-        const swatch = control.querySelector("[data-color-swatch]");
         const picker = control.querySelector("[data-color-picker]");
         const expression = control.querySelector("[data-color-expression]");
-        if (swatch) {
-            swatch.style.background = hex;
-            swatch.setAttribute("data-tooltip", "Color preview: " + colorExpression(color));
-        }
         if (picker && /^#[0-9a-f]{6}$/i.test(hex)) {
             picker.value = hex;
         }
