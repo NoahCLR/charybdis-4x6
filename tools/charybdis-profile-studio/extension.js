@@ -3041,6 +3041,11 @@ function getClientScript() {
     let rgbBuilderColor = undefined;
     let keyPicker = undefined;
     let notice = "";
+    let localUndoStack = [];
+    let localRedoStack = [];
+    let currentLocalSnapshot = "";
+    let restoringLocalSnapshot = false;
+    const localHistoryLimit = 100;
     const tapCountNames = ${JSON.stringify(TAP_COUNT_NAMES)};
     const views = [
         ["layout", "Layout"],
@@ -3334,6 +3339,22 @@ function getClientScript() {
         event.preventDefault();
         choosePickerKey(target.dataset.value);
     });
+    document.addEventListener("keydown", (event) => {
+        if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+        const key = String(event.key || "").toLowerCase();
+        const wantsUndo = key === "z" && !event.shiftKey;
+        const wantsRedo = key === "y" || (key === "z" && event.shiftKey);
+        if (!wantsUndo && !wantsRedo) return;
+        if (keyPicker) return;
+        if (wantsUndo && !localUndoStack.length) return;
+        if (wantsRedo && !localRedoStack.length) return;
+        event.preventDefault();
+        if (wantsUndo) {
+            undoLocalEdit();
+        } else {
+            redoLocalEdit();
+        }
+    });
     keyPickerHost.addEventListener("input", (event) => {
         if (!keyPicker || !event.target.matches("[data-picker-search]")) return;
         keyPicker.search = event.target.value || "";
@@ -3361,10 +3382,12 @@ function getClientScript() {
             }
             normalizeRgbGroupState();
             render();
+            resetLocalHistory();
         }
         if (event.data.type === "error") {
             notice = event.data.message || "Unknown error";
             render();
+            resetLocalHistory();
         }
     });
 
@@ -3376,21 +3399,30 @@ function getClientScript() {
             activeLayer = target.dataset.layer;
             selectedKey = 0;
             render();
+            resetLocalHistory();
         } else if (action === "selectView") {
             activeView = target.dataset.view;
             render();
+            resetLocalHistory();
         } else if (action === "selectKey") {
             selectedKey = Number(target.dataset.index);
             render();
+            resetLocalHistory();
         } else if (action === "toggleRgbLed") {
+            const before = currentLocalSnapshot || serializeLocalState();
             toggleRgbLed(Number(target.dataset.led));
             render();
+            commitLocalHistory(before);
         } else if (action === "toggleRgbTrackball") {
+            const before = currentLocalSnapshot || serializeLocalState();
             toggleRgbLed(56);
             render();
+            commitLocalHistory(before);
         } else if (action === "clearRgbSelection") {
+            const before = currentLocalSnapshot || serializeLocalState();
             rgbSelectedLeds = [];
             render();
+            commitLocalHistory(before);
         } else if (action === "openKeyPicker") {
             openKeyPicker(target.dataset.target, target.dataset.mode || "single");
         } else if (action === "applyKey") {
@@ -3475,10 +3507,12 @@ function getClientScript() {
     });
 
     app.addEventListener("change", (event) => {
+        const before = currentLocalSnapshot || serializeLocalState();
         const colorControl = event.target?.closest?.("[data-color-control]");
         if (colorControl) {
             syncColorControl(event, colorControl);
             updateDirtyFromEvent(event);
+            commitLocalHistory(before);
             return;
         }
         if (event.target?.name === "target" && event.target.closest("#rgbGroupBuilder")) {
@@ -3487,24 +3521,29 @@ function getClientScript() {
             rgbBuilderColor = undefined;
             normalizeRgbGroupState();
             render();
+            commitLocalHistory(before);
             return;
         }
         if (event.target?.name === "owner" && event.target.closest("#rgbGroupBuilder")) {
             rgbGroupOwner = event.target.value;
             rgbBuilderColor = undefined;
             render();
+            commitLocalHistory(before);
             return;
         }
         if (event.target?.matches("[data-helper-select]")) {
             updateHelperFields(event.target.id.replace(/Helper$/, ""));
         }
         updateDirtyFromEvent(event);
+        commitLocalHistory(before);
     });
 
     app.addEventListener("input", (event) => {
+        const before = currentLocalSnapshot || serializeLocalState();
         const control = event.target?.closest?.("[data-color-control]");
         if (control) syncColorControl(event, control);
         updateDirtyFromEvent(event);
+        commitLocalHistory(before);
     });
 
     function syncColorControl(event, control) {
@@ -3567,6 +3606,7 @@ function getClientScript() {
     function post(message) {
         notice = "Working...";
         render();
+        resetLocalHistory();
         vscode.postMessage(message);
     }
 
@@ -3581,6 +3621,127 @@ function getClientScript() {
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
         initializeDirtyTracking();
         hydrateTooltips();
+    }
+
+    function resetLocalHistory() {
+        localUndoStack = [];
+        localRedoStack = [];
+        currentLocalSnapshot = serializeLocalState();
+    }
+
+    function commitLocalHistory(before) {
+        if (restoringLocalSnapshot) return;
+        const after = serializeLocalState();
+        if (!before || before === after) {
+            currentLocalSnapshot = after;
+            return;
+        }
+        localUndoStack.push(before);
+        if (localUndoStack.length > localHistoryLimit) {
+            localUndoStack.shift();
+        }
+        localRedoStack = [];
+        currentLocalSnapshot = after;
+    }
+
+    function undoLocalEdit() {
+        if (!localUndoStack.length) return;
+        const current = currentLocalSnapshot || serializeLocalState();
+        const previous = localUndoStack.pop();
+        localRedoStack.push(current);
+        if (localRedoStack.length > localHistoryLimit) {
+            localRedoStack.shift();
+        }
+        restoreLocalSnapshot(previous);
+    }
+
+    function redoLocalEdit() {
+        if (!localRedoStack.length) return;
+        const current = currentLocalSnapshot || serializeLocalState();
+        const next = localRedoStack.pop();
+        localUndoStack.push(current);
+        if (localUndoStack.length > localHistoryLimit) {
+            localUndoStack.shift();
+        }
+        restoreLocalSnapshot(next);
+    }
+
+    function serializeLocalState() {
+        return JSON.stringify({
+            activeView,
+            activeLayer,
+            selectedKey,
+            rgbGroupTarget,
+            rgbGroupOwner,
+            rgbSelectedLeds,
+            rgbBuilderColor,
+            controls: localEditableControls().map(controlSnapshot)
+        });
+    }
+
+    function restoreLocalSnapshot(snapshot) {
+        let state;
+        try {
+            state = JSON.parse(snapshot);
+        } catch {
+            return;
+        }
+        restoringLocalSnapshot = true;
+        try {
+            activeView = state.activeView || activeView;
+            activeLayer = state.activeLayer || activeLayer;
+            selectedKey = Number.isInteger(state.selectedKey) ? state.selectedKey : selectedKey;
+            rgbGroupTarget = state.rgbGroupTarget || rgbGroupTarget;
+            rgbGroupOwner = state.rgbGroupOwner || "";
+            rgbSelectedLeds = Array.isArray(state.rgbSelectedLeds) ? state.rgbSelectedLeds : [];
+            rgbBuilderColor = state.rgbBuilderColor || undefined;
+            normalizeRgbGroupState();
+            render();
+            restoreLocalControls(state.controls || []);
+            refreshRestoredLocalState();
+            currentLocalSnapshot = serializeLocalState();
+        } finally {
+            restoringLocalSnapshot = false;
+        }
+    }
+
+    function restoreLocalControls(snapshots) {
+        const controls = localEditableControls();
+        snapshots.forEach((snapshot, index) => {
+            const control = controls[index];
+            if (!control) return;
+            if (control.type === "checkbox" || control.type === "radio") {
+                control.checked = Boolean(snapshot.checked);
+            } else {
+                control.value = snapshot.value || "";
+            }
+        });
+    }
+
+    function refreshRestoredLocalState() {
+        for (const select of document.querySelectorAll("[data-helper-select]")) {
+            updateHelperFields(select.id.replace(/Helper$/, ""));
+        }
+        for (const control of document.querySelectorAll("[data-color-control]")) {
+            updateColorControl(control);
+        }
+        updateRgbSelectionPreview();
+        for (const section of document.querySelectorAll("[data-dirty-section]")) {
+            updateDirtySection(section);
+        }
+        hydrateTooltips();
+    }
+
+    function localEditableControls() {
+        return Array.from(app.querySelectorAll("input, select, textarea"))
+            .filter((control) => !control.disabled);
+    }
+
+    function controlSnapshot(control) {
+        if (control.type === "checkbox" || control.type === "radio") {
+            return { checked: Boolean(control.checked) };
+        }
+        return { value: control.value || "" };
     }
 
     function initializeDirtyTracking() {
