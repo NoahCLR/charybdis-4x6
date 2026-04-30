@@ -3737,7 +3737,7 @@ function getClientScript() {
             lastLayoutKeyClick = { index, time: isDoubleClick ? 0 : now };
             render();
             if (isDoubleClick) {
-                openKeyPicker("keycodeInput", "single");
+                openLayoutKeyPicker(index);
             }
             currentLocalSnapshot = serializeLocalState();
         } else if (action === "toggleLayoutComboPicking") {
@@ -4990,12 +4990,17 @@ function getClientScript() {
             "</span></label>";
     }
 
-    function openKeyPicker(targetId, mode) {
+    function openLayoutKeyPicker(layoutIndex) {
+        openKeyPicker("keycodeInput", "single", { layoutStageIndex: layoutIndex });
+    }
+
+    function openKeyPicker(targetId, mode, options = {}) {
         const input = document.getElementById(targetId);
         if (!input) return;
         keyPicker = {
             targetId,
             mode: mode === "list" ? "list" : "single",
+            layoutStageIndex: Number.isInteger(options.layoutStageIndex) ? options.layoutStageIndex : undefined,
             section: "qwerty",
             search: "",
             layerTapLayer: "",
@@ -5403,9 +5408,21 @@ function getClientScript() {
     function confirmKeyPicker() {
         if (!keyPicker) return;
         const targetId = keyPicker.targetId;
+        const layoutStageIndex = keyPicker.layoutStageIndex;
+        const expression = keyPickerExpression();
+        if (Number.isInteger(layoutStageIndex)) {
+            const before = currentLocalSnapshot || serializeLocalState();
+            closeKeyPicker();
+            selectedKey = layoutStageIndex;
+            if (expression && stageLayoutKey(layoutStageIndex, expression)) {
+                render();
+                commitLocalHistory(before);
+            }
+            return;
+        }
         const input = document.getElementById(keyPicker.targetId);
         if (input) {
-            input.value = keyPickerExpression();
+            input.value = expression;
             input.dispatchEvent(new Event("input", { bubbles: true }));
         }
         closeKeyPicker();
