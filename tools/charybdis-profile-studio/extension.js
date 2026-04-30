@@ -2472,7 +2472,14 @@ function getStudioHtml() {
             color: #fff4d2;
             box-shadow: 0 0 0 1px rgba(242, 184, 75, 0.28);
         }
-        button:hover { border-color: var(--accent); }
+        button:disabled {
+            border-color: rgba(168, 178, 184, 0.26);
+            background: rgba(32, 38, 42, 0.58);
+            color: rgba(168, 178, 184, 0.58);
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        button:not(:disabled):hover { border-color: var(--accent); }
         input, select {
             min-height: 32px;
             padding: 5px 8px;
@@ -4492,6 +4499,7 @@ function getClientScript() {
         button.textContent = dirty ? "Unsaved - " + cleanLabel : cleanLabel;
         button.classList.toggle("dirty", dirty);
         button.setAttribute("aria-label", dirty ? "Unsaved changes: " + cleanLabel : cleanLabel);
+        button.disabled = !dirty;
     }
 
     function dirtySnapshot(section) {
