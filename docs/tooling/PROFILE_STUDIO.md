@@ -38,9 +38,9 @@ back to the same blocks.
 - appended simple `key_behaviors[]` rows
 
 The UI is split into Layout, Macros & combos, and RGB work areas. The Layout
-page owns layer-filtered key behavior editing: if a key on the active layer has
-an authored `key_behaviors[]` row, the behavior appears there, including when a
-key is later changed to an existing behavior-owned keycode.
+panel embeds selected-key behavior editing: if a key on the active layer has an
+authored `key_behaviors[]` row, the behavior appears there, including when a key
+is later changed to an existing behavior-owned keycode.
 The Layout page also has a combo sidecar below the selected-key editor. Its
 selection mode lets the active layer board choose multiple physical keys as the
 new combo inputs, and the input field also exposes the same multi-key picker as

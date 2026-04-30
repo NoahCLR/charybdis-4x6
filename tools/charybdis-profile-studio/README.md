@@ -32,8 +32,9 @@ those two files.
 - edit modifier chords as user-facing labels such as `Shift+\`` or
   `Alt+Cmd+Esc`
 - disabled/read-only fields are visually distinct from editable controls
-- view and save key behavior rows directly from the active layer page; the
-  layer filters visible behavior rows by keys currently present on that layer
+- view and save the selected key behavior directly inside the active layer
+  layout panel; the layer filters visible behavior rows by keys currently
+  present on that layer
 - the layer overview lists layer-reachable behaviors, macros, combos, and
   pointing modes
 - layer combo rows show any key behavior row triggered by the combo output

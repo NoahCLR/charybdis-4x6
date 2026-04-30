@@ -2515,12 +2515,17 @@ function getStudioHtml() {
             gap: 24px;
             align-items: stretch;
         }
+        .layout-main-column {
+            display: grid;
+            align-content: start;
+            gap: 14px;
+            min-width: 0;
+        }
         .layout-selected-key-column {
             display: grid;
-            align-content: center;
+            align-content: start;
             justify-items: center;
             gap: 12px;
-            padding: 24px;
             min-height: 100%;
         }
         .layout-sidecar-stack {
@@ -2815,7 +2820,6 @@ function getStudioHtml() {
         .selected-behavior-editor {
             display: grid;
             gap: 14px;
-            margin-top: 20px;
         }
         .selected-behavior-editor h3 {
             margin: 0;
@@ -3196,8 +3200,7 @@ function getClientScript() {
     };
     const panelTooltips = {
         Status: "Parser messages, write status, and warnings from the current studio model.",
-        Layout: "Physical keyboard preview for the active layer. Click a key to edit it.",
-        "Selected Key Behavior": "Edit the key behavior row attached to the selected keycode.",
+        Layout: "Physical keyboard preview, selected-key editor, and selected-key behavior editor for the active layer.",
         "Layer Overview": "Behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
         "VIA Macros": "Payload strings for the VIA_MACROS(MACRO) table in keymap.c.",
         "Combo Builder": "Append a new COMBOS(COMBO) row to keymap.c.",
@@ -4362,9 +4365,9 @@ function getClientScript() {
         const layer = currentLayer();
         if (!layer) return panel("Layers", "<p class='muted'>No LAYOUT blocks found.</p>", true);
         const selected = layer.positions[selectedKey] || layer.positions[0];
+        const selectedBehavior = behaviorForKey(selected.keycode);
         return "<div class='stack'>" +
-            panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected), true) +
-            panel("Selected Key Behavior", renderSelectedBehaviorEditor(selected, behaviorForKey(selected.keycode)), true) +
+            panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected, selectedBehavior), true) +
             panel("Layer Overview", renderLayerOverview(layer), true) +
             "</div>";
     }
@@ -4375,9 +4378,12 @@ function getClientScript() {
         ).join("") + "</div>";
     }
 
-    function renderLayoutWithSelectedKeyEditor(layer, selected) {
+    function renderLayoutWithSelectedKeyEditor(layer, selected, behavior) {
         return "<div class='layout-with-key-editor'>" +
+            "<div class='layout-main-column'>" +
             renderBoard(layer) +
+            renderSelectedBehaviorEditor(selected, behavior) +
+            "</div>" +
             "<div class='layout-selected-key-column'>" +
             "<div class='layout-sidecar-stack'>" +
             renderSelectedKeyEditor(layer, selected) +
@@ -4436,7 +4442,7 @@ function getClientScript() {
         for (let index = 0; index < 5; index += 1) {
             steps.push(row.steps.find((step) => step.tapCount === index) || { tapCount: index, tapCountName: tapBranchName(index) });
         }
-        return "<div class='selected-behavior-editor' data-dirty-section><h3>Behavior on this key</h3>" +
+        return "<div class='card selected-behavior-editor' data-dirty-section><h3>Behavior on this key</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
             "<div><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(row.keycode) + "</code></div>" +
             "<div class='form-grid four'>" +
