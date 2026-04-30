@@ -43,9 +43,12 @@ an authored `key_behaviors[]` row, the behavior appears there, including when a
 key is later changed to an existing behavior-owned keycode.
 The Layout page also has a combo sidecar below the selected-key editor. Its
 selection mode lets the active layer board choose multiple physical keys as the
-new combo inputs before appending a `COMBOS(COMBO)` row.
+new combo inputs, and the input field also exposes the same multi-key picker as
+the Macros & combos page before appending a `COMBOS(COMBO)` row.
 Layer combo rows also show behavior rows triggered by the combo output keycode,
 so combo-driven key behaviors are visible from the active layer view.
+The layer overview also lists macros directly placed on the layer or reachable
+through visible behavior and combo output paths.
 
 Normal keys can be entered as user-facing labels such as `A`, `Enter`, `Space`,
 the classic transparent token `_______`, or modifier chords such as

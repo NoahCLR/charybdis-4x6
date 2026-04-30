@@ -285,7 +285,11 @@ Current authored combo feedback locality: `RGB_KEY_HALF`.
 | --- | --- | --- | --- |
 | `Active Combo` | Steady combo layer color while a combo chord stays active. Preview- or PD-owning combos can be routed underneath those state indicators, while unrelated combos remain above them. | `HSV(191, 255, 200)` | <img alt="Active combo color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
 
-No active authored combo feedback LED group rows are configured.
+Authored combo feedback LED groups repaint after the combo locality render inside the current combo underlay or overlay substage.
+
+| Group | LEDs | Count | Authored HSV | Preview Color |
+| --- | --- | --- | --- | --- |
+| `1` | `26,27,28,25,24,53,54,55` | `8` | `HSV(191, 255, 200)` | <img alt="Combo feedback group 1 color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
 
 ## Key-Behavior Feedback LEDs
 
@@ -327,7 +331,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 
 | Semantic Group | LEDs | Count | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- |
-| `KEY_FEEDBACK_GROUP_ALL` | `26,27,28,25,24,55,53,54` | `8` | `HSV(0, 0, 0)` | <img alt="All group color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `KEY_FEEDBACK_GROUP_ALL` | `26,27,28,25,24,53,54,55` | `8` | `HSV(0, 0, 0)` | <img alt="All group color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
 
 ## Macro Inventory
 
@@ -402,7 +406,7 @@ No active authored layer LED group rows are configured.
 | `pd_mode_color_count` | `6` |
 | `layer_led_group_count` | `0` |
 | `pd_mode_led_group_count` | `0` |
-| `combo_feedback_led_group_count` | `0` |
+| `combo_feedback_led_group_count` | `1` |
 | `key_behavior_feedback_led_group_count` | `1` |
 | `combo_feedback_configured` | `1` |
 

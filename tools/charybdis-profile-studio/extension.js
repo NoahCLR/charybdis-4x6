@@ -3170,6 +3170,7 @@ function getClientScript() {
     let layoutComboPicking = false;
     let layoutComboSelection = [];
     let layoutComboOutput = "";
+    let layoutComboInputs = "";
     let keyPicker = undefined;
     let notice = "";
     let localUndoStack = [];
@@ -3197,8 +3198,7 @@ function getClientScript() {
         Status: "Parser messages, write status, and warnings from the current studio model.",
         Layout: "Physical keyboard preview for the active layer. Click a key to edit it.",
         "Selected Key Behavior": "Edit the key behavior row attached to the selected keycode.",
-        "Layer Behaviors": "Behavior rows whose keycode is currently present on the active layer.",
-        "Layer Combos & PD Modes": "Combos and pointing modes reachable from keys on the active layer.",
+        "Layer Overview": "Behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
         "VIA Macros": "Payload strings for the VIA_MACROS(MACRO) table in keymap.c.",
         "Combo Builder": "Append a new COMBOS(COMBO) row to keymap.c.",
         "RGB LED Group Builder": "Select physical LEDs and append a row to one of the rgb_config.c LED group tables.",
@@ -3554,6 +3554,7 @@ function getClientScript() {
             layoutComboPicking = false;
             layoutComboSelection = [];
             layoutComboOutput = "";
+            layoutComboInputs = "";
             render();
             resetLocalHistory();
         } else if (action === "selectView") {
@@ -3574,12 +3575,14 @@ function getClientScript() {
             const before = currentLocalSnapshot || serializeLocalState();
             captureLayoutComboBuilderInputs();
             toggleLayoutComboKey(Number(target.dataset.index));
+            syncLayoutComboInputsFromSelection();
             render();
             commitLocalHistory(before);
         } else if (action === "clearLayoutComboSelection") {
             const before = currentLocalSnapshot || serializeLocalState();
             captureLayoutComboBuilderInputs();
             layoutComboSelection = [];
+            layoutComboInputs = "";
             render();
             commitLocalHistory(before);
         } else if (action === "toggleRgbLed") {
@@ -3674,6 +3677,7 @@ function getClientScript() {
             layoutComboPicking = false;
             layoutComboSelection = [];
             layoutComboOutput = "";
+            layoutComboInputs = "";
             post({ type: "addCombo", ...payload });
         } else if (action === "addBehavior") {
             post({ type: "addBehavior", behavior: readBehaviorForm() });
@@ -3725,6 +3729,10 @@ function getClientScript() {
         if (control) syncColorControl(event, control);
         if (event.target?.id === "layoutComboOutput") {
             layoutComboOutput = event.target.value;
+        }
+        if (event.target?.id === "layoutComboInputs") {
+            layoutComboInputs = event.target.value;
+            syncLayoutComboSelectionFromInputs();
         }
         validateControl(event.target);
         updateDirtyFromEvent(event);
@@ -3803,7 +3811,34 @@ function getClientScript() {
 
     function captureLayoutComboBuilderInputs() {
         const output = document.getElementById("layoutComboOutput");
+        const inputs = document.getElementById("layoutComboInputs");
         if (output) layoutComboOutput = output.value;
+        if (inputs) layoutComboInputs = inputs.value;
+    }
+
+    function syncLayoutComboInputsFromSelection() {
+        const layer = currentLayer();
+        if (!layer) {
+            layoutComboInputs = "";
+            return;
+        }
+        layoutComboInputs = layoutComboSelectedPositions(layer).map((position) => position.keycode).join(", ");
+    }
+
+    function syncLayoutComboSelectionFromInputs() {
+        const layer = currentLayer();
+        if (!layer) return;
+        const unusedPositions = layer.positions.slice();
+        layoutComboSelection = layoutComboInputs.split(",")
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .map((keycode) => {
+                const index = unusedPositions.findIndex((position) => position.keycode === keycode);
+                if (index === -1) return undefined;
+                const [position] = unusedPositions.splice(index, 1);
+                return position.layoutIndex;
+            })
+            .filter((index) => Number.isInteger(index));
     }
 
     function normalizeRgbGroupState() {
@@ -3893,6 +3928,7 @@ function getClientScript() {
             layoutComboPicking,
             layoutComboSelection,
             layoutComboOutput,
+            layoutComboInputs,
             controls: localEditableControls().map(controlSnapshot)
         });
     }
@@ -3916,6 +3952,7 @@ function getClientScript() {
             layoutComboPicking = Boolean(state.layoutComboPicking);
             layoutComboSelection = Array.isArray(state.layoutComboSelection) ? state.layoutComboSelection : [];
             layoutComboOutput = state.layoutComboOutput || "";
+            layoutComboInputs = state.layoutComboInputs || "";
             normalizeLayoutComboState();
             normalizeRgbGroupState();
             render();
@@ -3990,7 +4027,7 @@ function getClientScript() {
     }
 
     function sectionHasCustomDirtyState(section) {
-        if (section.id === "layoutComboBuilder") return layoutComboSelection.length > 0;
+        if (section.id === "layoutComboBuilder") return Boolean(layoutComboOutput || layoutComboInputs || layoutComboSelection.length);
         return section.id === "rgbGroupBuilder" && rgbSelectedLeds.length > 0;
     }
 
@@ -4328,8 +4365,7 @@ function getClientScript() {
         return "<div class='stack'>" +
             panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected), true) +
             panel("Selected Key Behavior", renderSelectedBehaviorEditor(selected, behaviorForKey(selected.keycode)), true) +
-            panel("Layer Behaviors", renderLayerBehaviorTable(layer), true) +
-            panel("Layer Combos & PD Modes", renderLayerComboTable(layer) + renderLayerPdModeTable(layer), true) +
+            panel("Layer Overview", renderLayerOverview(layer), true) +
             "</div>";
     }
 
@@ -4366,7 +4402,7 @@ function getClientScript() {
 
     function renderLayoutComboBuilder(layer) {
         const selectedPositions = layoutComboSelectedPositions(layer);
-        const inputValue = selectedPositions.map((position) => position.keycode).join(", ");
+        const inputValue = layoutComboInputs || selectedPositions.map((position) => position.keycode).join(", ");
         const selectedList = selectedPositions.length
             ? selectedPositions.map((position) =>
                 "<button type='button' data-action='toggleLayoutComboKey' data-index='" + position.layoutIndex + "'><span>" + escapeHtml(position.display || position.keycode) + "</span><code>" + escapeHtml(position.keycode) + "</code></button>"
@@ -4376,7 +4412,7 @@ function getClientScript() {
             "<h3>Create combo</h3>" +
             "<div class='selected-key-edit-fields'>" +
             renderKeyPickerInput("layoutComboOutput", "Output", layoutComboOutput, "Tab", "single", "", "data-combo-output") +
-            "<label><span>Inputs</span><input id='layoutComboInputs' data-combo-inputs readonly value='" + escapeAttr(inputValue) + "' placeholder='Select keys on layout'></label>" +
+            renderKeyPickerInput("layoutComboInputs", "Inputs", inputValue, "D, F", "list", "", "data-combo-inputs") +
             "<div class='layout-combo-selected-list'>" + selectedList + "</div>" +
             "<div class='layout-combo-actions'>" +
             "<button type='button' class='" + (layoutComboPicking ? "active" : "") + "' data-action='toggleLayoutComboPicking'>" + (layoutComboPicking ? "Selecting inputs" : "Select inputs") + "</button>" +
@@ -4402,6 +4438,7 @@ function getClientScript() {
         }
         return "<div class='selected-behavior-editor' data-dirty-section><h3>Behavior on this key</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
+            "<div><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(row.keycode) + "</code></div>" +
             "<div class='form-grid four'>" +
             renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
             renderTimingInput("selectedLongerHoldTerm", "longer_hold_term", row.longerHoldTerm || "", row.keycode) +
@@ -4491,9 +4528,10 @@ function getClientScript() {
     function renderKeyPickerInput(id, label, value, placeholder, mode = "single", style = "", attrs = "") {
         const styleAttr = style ? " style='" + escapeAttr(style) + "'" : "";
         const extraAttrs = attrs ? " " + attrs : "";
+        const buttonLabel = mode === "list" ? "Pick keycodes" : "Pick keycode";
         return "<label" + styleAttr + extraAttrs + "><span>" + escapeHtml(label) + "</span><span class='input-with-button'>" +
             "<input id='" + escapeAttr(id) + "' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder || "") + "'>" +
-            "<button type='button' data-action='openKeyPicker' data-target='" + escapeAttr(id) + "' data-mode='" + escapeAttr(mode) + "'>Pick keycode</button>" +
+            "<button type='button' data-action='openKeyPicker' data-target='" + escapeAttr(id) + "' data-mode='" + escapeAttr(mode) + "'>" + buttonLabel + "</button>" +
             "</span></label>";
     }
 
@@ -4909,12 +4947,16 @@ function getClientScript() {
 
     function confirmKeyPicker() {
         if (!keyPicker) return;
+        const targetId = keyPicker.targetId;
         const input = document.getElementById(keyPicker.targetId);
         if (input) {
             input.value = keyPickerExpression();
             input.dispatchEvent(new Event("input", { bubbles: true }));
         }
         closeKeyPicker();
+        if (targetId === "layoutComboInputs") {
+            render();
+        }
     }
 
     function updateHelperFields(prefix) {
@@ -5166,6 +5208,15 @@ function getClientScript() {
         return rows;
     }
 
+    function renderLayerOverview(layer) {
+        return "<div class='stack'>" +
+            "<div><h3>Behaviors</h3>" + renderLayerBehaviorTable(layer) + "</div>" +
+            "<div>" + renderLayerMacroTable(layer) + "</div>" +
+            "<div>" + renderLayerComboTable(layer) + "</div>" +
+            "<div>" + renderLayerPdModeTable(layer) + "</div>" +
+            "</div>";
+    }
+
     function renderLayerBehaviorTable(layer) {
         const rows = layerBehaviorRows(layer);
         if (!rows.length) {
@@ -5216,14 +5267,84 @@ function getClientScript() {
         return behavior.steps.map(renderStep).join("<br>");
     }
 
+    function renderLayerMacroTable(layer) {
+        const rows = collectLayerMacros(layer);
+        if (!rows.length) {
+            return "<h3>Macros</h3><p class='muted'>No macro keycodes are directly placed or reached by visible behavior actions on this layer.</p>";
+        }
+        return "<h3>Macros</h3><table><thead><tr><th>Reachable via</th><th>Macro</th><th>Payload</th></tr></thead><tbody>" +
+            rows.map((row) =>
+                "<tr><td>" + escapeHtml(row.source) + "</td><td>" + escapeHtml(row.display || row.keycode) + "<br><code class='muted'>" + escapeHtml(row.keycode) + "</code></td><td>" + renderMacroPayload(row.slot) + "</td></tr>"
+            ).join("") +
+            "</tbody></table>";
+    }
+
+    function renderMacroPayload(slot) {
+        if (!slot) return "<span class='muted'>No parsed payload.</span>";
+        const kind = slot.kind === "via" ? "VIA" : "Hardcoded";
+        const payload = slot.payload ? escapeHtml(slot.payload) : "<span class='muted'>empty</span>";
+        return "<code class='muted'>" + kind + "</code><br>" + payload;
+    }
+
+    function collectLayerMacros(layer) {
+        const rows = [];
+        const seen = new Set();
+        for (const position of layer.positions) {
+            addMacroCandidate(rows, seen, position.keycode, position.display);
+            addBehaviorMacroCandidates(rows, seen, behaviorForKey(position.keycode), position.display);
+        }
+        for (const combo of layerCombos(layer)) {
+            addMacroCandidate(rows, seen, combo.output, combo.badge + " output " + (combo.outputDisplay || combo.output));
+            addBehaviorMacroCandidates(rows, seen, behaviorForKey(combo.output), combo.badge + " output " + (combo.outputDisplay || combo.output));
+        }
+        return rows;
+    }
+
+    function addBehaviorMacroCandidates(rows, seen, behavior, sourcePrefix) {
+        for (const step of behavior?.steps || []) {
+            for (const action of [step.tap, step.hold, step.longHold]) {
+                if (action?.action) {
+                    addMacroCandidate(rows, seen, action.action, sourcePrefix + " via " + step.tapCountName + " " + action.helper);
+                }
+            }
+        }
+    }
+
+    function addMacroCandidate(rows, seen, keycode, source) {
+        const slot = macroSlotForKeycode(keycode);
+        if (!slot && !looksLikeMacroKeycode(keycode)) return;
+        const key = keycode + source;
+        if (seen.has(key)) return;
+        seen.add(key);
+        rows.push({
+            source,
+            keycode,
+            display: displayAction(keycode),
+            slot
+        });
+    }
+
+    function macroSlotForKeycode(keycode) {
+        return (model.viaMacros || []).concat(model.hardcodedMacros || []).find((slot) => slot.keycode === keycode);
+    }
+
+    function looksLikeMacroKeycode(keycode) {
+        return /^VIA_MACRO_\d+$/.test(keycode || "") || /^MACRO_\d+$/.test(keycode || "");
+    }
+
     function renderLayerPdModeTable(layer) {
         const rows = collectLayerPdModes(layer);
         if (!rows.length) {
-            return "<h3 style='margin-top: 14px'>PD Modes</h3><p class='muted'>No pointing modes are directly placed or reached by visible behavior actions on this layer.</p>";
+            return "<h3>PD Modes</h3><p class='muted'>No pointing modes are directly placed or reached by visible behavior actions on this layer.</p>";
         }
-        return "<h3 style='margin-top: 14px'>PD Modes</h3><table><thead><tr><th>Reachable via</th><th>Mode</th><th>RGB</th></tr></thead><tbody>" +
-            rows.map((row) => "<tr><td>" + escapeHtml(row.source) + "</td><td>" + escapeHtml(row.mode) + "</td><td>" + renderInlineSwatch(row.color) + " <code class='muted'>" + escapeHtml(row.locality || "no override") + "</code></td></tr>").join("") +
+        return "<h3>PD Modes</h3><table><thead><tr><th>Reachable via</th><th>Mode</th><th>RGB</th></tr></thead><tbody>" +
+            rows.map((row) => "<tr><td>" + escapeHtml(row.source) + "</td><td>" + renderPdModeCell(row) + "</td><td>" + renderInlineSwatch(row.color) + " <code class='muted'>" + escapeHtml(row.locality || "no override") + "</code></td></tr>").join("") +
             "</tbody></table>";
+    }
+
+    function renderPdModeCell(row) {
+        const action = row.locked ? "lock action: " : "action: ";
+        return escapeHtml(row.mode) + "<br><code class='muted'>" + action + escapeHtml(row.keycode) + "</code>";
     }
 
     function collectLayerPdModes(layer) {
@@ -5260,7 +5381,9 @@ function getClientScript() {
         const color = colorForPdMode(mode);
         rows.push({
             source,
+            keycode,
             mode,
+            locked: isPdModeLockKeycode(keycode),
             color: color?.color,
             locality: color?.locality
         });
@@ -5274,6 +5397,10 @@ function getClientScript() {
         if (keycode === "DRAGSCROLL" || keycode === "DRAGSCROLL_LOCK") return "PD_MODE_DRAGSCROLL";
         const base = keycode.replace(/_MODE_LOCK$/, "").replace(/_MODE$/, "").replace(/_LOCK$/, "");
         return "PD_MODE_" + base;
+    }
+
+    function isPdModeLockKeycode(keycode) {
+        return /_MODE_LOCK$/.test(keycode || "") || keycode === "DRAGSCROLL_LOCK";
     }
 
     function colorForPdMode(mode) {

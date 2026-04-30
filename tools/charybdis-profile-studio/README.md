@@ -34,9 +34,11 @@ those two files.
 - disabled/read-only fields are visually distinct from editable controls
 - view and save key behavior rows directly from the active layer page; the
   layer filters visible behavior rows by keys currently present on that layer
+- the layer overview lists layer-reachable behaviors, macros, combos, and
+  pointing modes
 - layer combo rows show any key behavior row triggered by the combo output
 - append combo rows from the active layer by selecting multiple physical keys
-  on the layout sidecar
+  on the layout sidecar or by using the multi-key picker
 - behavior timing fields show the resolved default milliseconds in their
   placeholder text when a row leaves the override empty
 - numeric-only fields such as HSV hue/saturation channels, behavior timing
