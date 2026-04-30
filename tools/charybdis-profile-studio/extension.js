@@ -2507,32 +2507,28 @@ function getStudioHtml() {
         }
         .board {
             overflow-x: auto;
-            padding: 4px 0 8px;
+            display: grid;
+            min-width: 0;
         }
         .layout-with-key-editor {
             display: grid;
-            grid-template-columns: minmax(760px, 1120px) minmax(360px, 1fr);
-            gap: 24px;
-            align-items: stretch;
-        }
-        .layout-main-column {
-            display: grid;
-            align-content: start;
+            grid-template-columns: minmax(760px, 1fr) minmax(420px, 520px);
             gap: 14px;
-            min-width: 0;
+            align-items: stretch;
+            margin-bottom: 14px;
         }
         .layout-selected-key-column {
             display: grid;
-            align-content: start;
-            justify-items: center;
+            align-content: stretch;
+            justify-items: stretch;
             gap: 12px;
             min-height: 100%;
         }
         .layout-sidecar-stack {
             display: grid;
+            align-content: start;
             gap: 12px;
             width: 100%;
-            max-width: 420px;
         }
         .selected-key-edit-card {
             display: grid;
@@ -2558,6 +2554,40 @@ function getStudioHtml() {
             border: 1px solid var(--line);
             border-radius: 8px;
             background: #2f3336;
+        }
+        .layout-board-card {
+            grid-template-rows: auto minmax(0, 1fr);
+            min-height: 620px;
+            height: 100%;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #2f3336;
+        }
+        .layout-board-header {
+            padding: 22px 32px 0;
+        }
+        .layout-board-title {
+            margin: 0;
+            color: #dbe6e8;
+            font-size: 24px;
+            font-weight: 650;
+            line-height: 1.2;
+        }
+        .layout-board-subtitle {
+            margin: 8px 0 0;
+            color: #a8b2b8;
+            font-size: 13px;
+        }
+        .layout-board-stage {
+            display: grid;
+            place-items: center;
+            min-height: 0;
+            padding: 18px 32px 34px;
+        }
+        .layout-board-svg {
+            border: 0;
+            border-radius: 0;
+            background: transparent;
         }
         .svg-key {
             cursor: pointer;
@@ -3131,6 +3161,10 @@ function getStudioHtml() {
             .layout-with-key-editor {
                 grid-template-columns: 1fr;
             }
+            .layout-board-card {
+                height: auto;
+                min-height: 0;
+            }
             .layout-selected-key-column {
                 padding: 8px 0 0;
             }
@@ -3416,6 +3450,7 @@ function getClientScript() {
         radius: 7,
         yOffset: 54,
         rowStep: 64,
+        layoutViewBox: { x: 0, y: 86, width: 1120, height: 510 },
         leftX: [36, 102, 168, 234, 300, 366],
         leftTopY: [118, 118, 78, 54, 78, 78],
         rightX: [698, 764, 830, 896, 962, 1028],
@@ -4367,7 +4402,7 @@ function getClientScript() {
         const selected = layer.positions[selectedKey] || layer.positions[0];
         const selectedBehavior = behaviorForKey(selected.keycode);
         return "<div class='stack'>" +
-            panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected, selectedBehavior), true) +
+            panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected) + renderSelectedBehaviorEditor(selected, selectedBehavior), true) +
             panel("Layer Overview", renderLayerOverview(layer), true) +
             "</div>";
     }
@@ -4378,12 +4413,9 @@ function getClientScript() {
         ).join("") + "</div>";
     }
 
-    function renderLayoutWithSelectedKeyEditor(layer, selected, behavior) {
+    function renderLayoutWithSelectedKeyEditor(layer, selected) {
         return "<div class='layout-with-key-editor'>" +
-            "<div class='layout-main-column'>" +
             renderBoard(layer) +
-            renderSelectedBehaviorEditor(selected, behavior) +
-            "</div>" +
             "<div class='layout-selected-key-column'>" +
             "<div class='layout-sidecar-stack'>" +
             renderSelectedKeyEditor(layer, selected) +
@@ -5004,12 +5036,17 @@ function getClientScript() {
 
     function renderBoard(layer) {
         const layerColor = colorForLayer(layer.name);
-        return "<div class='board'>" +
-            "<svg class='keyboard-svg' viewBox='0 0 " + keyboardGeometry.width + " " + keyboardGeometry.height + "' role='img' aria-label='" + escapeAttr(layer.name + " keyboard layout") + "'>" +
-            "<text x='32' y='40' fill='#dbe6e8' font-size='24' font-weight='650'>" + escapeHtml(layer.name) + "</text>" +
-            "<text x='32' y='68' fill='#a8b2b8' font-size='13'>" + escapeHtml(layerColorSubtitle(layerColor)) + "</text>" +
+        const viewBox = keyboardGeometry.layoutViewBox;
+        return "<div class='board layout-board-card'>" +
+            "<div class='layout-board-header'>" +
+            "<h3 class='layout-board-title'>" + escapeHtml(layer.name) + "</h3>" +
+            "<p class='layout-board-subtitle'>" + escapeHtml(layerColorSubtitle(layerColor)) + "</p>" +
+            "</div>" +
+            "<div class='layout-board-stage'>" +
+            "<svg class='keyboard-svg layout-board-svg' viewBox='" + viewBox.x + " " + viewBox.y + " " + viewBox.width + " " + viewBox.height + "' preserveAspectRatio='xMidYMid meet' role='img' aria-label='" + escapeAttr(layer.name + " keyboard layout") + "'>" +
             layer.positions.map(renderSvgKey).join("") +
             "</svg>" +
+            "</div>" +
             "</div>";
     }
 
