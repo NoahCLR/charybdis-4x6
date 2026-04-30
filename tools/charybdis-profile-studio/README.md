@@ -80,6 +80,7 @@ those two files.
   physical keys on the active layout
 - append simple `key_behaviors[]` rows for tap, hold, and long-hold actions
 - open the backing source file from the studio
+- refresh from disk and discard uncommitted Studio edits
 - hover panels, tabs, controls, tables, color previews, and SVG keys for
   tooltips that explain what each part edits or displays
 

@@ -488,8 +488,10 @@ async function fileExists(filePath) {
 async function handleWebviewMessage(panel, root, message) {
     switch (message?.type) {
         case "ready":
-        case "refresh":
             await postModel(panel, root);
+            return;
+        case "refresh":
+            await postModel(panel, root, "Reloaded files and discarded uncommitted Studio edits.");
             return;
         case "openSource":
             await openSource(root, message.file);
@@ -3308,7 +3310,7 @@ function getClientScript() {
     const headerTooltips = {
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
         openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
-        refresh: "Re-read keymap.c and rgb_config.c from disk and rebuild the studio model."
+        refresh: "Reload keymap.c and rgb_config.c from disk, discarding uncommitted Studio edits."
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
@@ -3557,7 +3559,10 @@ function getClientScript() {
     const keyPickerHost = document.getElementById("keyPickerHost");
     let activeTooltipTarget = undefined;
 
-    document.getElementById("refresh").addEventListener("click", () => post({ type: "refresh" }));
+    document.getElementById("refresh").addEventListener("click", () => {
+        discardLocalDraftState();
+        post({ type: "refresh" });
+    });
     document.getElementById("openKeymap").addEventListener("click", () => post({ type: "openSource", file: "keymap" }));
     document.getElementById("openRgb").addEventListener("click", () => post({ type: "openSource", file: "rgb" }));
     document.addEventListener("pointerover", (event) => {
@@ -4318,6 +4323,26 @@ function getClientScript() {
         render();
         resetLocalHistory();
         vscode.postMessage(message);
+    }
+
+    function discardLocalDraftState() {
+        rgbGroupOwner = "";
+        rgbSelectedLeds = [];
+        rgbBuilderColor = undefined;
+        layoutComboPicking = false;
+        layoutComboSelection = [];
+        layoutComboOutput = "";
+        layoutComboInputs = "";
+        pendingLayoutEdits = {};
+        copiedLayoutKey = "";
+        layoutDragState = undefined;
+        suppressNextLayoutClick = false;
+        lastLayoutKeyClick = { index: undefined, time: 0 };
+        keyPicker = undefined;
+        keyPickerHost.innerHTML = "";
+        localUndoStack = [];
+        localRedoStack = [];
+        currentLocalSnapshot = "";
     }
 
     function render() {
