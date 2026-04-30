@@ -2708,6 +2708,38 @@ function getStudioHtml() {
             grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
             gap: 10px;
         }
+        .behavior-helper-control {
+            display: grid;
+            gap: 8px;
+        }
+        .behavior-helper-select {
+            display: grid;
+            grid-template-rows: auto auto;
+            gap: 4px;
+            min-width: 0;
+            color: var(--muted);
+        }
+        .checkbox-inline {
+            display: grid;
+            grid-template-columns: 16px minmax(0, 1fr);
+            grid-template-rows: auto;
+            align-items: center;
+            gap: 8px;
+            min-height: 24px;
+            color: var(--text);
+        }
+        .checkbox-inline input[type="checkbox"] {
+            justify-self: start;
+            width: 16px;
+            height: 16px;
+            min-height: 0;
+            padding: 0;
+            accent-color: var(--accent);
+        }
+        .checkbox-inline span {
+            font-size: 12px;
+            font-weight: 650;
+        }
         .selected-behavior-editor {
             display: grid;
             gap: 14px;
@@ -3572,8 +3604,11 @@ function getClientScript() {
             commitLocalHistory(before);
             return;
         }
+        if (event.target?.matches("[data-helper-enabled]")) {
+            updateHelperFields(event.target.dataset.helperPrefix || event.target.id.replace(/Enabled$/, ""));
+        }
         if (event.target?.matches("[data-helper-select]")) {
-            updateHelperFields(event.target.id.replace(/Helper$/, ""));
+            updateHelperFields(event.target.dataset.helperPrefix || event.target.id.replace(/Helper$/, ""));
         }
         validateControl(event.target);
         updateDirtyFromEvent(event);
@@ -4050,7 +4085,7 @@ function getClientScript() {
         if (!key) return "";
         if (fieldTooltips[key]) return fieldTooltips[key];
         if (key.endsWith(" helper")) {
-            return "Choose the helper that controls this behavior action. Select none to leave the action empty.";
+            return "Choose the helper that controls this behavior action.";
         }
         if (key.endsWith(" action")) {
             return "User-facing key or action for this behavior branch, for example Esc, Shift+\`, Cmd+Q, or a pointing-mode key.";
@@ -4267,9 +4302,18 @@ function getClientScript() {
         const actionHidden = action?.helper ? "" : " hidden";
         const repeatHidden = action?.helper === "REPEAT_WHILE_HELD" ? "" : " hidden";
         return "<div class='stack behavior-action-editor'>" +
-            "<label><span>" + label + " helper</span><select id='" + id + "Helper' data-helper-select>" + helperOptions(helpers, action?.helper || "") + "</select></label>" +
+            renderHelperControl(id, label, helpers, action?.helper || "") +
             renderKeyPickerInput(id + "Action", label + " action", editableActionValue(action), "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(id) + "'" + actionHidden) +
             (hasRepeat ? "<label data-helper-field data-helper-prefix='" + id + "' data-helper-value='REPEAT_WHILE_HELD'" + repeatHidden + "><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' data-validate='positive-int' inputmode='numeric' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
+            "</div>";
+    }
+
+    function renderHelperControl(prefix, label, helpers, selected) {
+        const enabled = Boolean(selected);
+        const escapedPrefix = escapeAttr(prefix);
+        return "<div class='behavior-helper-control'>" +
+            "<label class='checkbox-inline'><input type='checkbox' id='" + escapedPrefix + "Enabled' data-helper-enabled data-helper-prefix='" + escapedPrefix + "'" + (enabled ? " checked" : "") + "><span>" + escapeHtml(label) + "</span></label>" +
+            "<label class='behavior-helper-select' data-helper-select-prefix='" + escapedPrefix + "'" + (enabled ? "" : " hidden") + "><span>" + escapeHtml(label) + " helper</span><select id='" + escapedPrefix + "Helper' data-helper-select data-helper-prefix='" + escapedPrefix + "'>" + helperOptions(helpers, selected) + "</select></label>" +
             "</div>";
     }
 
@@ -4703,7 +4747,12 @@ function getClientScript() {
     }
 
     function updateHelperFields(prefix) {
-        const helper = document.getElementById(prefix + "Helper")?.value || "";
+        const enabled = Boolean(document.getElementById(prefix + "Enabled")?.checked);
+        const helper = enabled ? (document.getElementById(prefix + "Helper")?.value || "") : "";
+        for (const field of document.querySelectorAll("[data-helper-select-prefix='" + prefix + "']")) {
+            field.hidden = !enabled;
+            field.style.display = enabled ? "" : "none";
+        }
         for (const field of document.querySelectorAll("[data-helper-action-prefix='" + prefix + "']")) {
             const visible = Boolean(helper);
             field.hidden = !visible;
@@ -4713,7 +4762,7 @@ function getClientScript() {
                 else clearFieldError(control);
             }
         }
-        for (const field of document.querySelectorAll("[data-helper-prefix='" + prefix + "']")) {
+        for (const field of document.querySelectorAll("[data-helper-field][data-helper-prefix='" + prefix + "']")) {
             const values = String(field.dataset.helperValue || "").split(" ");
             const visible = values.includes(helper);
             field.hidden = !visible;
@@ -5078,9 +5127,7 @@ function getClientScript() {
 
     function renderActionInputs(prefix, label, helpers) {
         const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
-        return "<label><span>" + label + " helper</span><select id='" + prefix + "Helper' data-helper-select>" +
-            helperOptions(helpers, "") +
-            "</select></label>" +
+        return renderHelperControl(prefix, label, helpers, "") +
             renderKeyPickerInput(prefix + "Action", label + " action", "", "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(prefix) + "' hidden") +
             (hasRepeat ? "<label data-helper-field data-helper-prefix='" + prefix + "' data-helper-value='REPEAT_WHILE_HELD' hidden><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' data-validate='positive-int' inputmode='numeric' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
     }
@@ -5128,7 +5175,15 @@ function getClientScript() {
     }
 
     function readAction(prefix) {
-        const helper = document.getElementById(prefix + "Helper").value;
+        const enabled = Boolean(document.getElementById(prefix + "Enabled")?.checked);
+        if (!enabled) {
+            return {
+                helper: "",
+                action: "",
+                repeatHz: ""
+            };
+        }
+        const helper = document.getElementById(prefix + "Helper")?.value || "";
         if (!helper) {
             return {
                 helper: "",
@@ -5870,12 +5925,13 @@ function getClientScript() {
     }
 
     function helperOptions(values, selected) {
-        return values.map((value) => "<option value='" + escapeAttr(value) + "' " + (value === selected ? "selected" : "") + ">" + escapeHtml(helperLabel(value)) + "</option>").join("");
+        const helpers = values.filter(Boolean);
+        const selectedHelper = selected || helpers[0] || "";
+        return helpers.map((value) => "<option value='" + escapeAttr(value) + "' " + (value === selectedHelper ? "selected" : "") + ">" + escapeHtml(helperLabel(value)) + "</option>").join("");
     }
 
     function helperLabel(value) {
         return {
-            "": "None",
             TAP_SENDS: "Tap sends",
             PRESS_AND_HOLD_UNTIL_RELEASE: "Press and hold until release",
             TAP_AT_HOLD_THRESHOLD: "Tap at hold threshold",

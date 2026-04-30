@@ -223,8 +223,7 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 // underlay/overlay substage is live.
 //
 // Uncomment or add rows inside this table to enable persistent combo accents.
-static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
-    // { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_THUMBS}, //
 );
 #    endif // COMBO_ENABLE && RGB_COMBO_FEEDBACK_ENABLE
 
@@ -317,7 +316,7 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_
     // { .semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
-    {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(26, 27, 28, 25, 24, 55, 53, 54)}, );
+    {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS}, );
 #    endif // RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 
 // Expand the authored RGB tables, derived counts, and RGB feedback policy
