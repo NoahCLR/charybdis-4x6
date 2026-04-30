@@ -2719,24 +2719,61 @@ function getStudioHtml() {
             min-width: 0;
             color: var(--muted);
         }
-        .checkbox-inline {
+        .toggle-inline {
+            position: relative;
             display: grid;
-            grid-template-columns: 16px minmax(0, 1fr);
+            grid-template-columns: 34px minmax(0, 1fr);
             grid-template-rows: auto;
             align-items: center;
             gap: 8px;
             min-height: 24px;
             color: var(--text);
+            cursor: pointer;
         }
-        .checkbox-inline input[type="checkbox"] {
-            justify-self: start;
-            width: 16px;
-            height: 16px;
+        .toggle-inline input[type="checkbox"] {
+            position: absolute;
+            width: 1px;
+            height: 1px;
             min-height: 0;
             padding: 0;
-            accent-color: var(--accent);
+            margin: 0;
+            opacity: 0;
+            pointer-events: none;
         }
-        .checkbox-inline span {
+        .toggle-switch {
+            position: relative;
+            width: 34px;
+            height: 18px;
+            border: 1px solid #60707a;
+            border-radius: 999px;
+            background: #20262a;
+            box-shadow: inset 0 0 0 1px rgba(49, 198, 164, 0.08);
+            transition: background 120ms ease, border-color 120ms ease;
+        }
+        .toggle-switch::after {
+            content: "";
+            position: absolute;
+            top: 1px;
+            left: 1px;
+            width: 14px;
+            height: 14px;
+            border-radius: 999px;
+            background: var(--muted);
+            transition: transform 120ms ease, background 120ms ease;
+        }
+        .toggle-inline input[type="checkbox"]:checked + .toggle-switch {
+            border-color: var(--accent);
+            background: #217a6a;
+        }
+        .toggle-inline input[type="checkbox"]:checked + .toggle-switch::after {
+            transform: translateX(16px);
+            background: #f7f7f4;
+        }
+        .toggle-inline input[type="checkbox"]:focus-visible + .toggle-switch {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+        .toggle-label {
             font-size: 12px;
             font-weight: 650;
         }
@@ -4312,7 +4349,7 @@ function getClientScript() {
         const enabled = Boolean(selected);
         const escapedPrefix = escapeAttr(prefix);
         return "<div class='behavior-helper-control'>" +
-            "<label class='checkbox-inline'><input type='checkbox' id='" + escapedPrefix + "Enabled' data-helper-enabled data-helper-prefix='" + escapedPrefix + "'" + (enabled ? " checked" : "") + "><span>" + escapeHtml(label) + "</span></label>" +
+            "<label class='toggle-inline'><input type='checkbox' id='" + escapedPrefix + "Enabled' data-helper-enabled data-helper-prefix='" + escapedPrefix + "'" + (enabled ? " checked" : "") + "><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>" + escapeHtml(label) + "</span></label>" +
             "<label class='behavior-helper-select' data-helper-select-prefix='" + escapedPrefix + "'" + (enabled ? "" : " hidden") + "><span>" + escapeHtml(label) + " helper</span><select id='" + escapedPrefix + "Helper' data-helper-select data-helper-prefix='" + escapedPrefix + "'>" + helperOptions(helpers, selected) + "</select></label>" +
             "</div>";
     }
