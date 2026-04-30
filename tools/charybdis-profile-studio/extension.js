@@ -2773,14 +2773,23 @@ function getStudioHtml() {
             border-radius: 0;
             background: transparent;
         }
-        .layout-board-apply {
+        .layout-board-footer {
             position: absolute;
             left: 32px;
+            right: 32px;
             bottom: 22px;
             z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
         }
         .layout-board-apply button {
             min-width: 190px;
+        }
+        .layout-board-notice {
+            color: var(--warn);
+            font-weight: 650;
         }
         .svg-key {
             cursor: pointer;
@@ -3427,6 +3436,7 @@ function getClientScript() {
     let lastLayoutKeyClick = { index: undefined, time: 0 };
     let keyPicker = undefined;
     let notice = "";
+    let layoutNotice = "";
     let localUndoStack = [];
     let localRedoStack = [];
     let currentLocalSnapshot = "";
@@ -3807,6 +3817,7 @@ function getClientScript() {
             model = event.data.model;
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
             notice = event.data.notice || "";
+            layoutNotice = "";
             if (!activeLayer && model.layers.length) {
                 activeLayer = model.layers[0].name;
             }
@@ -3818,6 +3829,7 @@ function getClientScript() {
         }
         if (event.data.type === "error") {
             notice = event.data.message || "Unknown error";
+            layoutNotice = "";
             render();
             resetLocalHistory();
         }
@@ -3862,6 +3874,7 @@ function getClientScript() {
         if (action === "selectLayer") {
             activeLayer = target.dataset.layer;
             selectedKey = 0;
+            layoutNotice = "";
             layoutComboPicking = false;
             layoutComboSelection = [];
             layoutComboOutput = "";
@@ -3871,6 +3884,7 @@ function getClientScript() {
             resetLocalHistory();
         } else if (action === "selectView") {
             activeView = target.dataset.view;
+            layoutNotice = "";
             lastLayoutKeyClick = { index: undefined, time: 0 };
             render();
             resetLocalHistory();
@@ -4208,9 +4222,10 @@ function getClientScript() {
         const value = canonicalLayoutKeyExpression(keycode);
         const error = layoutKeyExpressionError(value);
         if (!base || !original || error) {
-            if (error) notice = error;
+            if (error) layoutNotice = error;
             return false;
         }
+        layoutNotice = "";
         const nextLayerEdits = { ...layerPendingLayoutEdits(layerName) };
         if (layoutKeyEquivalent(value, original.keycode)) {
             delete nextLayerEdits[layoutIndex];
@@ -4573,6 +4588,7 @@ function getClientScript() {
 
     function post(message) {
         notice = "Working...";
+        layoutNotice = "";
         render();
         resetLocalHistory();
         vscode.postMessage(message);
@@ -4593,6 +4609,7 @@ function getClientScript() {
         lastLayoutKeyClick = { index: undefined, time: 0 };
         keyPicker = undefined;
         keyPickerHost.innerHTML = "";
+        layoutNotice = "";
         localUndoStack = [];
         localRedoStack = [];
         currentLocalSnapshot = "";
@@ -5770,12 +5787,20 @@ function getClientScript() {
             layer.positions.map(renderSvgKey).join("") +
             "</svg>" +
             "</div>" +
-            renderLayoutBoardApplyButton(layer) +
+            renderLayoutBoardFooter(layer) +
             "</div>";
     }
 
-    function renderLayoutBoardApplyButton(layer) {
+    function renderLayoutBoardFooter(layer) {
         const changes = pendingLayoutChanges(layer.name);
+        if (!changes.length && !layoutNotice) return "";
+        return "<div class='layout-board-footer'>" +
+            (layoutNotice ? "<div class='layout-board-notice'>" + escapeHtml(layoutNotice) + "</div>" : "") +
+            renderLayoutBoardApplyButton(changes) +
+            "</div>";
+    }
+
+    function renderLayoutBoardApplyButton(changes) {
         if (!changes.length) return "";
         const label = "Apply " + changes.length + " layout " + (changes.length === 1 ? "change" : "changes");
         return "<div class='layout-board-apply'>" +

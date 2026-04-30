@@ -23,7 +23,8 @@ those two files.
   slot swaps, and stage copy/paste or sidecar keycode edits before applying
   them to `keymap.c`
 - reject comma-separated clipboard lists and random text when editing one layout
-  slot, while still allowing nested QMK expressions such as `LT(layer, key)`
+  slot, while still allowing nested QMK expressions such as `LT(layer, key)`;
+  layout-slot rejection messages appear at the bottom of the Layout board
 - use a VIA-style picker for key fields, with an SVG-based full-size keyboard tab,
   a shared search box where Keyboard and All QMK search the full catalog while
   category tabs narrow the results, symbol/navigation/numpad/more-keys menus,
