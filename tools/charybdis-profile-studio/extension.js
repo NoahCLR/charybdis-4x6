@@ -494,10 +494,6 @@ async function handleWebviewMessage(panel, root, message) {
         case "openSource":
             await openSource(root, message.file);
             return;
-        case "updateLayoutKey":
-            await patchLayoutKey(root, message.layer, Number(message.layoutIndex), message.keycode);
-            await postModel(panel, root, "Updated keymap.c layer key.");
-            return;
         case "updateLayoutKeys":
             await patchLayoutKeys(root, message.layer, message.changes);
             await postModel(panel, root, "Updated keymap.c layout keys.");
@@ -1166,10 +1162,6 @@ function parseHsv(value) {
         s: args[1] || "",
         v: args[2] || "",
     };
-}
-
-async function patchLayoutKey(root, layer, layoutIndex, keycode) {
-    await patchLayoutKeys(root, layer, [{ layoutIndex, keycode }]);
 }
 
 async function patchLayoutKeys(root, layer, changes) {
@@ -3334,7 +3326,7 @@ function getClientScript() {
         "Key Behavior Feedback LED Groups": "Inspect key-behavior feedback LED group rows from rgb_config.c."
     };
     const actionTooltips = {
-        applyKey: "Write the selected key value back to this layer's LAYOUT() slot in keymap.c.",
+        applyKey: "Stage the selected key value as a pending layout edit.",
         saveSelectedBehavior: "Create or replace the key_behaviors[] row for this selected keycode.",
         addBehavior: "Append a simple key_behaviors[] row to keymap.c.",
         updateLayerColor: "Write this layer color and render mode back to rgb_config.c.",
@@ -3788,7 +3780,11 @@ function getClientScript() {
             openKeyPicker(target.dataset.target, target.dataset.mode || "single");
         } else if (action === "applyKey") {
             const input = document.getElementById("keycodeInput");
-            post({ type: "updateLayoutKey", layer: activeLayer, layoutIndex: selectedKey, keycode: input.value });
+            const before = currentLocalSnapshot || serializeLocalState();
+            if (stageLayoutKey(selectedKey, input.value)) {
+                render();
+                commitLocalHistory(before);
+            }
         } else if (action === "updateLayerColor") {
             const card = target.closest(".card");
             post({
@@ -4112,8 +4108,90 @@ function getClientScript() {
         const normalized = normalizeDisplayExpression(value);
         if (!normalized) return "";
         if (qmkKeyLabels[normalized]) return normalized;
+        const chord = canonicalLayoutChordExpression(normalized);
+        if (chord) return chord;
         const match = Object.entries(qmkKeyLabels).find(([, label]) => String(label || "").toLowerCase() === normalized.toLowerCase());
-        return match ? match[0] : normalized;
+        if (match) return match[0];
+        if (/^[a-z]$/i.test(normalized)) return "KC_" + normalized.toUpperCase();
+        if (/^\\d$/.test(normalized)) return "KC_" + normalized;
+        if (/^[a-z][a-z0-9_]*$/i.test(normalized) && normalized.includes("_")) return normalized.toUpperCase();
+        return normalized;
+    }
+
+    function canonicalLayoutChordExpression(value) {
+        const parts = String(value || "").split("+").map((part) => part.trim()).filter(Boolean);
+        if (parts.length < 2) return "";
+        const key = canonicalLayoutKeyExpression(parts[parts.length - 1]);
+        if (!key) return "";
+        const modifiers = [];
+        for (const part of parts.slice(0, -1)) {
+            const modifier = normalizeLayoutModifier(part);
+            if (!modifier) return "";
+            if (!modifiers.includes(modifier)) modifiers.push(modifier);
+        }
+        const wrapper = wrapperForLayoutModifiers(modifiers);
+        if (wrapper) return wrapper + "(" + key + ")";
+        const wrappers = wrappersForLayoutModifiers(modifiers);
+        if (wrappers.length !== modifiers.length) return "";
+        return wrappers.reduceRight((expression, candidate) => candidate + "(" + expression + ")", key);
+    }
+
+    function normalizeLayoutModifier(value) {
+        const normalized = String(value || "").toLowerCase().replace(/[\\s_-]+/g, "");
+        return {
+            ctrl: "Ctrl",
+            control: "Ctrl",
+            lctrl: "Ctrl",
+            leftctrl: "Ctrl",
+            shift: "Shift",
+            lshift: "Shift",
+            leftshift: "Shift",
+            alt: "Alt",
+            option: "Alt",
+            lalt: "Alt",
+            leftalt: "Alt",
+            cmd: "Cmd",
+            command: "Cmd",
+            gui: "Cmd",
+            win: "Cmd",
+            meta: "Cmd",
+            lgui: "Cmd",
+            leftgui: "Cmd",
+            rctrl: "Right Ctrl",
+            rightctrl: "Right Ctrl",
+            rshift: "Right Shift",
+            rightshift: "Right Shift",
+            rgui: "Right Cmd",
+            rightgui: "Right Cmd",
+            rightcmd: "Right Cmd",
+            ralt: "Right Alt",
+            rightalt: "Right Alt"
+        }[normalized] || "";
+    }
+
+    function wrapperForLayoutModifiers(modifiers) {
+        const key = modifiers.map(normalizeLayoutModifier).filter(Boolean).sort().join("+");
+        for (const [wrapper, labels] of Object.entries(modWrapperLabels)) {
+            const candidate = labels.map(normalizeLayoutModifier).filter(Boolean).sort().join("+");
+            if (candidate === key) return wrapper;
+        }
+        return "";
+    }
+
+    function wrappersForLayoutModifiers(modifiers) {
+        return modifiers.map((modifier) => {
+            switch (normalizeLayoutModifier(modifier)) {
+                case "Ctrl": return "C";
+                case "Shift": return "S";
+                case "Alt": return "A";
+                case "Cmd": return "G";
+                case "Right Ctrl": return "RCTL";
+                case "Right Shift": return "RSFT";
+                case "Right Alt": return "RALT";
+                case "Right Cmd": return "RGUI";
+                default: return "";
+            }
+        }).filter(Boolean);
     }
 
     function canUseLayoutClipboard(target) {
@@ -4772,7 +4850,7 @@ function getClientScript() {
             "<label><span>Layout index</span><input disabled value='" + selected.layoutIndex + "'></label>" +
             renderKeyPickerInput("keycodeInput", "Key", selected.editLabel || selected.display || selected.keycode, "A, Enter, Space, _______", "single") +
             "<div><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(selected.keycode) + "</code></div>" +
-            "<button data-action='applyKey' data-dirty-button class='primary'>Apply key</button>" +
+            "<button data-action='applyKey' data-dirty-button class='primary'>Stage key</button>" +
             "</div>" +
             "</div>";
     }

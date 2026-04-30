@@ -43,9 +43,10 @@ authored `key_behaviors[]` row, the behavior appears there, including when a key
 is later changed to an existing behavior-owned keycode.
 On the Layout board, clicking a key selects it, double-clicking opens the
 keycode picker for that key, dragging one key onto another stages a slot swap,
-and copy/paste stages the selected keycode on another selected slot. Staged
-drag/drop and paste edits are written to `keymap.c` only when the Layout
-board's apply button is pressed.
+and copy/paste stages the selected keycode on another selected slot. The
+selected-key sidecar stages keycode edits into that same pending layout set.
+Staged layout edits are written to `keymap.c` only when the Layout board's
+apply button is pressed.
 The Layout page also has a combo sidecar below the selected-key editor. Its
 selection mode lets the active layer board choose multiple physical keys as the
 new combo inputs, and the input field also exposes the same multi-key picker as
