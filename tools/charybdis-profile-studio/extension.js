@@ -498,6 +498,10 @@ async function handleWebviewMessage(panel, root, message) {
             await patchLayoutKey(root, message.layer, Number(message.layoutIndex), message.keycode);
             await postModel(panel, root, "Updated keymap.c layer key.");
             return;
+        case "updateLayoutKeys":
+            await patchLayoutKeys(root, message.layer, message.changes);
+            await postModel(panel, root, "Updated keymap.c layout keys.");
+            return;
         case "updateLayerColor":
             await patchLayerColor(root, message.layer, message.hue, message.sat, message.val, message.mode);
             await postModel(panel, root, "Updated rgb_config.c layer color.");
@@ -1165,12 +1169,45 @@ function parseHsv(value) {
 }
 
 async function patchLayoutKey(root, layer, layoutIndex, keycode) {
-    keycode = normalizeUserKeyExpression(keycode);
-    assertSafeExpression(keycode, "keycode");
-    if (!Number.isInteger(layoutIndex) || layoutIndex < 0 || layoutIndex >= LAYOUT_SLOT_COUNT) {
-        throw new Error(`Invalid layout index: ${layoutIndex}`);
+    await patchLayoutKeys(root, layer, [{ layoutIndex, keycode }]);
+}
+
+async function patchLayoutKeys(root, layer, changes) {
+    const normalizedChanges = normalizeLayoutKeyChanges(changes);
+    if (!normalizedChanges.length) {
+        return;
     }
 
+    const context = await readLayoutSlotContext(root, layer);
+    const replacements = normalizedChanges.map((change) => {
+        const token = layoutSlotToken(context, change.layoutIndex);
+        return {
+            start: token.start,
+            end: token.end,
+            value: change.keycode,
+        };
+    }).sort((left, right) => right.start - left.start);
+
+    let next = context.text;
+    for (const replacement of replacements) {
+        next = replaceRange(next, replacement.start, replacement.end, replacement.value);
+    }
+    await writeText(context.filePath, next);
+}
+
+function normalizeLayoutKeyChanges(changes) {
+    const byIndex = new Map();
+    for (const change of Array.isArray(changes) ? changes : []) {
+        const layoutIndex = Number(change?.layoutIndex);
+        assertLayoutIndex(layoutIndex);
+        const keycode = normalizeUserKeyExpression(change?.keycode || "");
+        assertSafeExpression(keycode, "keycode");
+        byIndex.set(layoutIndex, normalizeExpr(keycode));
+    }
+    return Array.from(byIndex.entries()).map(([layoutIndex, keycode]) => ({ layoutIndex, keycode }));
+}
+
+async function readLayoutSlotContext(root, layer) {
     const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
     const text = await fs.readFile(filePath, "utf8");
     const array = findInitializerBody(text, /keymaps\s*\[\]\s*\[MATRIX_ROWS\]\s*\[MATRIX_COLS\]\s*=/);
@@ -1181,10 +1218,24 @@ async function patchLayoutKey(root, layer, layoutIndex, keycode) {
         throw new Error(`${layer} expected ${LAYOUT_SLOT_COUNT} layout entries, got ${items.length}`);
     }
 
-    const token = trimCodeRange(argsBody, items[layoutIndex].start, items[layoutIndex].end);
-    const absoluteStart = array.bodyStart + layerCall.argsStart + token.start;
-    const absoluteEnd = array.bodyStart + layerCall.argsStart + token.end;
-    await writeText(filePath, replaceRange(text, absoluteStart, absoluteEnd, normalizeExpr(keycode)));
+    return { filePath, text, array, layerCall, argsBody, items };
+}
+
+function layoutSlotToken(context, layoutIndex) {
+    assertLayoutIndex(layoutIndex);
+    const item = context.items[layoutIndex];
+    const token = trimCodeRange(context.argsBody, item.start, item.end);
+    return {
+        start: context.array.bodyStart + context.layerCall.argsStart + token.start,
+        end: context.array.bodyStart + context.layerCall.argsStart + token.end,
+        text: context.argsBody.slice(token.start, token.end),
+    };
+}
+
+function assertLayoutIndex(layoutIndex) {
+    if (!Number.isInteger(layoutIndex) || layoutIndex < 0 || layoutIndex >= LAYOUT_SLOT_COUNT) {
+        throw new Error(`Invalid layout index: ${layoutIndex}`);
+    }
 }
 
 async function patchLayerColor(root, layer, hue, sat, val, mode) {
@@ -2556,6 +2607,7 @@ function getStudioHtml() {
             background: #2f3336;
         }
         .layout-board-card {
+            position: relative;
             grid-template-rows: auto minmax(0, 1fr);
             min-height: 620px;
             height: 100%;
@@ -2589,8 +2641,35 @@ function getStudioHtml() {
             border-radius: 0;
             background: transparent;
         }
+        .layout-board-apply {
+            position: absolute;
+            left: 32px;
+            bottom: 22px;
+            z-index: 1;
+        }
+        .layout-board-apply button {
+            min-width: 190px;
+        }
         .svg-key {
             cursor: pointer;
+        }
+        .layout-board-svg .svg-key {
+            cursor: grab;
+        }
+        body.layout-key-dragging .layout-board-svg .svg-key {
+            cursor: grabbing;
+        }
+        .layout-board-svg .svg-key.drag-source {
+            opacity: 0.62;
+        }
+        .layout-board-svg .svg-key.drag-target rect {
+            stroke: var(--warn);
+            stroke-width: 3;
+        }
+        .layout-board-svg .svg-key.pending rect {
+            stroke: var(--warn);
+            stroke-dasharray: 6 4;
+            stroke-width: 3;
         }
         .svg-key rect {
             stroke-width: 1.4;
@@ -3209,6 +3288,11 @@ function getClientScript() {
     let layoutComboSelection = [];
     let layoutComboOutput = "";
     let layoutComboInputs = "";
+    let pendingLayoutEdits = {};
+    let copiedLayoutKey = "";
+    let layoutDragState = undefined;
+    let suppressNextLayoutClick = false;
+    let lastLayoutKeyClick = { index: undefined, time: 0 };
     let keyPicker = undefined;
     let notice = "";
     let localUndoStack = [];
@@ -3264,10 +3348,11 @@ function getClientScript() {
         updateViaMacro: "Write this VIA macro payload string back to keymap.c.",
         addCombo: "Append a combo row with the entered output and input keys.",
         addLayoutCombo: "Append a combo row using the selected layout keys as inputs.",
+        applyLayoutChanges: "Write pending layout drag/drop and paste edits back to keymap.c.",
         toggleLayoutComboPicking: "Toggle layout combo input selection.",
         toggleLayoutComboKey: "Add or remove this key from the pending layout combo.",
         clearLayoutComboSelection: "Clear the pending layout combo input keys.",
-        selectKey: "Select this physical key so its keycode and behavior can be edited.",
+        selectKey: "Select this physical key. Double-click to pick a keycode, drag onto another key to swap, or use copy/paste between selected keys.",
         toggleRgbLed: "Add or remove this physical LED from the new RGB group.",
         openKeyPicker: "Open a VIA-style keycode picker with sections, QWERTY keys, modifiers, and OK/Cancel confirmation."
     };
@@ -3529,6 +3614,10 @@ function getClientScript() {
     document.addEventListener("keydown", (event) => {
         if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
         const key = String(event.key || "").toLowerCase();
+        if (!keyPicker && key === "c" && canUseLayoutClipboard(event.target)) {
+            copySelectedLayoutKey();
+            return;
+        }
         const wantsUndo = key === "z" && !event.shiftKey;
         const wantsRedo = key === "y" || (key === "z" && event.shiftKey);
         if (!wantsUndo && !wantsRedo) return;
@@ -3540,6 +3629,23 @@ function getClientScript() {
             undoLocalEdit();
         } else {
             redoLocalEdit();
+        }
+    });
+    document.addEventListener("copy", (event) => {
+        if (!canUseLayoutClipboard(event.target)) return;
+        const copied = copySelectedLayoutKey();
+        if (!copied) return;
+        event.clipboardData?.setData("text/plain", copied);
+        event.preventDefault();
+    });
+    document.addEventListener("paste", (event) => {
+        if (!canUseLayoutClipboard(event.target)) return;
+        const text = event.clipboardData?.getData("text/plain") || copiedLayoutKey;
+        if (!text) return;
+        event.preventDefault();
+        const before = currentLocalSnapshot || serializeLocalState();
+        if (pasteLayoutKey(text)) {
+            commitLocalHistory(before);
         }
     });
     keyPickerHost.addEventListener("input", (event) => {
@@ -3567,6 +3673,7 @@ function getClientScript() {
             if (!activeLayer && model.layers.length) {
                 activeLayer = model.layers[0].name;
             }
+            reconcilePendingLayoutEdits();
             normalizeLayoutComboState();
             normalizeRgbGroupState();
             render();
@@ -3579,7 +3686,36 @@ function getClientScript() {
         }
     });
 
+    app.addEventListener("pointerdown", (event) => {
+        const target = event.target.closest(".layout-board-svg .svg-key[data-index]");
+        if (!canDragLayoutKey(event, target)) return;
+        layoutDragState = {
+            pointerId: event.pointerId,
+            sourceIndex: Number(target.dataset.index),
+            startX: event.clientX,
+            startY: event.clientY,
+            dragging: false,
+            targetIndex: undefined
+        };
+        try {
+            target.setPointerCapture?.(event.pointerId);
+        } catch {
+            // Pointer capture is a best-effort enhancement for SVG nodes.
+        }
+    });
+    document.addEventListener("pointermove", updateLayoutKeyDrag);
+    document.addEventListener("pointerup", finishLayoutKeyDrag);
+    document.addEventListener("pointercancel", cancelLayoutKeyDrag);
+
     app.addEventListener("click", (event) => {
+        if (suppressNextLayoutClick) {
+            suppressNextLayoutClick = false;
+            if (event.target.closest(".layout-board-svg .svg-key")) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+        }
         const target = event.target.closest("[data-action]");
         if (!target) return;
         const action = target.dataset.action;
@@ -3593,20 +3729,30 @@ function getClientScript() {
             layoutComboSelection = [];
             layoutComboOutput = "";
             layoutComboInputs = "";
+            lastLayoutKeyClick = { index: undefined, time: 0 };
             render();
             resetLocalHistory();
         } else if (action === "selectView") {
             activeView = target.dataset.view;
+            lastLayoutKeyClick = { index: undefined, time: 0 };
             render();
             resetLocalHistory();
         } else if (action === "selectKey") {
-            selectedKey = Number(target.dataset.index);
+            const index = Number(target.dataset.index);
+            const now = Date.now();
+            const isDoubleClick = lastLayoutKeyClick.index === index && now - lastLayoutKeyClick.time < 450;
+            selectedKey = index;
+            lastLayoutKeyClick = { index, time: isDoubleClick ? 0 : now };
             render();
+            if (isDoubleClick) {
+                openKeyPicker("keycodeInput", "single");
+            }
             resetLocalHistory();
         } else if (action === "toggleLayoutComboPicking") {
             const before = currentLocalSnapshot || serializeLocalState();
             captureLayoutComboBuilderInputs();
             layoutComboPicking = !layoutComboPicking;
+            lastLayoutKeyClick = { index: undefined, time: 0 };
             render();
             commitLocalHistory(before);
         } else if (action === "toggleLayoutComboKey") {
@@ -3717,6 +3863,11 @@ function getClientScript() {
             layoutComboOutput = "";
             layoutComboInputs = "";
             post({ type: "addCombo", ...payload });
+        } else if (action === "applyLayoutChanges") {
+            const changes = pendingLayoutChanges(activeLayer);
+            if (changes.length) {
+                post({ type: "updateLayoutKeys", layer: activeLayer, changes });
+            }
         } else if (action === "addBehavior") {
             post({ type: "addBehavior", behavior: readBehaviorForm() });
         } else if (action === "saveSelectedBehavior") {
@@ -3879,6 +4030,192 @@ function getClientScript() {
             .filter((index) => Number.isInteger(index));
     }
 
+    function currentLayoutPosition(layoutIndex = selectedKey) {
+        const layer = currentLayer();
+        if (!layer) return undefined;
+        return layer.positions.find((position) => position.layoutIndex === layoutIndex) || layer.positions[layoutIndex];
+    }
+
+    function baseLayer(layerName = activeLayer) {
+        return model.layers.find((layer) => layer.name === layerName) || model.layers[0];
+    }
+
+    function layerPendingLayoutEdits(layerName = activeLayer) {
+        return pendingLayoutEdits[layerName] || {};
+    }
+
+    function pendingLayoutChanges(layerName = activeLayer) {
+        const base = baseLayer(layerName);
+        if (!base) return [];
+        const byIndex = layerPendingLayoutEdits(layerName);
+        return Object.keys(byIndex)
+            .map((key) => Number(key))
+            .filter((layoutIndex) => Number.isInteger(layoutIndex))
+            .map((layoutIndex) => ({ layoutIndex, keycode: byIndex[layoutIndex] }))
+            .filter((change) => {
+                const original = base.positions.find((position) => position.layoutIndex === change.layoutIndex);
+                return original && change.keycode && !layoutKeyEquivalent(change.keycode, original.keycode);
+            })
+            .sort((left, right) => left.layoutIndex - right.layoutIndex);
+    }
+
+    function stageLayoutKey(layoutIndex, keycode, layerName = activeLayer) {
+        const base = baseLayer(layerName);
+        const original = base?.positions.find((position) => position.layoutIndex === layoutIndex);
+        const value = canonicalLayoutKeyExpression(keycode);
+        if (!base || !original || !value) return false;
+        const nextLayerEdits = { ...layerPendingLayoutEdits(layerName) };
+        if (layoutKeyEquivalent(value, original.keycode)) {
+            delete nextLayerEdits[layoutIndex];
+        } else {
+            nextLayerEdits[layoutIndex] = value;
+        }
+        pendingLayoutEdits = { ...pendingLayoutEdits, [layerName]: nextLayerEdits };
+        if (!Object.keys(nextLayerEdits).length) {
+            delete pendingLayoutEdits[layerName];
+        }
+        return true;
+    }
+
+    function stageLayoutSwap(sourceIndex, targetIndex) {
+        const source = currentLayoutPosition(sourceIndex);
+        const target = currentLayoutPosition(targetIndex);
+        if (!source || !target || sourceIndex === targetIndex) return false;
+        return stageLayoutKey(sourceIndex, target.keycode) && stageLayoutKey(targetIndex, source.keycode);
+    }
+
+    function reconcilePendingLayoutEdits() {
+        const next = {};
+        for (const [layerName, edits] of Object.entries(pendingLayoutEdits)) {
+            const base = baseLayer(layerName);
+            if (!base) continue;
+            const layerEdits = {};
+            for (const [index, keycode] of Object.entries(edits || {})) {
+                const layoutIndex = Number(index);
+                const original = base.positions.find((position) => position.layoutIndex === layoutIndex);
+                if (original && keycode && !layoutKeyEquivalent(keycode, original.keycode)) {
+                    layerEdits[index] = canonicalLayoutKeyExpression(keycode);
+                }
+            }
+            if (Object.keys(layerEdits).length) {
+                next[layerName] = layerEdits;
+            }
+        }
+        pendingLayoutEdits = next;
+    }
+
+    function layoutKeyEquivalent(left, right) {
+        return canonicalLayoutKeyExpression(left) === canonicalLayoutKeyExpression(right);
+    }
+
+    function canonicalLayoutKeyExpression(value) {
+        const normalized = normalizeDisplayExpression(value);
+        if (!normalized) return "";
+        if (qmkKeyLabels[normalized]) return normalized;
+        const match = Object.entries(qmkKeyLabels).find(([, label]) => String(label || "").toLowerCase() === normalized.toLowerCase());
+        return match ? match[0] : normalized;
+    }
+
+    function canUseLayoutClipboard(target) {
+        if (keyPicker || activeView !== "layout" || !currentLayer()) return false;
+        if (isEditableTarget(target)) return false;
+        return Boolean(currentLayoutPosition());
+    }
+
+    function isEditableTarget(target) {
+        return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true']"));
+    }
+
+    function copySelectedLayoutKey() {
+        const position = currentLayoutPosition();
+        if (!position?.keycode) return "";
+        copiedLayoutKey = position.keycode;
+        navigator.clipboard?.writeText(copiedLayoutKey)?.catch(() => {});
+        return copiedLayoutKey;
+    }
+
+    function pasteLayoutKey(keycode) {
+        const position = currentLayoutPosition();
+        const value = String(keycode || "").trim();
+        if (!position || !value) return false;
+        if (!stageLayoutKey(position.layoutIndex, value)) return false;
+        render();
+        return true;
+    }
+
+    function canDragLayoutKey(event, target) {
+        if (!target || activeView !== "layout" || layoutComboPicking || keyPicker) return false;
+        if (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey) return false;
+        return target.dataset.action === "selectKey" && Number.isInteger(Number(target.dataset.index));
+    }
+
+    function updateLayoutKeyDrag(event) {
+        if (!layoutDragState || event.pointerId !== layoutDragState.pointerId) return;
+        const dx = event.clientX - layoutDragState.startX;
+        const dy = event.clientY - layoutDragState.startY;
+        if (!layoutDragState.dragging && Math.hypot(dx, dy) < 6) return;
+        if (!layoutDragState.dragging) {
+            layoutDragState.dragging = true;
+            lastLayoutKeyClick = { index: undefined, time: 0 };
+            suppressNextLayoutClick = true;
+            window.setTimeout(() => {
+                suppressNextLayoutClick = false;
+            }, 250);
+            document.body.classList.add("layout-key-dragging");
+            layoutKeyElement(layoutDragState.sourceIndex)?.classList.add("drag-source");
+        }
+        event.preventDefault();
+        markLayoutDragTarget(layoutKeyDropIndex(event.clientX, event.clientY));
+    }
+
+    function finishLayoutKeyDrag(event) {
+        if (!layoutDragState || event.pointerId !== layoutDragState.pointerId) return;
+        const state = layoutDragState;
+        const targetIndex = state.dragging ? layoutKeyDropIndex(event.clientX, event.clientY) : undefined;
+        cleanupLayoutKeyDrag();
+        if (!state.dragging) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!Number.isInteger(targetIndex) || targetIndex === state.sourceIndex) return;
+        const before = currentLocalSnapshot || serializeLocalState();
+        stageLayoutSwap(state.sourceIndex, targetIndex);
+        selectedKey = targetIndex;
+        render();
+        commitLocalHistory(before);
+    }
+
+    function cancelLayoutKeyDrag() {
+        cleanupLayoutKeyDrag();
+    }
+
+    function cleanupLayoutKeyDrag() {
+        document.body.classList.remove("layout-key-dragging");
+        for (const key of document.querySelectorAll(".layout-board-svg .svg-key.drag-source, .layout-board-svg .svg-key.drag-target")) {
+            key.classList.remove("drag-source", "drag-target");
+        }
+        layoutDragState = undefined;
+    }
+
+    function markLayoutDragTarget(layoutIndex) {
+        for (const key of document.querySelectorAll(".layout-board-svg .svg-key.drag-target")) {
+            key.classList.remove("drag-target");
+        }
+        if (!layoutDragState || !Number.isInteger(layoutIndex) || layoutIndex === layoutDragState.sourceIndex) return;
+        layoutKeyElement(layoutIndex)?.classList.add("drag-target");
+    }
+
+    function layoutKeyDropIndex(clientX, clientY) {
+        const element = document.elementFromPoint(clientX, clientY);
+        const key = element?.closest?.(".layout-board-svg .svg-key[data-index]");
+        if (!key || key.dataset.action !== "selectKey") return undefined;
+        const index = Number(key.dataset.index);
+        return Number.isInteger(index) ? index : undefined;
+    }
+
+    function layoutKeyElement(layoutIndex) {
+        return document.querySelector(".layout-board-svg .svg-key[data-index='" + String(layoutIndex) + "']");
+    }
+
     function normalizeRgbGroupState() {
         if (!["layer", "pdMode", "combo", "keyBehavior"].includes(rgbGroupTarget)) {
             rgbGroupTarget = "layer";
@@ -3967,6 +4304,7 @@ function getClientScript() {
             layoutComboSelection,
             layoutComboOutput,
             layoutComboInputs,
+            pendingLayoutEdits,
             controls: localEditableControls().map(controlSnapshot)
         });
     }
@@ -3991,6 +4329,7 @@ function getClientScript() {
             layoutComboSelection = Array.isArray(state.layoutComboSelection) ? state.layoutComboSelection : [];
             layoutComboOutput = state.layoutComboOutput || "";
             layoutComboInputs = state.layoutComboInputs || "";
+            pendingLayoutEdits = state.pendingLayoutEdits && typeof state.pendingLayoutEdits === "object" ? state.pendingLayoutEdits : {};
             normalizeLayoutComboState();
             normalizeRgbGroupState();
             render();
@@ -5047,6 +5386,16 @@ function getClientScript() {
             layer.positions.map(renderSvgKey).join("") +
             "</svg>" +
             "</div>" +
+            renderLayoutBoardApplyButton(layer) +
+            "</div>";
+    }
+
+    function renderLayoutBoardApplyButton(layer) {
+        const changes = pendingLayoutChanges(layer.name);
+        if (!changes.length) return "";
+        const label = "Apply " + changes.length + " layout " + (changes.length === 1 ? "change" : "changes");
+        return "<div class='layout-board-apply'>" +
+            "<button type='button' data-action='applyLayoutChanges' class='primary'>" + escapeHtml(label) + "</button>" +
             "</div>";
     }
 
@@ -5063,9 +5412,9 @@ function getClientScript() {
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
         const tooltipText = layoutComboPicking
             ? "Toggle combo input " + label + " (" + position.keycode + ")"
-            : "Click to edit layout index " + position.layoutIndex + ": " + label + " (" + position.keycode + ")";
+            : "Click to edit layout index " + position.layoutIndex + ": " + label + " (" + position.keycode + "). Double-click to pick a keycode, drag onto another key to swap, or copy/paste selected keys.";
         const action = layoutComboPicking ? "toggleLayoutComboKey" : "selectKey";
-        return "<g class='svg-key " + (selected ? "selected" : "") + (comboSelected ? " combo-input-selected" : "") + "' data-action='" + action + "' data-index='" + position.layoutIndex + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
+        return "<g class='svg-key " + (selected ? "selected" : "") + (comboSelected ? " combo-input-selected" : "") + (position.pending ? " pending" : "") + "' tabindex='0' role='button' data-action='" + action + "' data-index='" + position.layoutIndex + "' data-keycode='" + escapeAttr(position.keycode) + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
             renderSvgLabel(label, cx, cy, style.text) +
             renderBehaviorDots(dots, visual, style.text) +
@@ -6339,7 +6688,27 @@ function getClientScript() {
     }
 
     function currentLayer() {
-        return model.layers.find((layer) => layer.name === activeLayer) || model.layers[0];
+        return layerWithPendingLayoutEdits(model.layers.find((layer) => layer.name === activeLayer) || model.layers[0]);
+    }
+
+    function layerWithPendingLayoutEdits(layer) {
+        if (!layer) return layer;
+        const edits = layerPendingLayoutEdits(layer.name);
+        if (!Object.keys(edits).length) return layer;
+        return {
+            ...layer,
+            positions: layer.positions.map((position) => {
+                const keycode = edits[position.layoutIndex];
+                if (!keycode) return position;
+                return {
+                    ...position,
+                    keycode,
+                    display: displayKeyExpression(keycode),
+                    editLabel: displayKeyExpression(keycode),
+                    pending: true,
+                };
+            })
+        };
     }
 
     function displayAction(value) {

@@ -19,6 +19,8 @@ those two files.
   fallback used by the introspection report
 - click a key, edit it as a normal key label such as `A`, `Enter`, `Space`, or
   `_______`, and patch the matching `LAYOUT()` slot
+- double-click a layout key to open the keycode picker, stage drag/drop slot
+  swaps, and stage copy/paste keycode edits before applying them to `keymap.c`
 - use a VIA-style picker for key fields, with an SVG-based full-size keyboard tab,
   a shared search box where Keyboard and All QMK search the full catalog while
   category tabs narrow the results, symbol/navigation/numpad/more-keys menus,
