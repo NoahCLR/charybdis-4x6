@@ -3341,7 +3341,7 @@ function getClientScript() {
         addCombo: "Append a combo row with the entered output and input keys.",
         addLayoutCombo: "Append a combo row using the selected layout keys as inputs.",
         applyLayoutChanges: "Write pending layout drag/drop and paste edits back to keymap.c.",
-        toggleLayoutComboPicking: "Toggle layout combo input selection.",
+        toggleLayoutComboPicking: "Switch the layout board into combo input picking mode; click keys on the board to add or remove inputs.",
         toggleLayoutComboKey: "Add or remove this key from the pending layout combo.",
         clearLayoutComboSelection: "Clear the pending layout combo input keys.",
         selectKey: "Select this physical key. Double-click to pick a keycode, drag onto another key to swap, or use copy/paste between selected keys.",
@@ -4858,11 +4858,12 @@ function getClientScript() {
     function renderLayoutComboBuilder(layer) {
         const selectedPositions = layoutComboSelectedPositions(layer);
         const inputValue = layoutComboInputs || selectedPositions.map((position) => position.keycode).join(", ");
+        const inputPickingLabel = layoutComboPicking ? "Done picking inputs" : "Pick input keys on layout";
         const selectedList = selectedPositions.length
             ? selectedPositions.map((position) =>
                 "<button type='button' data-action='toggleLayoutComboKey' data-index='" + position.layoutIndex + "'><span>" + escapeHtml(position.display || position.keycode) + "</span><code>" + escapeHtml(position.keycode) + "</code></button>"
             ).join("")
-            : "<span class='muted'>No inputs selected</span>";
+            : "<span class='muted'>No layout input keys selected</span>";
         return "<div id='layoutComboBuilder' class='card selected-key-edit-card layout-combo-builder-card' data-dirty-section data-combo-builder>" +
             "<h3>Create combo</h3>" +
             "<div class='selected-key-edit-fields'>" +
@@ -4870,7 +4871,7 @@ function getClientScript() {
             renderKeyPickerInput("layoutComboInputs", "Inputs", inputValue, "D, F", "list", "", "data-combo-inputs") +
             "<div class='layout-combo-selected-list'>" + selectedList + "</div>" +
             "<div class='layout-combo-actions'>" +
-            "<button type='button' class='" + (layoutComboPicking ? "active" : "") + "' data-action='toggleLayoutComboPicking'>" + (layoutComboPicking ? "Selecting inputs" : "Select inputs") + "</button>" +
+            "<button type='button' class='" + (layoutComboPicking ? "active" : "") + "' aria-pressed='" + (layoutComboPicking ? "true" : "false") + "' data-action='toggleLayoutComboPicking'>" + inputPickingLabel + "</button>" +
             "<button type='button' data-action='clearLayoutComboSelection'>Clear</button>" +
             "</div>" +
             "<button data-action='addLayoutCombo' data-dirty-button class='primary'>Append combo row</button>" +
