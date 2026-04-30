@@ -5473,7 +5473,7 @@ function getClientScript() {
         if (!changes.length) return "";
         const label = "Apply " + changes.length + " layout " + (changes.length === 1 ? "change" : "changes");
         return "<div class='layout-board-apply'>" +
-            "<button type='button' data-action='applyLayoutChanges' class='primary'>" + escapeHtml(label) + "</button>" +
+            "<button type='button' data-action='applyLayoutChanges' class='primary dirty' aria-label='" + escapeAttr("Unsaved changes: " + label) + "'>" + escapeHtml(label) + "</button>" +
             "</div>";
     }
 
