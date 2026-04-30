@@ -3622,7 +3622,7 @@ function getClientScript() {
         } else {
             redoLocalEdit();
         }
-    });
+    }, true);
     document.addEventListener("copy", (event) => {
         if (!canUseLayoutClipboard(event.target)) return;
         const copied = copySelectedLayoutKey();
@@ -3739,7 +3739,7 @@ function getClientScript() {
             if (isDoubleClick) {
                 openKeyPicker("keycodeInput", "single");
             }
-            resetLocalHistory();
+            currentLocalSnapshot = serializeLocalState();
         } else if (action === "toggleLayoutComboPicking") {
             const before = currentLocalSnapshot || serializeLocalState();
             captureLayoutComboBuilderInputs();
