@@ -35,6 +35,8 @@ those two files.
 - view and save key behavior rows directly from the active layer page; the
   layer filters visible behavior rows by keys currently present on that layer
 - layer combo rows show any key behavior row triggered by the combo output
+- append combo rows from the active layer by selecting multiple physical keys
+  on the layout sidecar
 - behavior timing fields show the resolved default milliseconds in their
   placeholder text when a row leaves the override empty
 - numeric-only fields such as HSV hue/saturation channels, behavior timing
@@ -68,7 +70,8 @@ those two files.
   automouse fade, combo feedback, and key-behavior feedback
 - edit `pd_mode_colors[]` HSV values and locality
 - edit `VIA_MACROS(MACRO)` payload strings
-- append `COMBOS(COMBO)` rows
+- append `COMBOS(COMBO)` rows from the Macros & combos page or from selected
+  physical keys on the active layout
 - append simple `key_behaviors[]` rows for tap, hold, and long-hold actions
 - open the backing source file from the studio
 - hover panels, tabs, controls, tables, color previews, and SVG keys for

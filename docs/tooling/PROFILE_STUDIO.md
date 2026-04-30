@@ -33,13 +33,17 @@ back to the same blocks.
 - key-behavior feedback colors, tap-branch colors, tap commit mode, and
   locality
 - `VIA_MACROS(MACRO)`
-- appended `COMBOS(COMBO)` rows
+- appended `COMBOS(COMBO)` rows, including from selected physical keys on the
+  active layout
 - appended simple `key_behaviors[]` rows
 
 The UI is split into Layout, Macros & combos, and RGB work areas. The Layout
 page owns layer-filtered key behavior editing: if a key on the active layer has
 an authored `key_behaviors[]` row, the behavior appears there, including when a
 key is later changed to an existing behavior-owned keycode.
+The Layout page also has a combo sidecar below the selected-key editor. Its
+selection mode lets the active layer board choose multiple physical keys as the
+new combo inputs before appending a `COMBOS(COMBO)` row.
 Layer combo rows also show behavior rows triggered by the combo output keycode,
 so combo-driven key behaviors are visible from the active layer view.
 
