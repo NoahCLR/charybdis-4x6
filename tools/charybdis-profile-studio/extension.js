@@ -187,6 +187,7 @@ const MOD_WRAPPER_LABELS = {
     MEH: ["Ctrl", "Shift", "Alt"],
     HYPR: ["Ctrl", "Shift", "Alt", "Cmd"],
 };
+const LAYOUT_KEY_CALL_FUNCTIONS = ["LT", "MO", "TG", "TO", "TT", "DF", "OSL", "LM", "OSM", "MT", "CUSTOM"];
 const RGB_LED_GROUP_TARGETS = {
     layer: {
         tableName: "layer_led_groups_data",
@@ -1167,12 +1168,12 @@ function parseHsv(value) {
 }
 
 async function patchLayoutKeys(root, layer, changes) {
-    const normalizedChanges = normalizeLayoutKeyChanges(changes);
+    const context = await readLayoutSlotContext(root, layer);
+    const normalizedChanges = normalizeLayoutKeyChanges(changes, knownLayoutKeyTokens(context.text));
     if (!normalizedChanges.length) {
         return;
     }
 
-    const context = await readLayoutSlotContext(root, layer);
     const replacements = normalizedChanges.map((change) => {
         const token = layoutSlotToken(context, change.layoutIndex);
         return {
@@ -1189,16 +1190,42 @@ async function patchLayoutKeys(root, layer, changes) {
     await writeText(context.filePath, next);
 }
 
-function normalizeLayoutKeyChanges(changes) {
+function normalizeLayoutKeyChanges(changes, knownTokens = new Set()) {
     const byIndex = new Map();
     for (const change of Array.isArray(changes) ? changes : []) {
         const layoutIndex = Number(change?.layoutIndex);
         assertLayoutIndex(layoutIndex);
         const keycode = normalizeUserKeyExpression(change?.keycode || "");
         assertSafeExpression(keycode, "keycode");
+        assertLayoutKeyExpression(keycode, "layout keycode", knownTokens);
         byIndex.set(layoutIndex, normalizeExpr(keycode));
     }
     return Array.from(byIndex.entries()).map(([layoutIndex, keycode]) => ({ layoutIndex, keycode }));
+}
+
+function knownLayoutKeyTokens(keymapText) {
+    const tokens = new Set(Object.keys(QMK_KEY_LABELS));
+    tokens.add("_______");
+    tokens.add("XXXXXXX");
+
+    try {
+        for (const layer of parseLayers(keymapText)) {
+            for (const position of layer.positions || []) {
+                collectLayoutKeyTokens(position.keycode, tokens);
+            }
+        }
+    } catch {
+        // The caller already validates the active LAYOUT block. Known-token
+        // collection is only a guard against accepting random clipboard text.
+    }
+
+    return tokens;
+}
+
+function collectLayoutKeyTokens(expression, tokens) {
+    for (const match of String(expression || "").matchAll(/\b[A-Z][A-Z0-9_]*\b/g)) {
+        tokens.add(match[0]);
+    }
 }
 
 async function readLayoutSlotContext(root, layer) {
@@ -1856,6 +1883,76 @@ function findTopLevelEquals(text) {
     return -1;
 }
 
+function hasTopLevelDelimiter(text, delimiter = ",") {
+    let depthParen = 0;
+    let depthBrace = 0;
+    let depthBracket = 0;
+    let quote = "";
+    let escaped = false;
+    let lineComment = false;
+    let blockComment = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        const next = text[index + 1];
+
+        if (lineComment) {
+            if (char === "\n") {
+                lineComment = false;
+            }
+            continue;
+        }
+        if (blockComment) {
+            if (char === "*" && next === "/") {
+                blockComment = false;
+                index += 1;
+            }
+            continue;
+        }
+        if (quote) {
+            if (escaped) {
+                escaped = false;
+            } else if (char === "\\") {
+                escaped = true;
+            } else if (char === quote) {
+                quote = "";
+            }
+            continue;
+        }
+
+        if (char === "/" && next === "/") {
+            lineComment = true;
+            index += 1;
+            continue;
+        }
+        if (char === "/" && next === "*") {
+            blockComment = true;
+            index += 1;
+            continue;
+        }
+        if (char === "\"" || char === "'") {
+            quote = char;
+            continue;
+        }
+
+        if (char === "(") depthParen += 1;
+        else if (char === ")") depthParen -= 1;
+        else if (char === "{") depthBrace += 1;
+        else if (char === "}") depthBrace -= 1;
+        else if (char === "[") depthBracket += 1;
+        else if (char === "]") depthBracket -= 1;
+        else if (
+            char === delimiter &&
+            depthParen === 0 &&
+            depthBrace === 0 &&
+            depthBracket === 0
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function splitTopLevel(text) {
     return splitTopLevelWithRanges(text).map((item) => text.slice(item.start, item.end));
 }
@@ -2368,6 +2465,40 @@ function assertSafeExpression(value, label) {
     if (!normalized || /[;"{}#\n\r]/.test(normalized)) {
         throw new Error(`Invalid ${label}: ${value}`);
     }
+}
+
+function assertLayoutKeyExpression(value, label, knownTokens = new Set()) {
+    const normalized = normalizeExpr(value);
+    if (hasTopLevelDelimiter(normalized, ",")) {
+        throw new Error(`Invalid ${label}: expected one keycode expression, got a comma-separated list.`);
+    }
+    if (!isLayoutKeyExpression(normalized, knownTokens)) {
+        throw new Error(`Invalid ${label}: expected a keycode, alias, or QMK key expression.`);
+    }
+}
+
+function isLayoutKeyExpression(value, knownTokens = new Set()) {
+    if (value === "_______" || value === "XXXXXXX") {
+        return true;
+    }
+    if (/^[A-Z_][A-Z0-9_]*$/.test(value)) {
+        return knownTokens.has(value) || value.includes("_");
+    }
+    return isLayoutKeyCallExpression(value, knownTokens);
+}
+
+function isLayoutKeyCallExpression(value, knownTokens = new Set()) {
+    const match = String(value || "").match(/^([A-Z][A-Z0-9_]*)\s*\(/);
+    if (!match) {
+        return false;
+    }
+    const open = value.indexOf("(", match[1].length);
+    const close = findMatching(value, open, "(", ")");
+    if (close !== value.length - 1) {
+        return false;
+    }
+    const name = match[1];
+    return knownTokens.has(name) || LAYOUT_KEY_CALL_FUNCTIONS.includes(name) || Boolean(MOD_WRAPPER_LABELS[name]) || name.includes("_");
 }
 
 function assertSafeHsv(hue, sat, val) {
@@ -3410,6 +3541,8 @@ function getClientScript() {
     const qmkKeycodeSectionGroups = ${JSON.stringify(QMK_KEYCODE_SECTION_GROUPS)};
     const keyPickerKeyboardSvgLayout = ${JSON.stringify(KEY_PICKER_KEYBOARD_SVG_LAYOUT)};
     const modWrapperLabels = ${JSON.stringify(MOD_WRAPPER_LABELS)};
+    const layoutKeyCallFunctions = new Set(${JSON.stringify(LAYOUT_KEY_CALL_FUNCTIONS)});
+    const userKeyAliases = ${JSON.stringify(USER_KEY_ALIASES)};
     const keyBehaviorAllGroups = ${JSON.stringify(KEY_FEEDBACK_GROUP_ALL)};
     const rgbLocalities = ${JSON.stringify(RGB_LOCALITIES)};
     const automouseFadeModes = ${JSON.stringify(AUTOMOUSE_FADE_MODES)};
@@ -3796,6 +3929,8 @@ function getClientScript() {
             if (stageLayoutKey(selectedKey, input.value)) {
                 render();
                 commitLocalHistory(before);
+            } else {
+                render();
             }
         } else if (action === "updateLayerColor") {
             const card = target.closest(".card");
@@ -4071,7 +4206,11 @@ function getClientScript() {
         const base = baseLayer(layerName);
         const original = base?.positions.find((position) => position.layoutIndex === layoutIndex);
         const value = canonicalLayoutKeyExpression(keycode);
-        if (!base || !original || !value) return false;
+        const error = layoutKeyExpressionError(value);
+        if (!base || !original || error) {
+            if (error) notice = error;
+            return false;
+        }
         const nextLayerEdits = { ...layerPendingLayoutEdits(layerName) };
         if (layoutKeyEquivalent(value, original.keycode)) {
             delete nextLayerEdits[layoutIndex];
@@ -4101,8 +4240,9 @@ function getClientScript() {
             for (const [index, keycode] of Object.entries(edits || {})) {
                 const layoutIndex = Number(index);
                 const original = base.positions.find((position) => position.layoutIndex === layoutIndex);
-                if (original && keycode && !layoutKeyEquivalent(keycode, original.keycode)) {
-                    layerEdits[index] = canonicalLayoutKeyExpression(keycode);
+                const value = canonicalLayoutKeyExpression(keycode);
+                if (original && value && !layoutKeyExpressionError(value) && !layoutKeyEquivalent(value, original.keycode)) {
+                    layerEdits[index] = value;
                 }
             }
             if (Object.keys(layerEdits).length) {
@@ -4119,6 +4259,8 @@ function getClientScript() {
     function canonicalLayoutKeyExpression(value) {
         const normalized = normalizeDisplayExpression(value);
         if (!normalized) return "";
+        const alias = userKeyAliases[normalized] || userKeyAliases[normalized.toLowerCase()];
+        if (alias) return alias;
         if (qmkKeyLabels[normalized]) return normalized;
         const chord = canonicalLayoutChordExpression(normalized);
         if (chord) return chord;
@@ -4128,6 +4270,114 @@ function getClientScript() {
         if (/^\\d$/.test(normalized)) return "KC_" + normalized;
         if (/^[a-z][a-z0-9_]*$/i.test(normalized) && normalized.includes("_")) return normalized.toUpperCase();
         return normalized;
+    }
+
+    function layoutKeyExpressionError(value) {
+        const normalized = normalizeDisplayExpression(value);
+        if (!normalized) {
+            return "Layout slots expect one keycode expression.";
+        }
+        if (hasTopLevelLayoutDelimiter(normalized, ",")) {
+            return "Layout slots accept one keycode expression. Use combo inputs for comma-separated key lists.";
+        }
+        if (!isLayoutKeyExpression(normalized)) {
+            return "Layout slots expect a keycode, alias, or QMK key expression.";
+        }
+        return "";
+    }
+
+    function isLayoutKeyExpression(value) {
+        if (value === "_______" || value === "XXXXXXX") return true;
+        if (/^[A-Z_][A-Z0-9_]*$/.test(value)) {
+            return Boolean(qmkKeyLabels[value]) || value.includes("_") || knownLayoutKeyTokens().has(value);
+        }
+        return isLayoutKeyCallExpression(value);
+    }
+
+    function isLayoutKeyCallExpression(value) {
+        const match = String(value || "").match(/^([A-Z][A-Z0-9_]*)\\s*\\(/);
+        if (!match) return false;
+        const open = value.indexOf("(", match[1].length);
+        const close = matchingLayoutParenIndex(value, open);
+        if (close !== value.length - 1) return false;
+        const name = match[1];
+        return layoutKeyCallFunctions.has(name) || Boolean(modWrapperLabels[name]) || name.includes("_") || knownLayoutKeyTokens().has(name);
+    }
+
+    function knownLayoutKeyTokens() {
+        const tokens = new Set(Object.keys(qmkKeyLabels));
+        tokens.add("_______");
+        tokens.add("XXXXXXX");
+        for (const layer of model?.layers || []) {
+            for (const position of layer.positions || []) {
+                collectLayoutKeyTokens(position.keycode, tokens);
+            }
+        }
+        return tokens;
+    }
+
+    function collectLayoutKeyTokens(expression, tokens) {
+        for (const match of String(expression || "").matchAll(/\\b[A-Z][A-Z0-9_]*\\b/g)) {
+            tokens.add(match[0]);
+        }
+    }
+
+    function hasTopLevelLayoutDelimiter(text, delimiter) {
+        let depthParen = 0;
+        let depthBrace = 0;
+        let depthBracket = 0;
+        let quote = "";
+        let escaped = false;
+
+        for (let index = 0; index < text.length; index += 1) {
+            const char = text[index];
+            if (quote) {
+                if (escaped) escaped = false;
+                else if (char === "\\\\") escaped = true;
+                else if (char === quote) quote = "";
+                continue;
+            }
+            if (char === '"' || char === "'") {
+                quote = char;
+                continue;
+            }
+            if (char === "(") depthParen += 1;
+            else if (char === ")") depthParen -= 1;
+            else if (char === "{") depthBrace += 1;
+            else if (char === "}") depthBrace -= 1;
+            else if (char === "[") depthBracket += 1;
+            else if (char === "]") depthBracket -= 1;
+            else if (char === delimiter && depthParen === 0 && depthBrace === 0 && depthBracket === 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function matchingLayoutParenIndex(text, openIndex) {
+        if (openIndex < 0 || text[openIndex] !== "(") return -1;
+        let depth = 0;
+        let quote = "";
+        let escaped = false;
+        for (let index = openIndex; index < text.length; index += 1) {
+            const char = text[index];
+            if (quote) {
+                if (escaped) escaped = false;
+                else if (char === "\\\\") escaped = true;
+                else if (char === quote) quote = "";
+                continue;
+            }
+            if (char === '"' || char === "'") {
+                quote = char;
+                continue;
+            }
+            if (char === "(") depth += 1;
+            else if (char === ")") {
+                depth -= 1;
+                if (depth === 0) return index;
+            }
+        }
+        return -1;
     }
 
     function canonicalLayoutChordExpression(value) {
@@ -4228,7 +4478,10 @@ function getClientScript() {
         const position = currentLayoutPosition();
         const value = String(keycode || "").trim();
         if (!position || !value) return false;
-        if (!stageLayoutKey(position.layoutIndex, value)) return false;
+        if (!stageLayoutKey(position.layoutIndex, value)) {
+            render();
+            return false;
+        }
         render();
         return true;
     }
@@ -5451,6 +5704,8 @@ function getClientScript() {
             if (expression && stageLayoutKey(layoutStageIndex, expression)) {
                 render();
                 commitLocalHistory(before);
+            } else if (expression) {
+                render();
             }
             return;
         }

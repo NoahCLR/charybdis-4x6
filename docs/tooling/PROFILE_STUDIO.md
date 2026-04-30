@@ -46,6 +46,9 @@ keycode picker and stages the picked keycode for that key, dragging one key onto
 another stages a slot swap, and copy/paste stages the selected keycode on
 another selected slot. The selected-key sidecar stages keycode edits into that
 same pending layout set.
+Single layout slots only accept one keycode expression: comma-separated
+clipboard text such as `KC_L, KC_K, KC_J` is rejected, while nested QMK
+expressions such as `LT(LAYER_NAV, KC_F)` remain valid.
 Staged layout edits are written to `keymap.c` only when the Layout board's
 apply button is pressed.
 The Layout page also has a combo sidecar below the selected-key editor. Its
