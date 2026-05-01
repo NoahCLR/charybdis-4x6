@@ -32,12 +32,14 @@ back to the same blocks.
 - combo feedback color/locality
 - key-behavior feedback colors, tap-branch colors, tap commit mode, and
   locality
-- `VIA_MACROS(MACRO)`
+- `VIA_MACROS(MACRO)` through a dedicated macro builder with a 64-slot browser,
+  raw payload editor, step insertion controls, live key-event recording, and a
+  parsed payload preview
 - appended `COMBOS(COMBO)` rows, including from selected physical keys on the
   active layout
 - appended simple `key_behaviors[]` rows
 
-The UI is split into Layout, Macros & combos, and RGB work areas. The Layout
+The UI is split into Layout, Macros, and RGB work areas. The Layout
 panel embeds selected-key behavior editing: if a key on the active layer has an
 authored `key_behaviors[]` row, the behavior appears there, including when a key
 is later changed to an existing behavior-owned keycode.
@@ -56,13 +58,19 @@ Staged layout edits are written to `keymap.c` only when the Layout board's
 apply button is pressed.
 The Layout page also has a combo sidecar below the selected-key editor. Its
 `Pick input keys on layout` action lets the active layer board choose multiple
-physical keys as the new combo inputs, and the input field also exposes the same
-multi-key picker as the Macros & combos page before appending a `COMBOS(COMBO)`
-row.
+physical keys as the new combo inputs, and the input field also exposes the
+multi-key picker before appending a `COMBOS(COMBO)` row.
 Layer combo rows also show behavior rows triggered by the combo output keycode,
 so combo-driven key behaviors are visible from the active layer view.
 The layer overview also lists macros directly placed on the layer or reachable
-through visible behavior and combo output paths.
+through visible behavior and combo output paths. The Macros page is dedicated to
+VIA macro authoring: select any `VIA_MACRO_0` through `VIA_MACRO_63`, edit its
+raw payload, insert text/tap/chord/key-down/key-up/delay steps, record live
+keydown/keyup events with optional elapsed-time delays, and inspect the parsed
+command preview before writing the slot back to `keymap.c`. Live recording edits
+only the selected macro draft until `Apply macro` is pressed. Compact recording
+folds matching down/up pairs into text, taps, and chords where possible; exact
+recording keeps explicit `{+KC_*}` and `{-KC_*}` events.
 
 Normal keys can be entered as user-facing labels such as `A`, `Enter`, `Space`,
 the classic transparent token `_______`, or modifier chords such as

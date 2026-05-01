@@ -32,6 +32,7 @@ const KEYMAP_CONFIG_RELATIVE_PATH = path.join(
     "config.h"
 );
 const QMK_KEYCODE_DATA_RELATIVE_PATH = path.join("data", "constants", "keycodes");
+const MACRO_PAYLOAD_KEYCODES_RELATIVE_PATH = path.join("users", "noah", "lib", "macro", "macro_payload_keycodes.c");
 
 const LAYOUT_SLOT_COUNT = 56;
 const TAP_COUNT_NAMES = ["Single Tap Branch", "Double Tap Branch", "Triple Tap Branch", "Quadruple Tap Branch", "Quintuple Tap Branch"];
@@ -561,10 +562,12 @@ async function buildModel(root) {
     const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
     const rgbPath = path.join(root, RGB_RELATIVE_PATH);
     const configPath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
-    const [keymapText, rgbText, configText] = await Promise.all([
+    const macroPayloadKeycodesPath = path.join(root, MACRO_PAYLOAD_KEYCODES_RELATIVE_PATH);
+    const [keymapText, rgbText, configText, macroPayloadKeycodesText] = await Promise.all([
         fs.readFile(keymapPath, "utf8"),
         fs.readFile(rgbPath, "utf8"),
         fs.readFile(configPath, "utf8").catch(() => ""),
+        fs.readFile(macroPayloadKeycodesPath, "utf8").catch(() => ""),
     ]);
 
     const diagnostics = [];
@@ -601,8 +604,17 @@ async function buildModel(root) {
         qmkKeyLabels: qmkKeycodeCatalog.labels,
         qmkKeycodeAliases: qmkKeycodeCatalog.aliases,
         qmkKeycodeSource: qmkKeycodeCatalog.source,
+        macroPayloadKeycodes: safe("macroPayloadKeycodes", [], () => parseMacroPayloadKeycodes(macroPayloadKeycodesText)),
         diagnostics,
     };
+}
+
+function parseMacroPayloadKeycodes(text) {
+    const names = [];
+    for (const match of String(text || "").matchAll(/^\s*X\(\s*([A-Z_][A-Z0-9_]*)\s*,/gm)) {
+        names.push(match[1]);
+    }
+    return uniqueStrings(names);
 }
 
 async function loadQmkKeycodeCatalog(root) {
@@ -2636,7 +2648,7 @@ function getStudioHtml() {
         h1 { font-size: 18px; }
         h2 { font-size: 15px; margin-bottom: 10px; }
         h3 { font-size: 13px; margin-bottom: 8px; color: var(--muted); }
-        button, input, select {
+        button, input, select, textarea {
             border: 1px solid var(--line);
             border-radius: 6px;
             background: #20262a;
@@ -2665,21 +2677,26 @@ function getStudioHtml() {
             cursor: not-allowed;
         }
         button:not(:disabled):hover { border-color: var(--accent); }
-        input, select {
+        input, select, textarea {
             min-height: 32px;
             padding: 5px 8px;
             width: 100%;
         }
-        input:not(:disabled), select:not(:disabled) {
+        textarea {
+            min-height: 96px;
+            resize: vertical;
+            line-height: 1.45;
+        }
+        input:not(:disabled), select:not(:disabled), textarea:not(:disabled) {
             border-color: #60707a;
             background: #20262a;
             box-shadow: inset 0 0 0 1px rgba(49, 198, 164, 0.08);
         }
-        input.invalid, select.invalid {
+        input.invalid, select.invalid, textarea.invalid {
             border-color: var(--danger);
             box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.36), 0 0 0 1px rgba(255, 107, 107, 0.24);
         }
-        input:disabled, select:disabled {
+        input:disabled, select:disabled, textarea:disabled {
             border-style: dashed;
             border-color: rgba(168, 178, 184, 0.38);
             background: rgba(32, 38, 42, 0.46);
@@ -2689,6 +2706,9 @@ function getStudioHtml() {
         }
         input:disabled::selection {
             background: transparent;
+        }
+        textarea.monospace {
+            font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
         }
         main {
             display: block;
@@ -2948,6 +2968,299 @@ function getStudioHtml() {
             max-width: 100%;
             padding: 4px 7px;
             font-size: 11px;
+        }
+        .macro-builder-grid {
+            display: grid;
+            grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
+            gap: 14px;
+            align-items: start;
+        }
+        .macro-builder-summary {
+            margin: 2px 0 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(70, 82, 90, 0.52);
+        }
+        .macro-slot-browser {
+            display: grid;
+            gap: 10px;
+            min-width: 0;
+        }
+        .macro-slot-browser h3 {
+            margin-bottom: 0;
+        }
+        .macro-slot-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+            gap: 6px;
+            max-height: 620px;
+            overflow: auto;
+            padding-right: 2px;
+        }
+        .macro-slot-button {
+            display: grid;
+            gap: 4px;
+            min-height: 48px;
+            padding: 7px 8px;
+            text-align: left;
+        }
+        .macro-slot-button.active {
+            border-color: var(--accent);
+            background: #1f5d52;
+        }
+        .macro-slot-button.empty {
+            color: var(--muted);
+        }
+        .macro-slot-button.dirty {
+            border-color: var(--warn);
+            background: #584720;
+        }
+        .macro-slot-title {
+            font-weight: 650;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .macro-slot-state {
+            color: var(--muted);
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .macro-builder-main {
+            display: grid;
+            gap: 12px;
+            min-width: 0;
+        }
+        .macro-authoring-card,
+        .macro-recorder-card,
+        .macro-preview-card {
+            display: grid;
+            gap: 12px;
+        }
+        .macro-authoring-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(190px, 260px);
+            gap: 14px;
+            align-items: stretch;
+        }
+        .macro-step-sidecar {
+            display: grid;
+            gap: 12px;
+            align-content: start;
+            min-width: 0;
+            padding-left: 14px;
+            border-left: 1px solid rgba(70, 82, 90, 0.64);
+        }
+        .macro-payload-pane {
+            display: grid;
+            gap: 12px;
+            min-width: 0;
+        }
+        .macro-builder-head {
+            display: flex;
+            align-items: start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .macro-builder-head button {
+            min-width: 132px;
+        }
+        .macro-payload-textarea {
+            min-height: 132px;
+        }
+        .macro-stat-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            align-items: center;
+        }
+        .macro-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            max-width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 3px 7px;
+            color: var(--muted);
+            font-size: 11px;
+            overflow-wrap: anywhere;
+        }
+        .macro-chip strong {
+            color: var(--text);
+            font-size: 12px;
+        }
+        .macro-chip.warning {
+            border-color: rgba(242, 184, 75, 0.58);
+            color: var(--warn);
+        }
+        .macro-composer-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            align-items: stretch;
+        }
+        .macro-step-fields {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            align-items: stretch;
+        }
+        .macro-step-fields label {
+            margin: 0;
+        }
+        .macro-recorder-controls {
+            display: grid;
+            grid-template-columns: minmax(190px, 250px) max-content minmax(160px, 1fr) minmax(160px, 1fr);
+            gap: 12px;
+            align-items: end;
+        }
+        .macro-recorder-controls label {
+            margin: 0;
+        }
+        .macro-recorder-toggle {
+            position: relative;
+            display: grid;
+            grid-template-columns: max-content;
+            grid-template-rows: auto auto 14px;
+            align-items: start;
+            justify-items: center;
+            gap: 8px;
+            min-height: 0;
+            width: max-content;
+            margin: 0;
+        }
+        .macro-recorder-toggle input[type='checkbox'] {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            min-height: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            clip-path: inset(50%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .macro-recorder-toggle-track {
+            position: relative;
+            width: 42px;
+            height: 24px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: #20262a;
+            box-shadow: inset 0 0 0 1px rgba(49, 198, 164, 0.08);
+            transition: background 120ms ease, border-color 120ms ease;
+        }
+        .macro-recorder-toggle-track::after {
+            content: "";
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--muted);
+            transition: transform 120ms ease, background 120ms ease;
+        }
+        .macro-recorder-toggle input[type='checkbox']:checked + .macro-recorder-toggle-track {
+            border-color: var(--accent);
+            background: #1f5d52;
+        }
+        .macro-recorder-toggle input[type='checkbox']:checked + .macro-recorder-toggle-track::after {
+            transform: translateX(18px);
+            background: var(--text);
+        }
+        .macro-recorder-toggle input[type='checkbox']:focus-visible + .macro-recorder-toggle-track {
+            outline: 1px solid var(--accent);
+            outline-offset: 2px;
+        }
+        .macro-recorder-toggle-label {
+            min-width: 0;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .macro-recorder-actions {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            align-self: end;
+            margin-top: 2px;
+        }
+        .macro-step-sidecar .layout-combo-actions button,
+        .macro-recorder-actions button {
+            min-width: 124px;
+        }
+        .macro-recorder-actions button.primary {
+            min-width: 170px;
+        }
+        .macro-recorder-status {
+            display: grid;
+            gap: 8px;
+        }
+        .macro-recorder-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+            box-shadow: 0 0 0 4px rgba(217, 83, 79, 0.18);
+        }
+        .macro-recorder-timeline {
+            display: grid;
+            gap: 6px;
+            max-height: 190px;
+            overflow: auto;
+        }
+        .macro-recorder-event {
+            display: grid;
+            grid-template-columns: 70px minmax(0, 1fr);
+            gap: 8px;
+            align-items: center;
+            border: 1px solid rgba(70, 82, 90, 0.74);
+            border-radius: 6px;
+            padding: 6px 8px;
+            background: #20282d;
+        }
+        .macro-recorder-event.delay {
+            border-color: rgba(242, 184, 75, 0.4);
+        }
+        .macro-recorder-kind {
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 650;
+            text-transform: uppercase;
+        }
+        .macro-recorder-detail {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        .macro-preview-list {
+            display: grid;
+            gap: 6px;
+        }
+        .macro-preview-step {
+            display: grid;
+            grid-template-columns: 84px minmax(0, 1fr);
+            gap: 8px;
+            align-items: start;
+            border: 1px solid rgba(70, 82, 90, 0.74);
+            border-radius: 6px;
+            padding: 7px 8px;
+            background: #20282d;
+        }
+        .macro-preview-kind {
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 650;
+            text-transform: uppercase;
+        }
+        .macro-preview-detail {
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
         .muted { color: var(--muted); }
         .notice { color: var(--accent); }
@@ -3433,6 +3746,21 @@ function getStudioHtml() {
             .layout-with-key-editor {
                 grid-template-columns: 1fr;
             }
+            .macro-builder-grid,
+            .macro-authoring-layout,
+            .macro-composer-grid,
+            .macro-recorder-controls {
+                grid-template-columns: 1fr;
+            }
+            .macro-slot-list {
+                max-height: 280px;
+            }
+            .macro-step-sidecar {
+                padding-left: 0;
+                padding-bottom: 12px;
+                border-left: 0;
+                border-bottom: 1px solid rgba(70, 82, 90, 0.64);
+            }
             .layout-board-card {
                 height: auto;
                 min-height: 0;
@@ -3481,6 +3809,19 @@ function getClientScript() {
     let layoutComboSelection = [];
     let layoutComboOutput = "";
     let layoutComboInputs = "";
+    let activeMacroKeycode = "";
+    let macroDrafts = {};
+    let macroRecording = false;
+    let macroRecordDelays = true;
+    let macroRecorderMode = "compact";
+    let macroRecorderDelayThreshold = "30";
+    let macroRecorderDelayRound = "10";
+    let macroRecordedEvents = [];
+    let macroRecordingPrefix = "";
+    let macroRecorderLastEventAt = 0;
+    let macroRecorderHeldKeys = {};
+    let macroRecorderNotice = "";
+    let macroRecorderHistoryStart = "";
     let pendingLayoutEdits = {};
     let copiedLayoutKey = "";
     let layoutDragState = undefined;
@@ -3497,7 +3838,7 @@ function getClientScript() {
     const tapCountNames = ${JSON.stringify(TAP_COUNT_NAMES)};
     const views = [
         ["layout", "Layout"],
-        ["macros", "Macros & combos"],
+        ["macros", "Macros"],
         ["rgb", "RGB"]
     ];
     const headerTooltips = {
@@ -3507,14 +3848,14 @@ function getClientScript() {
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
-        macros: "Edit VIA macro payloads and append combo rows in keymap.c.",
+        macros: "Build and edit VIA macro payloads in keymap.c.",
         rgb: "Edit rgb_config.c colors, feedback policies, and LED group tables."
     };
     const panelTooltips = {
         Status: "Parser messages, write status, and warnings from the current studio model.",
         Layout: "Physical keyboard preview, selected-key editor, and selected-key behavior editor for the active layer.",
         "Layer Overview": "Behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
-        "VIA Macros": "Payload strings for the VIA_MACROS(MACRO) table in keymap.c.",
+        "Macro Builder": "Build payload strings for the VIA_MACROS(MACRO) table in keymap.c.",
         "Combo Builder": "Append a new COMBOS(COMBO) row to keymap.c.",
         "RGB LED Group Builder": "Select physical LEDs and append a row to one of the rgb_config.c LED group tables.",
         "Layer Colors": "Edit layer_colors[] HSV values and layer render mode.",
@@ -3540,6 +3881,12 @@ function getClientScript() {
         clearRgbSelection: "Remove all currently selected LEDs from the group builder.",
         toggleRgbTrackball: "Add or remove the trackball LED index 56 from the group builder.",
         updateViaMacro: "Write this VIA macro payload string back to keymap.c.",
+        selectMacroSlot: "Select this VIA macro slot for editing.",
+        insertMacroStep: "Insert the configured macro step into the selected payload.",
+        clearMacroPayload: "Clear the selected macro payload field.",
+        startMacroRecording: "Start recording browser keydown and keyup events into the selected macro draft.",
+        stopMacroRecording: "Stop recording and keep the generated payload in the selected macro draft.",
+        clearMacroRecording: "Clear the current recording take and restore the payload captured when recording started.",
         addCombo: "Append a combo row with the entered output and input keys.",
         addLayoutCombo: "Append a combo row using the selected layout keys as inputs.",
         applyLayoutChanges: "Write pending layout drag/drop and paste edits back to keymap.c.",
@@ -3589,6 +3936,15 @@ function getClientScript() {
         inputs: "Comma-separated combo input keys, such as D, F.",
         slot: "The VIA macro keycode slot.",
         payload: "The string payload sent by this VIA macro slot.",
+        "step type": "Choose which payload command the macro step builder inserts.",
+        text: "Plain ASCII text to type one character at a time.",
+        "macro keys": "One or more keys to tap together, such as A, Cmd+Space, or KC_LGUI, KC_SPC.",
+        "macro key": "One key used by a key-down or key-up macro step.",
+        "delay ms": "Milliseconds to wait before the next macro step.",
+        "record mode": "Compact turns matching down/up pairs into taps or chords; exact preserves key-down and key-up commands.",
+        "record delays": "Insert delay commands from elapsed time between recorded key events.",
+        "delay threshold ms": "Only elapsed gaps at or above this many milliseconds become delay commands.",
+        "delay round ms": "Round recorded delays to this many milliseconds.",
         leds: "The physical RGB LED indices contained in this group.",
         "led group": "The authored LED group expression in rgb_config.c.",
         color: "The HSV color expression used by this row.",
@@ -3601,6 +3957,7 @@ function getClientScript() {
     };
     const qmkKeyLabels = ${JSON.stringify(QMK_KEY_LABELS)};
     const qmkKeyAliases = ${JSON.stringify(qmkKeyAliasesFromEntries(fallbackQmkKeycodeCatalog().entries))};
+    let macroPayloadKeycodes = new Set();
     const qmkKeycodeSectionGroups = ${JSON.stringify(QMK_KEYCODE_SECTION_GROUPS)};
     const keyPickerKeyboardSvgLayout = ${JSON.stringify(KEY_PICKER_KEYBOARD_SVG_LAYOUT)};
     const modWrapperLabels = ${JSON.stringify(MOD_WRAPPER_LABELS)};
@@ -3628,6 +3985,123 @@ function getClientScript() {
     keyBehaviorRgbSemanticLabels[keyBehaviorAllGroups] = "All feedback groups";
     const keyPickerModifiers = ["Ctrl", "Shift", "Alt", "Cmd", "Right Ctrl", "Right Shift", "Right Alt", "Right Cmd"];
     const keyPickerLayerTapPrefix = "__LT_LAYER__:";
+    const macroRecorderEventCodeMap = {};
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach((letter) => {
+        macroRecorderEventCodeMap["Key" + letter] = "KC_" + letter;
+    });
+    "0123456789".split("").forEach((digit) => {
+        macroRecorderEventCodeMap["Digit" + digit] = "KC_" + digit;
+        macroRecorderEventCodeMap["Numpad" + digit] = "KC_P" + digit;
+    });
+    for (let index = 1; index <= 24; index += 1) {
+        macroRecorderEventCodeMap["F" + index] = "KC_F" + index;
+    }
+    Object.assign(macroRecorderEventCodeMap, {
+        AltLeft: "KC_LALT",
+        AltRight: "KC_RALT",
+        ArrowDown: "KC_DOWN",
+        ArrowLeft: "KC_LEFT",
+        ArrowRight: "KC_RGHT",
+        ArrowUp: "KC_UP",
+        AudioVolumeDown: "KC_VOLD",
+        AudioVolumeMute: "KC_MUTE",
+        AudioVolumeUp: "KC_VOLU",
+        Backquote: "KC_GRV",
+        Backslash: "KC_BSLS",
+        Backspace: "KC_BSPC",
+        BracketLeft: "KC_LBRC",
+        BracketRight: "KC_RBRC",
+        CapsLock: "KC_CAPS",
+        Comma: "KC_COMM",
+        ContextMenu: "KC_APP",
+        ControlLeft: "KC_LCTL",
+        ControlRight: "KC_RCTL",
+        Delete: "KC_DEL",
+        End: "KC_END",
+        Enter: "KC_ENT",
+        Equal: "KC_EQL",
+        Escape: "KC_ESC",
+        Help: "KC_HELP",
+        Home: "KC_HOME",
+        Insert: "KC_INS",
+        MediaPlayPause: "KC_MPLY",
+        MediaStop: "KC_MSTP",
+        MediaTrackNext: "KC_MNXT",
+        MediaTrackPrevious: "KC_MPRV",
+        MetaLeft: "KC_LGUI",
+        MetaRight: "KC_RGUI",
+        Minus: "KC_MINS",
+        NumLock: "KC_NUM",
+        NumpadAdd: "KC_PPLS",
+        NumpadComma: "KC_PCMM",
+        NumpadDecimal: "KC_PDOT",
+        NumpadDivide: "KC_PSLS",
+        NumpadEnter: "KC_PENT",
+        NumpadEqual: "KC_PEQL",
+        NumpadMultiply: "KC_PAST",
+        NumpadSubtract: "KC_PMNS",
+        OSLeft: "KC_LGUI",
+        OSRight: "KC_RGUI",
+        PageDown: "KC_PGDN",
+        PageUp: "KC_PGUP",
+        Pause: "KC_PAUS",
+        Period: "KC_DOT",
+        PrintScreen: "KC_PSCR",
+        Quote: "KC_QUOT",
+        ScrollLock: "KC_SCRL",
+        Semicolon: "KC_SCLN",
+        ShiftLeft: "KC_LSFT",
+        ShiftRight: "KC_RSFT",
+        Slash: "KC_SLSH",
+        Space: "KC_SPC",
+        Tab: "KC_TAB"
+    });
+    const macroRecorderKeyFallbackMap = {
+        " ": "KC_SPC",
+        ArrowDown: "KC_DOWN",
+        ArrowLeft: "KC_LEFT",
+        ArrowRight: "KC_RGHT",
+        ArrowUp: "KC_UP",
+        Backspace: "KC_BSPC",
+        CapsLock: "KC_CAPS",
+        Delete: "KC_DEL",
+        End: "KC_END",
+        Enter: "KC_ENT",
+        Escape: "KC_ESC",
+        Home: "KC_HOME",
+        Insert: "KC_INS",
+        PageDown: "KC_PGDN",
+        PageUp: "KC_PGUP",
+        Tab: "KC_TAB"
+    };
+    const macroRecorderTextKeyMap = {};
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach((letter) => {
+        macroRecorderTextKeyMap["KC_" + letter] = [letter.toLowerCase(), letter];
+    });
+    Object.assign(macroRecorderTextKeyMap, {
+        KC_0: ["0", ")"],
+        KC_1: ["1", "!"],
+        KC_2: ["2", "@"],
+        KC_3: ["3", "#"],
+        KC_4: ["4", "$"],
+        KC_5: ["5", "%"],
+        KC_6: ["6", "^"],
+        KC_7: ["7", "&"],
+        KC_8: ["8", "*"],
+        KC_9: ["9", "("],
+        KC_BSLS: ["\\\\", "|"],
+        KC_COMM: [",", "<"],
+        KC_DOT: [".", ">"],
+        KC_EQL: ["=", "+"],
+        KC_GRV: ["\`", "~"],
+        KC_LBRC: ["[", "{"],
+        KC_MINS: ["-", "_"],
+        KC_QUOT: ["'", '"'],
+        KC_RBRC: ["]", "}"],
+        KC_SCLN: [";", ":"],
+        KC_SLSH: ["/", "?"],
+        KC_SPC: [" ", " "]
+    });
     const keyPickerSections = [
         {
             id: "qwerty",
@@ -3811,6 +4285,8 @@ function getClientScript() {
         event.preventDefault();
         choosePickerKey(target.dataset.value);
     });
+    window.addEventListener("keydown", handleMacroRecorderKeyEvent, true);
+    window.addEventListener("keyup", handleMacroRecorderKeyEvent, true);
     document.addEventListener("keydown", (event) => {
         if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
         const key = String(event.key || "").toLowerCase();
@@ -3870,6 +4346,7 @@ function getClientScript() {
             model = event.data.model;
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
             Object.assign(qmkKeyAliases, model.qmkKeycodeAliases || {});
+            macroPayloadKeycodes = new Set(model.macroPayloadKeycodes || []);
             notice = event.data.notice || "";
             layoutNotice = "";
             if (!activeLayer && model.layers.length) {
@@ -3877,6 +4354,7 @@ function getClientScript() {
             }
             reconcilePendingLayoutEdits();
             normalizeLayoutComboState();
+            normalizeMacroBuilderState();
             normalizeRgbGroupState();
             render();
             resetLocalHistory();
@@ -3937,11 +4415,26 @@ function getClientScript() {
             render();
             resetLocalHistory();
         } else if (action === "selectView") {
+            if (activeView !== target.dataset.view) {
+                stopMacroRecording(true);
+            }
             activeView = target.dataset.view;
             layoutNotice = "";
             lastLayoutKeyClick = { index: undefined, time: 0 };
+            normalizeMacroBuilderState();
             render();
             resetLocalHistory();
+        } else if (action === "selectMacroSlot") {
+            if (target.dataset.keycode && target.dataset.keycode !== activeMacroKeycode) {
+                stopMacroRecording(true);
+                clearMacroRecorderSession(false);
+            }
+            const before = currentLocalSnapshot || serializeLocalState();
+            captureActiveMacroDraft();
+            activeMacroKeycode = target.dataset.keycode || activeMacroKeycode;
+            normalizeMacroBuilderState();
+            render();
+            commitLocalHistory(before);
         } else if (action === "selectKey") {
             const index = Number(target.dataset.index);
             const now = Date.now();
@@ -3991,6 +4484,25 @@ function getClientScript() {
             commitLocalHistory(before);
         } else if (action === "openKeyPicker") {
             openKeyPicker(target.dataset.target, target.dataset.mode || "single");
+        } else if (action === "insertMacroStep") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            if (insertMacroStep(target)) {
+                commitLocalHistory(before);
+            }
+        } else if (action === "clearMacroPayload") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            if (clearMacroPayload(target)) {
+                commitLocalHistory(before);
+            }
+        } else if (action === "startMacroRecording") {
+            startMacroRecording(target);
+        } else if (action === "stopMacroRecording") {
+            stopMacroRecording(true);
+        } else if (action === "clearMacroRecording") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            if (clearMacroRecording(target)) {
+                commitLocalHistory(before);
+            }
         } else if (action === "applyKey") {
             const input = document.getElementById("keycodeInput");
             const before = currentLocalSnapshot || serializeLocalState();
@@ -4059,11 +4571,15 @@ function getClientScript() {
                 group: readRgbLedGroupBuilder(form)
             });
         } else if (action === "updateViaMacro") {
-            const row = target.closest("tr");
+            stopMacroRecording(true);
+            clearMacroRecorderSession(false);
+            const row = target.closest("[data-macro-editor]") || target.closest("tr");
+            const payloadControl = row.querySelector("[data-macro-payload]") || row.querySelector("input, textarea");
+            captureMacroDraftFromControl(payloadControl);
             post({
                 type: "updateViaMacro",
                 keycode: row.dataset.keycode,
-                payload: row.querySelector("input").value
+                payload: payloadControl.value
             });
         } else if (action === "addCombo") {
             post({ type: "addCombo", ...readComboBuilder(target) });
@@ -4118,6 +4634,19 @@ function getClientScript() {
         if (event.target?.matches("[data-helper-select]")) {
             updateHelperFields(event.target.dataset.helperPrefix || event.target.id.replace(/Helper$/, ""));
         }
+        if (event.target?.id === "macroStepType") {
+            updateMacroComposerFields(event.target.closest("[data-macro-workbench]") || document);
+        }
+        if (event.target?.closest?.("[data-macro-recorder]")) {
+            captureMacroRecorderSettings();
+            syncMacroRecordedPayloadDraft();
+            refreshMacroRecorderPanel(event.target.closest("[data-macro-workbench]"));
+            validateControl(event.target);
+            if (!macroRecording) {
+                commitLocalHistory(before);
+            }
+            return;
+        }
         validateControl(event.target);
         updateDirtyFromEvent(event);
         commitLocalHistory(before);
@@ -4133,6 +4662,19 @@ function getClientScript() {
         if (event.target?.id === "layoutComboInputs") {
             layoutComboInputs = event.target.value;
             syncLayoutComboSelectionFromInputs();
+        }
+        if (event.target?.matches("[data-macro-payload]")) {
+            captureMacroDraftFromControl(event.target);
+            refreshMacroPreview(event.target.closest("[data-macro-workbench]"));
+        }
+        if (event.target?.closest?.("[data-macro-recorder]")) {
+            captureMacroRecorderSettings();
+            syncMacroRecordedPayloadDraft();
+            validateControl(event.target);
+            if (!macroRecording) {
+                commitLocalHistory(before);
+            }
+            return;
         }
         validateControl(event.target);
         updateDirtyFromEvent(event);
@@ -4197,6 +4739,30 @@ function getClientScript() {
             seen.add(index);
             return true;
         });
+    }
+
+    function normalizeMacroBuilderState() {
+        const slots = model?.viaMacros || [];
+        if (!slots.length) {
+            activeMacroKeycode = "";
+            macroDrafts = {};
+            return;
+        }
+
+        const keys = new Set(slots.map((slot) => slot.keycode));
+        if (!keys.has(activeMacroKeycode)) {
+            activeMacroKeycode = (slots.find((slot) => !slot.empty) || slots[0]).keycode;
+        }
+
+        const nextDrafts = {};
+        for (const [keycode, payload] of Object.entries(macroDrafts || {})) {
+            if (!keys.has(keycode)) continue;
+            const slot = slots.find((candidate) => candidate.keycode === keycode);
+            if (slot && String(payload || "") !== String(slot.payload || "")) {
+                nextDrafts[keycode] = String(payload || "");
+            }
+        }
+        macroDrafts = nextDrafts;
     }
 
     function toggleLayoutComboKey(layoutIndex) {
@@ -4658,6 +5224,9 @@ function getClientScript() {
         layoutComboSelection = [];
         layoutComboOutput = "";
         layoutComboInputs = "";
+        activeMacroKeycode = "";
+        macroDrafts = {};
+        resetMacroRecorderState();
         pendingLayoutEdits = {};
         copiedLayoutKey = "";
         layoutDragState = undefined;
@@ -4740,6 +5309,12 @@ function getClientScript() {
             layoutComboSelection,
             layoutComboOutput,
             layoutComboInputs,
+            activeMacroKeycode,
+            macroDrafts,
+            macroRecordDelays,
+            macroRecorderMode,
+            macroRecorderDelayThreshold,
+            macroRecorderDelayRound,
             pendingLayoutEdits,
             controls: localEditableControls().map(controlSnapshot)
         });
@@ -4765,8 +5340,16 @@ function getClientScript() {
             layoutComboSelection = Array.isArray(state.layoutComboSelection) ? state.layoutComboSelection : [];
             layoutComboOutput = state.layoutComboOutput || "";
             layoutComboInputs = state.layoutComboInputs || "";
+            activeMacroKeycode = state.activeMacroKeycode || "";
+            macroDrafts = state.macroDrafts && typeof state.macroDrafts === "object" ? state.macroDrafts : {};
+            macroRecordDelays = typeof state.macroRecordDelays === "boolean" ? state.macroRecordDelays : macroRecordDelays;
+            macroRecorderMode = state.macroRecorderMode === "exact" ? "exact" : "compact";
+            macroRecorderDelayThreshold = state.macroRecorderDelayThreshold || macroRecorderDelayThreshold;
+            macroRecorderDelayRound = state.macroRecorderDelayRound || macroRecorderDelayRound;
+            clearMacroRecorderSession(false);
             pendingLayoutEdits = state.pendingLayoutEdits && typeof state.pendingLayoutEdits === "object" ? state.pendingLayoutEdits : {};
             normalizeLayoutComboState();
+            normalizeMacroBuilderState();
             normalizeRgbGroupState();
             render();
             restoreLocalControls(state.controls || []);
@@ -4796,6 +5379,9 @@ function getClientScript() {
         }
         for (const control of document.querySelectorAll("[data-color-control]")) {
             updateColorControl(control);
+        }
+        for (const composer of document.querySelectorAll("[data-macro-composer]")) {
+            updateMacroComposerFields(composer.closest("[data-macro-workbench]") || composer);
         }
         updateRgbSelectionPreview();
         for (const section of document.querySelectorAll("[data-dirty-section]")) {
@@ -4841,6 +5427,7 @@ function getClientScript() {
 
     function sectionHasCustomDirtyState(section) {
         if (section.id === "layoutComboBuilder") return Boolean(layoutComboOutput || layoutComboInputs || layoutComboSelection.length);
+        if (section.matches?.("[data-macro-editor]")) return macroSlotDirty(section.dataset.keycode || "");
         return section.id === "rgbGroupBuilder" && rgbSelectedLeds.length > 0;
     }
 
@@ -4911,6 +5498,8 @@ function getClientScript() {
             error = validateOptionalTerm(value, "Enter a positive integer, or KEY_BEHAVIOR_TERM(ms).");
         } else if (rule === "positive-int") {
             error = validatePositiveInteger(value, "Enter a positive integer.");
+        } else if (rule === "macro-payload") {
+            error = validateMacroPayload(value);
         }
         setFieldError(control, error);
         return !error;
@@ -4945,7 +5534,13 @@ function getClientScript() {
         return Number(value) > 0 ? "" : message;
     }
 
+    function validateMacroPayload(value) {
+        const parsed = parseMacroPayloadPreview(value || "");
+        return parsed.error || "";
+    }
+
     function setFieldError(control, message) {
+        if (!control) return;
         const label = control.closest("label");
         control.classList.toggle("invalid", Boolean(message));
         control.toggleAttribute("aria-invalid", Boolean(message));
@@ -5167,7 +5762,7 @@ function getClientScript() {
     }
 
     function renderActiveView() {
-        if (activeView === "macros") return "<div class='stack'>" + renderMacroStudio() + renderComboStudio() + "</div>";
+        if (activeView === "macros") return renderMacroStudio();
         if (activeView === "rgb") return renderRgbStudio();
         return renderLayerStudio();
     }
@@ -5494,10 +6089,8 @@ function getClientScript() {
             if (section.id === "macros") {
                 return {
                     ...section,
-                    rows: [
-                        (model.viaMacros || []).map((slot) => slot.keycode),
-                        (model.hardcodedMacros || []).map((slot) => slot.keycode)
-                    ]
+                    rows: chunkKeyPickerItems((model.viaMacros || []).map((slot) => slot.keycode), 8)
+                        .concat(chunkKeyPickerItems((model.hardcodedMacros || []).map((slot) => slot.keycode), 8))
                 };
             }
             return section;
@@ -7185,31 +7778,907 @@ function getClientScript() {
     }
 
     function renderMacroStudio() {
-        return panel("VIA Macros",
-            "<table><thead><tr><th>Slot</th><th>Payload</th><th></th></tr></thead><tbody>" +
-            model.viaMacros.map((slot) =>
-                "<tr data-dirty-section data-keycode='" + escapeAttr(slot.keycode) + "'><td><code>" + escapeHtml(slot.keycode) + "</code></td><td><input value='" + escapeAttr(slot.payload) + "'></td><td><button data-action='updateViaMacro' data-dirty-button>Apply</button></td></tr>"
-            ).join("") +
-            "</tbody></table>",
+        normalizeMacroBuilderState();
+        const slots = model.viaMacros || [];
+        if (!slots.length) {
+            return panel("Macro Builder", "<p class='muted'>No VIA_MACROS(MACRO) rows were parsed.</p>", true);
+        }
+        const active = activeMacroSlot() || slots[0];
+        return panel("Macro Builder",
+            renderMacroUsageSummary(slots) +
+            "<div class='macro-builder-grid'>" +
+            renderMacroSlotBrowser(slots) +
+            renderMacroWorkbench(active) +
+            "</div>",
             true
         );
     }
 
-    function renderComboStudio() {
-        return panel("Combo Builder",
-            "<div class='card' data-dirty-section data-combo-builder><div class='form-grid'>" +
-            renderKeyPickerInput("comboOutput", "Output", "", "Tab", "single", "", "data-combo-output") +
-            renderKeyPickerInput("comboInputs", "Inputs", "", "D, F", "list", "", "data-combo-inputs") +
-            "<button data-action='addCombo' data-dirty-button class='primary'>Append combo row</button>" +
-            "</div></div>" +
-            "<h3 style='margin-top: 14px'>Existing combos</h3>" +
-            "<table><thead><tr><th>Output</th><th>Inputs</th></tr></thead><tbody>" +
-            model.combos.map((combo) =>
-                "<tr><td>" + escapeHtml(combo.outputDisplay || combo.output) + "<br><code class='muted'>" + escapeHtml(combo.output) + "</code></td><td>" + escapeHtml((combo.inputDisplays || combo.inputs).join(" + ")) + "<br><code class='muted'>" + escapeHtml(combo.inputs.join(" + ")) + "</code></td></tr>"
-            ).join("") +
-            "</tbody></table>",
-            true
-        );
+    function renderMacroUsageSummary(slots) {
+        const payloads = slots.map((slot) => macroPayloadForSlot(slot));
+        const filled = payloads.filter((payload) => payload.length > 0).length;
+        const edited = slots.filter((slot) => macroSlotDirty(slot.keycode)).length;
+        const totalChars = payloads.reduce((sum, payload) => sum + payload.length, 0);
+        return "<div class='macro-stat-row macro-builder-summary'>" +
+            renderMacroChip("slots", filled + " / " + slots.length + " filled") +
+            renderMacroChip("payload chars", String(totalChars)) +
+            (edited ? renderMacroChip("edited", String(edited), "warning") : "") +
+            renderMacroChip("target", "VIA_MACROS(MACRO)") +
+            "</div>";
+    }
+
+    function renderMacroSlotBrowser(slots) {
+        return "<div class='macro-slot-browser'>" +
+            "<h3>VIA Macro Slots</h3>" +
+            "<div class='macro-slot-list' role='listbox' aria-label='VIA macro slots'>" +
+            slots.map(renderMacroSlotButton).join("") +
+            "</div>" +
+            "</div>";
+    }
+
+    function renderMacroSlotButton(slot) {
+        const payload = macroPayloadForSlot(slot);
+        const active = slot.keycode === activeMacroKeycode;
+        const dirty = macroSlotDirty(slot.keycode);
+        const empty = payload.length === 0;
+        const label = "VIA " + macroSlotNumber(slot.keycode);
+        const state = dirty ? "edited" : empty ? "empty" : payload.length + " chars";
+        const classes = ["macro-slot-button", active ? "active" : "", dirty ? "dirty" : "", empty ? "empty" : ""].filter(Boolean).join(" ");
+        return "<button type='button' role='option' aria-selected='" + (active ? "true" : "false") + "' class='" + classes + "' data-action='selectMacroSlot' data-keycode='" + escapeAttr(slot.keycode) + "'>" +
+            "<span class='macro-slot-title'>" + escapeHtml(label) + "</span>" +
+            "<span class='macro-slot-state'>" + escapeHtml(state) + "</span>" +
+            "</button>";
+    }
+
+    function renderMacroWorkbench(slot) {
+        const payload = macroPayloadForSlot(slot);
+        return "<div class='macro-builder-main' data-macro-workbench data-keycode='" + escapeAttr(slot.keycode) + "'>" +
+            renderMacroEditor(slot, payload) +
+            renderMacroRecorder(slot) +
+            renderMacroPreview(payload) +
+            "</div>";
+    }
+
+    function renderMacroEditor(slot, payload) {
+        const parsed = parseMacroPayloadPreview(payload);
+        const status = parsed.error ? "invalid" : payload ? "ready" : "empty";
+        return "<div class='card macro-authoring-card'>" +
+            "<div class='macro-authoring-layout'>" +
+            "<div class='macro-payload-pane' data-dirty-section data-macro-editor data-keycode='" + escapeAttr(slot.keycode) + "'>" +
+            "<div class='macro-builder-head'>" +
+            "<div><h3>" + escapeHtml(displayKeyExpression(slot.keycode)) + "</h3>" +
+            "<div class='muted'><code>" + escapeHtml(slot.keycode) + "</code> - " + escapeHtml(status) + "</div></div>" +
+            "<button data-action='updateViaMacro' data-dirty-button class='primary'>Apply macro</button>" +
+            "</div>" +
+            "<label><span>Payload</span><textarea class='macro-payload-textarea monospace' data-macro-payload data-validate='macro-payload' spellcheck='false'>" + escapeHtml(payload) + "</textarea></label>" +
+            "</div>" +
+            renderMacroComposer() +
+            "</div>" +
+            "</div>";
+    }
+
+    function renderMacroComposer() {
+        const typeOptions = [
+            ["tap", "Tap key or chord"],
+            ["text", "Type text"],
+            ["down", "Key down"],
+            ["up", "Key up"],
+            ["delay", "Delay"]
+        ];
+        return "<div class='macro-step-sidecar' data-macro-composer>" +
+            "<h3>Step Builder</h3>" +
+            "<div class='macro-composer-grid'>" +
+            "<label><span>Step type</span><select id='macroStepType' name='macroStepType'>" + optionsWithLabels(typeOptions, "tap") + "</select></label>" +
+            "<div class='macro-step-fields'>" +
+            "<label data-macro-step-field='text' hidden><span>Text</span><input id='macroStepText' placeholder='hello'></label>" +
+            renderKeyPickerInput("macroStepKeys", "Macro keys", "", "A, Cmd+Space, KC_LGUI, KC_SPC", "list", "", "data-macro-step-field='tap'") +
+            renderKeyPickerInput("macroStepKey", "Macro key", "", "Shift", "single", "", "data-macro-step-field='down up' hidden") +
+            "<label data-macro-step-field='delay' hidden><span>Delay ms</span><input id='macroStepDelay' data-validate='positive-int' inputmode='numeric' value='250'></label>" +
+            "</div>" +
+            "<div class='layout-combo-actions'>" +
+            "<button type='button' data-action='insertMacroStep' class='primary'>Insert step</button>" +
+            "<button type='button' data-action='clearMacroPayload'>Clear</button>" +
+            "</div>" +
+            "</div>" +
+            "</div>";
+    }
+
+    function renderMacroRecorder(slot) {
+        return "<div class='card macro-recorder-card' data-macro-recorder>" + renderMacroRecorderBody(slot) + "</div>";
+    }
+
+    function renderMacroRecorderBody(slot) {
+        const recordedPayload = recordedMacroPayload();
+        const eventCount = macroRecordedEvents.filter((event) => event.kind === "key").length;
+        const modeOptions = [
+            ["compact", "Compact taps/chords"],
+            ["exact", "Exact down/up"]
+        ];
+        return "<div class='macro-builder-head macro-recorder-header'>" +
+            "<div><h3>Live Recorder</h3>" +
+            "<div class='muted macro-recorder-state'>" + (macroRecording ? "<span class='macro-recorder-dot' aria-hidden='true'></span> recording" : "idle") + "</div></div>" +
+            "<div class='macro-stat-row macro-recorder-stats'>" +
+            renderMacroChip("events", String(eventCount)) +
+            renderMacroChip("generated chars", String(recordedPayload.length)) +
+            (macroRecordDelays ? renderMacroChip("delays", "on") : renderMacroChip("delays", "off")) +
+            "</div>" +
+            "</div>" +
+            "<div class='macro-recorder-controls'>" +
+            "<label><span>Record mode</span><select id='macroRecorderMode' name='macroRecorderMode'>" + optionsWithLabels(modeOptions, macroRecorderMode) + "</select></label>" +
+            "<label class='macro-recorder-toggle'><span class='macro-recorder-toggle-label'>Record delays</span><input id='macroRecordDelays' name='macroRecordDelays' type='checkbox' " + (macroRecordDelays ? "checked" : "") + "><span class='macro-recorder-toggle-track' aria-hidden='true'></span></label>" +
+            "<label><span>Delay threshold ms</span><input id='macroRecorderDelayThreshold' name='macroRecorderDelayThreshold' data-validate='positive-int' inputmode='numeric' value='" + escapeAttr(macroRecorderDelayThreshold) + "'></label>" +
+            "<label><span>Delay round ms</span><input id='macroRecorderDelayRound' name='macroRecorderDelayRound' data-validate='positive-int' inputmode='numeric' value='" + escapeAttr(macroRecorderDelayRound) + "'></label>" +
+            "<div class='macro-recorder-actions'>" +
+            (macroRecording
+                ? "<button type='button' data-action='stopMacroRecording' class='primary wide'>Stop</button>"
+                : "<button type='button' data-action='startMacroRecording' class='primary wide'>Record</button>") +
+            "<button type='button' data-action='clearMacroRecording'>Clear take</button>" +
+            "</div>" +
+            "</div>" +
+            "<div class='macro-recorder-status'>" +
+            (macroRecorderNotice ? "<p class='muted'>" + escapeHtml(macroRecorderNotice) + "</p>" : "") +
+            renderMacroRecorderTimeline() +
+            "</div>";
+    }
+
+    function renderMacroRecorderTimeline() {
+        const events = macroRecordedEvents.slice(-28);
+        if (!events.length) {
+            return "<p class='muted'>No recorded events.</p>";
+        }
+        const omitted = macroRecordedEvents.length - events.length;
+        return (omitted > 0 ? "<p class='muted'>" + omitted + " earlier events hidden.</p>" : "") +
+            "<div class='macro-recorder-timeline'>" +
+            events.map(renderMacroRecorderEvent).join("") +
+            "</div>";
+    }
+
+    function renderMacroRecorderEvent(event) {
+        if (event.kind === "delay") {
+            return "<div class='macro-recorder-event delay'>" +
+                "<div class='macro-recorder-kind'>Delay</div>" +
+                "<div class='macro-recorder-detail'>" + escapeHtml(String(event.value || 0)) + " ms</div>" +
+                "</div>";
+        }
+        const kind = event.phase === "down" ? "Down" : "Up";
+        return "<div class='macro-recorder-event'>" +
+            "<div class='macro-recorder-kind'>" + escapeHtml(kind) + "</div>" +
+            "<div class='macro-recorder-detail'>" + escapeHtml(displayKeyExpression(event.keycode || "")) + " <code class='muted'>" + escapeHtml(event.keycode || "") + "</code></div>" +
+            "</div>";
+    }
+
+    function renderMacroPreview(payload) {
+        return "<div class='card macro-preview-card' data-macro-preview>" + renderMacroPreviewBody(payload) + "</div>";
+    }
+
+    function renderMacroPreviewBody(payload) {
+        const parsed = parseMacroPayloadPreview(payload || "");
+        const stats = macroPayloadStats(parsed, payload || "");
+        return "<h3>Payload Preview</h3>" +
+            "<div class='macro-stat-row'>" +
+            renderMacroChip("source chars", String((payload || "").length)) +
+            renderMacroChip("encoded bytes", parsed.error ? "unknown" : String(stats.bytes)) +
+            renderMacroChip("steps", String(parsed.steps.length)) +
+            (parsed.error ? renderMacroChip("invalid", parsed.error, "warning") : "") +
+            "</div>" +
+            (parsed.steps.length ? "<div class='macro-preview-list'>" + parsed.steps.map(renderMacroPreviewStep).join("") + "</div>" : "<p class='muted'>This macro is empty.</p>");
+    }
+
+    function renderMacroPreviewStep(step) {
+        return "<div class='macro-preview-step'>" +
+            "<div class='macro-preview-kind'>" + escapeHtml(step.kindLabel) + "</div>" +
+            "<div class='macro-preview-detail'>" + escapeHtml(step.detail) + (step.raw ? "<br><code class='muted'>" + escapeHtml(step.raw) + "</code>" : "") + "</div>" +
+            "</div>";
+    }
+
+    function renderMacroChip(label, value, extraClass = "") {
+        return "<span class='macro-chip " + escapeAttr(extraClass) + "'><strong>" + escapeHtml(label) + "</strong> " + escapeHtml(value) + "</span>";
+    }
+
+    function activeMacroSlot() {
+        return (model.viaMacros || []).find((slot) => slot.keycode === activeMacroKeycode);
+    }
+
+    function macroSlotByKeycode(keycode) {
+        return (model.viaMacros || []).find((slot) => slot.keycode === keycode);
+    }
+
+    function macroPayloadForSlot(slot) {
+        if (!slot) return "";
+        if (Object.prototype.hasOwnProperty.call(macroDrafts, slot.keycode)) {
+            return String(macroDrafts[slot.keycode] || "");
+        }
+        return String(slot.payload || "");
+    }
+
+    function macroSlotDirty(keycode) {
+        const slot = macroSlotByKeycode(keycode);
+        return Boolean(slot && Object.prototype.hasOwnProperty.call(macroDrafts, keycode) && String(macroDrafts[keycode] || "") !== String(slot.payload || ""));
+    }
+
+    function macroSlotNumber(keycode) {
+        return String(keycode || "").match(/_(\\d+)$/)?.[1] || "?";
+    }
+
+    function setMacroDraft(keycode, payload) {
+        const slot = macroSlotByKeycode(keycode);
+        if (!slot) return;
+        const nextPayload = String(payload || "");
+        if (nextPayload === String(slot.payload || "")) {
+            const nextDrafts = { ...macroDrafts };
+            delete nextDrafts[keycode];
+            macroDrafts = nextDrafts;
+            return;
+        }
+        macroDrafts = { ...macroDrafts, [keycode]: nextPayload };
+    }
+
+    function captureActiveMacroDraft() {
+        captureMacroDraftFromControl(document.querySelector("[data-macro-payload]"));
+    }
+
+    function captureMacroDraftFromControl(control) {
+        if (!control) return;
+        const editor = control.closest("[data-macro-editor]");
+        const keycode = editor?.dataset.keycode || activeMacroKeycode;
+        if (!keycode) return;
+        setMacroDraft(keycode, control.value || "");
+    }
+
+    function parseMacroPayloadPreview(payload) {
+        const steps = [];
+        let textStart = 0;
+        let index = 0;
+
+        const flushText = (end) => {
+            if (end <= textStart) return;
+            const text = payload.slice(textStart, end);
+            steps.push({
+                kind: "text",
+                kindLabel: "Text",
+                detail: text,
+                raw: text.length > 48 ? text.slice(0, 48) + "..." : text
+            });
+        };
+
+        while (index < payload.length) {
+            const char = payload[index];
+            if (char.charCodeAt(0) > 0x7F) {
+                return { steps, error: "Macro payloads only support ASCII text." };
+            }
+            if (char === "}") {
+                return { steps, error: "Unexpected } outside a macro command." };
+            }
+            if (char !== "{") {
+                index += 1;
+                continue;
+            }
+
+            flushText(index);
+            const close = payload.indexOf("}", index + 1);
+            if (close === -1) {
+                return { steps, error: "Missing } for macro command." };
+            }
+
+            const commandText = payload.slice(index + 1, close);
+            const command = parseMacroCommandPreview(commandText);
+            if (command.error) {
+                return { steps, error: command.error };
+            }
+            steps.push(command.step);
+            index = close + 1;
+            textStart = index;
+        }
+
+        flushText(payload.length);
+        return { steps, error: "" };
+    }
+
+    function parseMacroCommandPreview(commandText) {
+        const command = String(commandText || "").trim();
+        if (!command) {
+            return { error: "Empty macro command." };
+        }
+        if (/^\\d+$/.test(command)) {
+            return {
+                step: {
+                    kind: "delay",
+                    kindLabel: "Delay",
+                    detail: command + " ms",
+                    raw: "{" + command + "}",
+                    bytes: 3
+                }
+            };
+        }
+        if (/^[+-]/.test(command)) {
+            const sign = command[0];
+            const key = command.slice(1).trim();
+            if (!key || key.includes(",")) {
+                return { error: "Key down/up commands need exactly one key." };
+            }
+            const keyError = macroPayloadKeyListError([key]);
+            if (keyError) {
+                return { error: keyError };
+            }
+            return {
+                step: {
+                    kind: sign === "+" ? "down" : "up",
+                    kindLabel: sign === "+" ? "Down" : "Up",
+                    detail: displayKeyExpression(key),
+                    raw: "{" + sign + key + "}",
+                    bytes: 2
+                }
+            };
+        }
+
+        const keys = splitLayoutArguments(command).map((item) => item.trim()).filter(Boolean);
+        if (!keys.length) {
+            return { error: "Tap commands need at least one key." };
+        }
+        const keyError = macroPayloadKeyListError(keys);
+        if (keyError) {
+            return { error: keyError };
+        }
+        return {
+            step: {
+                kind: "tap",
+                kindLabel: keys.length > 1 ? "Chord" : "Tap",
+                detail: keys.map(displayKeyExpression).join(" + "),
+                raw: "{" + keys.join(", ") + "}",
+                bytes: 2 + keys.length
+            }
+        };
+    }
+
+    function macroPayloadStats(parsed, payload) {
+        if (parsed.error) {
+            return { bytes: 0 };
+        }
+        let bytes = 0;
+        for (const step of parsed.steps) {
+            if (step.kind === "text") {
+                const length = step.detail.length;
+                bytes += length + Math.ceil(length / 255) * 2;
+            } else {
+                bytes += step.bytes || 0;
+            }
+        }
+        return { bytes, sourceChars: String(payload || "").length };
+    }
+
+    function insertMacroStep(target) {
+        const workbench = target.closest("[data-macro-workbench]");
+        const textarea = workbench?.querySelector("[data-macro-payload]");
+        if (!workbench || !textarea) return false;
+
+        const snippet = macroStepSnippet(workbench);
+        if (!snippet) return false;
+
+        const start = Number.isInteger(textarea.selectionStart) ? textarea.selectionStart : textarea.value.length;
+        const end = Number.isInteger(textarea.selectionEnd) ? textarea.selectionEnd : start;
+        textarea.value = textarea.value.slice(0, start) + snippet + textarea.value.slice(end);
+        const cursor = start + snippet.length;
+        textarea.focus();
+        textarea.setSelectionRange(cursor, cursor);
+        captureMacroDraftFromControl(textarea);
+        validateControl(textarea);
+        refreshMacroPreview(workbench);
+        updateDirtySection(workbench.querySelector("[data-macro-editor]"));
+        return true;
+    }
+
+    function clearMacroPayload(target) {
+        const workbench = target.closest("[data-macro-workbench]");
+        const textarea = workbench?.querySelector("[data-macro-payload]");
+        if (!workbench || !textarea) return false;
+        textarea.value = "";
+        textarea.focus();
+        captureMacroDraftFromControl(textarea);
+        validateControl(textarea);
+        refreshMacroPreview(workbench);
+        updateDirtySection(workbench.querySelector("[data-macro-editor]"));
+        return true;
+    }
+
+    function startMacroRecording(target) {
+        const workbench = target?.closest?.("[data-macro-workbench]") || document.querySelector("[data-macro-workbench]");
+        const slot = activeMacroSlot();
+        if (!workbench || !slot) return false;
+        captureActiveMacroDraft();
+        captureMacroRecorderSettings();
+        macroRecording = true;
+        macroRecordedEvents = [];
+        macroRecordingPrefix = macroPayloadForSlot(slot);
+        macroRecorderLastEventAt = 0;
+        macroRecorderHeldKeys = {};
+        macroRecorderNotice = "Recording into " + displayKeyExpression(slot.keycode) + ".";
+        macroRecorderHistoryStart = currentLocalSnapshot || serializeLocalState();
+        refreshMacroRecorderPanel(workbench);
+        return true;
+    }
+
+    function stopMacroRecording(commit) {
+        if (!macroRecording) return false;
+        macroRecording = false;
+        macroRecorderHeldKeys = {};
+        macroRecorderLastEventAt = 0;
+        macroRecorderNotice = macroRecordedEvents.length ? "Recording stopped." : "Recording stopped with no captured events.";
+        if (commit && macroRecorderHistoryStart) {
+            commitLocalHistory(macroRecorderHistoryStart);
+        }
+        macroRecorderHistoryStart = "";
+        refreshMacroRecorderPanel();
+        return true;
+    }
+
+    function clearMacroRecording(target) {
+        const hadState = macroRecordedEvents.length > 0 || Boolean(macroRecordingPrefix) || Boolean(macroRecorderNotice);
+        const workbench = target?.closest?.("[data-macro-workbench]") || document.querySelector("[data-macro-workbench]");
+        const restorePayload = macroRecordingPrefix || macroPayloadForSlot(activeMacroSlot());
+        macroRecording = false;
+        macroRecordedEvents = [];
+        macroRecordingPrefix = restorePayload;
+        macroRecorderLastEventAt = 0;
+        macroRecorderHeldKeys = {};
+        macroRecorderNotice = "Recording take cleared.";
+        macroRecorderHistoryStart = "";
+        if (workbench) {
+            syncMacroRecordedPayloadDraft(true);
+            refreshMacroRecorderPanel(workbench);
+        }
+        return hadState;
+    }
+
+    function clearMacroRecorderSession(resetPrefix) {
+        macroRecording = false;
+        macroRecordedEvents = [];
+        macroRecorderLastEventAt = 0;
+        macroRecorderHeldKeys = {};
+        macroRecorderNotice = "";
+        macroRecorderHistoryStart = "";
+        if (resetPrefix) {
+            macroRecordingPrefix = macroPayloadForSlot(activeMacroSlot());
+        } else {
+            macroRecordingPrefix = "";
+        }
+    }
+
+    function resetMacroRecorderState() {
+        macroRecording = false;
+        macroRecordDelays = true;
+        macroRecorderMode = "compact";
+        macroRecorderDelayThreshold = "30";
+        macroRecorderDelayRound = "10";
+        macroRecordedEvents = [];
+        macroRecordingPrefix = "";
+        macroRecorderLastEventAt = 0;
+        macroRecorderHeldKeys = {};
+        macroRecorderNotice = "";
+        macroRecorderHistoryStart = "";
+    }
+
+    function handleMacroRecorderKeyEvent(event) {
+        if (!macroRecording || activeView !== "macros") return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.repeat) return;
+
+        const phase = event.type === "keyup" ? "up" : "down";
+        const recordKey = event.code || event.key || "";
+        let keycode = macroRecorderKeycodeForEvent(event);
+        if (phase === "up" && macroRecorderHeldKeys[recordKey]) {
+            keycode = macroRecorderHeldKeys[recordKey];
+        }
+        if (!keycode) {
+            macroRecorderNotice = "Unsupported key event: " + (event.code || event.key || "unknown");
+            macroRecorderLastEventAt = macroRecorderNow();
+            refreshMacroRecorderPanel();
+            return;
+        }
+        if (macroPayloadKeycodes.size && !macroPayloadKeycodes.has(keycode)) {
+            macroRecorderNotice = "Unsupported macro keycode: " + keycode;
+            macroRecorderLastEventAt = macroRecorderNow();
+            refreshMacroRecorderPanel();
+            return;
+        }
+        const heldBeforeEvent = Object.keys(macroRecorderHeldKeys).length;
+        if (phase === "down") {
+            if (macroRecorderHeldKeys[recordKey]) return;
+            macroRecorderHeldKeys[recordKey] = keycode;
+        } else if (!macroRecorderHeldKeys[recordKey]) {
+            macroRecorderNotice = "Ignored key-up without a matching key-down: " + displayKeyExpression(keycode);
+            macroRecorderLastEventAt = macroRecorderNow();
+            refreshMacroRecorderPanel();
+            return;
+        } else {
+            delete macroRecorderHeldKeys[recordKey];
+        }
+
+        appendMacroRecorderDelay(phase, heldBeforeEvent);
+        macroRecordedEvents = macroRecordedEvents.concat([{
+            kind: "key",
+            phase,
+            keycode,
+            code: event.code || "",
+            key: event.key || ""
+        }]);
+        macroRecorderLastEventAt = macroRecorderNow();
+        macroRecorderNotice = "Captured " + displayKeyExpression(keycode) + " " + phase + ".";
+        syncMacroRecordedPayloadDraft();
+        refreshMacroRecorderPanel();
+    }
+
+    function macroRecorderKeycodeForEvent(event) {
+        const direct = macroRecorderEventCodeMap[event.code || ""];
+        if (direct) return direct;
+        const fallback = macroRecorderKeyFallbackMap[event.key || ""];
+        if (fallback) return fallback;
+        const key = String(event.key || "");
+        if (/^[a-z]$/i.test(key)) return "KC_" + key.toUpperCase();
+        if (/^\\d$/.test(key)) return "KC_" + key;
+        return "";
+    }
+
+    function appendMacroRecorderDelay(phase, heldBeforeEvent) {
+        const now = macroRecorderNow();
+        if (!macroRecordDelays || !macroRecorderLastEventAt) return;
+        if (macroRecorderMode === "compact" && (phase !== "down" || heldBeforeEvent > 0)) return;
+        const elapsed = now - macroRecorderLastEventAt;
+        const threshold = macroRecorderPositiveNumber(macroRecorderDelayThreshold, 30);
+        const delay = roundedMacroRecorderDelay(elapsed);
+        if (delay >= threshold) {
+            macroRecordedEvents = macroRecordedEvents.concat([{ kind: "delay", value: delay }]);
+        }
+    }
+
+    function roundedMacroRecorderDelay(value) {
+        const round = macroRecorderPositiveNumber(macroRecorderDelayRound, 10);
+        return Math.max(1, Math.round(Number(value || 0) / round) * round);
+    }
+
+    function macroRecorderPositiveNumber(value, fallback) {
+        const number = Number(value);
+        return Number.isFinite(number) && number > 0 ? number : fallback;
+    }
+
+    function macroRecorderNow() {
+        return window.performance?.now ? window.performance.now() : Date.now();
+    }
+
+    function captureMacroRecorderSettings() {
+        const mode = document.getElementById("macroRecorderMode")?.value || macroRecorderMode;
+        macroRecorderMode = mode === "exact" ? "exact" : "compact";
+        const delays = document.getElementById("macroRecordDelays");
+        if (delays) {
+            macroRecordDelays = Boolean(delays.checked);
+        }
+        const threshold = document.getElementById("macroRecorderDelayThreshold");
+        if (threshold) {
+            macroRecorderDelayThreshold = threshold.value || "";
+        }
+        const round = document.getElementById("macroRecorderDelayRound");
+        if (round) {
+            macroRecorderDelayRound = round.value || "";
+        }
+    }
+
+    function syncMacroRecordedPayloadDraft(force = false) {
+        if (!force && !macroRecording && !macroRecordedEvents.length && !macroRecordingPrefix) return;
+        const slot = activeMacroSlot();
+        if (!slot) return;
+        const payload = macroRecordingPrefix + recordedMacroPayload();
+        setMacroDraft(slot.keycode, payload);
+
+        const workbench = document.querySelector("[data-macro-workbench]");
+        if (workbench?.dataset.keycode === slot.keycode) {
+            const textarea = workbench.querySelector("[data-macro-payload]");
+            if (textarea) {
+                textarea.value = payload;
+                validateControl(textarea);
+            }
+            refreshMacroPreview(workbench);
+            updateDirtySection(workbench.querySelector("[data-macro-editor]"));
+        }
+        refreshMacroSlotButton(slot.keycode);
+    }
+
+    function refreshMacroRecorderPanel(workbench = document.querySelector("[data-macro-workbench]")) {
+        const slot = activeMacroSlot();
+        const recorder = workbench?.querySelector("[data-macro-recorder]");
+        if (!slot || !recorder) return;
+        recorder.innerHTML = renderMacroRecorderBody(slot);
+        validateSection(recorder, false);
+        hydrateTooltips();
+    }
+
+    function refreshMacroSlotButton(keycode) {
+        const slot = macroSlotByKeycode(keycode);
+        if (!slot) return;
+        for (const button of document.querySelectorAll(".macro-slot-button[data-keycode]")) {
+            if (button.dataset.keycode !== keycode) continue;
+            button.outerHTML = renderMacroSlotButton(slot);
+            hydrateTooltips();
+            return;
+        }
+    }
+
+    function recordedMacroPayload() {
+        const items = macroRecorderMode === "exact"
+            ? exactRecordedMacroItems(macroRecordedEvents)
+            : compactRecordedMacroItems(macroRecordedEvents);
+        return recordedMacroItemsToPayload(items);
+    }
+
+    function exactRecordedMacroItems(events) {
+        return events.map((event) => {
+            if (event.kind === "delay") return { kind: "delay", value: event.value };
+            return { kind: event.phase, keycode: event.keycode };
+        });
+    }
+
+    function compactRecordedMacroItems(events) {
+        const output = [];
+        let segment = [];
+        const flush = () => {
+            if (!segment.length) return;
+            output.push(...compactRecordedMacroSegment(segment));
+            segment = [];
+        };
+        for (const event of events) {
+            if (event.kind === "delay") {
+                flush();
+                output.push({ kind: "delay", value: event.value });
+            } else {
+                segment.push(event);
+            }
+        }
+        flush();
+        return output;
+    }
+
+    function compactRecordedMacroSegment(segment) {
+        const output = [];
+        let index = 0;
+        while (index < segment.length) {
+            const chord = compactRecordedChordAt(segment, index);
+            if (chord) {
+                output.push(chord.item);
+                index += chord.length;
+                continue;
+            }
+            const event = segment[index];
+            const next = segment[index + 1];
+            if (event.phase === "down" && next?.phase === "up" && next.keycode === event.keycode) {
+                output.push({ kind: "tap", keycodes: [event.keycode] });
+                index += 2;
+                continue;
+            }
+            output.push({ kind: event.phase, keycode: event.keycode });
+            index += 1;
+        }
+        return output;
+    }
+
+    function compactRecordedChordAt(segment, start) {
+        const remaining = segment.length - start;
+        const maxLength = remaining % 2 === 0 ? remaining : remaining - 1;
+        for (let length = maxLength; length >= 2; length -= 2) {
+            const half = length / 2;
+            const slice = segment.slice(start, start + length);
+            const downs = slice.slice(0, half);
+            const ups = slice.slice(half);
+            if (!downs.every((event) => event.phase === "down") || !ups.every((event) => event.phase === "up")) continue;
+            if (!ups.every((event, index) => event.keycode === downs[half - index - 1].keycode)) continue;
+            const keycodes = downs.map((event) => event.keycode);
+            if (new Set(keycodes).size !== keycodes.length) continue;
+            return {
+                length,
+                item: keycodes.length === 1 ? { kind: "tap", keycodes } : { kind: "chord", keycodes }
+            };
+        }
+        return undefined;
+    }
+
+    function recordedMacroItemsToPayload(items) {
+        let payload = "";
+        let text = "";
+        const flushText = () => {
+            if (!text) return;
+            payload += text;
+            text = "";
+        };
+        for (const item of items) {
+            if (item.kind === "tap" || item.kind === "chord") {
+                const character = macroRecorderTextForKeys(item.keycodes || []);
+                if (character) {
+                    text += character;
+                    continue;
+                }
+            }
+            flushText();
+            payload += macroRecorderCommandForItem(item);
+        }
+        flushText();
+        return payload;
+    }
+
+    function macroRecorderCommandForItem(item) {
+        if (item.kind === "delay") return "{" + Math.max(1, Math.round(Number(item.value || 0))) + "}";
+        if (item.kind === "down") return "{+" + item.keycode + "}";
+        if (item.kind === "up") return "{-" + item.keycode + "}";
+        if (item.kind === "tap" || item.kind === "chord") return "{" + (item.keycodes || []).join(",") + "}";
+        return "";
+    }
+
+    function macroRecorderTextForKeys(keycodes) {
+        const keys = (keycodes || []).filter(Boolean);
+        if (!keys.length) return "";
+        const shiftKeys = new Set(["KC_LSFT", "KC_RSFT", "KC_LEFT_SHIFT", "KC_RIGHT_SHIFT"]);
+        const blockedModifiers = new Set(["KC_LCTL", "KC_RCTL", "KC_LEFT_CTRL", "KC_RIGHT_CTRL", "KC_LALT", "KC_RALT", "KC_LEFT_ALT", "KC_RIGHT_ALT", "KC_LGUI", "KC_RGUI", "KC_LEFT_GUI", "KC_RIGHT_GUI"]);
+        if (keys.some((key) => blockedModifiers.has(key))) return "";
+        const shift = keys.some((key) => shiftKeys.has(key));
+        const printable = keys.filter((key) => !shiftKeys.has(key));
+        if (printable.length !== 1) return "";
+        const pair = macroRecorderTextKeyMap[printable[0]];
+        if (!pair) return "";
+        const character = pair[shift ? 1 : 0];
+        if (!macroRecorderCanEmitText(character)) return "";
+        return character;
+    }
+
+    function macroRecorderCanEmitText(character) {
+        if (!character || character === "{" || character === "}") return false;
+        const code = character.charCodeAt(0);
+        return code >= 0x20 && code <= 0x7E;
+    }
+
+    function macroStepSnippet(workbench) {
+        const type = workbench.querySelector("#macroStepType")?.value || "tap";
+        if (type === "text") {
+            const input = workbench.querySelector("#macroStepText");
+            const text = input?.value || "";
+            if (!text) {
+                setFieldError(input, "Enter text to insert.");
+                return "";
+            }
+            if (/[{}]/.test(text)) {
+                setFieldError(input, "Text steps cannot include { or }.");
+                return "";
+            }
+            setFieldError(input, "");
+            return text;
+        }
+        if (type === "delay") {
+            const input = workbench.querySelector("#macroStepDelay");
+            const delay = String(input?.value || "").trim();
+            const error = validatePositiveInteger(delay, "Enter a positive delay in milliseconds.");
+            setFieldError(input, error);
+            return error ? "" : "{" + delay + "}";
+        }
+        if (type === "tap") {
+            const input = workbench.querySelector("#macroStepKeys");
+            const keys = canonicalMacroKeySequence(input?.value || "");
+            if (!keys.length) {
+                setFieldError(input, "Choose at least one key.");
+                return "";
+            }
+            const keyError = macroPayloadKeyListError(keys);
+            if (keyError) {
+                setFieldError(input, keyError);
+                return "";
+            }
+            setFieldError(input, "");
+            return "{" + keys.join(",") + "}";
+        }
+        if (type === "down" || type === "up") {
+            const input = workbench.querySelector("#macroStepKey");
+            const keys = canonicalMacroKeySequence(input?.value || "");
+            if (keys.length !== 1) {
+                setFieldError(input, "Choose exactly one key.");
+                return "";
+            }
+            const keyError = macroPayloadKeyListError(keys);
+            if (keyError) {
+                setFieldError(input, keyError);
+                return "";
+            }
+            setFieldError(input, "");
+            return "{" + (type === "down" ? "+" : "-") + keys[0] + "}";
+        }
+        return "";
+    }
+
+    function canonicalMacroKeySequence(value) {
+        return splitLayoutArguments(String(value || ""))
+            .flatMap(canonicalMacroKeyPart)
+            .filter(Boolean);
+    }
+
+    function canonicalMacroKeyPart(value) {
+        const normalized = normalizeDisplayExpression(value);
+        if (!normalized) return [];
+
+        const chordParts = normalized.split("+").map((part) => part.trim()).filter(Boolean);
+        if (chordParts.length > 1) {
+            const key = canonicalMacroPlainKey(chordParts[chordParts.length - 1]);
+            const modifiers = chordParts.slice(0, -1).map(normalizeLayoutModifier);
+            if (!key || modifiers.some((modifier) => !modifier)) return [];
+            return uniqueMacroKeys(modifiers.map(macroModifierKeycode).concat([key]));
+        }
+
+        const canonical = canonicalLayoutKeyExpression(normalized);
+        const call = canonical.match(/^([A-Z][A-Z0-9_]*)\\((.+)\\)$/);
+        if (call && modWrapperLabels[call[1]]) {
+            const key = canonicalMacroPlainKey(call[2]);
+            const modifiers = (modWrapperLabels[call[1]] || []).map(macroModifierKeycode);
+            return key ? uniqueMacroKeys(modifiers.concat([key])) : [];
+        }
+        return canonical ? [canonical] : [];
+    }
+
+    function canonicalMacroPlainKey(value) {
+        const canonical = canonicalLayoutKeyExpression(value);
+        if (!canonical || /^([A-Z][A-Z0-9_]*)\\(/.test(canonical)) return "";
+        return canonical;
+    }
+
+    function macroModifierKeycode(modifier) {
+        switch (normalizeLayoutModifier(modifier)) {
+            case "Ctrl": return "KC_LCTL";
+            case "Shift": return "KC_LSFT";
+            case "Alt": return "KC_LALT";
+            case "Cmd": return "KC_LGUI";
+            case "Right Ctrl": return "KC_RCTL";
+            case "Right Shift": return "KC_RSFT";
+            case "Right Alt": return "KC_RALT";
+            case "Right Cmd": return "KC_RGUI";
+            default: return "";
+        }
+    }
+
+    function macroPayloadKeyListError(keys) {
+        for (const key of keys || []) {
+            if (/^[A-Z][A-Z0-9_]*\\(/.test(key)) {
+                return "Macro payloads need raw keycodes; use a key list such as KC_LGUI, KC_SPC instead of a wrapper.";
+            }
+            if (macroPayloadKeycodes.size && !macroPayloadKeycodes.has(key)) {
+                return "Unsupported macro keycode: " + key;
+            }
+        }
+        return "";
+    }
+
+    function uniqueMacroKeys(keys) {
+        const seen = new Set();
+        return keys.filter((key) => {
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
+
+    function updateMacroComposerFields(root = document) {
+        const type = root.querySelector("#macroStepType")?.value || "tap";
+        for (const field of root.querySelectorAll("[data-macro-step-field]")) {
+            const values = String(field.dataset.macroStepField || "").split(/\\s+/);
+            const visible = values.includes(type);
+            field.hidden = !visible;
+            field.style.display = visible ? "" : "none";
+            for (const control of field.querySelectorAll("input, select, textarea")) {
+                if (visible) validateControl(control);
+                else clearFieldError(control);
+            }
+        }
+    }
+
+    function refreshMacroPreview(workbench) {
+        if (!workbench) return;
+        const preview = workbench.querySelector("[data-macro-preview]");
+        const payload = workbench.querySelector("[data-macro-payload]")?.value || "";
+        if (preview) {
+            preview.innerHTML = renderMacroPreviewBody(payload);
+            hydrateTooltips();
+        }
     }
 
     function currentLayer() {

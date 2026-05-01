@@ -12,7 +12,7 @@ those two files.
 
 ## Current Features
 
-- separate Layout, Macros & combos, and RGB work areas
+- separate Layout, Macros, and RGB work areas
 - visual Charybdis 4x6 SVG board using the same physical geometry as the
   profile introspection previews
 - layer previews use `layer_colors[]`, including the base-layer default RGB
@@ -80,9 +80,13 @@ those two files.
 - inspect every active `rgb_config.c` surface, including LED group tables,
   automouse fade, combo feedback, and key-behavior feedback
 - edit `pd_mode_colors[]` HSV values and locality
-- edit `VIA_MACROS(MACRO)` payload strings
-- append `COMBOS(COMBO)` rows from the Macros & combos page or from selected
-  physical keys on the active layout
+- edit `VIA_MACROS(MACRO)` payload strings from a dedicated macro builder with
+  a 64-slot browser, raw payload editor, step insertion for text, key taps,
+  chords, key down/up events, delays, a live keydown/keyup recorder with
+  compact or exact output, and a parsed payload preview
+- record macro timing gaps as optional delay commands while keeping recorded
+  payloads draft-only until the selected slot's Apply button writes `keymap.c`
+- append `COMBOS(COMBO)` rows from selected physical keys on the active layout
 - append simple `key_behaviors[]` rows for tap, hold, and long-hold actions
 - open the backing source file from the studio
 - refresh from disk and discard uncommitted Studio edits
