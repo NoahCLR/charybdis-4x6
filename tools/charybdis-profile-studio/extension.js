@@ -3233,6 +3233,11 @@ function getStudioHtml() {
         .macro-recorder-actions button.primary {
             min-width: 170px;
         }
+        .macro-recorder-actions button.record-action {
+            border-color: #d45b5b;
+            background: #8a3030;
+            color: #fff0f0;
+        }
         .macro-recorder-state {
             overflow-wrap: anywhere;
         }
@@ -7934,8 +7939,8 @@ function getClientScript() {
             "<div class='macro-recorder-actions'>" +
             "<button type='button' data-action='clearMacroRecording'>Clear take</button>" +
             (macroRecording
-                ? "<button type='button' data-action='stopMacroRecording' class='primary wide'>Stop</button>"
-                : "<button type='button' data-action='startMacroRecording' class='primary wide'>Record</button>") +
+                ? "<button type='button' data-action='stopMacroRecording' class='primary wide record-action'>Stop</button>"
+                : "<button type='button' data-action='startMacroRecording' class='primary wide record-action'>Record</button>") +
             "</div>";
     }
 
