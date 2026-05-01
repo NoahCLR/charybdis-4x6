@@ -3032,30 +3032,18 @@ function getStudioHtml() {
             gap: 12px;
             min-width: 0;
         }
-        .macro-authoring-card,
+        .macro-editor-card,
+        .macro-composer-card,
         .macro-recorder-card,
         .macro-preview-card {
             display: grid;
             gap: 12px;
         }
-        .macro-authoring-layout {
+        .macro-tool-row {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(190px, 260px);
-            gap: 14px;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 12px;
             align-items: stretch;
-        }
-        .macro-step-sidecar {
-            display: grid;
-            gap: 12px;
-            align-content: start;
-            min-width: 0;
-            padding-left: 14px;
-            border-left: 1px solid rgba(70, 82, 90, 0.64);
-        }
-        .macro-payload-pane {
-            display: grid;
-            gap: 12px;
-            min-width: 0;
         }
         .macro-builder-head {
             display: flex;
@@ -3097,39 +3085,84 @@ function getStudioHtml() {
         }
         .macro-composer-grid {
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) minmax(220px, auto);
             gap: 10px;
-            align-items: stretch;
+            align-items: end;
         }
         .macro-step-fields {
             display: grid;
             grid-template-columns: 1fr;
             gap: 10px;
-            align-items: stretch;
+            align-items: end;
         }
         .macro-step-fields label {
             margin: 0;
         }
+        .macro-composer-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            align-items: end;
+        }
+        .macro-composer-actions button {
+            min-width: 104px;
+        }
+        .macro-tool-row .macro-composer-grid {
+            grid-template-columns: 1fr;
+            align-items: stretch;
+        }
+        .macro-sidecar-state-spacer {
+            visibility: hidden;
+        }
+        .macro-tool-row .macro-composer-actions {
+            justify-content: stretch;
+        }
+        .macro-tool-row .macro-composer-actions button {
+            flex: 1 1 0;
+        }
         .macro-recorder-controls {
             display: grid;
-            grid-template-columns: minmax(190px, 250px) max-content minmax(160px, 1fr) minmax(160px, 1fr);
-            gap: 12px;
-            align-items: end;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            align-items: stretch;
+            justify-content: stretch;
         }
         .macro-recorder-controls label {
             margin: 0;
         }
+        .macro-recorder-primary-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(120px, 160px);
+            gap: 10px;
+            align-items: end;
+        }
+        .macro-recorder-primary-row label {
+            margin: 0;
+        }
+        .macro-recorder-delay-fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            align-items: end;
+        }
+        .macro-recorder-delay-fields label {
+            margin: 0;
+        }
+        .macro-recorder-delay-fields.inactive {
+            opacity: 0.44;
+            pointer-events: none;
+        }
         .macro-recorder-toggle {
             position: relative;
             display: grid;
-            grid-template-columns: max-content;
-            grid-template-rows: auto auto 14px;
+            grid-template-rows: auto 38px 14px;
             align-items: start;
-            justify-items: center;
-            gap: 8px;
+            justify-items: start;
+            gap: 4px;
             min-height: 0;
-            width: max-content;
+            width: 100%;
             margin: 0;
+            color: var(--muted);
         }
         .macro-recorder-toggle input[type='checkbox'] {
             position: absolute;
@@ -3145,6 +3178,7 @@ function getStudioHtml() {
         }
         .macro-recorder-toggle-track {
             position: relative;
+            align-self: center;
             width: 42px;
             height: 24px;
             border: 1px solid var(--line);
@@ -3178,28 +3212,29 @@ function getStudioHtml() {
         }
         .macro-recorder-toggle-label {
             min-width: 0;
-            text-align: center;
+            text-align: left;
             white-space: nowrap;
+            font-size: 11px;
         }
         .macro-recorder-actions {
-            grid-column: 1 / -1;
             display: flex;
-            justify-content: flex-end;
+            justify-content: stretch;
             align-items: center;
             gap: 8px;
-            align-self: end;
-            margin-top: 2px;
+            justify-self: stretch;
+            width: 100%;
         }
-        .macro-step-sidecar .layout-combo-actions button,
         .macro-recorder-actions button {
+            flex: 1 1 0;
+            min-height: 32px;
             min-width: 124px;
+            padding-block: 5px;
         }
         .macro-recorder-actions button.primary {
             min-width: 170px;
         }
-        .macro-recorder-status {
-            display: grid;
-            gap: 8px;
+        .macro-recorder-state {
+            overflow-wrap: anywhere;
         }
         .macro-recorder-dot {
             display: inline-block;
@@ -3208,35 +3243,6 @@ function getStudioHtml() {
             border-radius: 50%;
             background: var(--danger);
             box-shadow: 0 0 0 4px rgba(217, 83, 79, 0.18);
-        }
-        .macro-recorder-timeline {
-            display: grid;
-            gap: 6px;
-            max-height: 190px;
-            overflow: auto;
-        }
-        .macro-recorder-event {
-            display: grid;
-            grid-template-columns: 70px minmax(0, 1fr);
-            gap: 8px;
-            align-items: center;
-            border: 1px solid rgba(70, 82, 90, 0.74);
-            border-radius: 6px;
-            padding: 6px 8px;
-            background: #20282d;
-        }
-        .macro-recorder-event.delay {
-            border-color: rgba(242, 184, 75, 0.4);
-        }
-        .macro-recorder-kind {
-            color: var(--accent);
-            font-size: 11px;
-            font-weight: 650;
-            text-transform: uppercase;
-        }
-        .macro-recorder-detail {
-            min-width: 0;
-            overflow-wrap: anywhere;
         }
         .macro-preview-list {
             display: grid;
@@ -3747,19 +3753,25 @@ function getStudioHtml() {
                 grid-template-columns: 1fr;
             }
             .macro-builder-grid,
-            .macro-authoring-layout,
+            .macro-tool-row,
             .macro-composer-grid,
-            .macro-recorder-controls {
+            .macro-recorder-primary-row,
+            .macro-recorder-controls,
+            .macro-recorder-delay-fields {
                 grid-template-columns: 1fr;
+            }
+            .macro-recorder-actions {
+                justify-content: stretch;
+                justify-self: stretch;
             }
             .macro-slot-list {
                 max-height: 280px;
             }
-            .macro-step-sidecar {
-                padding-left: 0;
-                padding-bottom: 12px;
-                border-left: 0;
-                border-bottom: 1px solid rgba(70, 82, 90, 0.64);
+            .macro-composer-actions {
+                justify-content: start;
+            }
+            .macro-step-fields {
+                grid-template-columns: 1fr;
             }
             .layout-board-card {
                 height: auto;
@@ -7834,7 +7846,10 @@ function getClientScript() {
         const payload = macroPayloadForSlot(slot);
         return "<div class='macro-builder-main' data-macro-workbench data-keycode='" + escapeAttr(slot.keycode) + "'>" +
             renderMacroEditor(slot, payload) +
+            "<div class='macro-tool-row'>" +
             renderMacroRecorder(slot) +
+            renderMacroComposer() +
+            "</div>" +
             renderMacroPreview(payload) +
             "</div>";
     }
@@ -7842,18 +7857,13 @@ function getClientScript() {
     function renderMacroEditor(slot, payload) {
         const parsed = parseMacroPayloadPreview(payload);
         const status = parsed.error ? "invalid" : payload ? "ready" : "empty";
-        return "<div class='card macro-authoring-card'>" +
-            "<div class='macro-authoring-layout'>" +
-            "<div class='macro-payload-pane' data-dirty-section data-macro-editor data-keycode='" + escapeAttr(slot.keycode) + "'>" +
+        return "<div class='card macro-editor-card' data-dirty-section data-macro-editor data-keycode='" + escapeAttr(slot.keycode) + "'>" +
             "<div class='macro-builder-head'>" +
             "<div><h3>" + escapeHtml(displayKeyExpression(slot.keycode)) + "</h3>" +
             "<div class='muted'><code>" + escapeHtml(slot.keycode) + "</code> - " + escapeHtml(status) + "</div></div>" +
             "<button data-action='updateViaMacro' data-dirty-button class='primary'>Apply macro</button>" +
             "</div>" +
             "<label><span>Payload</span><textarea class='macro-payload-textarea monospace' data-macro-payload data-validate='macro-payload' spellcheck='false'>" + escapeHtml(payload) + "</textarea></label>" +
-            "</div>" +
-            renderMacroComposer() +
-            "</div>" +
             "</div>";
     }
 
@@ -7865,8 +7875,11 @@ function getClientScript() {
             ["up", "Key up"],
             ["delay", "Delay"]
         ];
-        return "<div class='macro-step-sidecar' data-macro-composer>" +
-            "<h3>Step Builder</h3>" +
+        return "<div class='card macro-composer-card' data-macro-composer>" +
+            "<div class='macro-builder-head macro-composer-header'>" +
+            "<div><h3>Step Builder</h3>" +
+            "<div class='muted macro-sidecar-state-spacer' aria-hidden='true'>idle</div></div>" +
+            "</div>" +
             "<div class='macro-composer-grid'>" +
             "<label><span>Step type</span><select id='macroStepType' name='macroStepType'>" + optionsWithLabels(typeOptions, "tap") + "</select></label>" +
             "<div class='macro-step-fields'>" +
@@ -7875,7 +7888,7 @@ function getClientScript() {
             renderKeyPickerInput("macroStepKey", "Macro key", "", "Shift", "single", "", "data-macro-step-field='down up' hidden") +
             "<label data-macro-step-field='delay' hidden><span>Delay ms</span><input id='macroStepDelay' data-validate='positive-int' inputmode='numeric' value='250'></label>" +
             "</div>" +
-            "<div class='layout-combo-actions'>" +
+            "<div class='macro-composer-actions'>" +
             "<button type='button' data-action='insertMacroStep' class='primary'>Insert step</button>" +
             "<button type='button' data-action='clearMacroPayload'>Clear</button>" +
             "</div>" +
@@ -7890,13 +7903,18 @@ function getClientScript() {
     function renderMacroRecorderBody(slot) {
         const recordedPayload = recordedMacroPayload();
         const eventCount = macroRecordedEvents.filter((event) => event.kind === "key").length;
+        const state = macroRecording
+            ? "<span class='macro-recorder-dot' aria-hidden='true'></span> recording" + (macroRecorderNotice ? " - " + escapeHtml(macroRecorderNotice) : "")
+            : escapeHtml(macroRecorderNotice || "idle");
         const modeOptions = [
             ["compact", "Compact taps/chords"],
             ["exact", "Exact down/up"]
         ];
+        const delayFieldClass = "macro-recorder-delay-fields" + (macroRecordDelays ? "" : " inactive");
+        const delayFieldAttrs = macroRecordDelays ? " data-validate='positive-int'" : " tabindex='-1'";
         return "<div class='macro-builder-head macro-recorder-header'>" +
-            "<div><h3>Live Recorder</h3>" +
-            "<div class='muted macro-recorder-state'>" + (macroRecording ? "<span class='macro-recorder-dot' aria-hidden='true'></span> recording" : "idle") + "</div></div>" +
+            "<div><h3>Record Macro</h3>" +
+            "<div class='muted macro-recorder-state'>" + state + "</div></div>" +
             "<div class='macro-stat-row macro-recorder-stats'>" +
             renderMacroChip("events", String(eventCount)) +
             renderMacroChip("generated chars", String(recordedPayload.length)) +
@@ -7904,46 +7922,20 @@ function getClientScript() {
             "</div>" +
             "</div>" +
             "<div class='macro-recorder-controls'>" +
+            "<div class='macro-recorder-primary-row'>" +
             "<label><span>Record mode</span><select id='macroRecorderMode' name='macroRecorderMode'>" + optionsWithLabels(modeOptions, macroRecorderMode) + "</select></label>" +
             "<label class='macro-recorder-toggle'><span class='macro-recorder-toggle-label'>Record delays</span><input id='macroRecordDelays' name='macroRecordDelays' type='checkbox' " + (macroRecordDelays ? "checked" : "") + "><span class='macro-recorder-toggle-track' aria-hidden='true'></span></label>" +
-            "<label><span>Delay threshold ms</span><input id='macroRecorderDelayThreshold' name='macroRecorderDelayThreshold' data-validate='positive-int' inputmode='numeric' value='" + escapeAttr(macroRecorderDelayThreshold) + "'></label>" +
-            "<label><span>Delay round ms</span><input id='macroRecorderDelayRound' name='macroRecorderDelayRound' data-validate='positive-int' inputmode='numeric' value='" + escapeAttr(macroRecorderDelayRound) + "'></label>" +
+            "</div>" +
+            "<div class='" + delayFieldClass + "' aria-disabled='" + (macroRecordDelays ? "false" : "true") + "'>" +
+            "<label><span>Delay threshold ms</span><input id='macroRecorderDelayThreshold' name='macroRecorderDelayThreshold'" + delayFieldAttrs + " inputmode='numeric' value='" + escapeAttr(macroRecorderDelayThreshold) + "'></label>" +
+            "<label><span>Delay round ms</span><input id='macroRecorderDelayRound' name='macroRecorderDelayRound'" + delayFieldAttrs + " inputmode='numeric' value='" + escapeAttr(macroRecorderDelayRound) + "'></label>" +
+            "</div>" +
+            "</div>" +
             "<div class='macro-recorder-actions'>" +
+            "<button type='button' data-action='clearMacroRecording'>Clear take</button>" +
             (macroRecording
                 ? "<button type='button' data-action='stopMacroRecording' class='primary wide'>Stop</button>"
                 : "<button type='button' data-action='startMacroRecording' class='primary wide'>Record</button>") +
-            "<button type='button' data-action='clearMacroRecording'>Clear take</button>" +
-            "</div>" +
-            "</div>" +
-            "<div class='macro-recorder-status'>" +
-            (macroRecorderNotice ? "<p class='muted'>" + escapeHtml(macroRecorderNotice) + "</p>" : "") +
-            renderMacroRecorderTimeline() +
-            "</div>";
-    }
-
-    function renderMacroRecorderTimeline() {
-        const events = macroRecordedEvents.slice(-28);
-        if (!events.length) {
-            return "<p class='muted'>No recorded events.</p>";
-        }
-        const omitted = macroRecordedEvents.length - events.length;
-        return (omitted > 0 ? "<p class='muted'>" + omitted + " earlier events hidden.</p>" : "") +
-            "<div class='macro-recorder-timeline'>" +
-            events.map(renderMacroRecorderEvent).join("") +
-            "</div>";
-    }
-
-    function renderMacroRecorderEvent(event) {
-        if (event.kind === "delay") {
-            return "<div class='macro-recorder-event delay'>" +
-                "<div class='macro-recorder-kind'>Delay</div>" +
-                "<div class='macro-recorder-detail'>" + escapeHtml(String(event.value || 0)) + " ms</div>" +
-                "</div>";
-        }
-        const kind = event.phase === "down" ? "Down" : "Up";
-        return "<div class='macro-recorder-event'>" +
-            "<div class='macro-recorder-kind'>" + escapeHtml(kind) + "</div>" +
-            "<div class='macro-recorder-detail'>" + escapeHtml(displayKeyExpression(event.keycode || "")) + " <code class='muted'>" + escapeHtml(event.keycode || "") + "</code></div>" +
             "</div>";
     }
 
