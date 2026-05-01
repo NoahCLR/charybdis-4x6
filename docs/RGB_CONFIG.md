@@ -649,6 +649,23 @@ holds.
 
 Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the active keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
+## Verification
+
+RGB authoring changes affect generated profile docs, profile validation, and
+the RGB render tests. For `rgb_config.c` changes, use:
+
+```sh
+python3 tools/profile_introspect.py --write
+python3 tools/profile_introspect.py --check
+sh tests/host/run_profile_introspection_checks.sh
+sh tests/host/run_rgb_validation_tests.sh
+sh tests/host/run_rgb_layer_render_tests.sh
+sh tests/host/run_real_profile_validation_tests.sh
+```
+
+Before handing back firmware-behavior changes, also run the full host suite and
+firmware compile from the repo root.
+
 ## What This File Does Not Do
 
 [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) does not decide:

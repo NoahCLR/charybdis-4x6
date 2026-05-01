@@ -599,6 +599,7 @@ async function buildModel(root) {
         rgb: safe("rgb", {}, () => parseRgbConfig(rgbText, configMacros)),
         qmkKeycodes: qmkKeycodeCatalog.entries,
         qmkKeyLabels: qmkKeycodeCatalog.labels,
+        qmkKeycodeAliases: qmkKeycodeCatalog.aliases,
         qmkKeycodeSource: qmkKeycodeCatalog.source,
         diagnostics,
     };
@@ -634,6 +635,7 @@ async function loadQmkKeycodeCatalog(root) {
         source: `${path.join(keycodeDir, "*.hjson")} + ${path.join(keycodeDir, "extras", "keycodes_us_*.hjson")}`,
         entries,
         labels: qmkKeyLabelsFromEntries(entries),
+        aliases: qmkKeyAliasesFromEntries(entries),
     };
 }
 
@@ -750,6 +752,24 @@ function qmkKeyLabelsFromEntries(entries) {
     return labels;
 }
 
+function qmkKeyAliasesFromEntries(entries) {
+    const aliases = {};
+    for (const entry of entries) {
+        const value = entry.value || entry.key;
+        if (!value) {
+            continue;
+        }
+        for (const alias of [entry.value, entry.key].concat(entry.aliases || [])) {
+            if (alias && !aliases[alias]) {
+                aliases[alias] = value;
+            }
+        }
+    }
+    aliases._______ = "_______";
+    aliases.XXXXXXX = "XXXXXXX";
+    return aliases;
+}
+
 function buildQmkKeycodeSearch(entry, value) {
     const terms = uniqueStrings([value, entry.key, entry.label, QMK_KEY_LABELS[value], QMK_KEY_LABELS[entry.key], displayKeyExpression(value)]
         .concat(entry.aliases || [])
@@ -797,7 +817,37 @@ function fallbackQmkKeycodeCatalog() {
         source: "built-in fallback",
         entries,
         labels: {...QMK_KEY_LABELS},
+        aliases: qmkKeyAliasesFromEntries(entries),
     };
+}
+
+function canonicalKeyExpression(value, aliases = {}) {
+    const normalized = normalizeExpr(value || "");
+    if (!normalized) {
+        return "";
+    }
+    if (aliases[normalized]) {
+        return aliases[normalized];
+    }
+
+    const open = normalized.indexOf("(");
+    if (open <= 0 || !normalized.endsWith(")")) {
+        return normalized;
+    }
+
+    let close;
+    try {
+        close = findMatching(normalized, open, "(", ")");
+    } catch {
+        return normalized;
+    }
+    if (close !== normalized.length - 1) {
+        return normalized;
+    }
+
+    const helper = normalized.slice(0, open);
+    const args = splitTopLevel(normalized.slice(open + 1, -1)).map((arg) => canonicalKeyExpression(arg, aliases));
+    return `${helper}(${args.join(", ")})`;
 }
 
 function compareQmkKeycodes(left, right) {
@@ -1486,7 +1536,8 @@ async function saveKeyBehavior(root, behavior) {
     const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
     const text = await fs.readFile(filePath, "utf8");
     const initializer = findInitializerBody(text, /key_behaviors\s*\[\]\s*=/);
-    const existing = findKeyBehaviorEntry(initializer.body, normalizedKeycode);
+    const qmkKeycodeCatalog = await loadQmkKeycodeCatalog(root).catch(() => fallbackQmkKeycodeCatalog());
+    const existing = findKeyBehaviorEntry(initializer.body, normalizedKeycode, qmkKeycodeCatalog.aliases || {});
 
     if (existing) {
         await writeText(filePath, replaceRange(text, initializer.bodyStart + existing.start, initializer.bodyStart + existing.end, row));
@@ -1496,7 +1547,8 @@ async function saveKeyBehavior(root, behavior) {
     await writeText(filePath, replaceRange(text, initializer.bodyEnd, initializer.bodyEnd, `\n${row}\n`));
 }
 
-function findKeyBehaviorEntry(body, keycode) {
+function findKeyBehaviorEntry(body, keycode, keyAliases = {}) {
+    const canonicalKeycode = canonicalKeyExpression(keycode, keyAliases);
     for (const entry of splitTopLevelWithRanges(body)) {
         const text = body.slice(entry.start, entry.end).trim();
         const inner = trimOuterInitializer(text);
@@ -1504,7 +1556,7 @@ function findKeyBehaviorEntry(body, keycode) {
             continue;
         }
         const fields = parseDesignatedFields(inner);
-        if (normalizeExpr(fields[".keycode"] || "") === keycode) {
+        if (canonicalKeyExpression(fields[".keycode"] || "", keyAliases) === canonicalKeycode) {
             return entry;
         }
     }
@@ -3548,6 +3600,7 @@ function getClientScript() {
         "reachable via": "The visible key or behavior action that can reach this pointing mode."
     };
     const qmkKeyLabels = ${JSON.stringify(QMK_KEY_LABELS)};
+    const qmkKeyAliases = ${JSON.stringify(qmkKeyAliasesFromEntries(fallbackQmkKeycodeCatalog().entries))};
     const qmkKeycodeSectionGroups = ${JSON.stringify(QMK_KEYCODE_SECTION_GROUPS)};
     const keyPickerKeyboardSvgLayout = ${JSON.stringify(KEY_PICKER_KEYBOARD_SVG_LAYOUT)};
     const modWrapperLabels = ${JSON.stringify(MOD_WRAPPER_LABELS)};
@@ -3816,6 +3869,7 @@ function getClientScript() {
         if (event.data.type === "model") {
             model = event.data.model;
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
+            Object.assign(qmkKeyAliases, model.qmkKeycodeAliases || {});
             notice = event.data.notice || "";
             layoutNotice = "";
             if (!activeLayer && model.layers.length) {
@@ -4276,6 +4330,8 @@ function getClientScript() {
         if (!normalized) return "";
         const alias = userKeyAliases[normalized] || userKeyAliases[normalized.toLowerCase()];
         if (alias) return alias;
+        const qmkAlias = qmkKeyAliases[normalized];
+        if (qmkAlias) return qmkAlias;
         if (qmkKeyLabels[normalized]) return normalized;
         const chord = canonicalLayoutChordExpression(normalized);
         if (chord) return chord;
@@ -5964,7 +6020,7 @@ function getClientScript() {
     }
 
     function comboBadgesForKey(keycode) {
-        return layerCombos(currentLayer()).filter((combo) => combo.inputs.includes(keycode)).map((combo) => combo.badge);
+        return layerCombos(currentLayer()).filter((combo) => combo.inputs.some((input) => keyExpressionsEquivalent(input, keycode))).map((combo) => combo.badge);
     }
 
     function renderComboBadges(badges, visual) {
@@ -5984,7 +6040,64 @@ function getClientScript() {
     }
 
     function behaviorForKey(keycode) {
-        return model.keyBehaviors.find((behavior) => behavior.keycode === keycode);
+        const canonical = canonicalKeyExpression(keycode);
+        return model.keyBehaviors.find((behavior) => canonicalKeyExpression(behavior.keycode) === canonical);
+    }
+
+    function keyExpressionsEquivalent(left, right) {
+        return canonicalKeyExpression(left) === canonicalKeyExpression(right);
+    }
+
+    function canonicalKeyExpression(value) {
+        const normalized = normalizeDisplayExpression(value);
+        if (!normalized) return "";
+        if (qmkKeyAliases[normalized]) return qmkKeyAliases[normalized];
+
+        const open = normalized.indexOf("(");
+        if (open <= 0 || !normalized.endsWith(")")) return normalized;
+        const close = matchingLayoutParenIndex(normalized, open);
+        if (close !== normalized.length - 1) return normalized;
+
+        const helper = normalized.slice(0, open);
+        const args = splitLayoutArguments(normalized.slice(open + 1, -1)).map(canonicalKeyExpression);
+        return helper + "(" + args.join(", ") + ")";
+    }
+
+    function splitLayoutArguments(text) {
+        const items = [];
+        let start = 0;
+        let depthParen = 0;
+        let depthBrace = 0;
+        let depthBracket = 0;
+        let quote = "";
+        let escaped = false;
+
+        for (let index = 0; index < text.length; index += 1) {
+            const char = text[index];
+            if (quote) {
+                if (escaped) escaped = false;
+                else if (char === "\\\\") escaped = true;
+                else if (char === quote) quote = "";
+                continue;
+            }
+            if (char === '"' || char === "'") {
+                quote = char;
+                continue;
+            }
+            if (char === "(") depthParen += 1;
+            else if (char === ")") depthParen -= 1;
+            else if (char === "{") depthBrace += 1;
+            else if (char === "}") depthBrace -= 1;
+            else if (char === "[") depthBracket += 1;
+            else if (char === "]") depthBracket -= 1;
+            else if (char === "," && depthParen === 0 && depthBrace === 0 && depthBracket === 0) {
+                items.push(text.slice(start, index).trim());
+                start = index + 1;
+            }
+        }
+
+        items.push(text.slice(start).trim());
+        return items.filter(Boolean);
     }
 
     function layoutComboSelectedPositions(layer) {
@@ -5997,13 +6110,14 @@ function getClientScript() {
         const seen = new Set();
         const rows = [];
         for (const position of layer.positions) {
-            if (seen.has(position.keycode)) continue;
+            const canonical = canonicalKeyExpression(position.keycode);
+            if (seen.has(canonical)) continue;
             const behavior = behaviorForKey(position.keycode);
             if (!behavior) continue;
-            seen.add(position.keycode);
+            seen.add(canonical);
             rows.push({
                 behavior,
-                positions: layer.positions.filter((candidate) => candidate.keycode === position.keycode)
+                positions: layer.positions.filter((candidate) => keyExpressionsEquivalent(candidate.keycode, position.keycode))
             });
         }
         return rows;
@@ -6033,10 +6147,10 @@ function getClientScript() {
     }
 
     function layerCombos(layer) {
-        const keycodes = new Set(layer.positions.map((position) => position.keycode));
+        const keycodes = new Set(layer.positions.map((position) => canonicalKeyExpression(position.keycode)));
         const rows = [];
         for (const combo of model.combos) {
-            if (combo.inputs.every((input) => keycodes.has(input))) {
+            if (combo.inputs.every((input) => keycodes.has(canonicalKeyExpression(input)))) {
                 rows.push({ ...combo, badge: "C" + (rows.length + 1) });
             }
         }

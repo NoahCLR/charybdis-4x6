@@ -12,6 +12,7 @@ The source trace for this pack covers:
 - every package under `users/noah/lib/`
 - the authored profile files under
   `keyboards/bastardkb/charybdis/4x6/keymaps/noah/`
+- the repo-local profile tooling under `tools/`
 - host test runners under `tests/host/`
 
 ## Mental Model
@@ -86,8 +87,8 @@ flowchart TD
 - [runtime-flow.md](./runtime-flow.md) traces user-visible runtime flows and
   marks authoritative state, planned effects, projected state, and compatibility
   adapters.
-- [source-map.md](./source-map.md) maps source packages to responsibilities,
-  mutation ownership, side effects, tests, and existing docs.
+- [source-map.md](./source-map.md) maps source packages and profile tooling to
+  responsibilities, mutation ownership, side effects, tests, and existing docs.
 - [change-guide.md](./change-guide.md) tells future maintainers and agents where
   to make common changes and which checks to run.
 

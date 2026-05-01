@@ -350,6 +350,9 @@ If the new mode is meant to be used, not just prototyped, also update:
 - [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) if the mode introduces a new shared interaction pattern
 - [KEYMAP.md](./KEYMAP.md) if the current profile gives that mode concrete taps,
   gestures, or placement worth documenting
+- [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md), generated through
+  `python3 tools/profile_introspect.py --write`, when the mode is reachable
+  from the current authored profile or has authored RGB config
 
 ## When You Need Extra Work
 
@@ -527,6 +530,9 @@ For normal pd-mode work in this repo, the usual verification set is:
 
 If you changed authored keymap or RGB data as part of exposing the mode, also run:
 
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_profile_introspection_checks.sh`
 - `sh tests/host/run_real_profile_validation_tests.sh`
 
 If you changed runtime wiring, source lists, or header boundaries while adding

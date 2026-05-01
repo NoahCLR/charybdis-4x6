@@ -130,6 +130,8 @@ After syncing from VIA, check these things:
 Then build:
 
 ```sh
+python3 tools/profile_introspect.py --write
+python3 tools/profile_introspect.py --check
 sh tests/host/run_real_profile_validation_tests.sh
 sh tests/host/run_all_host_tests.sh
 qmk compile -kb bastardkb/charybdis/4x6 -km noah

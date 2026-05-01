@@ -430,6 +430,27 @@ So the current profile uses both:
 Some other shortcuts in the current profile, especially several VIA slots, are
 simply personal shortcuts rather than standard macOS conventions.
 
+## Verification
+
+When this profile changes, regenerate the visual report and run the authored
+profile checks before the full host suite:
+
+```sh
+python3 tools/profile_introspect.py --write
+python3 tools/profile_introspect.py --check
+sh tests/host/run_profile_introspection_checks.sh
+sh tests/host/run_key_behavior_lookup_tests.sh
+sh tests/host/run_key_behavior_validation_tests.sh
+sh tests/host/run_keymap_validation_tests.sh
+sh tests/host/run_real_profile_validation_tests.sh
+```
+
+If the change touches layer-lock behavior on the real profile, also run:
+
+```sh
+sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh
+```
+
 ## Related Files
 
 - [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md): generated visual snapshot of the

@@ -361,8 +361,10 @@ No filled hardcoded macro slots.
 | File | Authored Surface |
 | --- | --- |
 | [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |
-| [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
+| [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
+| [users/noah/config.h](../users/noah/config.h) | shared userspace config consumed by this profile report, including split, RGB Matrix, pointing, dragscroll, and VIA layer-count defaults |
 | [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, layer LED groups, pd-mode colors and LED groups, auto-mouse fade config, combo feedback color and LED groups, key-behavior feedback colors and LED groups |
+| [pd_mode_manifest.h](../users/noah/lib/pointing/defs/pd_mode_manifest.h) | shared pointing-mode identities, generated mode/lock keycodes, traits, DPI hooks, and lifecycle hook selections |
 
 ### Shared Keycode Surfaces
 

@@ -46,6 +46,8 @@ keycode picker and stages the picked keycode for that key, dragging one key onto
 another stages a slot swap, and copy/paste stages the selected keycode on
 another selected slot. The selected-key sidecar stages keycode edits into that
 same pending layout set.
+Local Studio edits support normal undo/redo shortcuts before they are written:
+`Cmd+Z` / `Ctrl+Z` undo, and `Cmd+Shift+Z`, `Ctrl+Shift+Z`, or `Ctrl+Y` redo.
 Single layout slots only accept one keycode expression: comma-separated
 clipboard text such as `KC_L, KC_K, KC_J` is rejected, while nested QMK
 expressions such as `LT(LAYER_NAV, KC_F)` remain valid. Layout-slot rejection
@@ -120,6 +122,8 @@ current workspace instead of an Extension Development Host.
 
 After reload, use the `$(keyboard) Profile Studio` status bar item or run
 `Charybdis: Open Profile Studio` from the command palette.
+The command is also contributed to the editor title when `keymap.c` or
+`rgb_config.c` is open.
 
 You can also install it from a shell:
 
@@ -143,12 +147,24 @@ Then run `Charybdis: Open Profile Studio` from the command palette.
 
 ## Verification After Edits
 
+To check the extension after Studio documentation or extension changes:
+
+```sh
+cd tools/charybdis-profile-studio
+npm run check
+```
+
+That runs a JavaScript syntax check and verifies that the Studio parser can
+associate every current `key_behaviors[]` row with the active layout or combo
+output through canonical key-expression matching.
+
 Profile Studio edits authored firmware inputs. After using it to change source,
 run the same checks as direct edits to the touched surfaces:
 
 ```sh
 python3 tools/profile_introspect.py --write
 python3 tools/profile_introspect.py --check
+sh tests/host/run_profile_introspection_checks.sh
 sh tests/host/run_real_profile_validation_tests.sh
 sh tests/host/run_all_host_tests.sh
 qmk compile -kb bastardkb/charybdis/4x6 -km noah

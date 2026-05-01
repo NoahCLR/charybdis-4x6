@@ -1756,8 +1756,10 @@ def render_reference_section(profile: dict[str, object]) -> str:
     feedback_locality = rgb["key_behavior_feedback_locality"]
     tap_commit_mode = rgb["key_behavior_feedback_tap_commit_mode"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
-    config_link = markdown_path_link(CONFIG_FILE, "config.h")
+    config_link = markdown_path_link(CONFIG_FILE, "keymap config.h")
+    user_config_link = markdown_path_link(USER_CONFIG_FILE, "users/noah/config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
+    pd_manifest_link = markdown_path_link(PD_MODE_MANIFEST_FILE, "pd_mode_manifest.h")
     rgb_authored_surfaces = ["layer colors", "layer LED groups"]
     if features["rgb_pd_mode_feedback_enabled"]:
         rgb_authored_surfaces.append("pd-mode colors and LED groups")
@@ -1776,7 +1778,9 @@ def render_reference_section(profile: dict[str, object]) -> str:
         "| --- | --- |",
         f"| {keymap_link} | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |",
         f"| {config_link} | layer enum, timing, RGB defaults, and keymap-facing feature config |",
+        f"| {user_config_link} | shared userspace config consumed by this profile report, including split, RGB Matrix, pointing, dragscroll, and VIA layer-count defaults |",
         f"| {rgb_link} | {', '.join(rgb_authored_surfaces)} |",
+        f"| {pd_manifest_link} | shared pointing-mode identities, generated mode/lock keycodes, traits, DPI hooks, and lifecycle hook selections |",
         "",
         "### Shared Keycode Surfaces",
         "",

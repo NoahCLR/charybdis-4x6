@@ -22,6 +22,8 @@ those two files.
 - double-click a layout key to stage a picker-selected keycode, stage drag/drop
   slot swaps, and stage copy/paste or sidecar keycode edits before applying
   them to `keymap.c`
+- undo or redo local Studio edits before writing them, using normal
+  `Cmd+Z` / `Ctrl+Z`, `Cmd+Shift+Z`, `Ctrl+Shift+Z`, or `Ctrl+Y` shortcuts
 - reject comma-separated clipboard lists and random text when editing one layout
   slot, while still allowing nested QMK expressions such as `LT(layer, key)`;
   layout-slot rejection messages appear at the bottom of the Layout board
@@ -96,6 +98,8 @@ current workspace instead of an Extension Development Host.
 
 After reload, use the `$(keyboard) Profile Studio` status bar item or run
 `Charybdis: Open Profile Studio` from the command palette.
+The command is also available from the editor title when `keymap.c` or
+`rgb_config.c` is open.
 
 You can also install it from a shell:
 
@@ -119,11 +123,16 @@ Then run `Charybdis: Open Profile Studio` from the command palette.
 
 ## Checks
 
-This extension has no runtime npm dependencies. To syntax-check it:
+This extension has no runtime npm dependencies. To check it:
 
 ```sh
 npm run check
 ```
 
+That command runs a JavaScript syntax check and verifies that the parser can
+associate current `key_behaviors[]` rows with layout keys and combo outputs
+using canonical key-expression matching.
+
 After using the studio to change authored firmware inputs, run the same repo
-checks you would run for direct source edits.
+checks you would run for direct source edits. The full checklist lives in
+[`docs/tooling/PROFILE_STUDIO.md`](../../docs/tooling/PROFILE_STUDIO.md).

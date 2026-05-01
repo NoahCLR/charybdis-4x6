@@ -306,6 +306,30 @@ Useful commands:
 - `python3 tools/via_to_qmk_layout.py --write`
 - `python3 tools/profile_introspect.py --write`
 - `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_profile_introspection_checks.sh`
+
+## Verification
+
+For current-profile changes, treat the generated overview as part of the source
+change. Regenerate it after editing `keymap.c`, the keymap `config.h`,
+`users/noah/config.h`, `rgb_config.c`, or the shared pd-mode manifest:
+
+```sh
+python3 tools/profile_introspect.py --write
+python3 tools/profile_introspect.py --check
+```
+
+For firmware behavior changes, use the focused host runner for the subsystem
+while iterating, then run the full host suite before compiling:
+
+```sh
+sh tests/host/run_all_host_tests.sh
+qmk compile -kb bastardkb/charybdis/4x6 -km noah
+```
+
+Docs-only changes can skip host tests and firmware compile when they do not
+touch runtime source, authored profile inputs, build wiring, or generated
+firmware inputs. Still run `git diff --check` before handing them back.
 
 ## Docs Map
 
@@ -334,6 +358,14 @@ Use the docs based on what you need:
   hooks without dropping shared behavior
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): how to add a new
   pointing-device mode safely
+- [`docs/architecture/README.md`](./docs/architecture/README.md): maintainer
+  entry point for runtime ownership, source boundaries, and change routing
+- [`docs/architecture/change-guide.md`](./docs/architecture/change-guide.md):
+  where to edit common runtime surfaces and which checks cover them
+- [`docs/architecture/source-map.md`](./docs/architecture/source-map.md): source
+  package inventory, generated-doc/tooling surfaces, and host runner map
+- [`docs/architecture/runtime-flow.md`](./docs/architecture/runtime-flow.md):
+  hook, key-runtime, pointing, RGB, split, macro, and VIA flow diagrams
 
 ## AI Workflow Note
 

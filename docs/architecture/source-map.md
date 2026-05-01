@@ -1,8 +1,8 @@
 # Source Map
 
-This map groups every source package under `users/noah/lib/` by responsibility.
-It is meant to help a maintainer or agent route changes without turning this
-document into a per-function encyclopedia.
+This map groups the userspace runtime packages and repo-local profile tooling
+by responsibility. It is meant to help a maintainer or agent route changes
+without turning this document into a per-function encyclopedia.
 
 ## Top-Level Runtime Surfaces
 
@@ -16,6 +16,17 @@ for this pack because they define how QMK reaches the runtime.
 | `users/noah/hooks.c` | Weak QMK hook defaults that call `noah_*` helpers | Hook integration | `run_hook_chaining_tests.sh`, feature gate compile |
 | `users/noah/noah_runtime.h` | Public userspace entry surface for keymap hook chaining | Boundary contract | hook chaining and compile gates |
 | `users/noah/config.h` | Shared userspace config defaults and feature knobs | Configuration input | profile introspection and real-profile validation when relevant |
+
+## Tooling And Generated Docs
+
+These files are not runtime packages, but they are part of the maintained
+source trace because they rewrite or verify human-facing firmware docs.
+
+| Surface | Responsibility | Writes | Primary checks |
+| --- | --- | --- | --- |
+| `tools/profile_introspect.py` | Parse authored profile inputs and render the generated visual profile report | `docs/KEYMAP-OVERVIEW.md`, SVG assets under `docs/media/profile-introspection/` | `python3 tools/profile_introspect.py --check`, `run_profile_introspection_checks.sh`, full host suite |
+| `tools/via_to_qmk_layout.py` | Convert VIA export JSON back into source-owned keymap blocks | optionally `keymap.c` `VIA_MACROS(MACRO)` and `keymaps[][]` | script preview/write review, real-profile validation, full host suite when source changes |
+| `tools/charybdis-profile-studio/` | VS Code webview editor for current authored profile surfaces | `keymap.c` and `rgb_config.c` only | `npm run check`, profile introspection, authored-profile and RGB checks after source edits |
 
 ## Source-To-Doc Matrix
 
@@ -180,7 +191,7 @@ Use the runner that matches the behavior touched while iterating, then use
 | Area | Runners |
 | --- | --- |
 | Action lifecycle and dispatch | `run_action_dispatch_tests.sh`, `run_action_lifecycle_tests.sh`, `run_delayed_action_tests.sh`, `run_owned_keycode_tests.sh` |
-| Key behavior and authored profile validation | `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
+| Key behavior, authored profile validation, and generated overview | `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
 | Key runtime | `run_key_runtime_release_matrix_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh`, `run_pd_mode_key_runtime_integration_tests.sh`, `run_key_runtime_layer_lock_integration_tests.sh`, `run_key_runtime_scenario_tests.sh`, `run_key_runtime_integration_harness_tests.sh` |
 | Hooks, ownership, and boundaries | `run_hook_chaining_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh`, `run_feature_gate_compile_tests.sh` |
 | Macro, VIA, and QMK compatibility | `run_macro_dispatch_tests.sh`, `run_macro_payload_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh` |

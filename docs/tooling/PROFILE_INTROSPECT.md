@@ -12,6 +12,7 @@ The introspector reads these authored inputs directly:
 
 - [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - [`config.h`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+- [`users/noah/config.h`](../../users/noah/config.h)
 - [`rgb_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - [`pd_mode_manifest.h`](../../users/noah/lib/pointing/defs/pd_mode_manifest.h)
 
@@ -79,6 +80,12 @@ Verify the generated outputs are current:
 python3 tools/profile_introspect.py --check
 ```
 
+Run the same verification through the host-suite wrapper:
+
+```sh
+sh tests/host/run_profile_introspection_checks.sh
+```
+
 ## When To Run It
 
 Run the introspector whenever you change authored inputs that affect the
@@ -88,6 +95,8 @@ documented profile view, especially:
   [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - layer enum or keymap-facing timing/config surfaces in
   [`config.h`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+- shared userspace config surfaces that appear in the generated config table in
+  [`users/noah/config.h`](../../users/noah/config.h)
 - layer colors, LED groups, mode colors, or feedback colors in
   [`rgb_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - shared pd-mode definitions in
