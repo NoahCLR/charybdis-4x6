@@ -6032,8 +6032,10 @@ function getClientScript() {
         const y = visual.y + keyboardGeometry.keyHeight - badgeHeight - 5;
         return badges.map((badge, index) => {
             const width = widths[index];
+            const textX = x + width / 2;
+            const textY = y + badgeHeight / 2;
             const out = "<rect x='" + x + "' y='" + y + "' width='" + width + "' height='" + badgeHeight + "' rx='5' fill='#141714' fill-opacity='0.94' stroke='#f5f5f3'></rect>" +
-                "<text x='" + (x + width / 2) + "' y='" + (y + 8.4) + "' fill='#f5f5f3' font-size='7.5' text-anchor='middle' font-weight='700'>" + escapeHtml(badge) + "</text>";
+                "<text x='" + textX + "' y='" + textY + "' fill='#f5f5f3' font-size='7.5' text-anchor='middle' dominant-baseline='central' font-weight='700'>" + escapeHtml(badge) + "</text>";
             x += width + 3;
             return out;
         }).join("");
