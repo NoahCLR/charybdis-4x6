@@ -146,4 +146,11 @@
 
 #ifdef VIA_ENABLE
 #    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
+#    define DYNAMIC_KEYMAP_MACRO_COUNT 64
+// RP2040 wear-leveling exposes half of this backing region as logical EEPROM.
+// 32768 bytes backing gives this keymap roughly 15 KB of VIA macro payload
+// space after VIA's dynamic layer storage.
+#    if defined(MCU_RP)
+#        define WEAR_LEVELING_BACKING_SIZE 32768
+#    endif
 #endif

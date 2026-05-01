@@ -50,7 +50,7 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
 #endif
 #ifndef DYNAMIC_KEYMAP_MACRO_COUNT
-#    define DYNAMIC_KEYMAP_MACRO_COUNT 16u
+#    define DYNAMIC_KEYMAP_MACRO_COUNT 64u
 #endif
 
 #ifndef MOD_BIT

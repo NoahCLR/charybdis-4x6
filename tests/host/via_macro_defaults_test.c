@@ -14,7 +14,7 @@ void via_init_kb(void);
 bool via_command_kb(uint8_t *data, uint8_t length);
 
 enum {
-    TEST_MACRO_BUFFER_CAPACITY = 64,
+    TEST_MACRO_BUFFER_CAPACITY = 128,
 };
 
 static uint8_t macro_buffer[TEST_MACRO_BUFFER_CAPACITY];

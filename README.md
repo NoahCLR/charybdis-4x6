@@ -189,7 +189,8 @@ the raw combo arrays to understand where they live.
 
 This userspace intentionally keeps two macro surfaces:
 
-- `VIA_MACRO_n` for VIA/QMK dynamic macro slots
+- `VIA_MACRO_n` for 64 VIA/QMK dynamic macro slots backed by the enlarged
+  RP2040 VIA macro buffer
 - `MACRO_n` for hardcoded repo-owned custom macros
 
 That split keeps editable VIA defaults and source-owned firmware behavior

@@ -382,6 +382,7 @@ key." It is more opinionated than that.
 The current profile uses VIA defaults more than hardcoded firmware macros:
 
 - all `MACRO_0` through `MACRO_15` hardcoded slots are currently empty
+- VIA exposes `VIA_MACRO_0` through `VIA_MACRO_63`
 - `VIA_MACRO_0` through `VIA_MACRO_9` currently have defaults
 
 But a lot of the current shortcut surface is not implemented through macro
@@ -420,6 +421,10 @@ while others are just my current app-launcher or utility bindings:
 | `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | current shortcut for [Maccy](https://maccy.app/), my clipboard manager |
 | `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | current shortcut for VS Code preview |
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | current shortcut for the VS Code command palette |
+
+`VIA_MACRO_10` through `VIA_MACRO_63` are empty by default. The RP2040
+wear-leveling region is enlarged for this profile, leaving roughly 15 KB of
+shared VIA macro buffer space after dynamic layer storage.
 
 So the current profile uses both:
 

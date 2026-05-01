@@ -24,15 +24,15 @@
 _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update the keymap config.h");
 #endif
 
-#define VIA_MACRO_SLOT_COUNT 16
+#define VIA_MACRO_SLOT_COUNT 64
 #ifdef VIA_ENABLE
 _Static_assert(VIA_MACRO_SLOT_COUNT == DYNAMIC_KEYMAP_MACRO_COUNT, "VIA_MACRO_SLOT_COUNT and DYNAMIC_KEYMAP_MACRO_COUNT are out of sync");
 #endif
 
-// VIA_MACRO_0–15 are authored aliases for VIA's dynamic macro slots.
+// VIA_MACRO_0–63 are authored aliases for VIA's dynamic macro slots.
 // The QMK-specific base keycodes stay here so keymap.c can stay declarative.
 enum {
-    VIA_MACRO_0  = QK_MACRO_0,
+    VIA_MACRO_0  = QK_MACRO_0 + 0,
     VIA_MACRO_1  = QK_MACRO_0 + 1,
     VIA_MACRO_2  = QK_MACRO_0 + 2,
     VIA_MACRO_3  = QK_MACRO_0 + 3,
@@ -48,7 +48,57 @@ enum {
     VIA_MACRO_13 = QK_MACRO_0 + 13,
     VIA_MACRO_14 = QK_MACRO_0 + 14,
     VIA_MACRO_15 = QK_MACRO_0 + 15,
+    VIA_MACRO_16 = QK_MACRO_0 + 16,
+    VIA_MACRO_17 = QK_MACRO_0 + 17,
+    VIA_MACRO_18 = QK_MACRO_0 + 18,
+    VIA_MACRO_19 = QK_MACRO_0 + 19,
+    VIA_MACRO_20 = QK_MACRO_0 + 20,
+    VIA_MACRO_21 = QK_MACRO_0 + 21,
+    VIA_MACRO_22 = QK_MACRO_0 + 22,
+    VIA_MACRO_23 = QK_MACRO_0 + 23,
+    VIA_MACRO_24 = QK_MACRO_0 + 24,
+    VIA_MACRO_25 = QK_MACRO_0 + 25,
+    VIA_MACRO_26 = QK_MACRO_0 + 26,
+    VIA_MACRO_27 = QK_MACRO_0 + 27,
+    VIA_MACRO_28 = QK_MACRO_0 + 28,
+    VIA_MACRO_29 = QK_MACRO_0 + 29,
+    VIA_MACRO_30 = QK_MACRO_0 + 30,
+    VIA_MACRO_31 = QK_MACRO_0 + 31,
+    VIA_MACRO_32 = QK_MACRO_0 + 32,
+    VIA_MACRO_33 = QK_MACRO_0 + 33,
+    VIA_MACRO_34 = QK_MACRO_0 + 34,
+    VIA_MACRO_35 = QK_MACRO_0 + 35,
+    VIA_MACRO_36 = QK_MACRO_0 + 36,
+    VIA_MACRO_37 = QK_MACRO_0 + 37,
+    VIA_MACRO_38 = QK_MACRO_0 + 38,
+    VIA_MACRO_39 = QK_MACRO_0 + 39,
+    VIA_MACRO_40 = QK_MACRO_0 + 40,
+    VIA_MACRO_41 = QK_MACRO_0 + 41,
+    VIA_MACRO_42 = QK_MACRO_0 + 42,
+    VIA_MACRO_43 = QK_MACRO_0 + 43,
+    VIA_MACRO_44 = QK_MACRO_0 + 44,
+    VIA_MACRO_45 = QK_MACRO_0 + 45,
+    VIA_MACRO_46 = QK_MACRO_0 + 46,
+    VIA_MACRO_47 = QK_MACRO_0 + 47,
+    VIA_MACRO_48 = QK_MACRO_0 + 48,
+    VIA_MACRO_49 = QK_MACRO_0 + 49,
+    VIA_MACRO_50 = QK_MACRO_0 + 50,
+    VIA_MACRO_51 = QK_MACRO_0 + 51,
+    VIA_MACRO_52 = QK_MACRO_0 + 52,
+    VIA_MACRO_53 = QK_MACRO_0 + 53,
+    VIA_MACRO_54 = QK_MACRO_0 + 54,
+    VIA_MACRO_55 = QK_MACRO_0 + 55,
+    VIA_MACRO_56 = QK_MACRO_0 + 56,
+    VIA_MACRO_57 = QK_MACRO_0 + 57,
+    VIA_MACRO_58 = QK_MACRO_0 + 58,
+    VIA_MACRO_59 = QK_MACRO_0 + 59,
+    VIA_MACRO_60 = QK_MACRO_0 + 60,
+    VIA_MACRO_61 = QK_MACRO_0 + 61,
+    VIA_MACRO_62 = QK_MACRO_0 + 62,
+    VIA_MACRO_63 = QK_MACRO_0 + 63,
 };
+
+_Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA macro slot count exceeds QMK macro keycode range");
 
 // ─── Custom Keycodes ────────────────────────────────────────────────────────
 //
@@ -57,7 +107,7 @@ enum {
 //
 // MACRO_0–15 are hardcoded custom macro slots used by key_behaviors[] and
 // dispatched by macro_dispatch().
-// VIA macros use the VIA_MACRO_0–15 aliases.
+// VIA macros use the VIA_MACRO_0–63 aliases.
 // Plain pointing-device mode keycodes work as default momentary holds.
 // Add a key_behaviors[] row when you want those keys to grow explicit tap,
 // hold, longer-hold, or multi-tap behavior on top of that default.

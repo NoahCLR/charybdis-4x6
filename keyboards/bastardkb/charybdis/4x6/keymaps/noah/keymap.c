@@ -41,8 +41,8 @@ enum keymap_custom_keycodes {
 };
 
 // ─── VIA Macros ─────────────────────────────────────────────────────────────
-// VIA_MACRO_0–15 are the authored aliases for VIA's dynamic macro slots.
-// All 16 slots are listed here so the slot limit stays visible in keymap.c.
+// VIA_MACRO_0–63 are the authored aliases for VIA's dynamic macro slots.
+// All 64 slots are listed here so the slot limit stays visible in keymap.c.
 // Use an empty string for an unused slot. The converter script can update this
 // block from a VIA export, and the firmware seeds VIA's dynamic macro EEPROM
 // defaults from it on init/reset.
@@ -77,7 +77,55 @@ enum keymap_custom_keycodes {
     MACRO(VIA_MACRO_12, "")                              \
     MACRO(VIA_MACRO_13, "")                              \
     MACRO(VIA_MACRO_14, "")                              \
-    MACRO(VIA_MACRO_15, "")
+    MACRO(VIA_MACRO_15, "")                              \
+    MACRO(VIA_MACRO_16, "")                              \
+    MACRO(VIA_MACRO_17, "")                              \
+    MACRO(VIA_MACRO_18, "")                              \
+    MACRO(VIA_MACRO_19, "")                              \
+    MACRO(VIA_MACRO_20, "")                              \
+    MACRO(VIA_MACRO_21, "")                              \
+    MACRO(VIA_MACRO_22, "")                              \
+    MACRO(VIA_MACRO_23, "")                              \
+    MACRO(VIA_MACRO_24, "")                              \
+    MACRO(VIA_MACRO_25, "")                              \
+    MACRO(VIA_MACRO_26, "")                              \
+    MACRO(VIA_MACRO_27, "")                              \
+    MACRO(VIA_MACRO_28, "")                              \
+    MACRO(VIA_MACRO_29, "")                              \
+    MACRO(VIA_MACRO_30, "")                              \
+    MACRO(VIA_MACRO_31, "")                              \
+    MACRO(VIA_MACRO_32, "")                              \
+    MACRO(VIA_MACRO_33, "")                              \
+    MACRO(VIA_MACRO_34, "")                              \
+    MACRO(VIA_MACRO_35, "")                              \
+    MACRO(VIA_MACRO_36, "")                              \
+    MACRO(VIA_MACRO_37, "")                              \
+    MACRO(VIA_MACRO_38, "")                              \
+    MACRO(VIA_MACRO_39, "")                              \
+    MACRO(VIA_MACRO_40, "")                              \
+    MACRO(VIA_MACRO_41, "")                              \
+    MACRO(VIA_MACRO_42, "")                              \
+    MACRO(VIA_MACRO_43, "")                              \
+    MACRO(VIA_MACRO_44, "")                              \
+    MACRO(VIA_MACRO_45, "")                              \
+    MACRO(VIA_MACRO_46, "")                              \
+    MACRO(VIA_MACRO_47, "")                              \
+    MACRO(VIA_MACRO_48, "")                              \
+    MACRO(VIA_MACRO_49, "")                              \
+    MACRO(VIA_MACRO_50, "")                              \
+    MACRO(VIA_MACRO_51, "")                              \
+    MACRO(VIA_MACRO_52, "")                              \
+    MACRO(VIA_MACRO_53, "")                              \
+    MACRO(VIA_MACRO_54, "")                              \
+    MACRO(VIA_MACRO_55, "")                              \
+    MACRO(VIA_MACRO_56, "")                              \
+    MACRO(VIA_MACRO_57, "")                              \
+    MACRO(VIA_MACRO_58, "")                              \
+    MACRO(VIA_MACRO_59, "")                              \
+    MACRO(VIA_MACRO_60, "")                              \
+    MACRO(VIA_MACRO_61, "")                              \
+    MACRO(VIA_MACRO_62, "")                              \
+    MACRO(VIA_MACRO_63, "")
 
 // ─── Hardcoded Macros ───────────────────────────────────────────────────────
 // HARDCODED_MACROS(MACRO) is the authored table for hardcoded custom macro

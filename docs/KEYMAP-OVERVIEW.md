@@ -399,7 +399,7 @@ No active authored layer LED group rows are configured.
 | `key_behavior_count` | `33` |
 | `key_behavior_step_count` | `44` |
 | `combo_count` | `4` |
-| `via_macro_count` | `16` |
+| `via_macro_count` | `64` |
 | `via_macro_non_empty_count` | `10` |
 | `hardcoded_macro_count` | `16` |
 | `hardcoded_macro_non_empty_count` | `0` |
@@ -449,6 +449,8 @@ These values come from the keymap config and the shared userspace config. When t
 | `NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS` | `55` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR` | `4` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_LAYER_COUNT` | `LAYER_COUNT` | [users/noah/config.h](../users/noah/config.h) |
+| `DYNAMIC_KEYMAP_MACRO_COUNT` | `64` | [users/noah/config.h](../users/noah/config.h) |
+| `WEAR_LEVELING_BACKING_SIZE` | `32768` | [users/noah/config.h](../users/noah/config.h) |
 | `TAPPING_TERM` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `COMBO_TERM` | `50` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `KEY_BEHAVIOR_MAX_TAP_COUNT` | `5` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |

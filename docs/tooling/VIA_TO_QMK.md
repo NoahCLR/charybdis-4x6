@@ -14,6 +14,10 @@ The script reads a VIA export JSON and renders:
 - `VIA_MACROS(MACRO)`
 - `keymaps[][]`
 
+This profile expects VIA exports with 64 macro entries. VIA backups made from
+older 16-slot firmware need their `macros[]` array padded before this script
+will accept them.
+
 In `--write` mode, it can rewrite either or both of those sections in
 [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 
@@ -93,7 +97,7 @@ The script translates VIA tokens into the symbols used by this repo.
 
 Important cases:
 
-- `MACRO(n)` in VIA export becomes `VIA_MACRO_n`
+- `MACRO(n)` in VIA export becomes `VIA_MACRO_n` for slots `0` through `63`
 - upstream Charybdis keyboard keycodes `CUSTOM(0)` through `CUSTOM(7)` map to
   the keyboard-defined symbols such as `DPI_MOD`, `DPI_RMOD`, `S_D_MOD`, and
   `S_D_RMOD`

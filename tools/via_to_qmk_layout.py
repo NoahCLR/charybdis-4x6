@@ -47,7 +47,10 @@ LAYER_NAMES = [
     "LAYER_POINTER",
 ]
 
-MACRO_COUNT = 16
+# VIA dynamic MACRO(n) slots are separate from this repo's hardcoded
+# custom MACRO_n keycodes.
+VIA_MACRO_COUNT = 64
+HARDCODED_MACRO_COUNT = 16
 VIA_CUSTOM_BASE = 64
 
 # Upstream Charybdis keyboard keycodes, defined by the keyboard in the
@@ -108,7 +111,7 @@ PD_MODE_KEYCODES = load_pd_mode_keycodes()
 #   - layer lock actions (one derived action per layer)
 #
 # Keymap-local custom keycodes begin immediately after this range.
-NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT = MACRO_COUNT + (2 * len(PD_MODE_KEYCODES)) + len(LAYER_NAMES)
+NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT = HARDCODED_MACRO_COUNT + (2 * len(PD_MODE_KEYCODES)) + len(LAYER_NAMES)
 
 # Token normalization: VIA JSON format → QMK keymap style.
 # VIA exports keycodes in its own format (CUSTOM(), MACRO(), S(), etc.)
@@ -174,7 +177,7 @@ for i, keycode in enumerate(CHARYBDIS_UPSTREAM_KEYCODES):
 
 # VIA exports its dynamic macro keycodes as MACRO(n).
 # Those map only to the repo-local VIA_MACRO_n aliases.
-for i in range(MACRO_COUNT):
+for i in range(VIA_MACRO_COUNT):
     REPLACEMENTS[f"MACRO({i})"] = f"VIA_MACRO_{i}"
 
 # VIA assigns CUSTOM(64 + n) where n is the keycode's position in
@@ -183,7 +186,7 @@ for i in range(MACRO_COUNT):
 # MACRO_0–15 are the first custom keycodes → CUSTOM(64)–CUSTOM(79).
 # These remain the hardcoded custom macros handled by macro_dispatch(), and
 # must stay distinct from VIA's dynamic MACRO(n) keycodes in the JSON export.
-for i in range(MACRO_COUNT):
+for i in range(HARDCODED_MACRO_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = f"MACRO_{i}"
 
 # The pointing-device mode keys follow at positions 16–21 → CUSTOM(80)–CUSTOM(85).
@@ -191,7 +194,7 @@ for i in range(MACRO_COUNT):
 # noah_keymap_ids.h, but this script does not map them because VIA exports the
 # direct layout keycodes that appear on layers, not the derived lock actions
 # authored through key_behaviors[].
-for i, keycode in enumerate(PD_MODE_KEYCODES, start=MACRO_COUNT):
+for i, keycode in enumerate(PD_MODE_KEYCODES, start=HARDCODED_MACRO_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
 
 
@@ -464,8 +467,8 @@ def load_all_exported_via_macros(via_data: dict, via_json_path: Path) -> dict[in
         return {}
     if not isinstance(macros, list):
         die(f"{via_json_path} is missing a top-level 'macros' list")
-    if len(macros) != MACRO_COUNT:
-        die(f"expected {MACRO_COUNT} macro slots in {via_json_path}, found {len(macros)}")
+    if len(macros) != VIA_MACRO_COUNT:
+        die(f"expected {VIA_MACRO_COUNT} macro slots in {via_json_path}, found {len(macros)}")
 
     slot_map: dict[int, dict] = {}
 
@@ -638,7 +641,7 @@ def load_via_macros_from_keymap_text(text: str) -> dict[int, dict]:
             die(f"could not parse VIA_MACROS line: {raw_line.strip()}")
         slot_text = active_match.group(1) or active_match.group(2)
         slot = int(slot_text)
-        if slot < 0 or slot >= MACRO_COUNT:
+        if slot < 0 or slot >= VIA_MACRO_COUNT:
             die(f"invalid VIA macro slot index: {slot}")
         if slot in slot_map:
             die(f"duplicate VIA macro slot {slot} in keymap.c")
@@ -662,7 +665,7 @@ def load_via_macros_from_keymap_text(text: str) -> dict[int, dict]:
 
 def render_via_macros_block(slot_map: dict[int, dict]) -> str:
     entries = []
-    for slot in range(MACRO_COUNT):
+    for slot in range(VIA_MACRO_COUNT):
         entry = slot_map.get(slot, {"via": {"value": ""}})
         value = json.dumps(entry["via"]["value"])
         entries.append(f"    MACRO(VIA_MACRO_{slot}, {value})")
