@@ -35,6 +35,7 @@ const QMK_KEYCODE_DATA_RELATIVE_PATH = path.join("data", "constants", "keycodes"
 const MACRO_PAYLOAD_KEYCODES_RELATIVE_PATH = path.join("users", "noah", "lib", "macro", "macro_payload_keycodes.c");
 
 const LAYOUT_SLOT_COUNT = 56;
+const KEY_BEHAVIOR_TERM_MAX_MS = 65535;
 const TAP_COUNT_NAMES = ["Single Tap Branch", "Double Tap Branch", "Triple Tap Branch", "Quadruple Tap Branch", "Quintuple Tap Branch"];
 const HOLD_HELPERS = [
     "",
@@ -1620,10 +1621,10 @@ function normalizeOptionalTerm(value, label) {
     if (!term) {
         return "";
     }
-    if (/^\d+$/.test(term) || /^KEY_BEHAVIOR_TERM\(\d+\)$/.test(term)) {
+    if (keyBehaviorTermInRange(term, false)) {
         return term;
     }
-    throw new Error(`${label} must be a positive integer when provided.`);
+    throw new Error(`${label} must be a positive integer from 1 to ${KEY_BEHAVIOR_TERM_MAX_MS} ms, optionally wrapped as KEY_BEHAVIOR_TERM(ms), when provided.`);
 }
 
 function normalizeOptionalBranchConfirmTerm(value) {
@@ -1631,13 +1632,34 @@ function normalizeOptionalBranchConfirmTerm(value) {
     if (!term) {
         return "";
     }
-    if (/^\d+$/.test(term)) {
+    if (/^\d+$/.test(term) && keyBehaviorTermNumberInRange(term, true)) {
         return `KEY_BEHAVIOR_TERM(${term})`;
     }
-    if (/^KEY_BEHAVIOR_TERM\(\d+\)$/.test(term)) {
+    if (keyBehaviorTermInRange(term, true)) {
         return term;
     }
-    throw new Error("branch_confirm_term must be a positive integer or KEY_BEHAVIOR_TERM(ms) when provided.");
+    throw new Error(`branch_confirm_term must be an integer from 0 to ${KEY_BEHAVIOR_TERM_MAX_MS} ms, optionally wrapped as KEY_BEHAVIOR_TERM(ms), when provided.`);
+}
+
+function keyBehaviorTermInRange(value, allowZero) {
+    const normalized = normalizeExpr(value || "");
+    if (/^\d+$/.test(normalized)) {
+        return keyBehaviorTermNumberInRange(normalized, allowZero);
+    }
+    const wrapped = normalized.match(/^KEY_BEHAVIOR_TERM\((\d+)\)$/);
+    return Boolean(wrapped && keyBehaviorTermNumberInRange(wrapped[1], allowZero));
+}
+
+function keyBehaviorTermNumberInRange(value, allowZero) {
+    if (!/^\d+$/.test(value || "")) {
+        return false;
+    }
+    const normalized = String(value).replace(/^0+(?=\d)/, "");
+    if (!allowZero && normalized === "0") {
+        return false;
+    }
+    const max = String(KEY_BEHAVIOR_TERM_MAX_MS);
+    return normalized.length < max.length || (normalized.length === max.length && normalized <= max);
 }
 
 function buildBehaviorStep(tapCount, tap, hold, longHold) {
@@ -2735,20 +2757,66 @@ function getStudioHtml() {
         details.panel > .panel-body {
             margin-top: 12px;
         }
+        section.panel > h2 {
+            margin: 0 0 12px;
+        }
+        .panel > .panel-body {
+            min-width: 0;
+        }
+        .status-popup {
+            position: fixed;
+            top: 66px;
+            right: 18px;
+            z-index: 5;
+            display: grid;
+            gap: 8px;
+            width: min(520px, calc(100vw - 36px));
+            max-height: min(360px, calc(100vh - 92px));
+            overflow: auto;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #20262a;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36);
+            padding: 12px;
+        }
+        .status-popup-title {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 650;
+        }
+        .status-popup-body {
+            display: grid;
+            gap: 6px;
+        }
         .stack { display: grid; gap: 14px; }
         .view-tabs {
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 14px;
+            flex-wrap: nowrap;
+            gap: 0;
+            align-items: flex-end;
+            margin: 12px 0 14px;
+            border-bottom: 1px solid var(--line);
+            overflow-x: auto;
         }
         .view-tab {
-            min-width: 104px;
+            min-width: 112px;
+            border: 1px solid transparent;
+            border-bottom: 0;
+            border-radius: 7px 7px 0 0;
+            background: transparent;
+            color: var(--muted);
+            padding: 8px 16px 9px;
             text-align: center;
+            white-space: nowrap;
+            position: relative;
         }
         .view-tab.active {
             border-color: var(--accent);
-            background: #1f5d52;
+            border-bottom-color: var(--panel);
+            background: var(--panel);
+            color: var(--text);
+            box-shadow: inset 0 2px 0 var(--accent);
+            margin-bottom: -1px;
         }
         .tabs {
             display: flex;
@@ -3852,6 +3920,7 @@ function getClientScript() {
     let currentLocalSnapshot = "";
     let restoringLocalSnapshot = false;
     const localHistoryLimit = 100;
+    const keyBehaviorTermMaxMs = ${KEY_BEHAVIOR_TERM_MAX_MS};
     const tapCountNames = ${JSON.stringify(TAP_COUNT_NAMES)};
     const views = [
         ["layout", "Layout"],
@@ -3933,10 +4002,10 @@ function getClientScript() {
         "layout index": "The physical LAYOUT() slot index for the selected key. It is fixed by the keyboard geometry.",
         key: "User-facing key label or expression to write into the selected LAYOUT() slot, for example A, Enter, Space, _______, or Shift+Esc.",
         source: "The raw C expression currently stored in keymap.c.",
-        tap_hold_term: "Optional milliseconds before a tap can become a hold for this behavior row.",
-        longer_hold_term: "Optional milliseconds before a hold can become a long hold.",
-        multi_tap_term: "Optional milliseconds used to detect repeated taps.",
-        branch_confirm_term: "Optional milliseconds before a tap branch is committed. Plain numbers are written as KEY_BEHAVIOR_TERM(ms).",
+        tap_hold_term: "Optional milliseconds before a tap can become a hold for this behavior row. Valid range: 1-65535 ms.",
+        longer_hold_term: "Optional milliseconds before a hold can become a long hold. Valid range: 1-65535 ms.",
+        multi_tap_term: "Optional milliseconds used to detect repeated taps. Valid range: 1-65535 ms.",
+        branch_confirm_term: "Optional milliseconds before a tap branch is committed. Valid range: 0-65535 ms. Plain numbers are written as KEY_BEHAVIOR_TERM(ms).",
         table: "Choose which rgb_config.c LED group table will receive the new row.",
         owner: "The owner value for the target LED group table. Combo feedback groups do not need one.",
         "pointing mode": "The pointing mode whose color or LED group is being edited.",
@@ -5510,9 +5579,9 @@ function getClientScript() {
         } else if (rule === "hsv-value") {
             error = validateHsvValue(value);
         } else if (rule === "optional-term") {
-            error = validateOptionalTerm(value, "Enter a positive integer or KEY_BEHAVIOR_TERM(ms).");
+            error = validateOptionalTerm(value, "Enter 1-" + keyBehaviorTermMaxMs + " ms, or KEY_BEHAVIOR_TERM(ms).", false);
         } else if (rule === "optional-branch-term") {
-            error = validateOptionalTerm(value, "Enter a positive integer, or KEY_BEHAVIOR_TERM(ms).");
+            error = validateOptionalTerm(value, "Enter 0-" + keyBehaviorTermMaxMs + " ms, or KEY_BEHAVIOR_TERM(ms).", true);
         } else if (rule === "positive-int") {
             error = validatePositiveInteger(value, "Enter a positive integer.");
         } else if (rule === "macro-payload") {
@@ -5538,12 +5607,20 @@ function getClientScript() {
         return "Enter an integer from 0 to 255, or a safe constant like RGB_MATRIX_MAXIMUM_BRIGHTNESS.";
     }
 
-    function validateOptionalTerm(value, message) {
+    function validateOptionalTerm(value, message, allowZero) {
         if (!value) return "";
-        if (/^\\d+$/.test(value)) return validatePositiveInteger(value, message);
+        if (/^\\d+$/.test(value)) return validateMsTermNumber(value, message, allowZero);
         const wrapped = value.match(/^KEY_BEHAVIOR_TERM\\((\\d+)\\)$/);
-        if (wrapped) return validatePositiveInteger(wrapped[1], message);
+        if (wrapped) return validateMsTermNumber(wrapped[1], message, allowZero);
         return message;
+    }
+
+    function validateMsTermNumber(value, message, allowZero) {
+        if (!/^\\d+$/.test(value || "")) return message;
+        const normalized = String(value).replace(/^0+(?=\\d)/, "");
+        if (!allowZero && normalized === "0") return message;
+        const max = String(keyBehaviorTermMaxMs);
+        return normalized.length < max.length || (normalized.length === max.length && normalized <= max) ? "" : message;
     }
 
     function validatePositiveInteger(value, message) {
@@ -5765,16 +5842,23 @@ function getClientScript() {
         for (const diagnostic of model.diagnostics || []) {
             items.push("<div class='warning'>" + escapeHtml(diagnostic) + "</div>");
         }
-        return items.length ? panel("Status", items.join(""), true) : "";
+        return items.length ? "<div class='status-popup' role='status' aria-live='polite'>" +
+            "<div class='status-popup-title'>Status</div>" +
+            "<div class='status-popup-body'>" + items.join("") + "</div>" +
+            "</div>" : "";
     }
 
     function panel(title, body, open = true) {
         return "<details class='panel' " + (open ? "open" : "") + "><summary><h2>" + escapeHtml(title) + "</h2></summary><div class='panel-body'>" + body + "</div></details>";
     }
 
+    function staticPanel(title, body) {
+        return "<section class='panel'><h2>" + escapeHtml(title) + "</h2><div class='panel-body'>" + body + "</div></section>";
+    }
+
     function renderViewTabs() {
-        return "<div class='view-tabs'>" + views.map(([id, label]) =>
-            "<button class='view-tab " + (activeView === id ? "active" : "") + "' data-action='selectView' data-view='" + escapeAttr(id) + "'>" + escapeHtml(label) + "</button>"
+        return "<div class='view-tabs' role='tablist' aria-label='Profile Studio views'>" + views.map(([id, label]) =>
+            "<button type='button' role='tab' aria-selected='" + (activeView === id ? "true" : "false") + "' class='view-tab " + (activeView === id ? "active" : "") + "' data-action='selectView' data-view='" + escapeAttr(id) + "'>" + escapeHtml(label) + "</button>"
         ).join("") + "</div>";
     }
 
@@ -7798,16 +7882,15 @@ function getClientScript() {
         normalizeMacroBuilderState();
         const slots = model.viaMacros || [];
         if (!slots.length) {
-            return panel("Macro Builder", "<p class='muted'>No VIA_MACROS(MACRO) rows were parsed.</p>", true);
+            return staticPanel("Macro Builder", "<p class='muted'>No VIA_MACROS(MACRO) rows were parsed.</p>");
         }
         const active = activeMacroSlot() || slots[0];
-        return panel("Macro Builder",
+        return staticPanel("Macro Builder",
             renderMacroUsageSummary(slots) +
             "<div class='macro-builder-grid'>" +
             renderMacroSlotBrowser(slots) +
             renderMacroWorkbench(active) +
-            "</div>",
-            true
+            "</div>"
         );
     }
 
