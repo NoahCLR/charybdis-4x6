@@ -2428,7 +2428,7 @@ function displayKeyExpression(expression) {
 
     let match = normalized.match(/^LT\(LAYER_([^,]+),\s*(.+)\)$/);
     if (match) {
-        return `${displayKeyExpression(match[2])} / hold ${titleCase(match[1])}`;
+        return `${displayKeyExpression(match[2])}, hold ${titleCase(match[1])}`;
     }
 
     match = normalized.match(/^MO\(LAYER_([^)]+)\)$/);
@@ -8721,7 +8721,7 @@ function getClientScript() {
         if (qmkKeyLabels[normalized]) return qmkKeyLabels[normalized];
 
         let match = normalized.match(/^LT\\(LAYER_([^,]+),\\s*(.+)\\)$/);
-        if (match) return displayKeyExpression(match[2]) + " / hold " + titleCase(match[1]);
+        if (match) return displayKeyExpression(match[2]) + ", hold " + titleCase(match[1]);
 
         match = normalized.match(/^MO\\(LAYER_([^)]+)\\)$/);
         if (match) return "Hold " + titleCase(match[1]);
