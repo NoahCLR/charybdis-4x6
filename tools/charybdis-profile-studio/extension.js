@@ -2852,6 +2852,11 @@ function getStudioHtml() {
             margin: 12px 0 14px;
             border-bottom: 1px solid var(--line);
             overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+        }
+        .view-tabs::-webkit-scrollbar {
+            display: none;
         }
         .view-tab {
             min-width: 112px;
