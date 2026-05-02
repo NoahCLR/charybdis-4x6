@@ -3213,6 +3213,9 @@ function getStudioHtml() {
             gap: 8px;
             align-items: end;
         }
+        .layer-flow-row label {
+            grid-template-rows: auto auto;
+        }
         .layer-flow-actions {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(120px, auto) minmax(180px, auto);
