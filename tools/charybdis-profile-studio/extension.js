@@ -3170,6 +3170,18 @@ function getStudioHtml() {
             box-shadow: inset 0 2px 0 var(--accent);
             margin-bottom: -1px;
         }
+        .view-tab.dirty {
+            border-color: var(--warn);
+            color: #fff4d2;
+            box-shadow: inset 0 2px 0 var(--warn);
+        }
+        .view-tab.dirty:not(.active) {
+            background: rgba(122, 91, 31, 0.42);
+        }
+        .view-tab.active.dirty {
+            border-bottom-color: var(--panel);
+            box-shadow: inset 0 2px 0 var(--warn);
+        }
         .tabs {
             display: flex;
             flex-wrap: wrap;
@@ -3192,6 +3204,17 @@ function getStudioHtml() {
             border-color: var(--danger);
             color: #ffd8d8;
             text-decoration: line-through;
+        }
+        .layer-tab.dirty {
+            border-color: var(--warn);
+            color: #fff4d2;
+            box-shadow: inset 0 2px 0 var(--warn);
+        }
+        .layer-tab.dirty:not(.active) {
+            background: rgba(122, 91, 31, 0.42);
+        }
+        .layer-tab.active.dirty {
+            background: #6d501e;
         }
         .layer-tab-action {
             min-width: 34px;
@@ -6379,6 +6402,7 @@ function getClientScript() {
             section.dataset.dirtyBaseline = dirtySnapshot(section);
             updateDirtySection(section);
         }
+        refreshDirtyTabIndicators();
     }
 
     function updateDirtyFromEvent(event) {
@@ -6386,6 +6410,7 @@ function getClientScript() {
         if (section) {
             updateDirtySection(section);
         }
+        refreshDirtyTabIndicators();
     }
 
     function updateDirtySection(section) {
@@ -6409,6 +6434,19 @@ function getClientScript() {
         button.classList.toggle("dirty", dirty);
         button.setAttribute("aria-label", dirty ? "Unsaved changes: " + cleanLabel : cleanLabel);
         button.disabled = !dirty;
+    }
+
+    function refreshDirtyTabIndicators() {
+        for (const tab of document.querySelectorAll("[data-view-tab]")) {
+            const dirty = viewTabDirty(tab.dataset.view || "");
+            tab.classList.toggle("dirty", dirty);
+            tab.setAttribute("aria-label", dirty ? tab.textContent.trim() + " has unsaved changes" : tab.textContent.trim());
+        }
+        for (const tab of document.querySelectorAll("[data-layer-tab]")) {
+            const dirty = layerTabDirty(tab.dataset.layer || "");
+            tab.classList.toggle("dirty", dirty);
+            tab.setAttribute("aria-label", dirty ? tab.textContent.trim() + " has unsaved changes" : tab.textContent.trim());
+        }
     }
 
     function dirtySnapshot(section) {
@@ -6835,8 +6873,36 @@ function getClientScript() {
 
     function renderViewTabs() {
         return "<div class='view-tabs' role='tablist' aria-label='Profile Studio views'>" + views.map(([id, label]) =>
-            "<button type='button' role='tab' aria-selected='" + (activeView === id ? "true" : "false") + "' class='view-tab " + (activeView === id ? "active" : "") + "' data-action='selectView' data-view='" + escapeAttr(id) + "'>" + escapeHtml(label) + "</button>"
+            "<button type='button' role='tab' aria-selected='" + (activeView === id ? "true" : "false") + "' class='" + viewTabClasses(id).join(" ") + "' data-action='selectView' data-view-tab data-view='" + escapeAttr(id) + "'>" + escapeHtml(label) + "</button>"
         ).join("") + "</div>";
+    }
+
+    function viewTabClasses(viewId) {
+        return ["view-tab", activeView === viewId ? "active" : "", viewTabDirty(viewId) ? "dirty" : ""].filter(Boolean);
+    }
+
+    function viewTabDirty(viewId) {
+        if (viewHasDirtyDomSection(viewId)) return true;
+        if (viewId === "layout") return layoutViewHasUnsavedChanges();
+        if (viewId === "macros") return macroViewHasUnsavedChanges();
+        if (viewId === "rgb") return rgbViewHasUnsavedChanges();
+        return false;
+    }
+
+    function viewHasDirtyDomSection(viewId) {
+        return activeView === viewId && Boolean(app.querySelector("[data-dirty-section].dirty"));
+    }
+
+    function layoutViewHasUnsavedChanges() {
+        return Boolean(hasPendingLayerChanges() || Object.keys(pendingLayoutEdits).some((layerName) => pendingLayoutChanges(layerName).length));
+    }
+
+    function macroViewHasUnsavedChanges() {
+        return Object.keys(macroDrafts || {}).some((keycode) => macroSlotDirty(keycode));
+    }
+
+    function rgbViewHasUnsavedChanges() {
+        return Boolean(rgbSelectedLeds.length || rgbBuilderColor);
     }
 
     function renderActiveView() {
@@ -6861,12 +6927,17 @@ function getClientScript() {
         const deleteDisabled = !activeLayer || activeLayer === "LAYER_BASE";
         return "<div class='tabs layer-tabs'>" + layers.map((layer) => {
             const pending = pendingLayerAdd(layer.name);
-            return "<button class='tab layer-tab " + (layer.name === activeLayer ? "active " : "") + (pending ? "pending-add" : "") + "' data-action='selectLayer' data-layer='" + escapeAttr(layer.name) + "'>" + escapeHtml(layer.name + (pending ? " *" : "")) + "</button>";
+            const classes = ["tab", "layer-tab", layer.name === activeLayer ? "active" : "", pending ? "pending-add" : "", layerTabDirty(layer.name) ? "dirty" : ""].filter(Boolean).join(" ");
+            return "<button class='" + classes + "' data-action='selectLayer' data-layer-tab data-layer='" + escapeAttr(layer.name) + "'>" + escapeHtml(layer.name + (pending ? " *" : "")) + "</button>";
         }).join("") + (showLayerFlow ?
             "<button type='button' class='layer-tab-action' data-action='showAddLayerDraft' aria-label='Add layer'>+</button>" +
             "<button type='button' class='layer-tab-action' data-action='deleteLayerDraft'" + (deleteDisabled ? " disabled" : "") + " aria-label='Delete active layer'>-</button>" : "") +
             "</div>" +
             (showLayerFlow ? renderLayerFlow() : "");
+    }
+
+    function layerTabDirty(layerName) {
+        return Boolean(pendingLayerAdd(layerName) || pendingLayerDeletes.includes(layerName) || pendingLayoutChanges(layerName).length);
     }
 
     function renderLayerFlow() {
