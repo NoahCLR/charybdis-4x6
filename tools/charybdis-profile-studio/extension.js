@@ -1509,24 +1509,27 @@ async function patchViaMacro(root, keycode, payload) {
 }
 
 async function appendCombo(root, output, inputs) {
+    const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
+    const text = await fs.readFile(filePath, "utf8");
+    const knownTokens = knownLayoutKeyTokens(text);
     output = normalizeUserKeyExpression(output || "");
     const inputList = splitTopLevel(String(inputs || ""))
         .map(normalizeUserKeyExpression)
         .filter(Boolean);
     assertSafeExpression(output, "combo output");
+    assertLayoutKeyExpression(output, "combo output", knownTokens);
     if (inputList.length < 2) {
         throw new Error("Combo inputs must include at least two keycodes.");
     }
     for (const input of inputList) {
         assertSafeExpression(input, "combo input");
+        assertLayoutKeyExpression(input, "combo input", knownTokens);
     }
     const duplicateInput = duplicateComboInput(inputList);
     if (duplicateInput) {
         throw new Error(`Combo inputs must be unique; ${duplicateInput} appears more than once.`);
     }
 
-    const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
-    const text = await fs.readFile(filePath, "utf8");
     const block = findMacroDefinitionBlock(text, "COMBOS");
     const lines = block.text.split(/\r?\n/);
     const insertLine = lines.findIndex((line, index) => index > 0 && line.includes("/* COMBO("));
@@ -4617,6 +4620,7 @@ function getClientScript() {
             const before = currentLocalSnapshot || serializeLocalState();
             captureLayoutComboBuilderInputs();
             layoutComboSelection = [];
+            layoutComboOutput = "";
             layoutComboInputs = "";
             render();
             commitLocalHistory(before);
@@ -4818,6 +4822,10 @@ function getClientScript() {
         if (event.target?.id === "layoutComboInputs") {
             layoutComboInputs = event.target.value;
             syncLayoutComboSelectionFromInputs();
+            refreshLayoutComboSelection(event.target.closest("[data-combo-builder]"));
+        }
+        if (event.target?.closest?.("[data-combo-builder]")) {
+            updateLayoutComboClearState(event.target.closest("[data-combo-builder]"));
         }
         if (event.target?.matches("[data-macro-payload]")) {
             captureMacroDraftFromControl(event.target);
@@ -4944,6 +4952,18 @@ function getClientScript() {
         if (inputs) layoutComboInputs = inputs.value;
     }
 
+    function updateLayoutComboClearState(builder) {
+        const button = builder?.querySelector?.("[data-layout-combo-clear]");
+        if (!button) return;
+        button.disabled = !layoutComboBuilderHasClearableValue(builder);
+    }
+
+    function layoutComboBuilderHasClearableValue(builder) {
+        const output = String(fieldValueFromMarker(builder || document, "[data-combo-output]") || "").trim();
+        const inputs = String(fieldValueFromMarker(builder || document, "[data-combo-inputs]") || "").trim();
+        return Boolean(output || inputs || layoutComboSelection.length);
+    }
+
     function syncLayoutComboInputsFromSelection() {
         const layer = currentLayer();
         if (!layer) {
@@ -4957,16 +4977,37 @@ function getClientScript() {
         const layer = currentLayer();
         if (!layer) return;
         const unusedPositions = layer.positions.slice();
-        layoutComboSelection = layoutComboInputs.split(",")
+        layoutComboSelection = splitLayoutArguments(layoutComboInputs)
             .map((part) => part.trim())
             .filter(Boolean)
             .map((keycode) => {
-                const index = unusedPositions.findIndex((position) => position.keycode === keycode);
+                const canonical = canonicalLayoutKeyExpression(keycode);
+                if (!canonical || layoutKeyExpressionError(canonical)) return undefined;
+                const index = unusedPositions.findIndex((position) => layoutKeyEquivalent(position.keycode, canonical));
                 if (index === -1) return undefined;
                 const [position] = unusedPositions.splice(index, 1);
                 return position.layoutIndex;
             })
             .filter((index) => Number.isInteger(index));
+    }
+
+    function refreshLayoutComboSelection(builder) {
+        refreshLayoutComboHighlights();
+        refreshLayoutComboSelectedList(builder);
+    }
+
+    function refreshLayoutComboHighlights() {
+        const selected = new Set(layoutComboSelection);
+        for (const key of document.querySelectorAll(".layout-board-svg .svg-key[data-index]")) {
+            key.classList.toggle("combo-input-selected", selected.has(Number(key.dataset.index)));
+        }
+    }
+
+    function refreshLayoutComboSelectedList(builder) {
+        const layer = currentLayer();
+        const list = builder?.querySelector?.("[data-layout-combo-selected-list]");
+        if (!layer || !list) return;
+        list.innerHTML = renderLayoutComboSelectedList(layer);
     }
 
     function currentLayoutPosition(layoutIndex = selectedKey) {
@@ -6106,24 +6147,30 @@ function getClientScript() {
         const selectedPositions = layoutComboSelectedPositions(layer);
         const inputValue = layoutComboInputs || selectedPositions.map((position) => position.keycode).join(", ");
         const inputPickingLabel = layoutComboPicking ? "Done picking inputs" : "Pick input keys on layout";
-        const selectedList = selectedPositions.length
-            ? selectedPositions.map((position) =>
-                "<button type='button' data-action='toggleLayoutComboKey' data-index='" + position.layoutIndex + "'><span>" + escapeHtml(position.display || position.keycode) + "</span><code>" + escapeHtml(position.keycode) + "</code></button>"
-            ).join("")
-            : "<span class='muted'>No layout input keys selected</span>";
+        const canClear = Boolean(layoutComboOutput || layoutComboInputs || selectedPositions.length);
         return "<div id='layoutComboBuilder' class='card selected-key-edit-card layout-combo-builder-card' data-dirty-section data-combo-builder>" +
             "<h3>Create combo</h3>" +
             "<div class='selected-key-edit-fields'>" +
             renderKeyPickerInput("layoutComboOutput", "Output", layoutComboOutput, "Tab", "single", "", "data-combo-output", "data-validate='layout-key'") +
             renderKeyPickerInput("layoutComboInputs", "Inputs", inputValue, "D, F", "list", "", "data-combo-inputs", "data-validate='combo-inputs'") +
-            "<div class='layout-combo-selected-list'>" + selectedList + "</div>" +
+            "<div class='layout-combo-selected-list' data-layout-combo-selected-list>" + renderLayoutComboSelectedList(layer) + "</div>" +
             "<div class='layout-combo-actions'>" +
             "<button type='button' class='combo-pick-toggle " + (layoutComboPicking ? "active" : "") + "' aria-pressed='" + (layoutComboPicking ? "true" : "false") + "' data-action='toggleLayoutComboPicking'>" + inputPickingLabel + "</button>" +
-            "<button type='button' data-action='clearLayoutComboSelection'>Clear</button>" +
+            "<button type='button' data-action='clearLayoutComboSelection' data-layout-combo-clear" + (canClear ? "" : " disabled") + ">Clear</button>" +
             "</div>" +
             "<button data-action='addLayoutCombo' data-dirty-button class='primary'>Append combo row</button>" +
             "</div>" +
             "</div>";
+    }
+
+    function renderLayoutComboSelectedList(layer) {
+        const selectedPositions = layoutComboSelectedPositions(layer);
+        if (!selectedPositions.length) {
+            return "<span class='muted'>No layout input keys selected</span>";
+        }
+        return selectedPositions.map((position) =>
+            "<button type='button' data-action='toggleLayoutComboKey' data-index='" + position.layoutIndex + "'><span>" + escapeHtml(position.display || position.keycode) + "</span><code>" + escapeHtml(position.keycode) + "</code></button>"
+        ).join("");
     }
 
     function renderSelectedBehaviorEditor(selected, behavior) {
