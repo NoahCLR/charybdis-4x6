@@ -6816,7 +6816,7 @@ function getClientScript() {
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
         const tooltipText = layoutComboPicking
             ? "Toggle combo input " + label + " (" + position.keycode + ")"
-            : "Click to edit layout index " + position.layoutIndex + ": " + label + " (" + position.keycode + "). Double-click to pick a keycode, drag onto another key to swap, or copy/paste selected keys.";
+            : layoutKeyTooltip(position, label);
         const action = layoutComboPicking ? "toggleLayoutComboKey" : "selectKey";
         return "<g class='svg-key " + (selected ? "selected" : "") + (comboSelected ? " combo-input-selected" : "") + (position.pending ? " pending" : "") + "' tabindex='0' role='button' data-action='" + action + "' data-index='" + position.layoutIndex + "' data-keycode='" + escapeAttr(position.keycode) + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
@@ -6824,6 +6824,37 @@ function getClientScript() {
             renderBehaviorDots(dots, visual, style.text) +
             renderComboBadges(badges, visual) +
             "</g>";
+    }
+
+    function layoutKeyTooltip(position, label) {
+        const base = "Click to edit layout index " + position.layoutIndex + ": " + label + " (" + position.keycode + "). Double-click to pick a keycode, drag onto another key to swap, or copy/paste selected keys.";
+        const macroPreview = macroPayloadTooltipForExpression(position.keycode);
+        return macroPreview ? base + "\\n\\n" + macroPreview : base;
+    }
+
+    function macroPayloadTooltipForExpression(expression) {
+        const parts = macroKeycodesInExpression(expression)
+            .map((keycode) => {
+                const slot = macroSlotForKeycode(keycode);
+                if (!slot) return "";
+                const payload = slot.kind === "via" ? macroPayloadForSlot(slot) : String(slot.payload || "");
+                const label = (slot.kind === "via" ? "VIA " : "Macro ") + macroSlotNumber(slot.keycode);
+                const state = payload ? payload.length + " chars" : "empty";
+                return label + " payload (" + state + "): " + truncateTooltipText(payload || "empty", 420);
+            })
+            .filter(Boolean);
+        return parts.join("\\n");
+    }
+
+    function macroKeycodesInExpression(expression) {
+        const seen = new Set();
+        const keys = [];
+        for (const match of String(expression || "").matchAll(/\\b(?:VIA_MACRO|MACRO)_\\d+\\b/g)) {
+            if (seen.has(match[0])) continue;
+            seen.add(match[0]);
+            keys.push(match[0]);
+        }
+        return keys;
     }
 
     function keyVisual(layoutIndex) {
