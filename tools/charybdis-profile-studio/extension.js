@@ -3761,13 +3761,13 @@ function getStudioHtml() {
             gap: 6px;
         }
         .key-picker-key {
-            flex: 0 0 calc(var(--key-units, 1) * 42px);
-            min-width: 46px;
+            flex: 0 0 auto;
+            width: max-content;
+            min-width: max(46px, calc(var(--key-units, 1) * 42px));
             min-height: 38px;
             padding: 6px 8px;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            overflow: visible;
             text-align: center;
         }
         .key-picker-keyboard {
@@ -3776,14 +3776,13 @@ function getStudioHtml() {
             min-width: 0;
         }
         .key-picker-grid:not(.key-picker-keyboard) .key-picker-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+            display: flex;
+            flex-wrap: wrap;
+            align-items: stretch;
             gap: 6px;
         }
         .key-picker-grid:not(.key-picker-keyboard) .key-picker-key {
-            flex: initial;
-            width: 100%;
-            min-width: 0;
+            flex: 0 0 auto;
             justify-content: center;
         }
         .key-picker-spacer {
