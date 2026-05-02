@@ -2806,6 +2806,7 @@ function getStudioHtml() {
             font-weight: 650;
         }
         .status-popup-dismiss {
+            position: relative;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -2814,8 +2815,22 @@ function getStudioHtml() {
             min-width: 28px;
             padding: 0;
             color: var(--muted);
-            font-size: 18px;
             line-height: 1;
+        }
+        .status-popup-dismiss::before,
+        .status-popup-dismiss::after {
+            content: "";
+            position: absolute;
+            width: 12px;
+            height: 2px;
+            border-radius: 999px;
+            background: currentColor;
+        }
+        .status-popup-dismiss::before {
+            transform: rotate(45deg);
+        }
+        .status-popup-dismiss::after {
+            transform: rotate(-45deg);
         }
         .status-popup-dismiss:hover {
             color: var(--text);
@@ -4809,6 +4824,12 @@ function getClientScript() {
             captureMacroDraftFromControl(event.target);
             refreshMacroPreview(event.target.closest("[data-macro-workbench]"));
         }
+        if (event.target?.closest?.("[data-macro-composer]")) {
+            validateControl(event.target);
+            updateMacroComposerInsertState(event.target.closest("[data-macro-workbench]") || event.target.closest("[data-macro-composer]"));
+            commitLocalHistory(before);
+            return;
+        }
         if (event.target?.closest?.("[data-macro-recorder]")) {
             captureMacroRecorderSettings();
             syncMacroRecordedPayloadDraft();
@@ -5652,6 +5673,10 @@ function getClientScript() {
             return true;
         }
         const value = String(control.value || "").trim();
+        if (macroStepEmptyFieldShouldStayNeutral(control, value)) {
+            clearFieldError(control);
+            return true;
+        }
         if (comboBuilderShouldStayNeutral(control)) {
             clearComboBuilderFieldErrors(control.closest("[data-combo-builder]"));
             return true;
@@ -5783,6 +5808,10 @@ function getClientScript() {
     function validateMacroPayload(value) {
         const parsed = parseMacroPayloadPreview(value || "");
         return parsed.error || "";
+    }
+
+    function macroStepEmptyFieldShouldStayNeutral(control, value) {
+        return !value && Boolean(control?.closest?.("[data-macro-composer]") && control.closest("[data-macro-step-field]"));
     }
 
     function setFieldError(control, message) {
@@ -5999,7 +6028,7 @@ function getClientScript() {
         return "<div class='status-popup' role='status' aria-live='polite'>" +
             "<div class='status-popup-header'>" +
             "<div class='status-popup-title'>Status</div>" +
-            "<button type='button' class='status-popup-dismiss' data-action='dismissStatus' aria-label='Dismiss status popup'>&times;</button>" +
+            "<button type='button' class='status-popup-dismiss' data-action='dismissStatus' aria-label='Dismiss status popup'></button>" +
             "</div>" +
             "<div class='status-popup-body'>" + items.join("") + "</div>" +
             "</div>";
@@ -8155,7 +8184,7 @@ function getClientScript() {
             "<label data-macro-step-field='delay' hidden><span>Delay ms</span><input id='macroStepDelay' data-validate='positive-int' inputmode='numeric' value='250'></label>" +
             "</div>" +
             "<div class='macro-composer-actions'>" +
-            "<button type='button' data-action='insertMacroStep' class='primary'>Insert step</button>" +
+            "<button type='button' data-action='insertMacroStep' class='primary' disabled>Insert step</button>" +
             "<button type='button' data-action='clearMacroPayload'>Clear</button>" +
             "</div>" +
             "</div>" +
@@ -8928,11 +8957,46 @@ function getClientScript() {
             field.hidden = !visible;
             field.style.display = visible ? "" : "none";
             for (const control of field.querySelectorAll("input, select, textarea")) {
-                if (visible) validateControl(control);
-                else clearFieldError(control);
+                if (!visible || macroStepEmptyFieldShouldStayNeutral(control, String(control.value || "").trim())) {
+                    clearFieldError(control);
+                } else {
+                    validateControl(control);
+                }
             }
         }
+        updateMacroComposerInsertState(root);
         scheduleMacroSlotBrowserHeightSync();
+    }
+
+    function updateMacroComposerInsertState(root = document) {
+        const composer = root.querySelector?.("[data-macro-composer]") || root.closest?.("[data-macro-composer]") || root;
+        const button = composer?.querySelector?.("[data-action='insertMacroStep']");
+        if (!button) return;
+        button.disabled = Boolean(macroStepInsertError(root));
+    }
+
+    function macroStepInsertError(root = document) {
+        const type = root.querySelector("#macroStepType")?.value || "tap";
+        if (type === "text") {
+            const text = root.querySelector("#macroStepText")?.value || "";
+            if (!text) return "Enter text to insert.";
+            return /[{}]/.test(text) ? "Text steps cannot include { or }." : "";
+        }
+        if (type === "delay") {
+            const delay = String(root.querySelector("#macroStepDelay")?.value || "").trim();
+            return validatePositiveInteger(delay, "Enter a positive delay in milliseconds.");
+        }
+        if (type === "tap") {
+            const keys = canonicalMacroKeySequence(root.querySelector("#macroStepKeys")?.value || "");
+            if (!keys.length) return "Choose at least one key.";
+            return macroPayloadKeyListError(keys);
+        }
+        if (type === "down" || type === "up") {
+            const keys = canonicalMacroKeySequence(root.querySelector("#macroStepKey")?.value || "");
+            if (keys.length !== 1) return "Choose exactly one key.";
+            return macroPayloadKeyListError(keys);
+        }
+        return "Choose a step type.";
     }
 
     function refreshMacroPreview(workbench) {
