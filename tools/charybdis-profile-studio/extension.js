@@ -499,6 +499,11 @@ async function handleWebviewMessage(panel, root, message) {
         case "openSource":
             await openSource(root, message.file);
             return;
+        case "applyAllChanges": {
+            await applyAllChanges(root, message);
+            await postModel(panel, root, "Applied all staged Studio changes.", { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
+            return;
+        }
         case "applyLayerChanges": {
             await applyLayerChanges(root, message.adds, message.deletes);
             await postModel(panel, root, "Applied staged layer changes.", { activeLayer: message.activeLayer, appliedLayerChanges: true });
@@ -1264,23 +1269,36 @@ async function patchLayoutKeys(root, layer, changes) {
 }
 
 async function patchLayoutKeyGroups(root, groups) {
-    const normalizedGroups = (Array.isArray(groups) ? groups : [])
-        .map((group) => ({
-            layer: normalizeExpr(group?.layer || ""),
-            changes: Array.isArray(group?.changes) ? group.changes : [],
-        }))
-        .filter((group) => group.layer && group.changes.length);
+    const normalizedGroups = normalizeLayoutKeyGroups(groups);
     if (!normalizedGroups.length) {
         return;
     }
 
     const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
     let text = await fs.readFile(keymapPath, "utf8");
+    const next = patchLayoutKeyGroupsInText(keymapPath, text, normalizedGroups);
+    if (next !== text) {
+        await writeText(keymapPath, next);
+    }
+}
+
+function normalizeLayoutKeyGroups(groups) {
+    const byLayer = new Map();
+    for (const group of Array.isArray(groups) ? groups : []) {
+        const layer = normalizeExpr(group?.layer || "");
+        const changes = Array.isArray(group?.changes) ? group.changes : [];
+        if (!layer || !changes.length) continue;
+        assertSafeIdentifier(layer, "layer");
+        byLayer.set(layer, (byLayer.get(layer) || []).concat(changes));
+    }
+    return Array.from(byLayer.entries()).map(([layer, changes]) => ({ layer, changes }));
+}
+
+function patchLayoutKeyGroupsInText(filePath, text, normalizedGroups) {
     const knownTokens = knownLayoutKeyTokens(text);
     const replacements = [];
     for (const group of normalizedGroups) {
-        assertSafeIdentifier(group.layer, "layer");
-        const context = layoutSlotContextFromText(keymapPath, text, group.layer);
+        const context = layoutSlotContextFromText(filePath, text, group.layer);
         const normalizedChanges = normalizeLayoutKeyChanges(group.changes, knownTokens);
         for (const change of normalizedChanges) {
             const token = layoutSlotToken(context, change.layoutIndex);
@@ -1292,23 +1310,67 @@ async function patchLayoutKeyGroups(root, groups) {
         }
     }
     if (!replacements.length) {
-        return;
+        return text;
     }
 
     replacements.sort((left, right) => right.start - left.start);
     for (const replacement of replacements) {
         text = replaceRange(text, replacement.start, replacement.end, replacement.value);
     }
-    await writeText(keymapPath, text);
+    return text;
 }
 
-async function applyLayerChanges(root, adds, deletes) {
-    const normalizedAdds = normalizeLayerAdds(adds);
-    const normalizedDeletes = normalizeLayerDeletes(deletes);
+async function applyAllChanges(root, message) {
+    const normalizedAdds = normalizeLayerAdds(message?.adds);
+    const normalizedDeletes = normalizeLayerDeletes(message?.deletes);
+    const layoutGroups = normalizeLayoutKeyGroups(message?.layoutGroups);
+    if (!normalizedAdds.length && !normalizedDeletes.length && !layoutGroups.length) {
+        return;
+    }
     if (!normalizedAdds.length && !normalizedDeletes.length) {
+        await patchLayoutKeyGroups(root, layoutGroups);
         return;
     }
 
+    const configPath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
+    const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
+    const rgbPath = path.join(root, RGB_RELATIVE_PATH);
+    let configText = await fs.readFile(configPath, "utf8");
+    let keymapText = await fs.readFile(keymapPath, "utf8");
+    let rgbText = await fs.readFile(rgbPath, "utf8");
+
+    validateLayerChangeRequest(normalizedAdds, normalizedDeletes, keymapText);
+
+    for (const layer of normalizedAdds) {
+        configText = insertLayerEnumEntry(configText, layer.name);
+        keymapText = insertKeymapLayerBlock(keymapText, layer.name, layer.keycodes);
+        rgbText = insertLayerColorEntry(rgbText, layer);
+    }
+
+    if (layoutGroups.length) {
+        keymapText = patchLayoutKeyGroupsInText(keymapPath, keymapText, layoutGroups);
+    }
+
+    for (const layer of normalizedDeletes) {
+        configText = removeLayerEnumEntry(configText, layer);
+        keymapText = removeKeymapLayerBlock(keymapText, layer);
+        rgbText = removeLayerColorEntry(rgbText, layer);
+        rgbText = removeLayerLedGroupRows(rgbText, layer);
+    }
+
+    for (const layer of normalizedDeletes) {
+        const remaining = remainingLayerReferences(layer, [configText, keymapText, rgbText]);
+        if (remaining.length) {
+            throw new Error(`Cannot delete ${layer}; references remain in ${remaining.join(", ")}.`);
+        }
+    }
+
+    await writeText(configPath, configText);
+    await writeText(keymapPath, keymapText);
+    await writeText(rgbPath, rgbText);
+}
+
+function validateLayerChangeRequest(normalizedAdds, normalizedDeletes, keymapText) {
     const duplicateAdd = duplicateLayerName(normalizedAdds.map((layer) => layer.name));
     if (duplicateAdd) {
         throw new Error(`Layer ${duplicateAdd} is staged more than once.`);
@@ -1318,13 +1380,6 @@ async function applyLayerChanges(root, adds, deletes) {
             throw new Error(`Layer ${layer.name} cannot be added and deleted in the same apply.`);
         }
     }
-
-    const configPath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
-    const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
-    const rgbPath = path.join(root, RGB_RELATIVE_PATH);
-    let configText = await fs.readFile(configPath, "utf8");
-    let keymapText = await fs.readFile(keymapPath, "utf8");
-    let rgbText = await fs.readFile(rgbPath, "utf8");
 
     const existingLayerNames = new Set(parseLayers(keymapText).map((layer) => layer.name));
     for (const layer of normalizedDeletes) {
@@ -1340,6 +1395,23 @@ async function applyLayerChanges(root, adds, deletes) {
             throw new Error(`Layer ${layer.name} already exists.`);
         }
     }
+}
+
+async function applyLayerChanges(root, adds, deletes) {
+    const normalizedAdds = normalizeLayerAdds(adds);
+    const normalizedDeletes = normalizeLayerDeletes(deletes);
+    if (!normalizedAdds.length && !normalizedDeletes.length) {
+        return;
+    }
+
+    const configPath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
+    const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
+    const rgbPath = path.join(root, RGB_RELATIVE_PATH);
+    let configText = await fs.readFile(configPath, "utf8");
+    let keymapText = await fs.readFile(keymapPath, "utf8");
+    let rgbText = await fs.readFile(rgbPath, "utf8");
+
+    validateLayerChangeRequest(normalizedAdds, normalizedDeletes, keymapText);
 
     for (const layer of normalizedDeletes) {
         configText = removeLayerEnumEntry(configText, layer);
@@ -4372,7 +4444,8 @@ function getStudioHtml() {
             <button id="openKeymap">Open keymap.c</button>
             <button id="openConfig">Open config.h</button>
             <button id="openRgb">Open rgb_config.c</button>
-            <button id="refresh" class="primary">Refresh</button>
+            <button id="applyAll" class="primary dirty" hidden disabled>Apply all</button>
+            <button id="reload" class="primary">Reload</button>
         </div>
     </header>
     <main id="app"></main>
@@ -4445,7 +4518,8 @@ function getClientScript() {
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
         openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
-        refresh: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
+        applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
+        reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
@@ -4837,7 +4911,10 @@ function getClientScript() {
     const keyPickerHost = document.getElementById("keyPickerHost");
     let activeTooltipTarget = undefined;
 
-    document.getElementById("refresh").addEventListener("click", () => {
+    document.getElementById("applyAll").addEventListener("click", () => {
+        applyAllStagedChanges();
+    });
+    document.getElementById("reload").addEventListener("click", () => {
         discardLocalDraftState();
         post({ type: "refresh" });
     });
@@ -6025,6 +6102,16 @@ function getClientScript() {
         };
     }
 
+    function applyAllStagedChanges() {
+        if (!hasApplyAllChanges()) return;
+        post({
+            type: "applyAllChanges",
+            ...layerStructurePayload(),
+            layoutGroups: pendingLayoutChangeGroups(),
+            activeLayer,
+        });
+    }
+
     function createTransparentLayerDraft(name) {
         return {
             name,
@@ -6511,6 +6598,27 @@ function getClientScript() {
             tab.classList.toggle("dirty", dirty);
             tab.setAttribute("aria-label", dirty ? tab.textContent.trim() + " has unsaved changes" : tab.textContent.trim());
         }
+        updateHeaderApplyAllState();
+    }
+
+    function hasApplyAllChanges() {
+        return Boolean(model && (hasPendingLayerChanges() || pendingLayoutChangeCount()));
+    }
+
+    function updateHeaderApplyAllState() {
+        const button = document.getElementById("applyAll");
+        if (!button) return;
+        const active = hasApplyAllChanges();
+        button.hidden = !active;
+        button.disabled = !active;
+        const count = model ? pendingLayoutChangeCount() : 0;
+        const layerChanges = pendingLayerAdds.length + pendingLayerDeletes.length;
+        const summary = [
+            layerChanges ? layerChanges + " layer " + (layerChanges === 1 ? "change" : "changes") : "",
+            count ? count + " layout " + (count === 1 ? "change" : "changes") : "",
+        ].filter(Boolean).join(", ");
+        button.textContent = summary ? "Apply all (" + summary + ")" : "Apply all";
+        button.setAttribute("aria-label", summary ? "Apply all staged changes: " + summary : "Apply all staged changes");
     }
 
     function dirtySnapshot(section) {

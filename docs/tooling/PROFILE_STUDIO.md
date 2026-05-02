@@ -58,14 +58,19 @@ Single layout slots only accept one keycode expression: comma-separated
 clipboard text such as `KC_L, KC_K, KC_J` is rejected, while nested QMK
 expressions such as `LT(LAYER_NAV, KC_F)` remain valid. Layout-slot rejection
 messages appear at the bottom of the Layout board beside the layout apply area.
-Staged layout edits are written to `keymap.c` only when the Layout board's
-apply button is pressed.
+Staged layout edits are written to `keymap.c` only when an apply action is
+pressed. The Layout board's apply button appears on every layer whenever any
+layer has staged layout edits, and writes all staged layout edits in one pass.
 Layer add/delete is a separate staged operation: the `+` button opens an inline
 new-layer form, the staged layer starts fully transparent, the `-` button
 stages deletion of the active non-base layer, and `Apply layer changes` is the
 only action that writes those structural changes to source. Deletes fail if
 references to the layer remain in the authored files after the owned enum,
 keymap block, layer color, and layer LED group rows are removed.
+The header `Apply all` button appears when staged layout or layer-structure
+changes exist and writes those staged changes together. New-layer key edits are
+included in the staged layer payload, so they are written with the new layer
+instead of requiring a separate layout apply.
 The Layout page also has a combo sidecar below the selected-key editor. Its
 `Pick input keys on layout` action lets the active layer board choose multiple
 physical keys as the new combo inputs, and the input field also exposes the
@@ -103,7 +108,7 @@ Numeric-only fields such as HSV hue/saturation channels, timing overrides, and
 repeat-Hz values are validated inline before the studio sends a write request;
 the extension validates the request again before patching the backing `.c`
 file.
-The header Refresh button reloads `keymap.c`, `config.h`, and `rgb_config.c` from disk and
+The header Reload button reloads `keymap.c`, `config.h`, and `rgb_config.c` from disk and
 discards uncommitted Studio edits, including dirty fields, staged layout edits,
 combo input picking, RGB group selections, picker state, and undo/redo history.
 
