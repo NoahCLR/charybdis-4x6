@@ -4994,6 +4994,7 @@ function getClientScript() {
             layoutComboSelection = [];
             layoutComboOutput = "";
             layoutComboInputs = "";
+            syncRgbLayerOwnerToActiveLayer();
             lastLayoutKeyClick = { index: undefined, time: 0 };
             render();
             resetLocalHistory();
@@ -5222,6 +5223,16 @@ function getClientScript() {
         }
         if (event.target?.name === "owner" && event.target.closest("#rgbGroupBuilder")) {
             rgbGroupOwner = event.target.value;
+            if (rgbGroupTarget === "layer" && rgbGroupOwner) {
+                activeLayer = rgbGroupOwner;
+                selectedKey = 0;
+                layoutNotice = "";
+                layoutComboPicking = false;
+                layoutComboSelection = [];
+                layoutComboOutput = "";
+                layoutComboInputs = "";
+                lastLayoutKeyClick = { index: undefined, time: 0 };
+            }
             rgbBuilderColor = undefined;
             render();
             commitLocalHistory(before);
@@ -6111,9 +6122,23 @@ function getClientScript() {
         const owners = rgbGroupOwners(rgbGroupTarget);
         if (!owners.length) {
             rgbGroupOwner = "";
+        } else if (rgbGroupTarget === "layer") {
+            if (!owners.includes(activeLayer)) {
+                activeLayer = owners[0];
+            }
+            rgbGroupOwner = activeLayer;
         } else if (!owners.includes(rgbGroupOwner)) {
-            rgbGroupOwner = rgbGroupTarget === "layer" ? activeLayer || owners[0] : owners[0];
+            rgbGroupOwner = owners[0];
         }
+    }
+
+    function syncRgbLayerOwnerToActiveLayer() {
+        if (rgbGroupTarget !== "layer") return;
+        if (!activeLayer || !rgbGroupOwners("layer").includes(activeLayer)) return;
+        if (rgbGroupOwner !== activeLayer) {
+            rgbBuilderColor = undefined;
+        }
+        rgbGroupOwner = activeLayer;
     }
 
     function post(message) {
