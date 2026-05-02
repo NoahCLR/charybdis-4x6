@@ -3000,8 +3000,23 @@ function getStudioHtml() {
         body.layout-key-dragging .layout-board-svg .svg-key {
             cursor: grabbing;
         }
-        .layout-board-svg .svg-key.drag-source {
-            opacity: 0.62;
+        .layout-board-svg .svg-key.drag-source > :not(rect:first-of-type) {
+            opacity: 0;
+        }
+        .layout-board-svg .svg-key.drag-source > rect:first-of-type {
+            fill: rgba(32, 38, 42, 0.22);
+            stroke: var(--warn);
+            stroke-dasharray: 5 4;
+            stroke-width: 2.4;
+        }
+        .layout-board-svg .svg-key.layout-drag-ghost {
+            opacity: 0.96;
+            pointer-events: none;
+            filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.42));
+        }
+        .layout-board-svg .svg-key.layout-drag-ghost rect:first-of-type {
+            stroke: var(--accent);
+            stroke-width: 3;
         }
         .layout-board-svg .svg-key.drag-target rect {
             stroke: var(--warn);
@@ -4536,6 +4551,7 @@ function getClientScript() {
             sourceIndex: Number(target.dataset.index),
             startX: event.clientX,
             startY: event.clientY,
+            startSvg: layoutSvgPoint(target.ownerSVGElement, event.clientX, event.clientY),
             dragging: false,
             targetIndex: undefined
         };
@@ -5351,8 +5367,10 @@ function getClientScript() {
             }, 250);
             document.body.classList.add("layout-key-dragging");
             layoutKeyElement(layoutDragState.sourceIndex)?.classList.add("drag-source");
+            beginLayoutKeyDragVisual(event);
         }
         event.preventDefault();
+        updateLayoutKeyDragVisual(event);
         markLayoutDragTarget(layoutKeyDropIndex(event.clientX, event.clientY));
     }
 
@@ -5378,10 +5396,48 @@ function getClientScript() {
 
     function cleanupLayoutKeyDrag() {
         document.body.classList.remove("layout-key-dragging");
+        layoutDragState?.ghost?.remove?.();
         for (const key of document.querySelectorAll(".layout-board-svg .svg-key.drag-source, .layout-board-svg .svg-key.drag-target")) {
             key.classList.remove("drag-source", "drag-target");
         }
         layoutDragState = undefined;
+    }
+
+    function beginLayoutKeyDragVisual(event) {
+        if (!layoutDragState) return;
+        const source = layoutKeyElement(layoutDragState.sourceIndex);
+        const svg = source?.ownerSVGElement;
+        if (!source || !svg) return;
+        const ghost = source.cloneNode(true);
+        ghost.classList.remove("drag-source", "drag-target", "selected", "combo-input-selected");
+        ghost.classList.add("layout-drag-ghost");
+        ghost.removeAttribute("data-action");
+        ghost.removeAttribute("tabindex");
+        ghost.setAttribute("aria-hidden", "true");
+        layoutDragState.svg = svg;
+        layoutDragState.sourceMatrix = source.transform.baseVal.consolidate()?.matrix || svg.createSVGMatrix();
+        layoutDragState.ghost = ghost;
+        svg.appendChild(ghost);
+        updateLayoutKeyDragVisual(event);
+    }
+
+    function updateLayoutKeyDragVisual(event) {
+        if (!layoutDragState?.ghost || !layoutDragState.svg || !layoutDragState.startSvg) return;
+        const point = layoutSvgPoint(layoutDragState.svg, event.clientX, event.clientY);
+        if (!point) return;
+        const dx = point.x - layoutDragState.startSvg.x;
+        const dy = point.y - layoutDragState.startSvg.y;
+        const matrix = layoutDragMatrix(layoutDragState.svg, layoutDragState.sourceMatrix, dx, dy);
+        layoutDragState.ghost.setAttribute("transform", svgMatrixAttribute(matrix));
+    }
+
+    function layoutDragMatrix(svg, sourceMatrix, dx, dy) {
+        const translation = svg.createSVGMatrix().translate(dx, dy);
+        return translation.multiply(sourceMatrix || svg.createSVGMatrix());
+    }
+
+    function svgMatrixAttribute(matrix) {
+        return "matrix(" + [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].map(svgNumber).join(" ") + ")";
     }
 
     function markLayoutDragTarget(layoutIndex) {
@@ -5398,6 +5454,15 @@ function getClientScript() {
         if (!key || key.dataset.action !== "selectKey") return undefined;
         const index = Number(key.dataset.index);
         return Number.isInteger(index) ? index : undefined;
+    }
+
+    function layoutSvgPoint(svg, clientX, clientY) {
+        const ctm = svg?.getScreenCTM?.();
+        if (!svg || !ctm) return undefined;
+        const point = svg.createSVGPoint();
+        point.x = clientX;
+        point.y = clientY;
+        return point.matrixTransform(ctm.inverse());
     }
 
     function layoutKeyElement(layoutIndex) {
