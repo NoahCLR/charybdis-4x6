@@ -6443,7 +6443,7 @@ function getClientScript() {
             tab.setAttribute("aria-label", dirty ? tab.textContent.trim() + " has unsaved changes" : tab.textContent.trim());
         }
         for (const tab of document.querySelectorAll("[data-layer-tab]")) {
-            const dirty = layerTabDirty(tab.dataset.layer || "");
+            const dirty = tab.dataset.layerDirtyScope === "layout" && layerTabDirty(tab.dataset.layer || "");
             tab.classList.toggle("dirty", dirty);
             tab.setAttribute("aria-label", dirty ? tab.textContent.trim() + " has unsaved changes" : tab.textContent.trim());
         }
@@ -6922,13 +6922,14 @@ function getClientScript() {
             "</div>";
     }
 
-    function renderLayerTabs(showLayerFlow = true) {
+    function renderLayerTabs(showLayerFlow = true, showDirty = true) {
         const layers = layersForUi();
         const deleteDisabled = !activeLayer || activeLayer === "LAYER_BASE";
         return "<div class='tabs layer-tabs'>" + layers.map((layer) => {
             const pending = pendingLayerAdd(layer.name);
-            const classes = ["tab", "layer-tab", layer.name === activeLayer ? "active" : "", pending ? "pending-add" : "", layerTabDirty(layer.name) ? "dirty" : ""].filter(Boolean).join(" ");
-            return "<button class='" + classes + "' data-action='selectLayer' data-layer-tab data-layer='" + escapeAttr(layer.name) + "'>" + escapeHtml(layer.name + (pending ? " *" : "")) + "</button>";
+            const dirty = showDirty && layerTabDirty(layer.name);
+            const classes = ["tab", "layer-tab", layer.name === activeLayer ? "active" : "", pending ? "pending-add" : "", dirty ? "dirty" : ""].filter(Boolean).join(" ");
+            return "<button class='" + classes + "' data-action='selectLayer' data-layer-tab" + (showDirty ? " data-layer-dirty-scope='layout'" : "") + " data-layer='" + escapeAttr(layer.name) + "'>" + escapeHtml(layer.name + (pending ? " *" : "")) + "</button>";
         }).join("") + (showLayerFlow ?
             "<button type='button' class='layer-tab-action' data-action='showAddLayerDraft' aria-label='Add layer'>+</button>" +
             "<button type='button' class='layer-tab-action' data-action='deleteLayerDraft'" + (deleteDisabled ? " disabled" : "") + " aria-label='Delete active layer'>-</button>" : "") +
@@ -8329,7 +8330,7 @@ function getClientScript() {
             "<div class='rgb-selected-list'><span class='rgb-led-list-label'>new row</span>" + selected + "</div>" +
             "<div class='rgb-selected-list rgb-defined-list'><span class='rgb-led-list-label'>defined</span>" + defined + "</div>" +
             "</div>" +
-            renderLayerTabs(false) +
+            renderLayerTabs(false, false) +
             renderRgbGroupBoard(layer) +
             "</div>";
     }
